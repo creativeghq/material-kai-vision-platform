@@ -31,7 +31,7 @@ const PAGE_STYLE: React.CSSProperties = {
   overflow: 'hidden',
   backgroundColor: '#ffffff',
   flexShrink: 0,
-  fontFamily: '"Roboto Slab", "Georgia", serif',
+  fontFamily: '"Open Sans", system-ui, sans-serif',
 };
 
 const BG_STYLE: React.CSSProperties = {

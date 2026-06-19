@@ -229,8 +229,9 @@ function printRunSheet(orders: DispatchQueueOrder[]) {
       </table>
     </div>`).join('');
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Dispatch run sheet — ${esc(today)}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-      body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111}
+      body{font-family:'Open Sans',Arial,Helvetica,sans-serif;margin:24px;color:#111}
       h1{font-size:18px;margin:0 0 4px} .sub{color:#666;font-size:12px;margin-bottom:16px}
       .order{border:1px solid #ccc;border-radius:6px;padding:10px 12px;margin-bottom:12px;page-break-inside:avoid}
       .ohead{font-size:14px;margin-bottom:2px} .ohead .date{float:right;color:#666;font-weight:normal}

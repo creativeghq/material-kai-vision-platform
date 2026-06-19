@@ -1052,7 +1052,7 @@ class ProjectsService {
       ? `<p style="margin:16px 0;padding:12px;background:#f5f5f5;border-left:3px solid #999;font-style:italic;">${escape(input.message)}</p>`
       : '';
     return `<!doctype html>
-<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:32px auto;padding:24px;color:#222;">
+<html><body style="font-family:'Open Sans',Arial,sans-serif;max-width:560px;margin:32px auto;padding:24px;color:#222;">
   <h2 style="margin:0 0 16px;font-weight:300;">You've been invited</h2>
   <p style="margin:0 0 12px;"><strong>${escape(input.inviterName)}</strong> invited you to view the project <strong>"${escape(input.projectName)}"</strong>.</p>
   ${messageBlock}

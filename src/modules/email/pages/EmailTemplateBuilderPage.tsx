@@ -438,7 +438,7 @@ async function addMhBlocks(editor: GrapesEditor) {
 
           el.style.cssText =
             'background:#f8f4f2;border:2px dashed #c4a0b0;border-radius:8px;' +
-            'padding:20px 24px;text-align:center;font-family:sans-serif;' +
+            "padding:20px 24px;text-align:center;font-family:'Open Sans',Arial,sans-serif;" +
             'margin:0;user-select:none;cursor:default;min-height:80px;' +
             'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;';
 

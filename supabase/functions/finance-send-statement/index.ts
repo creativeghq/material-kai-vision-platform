@@ -433,7 +433,7 @@ async function sendOneStatement(
 
   const subject = settings.statement_email_subject ?? 'Your account statement';
   const bodyText = settings.statement_email_body ?? `Please find your account statement attached. Closing balance: ${fmtMoney(closing, ledger.currency, opts.lang)}.`;
-  const html = `<div style="font-family:system-ui,sans-serif;max-width:600px;">
+  const html = `<div style="font-family:'Open Sans',Arial,sans-serif;max-width:600px;">
       <p>${party.display_name ?? ''},</p>
       <p>${String(bodyText).replace(/\n/g, '<br>')}</p>
       ${payLinksHtml}

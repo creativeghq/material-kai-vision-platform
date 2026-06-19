@@ -277,7 +277,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
       ? (ledgerSide === 'customer' ? 'Χρεωστικό υπόλοιπο (οφείλει) / owes us' : 'Πιστωτικό υπόλοιπο (οφείλουμε) / we owe')
       : (ledgerSide === 'customer' ? 'Πιστωτικό υπόλοιπο / credit' : 'Χρεωστικό υπόλοιπο / debit');
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Καρτέλα — ${party.display_name}</title>
-      <style>body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 2px}
+      <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+      <style>body{font-family:'Open Sans',Arial,Helvetica,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 2px}
       .sub{color:#555;font-size:12px;margin-bottom:4px}.id{font-size:11px;color:#444;margin-bottom:14px}
       table{width:100%;border-collapse:collapse;font-size:11px}th,td{border-bottom:1px solid #ddd;padding:4px 6px}
       th{text-align:left;background:#f1f1f4}.r{text-align:right}.g{color:#666}.b{font-weight:600}

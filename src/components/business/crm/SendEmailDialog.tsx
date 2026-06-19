@@ -156,7 +156,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       // The body comes in as plain text; convert newlines so it renders as
       // paragraphs in the email client. Anything fancier (markdown / rich text)
       // is a follow-up — keeping v1 simple.
-      const htmlBody = `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;white-space:pre-wrap">${
+      const htmlBody = `<div style="font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;white-space:pre-wrap">${
         customBody
           .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       }</div>`;

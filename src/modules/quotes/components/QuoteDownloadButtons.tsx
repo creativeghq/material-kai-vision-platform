@@ -7,7 +7,7 @@
  *
  * The hidden QuoteDocument is rendered off-screen at full resolution (4961×3508 px,
  * no zoom) so html2canvas sees the exact same pixels as the print-ready document.
- * We await document.fonts.ready before capture so Roboto Slab renders correctly.
+ * We await document.fonts.ready before capture so Open Sans renders correctly.
  */
 
 import React, { useRef, useState } from 'react';
@@ -74,7 +74,7 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
         import('jspdf'),
       ]);
 
-      // Wait for all web fonts (Roboto Slab, Open Sans) to be ready before capture
+      // Wait for web fonts (Open Sans) to be ready before capture
       await document.fonts.ready;
 
       // Also wait for all images inside the document container to finish loading

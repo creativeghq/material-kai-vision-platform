@@ -82,7 +82,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
 
   const subject = `Invoice ${number} from ${sender}`;
   const html = `
-    <div style="font-family:system-ui,Arial,sans-serif;max-width:560px;margin:auto;color:#222">
+    <div style="font-family:'Open Sans',Arial,sans-serif;max-width:560px;margin:auto;color:#222">
       <h2 style="font-weight:600">Invoice ${number}</h2>
       <p>Dear ${name || 'customer'},</p>
       <p>Please find your invoice from <strong>${sender}</strong>.</p>
