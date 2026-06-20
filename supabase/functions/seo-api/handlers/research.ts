@@ -57,11 +57,17 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
 
   // Authenticate
   const auth = await authenticate(req);
-  if (!auth.success || !auth.userId) {
+  if (!auth.success) {
     return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
   }
 
-  const userId = auth.userId;
+  // Service-role/secret callers (e.g. agent-chat sending the service key) authenticate at
+  // 'secret' level with auth.userId === null; they pass the acting user_id in the body.
+  // User-JWT callers keep auth.userId. Accept either.
+  const userId = auth.userId ?? body.user_id;
+  if (!userId) {
+    return jsonResponse({ success: false, error: 'user_id is required' }, 400);
+  }
 
   try {
 

@@ -52,11 +52,15 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   const auth = await authenticate(req);
-  if (!auth.success || !auth.userId) {
+  if (!auth.success) {
     return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
   }
 
-  const userId = auth.userId;
+  // Secret/service callers (agent-chat) auth at 'secret' level (userId null) + pass user_id in body.
+  const userId = auth.userId ?? body.user_id;
+  if (!userId) {
+    return jsonResponse({ success: false, error: 'user_id is required' }, 400);
+  }
 
   try {
 

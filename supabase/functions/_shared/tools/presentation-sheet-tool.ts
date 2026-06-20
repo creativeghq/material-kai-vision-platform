@@ -647,18 +647,18 @@ export const createPresentationSheetTool = (
     {
       name: 'generate_presentation_sheet',
       description:
-        'Create a presentation sheet attached to a moodboard. Eight sheet types: ' +
-        'material_board (selected materials, 0 credits), color_palette (extracted colors, 0), ' +
-        'concept_board (inspiration collage, 0), lighting_plan (fixture layout, 3 credits), ' +
-        'plumbing_plan (top-down plumbing fixture layout — WC/basin/bath/shower/floor drain/supply/waste/water heater — 3 credits), ' +
-        'annotated_render (render with AI-detected callouts, 3 credits), ' +
-        'elevation_render_pair (uploaded elevation + render with user dimensions, 2), ' +
-        'ffe_schedule (FF&E table from quote, 0), ' +
+        'Create a presentation sheet attached to a moodboard. Sheet types (credit cost): ' +
+        'material_board (selected materials, 1 credit), color_palette (extracted colors, 2), ' +
+        'concept_board (inspiration collage, 1), lighting_plan (fixture layout, 3), ' +
+        'plumbing_plan (top-down plumbing fixture layout — WC/basin/bath/shower/floor drain/supply/waste/water heater — 3), ' +
+        'annotated_render (render with AI-detected callouts, 4), ' +
+        'elevation_render_pair (uploaded elevation + render with user dimensions, 3), ' +
+        'ffe_schedule (FF&E table from quote, 1), ' +
         'area_breakdown (single composited board: hero render + dimensioned plan + elevation + ' +
-        'finishes + fitting columns + palette, 2 credits), full_deck (multi-page deck, 3). ' +
-        'Passive types (material_board, color_palette, concept_board, ffe_schedule, area_breakdown, full_deck) ' +
+        'finishes + fitting columns + palette, 2), full_deck (multi-page deck with cover + reorder canvas, 5). ' +
+        'Passive types (material_board, color_palette, concept_board, ffe_schedule, area_breakdown) ' +
         'generate the PDF immediately. Interactive types (lighting_plan, plumbing_plan, annotated_render, ' +
-        'elevation_render_pair) open a canvas widget for user input first. ALWAYS pass a sensible ' +
+        'elevation_render_pair, full_deck) open a canvas widget for user input first. ALWAYS pass a sensible ' +
         'initial_data payload — see the schema for each sheet_type.',
       schema: z.object({
         moodboard_id: z.string().uuid().describe('UUID of the moodboard the sheet attaches to'),

@@ -88,6 +88,26 @@ export async function authenticate(
       // misleading "Invalid JWT" errors on what is really a missing/disabled api_keys row.
       return partnerAuth;
     }
+
+    // Service-role / admin-secret on the Authorization BEARER (internal server-to-server).
+    // After the new-API-key migration the injected SUPABASE_SERVICE_ROLE_KEY is the opaque
+    // sb_secret_ key. Internal callers (MIVAA, agent-chat, other edge fns) send it as
+    // `Bearer <key>` WITHOUT an apikey header, so the apikey-secret path below misses it and
+    // they fall through to validateUserToken(getUser) → 401. Accept the service key (or the
+    // configured API_SECRET_KEY) here as full secret access — mirrors the inline
+    // `token === SUPABASE_SERVICE_ROLE_KEY` bypass already used by generate-interior-gemini /
+    // generate-catalog-pdf, and matches how the apikey-secret branch grants 'secret' level.
+    if ((supabaseServiceKey && token === supabaseServiceKey) ||
+        (supabaseSecretKey && token === supabaseSecretKey)) {
+      return {
+        success: true,
+        level: 'secret',
+        user: null,
+        userId: null,
+        error: null,
+        supabase: adminClient,
+      };
+    }
   }
 
   // Check for secret key (full admin access, bypasses RLS)

@@ -947,6 +947,7 @@ async function executeAgent(
   conversation_id?: string | null, // Supabase conversation ID for background task dispatch
   selectedToolkits?: string[] | null, // Per-turn user-selected toolkit IDs (resolved server-side to tool IDs)
   directTool?: { name: string; input: Record<string, any> } | null, // Deterministic single-tool run — skips the LLM entirely
+  userJwt?: string, // Caller's Supabase user JWT — threaded to user-scoped MIVAA/edge tools (mentions, job-research, seo-article) so they authenticate AS the user, not the opaque service key
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -1545,35 +1546,35 @@ async function executeAgent(
 
   // Mention monitoring tools (all users; module-gated + per-tool credit cost inside each tool)
   if (config.tools.includes('track_product_mentions') && createTrackProductMentionsTool) {
-    tools.push(createTrackProductMentionsTool(userId, workspaceId, undefined, onChunk));
+    tools.push(createTrackProductMentionsTool(userId, workspaceId, userJwt, onChunk));
   }
   if (config.tools.includes('get_mention_summary') && createGetMentionSummaryTool) {
-    tools.push(createGetMentionSummaryTool(userId, undefined, onChunk));
+    tools.push(createGetMentionSummaryTool(userId, userJwt, onChunk));
   }
   if (config.tools.includes('check_llm_visibility') && createCheckLlmVisibilityTool) {
-    tools.push(createCheckLlmVisibilityTool(userId, undefined, onChunk));
+    tools.push(createCheckLlmVisibilityTool(userId, userJwt, onChunk));
   }
   if (config.tools.includes('find_negative_mentions') && createFindNegativeMentionsTool) {
-    tools.push(createFindNegativeMentionsTool(userId, undefined, onChunk));
+    tools.push(createFindNegativeMentionsTool(userId, userJwt, onChunk));
   }
 
   // Job research tools (all users; module-gated; refresh runs on cron, not on demand → 0 cr per tool)
   if (config.tools.includes('track_job_search') && createTrackJobSearchTool) {
     // Thread the current conversation id through so the daily digest can chat-post
     // back into THIS thread when matches are found.
-    tools.push(createTrackJobSearchTool(userId, workspaceId, undefined, onChunk, conversation_id));
+    tools.push(createTrackJobSearchTool(userId, workspaceId, userJwt, onChunk, conversation_id));
   }
   if (config.tools.includes('list_my_job_searches') && createListMyJobSearchesTool) {
-    tools.push(createListMyJobSearchesTool(userId, undefined, onChunk));
+    tools.push(createListMyJobSearchesTool(userId, userJwt, onChunk));
   }
   if (config.tools.includes('find_jobs') && createFindJobsTool) {
-    tools.push(createFindJobsTool(userId, undefined, onChunk));
+    tools.push(createFindJobsTool(userId, userJwt, onChunk));
   }
   if (config.tools.includes('get_job_digest_preview') && createGetJobDigestPreviewTool) {
-    tools.push(createGetJobDigestPreviewTool(userId, undefined, onChunk));
+    tools.push(createGetJobDigestPreviewTool(userId, userJwt, onChunk));
   }
   if (config.tools.includes('manage_job_sites') && createManageJobSitesTool) {
-    tools.push(createManageJobSitesTool(userId, undefined, onChunk));
+    tools.push(createManageJobSitesTool(userId, userJwt, onChunk));
   }
 
   // Project Workspace tools (all users; module-gated inside each tool; 0 cr — DB-only)
@@ -2515,6 +2516,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               conversation_id, // Supabase conversation ID for background task dispatch
               selected_toolkits, // Per-turn user-selected toolkit IDs (primary toolkit-level gating)
               isDirectTool ? { name: direct_tool.name, input: direct_tool.input } : null, // Deterministic single-tool run
+              auth.level === 'user' ? (req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim() || undefined) : undefined, // user JWT for user-scoped tools
             );
             if (finalResult) {
             }
