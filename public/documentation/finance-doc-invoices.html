@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance: Invoices | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-documents.html">Documents</a> / Invoices</div>
+  <h1>Documents · Invoices</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge route">/finance/invoices/:id</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">An invoice is a sales document you raise to bill a customer. The Invoices tab is the list of every sales invoice you've raised — where you start a new one, check what's still owed, re-open a past invoice, and (when enabled) transmit each document to the tax authority. This guide covers the list view, the full step-by-step of creating an invoice in the editor, the issue-time options, and what an issued invoice changes elsewhere on the platform.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>Finance</strong> → the <strong>Invoices</strong> tab. Click <strong>New</strong> to start one, or click any row to open its detail page at <span class="badge route">/finance/invoices/:id</span>.</p>
+
+  <div class="callout tip"><p><strong>Before you issue your first invoice,</strong> set up <a href="finance-settings.html">Finance Settings</a> — your business identity, a numbering series, your income categories, and (if you transmit to the tax authority) <a href="finance-einvoicing.html">e-invoicing</a>. Those settings supply the issuer details, the legal sequential number, and the category pickers you'll use here.</p></div>
+
+  <h2>The Invoices list</h2>
+  <p><strong>What it is —</strong> the list of every sales invoice you've raised. <strong>When you'd use it —</strong> to bill a customer, to check what's still owed, or to find and re-open a past invoice. The toolbar and columns are built so you can read the state of each invoice at a glance.</p>
+
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-invoices.png" alt="Invoices tab"><figcaption>The Invoices tab.</figcaption></figure>
+
+  <h3>Toolbar</h3>
+  <ul class="feat">
+    <li><strong>New</strong> — start a new invoice in the editor (detailed below).</li>
+    <li><strong>Sync from myDATA</strong> — pulls the documents the tax authority already has on file for your business, so your own already-filed invoices appear and reconcile <em>without re-keying them</em>. It only works once you've entered your myDATA inbox credentials in <a href="finance-settings.html">Finance Settings → Documents</a>.</li>
+    <li><strong>Income category</strong> — opens the manager for the income category list used across the document lists, filters and reports. These same categories are also editable inline on a document header, so you can keep your books consistent without leaving the document you're working on. See <a href="finance-settings.html">Finance settings</a>.</li>
+    <li><strong>All categories filter</strong> — narrow the list to one income category.</li>
+    <li><strong>Search</strong> — by invoice number or customer when the history gets long.</li>
+  </ul>
+
+  <h3>Columns</h3>
+  <p>The columns let you read the state of each invoice at a glance — note the <strong>Due</strong> column (what's still outstanding) and <strong>mD</strong> (whether it has reached the tax authority):</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Number</strong></td><td>The invoice number.</td></tr>
+      <tr><td><strong>Date</strong></td><td>The issue date.</td></tr>
+      <tr><td><strong>Category</strong></td><td>The income category assigned.</td></tr>
+      <tr><td><strong>Total</strong></td><td>The gross document total.</td></tr>
+      <tr><td><strong>Due</strong></td><td>The amount still outstanding.</td></tr>
+      <tr><td><strong>Status</strong></td><td>The document status.</td></tr>
+      <tr><td><strong>mD</strong></td><td>The myDATA transmission status — whether the document has been transmitted to the tax authority (ΑΑΔΕ).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout"><p>For what the <strong>mD</strong> column means and how to fix a failed send, see <a href="finance-einvoicing.html">e-invoicing</a>.</p></div>
+
+  <h2>The invoice detail page</h2>
+  <div class="routes"><span class="badge route">/finance/invoices/:id</span></div>
+  <p><strong>What it is —</strong> the full view of a single invoice, reached by clicking any row in the Invoices tab. <strong>Why it matters —</strong> the list shows you the summary; the detail page is where you act on the document. <strong>What you can do here:</strong> see the customer, line items, taxes and totals, and the status; issue/transmit it, generate the PDF, and share a payment link so the customer can pay online.</p>
+
+  <h2>How to create an invoice</h2>
+  <p><strong>How to open it:</strong> from <strong>Finance → Invoices</strong>, click <strong>New</strong>. The same editor builds several document types — Sales invoice, Service invoice, Receipt, Delivery note — so pick the type at the top first; the rest of the form adapts to it. The sections below walk down the form in order. You only need a handful of fields for a basic invoice (Client, a line item, Category); the rest cover the compliance and delivery options Greek invoicing requires.</p>
+
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/new-invoice.png" alt="New invoice editor"><figcaption>The New Invoice editor — a full myDATA-compliant document form.</figcaption></figure>
+
+  <h3>Billed to</h3>
+  <p><strong>Why it's first —</strong> the document needs a recipient before anything else. If the customer isn't in your contacts yet, you can create them without leaving the form.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Client</strong></td><td>Search your contacts/companies, or use <strong>+ Add new client</strong> to create one on the spot.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Invoice details</h3>
+  <p><strong>Why it matters —</strong> this block carries the legal classification and the terms. The <strong>Document type (myDATA)</strong> is what tells the tax authority what kind of document this is, and the dates/terms drive when it becomes due.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Document type (myDATA)</strong></td><td>The classification code for the document, e.g. "1.1 — Sales Invoice".</td></tr>
+      <tr><td><strong>Related document</strong></td><td>Optional myDATA MARK or related invoice number.</td></tr>
+      <tr><td><strong>Date issued</strong></td><td>The issue date of the document.</td></tr>
+      <tr><td><strong>Payment terms (days)</strong></td><td>Number of days until payment is due.</td></tr>
+      <tr><td><strong>Currency</strong></td><td>The document currency, e.g. EUR.</td></tr>
+      <tr><td><strong>Default VAT %</strong></td><td>The default VAT rate applied to lines.</td></tr>
+      <tr><td><strong>Category</strong></td><td>Income type / income category for reporting.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Global line defaults</h3>
+  <p><strong>Why it's here —</strong> rather than repeat the same VAT rate or settings on every row, set them once and they apply to all lines, saving re-entry on long documents.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Global line defaults</strong></td><td>Defaults applied to all rows.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Items / services</h3>
+  <p><strong>The heart of the document —</strong> the lines that make up what you're billing. Add a blank row and type it in, or pull a priced line straight from your catalogue so you don't re-key product details. The <strong>Prices include VAT</strong> toggle tells the editor how to read the figures you enter, which changes how net/VAT/gross are calculated.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Description, Qty, Price, Disc., Unit, VAT category</strong></td><td>The per-row fields for each item or service line.</td></tr>
+      <tr><td><strong>Prices include VAT</strong></td><td>Toggle for whether the entered prices are VAT-inclusive.</td></tr>
+      <tr><td><strong>Add row / Pick from products</strong></td><td>Add a blank line, or pull a line from the catalogue.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout tip"><p><strong>Pick from products</strong> proposes a sell price using your markup rules from <a href="finance-settings.html">Finance Settings → Pricing</a> (or the General default markup) — so a catalogue cost becomes a sell price automatically.</p></div>
+
+  <h3>Taxes</h3>
+  <p><strong>When you'd use it —</strong> certain transactions carry withholding or a digital transaction fee. Leave these blank unless they apply to your case.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Withholding tax</strong></td><td>Withholding tax applied to the document.</td></tr>
+      <tr><td><strong>Digital transaction fee</strong></td><td>Digital transaction fee applied to the document.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Payment</h3>
+  <p><strong>Why it matters —</strong> the <strong>Payment method (myDATA)</strong> is part of what's transmitted to the tax authority, and the note gives the customer the practical detail (where/how to pay).</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Payment method (myDATA)</strong></td><td>The myDATA payment method, e.g. "3 — On credit".</td></tr>
+      <tr><td><strong>Payment note</strong></td><td>IBAN, card reference, "on credit", etc.</td></tr>
+      <tr><td><strong>VAT payment suspension</strong></td><td>Toggle for VAT payment suspension.</td></tr>
+      <tr><td><strong>Self-pricing</strong></td><td>Toggle for self-pricing.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Notes</h3>
+  <p><strong>When you'd use it —</strong> any free text you want printed on the document for the customer to read.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Notes</strong></td><td>Free text shown on the invoice.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>B2G — public-sector invoice</h3>
+  <p><strong>When you'd use it —</strong> turn this on only when you're selling to a public body, which has its own invoicing requirements.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>B2G — public-sector invoice</strong></td><td>Toggle for selling to public bodies.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Document &amp; delivery options (issue-time toggles)</h3>
+  <p><strong>What these do —</strong> these are the toggles that decide what happens the moment you create the document: whether it transmits, whether it moves stock, whether it's emailed, and — most importantly — whether it's issued as a legal record or saved as a draft.</p>
+  <div class="feat">
+    <ul>
+      <li><strong>Submit to myDATA on issue</strong> — transmit electronically when issued.</li>
+      <li><strong>Print online code / QR</strong>.</li>
+      <li><strong>Include in MYF report</strong>.</li>
+      <li><strong>Move stock on issue</strong> — decrement warehouse.</li>
+      <li><strong>Print terms &amp; comments</strong>.</li>
+      <li><strong>Send by email on create / Send by SMS on create</strong>.</li>
+      <li><strong>Info box (printed, ≤250 chars)</strong> — extra printed note (warranty/delivery terms).</li>
+      <li><strong>Issue now</strong> — assigns the legal number + date (otherwise saved as draft).</li>
+    </ul>
+  </div>
+  <p>When everything's right, click <strong>Preview</strong> to check the PDF, then <strong>Create invoice</strong>.</p>
+
+  <h2>"Issue now" vs. draft</h2>
+  <div class="callout warn"><p><strong>Draft vs. issued:</strong> "Issue now" assigns the official myDATA number — drafts can be edited freely; issued documents are legal records. Leave it off while you're still working on the document, and turn it on only when the document is final.</p></div>
+
+  <h2>Worked example: create &amp; issue an invoice</h2>
+  <p>The full happy path, end to end, from opening the tab to handing the customer a way to pay:</p>
+  <ol>
+    <li>Open <strong>Finance</strong> from the top navigation, then select the <strong>Invoices</strong> tab.</li>
+    <li>Start a new invoice.</li>
+    <li>Pick the customer. The VAT number is validated; for Greek customers the details can be enriched automatically from ΑΑΔΕ — this also helps avoid a rejected submission later.</li>
+    <li>Add line items — choose catalogue products or add custom lines — each with a quantity, price and VAT rate.</li>
+    <li>Assign an <strong>income category</strong> from the document header (categories are editable and can be managed inline) so the invoice lands in the right report bucket.</li>
+    <li>Review the totals (net, VAT and gross) to confirm the figures.</li>
+    <li>Issue the invoice. On issue it is transmitted to <a href="finance-einvoicing.html">ΑΑΔΕ / myDATA</a> and appears in <a href="finance-receivables-payables.html">Receivables</a>.</li>
+    <li>Generate the PDF and share a payment link with the customer.</li>
+  </ol>
+
+  <h2>What it affects elsewhere</h2>
+  <div class="callout"><p>Issued invoices flow into <a href="finance-receivables-payables.html">Receivables</a> and the <a href="finance.html">Dashboard</a> automatically, and (when enabled) transmit to <a href="finance-einvoicing.html">ΑΑΔΕ / myDATA</a> on issue. Nothing here is a dead end — every issued invoice moves a balance or a report.</p></div>
+
+  <p>See also: <a href="finance-einvoicing.html">e-invoicing</a> and <a href="finance-settings.html">Finance settings</a>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

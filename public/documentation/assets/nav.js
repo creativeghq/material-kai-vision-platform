@@ -34,7 +34,13 @@
       ]},
       { file: "finance.html", title: "Finance & Invoicing", icon: "💶", children: [
         { file: "finance-receivables-payables.html", title: "Receivables & Payables" },
-        { file: "finance-documents.html", title: "Documents" },
+        { file: "finance-documents.html", title: "Documents", children: [
+          { file: "finance-doc-invoices.html", title: "Invoices" },
+          { file: "finance-doc-receipts.html", title: "Receipts" },
+          { file: "finance-doc-credit-notes.html", title: "Credit notes" },
+          { file: "finance-doc-expenses.html", title: "Expenses" },
+          { file: "finance-doc-delivery-notes.html", title: "Delivery notes" },
+        ]},
         { file: "finance-einvoicing.html", title: "Greek e-invoicing" },
         { file: "finance-operations.html", title: "Operations & Reports" },
         { file: "finance-settings.html", title: "Settings", children: [
