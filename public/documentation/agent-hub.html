@@ -11,66 +11,87 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Agent Hub</div>
   <h1>Agent Hub (JARVIS)</h1>
   <div class="routes"><span class="badge route">/agent-hub</span></div>
-  <p class="lead">The conversational AI workspace at the centre of the platform. Ask in plain language and the assistant searches, creates, and automates across every module — returning rich, interactive results inline in the chat.</p>
+  <p class="lead">The Agent Hub is the conversational AI workspace at the centre of the platform. Instead of clicking through menus, you describe what you want in plain language and the assistant searches, creates and automates across every module — returning rich, interactive results inline in the chat. This guide teaches each part: starting a conversation, choosing an agent, using the composer, and turning the results into real artefacts you can keep.</p>
 
   <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Agent Hub</strong>.</p></div>
 
-  <h2>Step by step: ask the assistant for materials</h2>
-  <ol>
-    <li>Open <strong>Agent Hub</strong> from the top navigation.</li>
-    <li>Click <strong>New Conversation</strong> to start a fresh thread.</li>
-    <li>Pick an <a href="agent-agents.html">agent</a> above the composer — <strong>JARVIS</strong> is the default; choose <strong>Interior</strong> for design work, or <strong>Demo</strong> to try it out.</li>
-    <li>Type your request in plain language (for example, “find 5 cement-based grey tiles for a modern bathroom”). Optionally attach a room photo, or paste a web page via the <strong>inspiration-URL</strong> globe button to match its palette, materials and style.</li>
-    <li>Send the message.</li>
-    <li>Review the result cards as they stream into the thread — products, the search spec, and images.</li>
-    <li>Open a product, save it to a <a href="moodboards.html">moodboard</a>, or keep refining in the same thread — the assistant retains the conversation's context.</li>
-  </ol>
-  <div class="callout tip"><p><strong>Tip:</strong> type <code>/</code> in the composer to open the tools menu and run a specific tool directly. More tools can be enabled from the toolkit panel — see <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p></div>
+  <div class="callout tip"><p><strong>The fastest path to value.</strong> Almost everything below starts the same way: open the Hub, pick an agent, type what you want. You rarely need to know which tool does the job — describe the outcome and the assistant chooses. Read on to understand each capability and what it produces.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/agent-picker.png" alt="Agent Hub welcome screen with agent selector and composer">
     <figcaption>The Agent Hub: agent selector (JARVIS / Interior / Demo), conversation history, and a composer with attachments, voice, inspiration-URL and a “/” tools menu.</figcaption>
   </figure>
 
-  <h2>What this page is for</h2>
-  <p>Instead of clicking through menus, you describe what you want — “find 5 cement-based grey tiles for a modern bathroom”, “stage this empty room”, “track the price of this product”, “build a material board from these images” — and the assistant uses the platform's tools to do it. It is the single fastest way to get value from MaterialsHub.</p>
+  <!-- 1 -->
+  <h2>1. Starting a conversation</h2>
+  <p><strong>What it is —</strong> a conversation is a single chat thread with the assistant. Each thread remembers everything said in it, so you can keep refining a request without repeating yourself. <strong>Why it matters —</strong> context is what makes the assistant feel like an expert colleague rather than a one-shot search box: ask a follow-up like “now make them all darker” and it knows which products you mean.</p>
+  <h3>How to start one</h3>
+  <ol>
+    <li>Open <strong>Agent Hub</strong> from the top navigation.</li>
+    <li>Click <strong>New Conversation</strong> to begin a fresh thread.</li>
+    <li>Pick an <a href="agent-agents.html">agent</a> above the composer (see step 2).</li>
+    <li>Type your request in plain language and send it.</li>
+    <li>To return to earlier work, reopen any past conversation from the list on the left — it picks up exactly where you left off.</li>
+  </ol>
+  <p>The <strong>conversation list</strong> on the left holds every chat you've had, with a <em>Search conversations…</em> box to find old ones. Each item can be <strong>renamed</strong> or <strong>deleted</strong>, and shows the topic and tools it used so you can spot the right thread at a glance.</p>
+  <p><strong>What it affects elsewhere:</strong> start a <strong>new conversation</strong> for a new topic so contexts don't bleed into each other; keep one thread going when you're iterating on the same task.</p>
 
-  <h2>Layout</h2>
+  <!-- 2 -->
+  <h2>2. Choosing an agent</h2>
+  <p><strong>What it is —</strong> the agent selector sits directly above the composer and lets you pick which assistant handles the conversation. <strong>Why it matters —</strong> the agents share the same chat surface and tools but differ in focus, so picking the right one shapes the assistant's framing and default behaviour for that thread.</p>
   <ul class="feat">
-    <li><strong>Conversation list</strong> (left) — every chat you've had, each with a <em>Search conversations…</em> box. Items can be <strong>renamed</strong> or <strong>deleted</strong>, and show the topic/tools they used.</li>
-    <li><strong>Agent selector</strong> (above the composer) — switch between the available <a href="agent-agents.html">AI agents</a>: <strong>JARVIS</strong>, <strong>Interior</strong> (Interior Designer) and <strong>Demo</strong>.</li>
-    <li><strong>Composer</strong> — type a message; the toolbar adds attachments, documents, voice input, an inspiration-URL analyser, and a tools menu. <strong>Shift+Enter</strong> inserts a new line.</li>
-    <li><strong>Chat panel</strong> — the active conversation, where results render as interactive cards (products, images, search specs, price/mention data, sheets, and more).</li>
+    <li><strong>JARVIS</strong> — the default, general-purpose assistant. The right choice for almost everything.</li>
+    <li><strong>Interior</strong> — the Interior Designer agent, tuned for spatial and aesthetic design work.</li>
+    <li><strong>Demo</strong> — a lightweight assistant for quickly trying out the chat experience.</li>
   </ul>
+  <p>You can start different conversations with different agents. For a full breakdown of each agent and exactly when to use it, see <a href="agent-agents.html">AI Agents</a>.</p>
+  <div class="callout tip"><p><strong>Tip:</strong> not sure which to pick? Start with <strong>JARVIS</strong>, and switch to <strong>Interior</strong> when the task is about how a space should look and feel.</p></div>
 
-  <h2>The composer &amp; the “/” tools menu</h2>
-  <p>Type <code>/</code> in the message box to launch a workflow or invoke a specific tool directly, rather than relying on the assistant to choose. The composer toolbar exposes the most-used actions:</p>
-  <ul class="feat">
-    <li><strong>📎 Attach</strong> — add images (e.g. a room photo or material sample) for the assistant to analyse.</li>
-    <li><strong>📄 Document</strong> — attach a document for context.</li>
-    <li><strong>🎤 Voice</strong> — dictate your message.</li>
-    <li><strong>🌐 Inspiration URL</strong> — paste a web page; the assistant extracts its palette, materials and style and finds matching products.</li>
-    <li><strong>Core / + Toolkit</strong> — the assistant's available tool set; the toolkit expands as your plan/role unlocks more.</li>
-  </ul>
-  <p>The full catalogue of what the assistant can do is documented in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p>
-
-  <h2>An open conversation</h2>
+  <!-- 3 -->
+  <h2>3. The composer</h2>
+  <p><strong>What it is —</strong> the message box and its toolbar, where you write requests and attach context. <strong>Why it matters —</strong> the toolbar is how you give the assistant more than words — a room photo, a document, your voice, or a web page to learn a style from — which makes its answers far more precise.</p>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/conversation.png" alt="An open Agent Hub conversation">
     <figcaption>Results stream into the thread as interactive cards you can click, save or act on.</figcaption>
   </figure>
-
-  <h2>Using it — a typical session</h2>
+  <h3>What the toolbar offers</h3>
+  <ul class="feat">
+    <li><strong>📎 Attach</strong> — add images (e.g. a room photo or material sample) for the assistant to analyse.</li>
+    <li><strong>📄 Document</strong> — attach a document for context.</li>
+    <li><strong>🎤 Voice</strong> — dictate your message instead of typing.</li>
+    <li><strong>🌐 Inspiration URL</strong> — paste a web page; the assistant extracts its palette, materials and style and finds matching products.</li>
+    <li><strong>Core / + Toolkit</strong> — the assistant's available tool set; the toolkit expands as your plan/role unlocks more.</li>
+  </ul>
+  <h3>How to write a good request</h3>
   <ol>
-    <li>Pick an agent (default is JARVIS) and type a request, optionally attaching images.</li>
-    <li>Watch results stream in as cards; open a product, save it to a <a href="moodboards.html">moodboard</a>, or continue refining.</li>
-    <li>Chain follow-ups in the same thread — the assistant keeps the context of the conversation.</li>
-    <li>Start a <strong>new conversation</strong> for a new topic, or reopen any past one to continue.</li>
+    <li>Describe the outcome in plain language — for example, <em>“find 5 cement-based grey tiles for a modern bathroom”</em>.</li>
+    <li>Add context where it helps: attach a room photo, attach a document, or paste a web page via the <strong>inspiration-URL</strong> globe button to match its palette, materials and style.</li>
+    <li>Use <strong>Shift+Enter</strong> to insert a new line within a message; press <strong>Enter</strong> to send.</li>
+  </ol>
+  <h3>The “/” tools menu</h3>
+  <p>Type <code>/</code> in the message box to open the tools menu and launch a workflow or invoke a specific tool <em>directly</em>, rather than relying on the assistant to choose. This is useful when you know exactly which capability you want. More tools can be enabled from the toolkit panel.</p>
+  <p><strong>What it affects elsewhere:</strong> the full catalogue of what the assistant can do — and how to enable additional toolkits — is documented in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p>
+
+  <!-- 4 -->
+  <h2>4. Reading the results</h2>
+  <p><strong>What it is —</strong> the chat panel is the active conversation, where the assistant's answers render as interactive cards rather than plain text. <strong>Why it matters —</strong> cards are clickable and actionable: products you can open, images you can save, a search spec you can refine, price/mention data, sheets, and more.</p>
+  <h3>How to work through them</h3>
+  <ol>
+    <li>Send your message and watch the result cards stream into the thread — products, the search spec, images, and other rich output.</li>
+    <li>Open a product to inspect it, save it to a <a href="moodboards.html">moodboard</a>, or act on it directly from the card.</li>
+    <li>Chain follow-ups in the same thread to refine — the assistant keeps the context of the conversation.</li>
   </ol>
 
+  <!-- 5 -->
+  <h2>5. Turning results into real artefacts</h2>
+  <p><strong>What it is —</strong> many chat actions don't just display in the thread — they create real objects that live in their own module. <strong>Why it matters —</strong> a moodboard sheet, a tracked price/mention subject, or a generated image you make in chat is findable later outside the conversation, so the chat becomes a way to <em>do</em> work, not just talk about it.</p>
+  <ul class="feat">
+    <li>A generated image or a chat product can be promoted into a <a href="moodboards.html">moodboard</a> (a copy is kept so it survives even if the chat is deleted).</li>
+    <li>A presentation sheet you produce attaches to a moodboard and appears in that module.</li>
+    <li>A price or mention you ask the assistant to track becomes a tracked subject in the relevant monitoring module.</li>
+  </ul>
   <div class="callout"><p><strong>Credits:</strong> chatting and searching are inexpensive; explicit generation actions (images, presentation sheets, scans, 3D/VR) consume credits, and the assistant tells you the cost when an action is metered. See <a href="account.html">Account &amp; Billing</a>.</p></div>
-
-  <div class="callout tip"><p><strong>Where results go:</strong> many actions create real artefacts — a moodboard sheet, a tracked price/mention subject, a generated image — that also appear in their own module so you can find them later outside the chat.</p></div>
+  <div class="callout tip"><p><strong>Where results go:</strong> because actions create real artefacts that also appear in their own module, treat the Agent Hub as the front door to the whole platform — start here, and find the finished work in Moodboards, Projects, Finance and the monitoring modules later.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

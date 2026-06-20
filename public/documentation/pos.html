@@ -11,9 +11,9 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Point of Sale</div>
   <h1>Point of Sale</h1>
   <div class="routes"><span class="badge route">/pos</span> <span class="badge gated">invoice.issue</span></div>
-  <p class="lead">A counter checkout for issuing receipts and invoices on the spot — search for items, build a sale on a numeric keypad, and finalise the document in one tap. It's part of the <a href="finance.html">Finance</a> suite and reuses the same invoicing, payment and e-invoicing machinery.</p>
+  <p class="lead">Point of Sale is the counter checkout for issuing receipts and invoices on the spot — search for an item, build the sale on a numeric keypad, and finalise the document in one tap. It is part of the <a href="finance.html">Finance</a> suite and reuses the same invoicing, payment and e-invoicing machinery, so everything you ring up here becomes a real financial document. This guide walks every part of the screen — opening a shift, the two views, each keypad key, choosing a document type, issuing to myDATA, and where prices come from — explaining what it is, why it matters, exactly how to use it, and what it changes elsewhere.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> open <strong>Point of Sale</strong> at <span class="badge route">/pos</span> (part of the Finance suite; requires the invoice-issuing capability).</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> open <strong>Point of Sale</strong> at <span class="badge route">/pos</span> (part of the Finance suite; requires the invoice-issuing capability). Everything you issue here appears in your <a href="finance-documents.html">Finance documents</a> and feeds the rest of the back office automatically.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/pos.png" alt="Point of Sale">
@@ -21,11 +21,12 @@
   </figure>
 
   <h2>What this page is for</h2>
-  <p>Point of Sale is for in-person sales at a counter. You open a shift, search for products and services, build a basket, set the VAT rate, and press <strong>ISSUE</strong> to produce the document there and then. It's designed to be fast: a single keypad-driven screen with everything a cashier needs, including cash, card and IRIS payments, an on-screen receipt, and printing.</p>
-  <div class="callout"><p>POS sits inside the Finance suite and is gated by the invoice-issuing capability. Everything you issue here becomes a real financial document — it appears in your <a href="finance-documents.html">Finance documents</a> and feeds the rest of the back office automatically.</p></div>
+  <p><strong>What it is —</strong> a fast, in-person checkout. You open a shift, search for products and services, build a basket, set the VAT rate, and press <strong>ISSUE</strong> to produce the document there and then. It is a single keypad-driven screen with everything a cashier needs, including cash, card and IRIS payments, an on-screen receipt, and printing.</p>
+  <p><strong>Why it matters —</strong> POS sits inside the Finance suite and is gated by the invoice-issuing capability. It is not a separate till that you reconcile later: every sale you complete here is a genuine, numbered financial document the moment you press ISSUE, so the till and your books are always the same thing.</p>
+  <div class="callout"><p>Everything you issue here becomes a real financial document — it appears in your <a href="finance-documents.html">Finance documents</a> and feeds the rest of the back office (revenue, reporting, myDATA) automatically.</p></div>
 
   <h2>Layout &amp; controls</h2>
-  <p>The screen is split into two panels. On larger screens you see both at once; on a phone you switch between <strong>Register</strong> and <strong>Products</strong> using the tabs at the top.</p>
+  <p><strong>What it is —</strong> the screen is split into two panels. On larger screens you see both at once; on a phone you switch between <strong>Register</strong> and <strong>Products</strong> using the tabs at the top. <strong>Why it matters —</strong> knowing where each control lives is what makes a sale a few taps instead of a hunt.</p>
   <ul class="feat">
     <li><strong>Shift bar</strong> (top) — shows whether a shift is open. When none is open, an <strong>Open shift</strong> button appears and issuing is blocked. While a shift is open you can record <em>cash in</em> / <em>cash out</em>, view an <em>X report</em> (a live read of the shift so far), and <em>Close (Z)</em> to end the shift.</li>
     <li><strong>Product &amp; service search</strong> (right panel) — the <em>“Search products &amp; services…”</em> box filters your priced catalogue. Tap any tile to add it to the sale; each tile shows whether it's a good or a service and its price.</li>
@@ -35,13 +36,24 @@
     <li><strong>ISSUE</strong> — the large action key. It opens a short confirmation (payment method and a few options), then finalises the sale and produces the document.</li>
   </ul>
 
+  <h2>Opening a shift</h2>
+  <p><strong>What it is —</strong> the act of starting the register for the day. The shift bar at the top shows an <strong>Open shift</strong> button whenever no shift is running; clicking it asks for the opening cash float (how much money is already in the drawer).</p>
+  <p><strong>Why it matters —</strong> until a shift is open, <strong>issuing is blocked</strong> — you'll see <em>“No open shift — receipts are blocked until a shift is opened”</em>. A shift is what every sale, every cash movement and every payment is recorded against, so the platform can later tell you exactly what happened during that session and reconcile the cash drawer. Without an open shift there is nothing to attach a receipt to, which is why it has to come first.</p>
+  <h3>How to open a shift</h3>
+  <ol>
+    <li>Open <span class="badge route">/pos</span> from the <a href="finance.html">Finance</a> suite.</li>
+    <li>Click <strong>Open shift</strong> in the shift bar.</li>
+    <li>Enter the <strong>opening cash float</strong> (the cash already in the drawer) and confirm.</li>
+  </ol>
+  <p><strong>What it affects:</strong> it unblocks the <strong>ISSUE</strong> key, and it seeds the figure that the X report and the closing Z report reconcile against (expected cash = opening float + cash sales + cash in − cash out).</p>
+
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/pos-open-shift.png" alt="POS requires an open shift"><figcaption>Before a shift is open, receipts are blocked — use “Open shift” to start the register.</figcaption></figure>
 
   <h2>The register in detail</h2>
   <p>The register is the heart of POS. It has two views and a single keypad that drives the whole sale. Understanding the two views, the document type, and what each keypad key does makes issuing fast and predictable.</p>
 
   <h3>Register vs Products</h3>
-  <p>The screen has two views — on a phone you switch between them with the tabs at the top; on a wider screen you see both side by side.</p>
+  <p><strong>What it is —</strong> the screen has two views. On a phone you switch between them with the tabs at the top; on a wider screen you see both side by side. <strong>Why it matters —</strong> the two views are a build/pick split: one is the receipt you are finalising, the other is the catalogue you pick from. Knowing which is which means you don't lose the basket while you search.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>View</th><th>What it's for</th></tr></thead>
@@ -51,12 +63,14 @@
     </tbody>
   </table>
   </div>
+  <p><strong>What it affects:</strong> tapping a tile in <strong>Products</strong> adds a line to the receipt held in <strong>Register</strong> — the two views share one in-progress sale.</p>
 
   <h3>Document type</h3>
-  <p>A button at the top of the register chooses what kind of document you're about to issue — for example a <strong>Receipt</strong>. The chosen type determines how the issued document is classified and how it's reported to the tax authority.</p>
+  <p><strong>What it is —</strong> a button at the top of the register that chooses what kind of document you're about to issue — for example a <strong>Receipt</strong>. <strong>Why it matters —</strong> the chosen type determines how the issued document is classified and how it's reported to the tax authority, so picking the right one is what keeps the document legally correct. <strong>How:</strong> tap the document-type button and select the type before you press ISSUE.</p>
+  <p><strong>What it affects:</strong> the document's classification, its numbering series, and the way it is described when transmitted to <a href="finance-einvoicing.html">myDATA</a>.</p>
 
   <h3>The keypad keys</h3>
-  <p>Every amount, quantity and rate on the receipt is entered through the keypad. Each key has a specific job:</p>
+  <p><strong>What it is —</strong> every amount, quantity and rate on the receipt is entered through the keypad. <strong>Why it matters —</strong> each key has a specific job; once you know them, the whole sale is muscle memory.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Key</th><th>What it does</th></tr></thead>
@@ -70,14 +84,16 @@
     </tbody>
   </table>
   </div>
+  <p><strong>What it affects:</strong> the keypad writes directly into the transaction list — quantities, line prices and the VAT% on each line — which in turn drives the totals and VAT analysis on the issued document.</p>
 
-  <h3>Items only appear if they're priced</h3>
-  <p>The Products view only shows items that have a price set for the register. If something is missing, it simply hasn't been priced yet.</p>
+  <h3>Where prices come from (items only appear if they're priced)</h3>
+  <p><strong>What it is —</strong> the Products view only shows items that have a price set for the register. <strong>Why it matters —</strong> a tile with no price has no amount to ring up, so POS deliberately hides it; if something is missing, it simply hasn't been priced yet. Pricing each item is therefore the prerequisite for it being sellable at the till. <strong>How:</strong> set the price in the right place for each kind of item:</p>
   <ul class="feat">
     <li><strong>Products (goods)</strong> — set their price in <a href="materials.html">Materials</a>.</li>
     <li><strong>Services</strong> — set their price in <a href="finance-settings.html">Finance &rarr; Settings &rarr; Services</a>.</li>
     <li><strong>Free amount</strong> — even with nothing priced, you can punch a free amount straight on the keypad and issue it as a one-off line.</li>
   </ul>
+  <p><strong>What it affects:</strong> which tiles appear in the Products view and what price they propose on the receipt. The same priced catalogue also feeds the public <a href="finance-settings.html">Online Store</a>.</p>
   <div class="callout"><p>Once a receipt is issued it transmits to <a href="finance-einvoicing.html">myDATA</a>, just like any other financial document.</p></div>
 
   <h2>Step by step: issue a receipt</h2>
@@ -93,15 +109,17 @@
   <div class="callout tip"><p>At the end of the day, <strong>close the shift</strong> (Close / Z) to finalise the register and produce the Z report.</p></div>
 
   <h2>Using the keypad</h2>
-  <p>The keypad does more than enter quantities:</p>
+  <p><strong>What it is —</strong> the keypad does more than enter quantities; it can override prices and create lines on its own. <strong>Why it matters —</strong> these shortcuts cover the awkward cases — a one-off discount, a quick free-price sale — without leaving the register.</p>
   <ul class="feat">
     <li><strong>Type an amount, then tap a product</strong> — the typed amount overrides that product's price for this sale.</li>
     <li><strong>Type a number, then ×</strong> — sets the quantity for the next item you add.</li>
     <li><strong>Punch a free amount with no product</strong> — pressing ISSUE on a typed amount creates a single free-price line, handy for a quick one-off sale.</li>
     <li><strong>VAT-rate button</strong> — tap to cycle the VAT rate applied to the lines you add.</li>
   </ul>
+  <p><strong>What it affects:</strong> an override or free-price entry changes the line totals on the receipt only — it does not change the underlying catalogue price in Materials or Services.</p>
 
   <h2>Typical flow</h2>
+  <p><strong>What it is —</strong> the everyday cashier rhythm from opening the register to handing over the receipt. <strong>Why it matters —</strong> following the same order keeps cash, VAT and the customer record consistent across every sale of the day.</p>
   <ol>
     <li><strong>Open a shift</strong> at the start of the day (you'll be asked for the opening cash float). Receipts can't be issued until a shift is open.</li>
     <li><strong>Search &amp; add items</strong> — type in the search box and tap products/services, or punch a free amount on the keypad.</li>
@@ -112,7 +130,7 @@
   </ol>
 
   <h2>Payments</h2>
-  <p>At the issue step you pick how the customer is paying:</p>
+  <p><strong>What it is —</strong> at the issue step you pick how the customer is paying. <strong>Why it matters —</strong> the method decides whether the sale finalises instantly or waits on a terminal, and it determines how the takings are split on the X and Z reports.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Method</th><th>What happens</th></tr></thead>
@@ -123,13 +141,15 @@
     </tbody>
   </table>
   </div>
+  <p><strong>What it affects:</strong> the payment-method breakdown on the X and Z reports, and the expected-cash figure the drawer is reconciled against at close.</p>
   <div class="callout tip"><p>When card or IRIS is settled on a registered terminal, the register may hold the receipt while you charge the device, then confirm to complete it. Cash sales finalise straight away.</p></div>
 
   <h2>Closing the shift (X &amp; Z reports)</h2>
-  <p>The shift bar gives you an <strong>X report</strong> — a snapshot of the shift while it's still open (receipt count, total sales, a breakdown by payment method and by VAT rate, opening float, cash movements and expected cash). When you're done, <strong>Close (Z)</strong> asks for the counted cash in the drawer and produces the final, numbered Z report, including any cash variance. Both reports can be printed.</p>
+  <p><strong>What it is —</strong> the two shift reports. The <strong>X report</strong> is a snapshot of the shift while it's still open (receipt count, total sales, a breakdown by payment method and by VAT rate, opening float, cash movements and expected cash). <strong>Close (Z)</strong> ends the shift: it asks for the counted cash in the drawer and produces the final, numbered Z report, including any cash variance. <strong>Why it matters —</strong> the X report lets you check yourself mid-day without ending the session, and the Z report is the formal close-out that proves the day's takings and surfaces any discrepancy between counted and expected cash. <strong>How:</strong> tap <strong>X report</strong> to read the live snapshot, or <strong>Close (Z)</strong> at end of day and enter the counted cash. Both reports can be printed.</p>
+  <p><strong>What it affects:</strong> closing a shift returns the register to the “no open shift” state — issuing is blocked again until you open the next shift.</p>
 
   <h2>Where issued documents go</h2>
-  <p>Each receipt or invoice you issue is a normal financial document: it carries its number, totals and VAT analysis, and (where transmitted) its myDATA reference and authenticity QR. From there it flows into the rest of Finance — it shows up in your document lists and contributes to your revenue and reporting.</p>
+  <p><strong>What it is —</strong> each receipt or invoice you issue is a normal financial document: it carries its number, totals and VAT analysis, and (where transmitted) its myDATA reference and authenticity QR. <strong>Why it matters —</strong> because POS issues real documents rather than a separate till tape, every sale automatically flows into the rest of Finance — it shows up in your document lists and contributes to your revenue and reporting with no extra step.</p>
   <ul class="feat">
     <li>Browse and manage what you've issued in <a href="finance-documents.html">Finance &rarr; Documents</a>.</li>
     <li>See the tax-authority side of issuing in <a href="finance-einvoicing.html">Greek e-invoicing</a>.</li>

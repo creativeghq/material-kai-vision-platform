@@ -10,70 +10,83 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="agent-hub.html">Agent Hub</a> / Tools &amp; Capabilities</div>
   <h1>Tools &amp; Capabilities</h1>
-  <p class="lead">Everything the AI assistant can do for you. Ask in plain language, or type <code>/</code> to invoke a tool directly. Results appear as interactive cards in the chat and, where relevant, as real artefacts in their module.</p>
+  <p class="lead">Everything the AI assistant can do for you. This guide explains the toolkit model — how tools are loaded — and then teaches each capability group: what it is, why it matters, how to use it, and what it produces elsewhere. Ask in plain language, or type <code>/</code> to invoke a tool directly; results appear as interactive cards in the chat and, where relevant, as real artefacts in their module.</p>
 
   <div class="callout"><p>This page is a catalogue. You rarely need to name a tool — describe the outcome you want and the assistant picks the right one. Tools marked with a credit cost only charge when you confirm the action.</p></div>
 
-  <h2>Toolkits</h2>
-  <p>Tools are grouped into <strong>toolkits</strong>. A <strong>Core</strong> toolkit is always loaded — the knowledge base, catalogue and visual essentials (around four tools) — and the assistant can load additional toolkits mid-conversation when a task needs them. For example, a <strong>Projects</strong> toolkit and a suite of SEO research toolkits (SEO Research, SEO Domain Intel, SEO Backlinks, SEO Content &amp; Tech, SEO Multi-Engine + Niche, SEO Composite Audits). Some toolkits are restricted to admin/owner roles. You can open the toolkit panel from the composer to see what's active and enable more.</p>
+  <!-- toolkit model -->
+  <h2>The toolkit model: Core + loadable toolkits</h2>
+  <p><strong>What it is —</strong> tools are grouped into <strong>toolkits</strong>. A <strong>Core</strong> toolkit is always loaded — the knowledge base, catalogue and visual essentials (around four tools) — and the assistant can load additional toolkits mid-conversation when a task needs them. <strong>Why it matters —</strong> keeping only Core loaded by default keeps the assistant fast and focused, while letting it reach deeper capabilities exactly when the work calls for them.</p>
+  <p>Examples of additional toolkits include a <strong>Projects</strong> toolkit and a suite of SEO research toolkits (SEO Research, SEO Domain Intel, SEO Backlinks, SEO Content &amp; Tech, SEO Multi-Engine + Niche, SEO Composite Audits). Some toolkits are restricted to admin/owner roles.</p>
+  <h3>How to manage toolkits</h3>
+  <ol>
+    <li>Open the <strong>toolkit panel</strong> from the composer to see what's currently active.</li>
+    <li>Enable additional toolkits there when you need them — or simply describe a task and let the assistant load the right toolkit on its own.</li>
+  </ol>
+  <p><strong>What it affects elsewhere:</strong> the toolkit you see may be larger or smaller than another user's, because access depends on your role and plan.</p>
 
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/toolkit.png" alt="Agent toolkits panel"><figcaption>The toolkit panel — Core is always loaded; more can be enabled per conversation.</figcaption></figure>
 
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/toolkit-clusters.png" alt="Available agent toolkits"><figcaption>Available toolkits, including a Projects toolkit and the SEO research suite (admin-only toolkits are gated).</figcaption></figure>
 
+  <!-- group: search -->
   <h2>Search &amp; discovery</h2>
 
   <h3>Material &amp; product search</h3>
-  <p>The assistant runs the platform's multi-signal search (text + visual + an AI “understanding” of each item + colour/texture/style/material characteristics) to find materials and products by what they are and what they look like. Ask things like “matte black porcelain tiles, large format” or “something like travertine but darker”.</p>
+  <p><strong>What it is —</strong> the platform's multi-signal search (text + visual + an AI “understanding” of each item + colour/texture/style/material characteristics) to find materials and products by what they are and what they look like. <strong>Why it matters —</strong> it finds the right item even when you can't name it precisely, matching on appearance and meaning, not just keywords. <strong>How:</strong> ask things like <em>“matte black porcelain tiles, large format”</em> or <em>“something like travertine but darker”</em>. <strong>Affects:</strong> results render as product cards you can open, save to a moodboard, or refine further in the same thread.</p>
 
   <h3>Explainable search spec</h3>
-  <p>When it searches, the assistant can show a <strong>Search Spec</strong> card above the results — the colours (with swatches), materials, styles and specifications it used — so you understand <em>why</em> items matched and can refine precisely.</p>
+  <p><strong>What it is —</strong> a <strong>Search Spec</strong> card the assistant can show above the results — the colours (with swatches), materials, styles and specifications it used. <strong>Why it matters —</strong> it tells you <em>why</em> items matched, so you can trust the results and refine precisely. <strong>How:</strong> it appears automatically alongside a search; read it, then adjust your request to tighten the match. <strong>Affects:</strong> the same search results, made transparent and tunable.</p>
 
   <h3>Inspiration from a URL</h3>
-  <p>Paste any web page (a product page, a blog, a Pinterest pin) via the composer's 🌐 button. The assistant scrapes it, extracts the design tokens — colour palette with hex codes, materials, textures, style, room type — and runs a visual search to suggest matching catalogue products. Renders as an <strong>Inspiration</strong> card with the palette and hero image.</p>
+  <p><strong>What it is —</strong> paste any web page (a product page, a blog, a Pinterest pin) and the assistant turns it into a search. <strong>Why it matters —</strong> it lets a real-world reference drive your catalogue search instead of you having to describe the look in words. <strong>How:</strong> use the composer's 🌐 button to paste the URL; the assistant scrapes it, extracts the design tokens — colour palette with hex codes, materials, textures, style, room type — and runs a visual search for matching catalogue products. <strong>Affects:</strong> renders as an <strong>Inspiration</strong> card with the palette and hero image, plus the matched products.</p>
 
   <h3>Web &amp; manufacturer search</h3>
-  <p>For questions that go beyond your catalogue, the assistant can search the web and find manufacturers/suppliers, returning summarised, sourced results.</p>
+  <p><strong>What it is —</strong> search beyond your own catalogue. <strong>Why it matters —</strong> some questions need the wider web or a manufacturer/supplier you don't yet stock. <strong>How:</strong> ask a question that goes beyond your catalogue and the assistant searches the web and finds manufacturers/suppliers. <strong>Affects:</strong> returns summarised, sourced results in the chat.</p>
 
+  <!-- group: create -->
   <h2>Create &amp; visualise</h2>
 
   <h3>Image generation &amp; editing</h3>
-  <p>Generate new visuals or restyle existing ones (e.g. re-render a room in a different style). Generated images can be saved to a moodboard or used in deliverables.</p>
+  <p><strong>What it is —</strong> generate new visuals or restyle existing ones (e.g. re-render a room in a different style). <strong>Why it matters —</strong> it produces imagery on demand for concepts and deliverables. <strong>How:</strong> describe the image you want, or ask the assistant to edit one already in the thread. <strong>Affects:</strong> generated images can be saved to a moodboard or used in deliverables. (Metered — the assistant tells you the cost.)</p>
 
   <h3>Virtual staging (before / after)</h3>
-  <p>Turn an empty or dated room into a staged scene. Results open in a <strong>before/after slider</strong> so you can compare the source and the staged image, and you can run an <em>“Analyze Quality”</em> pass that scores lighting, perspective, scale, materials and edge-blending.</p>
+  <p><strong>What it is —</strong> turn an empty or dated room into a staged scene. <strong>Why it matters —</strong> it shows a space's potential without a real photoshoot. <strong>How:</strong> provide the room image and ask to stage it; results open in a <strong>before/after slider</strong> so you can compare source and staged image, and you can run an <em>“Analyze Quality”</em> pass. <strong>Affects:</strong> the quality pass scores lighting, perspective, scale, materials and edge-blending so you can judge the result.</p>
 
   <h3>Presentation sheets</h3>
-  <p>Produce client-ready A3 sheets attached to a <a href="moodboards.html">moodboard</a> — material boards, colour palettes, concept boards, lighting plans, annotated renders, elevation/render pairs, FF&amp;E schedules, area breakdowns, and full decks. Interactive sheet types open an in-chat canvas so you can place symbols, draw dimensions or position callouts before rendering the PDF.</p>
+  <p><strong>What it is —</strong> client-ready A3 sheets attached to a <a href="moodboards.html">moodboard</a> — material boards, colour palettes, concept boards, lighting plans, annotated renders, elevation/render pairs, FF&amp;E schedules, area breakdowns, and full decks. <strong>Why it matters —</strong> it produces polished deliverables straight from your work in chat. <strong>How:</strong> ask for the sheet type you want; interactive sheet types open an in-chat canvas so you can place symbols, draw dimensions or position callouts before rendering the PDF. <strong>Affects:</strong> the finished sheet attaches to the moodboard and appears in that module.</p>
 
   <h3>3D &amp; VR worlds</h3>
-  <p>Generate an explorable 3D world (Gaussian-splat “Marble” world) from an image, which can be embedded into a project's <a href="projects.html">Client View</a> for an immersive walkthrough.</p>
+  <p><strong>What it is —</strong> generate an explorable 3D world (Gaussian-splat “Marble” world) from an image. <strong>Why it matters —</strong> it offers an immersive walkthrough that a flat image can't. <strong>How:</strong> provide an image and ask the assistant to generate the world. <strong>Affects:</strong> the world can be embedded into a project's <a href="projects.html">Client View</a> for an immersive walkthrough.</p>
 
   <h3>AR &amp; lighting preview</h3>
-  <p>Materials can be previewed in <strong>augmented reality</strong> (view a swatch in your space, with a QR hand-off from desktop) and under different <strong>lighting</strong> conditions (daylight, golden hour, showroom spots, evening, night), so you can judge how a finish reads in context.</p>
+  <p><strong>What it is —</strong> preview materials in <strong>augmented reality</strong> and under different <strong>lighting</strong> conditions. <strong>Why it matters —</strong> it shows how a finish actually reads in a real space and across the day. <strong>How:</strong> view a swatch in your space (with a QR hand-off from desktop), and switch lighting conditions — daylight, golden hour, showroom spots, evening, night. <strong>Affects:</strong> helps you judge how a finish reads in context before committing.</p>
 
+  <!-- group: monitor -->
   <h2>Monitor &amp; research</h2>
 
   <h3>Price monitoring</h3>
-  <p>Track a product's price across retailers. The assistant discovers where it's sold, verifies live prices, and keeps watching on an adaptive schedule. You get min/median/max, a price history, and alerts on price drops, new retailers and promotions. (Try a free one-shot version under <a href="tools.html">Free Tools → Price scan</a>.)</p>
+  <p><strong>What it is —</strong> track a product's price across retailers. <strong>Why it matters —</strong> it keeps you informed of where an item sells and how its price moves, automatically. <strong>How:</strong> ask the assistant to track a product; it discovers where it's sold, verifies live prices, and keeps watching on an adaptive schedule. <strong>Affects:</strong> you get min/median/max, a price history, and alerts on price drops, new retailers and promotions. (Try a free one-shot version under <a href="tools.html">Free Tools → Price scan</a>.)</p>
 
   <h3>Mention monitoring</h3>
-  <p>Track where a brand or product is talked about across news, blogs, RSS and YouTube — with sentiment, top outlets, and spike/negative-sentiment/new-outlet alerts. It also measures <strong>LLM visibility</strong>: whether (and how favourably) AI assistants recommend the subject, and which competitors get co-mentioned. (Free taster: <a href="tools.html">Free Tools → Mention scan</a>.)</p>
+  <p><strong>What it is —</strong> track where a brand or product is talked about across news, blogs, RSS and YouTube. <strong>Why it matters —</strong> it surfaces reputation signals and competitive context you'd otherwise miss. <strong>How:</strong> ask the assistant to monitor a subject; it gathers mentions with sentiment, top outlets, and spike/negative-sentiment/new-outlet alerts. <strong>Affects:</strong> it also measures <strong>LLM visibility</strong> — whether (and how favourably) AI assistants recommend the subject, and which competitors get co-mentioned. (Free taster: <a href="tools.html">Free Tools → Mention scan</a>.)</p>
 
   <h3>Job research</h3>
-  <p>Set up a recurring job-discovery search across multiple sources with AI keyword expansion and relevance filtering. Findings post back into your conversation and arrive as one consolidated daily (or weekly) digest. Manage cadence, sources and exclusions all from chat.</p>
+  <p><strong>What it is —</strong> a recurring job-discovery search across multiple sources with AI keyword expansion and relevance filtering. <strong>Why it matters —</strong> it automates ongoing discovery instead of repeated manual searching. <strong>How:</strong> set it up from chat — manage cadence, sources and exclusions all in the conversation. <strong>Affects:</strong> findings post back into your conversation and arrive as one consolidated daily (or weekly) digest.</p>
 
+  <!-- group: content -->
   <h2>Content &amp; utilities</h2>
 
   <h3>Catalogue &amp; document translation</h3>
-  <p>Ask the assistant to translate an uploaded source PDF/catalogue into another language for a branded output.</p>
+  <p><strong>What it is —</strong> translate an uploaded source PDF/catalogue into another language for a branded output. <strong>Why it matters —</strong> it makes your catalogue usable for clients in other languages without re-authoring it. <strong>How:</strong> ask the assistant to translate the uploaded source. <strong>Affects:</strong> produces a branded output in the target language.</p>
 
   <h3>Content generation</h3>
-  <p>Draft product descriptions, summaries and other copy grounded in your catalogue data.</p>
+  <p><strong>What it is —</strong> draft product descriptions, summaries and other copy. <strong>Why it matters —</strong> it speeds up writing while staying accurate to your data. <strong>How:</strong> ask for the copy you need. <strong>Affects:</strong> the output is grounded in your catalogue data.</p>
 
   <h3>Save to moodboard</h3>
-  <p>Any image or product surfaced in chat can be promoted into a <a href="moodboards.html">moodboard</a> (a copy is kept so it survives even if the chat is deleted).</p>
+  <p><strong>What it is —</strong> promote any image or product surfaced in chat into a <a href="moodboards.html">moodboard</a>. <strong>Why it matters —</strong> it preserves the work outside the conversation. <strong>How:</strong> save the item from its card. <strong>Affects:</strong> a copy is kept, so it survives even if the chat is deleted.</p>
 
+  <!-- invoking -->
   <h2>Invoking tools</h2>
   <ul class="feat">
     <li><strong>Natural language</strong> — just describe the outcome; the assistant chooses the tool.</li>

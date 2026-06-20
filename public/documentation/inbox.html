@@ -11,9 +11,11 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Inbox</div>
   <h1>Inbox</h1>
   <div class="routes"><span class="badge route">/inbox</span> <span class="badge gated">inbox.use</span></div>
-  <p class="lead">One place for every conversation — internal team chats, customer threads, and WhatsApp messages — organised, searchable, and assigned to the right person.</p>
+  <p class="lead">The Inbox is one place for every conversation your team relies on — internal chats between colleagues, customer threads, and WhatsApp messages — organised, searchable, and assigned to the right person. This guide walks every part of it: what each control is, why it matters, exactly how to use it, and what it changes elsewhere in the platform.</p>
 
   <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Inbox</strong>.</p></div>
+
+  <div class="callout tip"><p><strong>Recommended reading order</strong> (each part builds on the last): the <strong>filters &amp; All-workspaces controls</strong> → <strong>starting an internal conversation</strong> → <strong>WhatsApp</strong> (connecting a number, assign-on-reply, templates &amp; the 24-hour window) → <strong>sharing a public thread</strong>. The first parts work the moment you have access; WhatsApp needs a connected number.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/inbox.png" alt="The Inbox showing the conversation list, search box, and All / Internal / WhatsApp filters">
@@ -21,37 +23,68 @@
   </figure>
 
   <h2>What this page is for</h2>
-  <p>The Inbox brings together the conversations your team relies on so they don't end up scattered across separate apps. In a single view you can follow internal discussions between colleagues, talk to customers, and read and reply to WhatsApp messages. It is <strong>multi-tenant aware</strong>: by default it shows the conversations for the workspace you're working in, and — where you're permitted — it can show conversations across all the workspaces you belong to.</p>
+  <p><strong>What it is —</strong> a single view that brings together the conversations your team relies on so they don't end up scattered across separate apps: internal discussions between colleagues, customer threads, and WhatsApp messages you can read and reply to. <strong>Why it matters —</strong> when conversations live in one searchable, assigned place, nothing falls through the cracks and the right person always picks up the right thread. The Inbox is <strong>multi-tenant aware</strong>: by default it shows the conversations for the workspace you're working in, and — where you're permitted — it can show conversations across all the workspaces you belong to.</p>
 
-  <h2>Layout &amp; controls</h2>
-  <p>The left side is the conversation list; selecting a conversation opens it on the right, where you read the message history and reply. The header gives you everything you need to find and start conversations:</p>
+  <h2>Layout &amp; the header controls</h2>
+  <p><strong>What it is —</strong> the conversation list on the left and the open conversation on the right; the header holds everything you need to find and start conversations. Selecting a conversation opens it on the right, where you read the message history and reply. <strong>Why it matters —</strong> these controls are how you cut a long list down to exactly the thread you need, and how you decide whether you're looking at one workspace or all of them.</p>
   <ul class="feat">
     <li><strong>Conversation list with count</strong> — every conversation you can see, with the total shown so you know how many are in the current view.</li>
     <li><strong>Search conversations</strong> — a search box to filter the list by what you're looking for.</li>
-    <li><strong>Filters: All / Internal / WhatsApp</strong> — narrow the list to everything, to internal team threads only, or to WhatsApp threads only.</li>
+    <li><strong>Filters: All / Internal / WhatsApp</strong> — narrow the list to everything, to internal team threads only, or to WhatsApp threads only. <em>All</em> is the default catch-all; <em>Internal</em> isolates colleague-to-colleague threads; <em>WhatsApp</em> isolates customer threads on a connected number.</li>
     <li><strong>All workspaces</strong> — a toggle to switch between a single workspace and a combined view across the workspaces you're allowed to see. If you only belong to one workspace, this has no effect.</li>
     <li><strong>New conversation</strong> — start a fresh thread.</li>
   </ul>
+  <p><strong>What it affects:</strong> the filters and search only change what's shown to you — they don't move or hide anything for teammates. The <strong>All workspaces</strong> toggle changes the scope of the whole list, so a thread you can't find in one workspace may simply be in another.</p>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/new-conversation.png" alt="New internal conversation dialog"><figcaption>Starting a new internal conversation.</figcaption></figure>
 
-  <h2>Conversation types</h2>
+  <div class="callout tip"><p><strong>Tip —</strong> reach for the <strong>filters</strong> first and the <strong>search</strong> second: filtering to WhatsApp (or Internal) shortens the list before you type, so the search has less to wade through.</p></div>
+
+  <h2>The three conversation types</h2>
+  <p><strong>What it is —</strong> every thread in the Inbox is one of three kinds. <strong>Why it matters —</strong> knowing the type tells you who can see it and how to reach the other party.</p>
   <div class="cards">
     <div class="card"><div class="ico">👥</div><h3>Internal</h3><p>Discussions between members of your team — questions, hand-offs, and notes that stay inside the workspace.</p></div>
     <div class="card"><div class="ico">💬</div><h3>WhatsApp</h3><p>Messages exchanged with customers over a connected WhatsApp number, read and answered in the Inbox.</p></div>
     <div class="card"><div class="ico">🔗</div><h3>Customer / shared</h3><p>Threads opened to an outside party through a link, so they can take part without creating an account.</p></div>
   </div>
 
+  <h2>Starting an internal conversation</h2>
+  <p><strong>What it is —</strong> a private thread between members of your team that stays inside the workspace. <strong>Why it matters —</strong> it keeps questions, hand-offs and notes alongside your customer and WhatsApp threads instead of in a separate chat app, so context isn't lost.</p>
+  <h3>How to start one</h3>
+  <ol>
+    <li>Open the <span class="badge route">/inbox</span> and click <strong>New conversation</strong> — this opens the <em>New internal conversation</em> dialog.</li>
+    <li>Give the conversation a <strong>subject</strong> so colleagues can recognise it in the list.</li>
+    <li>Pick the <strong>participants</strong> — the team members who should take part.</li>
+    <li>Send your <strong>first message</strong> to start the thread; it appears in the conversation list under the <strong>Internal</strong> filter.</li>
+  </ol>
+  <p><strong>What it affects:</strong> the new thread shows up for the participants you chose, under the <strong>Internal</strong> filter, in this workspace.</p>
+
   <h2>WhatsApp conversations</h2>
-  <p>When your workspace has a WhatsApp number connected, its conversations appear here alongside everything else.</p>
+  <p><strong>What it is —</strong> customer messages on a connected WhatsApp number, read and answered without leaving the Inbox. When your workspace has a WhatsApp number connected, its conversations appear here alongside everything else. <strong>Why it matters —</strong> customers increasingly expect to reach a business on WhatsApp, and handling those threads in the same place as the rest of your conversations means replies are fast and nothing is missed.</p>
   <ul class="feat">
     <li><strong>Connected numbers show up automatically</strong> — once a number is set up, its threads flow into the Inbox without any extra step.</li>
-    <li><strong>Customer replies become conversations</strong> — when a customer messages or replies, a conversation is created (or updated) and <strong>assigned to the right owner</strong> so the correct person picks it up.</li>
+    <li><strong>Customer replies become conversations</strong> — when a customer messages or replies, a conversation is created (or updated) and <strong>assigned to the right owner</strong> so the correct person picks it up. This is the <em>assign-on-reply</em> behaviour: you don't have to manually route an incoming message; it lands with the person responsible.</li>
     <li><strong>Outbound &amp; marketing sends use approved templates</strong> — to start or re-open a conversation outside the active reply window, WhatsApp requires a pre-approved message template. Day-to-day replies inside the 24-hour window can be free-form; messages sent outside that window must use one of the approved templates.</li>
+  </ul>
+
+  <h3>Why marketing sends need an approved template and a 24-hour window</h3>
+  <p>WhatsApp draws a clear line between <em>answering a customer who contacted you</em> and <em>reaching out to a customer first</em>. The rule exists to protect people from unsolicited business messages:</p>
+  <ul class="feat">
+    <li><strong>Inside the 24-hour window</strong> — the customer has messaged you recently, so they're expecting a conversation. You can reply <strong>free-form</strong>: any text, in your own words, for 24 hours after their last message.</li>
+    <li><strong>Outside the 24-hour window</strong> — the conversation has gone quiet, so a new message from you is effectively an unsolicited approach. WhatsApp only allows it if the wording was <strong>reviewed and approved in advance</strong> as a template. This is what stops the channel becoming a spam firehose, and it's why a marketing or "just checking in" send always has to go through an approved template — there's no recent customer message to open a free-form window.</li>
   </ul>
   <div class="callout warn"><p>WhatsApp's <strong>24-hour window</strong> rule is set by WhatsApp, not by MaterialsHub. Inside 24&nbsp;hours of the customer's last message you can reply freely; after that, you can only reach out using an approved template. The Inbox follows these rules for you.</p></div>
 
-  <h2>Customer &amp; public threads</h2>
-  <p>A conversation can be opened up to someone outside your team. When a thread is shared, the platform creates a <strong>token link</strong> (<span class="badge route">/i/:token</span> <span class="badge public">Public</span>) that the outside party can open in a browser to read and reply — no MaterialsHub account required. This is the same approach used for other shared customer-facing pages, so the experience is familiar to recipients.</p>
+  <h3>How to handle a WhatsApp reply</h3>
+  <ol>
+    <li>Open the <strong>WhatsApp</strong> filter to narrow the list to WhatsApp threads only.</li>
+    <li>Open the incoming conversation — on the customer's first reply it is created (or updated) and <strong>assigned to the right owner</strong>, so it lands with the correct person.</li>
+    <li><strong>Reply from the Inbox.</strong> Inside the 24-hour window you can reply free-form; outside it, outbound marketing sends use an approved template.</li>
+    <li>Optionally <strong>share a public thread link</strong> (<span class="badge route">/i/:token</span>) so an outside party can take part without a MaterialsHub account — see <a href="public-pages.html">Public &amp; Shared Pages</a>.</li>
+  </ol>
+  <p><strong>What it affects:</strong> connecting a number makes its threads appear under the <strong>WhatsApp</strong> filter; incoming replies are assigned automatically, and whether a send goes free-form or via template depends entirely on the 24-hour window above.</p>
+
+  <h2>Sharing a customer / public thread</h2>
+  <p><strong>What it is —</strong> a way to open a conversation up to someone outside your team. When a thread is shared, the platform creates a <strong>token link</strong> (<span class="badge route">/i/:token</span> <span class="badge public">Public</span>) that the outside party can open in a browser to read and reply — no MaterialsHub account required. <strong>Why it matters —</strong> it lets a customer, supplier or contractor take part in the exact thread you're already working in, instead of starting a separate email chain. This is the same approach used for other shared customer-facing pages, so the experience is familiar to recipients.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Surface</th><th>Who uses it</th><th>Access</th></tr></thead>
@@ -61,25 +94,10 @@
     </tbody>
   </table>
   </div>
-  <p>For more about customer-facing links and how they're shared and revoked, see <a href="public-pages.html">Public &amp; Shared Pages</a>.</p>
-
-  <h2>Step by step: start an internal conversation</h2>
-  <ol>
-    <li>Open the <span class="badge route">/inbox</span> and click <strong>New conversation</strong> — this opens the <em>New internal conversation</em> dialog.</li>
-    <li>Give the conversation a <strong>subject</strong> so colleagues can recognise it in the list.</li>
-    <li>Pick the <strong>participants</strong> — the team members who should take part.</li>
-    <li>Send your <strong>first message</strong> to start the thread; it appears in the conversation list under the <strong>Internal</strong> filter.</li>
-  </ol>
-
-  <h2>Step by step: handle a WhatsApp reply</h2>
-  <ol>
-    <li>Open the <strong>WhatsApp</strong> filter to narrow the list to WhatsApp threads only.</li>
-    <li>Open the incoming conversation — on the customer's first reply it is created (or updated) and <strong>assigned to the right owner</strong>, so it lands with the correct person.</li>
-    <li><strong>Reply from the Inbox.</strong> Inside the 24-hour window you can reply free-form; outside it, outbound marketing sends use an approved template.</li>
-    <li>Optionally <strong>share a public thread link</strong> (<span class="badge route">/i/:token</span>) so an outside party can take part without a MaterialsHub account — see <a href="public-pages.html">Public &amp; Shared Pages</a>.</li>
-  </ol>
+  <p><strong>What it affects:</strong> anyone holding the link can read and reply to that one thread — so treat it like any shared customer-facing link. For more about how these links are shared and revoked, see <a href="public-pages.html">Public &amp; Shared Pages</a>.</p>
 
   <h2>A typical workflow</h2>
+  <p>Putting the parts together, a normal day in the Inbox looks like this:</p>
   <ol>
     <li>Open <span class="badge route">/inbox</span> and use the filters or search to find the conversation you need.</li>
     <li>Pick a thread to read its history; reply directly — internal note, customer message, or WhatsApp.</li>
