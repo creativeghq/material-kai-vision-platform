@@ -252,21 +252,21 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
           <CardTitle className="text-sm flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {topProducts.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">No purchase history yet for this customer.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-xs text-muted-foreground">
-                <tr className="border-b border-border/60">
-                  <th className="px-4 py-2 text-left">Product</th>
-                  <th className="px-4 py-2 text-right">Qty bought</th>
-                  <th className="px-4 py-2 text-right">Revenue</th>
-                  <th className="px-4 py-2 text-right">Orders</th>
-                  <th className="px-4 py-2 text-right">Last ordered</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topProducts.map((p) => (
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground">
+              <tr className="border-b border-border/60">
+                <th className="px-4 py-2 text-left">Product</th>
+                <th className="px-4 py-2 text-right">Qty bought</th>
+                <th className="px-4 py-2 text-right">Revenue</th>
+                <th className="px-4 py-2 text-right">Orders</th>
+                <th className="px-4 py-2 text-right">Last ordered</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topProducts.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No purchase history yet for this customer.</td></tr>
+              ) : (
+                topProducts.map((p) => (
                   <tr key={p.product_id} className="border-b border-border/30 hover:bg-muted/30">
                     <td className="px-4 py-2">
                       <div className="font-medium">{p.description || 'Product'}</div>
@@ -277,10 +277,10 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
                     <td className="px-4 py-2 text-right tabular-nums">{p.order_count}</td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? new Date(p.last_ordered).toLocaleDateString() : '—'}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                ))
+              )}
+            </tbody>
+          </table>
         </CardContent>
       </Card>
     </div>
@@ -315,23 +315,23 @@ export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId }) =>
         <CardTitle className="text-sm">Quotes ({rows.length})</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        {loading ? (
-          <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>
-        ) : rows.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">No quotes for this customer.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground">
-              <tr className="border-b border-border/60">
-                <th className="px-4 py-2 text-left">Quote</th>
-                <th className="px-4 py-2 text-left">Status</th>
-                <th className="px-4 py-2 text-right">Total</th>
-                <th className="px-4 py-2 text-right">Created</th>
-                <th className="px-4 py-2 text-right" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((q) => (
+        <table className="w-full text-sm">
+          <thead className="text-xs text-muted-foreground">
+            <tr className="border-b border-border/60">
+              <th className="px-4 py-2 text-left">Quote</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-right">Total</th>
+              <th className="px-4 py-2 text-right">Created</th>
+              <th className="px-4 py-2 text-right" />
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No quotes for this customer.</td></tr>
+            ) : (
+              rows.map((q) => (
                 <tr key={q.id} className="border-b border-border/30 hover:bg-muted/30">
                   <td className="px-4 py-2 font-medium">{q.quote_number ?? q.name ?? q.id.slice(0, 8)}</td>
                   <td className="px-4 py-2"><Badge variant="outline">{q.status}</Badge></td>
@@ -341,10 +341,10 @@ export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId }) =>
                     <Link to={`/quotes/${q.id}`}><Button size="sm" variant="ghost"><ArrowUpRight className="h-3 w-3" /></Button></Link>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </CardContent>
     </Card>
   );
@@ -372,25 +372,25 @@ export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId }) 
         <CardTitle className="text-sm">Invoices ({rows.length})</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        {loading ? (
-          <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>
-        ) : rows.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">No invoices for this customer.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground">
-              <tr className="border-b border-border/60">
-                <th className="px-4 py-2 text-left">Number</th>
-                <th className="px-4 py-2 text-left">Status</th>
-                <th className="px-4 py-2 text-right">Total</th>
-                <th className="px-4 py-2 text-right">Paid</th>
-                <th className="px-4 py-2 text-right">Due</th>
-                <th className="px-4 py-2 text-right">Due date</th>
-                <th className="px-4 py-2 text-right" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((i) => (
+        <table className="w-full text-sm">
+          <thead className="text-xs text-muted-foreground">
+            <tr className="border-b border-border/60">
+              <th className="px-4 py-2 text-left">Number</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-right">Total</th>
+              <th className="px-4 py-2 text-right">Paid</th>
+              <th className="px-4 py-2 text-right">Due</th>
+              <th className="px-4 py-2 text-right">Due date</th>
+              <th className="px-4 py-2 text-right" />
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={7} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">No invoices for this customer.</td></tr>
+            ) : (
+              rows.map((i) => (
                 <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30">
                   <td className="px-4 py-2 font-mono text-xs">{i.internal_number}</td>
                   <td className="px-4 py-2">
@@ -404,10 +404,10 @@ export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId }) 
                     <Link to={`/finance/invoices/${i.id}`}><Button size="sm" variant="ghost"><ArrowUpRight className="h-3 w-3" /></Button></Link>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </CardContent>
     </Card>
   );
@@ -436,23 +436,23 @@ export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId }) 
         <CardTitle className="text-sm">Payments received ({rows.length})</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        {loading ? (
-          <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>
-        ) : rows.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">No payments recorded from this customer.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground">
-              <tr className="border-b border-border/60">
-                <th className="px-4 py-2 text-left">Paid on</th>
-                <th className="px-4 py-2 text-left">Method</th>
-                <th className="px-4 py-2 text-left">Reference</th>
-                <th className="px-4 py-2 text-right">Amount</th>
-                <th className="px-4 py-2 text-left">Allocated to</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
+        <table className="w-full text-sm">
+          <thead className="text-xs text-muted-foreground">
+            <tr className="border-b border-border/60">
+              <th className="px-4 py-2 text-left">Paid on</th>
+              <th className="px-4 py-2 text-left">Method</th>
+              <th className="px-4 py-2 text-left">Reference</th>
+              <th className="px-4 py-2 text-right">Amount</th>
+              <th className="px-4 py-2 text-left">Allocated to</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No payments recorded from this customer.</td></tr>
+            ) : (
+              rows.map((p) => (
                 <tr key={p.id} className="border-b border-border/30">
                   <td className="px-4 py-2">{new Date(p.paid_at).toLocaleDateString()}</td>
                   <td className="px-4 py-2">{p.method ?? '—'}</td>
@@ -478,10 +478,10 @@ export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId }) 
                     }
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </CardContent>
     </Card>
   );

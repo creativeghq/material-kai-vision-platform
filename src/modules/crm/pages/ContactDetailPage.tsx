@@ -500,22 +500,28 @@ export const ContactDetailPage: React.FC = () => {
               <FileText className="h-4 w-4 mr-2" />
               Notes & Activity
             </TabsTrigger>
-            <TabsTrigger value="account">
-              <Wallet className="h-4 w-4 mr-2" />
-              Account
-            </TabsTrigger>
-            <TabsTrigger value="quotes">
-              <ScrollText className="h-4 w-4 mr-2" />
-              Quotes
-            </TabsTrigger>
-            <TabsTrigger value="invoices">
-              <Receipt className="h-4 w-4 mr-2" />
-              Invoices
-            </TabsTrigger>
-            <TabsTrigger value="payments">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Payments
-            </TabsTrigger>
+            {/* Finance tabs need a saved contact to query against — hide them
+                while creating a new contact (nothing exists to show yet). */}
+            {!isNew && (
+              <>
+                <TabsTrigger value="account">
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Account
+                </TabsTrigger>
+                <TabsTrigger value="quotes">
+                  <ScrollText className="h-4 w-4 mr-2" />
+                  Quotes
+                </TabsTrigger>
+                <TabsTrigger value="invoices">
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Invoices
+                </TabsTrigger>
+                <TabsTrigger value="payments">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Payments
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           {/* Overview Tab */}

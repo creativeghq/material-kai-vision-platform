@@ -530,22 +530,28 @@ export const CompanyDetailPage: React.FC = () => {
               <Search className="h-4 w-4 mr-2"/>
               SEO
             </TabsTrigger>
-            <TabsTrigger value="account">
-              <Wallet className="h-4 w-4 mr-2"/>
-              Account
-            </TabsTrigger>
-            <TabsTrigger value="quotes">
-              <ScrollText className="h-4 w-4 mr-2"/>
-              Quotes
-            </TabsTrigger>
-            <TabsTrigger value="invoices">
-              <Receipt className="h-4 w-4 mr-2"/>
-              Invoices
-            </TabsTrigger>
-            <TabsTrigger value="payments">
-              <CreditCard className="h-4 w-4 mr-2"/>
-              Payments
-            </TabsTrigger>
+            {/* Finance tabs need a saved company to query against — hide them
+                while creating a new company (nothing exists to show yet). */}
+            {!isNew && (
+              <>
+                <TabsTrigger value="account">
+                  <Wallet className="h-4 w-4 mr-2"/>
+                  Account
+                </TabsTrigger>
+                <TabsTrigger value="quotes">
+                  <ScrollText className="h-4 w-4 mr-2"/>
+                  Quotes
+                </TabsTrigger>
+                <TabsTrigger value="invoices">
+                  <Receipt className="h-4 w-4 mr-2"/>
+                  Invoices
+                </TabsTrigger>
+                <TabsTrigger value="payments">
+                  <CreditCard className="h-4 w-4 mr-2"/>
+                  Payments
+                </TabsTrigger>
+              </>
+            )}
             {company.is_supplier && (
               <TabsTrigger value="products">
                 <Package className="h-4 w-4 mr-2"/>
