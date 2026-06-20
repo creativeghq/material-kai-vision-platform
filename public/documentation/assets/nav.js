@@ -66,6 +66,7 @@
           { file: "finance-op-time-billing.html", title: "Time & billing" },
           { file: "finance-op-reports.html", title: "Reports" },
           { file: "finance-op-marketplace.html", title: "Marketplace" },
+          { file: "finance-op-expense-cards.html", title: "Expense cards" },
         ]},
         { file: "finance-settings.html", title: "Settings", children: [
           { file: "finance-settings-general.html", title: "General" },
