@@ -1610,6 +1610,13 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                   WebkitMaskSize: '100% 100%',
                   maskImage: `url(data:image/png;base64,${activeMask})`,
                   maskSize: '100% 100%',
+                  // SAM masks are fully-opaque PNGs (alpha=255 everywhere) that
+                  // encode the selected zone in LUMINANCE (white=zone, black=rest).
+                  // Without luminance mode, CSS masking defaults to the alpha
+                  // channel → the whole image tints violet instead of just the zone.
+                  maskMode: 'luminance',
+                  // Older WebKit uses a differently-named property (not in csstype).
+                  ['WebkitMaskSourceType' as string]: 'luminance',
                   backgroundColor: 'rgba(124, 58, 237, 0.55)',
                 }}
               />
