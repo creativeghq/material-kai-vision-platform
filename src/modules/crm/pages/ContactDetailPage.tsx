@@ -49,6 +49,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { financeService } from '@/modules/finance/services/financeService';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 interface Contact {
   id: string;
@@ -77,6 +80,7 @@ interface Contact {
   discount_percent?: number | null;
   discount_notes?: string | null;
   credit_limit?: number | null;
+  user_level_key?: string | null; // #227 — pricing level
   is_supplier?: boolean | null;
   is_client?: boolean | null;
   contact_type?: string | null;
@@ -113,6 +117,8 @@ export const ContactDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+  const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -225,11 +231,33 @@ export const ContactDetailPage: React.FC = () => {
         // Navigate to the new contact's page
         navigate(`/admin/crm/contacts/${response.data.id}`, { replace: true });
       } else {
-        // Update existing contact
-        await contactsAPI.updateContact(id!, contact);
+        // #227 — route customer discount/level through the approval RPC (sales → pending,
+        // others → applied); strip them from the generic update so the handler never
+        // applies them directly (bypassing approval).
+        const { user_level_key, discount_percent, ...rest } = contact as any;
+        await contactsAPI.updateContact(id!, rest);
+        let pricingPending = false;
+        try {
+          const res = await financeService.proposeOrApplyCustomerPricing({
+            subjectType: 'contact', subjectId: id!,
+            userLevelKey: contact.user_level_key ?? null,
+            discountPercent: contact.discount_percent ?? null,
+          });
+          pricingPending = res.status === 'pending';
+          if (pricingPending) {
+            flowEventService.emit('pricing_change_requested', {
+              workspace_id: activeWorkspaceId, request_id: res.request_id,
+              subject_type: 'contact', subject_id: id!,
+              title: 'Discount change needs approval',
+              body: 'A sales team member proposed a customer discount/level change.',
+            });
+          }
+        } catch (e: any) {
+          toast({ title: 'Pricing change failed', description: e?.message, variant: 'destructive' });
+        }
         toast({
-          title: 'Success',
-          description: 'Contact updated successfully',
+          title: pricingPending ? 'Saved — discount change sent for approval' : 'Success',
+          description: pricingPending ? undefined : 'Contact updated successfully',
         });
         setEditing(false);
         await loadContact();
@@ -250,6 +278,14 @@ export const ContactDetailPage: React.FC = () => {
     if (!contact) return;
     setContact({ ...contact, [field]: value });
   };
+
+  // #227 — load this workspace's pricing levels for the customer-level dropdown.
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    financeService.listUserLevels(activeWorkspaceId)
+      .then((rows) => setPricingLevels(rows.map((r) => ({ level_key: r.level_key, label: r.label }))))
+      .catch(() => { /* non-fatal — dropdown just shows Standard */ });
+  }, [activeWorkspaceId]);
 
   /**
    * Inline patch for fields that should save on change without entering the
@@ -845,9 +881,27 @@ export const ContactDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="user_level_key">Pricing level</Label>
+                  <Select
+                    value={contact.user_level_key ?? '__default__'}
+                    onValueChange={(v) => updateField('user_level_key', v === '__default__' ? null : v)}
+                    disabled={!editing}
+                  >
+                    <SelectTrigger id="user_level_key"><SelectValue placeholder="Standard" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">Standard</SelectItem>
+                      {pricingLevels.map((l) => <SelectItem key={l.level_key} value={l.level_key}>{l.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    The tier this customer buys at — the level's discount applies off your retail price on quotes (ex-VAT).
+                    Configure levels in Finance → Settings → Pricing.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="discount_percent">Default discount %</Label>
+                    <Label htmlFor="discount_percent">Customer discount % (override)</Label>
                     <Input
                       id="discount_percent"
                       type="number"

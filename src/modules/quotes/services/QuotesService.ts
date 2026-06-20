@@ -430,8 +430,9 @@ export class QuotesService {
     installation_requirements?: string;
     delivery_date?: string;
   }): Promise<QuoteItem> {
-    // Resolve default unit from product metadata
+    // Resolve default unit + category from product metadata
     let customUnit: string | null = null;
+    let productCategory: string | null = null;
     try {
       const { data: product } = await supabase
         .from('products')
@@ -441,6 +442,7 @@ export class QuotesService {
       if (product?.metadata?.unit) {
         customUnit = product.metadata.unit;
       }
+      productCategory = product?.metadata?.material_category ?? null;
     } catch { /* non-fatal — falls back to null (displays as pcs) */ }
 
     // #176: pre-fill the line from the cascade resolver so catalog lines aren't blank.
@@ -450,29 +452,64 @@ export class QuotesService {
     const qtyNow = data.quantity || 1;
     let unitPrice: number | null = null;
     let costSnapshot: number | null = null;
+    let retailPrice: number | null = null;
+    let quoteWorkspaceId: string | null = null;
     try {
       const { data: quote } = await supabase
         .from('quotes')
-        .select('workspace_id')
+        .select('workspace_id, customer_company_id, customer_contact_id')
         .eq('id', data.quote_id)
         .single();
       if (quote?.workspace_id) {
+        quoteWorkspaceId = quote.workspace_id;
+        // #227: pass the quote's customer so the resolver applies their pricing-level discount.
+        // audience='seller' → staff get cost_basis + margin (never exposed to the buyer).
         const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
           p_workspace_id: quote.workspace_id,
           p_product_id: data.product_id,
+          p_company_id: quote.customer_company_id ?? null,
+          p_contact_id: quote.customer_contact_id ?? null,
+          p_audience: 'seller',
         });
         const p: any = priced;
         if (p && typeof p === 'object') {
           const basis = p.cost_basis != null ? Number(p.cost_basis) : null;
           const sell = p.suggested_sell != null ? Number(p.suggested_sell) : null;
-          // Prefill the sell price (cost × default markup); fall back to bare cost.
+          const retail = p.retail != null ? Number(p.retail) : null;
+          // Prefill the sell price (retail × customer discount); fall back to bare cost.
           if (sell != null && !Number.isNaN(sell)) unitPrice = sell;
           else if (basis != null && !Number.isNaN(basis)) unitPrice = basis;
+          // Store the pre-discount retail anchor for the line breakdown (ex-VAT).
+          if (retail != null && !Number.isNaN(retail)) retailPrice = retail;
           // Snapshot the procurement cost so the margin/profit block is honest.
           if (p.mode === 'operator_catalog' && basis != null && !Number.isNaN(basis)) costSnapshot = basis;
         }
       }
     } catch { /* non-fatal — leaves the line unpriced for manual entry */ }
+
+    // Layer B (#227): quote-time custom rules (volume per category, category extra) stack
+    // multiplicatively on top of the level discount. Needs line context (qty + category).
+    if (unitPrice != null && quoteWorkspaceId && productCategory) {
+      try {
+        const { data: cRules } = await supabase
+          .from('pricing_custom_rules')
+          .select('rule_type, category_key, params, discount_pct')
+          .eq('workspace_id', quoteWorkspaceId)
+          .eq('is_active', true);
+        let factor = 1;
+        for (const r of (cRules ?? []) as any[]) {
+          if (r.category_key && r.category_key !== productCategory) continue;
+          const d = Number(r.discount_pct) || 0;
+          if (d <= 0) continue;
+          if (r.rule_type === 'category_extra') factor *= 1 - d / 100;
+          else if (r.rule_type === 'volume_category') {
+            const minQty = Number(r.params?.min_qty ?? 0);
+            if (minQty > 0 && qtyNow >= minQty) factor *= 1 - d / 100;
+          }
+        }
+        if (factor < 1) unitPrice = Math.round(unitPrice * factor * 100) / 100;
+      } catch { /* non-fatal — Layer B is additive on top of the resolved price */ }
+    }
 
     const { data: item, error } = await supabase
       .from('quote_items')
@@ -494,6 +531,7 @@ export class QuotesService {
         unit_price: unitPrice,
         line_total: unitPrice != null ? Math.round(unitPrice * qtyNow * 100) / 100 : null,
         cost_snapshot: costSnapshot,
+        retail_price: retailPrice,
       } as any)
       .select()
       .single();

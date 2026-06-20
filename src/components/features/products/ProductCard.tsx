@@ -136,23 +136,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         </div>
 
-        {/* Pricing */}
-        <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-gray-200">
-          <div>
-            <p className="text-xs text-gray-600 mb-0.5">Retail</p>
+        {/* Pricing — #227: show the retail (sell) price only. NEVER the procurement cost
+            (the old "Wholesale" column rendered products.cost and leaked it to every viewer). */}
+        {product.pricing.retail > 0 && (
+          <div className="mb-3 pb-3 border-b border-gray-200">
+            <p className="text-xs text-gray-600 mb-0.5">Retail <span className="text-gray-400">(excl. VAT)</span></p>
             <p className="font-semibold text-gray-900">
               {product.pricing.currency === 'EUR' ? '€' : '$'}
               {product.pricing.retail.toFixed(2)}
             </p>
           </div>
-          <div>
-            <p className="text-xs text-gray-600 mb-0.5">Wholesale</p>
-            <p className="font-semibold text-gray-900">
-              {product.pricing.currency === 'EUR' ? '€' : '$'}
-              {product.pricing.wholesale.toFixed(2)}
-            </p>
-          </div>
-        </div>
+        )}
 
         {/* Stock Status */}
         <div className="mb-3">

@@ -205,6 +205,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         status, lead_source, contact_type, vat_number, country_code, tax_office,
         first_name, last_name, profession, is_client, is_supplier,
         discount_pct, discount_percent, discount_notes, credit_limit,
+        user_level_key, // #227 — pricing level
         // #207 — commercial depth
         contact_group, include_in_myf, vat_exemption_reason,
         billing_name, billing_vat, billing_tax_office, billing_street,
@@ -243,6 +244,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       else if (discount_pct !== undefined) updates.discount_percent = discount_pct;
       if (discount_notes !== undefined) updates.discount_notes = discount_notes;
       if (credit_limit !== undefined) updates.credit_limit = credit_limit;
+      if (user_level_key !== undefined) updates.user_level_key = user_level_key;
       // #207 — commercial depth
       if (contact_group !== undefined) updates.contact_group = contact_group;
       if (include_in_myf !== undefined) updates.include_in_myf = include_in_myf;

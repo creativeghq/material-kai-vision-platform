@@ -75,6 +75,10 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         .from('product_prices')
         .select('product_id, list_price, currency, unit, product:products(id, name, description, metadata, item_type)')
         .eq('workspace_id', ws.id).eq('storefront_published', true).not('list_price', 'is', null);
+      // #227 — list_price is NET (ex-VAT) everywhere; the consumer storefront shows the
+      // VAT-inclusive price, so add VAT here for display.
+      const { data: fsP } = await supabase.from('finance_settings').select('default_vat_rate').eq('workspace_id', ws.id).maybeSingle();
+      const vatP = Number(fsP?.default_vat_rate ?? 24);
       const products = (rows ?? [])
         .filter((r: any) => r.product)
         .map((r: any) => ({
@@ -83,7 +87,7 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
           description: r.product.description ?? null,
           unit: r.unit ?? null,
           item_type: r.product.item_type ?? 'good',
-          price: Number(r.list_price),
+          price: round2(Number(r.list_price) * (1 + vatP / 100)),
           currency: r.currency ?? 'EUR',
           image_url: imageFromMetadata(r.product.metadata),
         }));
@@ -122,11 +126,10 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         if (!pr || pr.list_price == null) return json({ error: 'a product is no longer available' }, 409);
         currency = pr.currency ?? currency;
         const qty = Math.min(Number(it.qty), 9999);
-        const unitGross = Number(pr.list_price);
-        const lineGross = round2(unitGross * qty);
-        totalGross += lineGross;
-        // Retail prices are VAT-inclusive — store the NET unit so per-line myDATA VAT is right.
-        const unitNet = round2(unitGross / (1 + vatRate / 100));
+        // #227 — list_price is NET (ex-VAT); add VAT to get the consumer gross, keep net per line for myDATA.
+        const unitNet = Number(pr.list_price);
+        const unitGross = round2(unitNet * (1 + vatRate / 100));
+        totalGross += round2(unitGross * qty);
         lines.push({
           description: pr.product?.name ?? 'Item', quantity: qty,
           unit_price: unitNet, net_value: round2(unitNet * qty), line_total: round2(unitNet * qty),

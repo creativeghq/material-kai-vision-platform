@@ -756,6 +756,168 @@ const _financeServiceCore = {
     if (error) throw error;
   },
 
+  // ── Pricing pyramid (#227): customer levels + level×category discounts ──
+  async listUserLevels(workspaceId: string): Promise<Array<{
+    id: string; level_key: string; label: string; default_discount_pct: number;
+    is_default: boolean; sort_order: number; is_active: boolean;
+  }>> {
+    const { data, error } = await supabase
+      .from('workspace_user_levels')
+      .select('id, level_key, label, default_discount_pct, is_default, sort_order, is_active')
+      .eq('workspace_id', workspaceId)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as any;
+  },
+
+  async upsertUserLevel(input: {
+    id?: string; workspaceId: string; levelKey: string; label: string;
+    defaultDiscountPct: number; isDefault?: boolean; sortOrder?: number; isActive?: boolean;
+  }): Promise<void> {
+    const row: any = {
+      workspace_id: input.workspaceId,
+      level_key: input.levelKey,
+      label: input.label,
+      default_discount_pct: input.defaultDiscountPct,
+    };
+    if (input.id) row.id = input.id;
+    if (input.isDefault !== undefined) row.is_default = input.isDefault;
+    if (input.sortOrder !== undefined) row.sort_order = input.sortOrder;
+    if (input.isActive !== undefined) row.is_active = input.isActive;
+    const { error } = await supabase.from('workspace_user_levels')
+      .upsert(row, { onConflict: 'workspace_id,level_key' });
+    if (error) throw error;
+  },
+
+  async deleteUserLevel(id: string): Promise<void> {
+    const { error } = await supabase.from('workspace_user_levels').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // Exactly one default level per workspace.
+  async setDefaultUserLevel(workspaceId: string, levelId: string): Promise<void> {
+    const clear = await supabase.from('workspace_user_levels')
+      .update({ is_default: false }).eq('workspace_id', workspaceId);
+    if (clear.error) throw clear.error;
+    const set = await supabase.from('workspace_user_levels')
+      .update({ is_default: true }).eq('id', levelId);
+    if (set.error) throw set.error;
+  },
+
+  async listLevelDiscounts(workspaceId: string): Promise<Array<{
+    id: string; level_key: string; category_key: string | null; discount_pct: number;
+  }>> {
+    const { data, error } = await supabase
+      .from('pricing_level_discounts')
+      .select('id, level_key, category_key, discount_pct')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    return (data ?? []) as any;
+  },
+
+  async upsertLevelDiscount(input: {
+    workspaceId: string; levelKey: string; categoryKey: string | null; discountPct: number;
+  }): Promise<void> {
+    // The unique slot is (workspace, level, coalesce(category,'__ALL__')); find an existing row to update.
+    let q = supabase.from('pricing_level_discounts')
+      .select('id')
+      .eq('workspace_id', input.workspaceId)
+      .eq('level_key', input.levelKey);
+    q = input.categoryKey === null ? q.is('category_key', null) : q.eq('category_key', input.categoryKey);
+    const existing = await q.limit(1);
+    if (existing.error) throw existing.error;
+    const row: any = {
+      workspace_id: input.workspaceId,
+      level_key: input.levelKey,
+      category_key: input.categoryKey,
+      discount_pct: input.discountPct,
+    };
+    if (existing.data && existing.data[0]) row.id = existing.data[0].id;
+    const { error } = await supabase.from('pricing_level_discounts').upsert(row);
+    if (error) throw error;
+  },
+
+  async deleteLevelDiscount(id: string): Promise<void> {
+    const { error } = await supabase.from('pricing_level_discounts').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // #227 — Layer B custom pricing rules (volume_category / category_extra / cash_payment).
+  async listCustomRules(workspaceId: string): Promise<Array<{
+    id: string; rule_type: string; category_key: string | null; params: any;
+    discount_pct: number; label: string | null; is_active: boolean; sort_order: number;
+  }>> {
+    const { data, error } = await supabase
+      .from('pricing_custom_rules')
+      .select('id, rule_type, category_key, params, discount_pct, label, is_active, sort_order')
+      .eq('workspace_id', workspaceId)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as any;
+  },
+
+  async upsertCustomRule(input: {
+    id?: string; workspaceId: string; ruleType: string; categoryKey: string | null;
+    params?: any; discountPct: number; label?: string | null; isActive?: boolean; sortOrder?: number;
+  }): Promise<void> {
+    const row: any = {
+      workspace_id: input.workspaceId,
+      rule_type: input.ruleType,
+      category_key: input.categoryKey,
+      params: input.params ?? {},
+      discount_pct: input.discountPct,
+    };
+    if (input.id) row.id = input.id;
+    if (input.label !== undefined) row.label = input.label;
+    if (input.isActive !== undefined) row.is_active = input.isActive;
+    if (input.sortOrder !== undefined) row.sort_order = input.sortOrder;
+    const { error } = await supabase.from('pricing_custom_rules').upsert(row);
+    if (error) throw error;
+  },
+
+  async deleteCustomRule(id: string): Promise<void> {
+    const { error } = await supabase.from('pricing_custom_rules').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // #227 — customer discount/level change: applied directly for finance/admin, or routed to
+  // a pending approval request for the 'sales' persona (enforced server-side in the RPC).
+  async proposeOrApplyCustomerPricing(input: {
+    subjectType: 'company' | 'contact'; subjectId: string;
+    userLevelKey: string | null; discountPercent: number | null;
+  }): Promise<{ status: 'applied' | 'pending' | 'unchanged'; request_id?: string }> {
+    const { data, error } = await supabase.rpc('propose_or_apply_customer_pricing', {
+      p_subject_type: input.subjectType,
+      p_subject_id: input.subjectId,
+      p_user_level_key: input.userLevelKey,
+      p_discount_percent: input.discountPercent,
+    });
+    if (error) throw error;
+    return (data ?? { status: 'unchanged' }) as any;
+  },
+
+  async listPendingDiscountRequests(workspaceId: string): Promise<Array<{
+    id: string; target_id: string; before: any; after: any; requested_by: string | null; created_at: string;
+  }>> {
+    const { data, error } = await supabase
+      .from('pricing_change_requests')
+      .select('id, target_id, before, after, requested_by, created_at')
+      .eq('workspace_id', workspaceId)
+      .eq('target_type', 'customer_discount')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as any;
+  },
+
+  async decidePricingRequest(requestId: string, approve: boolean, note?: string): Promise<{ subject_type?: string; subject_id?: string }> {
+    const { data, error } = await supabase.rpc('decide_customer_pricing_request', {
+      p_request_id: requestId, p_approve: approve, p_note: note ?? null,
+    });
+    if (error) throw error;
+    return (data ?? {}) as any;
+  },
+
   /** Customer open balance: sum of open-invoice amount_due − sum of unallocated inbound payments. */
   async getCustomerBalance(workspaceId: string, party: { companyId?: string | null; contactId?: string | null }): Promise<{
     open_invoices_due: number; customer_credit: number; net_balance: number; currency: string;

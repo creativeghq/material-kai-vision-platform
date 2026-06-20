@@ -17,6 +17,10 @@ import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdent
 import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCard';
 import { InvoiceTemplateCard } from '@/modules/finance/components/InvoiceTemplateCard';
 import { PricingRulesCard } from '@/modules/finance/components/PricingRulesCard';
+import { UserLevelsCard } from '@/modules/finance/components/UserLevelsCard';
+import { LevelCategoryDiscountsCard } from '@/modules/finance/components/LevelCategoryDiscountsCard';
+import { CustomPricingRulesCard } from '@/modules/finance/components/CustomPricingRulesCard';
+import { PendingDiscountApprovalsCard } from '@/modules/finance/components/PendingDiscountApprovalsCard';
 import { ServicesCard } from '@/modules/finance/components/ServicesCard';
 import { TeamInviteCard } from '@/modules/finance/components/TeamInviteCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
@@ -207,8 +211,12 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <EInvoicingCard workspaceId={workspaceId} />
         </TabsContent>
 
-        <TabsContent value="pricing" className="mt-0">
+        <TabsContent value="pricing" className="mt-0 space-y-4">
+          <PendingDiscountApprovalsCard workspaceId={workspaceId} />
           <PricingRulesCard workspaceId={workspaceId} />
+          <UserLevelsCard workspaceId={workspaceId} />
+          <LevelCategoryDiscountsCard workspaceId={workspaceId} />
+          <CustomPricingRulesCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="categories" className="mt-0">

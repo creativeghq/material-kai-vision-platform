@@ -102,7 +102,7 @@ const convertToDisplayProduct = (product: SimpleProduct): Product => {
     specifications: asObj(md.specifications),
     pricing: {
       retail: asNum(md.price),
-      wholesale: asNum(product.cost),
+      wholesale: 0, // #227 — never carry procurement cost into a display product (was leaking products.cost)
       currency: product.cost_currency || 'EUR',
     },
     stock: {
@@ -431,6 +431,24 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                             ) : (
                               <span className="text-sm">{fmtPrice(item.unit_price)}</span>
                             )}
+                            {/* #227 — seller-only breakdown: retail anchor, discount off retail, margin (ex-VAT). */}
+                            {editPricing && (() => {
+                              const retail = (item as any).retail_price != null ? Number((item as any).retail_price) : null;
+                              const cost = (item as any).cost_snapshot != null ? Number((item as any).cost_snapshot)
+                                : (item.product as any)?.cost != null ? Number((item.product as any).cost) : null;
+                              const final = effectivePrice != null ? Number(effectivePrice) : null;
+                              const off = retail != null && final != null && retail > 0 ? Math.round((1 - final / retail) * 100) : null;
+                              const marginPct = cost != null && final != null && cost > 0 ? Math.round(((final - cost) / cost) * 100) : null;
+                              const parts: string[] = [];
+                              if (retail != null && off != null && off > 0) parts.push(`Retail ${fmtPrice(retail)} · ${off}% off`);
+                              if (marginPct != null) parts.push(`margin ${marginPct}%`);
+                              if (parts.length === 0) return null;
+                              return (
+                                <div className={`mt-1 text-[10px] ${marginPct != null && marginPct < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                  {parts.join(' · ')}
+                                </div>
+                              );
+                            })()}
                           </td>
                         )}
 

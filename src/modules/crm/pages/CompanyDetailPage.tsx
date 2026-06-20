@@ -20,6 +20,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI } from '@/services/crm.service';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { financeService } from '@/modules/finance/services/financeService';
+import { flowEventService } from '@/services/flows/flowEventService';
 import { validateVatViaVies } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
@@ -73,6 +76,7 @@ interface Company {
   discount_percent?: number | null;
   discount_notes?: string | null;
   credit_limit?: number | null;
+  user_level_key?: string | null; // #227 — pricing level
   is_supplier?: boolean | null;
   is_customer?: boolean | null;
   // #207 — commercial depth
@@ -122,6 +126,8 @@ export const CompanyDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+  const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -212,11 +218,33 @@ export const CompanyDetailPage: React.FC = () => {
         // Navigate to the new company's page
         navigate(`/admin/crm/companies/${response.data.id}`, { replace: true });
       } else {
-        // Update existing company
-        await companiesAPI.updateCompany(id!, company);
+        // #227 — route customer discount/level through the approval RPC (sales → pending,
+        // others → applied) and strip them from the generic update so the handler never
+        // applies them directly (which would bypass approval).
+        const { user_level_key, discount_percent, ...rest } = company as any;
+        await companiesAPI.updateCompany(id!, rest);
+        let pricingPending = false;
+        try {
+          const res = await financeService.proposeOrApplyCustomerPricing({
+            subjectType: 'company', subjectId: id!,
+            userLevelKey: company.user_level_key ?? null,
+            discountPercent: company.discount_percent ?? null,
+          });
+          pricingPending = res.status === 'pending';
+          if (pricingPending) {
+            flowEventService.emit('pricing_change_requested', {
+              workspace_id: activeWorkspaceId, request_id: res.request_id,
+              subject_type: 'company', subject_id: id!,
+              title: 'Discount change needs approval',
+              body: 'A sales team member proposed a customer discount/level change.',
+            });
+          }
+        } catch (e: any) {
+          toast({ title: 'Pricing change failed', description: e?.message, variant: 'destructive' });
+        }
         toast({
-          title: 'Success',
-          description: 'Company updated successfully',
+          title: pricingPending ? 'Saved — discount change sent for approval' : 'Success',
+          description: pricingPending ? undefined : 'Company updated successfully',
         });
         setEditing(false);
         await loadCompany();
@@ -237,6 +265,14 @@ export const CompanyDetailPage: React.FC = () => {
     if (!company) return;
     setCompany({ ...company, [field]: value });
   };
+
+  // #227 — load this workspace's pricing levels for the customer-level dropdown.
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    financeService.listUserLevels(activeWorkspaceId)
+      .then((rows) => setPricingLevels(rows.map((r) => ({ level_key: r.level_key, label: r.label }))))
+      .catch(() => { /* non-fatal — dropdown just shows Default */ });
+  }, [activeWorkspaceId]);
 
   /**
    * Validate the company's EU VAT number against VIES (reuses the existing
@@ -888,9 +924,27 @@ export const CompanyDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="user_level_key">Pricing level</Label>
+                  <Select
+                    value={company.user_level_key ?? '__default__'}
+                    onValueChange={(v) => updateField('user_level_key', v === '__default__' ? null : v)}
+                    disabled={!editing}
+                  >
+                    <SelectTrigger id="user_level_key"><SelectValue placeholder="Standard" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">Standard</SelectItem>
+                      {pricingLevels.map((l) => <SelectItem key={l.level_key} value={l.level_key}>{l.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    The tier this customer buys at — the level's discount applies off your retail price on quotes (ex-VAT).
+                    Configure levels in Finance → Settings → Pricing.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="discount_percent">Default discount %</Label>
+                    <Label htmlFor="discount_percent">Customer discount % (override)</Label>
                     <Input
                       id="discount_percent"
                       type="number"
@@ -906,7 +960,7 @@ export const CompanyDetailPage: React.FC = () => {
                       placeholder="e.g. 50"
 />
                     <p className="text-xs text-muted-foreground">
-                      Applied automatically by the AI price lookup when this company is the quote customer. Leave empty for no customer discount.
+                      A fixed discount for this customer that <strong>overrides</strong> their pricing level. Leave empty to use the level's discount.
                     </p>
                   </div>
                   <div className="space-y-2">

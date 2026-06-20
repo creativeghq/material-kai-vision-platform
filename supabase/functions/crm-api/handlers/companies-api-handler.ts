@@ -21,6 +21,8 @@ const COMPANY_WRITABLE_COLUMNS = [
   'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'notes',
   'linkedin', 'twitter', 'facebook', 'description',
   'is_supplier', 'is_customer', 'discount_percent', 'discount_notes', 'credit_limit',
+  'user_level_key', // #227 — pricing level
+
   // #207 — commercial depth: segmentation, ΜΥΦ inclusion, on-invoice VAT-exemption
   // reason, and a separate billing identity (consumed by partyFromCrm at issue).
   'contact_group', 'include_in_myf', 'vat_exemption_reason',
