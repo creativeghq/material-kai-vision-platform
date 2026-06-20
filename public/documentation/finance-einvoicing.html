@@ -3,52 +3,100 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Greek e-invoicing (myDATA) | MaterialsHub Documentation</title>
+<title>Greek e-invoicing (myDATA) — setup & use | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / Greek e-invoicing</div>
-  <h1>Greek e-invoicing (myDATA / ΑΑΔΕ)</h1>
+  <h1>Greek e-invoicing (myDATA) — set it up and use it</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">Issue compliant invoices and transmit them to the Greek tax authority (ΑΑΔΕ / myDATA) directly from the platform — no separate accounting portal, no manual re-entry. This guide explains what myDATA actually is, why up-front VAT validation saves you money, and walks the issue-to-transmit flow step by step.</p>
+  <p class="lead">If you invoice in Greece, every invoice and receipt has to be reported electronically to the tax authority (ΑΑΔΕ) through <strong>myDATA</strong>. MaterialsHub does this for you at the moment you issue a document — but only after you've filled in a few details. This page walks the whole thing end to end: what you need before you start, exactly which fields to fill and where to find them, and how issuing an invoice actually transmits it.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> e-invoicing happens automatically when you issue invoices/receipts. You configure it once under top navigation → <strong>Finance</strong> → <strong>Settings</strong> (see the <a href="finance-settings.html">Settings guide</a>, section <em>e-Invoicing</em>).</p></div>
+  <div class="callout"><p><strong>The short version:</strong> fill in your <strong>Business Identity</strong>, set up your <strong>document numbering series</strong> and paste your <strong>myDATA credentials</strong>, mark e-invoicing <strong>active</strong>, then issue invoices with <em>“Submit to myDATA on issue”</em> ticked. The four setup areas are all under <strong>Finance → Settings</strong>; issuing happens on <strong>Finance → Invoices</strong>.</p></div>
 
-  <h2>What it is</h2>
-  <p><strong>myDATA</strong> (my Digital Accounting and Tax Application) is the Greek tax authority's electronic bookkeeping system, run by <strong>ΑΑΔΕ</strong>. Every business invoice and receipt in Greece must be reported to it. The platform connects to myDATA through the <strong>Novus</strong> connector, so when you issue a document here it is transmitted electronically to ΑΑΔΕ as the official record. There is no second system to copy figures into — the document you create in Finance <em>is</em> the filed document.</p>
-  <p>In practice this means the invoice you build under <a href="finance-documents.html">Documents → Invoices</a> (or the receipt you ring up at the <a href="pos.html">POS</a>) becomes the tax-authority record the moment you issue it. The manual step of re-keying everything into a separate accounting portal disappears.</p>
-
-  <h2>Why it matters</h2>
-  <p>myDATA reporting is a legal obligation, not an optional integration — Greek businesses must transmit their documents. Doing it inline has two concrete payoffs:</p>
+  <h2>Before you start — what you need from ΑΑΔΕ</h2>
+  <p>myDATA reporting uses credentials you get from the tax authority, not your normal TaxisNet login. Have these ready:</p>
   <ul class="feat">
-    <li><strong>One source of truth.</strong> The document you issue is the document that's filed, so your books and the authority's records can't drift apart.</li>
-    <li><strong>No double entry.</strong> You stop re-typing invoices into a separate portal, which removes both the work and the transcription errors that come with it.</li>
+    <li><strong>Your company's tax details</strong> — VAT number (ΑΦΜ), tax office (ΔΟΥ) and registered address. (The app can fetch most of these for you — see Step 1.)</li>
+    <li><strong>myDATA REST API credentials</strong> — a <strong>User ID</strong> and a <strong>Subscription Key</strong>, issued from your ΑΑΔΕ myDATA account when you register for REST API access. You'll paste both into the platform (Step 2). These are what let the platform talk to myDATA on your behalf.</li>
   </ul>
+  <div class="callout tip"><p>Don't have the myDATA REST credentials yet? You can still set everything else up and create <em>draft</em> invoices; you just won't be able to transmit until the credentials are in. Get them from your ΑΑΔΕ myDATA account's API-access / authorisation section (they appear as a user id and an <code>Ocp-Apim-Subscription-Key</code>).</p></div>
 
-  <h2>Multi-tenant by design</h2>
-  <p><strong>What it is —</strong> transmission is per-workspace. Each workspace issues under <strong>its own VAT identity and tax-authority authorisation</strong>, configured once and reused on every submission. <strong>Why it matters —</strong> many businesses share the platform, and this design guarantees they never cross-file: your documents always go out under your VAT number, never anyone else's. Your issuer details are set up a single time (in <a href="finance-settings.html">Settings → Business Identity</a>) and applied automatically thereafter.</p>
-
-  <h2>Why VAT validation matters</h2>
-  <p><strong>What it is —</strong> before a document is issued, the platform validates the counter-party's VAT number: Greek numbers against the <strong>ΑΑΔΕ registry</strong>, EU numbers against <strong>VIES</strong>. This ties into the same Greek business lookup used across <a href="crm.html">CRM</a>.</p>
-  <p><strong>Why it matters —</strong> a wrong or inactive VAT number is one of the most common reasons myDATA rejects a submission. Validating up front catches the problem while it's still cheap to fix — you correct one field before issuing, instead of unwinding a rejected or mis-filed document afterwards. It also keeps your counter-party details accurate, which feeds clean data into CRM and your reports.</p>
-  <div class="callout tip"><p>Because VAT is validated up front, fixing a wrong customer VAT <em>before</em> issuing is much cheaper than correcting a rejected or mis-filed document later. You can make this enforcement strict in <a href="finance-settings.html">Settings → General</a> — toggles there can <em>block</em> issuance when a buyer VAT is ΑΑΔΕ-inactive or was never validated.</p></div>
-
-  <h2>How it works — the issue-to-transmit flow</h2>
-  <p>From your side it's a single <em>Issue</em> click, but several things happen in sequence behind it. Here is the end-to-end flow:</p>
+  <h2>Step 1 — Your Business Identity (the issuer details)</h2>
+  <p><strong>Where:</strong> top nav → <strong>Finance</strong> → <strong>Settings</strong> → <strong>Business Identity</strong>. These details print on every document and are sent to myDATA as the issuer — they're mandatory.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-business-identity.png" alt="Business Identity settings with the fields and Fetch from ΑΑΔΕ button">
+    <figcaption>Finance → Settings → Business Identity. Tip: type your VAT number and click <strong>Fetch from ΑΑΔΕ</strong> to auto-fill the rest.</figcaption>
+  </figure>
   <ol>
-    <li><strong>Create the document.</strong> Build an invoice under <a href="finance-documents.html">Documents → Invoices</a>, or issue a receipt at the <a href="pos.html">POS</a>.</li>
-    <li><strong>VAT is validated.</strong> The counter-party's VAT number is checked against the ΑΑΔΕ registry (Greek) or VIES (EU). If your General settings are set to block, an invalid number stops you here — before any filing happens.</li>
-    <li><strong>The document is transmitted.</strong> On issue, it is sent to ΑΑΔΕ / myDATA through the Novus connector and marked accordingly, so you can see it's been filed.</li>
-    <li><strong>It flows into the rest of Finance.</strong> The issued document feeds your <a href="finance-receivables-payables.html">Receivables</a>, the <a href="finance.html">Dashboard</a> KPIs and your reports — automatically.</li>
+    <li>Make sure the language toggle is on <strong>GR</strong> (Greek details are what myDATA expects).</li>
+    <li>In the <strong>Billing</strong> sub-tab, type your <strong>VAT number</strong> (e.g. <code>EL123456789</code>) and click <strong>Fetch from ΑΑΔΕ</strong> — it fills your <strong>Company name</strong>, <strong>Activity</strong>, <strong>Tax office</strong> and registered <strong>address</strong> from the official registry.</li>
+    <li>Fill anything not returned: <strong>GEMI number</strong>, <strong>Phone</strong>, <strong>Email</strong>, and the bank/IBAN and logo under <strong>Bank &amp; Logo</strong>.</li>
+    <li>Click <strong>Save</strong>.</li>
+  </ol>
+  <p>Full field list: <a href="finance-settings-business-identity.html">Settings · Business Identity</a>.</p>
+
+  <h2>Step 2 — Document series &amp; myDATA credentials</h2>
+  <p><strong>Where:</strong> Finance → <strong>Settings</strong> → <strong>Documents</strong>.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-documents.png" alt="Documents settings: establishments, series and the myDATA inbox keys">
+    <figcaption>Finance → Settings → Documents — establishments, numbering series, and the myDATA inbox credentials at the bottom.</figcaption>
+  </figure>
+  <ol>
+    <li><strong>Establishments.</strong> Click <strong>Add establishment</strong> and add your premises. Your headquarters is <strong>branch 0</strong>; add branches as needed (each reports to myDATA under its own establishment number). Fill <strong>Branch number</strong>, <strong>Name</strong>, and the address; <strong>Save</strong>.</li>
+    <li><strong>Document Types &amp; Series.</strong> Create a numbering <strong>series</strong> for each document type you'll issue (sales invoice, receipt, etc.) and assign it to a branch. This is what produces the legal sequential number when you issue.</li>
+    <li><strong>myDATA Inbox (Received Documents).</strong> Paste the credentials from Step 0: <strong>User ID</strong> (the field is labelled “sent as <code>aade-user-id</code>”) and <strong>Subscription Key</strong> (labelled <code>Ocp-Apim-Subscription-Key</code>). These also power the <em>“Sync from myDATA”</em> button that pulls in documents suppliers issued to you.</li>
+  </ol>
+  <p>Full detail: <a href="finance-settings-documents.html">Settings · Documents</a>.</p>
+
+  <h2>Step 3 — Turn e-invoicing on</h2>
+  <p><strong>Where:</strong> Finance → <strong>Settings</strong> → <strong>e-Invoicing</strong>. This section tracks your activation through the platform's <strong>Novus → myDATA</strong> connector.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-e-invoicing.png" alt="e-Invoicing settings: status and note">
+    <figcaption>Finance → Settings → e-Invoicing — set the Status and add a note as you activate.</figcaption>
+  </figure>
+  <ol>
+    <li>Set the <strong>Status</strong> as you progress (it starts at <em>Not requested</em>).</li>
+    <li>Add an optional <strong>Note</strong> for your own records (contract number, date submitted, who handled it).</li>
+    <li>Click <strong>Save status</strong>.</li>
   </ol>
 
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-settings.png" alt="Finance Settings where e-invoicing is configured"><figcaption>Finance → Settings, where the workspace's fiscal / e-invoicing details are configured.</figcaption></figure>
+  <h2>Step 4 — Issue an invoice (and transmit it)</h2>
+  <p><strong>Where:</strong> Finance → <strong>Invoices</strong> → <strong>New</strong>. The editor has myDATA-specific fields — here's what each one is and what to put:</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/new-invoice.png" alt="New invoice editor with myDATA fields">
+    <figcaption>The invoice editor — the highlighted fields are the myDATA ones.</figcaption>
+  </figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to put</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Billed to</strong></td><td>Search and pick the customer (or “+ Add new client”). For a Greek business customer, their VAT is validated before you can issue.</td></tr>
+      <tr><td><strong>Document type (myDATA)</strong></td><td>The myDATA classification, shown with its code (e.g. <em>“1.1 — Sales Invoice”</em>). Pick the one that matches what you're issuing.</td></tr>
+      <tr><td><strong>Related document</strong></td><td>Optional — the myDATA MARK or number of a related invoice (e.g. for a credit note).</td></tr>
+      <tr><td><strong>Date issued · Payment terms · Currency · Default VAT %</strong></td><td>Standard header values (these can default from <a href="finance-settings-general.html">Settings → General</a>).</td></tr>
+      <tr><td><strong>Line items</strong></td><td>Add products/services; each line carries its <strong>VAT category</strong>. Use “Pick from products” or add custom lines.</td></tr>
+      <tr><td><strong>Withholding tax · Digital transaction fee</strong></td><td>Add where they apply (myDATA reports these separately).</td></tr>
+      <tr><td><strong>Payment method (myDATA)</strong></td><td>Choose the myDATA payment classification (e.g. <em>“3 — On credit”</em>).</td></tr>
+      <tr><td><strong>VAT payment suspension · Self-pricing</strong></td><td>Toggle if your case requires it.</td></tr>
+      <tr><td><strong>B2G — public-sector invoice</strong></td><td>Toggle on if you're invoicing a public-sector body.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>The issue-time switches</h3>
+  <ol>
+    <li>Tick <strong>“Submit to myDATA on issue”</strong> — this is what actually transmits the document.</li>
+    <li>Optionally tick <strong>Print online code / QR</strong>, <strong>Include in MYF report</strong>, send by email/SMS, etc.</li>
+    <li>Click <strong>Issue now</strong> — this assigns the official sequential number and date and (with the toggle on) sends it to myDATA. Until you issue, it stays an editable <strong>draft</strong>.</li>
+  </ol>
+  <p>Full editor reference: <a href="finance-doc-invoices.html">Documents · Invoices</a>.</p>
 
-  <h2>What it affects</h2>
-  <p>Once e-invoicing is connected, transmission is woven into normal issuing — there is no separate export step, and every issued invoice or receipt becomes part of your official myDATA record. It also drives the downstream figures: each transmitted document raises your receivables, updates the Dashboard, and appears in your reports, so the same action that satisfies the tax authority keeps your back-office in sync.</p>
+  <h2>How to tell it worked — the “mD” column</h2>
+  <p>Back on the <strong>Invoices</strong> list, the <strong>mD</strong> column shows each document's myDATA transmission status, so you can see at a glance which invoices have been reported and which haven't.</p>
 
-  <div class="callout"><p><strong>Setup:</strong> e-invoicing requires your workspace's fiscal details and tax-authority authorisation to be configured (under <a href="finance-settings.html">Finance → Settings</a> / by an administrator). Once connected, transmission happens as part of issuing — there's no separate export step.</p></div>
+  <h2>VAT validation (why it matters)</h2>
+  <p>Before a document is issued, the customer's VAT number is checked — Greek numbers against the <strong>ΑΑΔΕ registry</strong>, EU numbers against <strong>VIES</strong>. You can make this stricter in <a href="finance-settings-general.html">Settings → General</a> (block issuance to an inactive or never-validated VAT). Fixing a wrong VAT before issuing is far cheaper than correcting a rejected myDATA submission afterwards.</p>
+
+  <div class="callout tip"><p><strong>Quick checklist:</strong> ① Business Identity saved (with Fetch from ΑΑΔΕ) → ② a document series created and myDATA User ID + Subscription Key pasted → ③ e-Invoicing status set → ④ issue an invoice with “Submit to myDATA on issue”. After that, every issue reports automatically and the <strong>mD</strong> column confirms it.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

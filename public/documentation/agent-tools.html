@@ -3,102 +3,65 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Tools & Capabilities | MaterialsHub Documentation</title>
+<title>What the assistant can do | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
-  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="agent-hub.html">Agent Hub</a> / Tools &amp; Capabilities</div>
-  <h1>Tools &amp; Capabilities</h1>
-  <p class="lead">This is the full catalogue of what the assistant can actually do — every tool, what it's for, and what it returns. You rarely name a tool: describe the outcome and the assistant picks it (or type <code>/</code> to choose one). Which tools are available depends on the <a href="agent-agents.html">agent mode</a> and your role/plan.</p>
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="agent-hub.html">Agent Hub</a> / What you can do</div>
+  <h1>What you can do with the assistant</h1>
+  <div class="routes"><span class="badge route">/agent-hub</span></div>
+  <p class="lead">This page is task-by-task: what you can ask the assistant to do, <strong>how to ask it (and which composer button to use)</strong>, and <strong>what you get back</strong>. You don't learn any commands — you type in plain English. Each task below is one thing a real user wants to get done.</p>
 
-  <div class="callout"><p><strong>How to read this:</strong> tools are grouped by job. The “Returns” column tells you what appears in the chat. Tools tagged <span class="badge gated">admin/owner</span> are only offered to those roles; everything else is available to all signed-in users. Generation actions that cost credits say so at the point of use.</p></div>
+  <div class="callout"><p><strong>Where you do all of this:</strong> top navigation → <strong>Agent Hub</strong> → <strong>New Conversation</strong>. Pick the mode above the message box (<strong>JARVIS</strong> for everything, <strong>Interior</strong> for design/visuals — see <a href="agent-agents.html">AI Agents</a>), type your request, press Enter. Results appear as cards in the chat that you can click, save or act on.</p></div>
 
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/toolkit-clusters.png" alt="The agent toolkit panel listing toolkits">
-    <figcaption>The toolkit panel — Core is always loaded; the assistant loads more toolkits as a task needs them.</figcaption>
-  </figure>
+  <h2>Find materials and products</h2>
+  <p><strong>What it's for:</strong> finding items in the catalogue without knowing exact names. <strong>How to do it:</strong> just describe what you want in the message box — e.g. <em>“matte black porcelain floor tiles, large format, for a bathroom”</em> — and send. <strong>What you get:</strong> a row of product cards, plus a small <em>“search spec”</em> card that shows the colours, materials and styles it searched on (so you can see why each result matched and refine: <em>“warmer tones, smaller format”</em>). <strong>Then:</strong> click a card to open the product, or tell the assistant <em>“add the second one to a moodboard.”</em></p>
 
-  <h2>Search &amp; discovery</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Tool</th><th>What it does</th><th>Returns</th></tr></thead>
-    <tbody>
-      <tr><td><strong>material_search</strong></td><td>Find catalogue materials/products from a natural-language brief (colour, material, style, spec).</td><td>Product cards + an explainable “search-spec” card.</td></tr>
-      <tr><td><strong>visual_search</strong></td><td>Find materials that look like an image.</td><td>Visually-matched product cards.</td></tr>
-      <tr><td><strong>knowledge_base_search</strong></td><td>Search the knowledge base (specs, care, compliance, catalog details).</td><td>Relevant KB passages/links.</td></tr>
-      <tr><td><strong>analyze_inspiration_url</strong></td><td>Scrape a web page and extract its palette, materials, textures and style, then match products.</td><td>An inspiration card (palette + tags + hero) and product matches.</td></tr>
-    </tbody>
-  </table></div>
+  <h2>Find a material from a photo</h2>
+  <p><strong>What it's for:</strong> you have a picture of a finish and want to find similar real products. <strong>How:</strong> click the <strong>📎 attachment</strong> button in the composer, add the photo, and say <em>“find materials like this.”</em> <strong>What you get:</strong> visually-matched product cards.</p>
 
-  <h2>Calculators (free, instant)</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Tool</th><th>What it does</th><th>Returns</th></tr></thead>
-    <tbody>
-      <tr><td><strong>calculate_heat_pump_sizing</strong></td><td>Estimate the heat-pump capacity a space needs.</td><td>A recommended kW range + assumptions.</td></tr>
-      <tr><td><strong>calculate_heating_cost_comparison</strong></td><td>Compare annual running cost across heating methods.</td><td>A cost ranking.</td></tr>
-    </tbody>
-  </table></div>
+  <h2>Get ideas from a web page or Pinterest pin</h2>
+  <p><strong>What it's for:</strong> turning a reference you found online into a palette and matching products. <strong>How:</strong> click the <strong>🌐 globe</strong> button in the composer, paste the link, send. <strong>What you get:</strong> an <em>inspiration card</em> showing the page's colour palette (with hex codes), the materials/textures/style it detected and a hero image — plus catalogue products that match. <strong>Then:</strong> save the ones you like to a <a href="moodboards.html">moodboard</a>.</p>
 
-  <h2>Create &amp; visualise <span style="color:var(--muted);font-size:14px">(Interior Designer mode)</span></h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Tool</th><th>What it does</th><th>Returns</th></tr></thead>
-    <tbody>
-      <tr><td><strong>generate_3d</strong></td><td>Generate a 3D room/design from a brief or photo (runs asynchronously).</td><td>A rendered room image (fills in when the job completes).</td></tr>
-      <tr><td><strong>apply_lighting_preset</strong></td><td>Re-render a room image already in the chat under a chosen lighting preset — the “edit” step.</td><td>The same room relit (daylight / golden hour / evening / showroom / night).</td></tr>
-      <tr><td><strong>generate_vr_world</strong></td><td>Turn a room image into an explorable 3D/VR walkthrough.</td><td>A VR world you can embed in a <a href="projects-client-view.html">Client View</a>.</td></tr>
-      <tr><td><strong>generate_presentation_sheet</strong></td><td>Produce an A3 client sheet (material board, palette, lighting plan, FF&amp;E, area breakdown, full deck…).</td><td>A PDF attached to the moodboard (interactive types open an in-chat canvas first). See <a href="moodboards-sheets.html">sheets</a>.</td></tr>
-    </tbody>
-  </table></div>
-  <p>Beyond these, the assistant can <strong>generate and edit images</strong> (e.g. restyle a room, virtual-staging with a before/after comparison) — results render inline so you can compare and save them to a moodboard.</p>
+  <h2>Ask about specifications, care or compliance</h2>
+  <p><strong>What it's for:</strong> answers from the knowledge base — installation, cleaning, certifications, packaging, catalog details. <strong>How:</strong> ask the question, e.g. <em>“what's the slip rating and cleaning method for this tile?”</em> <strong>What you get:</strong> a written answer with the relevant source passages/links.</p>
 
-  <h2>Monitor &amp; research</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Tool</th><th>What it does</th><th>Returns</th></tr></thead>
-    <tbody>
-      <tr><td><strong>track_product_mentions</strong></td><td>Start tracking where a brand/product is mentioned (news, blogs, RSS, YouTube, LLMs).</td><td>A tracked subject; alerts over time.</td></tr>
-      <tr><td><strong>get_mention_summary</strong></td><td>Pull the rolling mention snapshot for a subject.</td><td>Sentiment, top outlets, volume card.</td></tr>
-      <tr><td><strong>check_llm_visibility</strong></td><td>See whether/how favourably AI assistants recommend the subject.</td><td>Share-of-voice + co-mentioned competitors.</td></tr>
-      <tr><td><strong>find_negative_mentions</strong></td><td>Surface negative coverage for reputation triage.</td><td>Filtered mention feed.</td></tr>
-      <tr><td><strong>track_job_search</strong> · <strong>list_my_job_searches</strong> · <strong>find_jobs</strong> · <strong>get_job_digest_preview</strong></td><td>Set up recurring job discovery, list searches, fetch matches, preview the digest.</td><td>Job-finding cards + a daily/weekly digest.</td></tr>
-      <tr><td><strong>price_lookup</strong> <span class="badge gated">admin/owner</span></td><td>Look a product's market price up from the pricing knowledge base.</td><td>A price proposal.</td></tr>
-    </tbody>
-  </table></div>
+  <h2>Design and visualise a room <span style="color:var(--muted);font-size:15px">(switch to Interior mode)</span></h2>
+  <p>This is the design workflow. Switch the mode selector (above the message box) to <strong>Interior</strong>, then:</p>
+  <ol>
+    <li><strong>Generate a room.</strong> Attach a photo of the space (or describe it) and ask for a design in a style — e.g. <em>“design this as a warm minimalist living room.”</em> You get a rendered room image (it generates in the background and appears when ready).</li>
+    <li><strong>Re-light it (the edit).</strong> With that render in the chat, say <em>“show it in warm evening light”</em> (or daylight / golden hour / showroom / night). You get the same room re-rendered under that lighting — useful for showing a client how a space feels at different times.</li>
+    <li><strong>Walk through it in 3D/VR.</strong> Ask <em>“make a 3D walkthrough”</em> and you get an explorable VR world you can embed in a project's <a href="projects-client-view.html">Client View</a>.</li>
+    <li><strong>Find the materials</strong> in it, then <strong>build a presentation sheet</strong> — see the next two tasks.</li>
+  </ol>
 
-  <h2>SEO suite <span style="color:var(--muted);font-size:14px">(JARVIS)</span></h2>
-  <p>A deep SEO toolkit. <strong>Keywords:</strong> seo_keyword_research / _suggestions / _difficulty / _search_intent / _keyword_overview / _ai_keyword_volume / _google_trends. <strong>SERP &amp; pages:</strong> seo_serp_audit / _historical_serps / _audit_url / _relevant_pages. <strong>Domain intel:</strong> seo_domain_snapshot / _ranked_keywords / _domain_competitors / _keyword_gap / _traffic_estimation / _subdomains / _categories_for_domain. <strong>Backlinks:</strong> seo_backlinks_summary / _backlinks_anchors / _referring_domains. <strong>Site crawl:</strong> seo_site_crawl_start / _site_crawl_status. <strong>Content &amp; tech:</strong> seo_content_sentiment / _domain_technologies / _domain_whois. <strong>Multi-engine &amp; niche:</strong> seo_youtube_search / _local_pack / _amazon_asin / _app_keywords / _trustpilot_search / _pinterest_search / _reddit_search / _llm_mentions_search. <strong>Composite audits:</strong> seo_site_review / _brand_search_audit. <strong>Article pipeline</strong> <span class="badge gated">admin/owner</span>: create_seo_article → seo_keyword_research → seo_article_planner → seo_article_writer → seo_content_analyzer. Each returns a structured report card; the pipeline produces a drafted, analysed article.</p>
+  <h2>Generate or restyle an image / stage an empty room</h2>
+  <p><strong>What it's for:</strong> creating or editing visuals. <strong>How:</strong> describe the image you want, or attach one and say how to change it (<em>“stage this empty room as a Scandinavian bedroom”</em>). <strong>What you get:</strong> generated images inline; staging results open in a <strong>before/after slider</strong> so you can compare. <strong>Then:</strong> save any result to a moodboard.</p>
 
-  <h2>B2B research <span class="badge gated">admin/owner</span></h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>b2b_manufacturer_search</strong></td><td>Web-search manufacturers/suppliers (sourced results).</td></tr>
-      <tr><td><strong>company_website_scrape</strong> · <strong>company_enrichment</strong></td><td>Pull a company's site and enrich its profile.</td></tr>
-      <tr><td><strong>contact_discovery</strong> · <strong>email_validate</strong></td><td>Find and verify contacts.</td></tr>
-      <tr><td><strong>save_to_crm</strong></td><td>Save the discovered company/contact straight into <a href="crm.html">CRM</a>.</td></tr>
-    </tbody>
-  </table></div>
+  <h2>Make a client presentation sheet</h2>
+  <p><strong>What it's for:</strong> a polished A3 deliverable. <strong>How:</strong> ask for the sheet type you want — <em>“make a material board / colour palette / lighting plan / FF&amp;E schedule / full deck.”</em> For interactive sheets (lighting plan, annotated render) the chat opens a small canvas where you place symbols or callouts. <strong>What you get:</strong> a PDF saved to your <a href="moodboards.html">moodboard</a>. Full detail: <a href="moodboards-sheets.html">Presentation sheets</a>.</p>
 
-  <h2>Presentation catalogs <span class="badge gated">admin/owner</span></h2>
-  <p><strong>create_catalog → attach_catalog_pdfs → extract_from_catalog_pdfs</strong> (or <strong>translate_pdf_to_catalog</strong>), then <strong>add_material_to_catalog</strong>, <strong>find_image_for_material</strong>, <strong>generate_catalog_pdf</strong> and <strong>publish_catalog</strong> — build a branded, published catalogue from supplier PDFs end to end.</p>
+  <h2>Keep an eye on a product's price or a brand's reputation</h2>
+  <p><strong>What it's for:</strong> ongoing monitoring. <strong>How:</strong> <em>“track the price of this product”</em> or <em>“track mentions of [brand]”</em>, then later <em>“how is [brand] doing this week?”</em> or <em>“show me any negative coverage.”</em> <strong>What you get:</strong> the subject is tracked from then on (with alerts), and summary cards showing price min/median/max, or mention volume, sentiment, top outlets — even whether AI assistants recommend the brand. For a free one-off check without signing up, use <a href="tools.html">Free Tools → Price/Mention scan</a>.</p>
 
-  <h2>Projects, sales &amp; content utilities</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>create_project</strong> · <strong>list_my_projects</strong> · <strong>find_project</strong> · <strong>add_task</strong></td><td>Spin up and organise a <a href="projects.html">project</a> and its tasks from chat.</td></tr>
-      <tr><td><strong>create_trip_card</strong> · <strong>add_trip_expense</strong> · <strong>list_trip_cards</strong> · <strong>submit_trip_card</strong></td><td>Log and submit sales-trip expenses (see <a href="sales.html">Sales</a>).</td></tr>
-      <tr><td><strong>translate_pdf_to_catalog</strong></td><td>Translate an uploaded source PDF into another language for a branded output.</td></tr>
-      <tr><td><strong>manage_job_sites</strong></td><td>Add/remove the job boards searched (writes are admin-gated).</td></tr>
-    </tbody>
-  </table></div>
+  <h2>Find relevant jobs on a schedule</h2>
+  <p><strong>What it's for:</strong> recurring job discovery. <strong>How:</strong> <em>“track senior interior designer jobs in Athens, daily,”</em> then <em>“what new jobs did you find?”</em> <strong>What you get:</strong> a running search that posts matches into the conversation and sends a consolidated daily/weekly digest.</p>
 
-  <h2>Invoking tools</h2>
-  <ul class="feat">
-    <li><strong>Natural language</strong> — describe the outcome; the assistant chooses the tool.</li>
-    <li><strong>“/” menu</strong> — type <code>/</code> in the composer to run a specific tool/workflow directly.</li>
-    <li><strong>Composer buttons</strong> — attachments, voice and the inspiration-URL analyser are one click away.</li>
-  </ul>
-  <div class="callout warn"><p><strong>Availability varies by mode, role &amp; plan.</strong> The Interior tools (3D, lighting, VR) exist only in Interior Designer mode; B2B, catalog and SEO-article tools require admin/owner; module-gated tools (price/mention/job monitoring) need the relevant module enabled for your workspace.</p></div>
+  <h2>SEO research &amp; content <span class="badge gated">admin / owner</span></h2>
+  <p><strong>What it's for:</strong> growing the site's search traffic. <strong>How:</strong> ask in plain language — <em>“research keywords for porcelain tiles,”</em> <em>“audit our homepage,”</em> <em>“who are our search competitors,”</em> <em>“check our backlinks,”</em> or <em>“write an SEO article about underfloor heating.”</em> <strong>What you get:</strong> structured report cards (keyword difficulty/volume/intent, SERP and on-page audits, domain &amp; competitor analysis, backlinks, trends, even YouTube/Amazon/Reddit results), and for articles a researched, planned, written and analysed draft.</p>
+
+  <h2>Find suppliers and grow your CRM <span class="badge gated">admin / owner</span></h2>
+  <p><strong>What it's for:</strong> B2B prospecting. <strong>How:</strong> <em>“find manufacturers of terrazzo in Italy,”</em> then <em>“enrich this company and find a contact,”</em> then <em>“save it to CRM.”</em> <strong>What you get:</strong> sourced companies/contacts (verified emails) you can push straight into <a href="crm.html">CRM</a>.</p>
+
+  <h2>Build a published catalogue from supplier PDFs <span class="badge gated">admin / owner</span></h2>
+  <p><strong>What it's for:</strong> turning supplier PDFs into a branded online catalogue. <strong>How:</strong> <em>“create a catalog,”</em> attach the PDFs, then <em>“extract the materials,”</em> (or <em>“translate this PDF into a catalog”</em>), then <em>“generate the catalog PDF and publish it.”</em> <strong>What you get:</strong> a published catalogue.</p>
+
+  <h2>Set up projects and log expenses</h2>
+  <p><strong>What it's for:</strong> housekeeping from chat. <strong>How:</strong> <em>“create a project called Kavouri Villa and add a task,”</em> or <em>“create a trip card for the Athens visit, add a €40 taxi, and submit it.”</em> <strong>What you get:</strong> a real <a href="projects.html">project</a>/task, or an <a href="finance-op-expense-cards.html">expense card</a> sent to finance.</p>
+
+  <div class="callout tip"><p><strong>Two shortcuts:</strong> type <code>/</code> in the message box to pick an action from a menu instead of describing it; and the composer's buttons (📎 attach, 🎤 voice, 🌐 inspiration link) cover the most common inputs.</p></div>
+  <div class="callout warn"><p><strong>What's available depends on your mode, role and plan.</strong> The design/visualise tasks need <strong>Interior</strong> mode; SEO articles, B2B and catalogs need an <strong>admin/owner</strong> role; price/mention/job tracking needs that module enabled. Generation tasks (images, sheets, 3D/VR, scans) use credits — the assistant tells you the cost before it runs.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>
