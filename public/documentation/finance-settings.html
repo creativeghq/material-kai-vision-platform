@@ -106,20 +106,52 @@
   <p><strong>What it affects:</strong> services become pickable on <a href="finance-documents.html">invoices/quotes</a> and, importantly, in the <a href="pos.html">POS</a> — items only appear in the register if they have a price, and services are priced here.</p>
 
   <!-- 7 -->
-  <h2>7. Team</h2>
-  <p><strong>What it is —</strong> who can work in this workspace, and at what role. <strong>Why it matters —</strong> roles decide which areas a person sees (CRM, Finance, Sales, etc.), so this is how you bring colleagues in safely. This is the platform's <strong>team-invitation</strong> surface.</p>
+  <h2>7. Team — add colleagues and control what they can see</h2>
+  <p>The Team section does two jobs: it shows everyone who already has access to this workspace, and it lets you invite new people by generating a sign-up link tied to a specific role. There are no passwords to set and no seats to buy here — you pick a role, generate a link, and send it.</p>
+
+  <h3>Where it is</h3>
+  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Team</strong> (in the row of settings sub-tabs).</p>
+
+  <h3>What's on the screen</h3>
+  <p>Two stacked areas:</p>
+  <ul class="feat">
+    <li><strong>Members (N)</strong> — the list at the top. Each row is one person who can access the workspace, shown by their email (or a short account id), with a <strong>role badge</strong> on the right — e.g. <em>Admin</em> or <em>Member</em>. This is your at-a-glance "who has access" list.</li>
+    <li><strong>Invite Team Member</strong> — the panel below, where you create an invite: a <strong>Role</strong> dropdown, a one-line description of the role you've picked, and a <strong>Generate invite link</strong> button.</li>
+  </ul>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-team.png" alt="Team section">
-    <figcaption>Team — current Members plus the invite flow.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-team-invite.png" alt="Team section: members list, Role dropdown with its description, Generate invite link, and the generated link">
+    <figcaption>Team — the Members list (top, with role badges), the Role dropdown showing the selected role's description, and the generated invite link with its "valid 30 days" note.</figcaption>
   </figure>
-  <h3>How to invite a team member</h3>
+
+  <h3>The roles you can grant, and exactly what each one can do</h3>
+  <p>When you open the <strong>Role</strong> dropdown you get three choices. The grey line under the dropdown updates to describe whatever you select — so you can confirm the access <em>before</em> you send the invite:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Role</th><th>What that person can do (shown under the dropdown)</th><th>Pick it for…</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Accountant</strong> <span style="color:var(--muted)">(finance ops, no settings)</span></td><td>"Finance only: view invoices/bills/reports, record payments, submit to myDATA. <em>No settings, pricing, CRM, or new documents.</em>"</td><td>A bookkeeper/accountant who reconciles and files but shouldn't change configuration or see customers.</td></tr>
+      <tr><td><strong>Sales rep</strong></td><td>"Sales portal — create quotes/orders for customers. <em>No finance or settings.</em>"</td><td>A salesperson who should live in the <a href="sales.html">Sales portal</a> and raise quotes, but never see the books.</td></tr>
+      <tr><td><strong>Member</strong></td><td>"Standard member access to this workspace."</td><td>A general colleague who needs normal day-to-day access.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>How to invite someone — step by step</h3>
   <ol>
-    <li>Open <strong>Team</strong> — it lists current <strong>Members</strong>.</li>
-    <li>Under <strong>Invite Team Member</strong>, choose the <strong>Role</strong> to grant.</li>
-    <li>Click <strong>Generate invite link</strong> (under <em>Invite &amp; referral links</em>).</li>
-    <li>Send the link to your colleague; when they accept they join this workspace with the role you chose.</li>
+    <li>Go to <strong>Finance → Settings → Team</strong>.</li>
+    <li>In the <strong>Invite Team Member</strong> panel, click the <strong>Role</strong> dropdown and choose a role (e.g. <em>Sales rep</em>).</li>
+    <li>Read the grey description that appears under the dropdown to confirm it grants exactly the access you intend.</li>
+    <li>Click <strong>Generate invite link</strong>. A confirmation pops up — <em>"Invite link created · Copied to clipboard"</em> — and the link appears under <strong>Share this link (valid 30 days)</strong>, e.g. <code>https://app.materialshub.gr/auth?mode=signup&amp;invite=…</code>. It's already on your clipboard; the icon button beside it copies it again.</li>
+    <li><strong>Send that link</strong> to your colleague (email, chat, etc.).</li>
+    <li>They open it, land on the sign-up screen, create their account, and are added to <em>this</em> workspace with the role baked into the link. The link works for <strong>30 days</strong>.</li>
   </ol>
-  <p><strong>What it affects:</strong> who appears in <a href="crm.html">CRM → Users</a> and what each member can access platform-wide (see <a href="getting-started.html">Roles &amp; access</a>).</p>
+
+  <div class="callout tip"><p><strong>Worked example.</strong> You hire a part-time bookkeeper. Open Team, set Role to <strong>Accountant (finance ops, no settings)</strong>, click <strong>Generate invite link</strong>, paste the copied link into an email to them. When they sign up they can open invoices, record payments and submit to myDATA — but the CRM, Pricing and Settings tabs simply won't be available to them, so there's nothing to lock down manually.</p></div>
+
+  <h3>After they join</h3>
+  <p>The new person appears in the <strong>Members</strong> list here with their role badge, and also in <a href="crm.html">CRM → Users</a> (where their role and subscription are managed). The role you chose controls which top-nav areas they see across the whole platform — see <a href="getting-started.html">Getting Started → Roles &amp; access</a> for the full picture.</p>
+
+  <div class="callout"><p><strong>Note:</strong> the three roles above are the ones you can hand out from this invite panel. Higher-level roles such as <em>Admin</em>/<em>Operator</em> (which you'll see on existing members) are managed at the platform/CRM level, not granted through a self-serve invite link.</p></div>
 
   <!-- 8 -->
   <h2>8. General</h2>
