@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Menu, LogOut } from 'lucide-react';
+import { User, Menu, LogOut, Wrench } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -92,6 +92,10 @@ export const Sidebar: React.FC = () => {
         <DropdownMenuItem onClick={() => navigate('/profile')} className="py-3">
           <User className="mr-3 h-4 w-4" />
           <span className="text-sm">My Profile</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate('/tools')} className="py-3">
+          <Wrench className="mr-3 h-4 w-4" />
+          <span className="text-sm">Tools</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

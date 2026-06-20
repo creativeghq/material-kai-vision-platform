@@ -12,8 +12,10 @@ import { Link } from 'react-router-dom';
 import {
   Calculator,
   ChevronRight,
+  Columns3,
   Flame,
   MessageSquareText,
+  ScanSearch,
   ShoppingBag,
   Thermometer,
   type LucideIcon,
@@ -30,6 +32,8 @@ interface ToolEntry {
   description: string;
   icon: LucideIcon;
   badge: string;
+  /** Absolute route to link to. Defaults to `/tools/<slug>` for the public tools. */
+  to?: string;
 }
 
 const TOOLS: ToolEntry[] = [
@@ -67,6 +71,57 @@ const TOOLS: ToolEntry[] = [
   },
 ];
 
+/**
+ * Catalog tools — require a signed-in workspace (they hit MIVAA / the product
+ * catalog), so they're shown only to authenticated users and link to their own
+ * authenticated routes rather than `/tools/<slug>`.
+ */
+const WORKSPACE_TOOLS: ToolEntry[] = [
+  {
+    slug: 'recognition',
+    to: '/recognition',
+    title: 'Material recognition',
+    description:
+      'Upload a photo of a material or surface and identify it — AI vision returns the closest matches from your catalog.',
+    icon: ScanSearch,
+    badge: 'Signed in · AI',
+  },
+  {
+    slug: 'compare',
+    to: '/compare',
+    title: 'Material comparison',
+    description:
+      'Put 2–4 catalog products side by side with property-level diff highlighting. Search and add products right in the tool.',
+    icon: Columns3,
+    badge: 'Signed in · catalog',
+  },
+];
+
+function ToolCard({ tool }: { tool: ToolEntry }) {
+  const Icon = tool.icon;
+  return (
+    <Link to={tool.to ?? `/tools/${tool.slug}`} className="group block">
+      <Card className="dashboard-card h-full transition-colors hover:border-primary/40">
+        <CardContent className="p-5 flex flex-col h-full">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="rounded-xl bg-primary/10 p-2.5">
+              <Icon className="h-5 w-5 text-primary" />
+            </div>
+            <Badge variant="outline" className="rounded-full text-[10px]">
+              {tool.badge}
+            </Badge>
+          </div>
+          <h2 className="text-lg font-semibold mb-1.5 flex items-center gap-1">
+            {tool.title}
+            <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:translate-x-0.5 group-hover:text-primary transition-all" />
+          </h2>
+          <p className="text-sm text-muted-foreground flex-1">{tool.description}</p>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
 export default function ToolsHubPage() {
   const { user, session } = useAuth();
   const accessToken = session?.access_token ?? null;
@@ -86,31 +141,21 @@ export default function ToolsHubPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {TOOLS.map((t) => {
-          const Icon = t.icon;
-          return (
-            <Link key={t.slug} to={`/tools/${t.slug}`} className="group block">
-              <Card className="dashboard-card h-full transition-colors hover:border-primary/40">
-                <CardContent className="p-5 flex flex-col h-full">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="rounded-xl bg-primary/10 p-2.5">
-                      <Icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <Badge variant="outline" className="rounded-full text-[10px]">
-                      {t.badge}
-                    </Badge>
-                  </div>
-                  <h2 className="text-lg font-semibold mb-1.5 flex items-center gap-1">
-                    {t.title}
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:translate-x-0.5 group-hover:text-primary transition-all" />
-                  </h2>
-                  <p className="text-sm text-muted-foreground flex-1">{t.description}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+        {TOOLS.map((t) => <ToolCard key={t.slug} tool={t} />)}
       </div>
+
+      {/* Catalog tools — only for signed-in workspaces (need MIVAA / the catalog). */}
+      {user && (
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold tracking-tight mb-1">Catalog tools</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Available in your workspace — these work over your product catalog.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {WORKSPACE_TOOLS.map((t) => <ToolCard key={t.slug} tool={t} />)}
+          </div>
+        </div>
+      )}
     </ToolsShell>
   );
 }
