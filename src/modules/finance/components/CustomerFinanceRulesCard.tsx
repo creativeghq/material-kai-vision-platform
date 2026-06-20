@@ -100,7 +100,7 @@ export const CustomerFinanceRulesCard: React.FC<Target> = ({ companyId, contactI
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Order rules &amp; sales ownership</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Payment Rules</CardTitle>
         <Button size="sm" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}</Button>
       </CardHeader>
       <CardContent className="p-5 space-y-4">
