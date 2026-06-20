@@ -12,7 +12,7 @@
   <h1>Free Tools</h1>
   <div class="routes"><span class="badge route">/tools</span> <span class="badge public">Public</span></div>
   <p class="lead">A small set of free, no-login utilities for sourcing, pricing and specifying. Each one is useful on its own — and a friendly on-ramp to the rest of the platform. Every tool here is also available inside the <a href="agent-hub.html">Agent Hub</a> assistant, so you can run the same calculations and scans by just asking in plain language.</p>
-  <div class="callout"><p><strong>How to open it:</strong> the free tools are public — open <span class="badge route">/tools</span> (no sign-in required).</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> the free tools are public — open <span class="badge route">/tools</span> (no sign-in required). When you're signed in, the same hub also lists <strong>Catalog tools</strong>, and you can reach it from your <strong>Profile</strong> menu → <strong>Tools</strong>.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/tools.png" alt="The Free Tools hub with cards for each tool">
@@ -26,6 +26,7 @@
     <li><strong>Live web scans</strong> — <em>Price scan</em> and <em>Mention scan</em>. These call real sources across the web, so they're protected by a small daily allowance, a quick bot check, and short-term caching of identical queries (see <a href="#fair-use">Fair use</a> below).</li>
   </ul>
   <p>You don't need an account to use any of them. The header shows your remaining free scans for the day; signing in raises the limit and unlocks ongoing, tracked monitoring with alerts.</p>
+  <p>When you're <strong>signed in</strong>, the hub adds a third group — <strong>Catalog tools</strong> — which work against your workspace catalogue (so they require a login): <a href="recognition.html">Material Recognition</a> and <a href="compare.html">Material Comparison</a> (see below).</p>
 
   <h2>Heat-pump sizer</h2>
   <div class="routes"><span class="badge route">/tools/heat-pump</span> <span class="badge public">Public</span></div>
@@ -108,6 +109,15 @@
   </figure>
   <p>Enter a brand or product and see <strong>recent press mentions</strong> — news, blogs and editorial coverage from the last 30 days — together with the <strong>top outlets</strong> talking about it. Each result shows the headline, a short excerpt, the outlet, the publish date and a link to the article.</p>
   <p>It's a preview of the platform's <strong>mention monitoring</strong>: signing in lets you track a subject continuously and get alerted to spikes in coverage, negative sentiment from reputable outlets, and brand-new outlets picking up the story — instead of a single snapshot. The same capability is available to the assistant in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p>
+
+  <h2>Catalog tools (signed in)</h2>
+  <div class="routes"><span class="badge gated">Signed in</span></div>
+  <p>When you're logged in, the hub shows a <strong>Catalog tools</strong> group. Unlike the public tools above, these work against your workspace catalogue (and the AI vision/search backend), so they require an account and open their own dedicated screens rather than a <code>/tools/&lt;slug&gt;</code> page. They were previously reachable only by typing the URL — now they're grouped here and in the <strong>Profile → Tools</strong> menu.</p>
+  <ul class="feat">
+    <li><strong>Material Recognition</strong> <span class="badge gated">Signed in · AI</span> — drop in a photo and identify the material, its attributes, and matching catalogue products. Opens <a href="recognition.html">Material Recognition</a> (<span class="badge route">/recognition</span>).</li>
+    <li><strong>Material Comparison</strong> <span class="badge gated">Signed in · catalog</span> — put materials side by side to evaluate them. Opens <a href="compare.html">Material Comparison</a> (<span class="badge route">/compare</span>).</li>
+  </ul>
+  <div class="callout"><p>These are kept separate from the free public tools so the "no login needed" promise still holds for the public utilities. The free scans show your remaining daily allowance in the header; Catalog tools simply require being signed in.</p></div>
 
   <h2 id="fair-use">Fair use &amp; limits</h2>
   <p>The two web scans (price and mention) call real, paid sources on every run, so they're kept fair with a few light guards:</p>
