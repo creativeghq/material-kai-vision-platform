@@ -18,7 +18,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticate, isAdminAccess, isServiceRoleRequest } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
 
 Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
   await bootstrapForFunction();
@@ -29,7 +29,7 @@ Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
   // Cron-only privileged fan-out across ALL tenants. Allow the pg_cron caller
   // (service-role bearer) or a platform admin; reject everyone else so an
   // anonymous caller can't force a platform-wide notification/cost run.
-  if (!isServiceRoleRequest(req)) {
+  if (!isCronAuthorized(req)) {
     const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
     if (!auth.success && !isAdminAccess(auth)) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {

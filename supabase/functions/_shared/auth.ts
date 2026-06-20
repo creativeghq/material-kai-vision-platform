@@ -371,6 +371,21 @@ export function isServiceRoleRequest(req: Request): boolean {
 }
 
 /**
+ * True when a cron-only function may run: either the platform service-role
+ * bearer (isServiceRoleRequest) OR a matching `x-cron-secret` header against
+ * CRON_SECRET. pg_cron jobs authenticate one of these two ways. Gate cron-only
+ * functions on THIS rather than only isServiceRoleRequest, so a job keeps
+ * working even when the service-role bearer the scheduler sends drifts from the
+ * function's SUPABASE_SERVICE_ROLE_KEY (e.g. a stale/placeholder vault secret).
+ */
+export function isCronAuthorized(req: Request): boolean {
+  if (isServiceRoleRequest(req)) return true;
+  const provided = req.headers.get('x-cron-secret');
+  const expected = Deno.env.get('CRON_SECRET') || '';
+  return !!expected && provided === expected;
+}
+
+/**
  * Quick helper to check if request is a partner kai_* API key call.
  */
 export function isPartnerApiKeyAccess(auth: AuthResult): boolean {

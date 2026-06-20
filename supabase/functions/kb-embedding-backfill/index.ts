@@ -17,7 +17,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -103,7 +103,7 @@ Deno.serve(withApiLogging('kb-embedding-backfill', async (req: Request) => {
   // Auth — accept service-role bearer (cron / internal) or admin JWT.
   const authHeader = req.headers.get('Authorization') || '';
   const isServiceRole = supabaseServiceKey && authHeader.includes(supabaseServiceKey);
-  if (!isServiceRole) {
+  if (!isServiceRole && !isCronAuthorized(req)) {
     const auth = await authenticate(req, { allowedRoles: ['admin'] });
     if (!auth.success && !isAdminAccess(auth)) {
       return new Response(
