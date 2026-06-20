@@ -11,7 +11,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Link } from 'react-router-dom';
 import {
-  financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill, type Payment, type PartyLedgerRow,
+  financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill, type Payment, type PartyLedgerRow, type CustomerAgingBuckets,
 } from '@/modules/finance/services/financeService';
 import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
 import { ExternalLink } from 'lucide-react';
@@ -26,6 +26,7 @@ interface Props { workspaceId: string; statementsEnabled: boolean; autoOpenParty
 export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, autoOpenParty, financeBase }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<PartyRow[]>([]);
+  const [agingMap, setAgingMap] = useState<Record<string, CustomerAgingBuckets>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<'all' | 'customer' | 'supplier' | 'both'>('all');
@@ -46,8 +47,17 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
   const load = async () => {
     try {
       setLoading(true);
-      const r = await financeService.listParties({ workspaceId, role });
+      const [r, aging] = await Promise.all([
+        financeService.listParties({ workspaceId, role }),
+        financeService.getCustomerAgingBuckets({ workspaceId }),
+      ]);
       setRows(r);
+      const map: Record<string, CustomerAgingBuckets> = {};
+      for (const a of aging) {
+        const key = a.customer_company_id ? `company:${a.customer_company_id}` : a.customer_contact_id ? `contact:${a.customer_contact_id}` : null;
+        if (key) map[key] = a;
+      }
+      setAgingMap(map);
     } catch (err: any) {
       toast({ title: 'Failed to load parties', description: err?.message, variant: 'destructive' });
     } finally {
@@ -68,10 +78,18 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
     });
   }, [rows, search, segment]);
 
-  const totals = useMemo(() => ({
-    rcv: filtered.reduce((acc, r) => acc + Number(r.receivable_outstanding || 0), 0),
-    pay: filtered.reduce((acc, r) => acc + Number(r.payable_outstanding || 0), 0),
-  }), [filtered]);
+  const agingFor = (r: PartyRow) => agingMap[`${r.party_type}:${r.party_id}`];
+
+  const totals = useMemo(() => {
+    let rcv = 0, pay = 0, due_0_30 = 0, due_31_90 = 0, due_90_plus = 0;
+    for (const r of filtered) {
+      rcv += Number(r.receivable_outstanding || 0);
+      pay += Number(r.payable_outstanding || 0);
+      const a = agingMap[`${r.party_type}:${r.party_id}`];
+      if (a) { due_0_30 += Number(a.due_0_30); due_31_90 += Number(a.due_31_90); due_90_plus += Number(a.due_90_plus); }
+    }
+    return { rcv, pay, due_0_30, due_31_90, due_90_plus };
+  }, [filtered, agingMap]);
 
   return (
     <div className="space-y-4">
@@ -114,10 +132,22 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Card className="dashboard-card border-0"><CardContent className="p-3">
           <div className="text-xs text-muted-foreground">Total customers owe</div>
           <div className={`text-lg font-semibold ${totals.rcv > 0 ? 'text-destructive' : ''}`}>{formatMoney(totals.rcv)}</div>
+        </CardContent></Card>
+        <Card className="dashboard-card border-0" title="Outstanding due within the last 30 days"><CardContent className="p-3">
+          <div className="text-xs text-muted-foreground">Overdue 1–30 days</div>
+          <div className="text-lg font-semibold">{formatMoney(totals.due_0_30)}</div>
+        </CardContent></Card>
+        <Card className="dashboard-card border-0" title="Outstanding 31–90 days past due"><CardContent className="p-3">
+          <div className="text-xs text-muted-foreground">Overdue 31–90 days</div>
+          <div className={`text-lg font-semibold ${totals.due_31_90 > 0 ? 'text-amber-500' : ''}`}>{formatMoney(totals.due_31_90)}</div>
+        </CardContent></Card>
+        <Card className="dashboard-card border-0" title="Outstanding more than 90 days past due"><CardContent className="p-3">
+          <div className="text-xs text-muted-foreground">Overdue 90+ days</div>
+          <div className={`text-lg font-semibold ${totals.due_90_plus > 0 ? 'text-destructive' : ''}`}>{formatMoney(totals.due_90_plus)}</div>
         </CardContent></Card>
         <Card className="dashboard-card border-0"><CardContent className="p-3">
           <div className="text-xs text-muted-foreground">We owe suppliers</div>
@@ -164,7 +194,20 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                       </div>
                     </td>
                     <td className="px-4 py-2 text-right">{formatMoney(Number(r.invoiced_total || 0))}</td>
-                    <td className={`px-4 py-2 text-right ${Number(r.receivable_outstanding) > 0 ? 'text-destructive font-medium' : ''}`}>{formatMoney(Number(r.receivable_outstanding || 0))}</td>
+                    <td className={`px-4 py-2 text-right ${Number(r.receivable_outstanding) > 0 ? 'text-destructive font-medium' : ''}`}>
+                      {formatMoney(Number(r.receivable_outstanding || 0))}
+                      {(() => {
+                        const a = agingFor(r);
+                        if (!a || (Number(a.due_0_30) + Number(a.due_31_90) + Number(a.due_90_plus)) <= 0) return null;
+                        return (
+                          <div className="mt-0.5 flex justify-end gap-1.5 text-[9px] font-normal tabular-nums">
+                            {Number(a.due_0_30) > 0 && <span className="text-muted-foreground" title="1–30 days past due">30d {formatMoney(Number(a.due_0_30))}</span>}
+                            {Number(a.due_31_90) > 0 && <span className="text-amber-500" title="31–90 days past due">90d {formatMoney(Number(a.due_31_90))}</span>}
+                            {Number(a.due_90_plus) > 0 && <span className="text-destructive" title="More than 90 days past due">90+ {formatMoney(Number(a.due_90_plus))}</span>}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-2 text-right">{formatMoney(Number(r.payable_outstanding || 0))}</td>
                     <td className={`px-4 py-2 text-right font-medium ${Number(r.net_position) < 0 ? 'text-destructive' : ''}`}>{formatMoney(Number(r.net_position || 0))}</td>
                     <td className="px-4 py-2 text-right">
@@ -180,6 +223,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
 
       <PartyDetailDialog
         party={selected}
+        aging={selected ? agingMap[`${selected.party_type}:${selected.party_id}`] ?? null : null}
         open={selected !== null}
         onClose={() => setSelected(null)}
         statementsEnabled={statementsEnabled}
@@ -193,13 +237,14 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
 
 interface DetailProps {
   party: PartyRow | null;
+  aging: CustomerAgingBuckets | null;
   open: boolean;
   onClose: () => void;
   statementsEnabled: boolean;
   crmBase: string;
 }
 
-const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statementsEnabled, crmBase }) => {
+const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose, statementsEnabled, crmBase }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -360,6 +405,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, open, onClose, statem
               supplier={(party.is_supplier || Number(party.billed_total) > 0 || Number(party.payable_outstanding) > 0)
                 ? { billed: Number(party.billed_total || 0), paid: Number(party.payable_paid_total || 0), outstanding: Number(party.payable_outstanding || 0) }
                 : null}
+              aging={aging ? { not_due: Number(aging.not_due), due_0_30: Number(aging.due_0_30), due_31_90: Number(aging.due_31_90), due_90_plus: Number(aging.due_90_plus) } : null}
             />
 
             <div className="flex flex-col gap-2 sm:flex-row">

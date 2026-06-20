@@ -258,6 +258,28 @@ export interface AgingRow {
   category_name?: string | null;
 }
 
+/**
+ * Per-customer AR aging roll-up (from vw_customer_aging_buckets).
+ * Exclusive buckets by days past due — an outstanding amount lands in exactly one.
+ */
+export interface CustomerAgingBuckets {
+  workspace_id: string;
+  customer_company_id: string | null;
+  customer_contact_id: string | null;
+  party_name: string | null;
+  open_doc_count: number;
+  total_outstanding: number;
+  /** Not yet due / no due date. */
+  not_due: number;
+  /** 1..30 days past due — "last 30 days". */
+  due_0_30: number;
+  /** 31..90 days past due — "more than 30 days". */
+  due_31_90: number;
+  /** >90 days past due — "more than 90 days". */
+  due_90_plus: number;
+  max_days_overdue: number;
+}
+
 export type ManualEntryDirection = 'receivable' | 'payable';
 export type ManualEntryStatus = 'open' | 'partially_paid' | 'paid' | 'void';
 
@@ -1128,6 +1150,28 @@ const _financeServiceCore = {
     return (data ?? []) as AgingRow[];
   },
 
+  /**
+   * Per-customer AR aging buckets (0-30 / 31-90 / 90+ days past due, plus not-due).
+   * One row per customer with an open balance; lets staff see how aged each
+   * customer's debt is at a glance. Optionally scope to a single party.
+   */
+  async getCustomerAgingBuckets(opts?: {
+    workspaceId?: string;
+    companyId?: string;
+    contactId?: string;
+  }): Promise<CustomerAgingBuckets[]> {
+    let q = supabase
+      .from('vw_customer_aging_buckets')
+      .select('*')
+      .order('total_outstanding', { ascending: false });
+    if (opts?.workspaceId) q = q.eq('workspace_id', opts.workspaceId);
+    if (opts?.companyId) q = q.eq('customer_company_id', opts.companyId);
+    if (opts?.contactId) q = q.eq('customer_contact_id', opts.contactId);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as CustomerAgingBuckets[];
+  },
+
   async getFollowUpQueue(workspaceId?: string): Promise<FollowUpRow[]> {
     let q = supabase.from('vw_quote_followup_queue').select('*').order('days_since_activity', { ascending: false });
     if (workspaceId) q = q.eq('workspace_id', workspaceId);
@@ -1307,6 +1351,8 @@ export interface FinanceSettings {
   /** Invoice design template selected for this workspace + per-role color overrides. */
   invoice_template_id: string;
   invoice_template_colors: Record<string, string>;
+  /** How an approved trip card posts to the ledger: planned_payment (auto-reimburse) | none. */
+  trip_expense_reimbursement_mode: 'planned_payment' | 'none';
   updated_at: string;
 }
 
@@ -1524,6 +1570,7 @@ const _financeServiceV2 = {
       'risk_block_inactive_vat','risk_block_unvalidated_vat',
       'risk_warn_over_credit_limit','risk_block_over_credit_limit',
       'invoice_template_id','invoice_template_colors',
+      'trip_expense_reimbursement_mode',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];
     }

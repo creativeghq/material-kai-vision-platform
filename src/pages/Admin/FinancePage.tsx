@@ -20,6 +20,7 @@ import {
   Settings as SettingsIcon,
   Banknote as BanknoteIcon,
   Ban,
+  Plane,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -53,6 +54,7 @@ import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
 import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
+import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
 import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
 import { MarketplaceEarningsTab } from '@/modules/finance/components/MarketplaceEarningsTab';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
@@ -284,6 +286,9 @@ const FinancePage: React.FC = () => {
 
             <TabsTrigger value="planning" className="w-full justify-start">
               <CalendarClock className="h-4 w-4 mr-2" /> Planning
+            </TabsTrigger>
+            <TabsTrigger value="trip_cards" className="w-full justify-start">
+              <Plane className="h-4 w-4 mr-2" /> Trip cards
             </TabsTrigger>
             {!isAccountant && (
               <TabsTrigger value="time" className="w-full justify-start">
@@ -647,6 +652,11 @@ const FinancePage: React.FC = () => {
           {/* ─────────── PLANNING ─────────── */}
           <TabsContent value="planning" className="space-y-4">
             <PlanningTab workspaceId={workspaceId} />
+          </TabsContent>
+
+          {/* ─────────── TRIP CARDS (finance review) ─────────── */}
+          <TabsContent value="trip_cards" className="space-y-4">
+            <TripExpensesPanel workspaceId={workspaceId} canReview={!isAccountant} />
           </TabsContent>
 
           {/* ─────────── TIME & BILLING ─────────── */}

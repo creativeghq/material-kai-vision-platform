@@ -868,6 +868,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'generate_catalog_pdf', 'publish_catalog',
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
+      // Trip cards / sales expenses (all users; 0 cr — DB-only)
+      'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
     ],
@@ -1586,6 +1588,19 @@ async function executeAgent(
   }
   if (config.tools.includes('add_task') && createAddTaskTool) {
     tools.push(createAddTaskTool(userId, onChunk));
+  }
+
+  // Trip cards / sales expenses (all users; 0 cr — DB-only). Self-contained import.
+  if (config.tools.some((t: string) => ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'].includes(t))) {
+    try {
+      const tripMod = await import('../_shared/tools/trip-expense-tools.ts');
+      if (config.tools.includes('create_trip_card')) tools.push(tripMod.createCreateTripCardTool(userId, workspaceId, onChunk));
+      if (config.tools.includes('add_trip_expense')) tools.push(tripMod.createAddTripExpenseTool(userId, workspaceId, onChunk));
+      if (config.tools.includes('list_trip_cards')) tools.push(tripMod.createListTripCardsTool(userId, workspaceId, onChunk));
+      if (config.tools.includes('submit_trip_card')) tools.push(tripMod.createSubmitTripCardTool(userId, workspaceId, onChunk));
+    } catch (tripErr) {
+      console.warn('⚠️ Could not register trip-expense tools:', tripErr);
+    }
   }
 
   // --- Tech Radar (Pepper's background brain) ---

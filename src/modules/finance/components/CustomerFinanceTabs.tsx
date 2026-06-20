@@ -71,8 +71,10 @@ export const CustomerFinanceSummary: React.FC<Target> = ({ contactId, companyId 
 export const PartyAccountSummary: React.FC<{
   customer?: { invoiced: number; paid: number; outstanding: number } | null;
   supplier?: { billed: number; paid: number; outstanding: number; ordered?: number } | null;
+  /** Per-customer AR aging breakdown (exclusive buckets, by days past due). */
+  aging?: { not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null;
   meta?: Array<{ label: string; value: React.ReactNode }>;
-}> = ({ customer, supplier, meta }) => {
+}> = ({ customer, supplier, aging, meta }) => {
   const net = (customer?.outstanding ?? 0) - (supplier?.outstanding ?? 0);
   const netLabel = net > 0 ? 'They owe us (net)' : net < 0 ? 'We owe them (net)' : 'Settled up';
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
@@ -85,6 +87,13 @@ export const PartyAccountSummary: React.FC<{
         <div className={`text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>{value}</div>
       </CardContent>
     </Card>
+  );
+
+  const agingCell = (label: string, value: number, danger = false) => (
+    <div className={`rounded-md border border-border/50 px-2.5 py-1.5 ${danger && value > 0 ? 'border-destructive/40' : ''}`}>
+      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`text-sm font-medium tabular-nums ${danger && value > 0 ? 'text-destructive' : ''}`}>{formatMoney(value)}</div>
+    </div>
   );
 
   return (
@@ -104,6 +113,14 @@ export const PartyAccountSummary: React.FC<{
             {cell('Paid', formatMoney(customer.paid))}
             {cell('They owe us', formatMoney(customer.outstanding), customer.outstanding > 0)}
           </div>
+          {aging && (aging.not_due + aging.due_0_30 + aging.due_31_90 + aging.due_90_plus) > 0 && (
+            <div className="grid grid-cols-4 gap-2 pt-0.5">
+              {agingCell('Not due', aging.not_due)}
+              {agingCell('1–30 days', aging.due_0_30)}
+              {agingCell('31–90 days', aging.due_31_90)}
+              {agingCell('90+ days', aging.due_90_plus, aging.due_90_plus > 0)}
+            </div>
+          )}
         </div>
       )}
 
@@ -142,6 +159,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [lastPayment, setLastPayment] = useState<{ paid_at: string; amount: number; currency: string } | null>(null);
   const [openOrders, setOpenOrders] = useState(0);
   const [topProducts, setTopProducts] = useState<CustomerTopProductRow[]>([]);
+  const [aging, setAging] = useState<{ not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null>(null);
   const [emailing, setEmailing] = useState(false);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
@@ -170,6 +188,13 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
       if (companyId) oq = oq.eq('customer_company_id', companyId);
       const { count } = await oq;
       setOpenOrders(count ?? 0);
+
+      // Per-customer AR aging breakdown (skip for supplier-only views).
+      if (activeWorkspaceId) {
+        const buckets = await financeService.getCustomerAgingBuckets({ workspaceId: activeWorkspaceId, companyId, contactId });
+        const b = buckets[0];
+        setAging(b ? { not_due: Number(b.not_due), due_0_30: Number(b.due_0_30), due_31_90: Number(b.due_31_90), due_90_plus: Number(b.due_90_plus) } : null);
+      }
     } catch (e) {
       console.error('account overview load failed', e);
     } finally {
@@ -215,6 +240,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
       <PartyAccountSummary
         customer={account ? { invoiced: account.invoicedTotal, paid: account.paidTotal, outstanding: account.outstandingTotal } : null}
         supplier={supplierAcct ? { billed: supplierAcct.billedTotal, paid: supplierAcct.paidTotal, outstanding: supplierAcct.outstandingTotal, ordered: supplierAcct.orderedTotal } : null}
+        aging={aging}
         meta={[
           { label: 'Open orders', value: openOrders },
           { label: 'Last payment', value: lastPayment ? new Date(lastPayment.paid_at).toLocaleDateString() : '—' },

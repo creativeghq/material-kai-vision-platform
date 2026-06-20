@@ -104,6 +104,7 @@ const ProjectInviteLandingPage = lazy(() => import('./modules/projects/pages/Inv
 const ProjectAcceptInvitePage = lazy(() => import('./modules/projects/pages/AcceptInvitePage').then(m => ({ default: m.AcceptInvitePage })));
 const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
 const PayInvoicePage = lazy(() => import('./pages/PayInvoicePage'));
+const TripExpensesPage = lazy(() => import('./pages/TripExpensesPage'));
 const PublicStorefrontPage = lazy(() => import('./pages/PublicStorefrontPage'));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 const PlansPage = lazy(() => import('./pages/Admin/PlansPage'));
@@ -237,6 +238,17 @@ const App = () => (
                           </Layout>
                         </EntitlementGuard>
                       </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* Sales-rep trip expense cards — any authenticated workspace member; NOT finance-gated. */}
+                <Route
+                  path="/trip-expenses"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <TripExpensesPage />
+                      </Layout>
                     </AuthGuard>
                   }
                 />

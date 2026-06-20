@@ -1,0 +1,522 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Badge } from '@/components/core/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { formatMoney } from '@/modules/finance/services/financeService';
+import {
+  tripExpenseService, TRIP_EXPENSE_CATEGORIES, TRIP_STATUS_LABEL,
+  type TripExpenseReport, type TripExpenseItem, type TripStatus, type ExpensePaymentMethod,
+} from '@/modules/finance/services/tripExpenseService';
+
+interface Props {
+  workspaceId: string;
+  /** Finance reviewers see every card and can approve/reject lines. Reps see only their own. */
+  canReview: boolean;
+}
+
+const STATUS_VARIANT: Record<TripStatus, 'default' | 'outline' | 'secondary' | 'destructive'> = {
+  draft: 'outline',
+  submitted: 'secondary',
+  partially_approved: 'secondary',
+  approved: 'default',
+  rejected: 'destructive',
+  reimbursed: 'default',
+};
+
+export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) => {
+  const { toast } = useToast();
+  const [reports, setReports] = useState<TripExpenseReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uid, setUid] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+
+  useEffect(() => { void supabase.auth.getUser().then(({ data }) => setUid(data?.user?.id ?? null)); }, []);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId, canReview]);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const rows = await tripExpenseService.listReports({ workspaceId, mine: !canReview });
+      setReports(rows);
+      if (rows.length && !rows.find((r) => r.id === selectedId)) setSelectedId(rows[0].id);
+    } catch (err: any) {
+      toast({ title: 'Failed to load trip cards', description: err?.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold">Trip cards</h3>
+          <p className="text-xs text-muted-foreground">
+            {canReview
+              ? 'Review the sales team’s trip expenses. Approve or reject each line; approved totals can post a reimbursement payable.'
+              : 'Log your trip expenses day by day, attach receipts, and submit them to finance for approval.'}
+          </p>
+        </div>
+        <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New trip card</Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
+        <Card>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : reports.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">No trip cards yet.</div>
+            ) : (
+              <ul className="divide-y divide-border/40">
+                {reports.map((r) => (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(r.id)}
+                      className={`flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/30 ${selectedId === r.id ? 'bg-muted/40' : ''}`}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{r.title}</div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                          {r.destination && <><MapPin className="h-3 w-3" /> {r.destination} ·</>}
+                          {r.item_count} item{r.item_count === 1 ? '' : 's'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium tabular-nums">{formatMoney(Number(r.total_amount), r.currency)}</div>
+                        <Badge variant={STATUS_VARIANT[r.status]} className="text-[10px]">{TRIP_STATUS_LABEL[r.status]}</Badge>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="min-w-0">
+          {selectedId ? (
+            <TripCardDetail
+              key={selectedId}
+              reportId={selectedId}
+              uid={uid}
+              canReview={canReview}
+              onChanged={load}
+              onDeleted={() => { setSelectedId(null); void load(); }}
+            />
+          ) : (
+            <Card><CardContent className="py-16 text-center text-sm text-muted-foreground">Select a trip card to view its expenses.</CardContent></Card>
+          )}
+        </div>
+      </div>
+
+      <NewTripCardDialog
+        workspaceId={workspaceId}
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        onCreated={(id) => { setNewOpen(false); setSelectedId(id); void load(); }}
+      />
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+
+const TripCardDetail: React.FC<{
+  reportId: string;
+  uid: string | null;
+  canReview: boolean;
+  onChanged: () => void;
+  onDeleted: () => void;
+}> = ({ reportId, uid, canReview, onChanged, onDeleted }) => {
+  const { toast } = useToast();
+  const [report, setReport] = useState<TripExpenseReport | null>(null);
+  const [items, setItems] = useState<TripExpenseItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const isOwner = !!report && report.user_id === uid;
+  const isDraft = report?.status === 'draft';
+  const canEditItems = isOwner && isDraft;
+  const canReviewNow = canReview && !!report && report.status !== 'draft';
+
+  const reload = async () => {
+    try {
+      setLoading(true);
+      const { report: r, items: it } = await tripExpenseService.getReport(reportId);
+      setReport(r); setItems(it);
+    } catch (err: any) {
+      toast({ title: 'Failed to load card', description: err?.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { void reload(); /* eslint-disable-next-line */ }, [reportId]);
+
+  const refreshAll = async () => { await reload(); onChanged(); };
+
+  const submit = async () => {
+    try {
+      setBusy(true);
+      await tripExpenseService.submit(reportId);
+      toast({ title: 'Submitted for review' });
+      await refreshAll();
+    } catch (err: any) {
+      toast({ title: 'Could not submit', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const review = async (itemId: string, decision: 'approved' | 'rejected') => {
+    let note: string | undefined;
+    if (decision === 'rejected') {
+      note = window.prompt('Reason for rejecting this expense (optional):') || undefined;
+    }
+    try {
+      setBusy(true);
+      await tripExpenseService.reviewItem(itemId, decision, note);
+      await refreshAll();
+    } catch (err: any) {
+      toast({ title: 'Review failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const removeItem = async (id: string) => {
+    try { await tripExpenseService.removeItem(id); await refreshAll(); }
+    catch (err: any) { toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  const uploadReceipt = async (item: TripExpenseItem, file: File) => {
+    try {
+      setBusy(true);
+      await tripExpenseService.uploadReceipt(item.id, file);
+      toast({ title: 'Receipt attached' });
+      await reload();
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const openReceipt = async (item: TripExpenseItem) => {
+    try {
+      const url = await tripExpenseService.receiptUrl(item.id);
+      if (url) window.open(url, '_blank');
+      else toast({ title: 'No receipt on this line' });
+    } catch (err: any) {
+      toast({ title: 'Could not open receipt', description: err?.message, variant: 'destructive' });
+    }
+  };
+
+  const downloadPdf = async () => {
+    try {
+      setBusy(true);
+      const { pdf_url } = await tripExpenseService.generatePdf(reportId);
+      if (pdf_url) window.open(pdf_url, '_blank');
+    } catch (err: any) {
+      toast({ title: 'PDF failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const deleteCard = async () => {
+    if (!window.confirm('Delete this trip card and all its expenses?')) return;
+    try { await tripExpenseService.deleteReport(reportId); onDeleted(); }
+    catch (err: any) { toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  if (loading || !report) {
+    return <Card><CardContent className="py-16 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-border/60 px-5 py-3 space-y-2">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">{report.title}
+              <Badge variant={STATUS_VARIANT[report.status]} className="text-[10px]">{TRIP_STATUS_LABEL[report.status]}</Badge>
+            </CardTitle>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              {[report.destination, report.purpose].filter(Boolean).join(' · ')}
+              {(report.trip_start || report.trip_end) && <> · {report.trip_start ?? '?'} → {report.trip_end ?? '?'}</>}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {canEditItems && <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Expense</Button>}
+            {canEditItems && report.item_count > 0 && (
+              <Button size="sm" disabled={busy} onClick={submit}><Send className="h-3.5 w-3.5 mr-1" /> Submit</Button>
+            )}
+            <Button size="sm" variant="ghost" disabled={busy} onClick={downloadPdf} title="Download PDF"><FileText className="h-3.5 w-3.5" /></Button>
+            {isOwner && isDraft && (
+              <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={deleteCard} title="Delete card"><Trash2 className="h-3.5 w-3.5" /></Button>
+            )}
+          </div>
+        </div>
+
+        {/* Totals strip */}
+        <div className="grid grid-cols-4 gap-2">
+          <Totals label="Total" value={report.total_amount} currency={report.currency} />
+          <Totals label="Approved" value={report.approved_amount} currency={report.currency} tone="green" />
+          <Totals label="Rejected" value={report.rejected_amount} currency={report.currency} tone="red" />
+          <Totals label="Pending" value={report.pending_amount} currency={report.currency} tone="amber" />
+        </div>
+        {report.reimbursed_at && (
+          <div className="text-[11px] text-emerald-500">Reimbursed on {new Date(report.reimbursed_at).toLocaleDateString()}.</div>
+        )}
+      </CardHeader>
+
+      <CardContent className="p-0">
+        {items.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            No expenses yet.{canEditItems && ' Click “Expense” to add the first line.'}
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground">
+              <tr className="border-b border-border/60">
+                <th className="px-3 py-2 text-left">Date</th>
+                <th className="px-3 py-2 text-left">Category</th>
+                <th className="px-3 py-2 text-left">Description</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2 text-center">Receipt</th>
+                <th className="px-3 py-2 text-center">Status</th>
+                <th className="px-3 py-2 text-right" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={it.id} className="border-b border-border/30 hover:bg-muted/20">
+                  <td className="px-3 py-2 whitespace-nowrap">{it.expense_date}</td>
+                  <td className="px-3 py-2 capitalize">{it.category}</td>
+                  <td className="px-3 py-2">
+                    <div className="truncate max-w-[220px]">{it.description || '—'}</div>
+                    {it.vendor && <div className="text-[10px] text-muted-foreground">{it.vendor}</div>}
+                    {it.review_notes && it.approval_status === 'rejected' && <div className="text-[10px] text-destructive">Rejected: {it.review_notes}</div>}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium">{formatMoney(Number(it.amount), it.currency)}</td>
+                  <td className="px-3 py-2 text-center">
+                    {it.receipt_path ? (
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openReceipt(it)} title={it.receipt_name || 'Open receipt'}><ExternalLink className="h-3.5 w-3.5" /></Button>
+                    ) : canEditItems ? (
+                      <>
+                        <input
+                          ref={(el) => { fileInputs.current[it.id] = el; }}
+                          type="file" accept="image/*,application/pdf" className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadReceipt(it, f); e.currentTarget.value = ''; }}
+                        />
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={busy} onClick={() => fileInputs.current[it.id]?.click()} title="Attach receipt"><Paperclip className="h-3.5 w-3.5" /></Button>
+                      </>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <Badge
+                      variant={it.approval_status === 'approved' ? 'default' : it.approval_status === 'rejected' ? 'destructive' : 'outline'}
+                      className="text-[10px] capitalize"
+                    >{it.approval_status}</Badge>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {canReviewNow ? (
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-500" disabled={busy || it.approval_status === 'approved'} onClick={() => review(it.id, 'approved')} title="Approve"><Check className="h-3.5 w-3.5" /></Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" disabled={busy || it.approval_status === 'rejected'} onClick={() => review(it.id, 'rejected')} title="Reject"><X className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    ) : canEditItems ? (
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => removeItem(it.id)} title="Delete line"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+
+      <AddExpenseDialog
+        reportId={reportId}
+        currency={report.currency}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onAdded={refreshAll}
+      />
+    </Card>
+  );
+};
+
+const Totals: React.FC<{ label: string; value: number; currency: string; tone?: 'green' | 'red' | 'amber' }> = ({ label, value, currency, tone }) => (
+  <div className="rounded-md border border-border/50 px-2.5 py-1.5">
+    <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</div>
+    <div className={`text-sm font-medium tabular-nums ${tone === 'green' ? 'text-emerald-500' : tone === 'red' ? 'text-destructive' : tone === 'amber' ? 'text-amber-500' : ''}`}>{formatMoney(Number(value), currency)}</div>
+  </div>
+);
+
+// ---------------------------------------------------------------------------
+
+const NewTripCardDialog: React.FC<{
+  workspaceId: string;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onCreated: (id: string) => void;
+}> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+  const { toast } = useToast();
+  const [title, setTitle] = useState('');
+  const [destination, setDestination] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [start, setStart] = useState('');
+  const [end, setEnd] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
+    try {
+      setSaving(true);
+      const r = await tripExpenseService.createReport({
+        workspaceId, title: title.trim(),
+        destination: destination.trim() || null, purpose: purpose.trim() || null,
+        trip_start: start || null, trip_end: end || null,
+      });
+      setTitle(''); setDestination(''); setPurpose(''); setStart(''); setEnd('');
+      onCreated(r.id);
+    } catch (err: any) {
+      toast({ title: 'Could not create card', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>New trip card</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Title</label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Athens client visits — June" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Destination</label>
+              <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Athens" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Purpose</label>
+              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Client meetings" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Trip start</label>
+              <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Trip end</label>
+              <Input type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const AddExpenseDialog: React.FC<{
+  reportId: string;
+  currency: string;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onAdded: () => void;
+}> = ({ reportId, currency, open, onOpenChange, onAdded }) => {
+  const { toast } = useToast();
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [category, setCategory] = useState<string>('transport');
+  const [description, setDescription] = useState('');
+  const [vendor, setVendor] = useState('');
+  const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState<ExpensePaymentMethod>('personal');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { toast({ title: 'Enter a valid amount', variant: 'destructive' }); return; }
+    try {
+      setSaving(true);
+      await tripExpenseService.addItem({
+        report_id: reportId, expense_date: date, category,
+        description: description.trim() || null, vendor: vendor.trim() || null,
+        amount: amt, currency, payment_method: method,
+      });
+      setDescription(''); setVendor(''); setAmount('');
+      onOpenChange(false);
+      onAdded();
+    } catch (err: any) {
+      toast({ title: 'Could not add expense', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Add expense</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Date</label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Category</label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TRIP_EXPENSE_CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Description</label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Taxi airport → hotel" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Vendor</label>
+              <Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Beat / hotel name" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Amount ({currency})</label>
+              <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Paid with</label>
+              <Select value={method} onValueChange={(v: any) => setMethod(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">Personal funds</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="company_card">Company card</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default TripExpensesPanel;

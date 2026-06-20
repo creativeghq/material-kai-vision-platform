@@ -115,6 +115,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         risk_block_unvalidated_vat: settings.risk_block_unvalidated_vat,
         risk_warn_over_credit_limit: settings.risk_warn_over_credit_limit,
         risk_block_over_credit_limit: settings.risk_block_over_credit_limit,
+        trip_expense_reimbursement_mode: settings.trip_expense_reimbursement_mode,
       });
       setSettings(updated);
       onSettingsChanged(updated);
@@ -390,6 +391,26 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             <label className="flex items-center justify-between gap-3">
               <span className="text-xs"><strong>Block</strong> (instead of warn) when over the credit limit</span>
               <Switch checked={settings.risk_block_over_credit_limit} onCheckedChange={(v) => set('risk_block_over_credit_limit', v)} />
+            </label>
+          </div>
+
+          {/* Trip cards — how an approved sales-team trip card posts to the ledger. */}
+          <div className="rounded-md border border-border/60 p-3 space-y-3">
+            <div>
+              <div className="text-sm font-medium">Trip cards (sales expenses)</div>
+              <p className="text-xs text-muted-foreground">
+                When finance approves a rep's trip card, decide whether the approved total is auto-posted as a reimbursement payable (shows in Planning / Payables and can be marked paid).
+              </p>
+            </div>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs">
+                <strong>Auto-create a reimbursement payable</strong> on approval
+                <span className="block text-muted-foreground">Off = approval-only; finance handles reimbursement outside the platform.</span>
+              </span>
+              <Switch
+                checked={settings.trip_expense_reimbursement_mode === 'planned_payment'}
+                onCheckedChange={(v) => set('trip_expense_reimbursement_mode', v ? 'planned_payment' : 'none')}
+              />
             </label>
           </div>
 
