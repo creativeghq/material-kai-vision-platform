@@ -8,6 +8,7 @@ import {
   CustomerInvoicesTab,
   CustomerPaymentsTab,
 } from '@/modules/finance/components/CustomerFinanceTabs';
+import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import CompanySEOPanel from '@/components/business/seo-toolkit/CompanySEOPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -1239,6 +1240,7 @@ export const CompanyDetailPage: React.FC = () => {
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
             {company.id && <CustomerAccountOverview companyId={company.id} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />}
+            {company.id && <CustomerFinanceRulesCard companyId={company.id} />}
           </TabsContent>
 
           {/* Quotes Tab */}

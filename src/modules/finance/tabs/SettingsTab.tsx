@@ -115,6 +115,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         risk_block_unvalidated_vat: settings.risk_block_unvalidated_vat,
         risk_warn_over_credit_limit: settings.risk_warn_over_credit_limit,
         risk_block_over_credit_limit: settings.risk_block_over_credit_limit,
+        min_order_value: settings.min_order_value,
+        default_credit_limit: settings.default_credit_limit,
+        risk_block_min_order: settings.risk_block_min_order,
+        risk_block_unpaid_invoice: settings.risk_block_unpaid_invoice,
         trip_expense_reimbursement_mode: settings.trip_expense_reimbursement_mode,
       });
       setSettings(updated);
@@ -392,6 +396,33 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
               <span className="text-xs"><strong>Block</strong> (instead of warn) when over the credit limit</span>
               <Switch checked={settings.risk_block_over_credit_limit} onCheckedChange={(v) => set('risk_block_over_credit_limit', v)} />
             </label>
+
+            <div className="pt-2 border-t border-border/60 space-y-3">
+              <p className="text-xs font-medium">Order rules <span className="text-muted-foreground font-normal">— defaults; each customer can override these in CRM</span></p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1">
+                  <span className="block text-[11px] text-muted-foreground">Default credit / balance hold (€)</span>
+                  <input type="number" step="0.01" min="0" value={settings.default_credit_limit ?? ''}
+                    onChange={(e) => set('default_credit_limit', e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="No limit" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
+                </label>
+                <label className="space-y-1">
+                  <span className="block text-[11px] text-muted-foreground">Minimum order value (€)</span>
+                  <input type="number" step="0.01" min="0" value={settings.min_order_value ?? ''}
+                    onChange={(e) => set('min_order_value', e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="No minimum" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
+                </label>
+              </div>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs"><strong>Block</strong> issuance when the order is below the minimum value</span>
+                <Switch checked={settings.risk_block_min_order} onCheckedChange={(v) => set('risk_block_min_order', v)} />
+              </label>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs"><strong>Block</strong> issuance while the buyer has an <strong>unpaid / overdue</strong> invoice</span>
+                <Switch checked={settings.risk_block_unpaid_invoice} onCheckedChange={(v) => set('risk_block_unpaid_invoice', v)} />
+              </label>
+              <p className="text-[11px] text-muted-foreground">A blocked issuance raises an approval request and notifies the responsible sales team via Flows; an approver can release it.</p>
+            </div>
           </div>
 
           {/* Expense cards — how an approved expense card (trip, monthly, …) posts to the ledger. */}

@@ -1231,6 +1231,25 @@ const _financeServiceCore = {
     };
   },
 
+  /** Effective order/credit limits for a buyer (per-customer override → workspace default). */
+  async getBuyerFinanceLimits(opts: { workspaceId: string; companyId?: string; contactId?: string }): Promise<{
+    credit_limit: number | null;
+    min_order_value: number | null;
+    payment_terms_days: number | null;
+    warn_over_credit_limit: boolean;
+    block_over_credit_limit: boolean;
+    block_min_order: boolean;
+    block_unpaid_invoice: boolean;
+  }> {
+    const { data, error } = await supabase.rpc('get_buyer_finance_limits', {
+      p_workspace_id: opts.workspaceId,
+      p_company_id: opts.companyId ?? null,
+      p_contact_id: opts.contactId ?? null,
+    });
+    if (error) throw error;
+    return data as any;
+  },
+
   async getSupplierAccount(opts: { contactId?: string; companyId?: string }): Promise<{
     poCount: number;
     orderedTotal: number;
@@ -1343,11 +1362,16 @@ export interface FinanceSettings {
   auto_statement_min_balance: number;
   auto_statement_side: 'customer' | 'supplier' | 'both';
   auto_statement_last_run_at: string | null;
-  /** Buyer risk-gate rules enforced at invoice issuance (ΑΑΔΕ status + credit limit). */
+  /** Buyer risk-gate rules enforced at invoice issuance (ΑΑΔΕ status + credit limit + order rules). */
   risk_block_inactive_vat: boolean;
   risk_block_unvalidated_vat: boolean;
   risk_warn_over_credit_limit: boolean;
   risk_block_over_credit_limit: boolean;
+  /** Order rules: workspace defaults (overridable per-customer in CRM). */
+  min_order_value: number | null;
+  default_credit_limit: number | null;
+  risk_block_min_order: boolean;
+  risk_block_unpaid_invoice: boolean;
   /** Invoice design template selected for this workspace + per-role color overrides. */
   invoice_template_id: string;
   invoice_template_colors: Record<string, string>;
@@ -1569,6 +1593,7 @@ const _financeServiceV2 = {
       'auto_statement_only_outstanding','auto_statement_min_balance','auto_statement_side',
       'risk_block_inactive_vat','risk_block_unvalidated_vat',
       'risk_warn_over_credit_limit','risk_block_over_credit_limit',
+      'min_order_value','default_credit_limit','risk_block_min_order','risk_block_unpaid_invoice',
       'invoice_template_id','invoice_template_colors',
       'trip_expense_reimbursement_mode',
     ] as const) {

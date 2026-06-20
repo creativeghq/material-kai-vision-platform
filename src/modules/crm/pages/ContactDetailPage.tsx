@@ -8,6 +8,7 @@ import {
   CustomerInvoicesTab,
   CustomerPaymentsTab,
 } from '@/modules/finance/components/CustomerFinanceTabs';
+import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -1156,6 +1157,7 @@ export const ContactDetailPage: React.FC = () => {
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
             {contact.id && <CustomerAccountOverview contactId={contact.id} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />}
+            {contact.id && <CustomerFinanceRulesCard contactId={contact.id} />}
           </TabsContent>
 
           {/* Quotes Tab */}
