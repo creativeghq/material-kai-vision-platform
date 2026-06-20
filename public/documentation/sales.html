@@ -11,43 +11,54 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Sales Portal</div>
   <h1>Sales Portal</h1>
   <div class="routes"><span class="badge route">/sales</span> <span class="badge gated">sales.portal</span></div>
-  <p class="lead">A focused workspace for sales representatives — your own orders, quotes, customers and opportunities, kept separate from the full back-office so you can concentrate on selling.</p>
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Sales</strong> (shown only to accounts with the sales capability) — or open <span class="badge route">/sales</span>.</p></div>
+  <p class="lead">The Sales Team portal is a focused workspace where sales reps build <strong>orders and quotes for their customers</strong>, track each one through to acceptance, and log their trip expenses — without seeing the full finance back-office. This guide covers what's on the screen, how to raise an order step-by-step, the status lifecycle, and the rep's other tools.</p>
 
-  <div class="callout warn"><p><strong>Access note:</strong> the Sales Portal is restricted to accounts that hold the <code>sales.portal</code> capability. Anyone without it — including operators who haven't been granted it — sees an <strong>“Access Restricted”</strong> card that states their current access level instead of the portal. Because the page is gated this way, this guide is written without a screenshot.</p></div>
+  <h2>What it is &amp; who it's for</h2>
+  <p>It's the rep-facing slice of the platform. A rep lands here (instead of Finance/CRM admin) and works a simple list of their own orders. Each "order" is effectively a quote raised on behalf of a customer: name it, attach the customer, add products, and submit it. It pairs with the <a href="agent-hub.html">Agent Hub</a> for logging sales-trip expenses, and with <a href="crm.html">CRM</a> for the customer records.</p>
 
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/sales/sales.png" alt="Sales Portal access restricted"><figcaption>For accounts without the sales capability, the Sales Portal shows an “Access Restricted” notice with the current access level.</figcaption></figure>
+  <h2>How to open it</h2>
+  <p>Top navigation → <strong>Sales</strong> (shown only to accounts with the <code>sales.portal</code> capability), or open <span class="badge route">/sales</span> directly.</p>
+  <div class="callout warn"><p><strong>Access note:</strong> the portal is gated. Accounts <em>without</em> the sales capability (including operators who haven't been granted it) see an <strong>"Access Restricted"</strong> screen showing their current access level — so the screenshot below is the gate, not the portal. To get in, ask a workspace administrator to grant the sales role (via <a href="finance-settings-team.html">Finance → Settings → Team</a> or CRM user management).</p></div>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/sales/sales.png" alt="Sales Portal access-restricted gate">
+    <figcaption>For accounts without the sales capability, the portal shows an Access Restricted notice with the current access level.</figcaption>
+  </figure>
 
-  <h2>What this area is for</h2>
-  <p><strong>What it is —</strong> a streamlined, rep-only view of one person's own selling activity. Instead of navigating the whole platform, a sales rep works from a single screen built around the day-to-day selling loop: see your orders, start a new one for a customer, and hand off to the full quote builder to add products and pricing. <strong>Why it matters —</strong> it removes the noise. A rep doesn't need Finance, Projects or the rest of the back office to do their job, so the portal gives them exactly the slice they need and keeps everything else out of the way. It complements — and links into — the <a href="quotes.html">Quotes</a> and <a href="crm.html">CRM</a> areas without exposing the entire workspace.</p>
-  <p><strong>Why it's role-gated —</strong> the portal is deliberately walled off behind the <code>sales.portal</code> capability for two reasons. First, <strong>privacy between reps</strong>: you only ever see <strong>your own</strong> orders, so one rep never sees another rep's pipeline. Second, <strong>scope control</strong>: gating it means a rep account can be handed out without also granting access to sensitive workspace areas. The capability is the single switch that turns the whole portal on for an account.</p>
-
-  <h2>What you'll find on the page</h2>
-  <p>Once you have access, the portal is one focused screen made of three parts:</p>
+  <h2>What's on the screen (for a sales rep)</h2>
+  <p>The portal header reads <em>"Create orders and quotes for your customers."</em> Below it:</p>
   <ul class="feat">
-    <li><strong>Summary stats</strong> — quick counts across your orders (total, submitted, accepted and drafts), so you can read your own pipeline at a glance without opening anything.</li>
-    <li><strong>My Orders</strong> — a table of every order you've created, showing the order name, customer, status, item count and creation date. Each row opens the order so you can pick up where you left off.</li>
-    <li><strong>New Order</strong> — the button that starts a fresh order for a customer (walked through below).</li>
+    <li><strong>Four summary cards</strong> — <strong>Total Orders</strong>, <strong>Submitted</strong>, <strong>Accepted</strong>, <strong>Drafts</strong> — your pipeline at a glance.</li>
+    <li><strong>Your orders list</strong> — a table of the orders you've created, with columns <strong>Order</strong> (its name), <strong>Customer</strong>, <strong>Status</strong>, <strong>Created</strong> and <strong>Actions</strong>. Each customer links through to their <a href="crm.html">CRM</a> detail. Empty state: <em>"No orders yet. Create one for a customer to get started."</em></li>
+    <li><strong>New order</strong> — the button that opens the create dialog.</li>
   </ul>
 
-  <h2>Creating an order</h2>
-  <p><strong>What it is —</strong> the rep's core action: turning a customer and a job name into a working draft. <strong>Why it matters —</strong> it's the fastest path from "a customer wants something" to a real, priced document, and it reuses the same engine as the rest of the platform so nothing is a throwaway. Choosing <strong>New Order</strong> opens a short dialog:</p>
+  <h2>Step by step: raise an order/quote for a customer</h2>
   <ol>
-    <li><strong>Pick a customer</strong> — search your existing CRM contacts and companies by name or email, or use <strong>Quick add</strong> to create a new contact on the spot (name required, email optional).</li>
-    <li><strong>Name the order</strong> — give it a clear title, e.g. a project or job name.</li>
-    <li><strong>Create &amp; add products</strong> — this starts the order as a draft quote and takes you straight into the full quote detail screen, where you build the line items from the catalogue.</li>
+    <li>Click <strong>New order</strong> — the <em>New order</em> dialog opens.</li>
+    <li>Under <strong>Customer</strong>, search your contacts/companies and pick one. If the customer isn't in CRM yet, add them inline (a quick contact create) — then they're selected. (If you skip this, the portal warns <em>"Pick a customer first."</em>)</li>
+    <li>Give the order a <strong>name</strong> (e.g. "Kavouri villa — bathroom package"). Leaving it blank prompts <em>"Name the order."</em></li>
+    <li>Click <strong>Create</strong>. The order is created as a <strong>draft</strong> and appears in your list.</li>
+    <li>Open the order and <strong>add products</strong> to it (catalogue or custom lines) — it builds exactly like a <a href="quotes-build.html">quote</a>.</li>
+    <li>When it's ready, <strong>submit</strong> it. As the customer responds, the status moves to <strong>accepted</strong>.</li>
   </ol>
-  <div class="callout tip"><p>An order in the Sales Portal is a <a href="quotes.html">quote</a> under the hood, so everything the quote builder offers — catalogue products, custom line items, pricing and document output — applies once you continue into it. Customers come from your <a href="crm.html">CRM</a>, and customer names in the orders table link straight back to the matching CRM record.</p></div>
 
-  <h2>Getting access</h2>
-  <p><strong>Why you might be blocked —</strong> if you open <span class="badge route">/sales</span> and see the <strong>“Access Restricted”</strong> card, your account simply doesn't hold the <code>sales.portal</code> capability yet. It isn't a fault; the portal is hidden from anyone without the rep capability by design.</p>
-  <h3>How to get the portal</h3>
-  <ol>
-    <li>Ask a <strong>workspace administrator</strong> to grant your account the <strong>sales</strong> capability.</li>
-    <li>Refresh the app once they've enabled it.</li>
-    <li><strong>Sales</strong> now appears in the top navigation and opens the rep portal for you.</li>
-  </ol>
-  <p><strong>What it affects:</strong> the moment the capability is granted, you get the full portal — your summary stats, your private My Orders list, and the New Order flow described above.</p>
+  <h2>The status lifecycle</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Draft</strong></td><td>Created but not yet sent — still editable.</td></tr>
+      <tr><td><strong>Submitted</strong></td><td>Sent to the customer / handed off.</td></tr>
+      <tr><td><strong>Accepted</strong></td><td>The customer accepted it.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The summary cards count each status so a rep (or their manager) can see how many orders are in flight versus closed.</p>
+
+  <h2>Trip expenses (via the assistant)</h2>
+  <p>Reps log expenses for customer visits straight from the <a href="agent-hub.html">Agent Hub</a> (JARVIS): ask it to <em>create a trip card</em>, <em>add an expense</em> to it, <em>list your trip cards</em>, and <em>submit</em> the card when the trip's done. Submitted trip cards surface as expense cards on the <a href="finance.html">Finance</a> side for approval/reimbursement.</p>
+  <div class="callout tip"><p><strong>Worked example.</strong> A rep visits a hotel client: in Agent Hub they say <em>"create a trip card for the Athens hotel visit"</em>, then <em>"add a €40 taxi expense"</em> and <em>"add a €25 lunch expense"</em>, and finally <em>"submit the trip card"</em> — finance then sees it as a trip-expense card.</p></div>
+
+  <h2>How to get access</h2>
+  <p>If you should have the portal but see the restriction, ask a workspace administrator to grant you the <strong>sales</strong> capability. Once enabled, <strong>Sales</strong> appears in the top navigation and opens the portal. Reps also get read access to <a href="crm.html">CRM customer details</a> for the customers they work with.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

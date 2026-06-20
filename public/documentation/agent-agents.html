@@ -3,64 +3,88 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Agents | MaterialsHub Documentation</title>
+<title>AI Agents (Modes) | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="agent-hub.html">Agent Hub</a> / AI Agents</div>
-  <h1>AI Agents</h1>
+  <h1>AI Agents (Modes)</h1>
   <div class="routes"><span class="badge route">/agent-hub</span></div>
-  <p class="lead">The Agent Hub offers several specialised assistants. They share the same chat surface and the same underlying tools, but differ in personality, focus, and which capabilities they emphasise. This guide explains what each agent is, why it exists, and — most importantly — <strong>when to use which</strong>.</p>
+  <p class="lead">The Agent Hub runs several distinct <strong>agents</strong> (modes). They share the same chat window but have different jobs, different toolsets, and even different underlying models. Picking the right one changes what the assistant can actually <em>do</em> for you. This page explains each agent: what it is, who it's for, exactly what it can do, a real example workflow, and what results you get back.</p>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/agent-picker.png" alt="Agent selector showing JARVIS, Interior and Demo">
-    <figcaption>Choose your agent from the selector above the message box.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/agent-picker.png" alt="Agent selector showing JARVIS, Interior and Demo above the composer">
+    <figcaption>Pick the mode from the selector above the message box: <strong>JARVIS</strong> (KAI), <strong>Interior</strong> (Interior Designer) and <strong>Demo</strong>.</figcaption>
   </figure>
 
-  <!-- intro -->
-  <h2>Choosing an agent</h2>
-  <p><strong>What it is —</strong> the agent selector sits directly above the composer. <strong>Why it matters —</strong> switching agent changes the assistant's framing and default behaviour for that conversation, so the choice shapes how it interprets and answers you. <strong>How:</strong> click the selector, pick the agent that fits the task, then type your request. You can start different conversations with different agents, so it's fine to keep one thread on JARVIS and another on Interior.</p>
+  <h2>How to switch mode</h2>
+  <ol>
+    <li>Open <strong>Agent Hub</strong> from the top navigation and click <strong>New Conversation</strong>.</li>
+    <li>Above the message box, click <strong>JARVIS</strong>, <strong>Interior</strong> or <strong>Demo</strong>.</li>
+    <li>Type your request. The mode you picked decides which tools the assistant may use for that conversation — you can keep one thread on JARVIS and another on Interior at the same time.</li>
+  </ol>
+  <div class="callout"><p><strong>Why the mode matters:</strong> each agent is given a different set of tools. JARVIS can search, research, monitor and automate; the Interior Designer can generate 3D rooms, relight images and build presentation sheets. Ask the Interior agent for an SEO audit and it won't have that tool; ask JARVIS to relight a room and it won't have that one. Match the mode to the job.</p></div>
 
-  <!-- 1 -->
-  <h2>1. JARVIS — the default assistant</h2>
-  <p><strong>What it is —</strong> JARVIS is the general-purpose “Material Intelligence” agent: <em>search, insights, research &amp; content</em>. It has the broadest tool access and can chain steps together. <strong>Why it matters —</strong> it's the right choice for almost everything, which means you rarely have to think about agent selection at all.</p>
+  <!-- KAI -->
+  <h2>1. JARVIS — the material-intelligence agent (default)</h2>
+  <p><strong>What it is —</strong> the general-purpose powerhouse, branded <em>JARVIS</em> (internally the “KAI” agent). It runs on a top-tier model and has by far the widest toolset. <strong>Who it's for —</strong> everyone, for almost everything: finding materials, researching, monitoring, and producing content. If you're unsure which mode to use, use this one.</p>
+  <h3>What it can do (and what you get back)</h3>
   <ul class="feat">
-    <li><strong>Best for:</strong> catalogue search, product discovery, research, automation, content.</li>
-    <li><strong>Strength:</strong> breadth — it can reach the full toolkit and chain steps together.</li>
+    <li><strong>Search your catalogue</strong> — material search, visual search and a knowledge-base search. <em>Result:</em> product cards (and an explainable “search spec” card showing the colours/materials/styles it matched on).</li>
+    <li><strong>Analyse an inspiration URL</strong> — paste a web page; it extracts the palette, materials and style and finds matching products. <em>Result:</em> an inspiration card + product matches.</li>
+    <li><strong>Free calculators</strong> — heat-pump sizing and heating-cost comparison, answered inline.</li>
+    <li><strong>Price &amp; mention monitoring</strong> — start tracking a product's price or a brand's mentions, pull a summary, check “LLM visibility” (whether AI assistants recommend it), and surface negative mentions. <em>Result:</em> tracked subjects + summary cards (see <a href="agent-tools.html">Tools &amp; Capabilities</a>).</li>
+    <li><strong>Job research</strong> — set up a recurring job search, list your searches, fetch matches, preview the daily digest.</li>
+    <li><strong>A full SEO suite</strong> — keyword research/difficulty/intent/volume, SERP &amp; URL audits, domain snapshots, ranked keywords, competitor &amp; keyword-gap analysis, backlinks, site crawls, content sentiment, Google Trends, YouTube/Amazon/Reddit/Pinterest/Trustpilot search, brand-search and site-review audits — and an end-to-end SEO article pipeline (research → plan → write → analyse).</li>
+    <li><strong>B2B research</strong> (admin/owner) — manufacturer web search, website scrape, company enrichment, contact discovery, email validation, and save-to-CRM.</li>
+    <li><strong>Presentation catalogs</strong> (admin/owner) — create a catalog, attach/extract from PDFs, translate a PDF into a catalog, add materials, generate the catalog PDF and publish it.</li>
+    <li><strong>Projects &amp; sales admin</strong> — create a project and add tasks; create <strong>trip cards</strong> and log <strong>sales-trip expenses</strong> (see <a href="sales.html">Sales</a>).</li>
   </ul>
-  <p><strong>When to use it:</strong> finding materials and products, answering questions about your catalogue, running price/mention/job research, generating images, and producing content. If you're unsure which agent to pick, start here.</p>
+  <div class="callout tip"><p><strong>Example.</strong> Type: <em>“find 5 matte grey porcelain tiles for a hotel bathroom, then start tracking the cheapest one's price.”</em> JARVIS runs a material search (returns product cards + a search-spec card), you pick one, and it sets up price monitoring on it — all in the same thread.</p></div>
+  <p class="lead" style="font-size:15px"><strong>Note on access:</strong> the core tools (search, inspiration-URL, calculators, monitoring, jobs, projects) are available to everyone. The B2B, catalog and some SEO-article tools are gated to <strong>admin/owner</strong> roles — JARVIS simply won't offer those if your role doesn't allow them.</p>
 
-  <!-- 2 -->
-  <h2>2. Interior Designer</h2>
-  <p><strong>What it is —</strong> an agent tuned for spatial and aesthetic work. It leans into the visual tools — building moodboards and <a href="moodboards.html">presentation sheets</a>, virtual staging, lighting and render workflows, palette and material selection — and frames its responses around design intent (style, mood, room type, finishes). <strong>Why it matters —</strong> design-aware framing produces answers that think about how a space looks and feels, not just which items match keywords.</p>
+  <!-- Interior -->
+  <h2>2. Interior Designer — the design &amp; visualisation agent</h2>
+  <p><strong>What it is —</strong> a design-focused agent (runs on the most capable model for design reasoning). It thinks in terms of space, style and finishes, and — crucially — it has the <strong>image-generation and image-editing</strong> tools that JARVIS doesn't. <strong>Who it's for —</strong> interior designers and anyone turning a room or a brief into visuals and a client-ready scheme.</p>
+  <h3>What it can do (and what you get back)</h3>
   <ul class="feat">
-    <li><strong>Best for:</strong> concept development, room schemes, FF&amp;E selection, client-facing visuals.</li>
-    <li><strong>Strength:</strong> design-aware reasoning and the creative/visual toolset.</li>
+    <li><strong>Find materials for a scheme</strong> — material search framed around style/mood/room type. <em>Result:</em> product cards.</li>
+    <li><strong>Generate a 3D room / design</strong> (<code>generate_3d</code>) — produces a rendered design; runs asynchronously and returns a job that fills in when ready. <em>Result:</em> a generated room image.</li>
+    <li><strong>Re-light a room (the “edit”)</strong> (<code>apply_lighting_preset</code>) — take a room image already in the conversation and re-render it under a chosen lighting preset (daylight, golden hour, evening, showroom, night…). <em>Result:</em> the same room under different lighting, so you can show a client how a space reads at different times.</li>
+    <li><strong>Build a VR walkthrough</strong> (<code>generate_vr_world</code>) — turn a room image into an explorable 3D world you can embed in a project's <a href="projects-client-view.html">Client View</a>.</li>
+    <li><strong>Analyse an inspiration URL</strong> — same palette/material/style extraction as JARVIS, to seed a scheme from a reference.</li>
+    <li><strong>Produce presentation sheets</strong> (<code>generate_presentation_sheet</code>) — material boards, colour palettes, lighting plans, annotated renders, FF&amp;E schedules, area breakdowns, full decks (see <a href="moodboards-sheets.html">Presentation sheets</a>).</li>
+    <li><strong>Organise the work</strong> — create a project and add tasks so the scheme has a home.</li>
   </ul>
-  <p><strong>When to use it:</strong> switch to Interior Designer when the task is about how a space should look and feel — developing a concept, putting together a room scheme, selecting FF&amp;E, or preparing visuals for a client.</p>
+  <h3>Example: a full Interior Designer workflow</h3>
+  <ol>
+    <li>Switch to <strong>Interior</strong>, attach a photo of the empty room (or describe it).</li>
+    <li>Ask it to <em>generate a 3D design</em> in a given style — it returns a rendered room.</li>
+    <li>Ask it to <em>apply an “evening / warm” lighting preset</em> to that render — it returns the relit version (the editing step).</li>
+    <li>Ask for <em>matching materials</em> — product cards you can save to a <a href="moodboards.html">moodboard</a>.</li>
+    <li>Ask it to <em>generate a VR walkthrough</em> and an <em>FF&amp;E / area-breakdown sheet</em>.</li>
+    <li>Bundle the render, the VR world and the sheets into a <a href="projects-client-view.html">Client View</a> for the client.</li>
+  </ol>
+  <div class="callout"><p>The image-driven tools (lighting preset, VR world) need a room image already in the conversation — generate or attach one first, then ask to edit it.</p></div>
 
-  <!-- 3 -->
-  <h2>3. Demo</h2>
-  <p><strong>What it is —</strong> a lightweight assistant intended for quick demonstrations and trying out the chat experience. <strong>Why it matters —</strong> it's a fast, low-cost way to see how the Agent Hub behaves before committing to real work. <strong>When to use it:</strong> when you just want to explore or show someone how the chat works.</p>
+  <!-- Demo -->
+  <h2>3. Demo — the showcase agent</h2>
+  <p><strong>What it is —</strong> a lightweight showcase mode for demonstrating the chat experience quickly and cheaply. <strong>Who it's for —</strong> trying things out or showing someone how the Agent Hub feels before committing to real work. It has no specialised tools and is intended for admins/owners running a demo.</p>
 
-  <!-- relate -->
-  <h2>How agents relate to tools</h2>
-  <p>All agents draw from the same underlying <a href="agent-tools.html">tool catalogue</a>. What differs is emphasis and access — the table below summarises the focus and the tools each agent tends to reach for.</p>
+  <!-- compare -->
+  <h2>Quick comparison</h2>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Agent</th><th>Focus</th><th>Typical tools emphasised</th></tr></thead>
+    <thead><tr><th>Agent</th><th>Best for</th><th>Signature tools</th><th>Result types</th></tr></thead>
     <tbody>
-      <tr><td>JARVIS</td><td>General material intelligence</td><td>Search, research (price/mention/jobs), image generation, content, web/manufacturer search</td></tr>
-      <tr><td>Interior Designer</td><td>Design &amp; visualisation</td><td>Moodboards, presentation sheets, virtual staging, inspiration-URL, lighting/render</td></tr>
-      <tr><td>Demo</td><td>Quick trial</td><td>Core chat + search</td></tr>
+      <tr><td><strong>JARVIS</strong> (KAI)</td><td>Search, research, monitoring, automation, content, SEO, B2B</td><td>Material/visual/KB search, inspiration-URL, price/mention/job monitoring, SEO suite, B2B, catalogs, projects, trip cards</td><td>Product &amp; search-spec cards, inspiration cards, monitoring summaries, SEO reports, catalogs</td></tr>
+      <tr><td><strong>Interior Designer</strong></td><td>Designing &amp; visualising a space</td><td>generate_3d, apply_lighting_preset, generate_vr_world, presentation sheets, material search, inspiration-URL</td><td>3D renders, relit images, VR walkthroughs, A3 sheets, product cards</td></tr>
+      <tr><td><strong>Demo</strong></td><td>Quick trial / showcase</td><td>—</td><td>Plain chat</td></tr>
     </tbody>
   </table>
   </div>
-
-  <div class="callout"><p><strong>Access &amp; roles:</strong> core tools are available to everyone. Some advanced tools (certain research, B2B and SEO capabilities) are gated to higher roles/plans, so the toolkit you see may be larger or smaller than another user's.</p></div>
-
-  <div class="callout tip"><p><strong>Tip:</strong> not sure which to pick? Start with <strong>JARVIS</strong>. Switch to <strong>Interior Designer</strong> when the task is about how a space should look and feel.</p></div>
+  <p>The full catalogue of every tool (with what each returns) is on <a href="agent-tools.html">Tools &amp; Capabilities</a>. Legacy entry points <code>search</code>, <code>insights</code> and <code>seo</code> all route to JARVIS.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>
