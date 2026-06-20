@@ -11,263 +11,29 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Account &amp; Billing</div>
   <h1>Account &amp; Billing</h1>
   <div class="routes"><span class="badge route">/profile</span> <span class="badge route">/billing/subscriptions</span> <span class="badge route">/billing/credits</span></div>
-  <p class="lead">This is everything about <em>you</em> on MaterialsHub. Your profile page opens into a row of tabs — your public profile and the services you offer, your inbox, appointments and reviews, plus the subscription, credits and billing that power the AI and generation features used across the platform. This guide walks every tab: <strong>what it is</strong>, <strong>why it matters</strong>, <strong>exactly how to use it</strong>, and <strong>what it changes elsewhere</strong>.</p>
+  <p class="lead">Everything about <em>you</em> on MaterialsHub: your public profile and the services you offer, your messages, appointments and reviews, plus the credits, subscription, API keys and billing that power the platform. Each tab is documented in full on its own page below.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> click your <strong>Profile</strong> menu at the top-right of any page, or go straight to <span class="badge route">/profile</span>. The page is organised into tabs along the top; each one is covered below. The workspace switcher (showing your role and plan) sits next to the Profile menu.</p></div>
-
-  <div class="callout tip"><p><strong>Recommended setup order:</strong> <strong>Profile</strong> (complete it and list your services) → <strong>Business</strong> (enrich from ΑΑΔΕ if you're a Greek company) → <strong>Social Accounts</strong> (connect what you publish to) → <strong>Credits / Subscription</strong> (top up or change plan as your usage grows). If you're brand new, read <a href="getting-started.html">Getting Started</a> first.</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> click your <strong>Profile</strong> menu at the top-right of any page. The workspace switcher (showing your role and plan) sits next to it.</p></div>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile.png" alt="My Profile page">
-    <figcaption>My Profile — appearance and avatar, personal information, business details and the services you offer.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile.png" alt="My Profile with its tabs">
+    <figcaption>My Profile — the tabs: Profile, Inbox, Appointments, Reviews, Subscription, Credits, Billing, Social Accounts.</figcaption>
   </figure>
+
+  <h2>The tabs</h2>
+  <div class="cards">
+    <a class="card" href="account-profile.html"><div class="ico">🪪</div><h3>Profile</h3><p>Your public profile: appearance, personal info, business (ΑΑΔΕ), services, skills, factories, availability.</p></a>
+    <a class="card" href="account-subscription.html"><div class="ico">📦</div><h3>Subscription &amp; API keys</h3><p>Your plan + generating and testing kai_* API keys for the partner APIs.</p></a>
+    <a class="card" href="account-credits.html"><div class="ico">🎟️</div><h3>Credits</h3><p>Balance, allowance, and buying credit packs (with volume discounts).</p></a>
+    <a class="card" href="account-billing.html"><div class="ico">🧾</div><h3>Billing</h3><p>The transaction ledger — every credit debit and purchase.</p></a>
+    <a class="card" href="account-social.html"><div class="ico">🔗</div><h3>Social Accounts</h3><p>Connect social platforms for publishing.</p></a>
+    <a class="card" href="account-appointments-reviews.html"><div class="ico">📅</div><h3>Appointments &amp; Reviews</h3><p>Your bookings and the reviews clients leave (you can reply).</p></a>
+  </div>
 
   <h2>Workspaces</h2>
-  <p><strong>What it is —</strong> the <strong>workspace switcher</strong> in the top-right of the app, showing your current workspace plus your <strong>role</strong> and <strong>plan</strong> within it. <strong>Why it matters —</strong> each workspace keeps its own data, members and billing, so the workspace you're in is the context for almost everything you see across the platform. Switching workspaces switches that whole context.</p>
-  <h3>How to use it</h3>
-  <ol>
-    <li>Open the switcher menu in the top-right.</li>
-    <li><strong>Switch between workspaces</strong> to change which set of data, members and billing you're working in.</li>
-    <li><strong>Create a new workspace</strong> for a separate business, team or context.</li>
-    <li>Open <strong>Manage network</strong> to administer the people and connections in your workspace.</li>
-  </ol>
-  <p><strong>What it affects:</strong> every page on the platform reflects the active workspace — its catalogue, finance, CRM, members and billing all change when you switch.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/workspace-menu.png" alt="Workspace switcher menu"><figcaption>The workspace switcher — switch workspace, create a new one, or open Manage network.</figcaption></figure>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/new-workspace.png" alt="Create new workspace"><figcaption>Creating a new workspace.</figcaption></figure>
+  <p>Next to the Profile menu is the <strong>workspace switcher</strong> (showing your current workspace, role and plan). Use it to switch between workspaces, create a new one, or open <em>Manage network</em>. A workspace groups your materials, moodboards, quotes, finance, CRM and team — see <a href="getting-started.html">Getting Started</a>.</p>
 
-  <h2>The profile tabs at a glance</h2>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Tab</th><th>What it's for</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Profile</strong></td><td>Your public profile, appearance/avatar, personal info, business details and the services you offer.</td></tr>
-      <tr><td><strong>Inbox</strong></td><td>Your personal messages and conversations.</td></tr>
-      <tr><td><strong>Appointments</strong></td><td>Meetings and bookings scheduled with you.</td></tr>
-      <tr><td><strong>Reviews</strong></td><td>Feedback others have left about you.</td></tr>
-      <tr><td><strong>Subscription</strong></td><td>Your current plan and what it unlocks (also where your API keys live).</td></tr>
-      <tr><td><strong>Credits</strong></td><td>Your credit balance and a history of what used credits.</td></tr>
-      <tr><td><strong>Billing</strong></td><td>Payment details, invoices and your full credit ledger.</td></tr>
-      <tr><td><strong>Social Accounts</strong></td><td>Connect social platforms so you can publish to them.</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>Profile tab</h2>
-  <p><strong>What it is —</strong> the place where you set up how you appear to the rest of the platform. The Profile tab <em>is</em> your public profile: what you fill in here feeds a sharable public page. <strong>Why it matters —</strong> a complete profile is your first impression whenever you share your link or appear elsewhere on the platform — your name, business, role and listed services are how clients and partners size you up.</p>
-  <p>It's organised into a few sections:</p>
-  <ul class="feat">
-    <li><strong>Appearance &amp; avatar</strong> — upload a profile photo and set how your name and role are presented.</li>
-    <li><strong>Personal information</strong> — your name, contact details and role.</li>
-    <li><strong>Business details</strong> — company name, address, VAT/tax details and other registration info. For Greek companies these can be <strong>enriched from the ΑΑΔΕ business registry</strong>: enter your Greek VAT number and pull official details in one step (see <a href="finance-einvoicing.html">Greek e-invoicing</a> for how the same registry data is used for tax documents).</li>
-    <li><strong>Services you offer</strong> — list the services you provide using the <em>Add Service</em> button. These appear on your public profile so others know what you do.</li>
-  </ul>
-
-  <h3>Your public profile</h3>
-  <p>What you put in the Profile tab feeds a sharable public page at <span class="badge route">/u/:userId</span> <span class="badge public">Public</span>. Use the <em>Copy link</em> button to grab the URL and share it with clients or partners — they can view your name, business, role and listed services without needing an account.</p>
-
-  <div class="callout tip"><p><strong>Tip:</strong> A complete profile with an avatar and a clear list of services makes a much stronger impression when you share your public link or appear elsewhere on the platform.</p></div>
-
-  <h3>How to build it out, section by section</h3>
-  <p>Edit each section, then click <em>Save</em> to publish your changes. Beyond the basics above, these sections together build the page others see at <span class="badge route">/u/:userId</span> <span class="badge public">Public</span>.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile-edit.png" alt="Editing the profile"><figcaption>Editing the public profile — appearance, personal information and the profile-building sections.</figcaption></figure>
-
-  <h4>Appearance</h4>
-  <ul class="feat">
-    <li><strong>Avatar</strong> — upload a profile photo (a file from your device).</li>
-    <li><strong>Theme</strong> — choose the platform theme.</li>
-  </ul>
-
-  <h4>Personal Information</h4>
-  <p>Click <em>Edit</em> on the Personal Information section to fill in the fields below.</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Full Name</strong></td><td>Your name as it appears on your public profile.</td></tr>
-      <tr><td><strong>Email Address</strong></td><td>Your contact email.</td></tr>
-      <tr><td><strong>Phone Number</strong></td><td>Includes a country code selector, e.g. 🇬🇷 +30.</td></tr>
-      <tr><td><strong>Company</strong></td><td>The company you're associated with.</td></tr>
-      <tr><td><strong>Location</strong></td><td>Search for a city or country.</td></tr>
-      <tr><td><strong>Website</strong></td><td>Your main website URL.</td></tr>
-      <tr><td><strong>Professional Type</strong></td><td>Your professional role, e.g. Consultant.</td></tr>
-      <tr><td><strong>Address</strong></td><td>Your address.</td></tr>
-      <tr><td><strong>Bio</strong></td><td>A short description about you.</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h4>The profile-building sections</h4>
-  <ul class="feat">
-    <li><strong>Business</strong> — your business details. For Greek companies these can be <strong>enriched from ΑΑΔΕ</strong> — see <a href="finance-einvoicing.html">Greek e-invoicing</a> and <a href="crm.html">CRM</a>.</li>
-    <li><strong>Services</strong> — list the services you offer with the <em>Add Service</em> button.</li>
-    <li><strong>Skills &amp; Expertise</strong> — add your skills with the <em>Add Skill</em> button.</li>
-    <li><strong>Preferred Factories</strong> — add the manufacturers you favour with the <em>Add Factory</em> button.</li>
-    <li><strong>Appointment Availability</strong> — set when clients can book you.</li>
-    <li><strong>Featured Moodboard</strong> — pick a board to showcase on your profile.</li>
-    <li><strong>Connected Websites / Your Websites</strong> — link your own sites.</li>
-    <li><strong>Profile Analytics</strong> — views and engagement on your public profile.</li>
-  </ul>
-
-  <h3>How to enrich your business from ΑΑΔΕ</h3>
-  <ol>
-    <li>Open the <strong>Business</strong> section and click <em>Edit</em>.</li>
-    <li>Enter your Greek <strong>ΑΦΜ</strong> (VAT number).</li>
-    <li>Pull the official company details from the <strong>ΑΑΔΕ</strong> registry in one step, rather than typing them by hand.</li>
-    <li><strong>Save</strong> to publish.</li>
-  </ol>
-  <p><strong>What it affects:</strong> the same registry data is reused for your tax documents and CRM records — see <a href="finance-einvoicing.html">Greek e-invoicing</a> and <a href="crm.html">CRM</a>.</p>
-
-  <div class="callout"><p>Use <strong>Copy link</strong> to share your public profile at <span class="badge route">/u/:userId</span>, and remember to click <strong>Save</strong> after editing.</p></div>
-
-  <h2>Credits</h2>
-  <p><strong>What it is —</strong> credits are the platform's currency for <strong>AI and generation actions</strong>. <strong>Why it matters —</strong> running an AI model or a generation job has a real cost, so those actions are <em>metered</em> in credits while everyday use stays free. Spending credits is how you turn your balance into images, sheets, scans and 3D worlds. What consumes them: generating images, presentation sheets, scans, 3D/VR worlds, and other metered tools.</p>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/profile-credits.png" alt="Credits tab showing balance and history">
-    <figcaption>The Credits tab — your current balance and a history of credit usage.</figcaption>
-  </figure>
-  <p>The Credits tab shows:</p>
-  <ul class="feat">
-    <li><strong>Balance</strong> — how many credits you have available right now.</li>
-    <li><strong>Usage history</strong> — a record of what consumed credits, so you can see where they went.</li>
-    <li><strong>Percentage of your monthly allowance</strong> — your balance against your plan's allowance, so you can see at a glance how much of your plan you've used.</li>
-  </ul>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/credits.png" alt="Credits tab"><figcaption>The Credits tab — balance and usage history.</figcaption></figure>
-  <div class="callout"><p>Everyday chatting and searching in the <a href="agent-hub.html">Agent Hub</a> is inexpensive. Only explicit generation actions are metered, and the assistant tells you the cost before it runs one. A full list of which actions cost credits is in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p></div>
-  <p><strong>What it affects:</strong> when your balance runs out, metered generation actions are blocked until you top up (below) or your monthly plan allowance refreshes.</p>
-
-  <h2>Buying credits</h2>
-  <p><strong>What it is —</strong> the credit-pack store at <span class="badge route">/billing/credits</span>. <strong>Why it matters —</strong> it's the fastest way to refill when you run low, and <strong>bigger packs earn bigger volume discounts</strong>, so buying in larger amounts stretches your money further.</p>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing-credits.png" alt="Credit packs available for purchase">
-    <figcaption>Credit packs at /billing/credits.</figcaption>
-  </figure>
-  <h3>How to buy a credit pack</h3>
-  <ol>
-    <li>Open <span class="badge route">/billing/credits</span> when you run low.</li>
-    <li>Choose one of the available credit packs (each button shows exactly what you'll receive, e.g. <em>"Buy 2,631 Credits for €25"</em>), or enter a <strong>custom amount</strong>.</li>
-    <li>Complete the purchase through secure checkout.</li>
-    <li>Your new balance is reflected in the Credits tab right after payment.</li>
-  </ol>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Pay</th><th>You get</th><th>Discount</th></tr></thead>
-    <tbody>
-      <tr><td>€10</td><td>~1,052 credits</td><td>5% off</td></tr>
-      <tr><td>€25</td><td>~2,631 credits</td><td>5% off</td></tr>
-      <tr><td>€50</td><td>~5,555 credits</td><td>10% off</td></tr>
-      <tr><td>€100</td><td>~11,764 credits</td><td>15% off</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p>With a <strong>custom amount</strong>, bigger amounts automatically get better rates. Spending <strong>€45 or more</strong> unlocks the <strong>Gold tier</strong> (10% off).</p>
-  <p><strong>What it affects:</strong> purchased credits add to the balance shown in the Credits tab and appear as a top-up in your <strong>Billing</strong> ledger.</p>
-
-  <h2>Plans &amp; subscriptions</h2>
-  <p><strong>What it is —</strong> your plan, shown in the <strong>Subscription</strong> tab and changed at <span class="badge route">/billing/subscriptions</span>. <strong>Why it matters —</strong> plans are tiered by the <strong>monthly credit allowance</strong> they include, and <strong>higher plans raise your quotas and unlock additional capabilities</strong> across the platform's modules. If you're hitting limits or want more advanced features, this is where to move up.</p>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing-subscriptions.png" alt="Subscription plans page">
-    <figcaption>Subscription plans at /billing/subscriptions.</figcaption>
-  </figure>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/subscription.png" alt="Subscription tab"><figcaption>The Subscription tab — your current plan.</figcaption></figure>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Tier</th><th>Monthly credit allowance</th></tr></thead>
-    <tbody>
-      <tr><td>Entry</td><td>100 credits / month</td></tr>
-      <tr><td>Pro</td><td>1,000 credits / month</td></tr>
-      <tr><td>Enterprise</td><td>5,000 credits / month</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <h3>How to change your plan</h3>
-  <ol>
-    <li>Open the <strong>Subscription</strong> tab to see your current plan.</li>
-    <li>Go to <span class="badge route">/billing/subscriptions</span> and pick a plan.</li>
-    <li>Use <strong>Manage Subscription</strong>, <strong>Cancel Subscription</strong>, or <strong>Subscribe to Enterprise</strong> as needed.</li>
-    <li>Confirm to apply the change.</li>
-  </ol>
-  <p><strong>What it affects:</strong> your monthly credit allowance, your quotas, and which advanced capabilities are available across the platform's modules.</p>
-
-  <h3>API Keys</h3>
-  <p><strong>What it is —</strong> credentials, also managed in the Subscription tab, that authenticate the <strong>external partner APIs</strong> for price tracking, mention tracking and job tracking. <strong>Why it matters —</strong> they let other projects call those services on your behalf. Keys are prefixed <code>kai_</code> and are shown <strong>masked</strong> (e.g. <code>kai_••••gBJd</code>) once created.</p>
-  <h4>How to generate and test a key</h4>
-  <ol>
-    <li>Click <strong>Generate Key</strong> to create a new <code>kai_*</code> key.</li>
-    <li>Note the <strong>Created</strong> and <strong>Last used</strong> details listed against each key.</li>
-    <li>Use <strong>Test</strong> to verify the key works.</li>
-    <li>Review the <strong>Changes Log</strong> for the history of key activity and changes.</li>
-  </ol>
-  <p><strong>What it affects:</strong> a valid key authorises external calls to the price, mention and job tracking APIs against your account.</p>
-
-  <h2>Billing</h2>
-  <p><strong>What it is —</strong> your payment details, the invoices for your subscription, and your full <strong>ledger</strong> of credit transactions. <strong>Why it matters —</strong> it's the single record of money in and out: every top-up and every credit-consuming action is listed, so you can reconcile spend and download invoices.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing.png" alt="Billing tab"><figcaption>The Billing tab — payment details and subscription invoices.</figcaption></figure>
-  <p>The ledger lists every entry with these columns:</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Balance After</th><th>Actions</th></tr></thead>
-    <tbody>
-      <tr><td>When the transaction happened.</td><td>Credit (top-up) or Debit (usage).</td><td>What the entry was for, e.g. <em>"Public price scan"</em>.</td><td>Credits added or spent.</td><td>Your running balance after the entry.</td><td>Per-row actions (e.g. view detail).</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p><strong>What it affects:</strong> nothing downstream — this is your audit trail. The <em>Balance After</em> column reconciles directly with the balance shown in the Credits tab.</p>
-
-  <h2>Social Accounts</h2>
-  <p><strong>What it is —</strong> the tab where you connect social media platforms to your account. <strong>Why it matters —</strong> once a platform is connected, you can publish content to it directly from MaterialsHub instead of switching apps.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/social-accounts.png" alt="Social Accounts tab"><figcaption>The Social Accounts tab — connect platforms for publishing.</figcaption></figure>
-  <h3>How to connect an account</h3>
-  <ol>
-    <li>Click <strong>Connect</strong> to link a new platform.</li>
-    <li>Use <strong>Refresh</strong> to re-sync a connected account if it falls out of date.</li>
-    <li>Connecting and disconnecting accounts is managed entirely from this tab.</li>
-  </ol>
-  <p><strong>What it affects:</strong> connected platforms become available as publishing targets when you create and send social content.</p>
-
-  <h2>Inbox, Appointments &amp; Reviews</h2>
-  <p><strong>What it is —</strong> three personal-activity tabs. <strong>Why it matters —</strong> they keep your conversations, upcoming meetings and reputation in one place so nothing about you slips through the cracks.</p>
-  <ul class="feat">
-    <li><strong>Inbox</strong> — your personal messages and conversations in one place. For the workspace-wide, multi-channel messaging experience, see the dedicated <a href="inbox.html">Inbox</a> documentation.</li>
-    <li><strong>Appointments</strong> — meetings and bookings that have been scheduled with you, so you can keep track of what's coming up. You can <strong>filter by status</strong> (for example "all") to focus the list.</li>
-    <li><strong>Reviews</strong> — feedback left by people who have worked with you, visible on your profile as your reputation. You can <strong>reply to each review</strong>.</li>
-  </ul>
-  <h3>How to reply to a review</h3>
-  <ol>
-    <li>Open the <strong>Reviews</strong> tab to see feedback others have left.</li>
-    <li>Find the review you want to respond to.</li>
-    <li>Use the reply action to post your response — it appears alongside the review on your profile.</li>
-  </ol>
-  <p><strong>What it affects:</strong> your replies are part of your public reputation; appointment scheduling ties back to the <strong>Appointment Availability</strong> you set on your profile.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/inbox.png" alt="Profile Inbox tab"><figcaption>The Inbox tab — your personal messages.</figcaption></figure>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/appointments.png" alt="Appointments tab"><figcaption>The Appointments tab — scheduled meetings.</figcaption></figure>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/reviews.png" alt="Reviews tab"><figcaption>The Reviews tab — feedback others have left.</figcaption></figure>
-
-  <h2>Step by step: complete your profile</h2>
-  <ol>
-    <li>Open your <strong>Profile</strong> from the avatar menu in the top-right, or go to <span class="badge route">/profile</span>.</li>
-    <li>Under <strong>Personal Information</strong>, click <em>Edit</em> and fill in your name, contact details and role.</li>
-    <li>Under <strong>Business</strong>, click <em>Edit</em> to add your company details. For a Greek company, enter the <strong>ΑΦΜ</strong> (VAT number) and pull official details from <strong>ΑΑΔΕ</strong> in one step — see <a href="finance-einvoicing.html">Greek e-invoicing</a> for how the same registry data is reused.</li>
-    <li>Add the services you offer with the <em>Add Service</em> button, so they appear on your public profile.</li>
-    <li>Use <em>Copy link</em> to share your public profile at <span class="badge route">/u/:userId</span>.</li>
-  </ol>
-
-  <h2>Step by step: top up credits</h2>
-  <ol>
-    <li>Open the <strong>Credits</strong> tab to see your current balance and usage history.</li>
-    <li>Go to <span class="badge route">/billing/credits</span>.</li>
-    <li>Choose a credit pack that suits your usage.</li>
-    <li>Complete checkout — your new balance appears in the Credits tab right after payment.</li>
-  </ol>
-
-  <h2>Step by step: change your plan</h2>
-  <ol>
-    <li>Open the <strong>Subscription</strong> tab to see your current plan.</li>
-    <li>Go to <span class="badge route">/billing/subscriptions</span>.</li>
-    <li>Pick the plan you want.</li>
-    <li>Confirm to apply the change. New users may want to start with <a href="getting-started.html">Getting Started</a> first.</li>
-  </ol>
-
-  <div class="callout tip"><p><strong>Putting it together:</strong> set up your <strong>Profile</strong> and services first, connect any <strong>Social Accounts</strong> you publish to, then top up <strong>Credits</strong> or change your <strong>plan</strong> as your usage grows.</p></div>
+  <div class="callout tip"><p><strong>Credits power the AI.</strong> Reading, searching and browsing are free; generation actions (images, presentation sheets, scans, 3D/VR) consume credits. Your balance shows in the header and on the Credits tab.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

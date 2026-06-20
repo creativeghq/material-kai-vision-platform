@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account: Billing | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="account.html">Account &amp; Billing</a> / Billing</div>
+  <h1>Account · Billing</h1>
+  <div class="routes"><span class="badge route">/profile</span></div>
+  <p class="lead">The Billing tab holds your payment details, the invoices for your subscription, and your full <strong>ledger</strong> of credit transactions. It's the single record of money in and out: every top-up and every credit-consuming action is listed, so you can reconcile your spend and find any individual charge. This guide covers <strong>what's on the screen</strong>, <strong>what each ledger column means</strong>, and <strong>how to read it to track down a charge</strong>.</p>
+
+  <h2>Where it is</h2>
+  <p>Open your <strong>Profile</strong> menu at the top-right of any page, or go straight to <span class="badge route">/profile</span>, then open the <strong>Billing</strong> tab in the row of profile tabs.</p>
+
+  <h2>What's on the screen</h2>
+  <p><strong>What it is —</strong> three things in one place: your <strong>payment details</strong>, the <strong>invoices</strong> for your subscription, and your full <strong>credit ledger</strong>. <strong>Why it matters —</strong> it's your complete audit trail — every top-up and every credit-consuming action is recorded, so you can reconcile spend and download invoices.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing.png" alt="Billing tab showing payment details, subscription invoices and the credit ledger">
+    <figcaption>The Billing tab — payment details, subscription invoices, and the full credit ledger.</figcaption>
+  </figure>
+
+  <h2>The ledger — column by column</h2>
+  <p>The ledger lists every entry. Each credit-consuming action and every purchase appears as its own row, with these columns:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Date</strong></td><td>When the transaction happened.</td></tr>
+      <tr><td><strong>Type</strong></td><td><strong>Credit</strong> (a top-up) or <strong>Debit</strong> (usage).</td></tr>
+      <tr><td><strong>Description</strong></td><td>What the entry was for, e.g. <em>"Public price scan"</em>.</td></tr>
+      <tr><td><strong>Amount</strong></td><td>Credits added or spent.</td></tr>
+      <tr><td><strong>Balance After</strong></td><td>Your running balance after the entry.</td></tr>
+      <tr><td><strong>Actions</strong></td><td>Per-row actions (e.g. view detail).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>How to read it — finding a charge</h2>
+  <ol>
+    <li>Open the <strong>Billing</strong> tab and scroll to the ledger.</li>
+    <li>Scan the <strong>Date</strong> column to the day you're interested in.</li>
+    <li>Check the <strong>Type</strong> to tell a top-up (<strong>Credit</strong>) from usage (<strong>Debit</strong>).</li>
+    <li>Read the <strong>Description</strong> to see what the entry was for — e.g. <em>"Public price scan"</em> — and the <strong>Amount</strong> for how many credits it added or spent.</li>
+    <li>Use the row's <strong>Actions</strong> to view detail, and the <strong>Balance After</strong> to confirm the running balance at that point.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example — reconciling a missing balance.</strong> Your <a href="account-credits.html">Credits</a> tab shows fewer credits than you expected. Open Billing and read the ledger top-down: a <strong>Credit</strong> row records the €25 pack you bought (Amount <em>~2,631 credits</em>), and below it several <strong>Debit</strong> rows — each a metered action with its own Description and Amount. Add the debits since your last top-up and the <strong>Balance After</strong> on the most recent row matches the figure in the Credits tab exactly. The charge you couldn't place is the Debit row whose Description names the action that spent it.</p></div>
+
+  <h2>What it affects</h2>
+  <p>Nothing downstream — this is your audit trail. The <strong>Balance After</strong> column reconciles directly with the balance shown in the <a href="account-credits.html">Credits</a> tab, and purchased packs appear here as <strong>Credit</strong> top-ups while every metered action appears as a <strong>Debit</strong>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

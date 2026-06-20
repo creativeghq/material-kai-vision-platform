@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account: Subscription &amp; API keys | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="account.html">Account &amp; Billing</a> / Subscription &amp; API keys</div>
+  <h1>Account · Subscription &amp; API keys</h1>
+  <div class="routes"><span class="badge route">/billing/subscriptions</span></div>
+  <p class="lead">Your plan is tiered by the <strong>monthly credit allowance</strong> it includes, and higher plans raise your quotas and unlock additional capabilities across the platform's modules. The Subscription tab is also where your <strong>API keys</strong> live — the <code>kai_*</code> credentials that authenticate the external partner APIs for price, mention and job tracking. This guide covers both: <strong>what they are</strong>, <strong>why they matter</strong>, <strong>exactly how to use them</strong>, and <strong>what they change elsewhere</strong>.</p>
+
+  <h2>Where it is</h2>
+  <p>Open your <strong>Profile</strong> menu at the top-right of any page and go to the <strong>Subscription</strong> tab to see your current plan. Change your plan at <span class="badge route">/billing/subscriptions</span>. Your API keys are managed in the same Subscription tab.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/subscription.png" alt="Subscription tab">
+    <figcaption>The Subscription tab — your current plan, and where your API keys live.</figcaption>
+  </figure>
+
+  <h2>What's on the screen</h2>
+  <ul class="feat">
+    <li><strong>Your current plan</strong> — the tier you're on, shown in the Subscription tab.</li>
+    <li><strong>Plan options</strong> at <span class="badge route">/billing/subscriptions</span> — pick a plan and use <strong>Manage Subscription</strong>, <strong>Cancel Subscription</strong>, or <strong>Subscribe to Enterprise</strong>.</li>
+    <li><strong>API Keys</strong> — generate, view (masked), test and audit your <code>kai_*</code> keys for the external partner APIs.</li>
+  </ul>
+
+  <h2>Plan tiers</h2>
+  <p>Plans are tiered by the <strong>monthly credit allowance</strong> they include. Higher plans raise your quotas and unlock additional capabilities across the platform's modules. If you're hitting limits or want more advanced features, this is where to move up.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tier</th><th>Monthly credit allowance</th></tr></thead>
+    <tbody>
+      <tr><td>Entry</td><td>100 credits / month</td></tr>
+      <tr><td>Pro</td><td>1,000 credits / month</td></tr>
+      <tr><td>Enterprise</td><td>5,000 credits / month</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing-subscriptions.png" alt="Subscription plans page">
+    <figcaption>Subscription plans at /billing/subscriptions.</figcaption>
+  </figure>
+
+  <h3>How to change your plan — step by step</h3>
+  <ol>
+    <li>Open the <strong>Subscription</strong> tab to see your current plan.</li>
+    <li>Go to <span class="badge route">/billing/subscriptions</span> and pick the plan you want.</li>
+    <li>Use <strong>Manage Subscription</strong>, <strong>Cancel Subscription</strong>, or <strong>Subscribe to Enterprise</strong> as needed.</li>
+    <li>Confirm to apply the change.</li>
+  </ol>
+  <p><strong>What it affects:</strong> your monthly credit allowance, your quotas, and which advanced capabilities are available across the platform's modules.</p>
+
+  <h2>API Keys</h2>
+  <p><strong>What it is —</strong> credentials, managed in the Subscription tab, that authenticate the <strong>external partner APIs</strong> for price tracking, mention tracking and job tracking. <strong>Why it matters —</strong> they let other projects call those services on your behalf. Keys are prefixed <code>kai_</code> and are shown <strong>masked</strong> (e.g. <code>kai_••••gBJd</code>) once created.</p>
+  <p>For each key you'll see:</p>
+  <ul class="feat">
+    <li><strong>The masked key</strong> — e.g. <code>kai_••••gBJd</code>, shown masked once created.</li>
+    <li><strong>Created</strong> — when the key was generated.</li>
+    <li><strong>Last used</strong> — when the key was last used.</li>
+    <li><strong>Generate Key</strong> — create a new <code>kai_*</code> key.</li>
+    <li><strong>Test</strong> — verify the key works.</li>
+    <li><strong>Changes Log</strong> — the history of key activity and changes.</li>
+  </ul>
+
+  <h3>How to generate &amp; test an API key — step by step</h3>
+  <ol>
+    <li>Click <strong>Generate Key</strong> to create a new <code>kai_*</code> key.</li>
+    <li>Note the <strong>Created</strong> and <strong>Last used</strong> details listed against each key.</li>
+    <li>Use <strong>Test</strong> to verify the key works.</li>
+    <li>Review the <strong>Changes Log</strong> for the history of key activity and changes.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example — wiring up an external project.</strong> Open the <strong>Subscription</strong> tab → click <strong>Generate Key</strong> to mint a fresh <code>kai_*</code> key → click <strong>Test</strong> to confirm it works → check the <strong>Changes Log</strong> to see the key recorded → paste the key into your other project so it can call the price, mention and job tracking APIs against your account. Back here, the key shows masked (<code>kai_••••gBJd</code>) with its <strong>Created</strong> date and a <strong>Last used</strong> timestamp that updates as your project makes calls.</p></div>
+
+  <p><strong>What it affects:</strong> a valid key authorises external calls to the price, mention and job tracking APIs against your account.</p>
+
+  <h2>What it affects</h2>
+  <ul class="feat">
+    <li>Changing your plan changes your <strong>monthly credit allowance</strong>, your <strong>quotas</strong>, and which <strong>advanced capabilities</strong> are available across the platform's modules.</li>
+    <li>A valid <code>kai_*</code> API key authorises external calls to the <strong>price</strong>, <strong>mention</strong> and <strong>job tracking</strong> APIs against your account.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -81,7 +81,14 @@
       { file: "tools.html", title: "Free Tools", icon: "🛠️" },
     ]},
     { title: "Account", items: [
-      { file: "account.html", title: "Account & Billing", icon: "⚙️" },
+      { file: "account.html", title: "Account & Billing", icon: "⚙️", children: [
+        { file: "account-profile.html", title: "Profile" },
+        { file: "account-subscription.html", title: "Subscription & API keys" },
+        { file: "account-credits.html", title: "Credits" },
+        { file: "account-billing.html", title: "Billing" },
+        { file: "account-social.html", title: "Social Accounts" },
+        { file: "account-appointments-reviews.html", title: "Appointments & Reviews" },
+      ]},
       { file: "sales.html", title: "Sales Portal", icon: "💼" },
     ]},
     { title: "Reference", items: [
