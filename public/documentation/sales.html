@@ -19,18 +19,19 @@
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/sales/sales.png" alt="Sales Portal access restricted"><figcaption>For accounts without the sales capability, the Sales Portal shows an “Access Restricted” notice with the current access level.</figcaption></figure>
 
   <h2>What this area is for</h2>
-  <p>The Sales Portal gives a sales rep a streamlined view of just their own selling activity. Rather than navigating the whole platform, you work from one screen built around the rep workflow: see your orders, start a new one for a customer, and hand off to the full quote builder to add products and pricing. It complements — and links into — the <a href="quotes.html">Quotes</a> and <a href="crm.html">CRM</a> areas without exposing the entire workspace.</p>
-  <p>You only ever see <strong>your own</strong> orders. Each rep's orders are private to them, so one rep never sees another rep's pipeline.</p>
+  <p><strong>What it is —</strong> a streamlined, rep-only view of one person's own selling activity. Instead of navigating the whole platform, a sales rep works from a single screen built around the day-to-day selling loop: see your orders, start a new one for a customer, and hand off to the full quote builder to add products and pricing. <strong>Why it matters —</strong> it removes the noise. A rep doesn't need Finance, Projects or the rest of the back office to do their job, so the portal gives them exactly the slice they need and keeps everything else out of the way. It complements — and links into — the <a href="quotes.html">Quotes</a> and <a href="crm.html">CRM</a> areas without exposing the entire workspace.</p>
+  <p><strong>Why it's role-gated —</strong> the portal is deliberately walled off behind the <code>sales.portal</code> capability for two reasons. First, <strong>privacy between reps</strong>: you only ever see <strong>your own</strong> orders, so one rep never sees another rep's pipeline. Second, <strong>scope control</strong>: gating it means a rep account can be handed out without also granting access to sensitive workspace areas. The capability is the single switch that turns the whole portal on for an account.</p>
 
   <h2>What you'll find on the page</h2>
+  <p>Once you have access, the portal is one focused screen made of three parts:</p>
   <ul class="feat">
-    <li><strong>Summary stats</strong> — quick counts across your orders: total orders, submitted, accepted and drafts.</li>
-    <li><strong>My Orders</strong> — a table of every order you've created, showing the order name, customer, status, item count and the date it was created. Each row opens the order.</li>
-    <li><strong>New Order</strong> — start a fresh order for a customer (see below).</li>
+    <li><strong>Summary stats</strong> — quick counts across your orders (total, submitted, accepted and drafts), so you can read your own pipeline at a glance without opening anything.</li>
+    <li><strong>My Orders</strong> — a table of every order you've created, showing the order name, customer, status, item count and creation date. Each row opens the order so you can pick up where you left off.</li>
+    <li><strong>New Order</strong> — the button that starts a fresh order for a customer (walked through below).</li>
   </ul>
 
   <h2>Creating an order</h2>
-  <p>Choosing <strong>New Order</strong> opens a short dialog:</p>
+  <p><strong>What it is —</strong> the rep's core action: turning a customer and a job name into a working draft. <strong>Why it matters —</strong> it's the fastest path from "a customer wants something" to a real, priced document, and it reuses the same engine as the rest of the platform so nothing is a throwaway. Choosing <strong>New Order</strong> opens a short dialog:</p>
   <ol>
     <li><strong>Pick a customer</strong> — search your existing CRM contacts and companies by name or email, or use <strong>Quick add</strong> to create a new contact on the spot (name required, email optional).</li>
     <li><strong>Name the order</strong> — give it a clear title, e.g. a project or job name.</li>
@@ -39,7 +40,14 @@
   <div class="callout tip"><p>An order in the Sales Portal is a <a href="quotes.html">quote</a> under the hood, so everything the quote builder offers — catalogue products, custom line items, pricing and document output — applies once you continue into it. Customers come from your <a href="crm.html">CRM</a>, and customer names in the orders table link straight back to the matching CRM record.</p></div>
 
   <h2>Getting access</h2>
-  <p>If you should have the portal but see the restriction, ask a workspace administrator to grant your account the <strong>sales</strong> capability. Once it's enabled, <strong>Sales</strong> appears in the navigation and opens the rep portal for you.</p>
+  <p><strong>Why you might be blocked —</strong> if you open <span class="badge route">/sales</span> and see the <strong>“Access Restricted”</strong> card, your account simply doesn't hold the <code>sales.portal</code> capability yet. It isn't a fault; the portal is hidden from anyone without the rep capability by design.</p>
+  <h3>How to get the portal</h3>
+  <ol>
+    <li>Ask a <strong>workspace administrator</strong> to grant your account the <strong>sales</strong> capability.</li>
+    <li>Refresh the app once they've enabled it.</li>
+    <li><strong>Sales</strong> now appears in the top navigation and opens the rep portal for you.</li>
+  </ol>
+  <p><strong>What it affects:</strong> the moment the capability is granted, you get the full portal — your summary stats, your private My Orders list, and the New Order flow described above.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

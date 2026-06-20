@@ -11,60 +11,61 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Finance &amp; Invoicing</div>
   <h1>Finance &amp; Invoicing</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge route">/finance/invoices/:id</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">A complete back-office: revenue and profit, receivables and payables, the full set of financial documents, Greek e-invoicing, warehouse and dispatch, planning, and reporting — all in one workspace.</p>
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong>. The Dashboard tab opens first; use the tab bar for everything else.</p></div>
+  <p class="lead">Finance is the complete back-office of your workspace: revenue and profit, what you're owed and what you owe, the full set of financial documents, Greek e-invoicing, warehouse and dispatch, planning and reporting — all in one place. This page is your orientation: it teaches you how to <em>read</em> the Dashboard at a glance, then points you to the focused sub-pages for everything deeper.</p>
+
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong>. The <strong>Dashboard</strong> tab opens first; use the tab bar across the top for everything else.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance.png" alt="Finance Dashboard">
     <figcaption>The Finance Dashboard — revenue, profit, receivables, payables and the follow-up queue.</figcaption>
   </figure>
 
-  <h2>What this area is for</h2>
-  <p>Finance is the accounting and billing centre of your workspace. The <strong>Dashboard</strong> tab gives you the financial health of the business at a glance, and the remaining tabs let you create and manage every kind of document, transmit invoices to the Greek tax authority, run the warehouse/dispatch side, plan ahead and report. Because it's deep, this guide splits Finance into focused sub-pages — use the list below or the sidebar.</p>
+  <h2>What it is</h2>
+  <p>Finance is the accounting and billing centre of your workspace. It's where invoices are created and transmitted to the Greek tax authority, where you track every euro coming in and going out, where the warehouse/dispatch side runs, and where you plan ahead and report. The <strong>Dashboard</strong> tab is the front door — a single screen that tells you the financial health of the business — and the rest of the tabs handle the day-to-day work behind those numbers.</p>
 
-  <h2>Finance at a glance (Dashboard)</h2>
-  <p>The default Dashboard tab summarises:</p>
-  <ul class="feat">
-    <li><strong>Revenue &amp; profit</strong> for the period.</li>
-    <li><strong>Receivables</strong> — money customers owe you.</li>
-    <li><strong>Payables</strong> — money you owe suppliers.</li>
-    <li><strong>Follow-up queue</strong> — items that need action (e.g. overdue documents).</li>
-  </ul>
+  <h2>Why it matters</h2>
+  <p>Most of your business decisions come down to two questions: <em>how much money is the business actually making</em>, and <em>is cash coming in fast enough to cover what's going out</em>. The Dashboard answers both without you opening a spreadsheet. Once you can read it, you'll spot an overdue customer, a thin-margin month, or a slow-collection problem the moment you log in — instead of finding out at the end of the quarter.</p>
+
+  <h2>How to read the Dashboard</h2>
+  <p>The Dashboard summarises four things up front: <strong>revenue &amp; profit</strong> for the period, <strong>receivables</strong> (money customers owe you), <strong>payables</strong> (money you owe suppliers), and a <strong>follow-up queue</strong> of items that need action, such as overdue documents. Two layers do the work: the KPI cards at the top, and the cash-flow table below them.</p>
 
   <h3>The four KPI cards</h3>
-  <p>Across the top of the Dashboard, four cards give you the headline numbers:</p>
+  <p>Across the top of the Dashboard, four cards give you the headline numbers. Read them left to right as a quick health check — owed to you, owed by you, this month's earnings, and how fast you collect:</p>
   <ul class="feat">
-    <li><strong>AR outstanding</strong> — the total amount (€) customers currently owe you, with a status indicator (e.g. <em>"All on schedule"</em>) summarising whether receivables are on track.</li>
-    <li><strong>AP outstanding</strong> — the total amount (€) you currently owe suppliers, alongside a count of open bills.</li>
-    <li><strong>This month revenue (net)</strong> — net revenue recognised for the current month.</li>
-    <li><strong>DSO (rough)</strong> — a rough <em>Days Sales Outstanding</em> figure in days (how long, on average, it takes to collect what you're owed), plus a count of quotes needing follow-up.</li>
+    <li><strong>AR outstanding</strong> — the total amount (€) customers currently owe you, with a status indicator (e.g. <em>"All on schedule"</em>) summarising whether receivables are on track. A rising number with a worsening status is your cue to chase payment.</li>
+    <li><strong>AP outstanding</strong> — the total amount (€) you currently owe suppliers, alongside a count of open bills. This is your near-term cash obligation.</li>
+    <li><strong>This month revenue (net)</strong> — net revenue recognised for the current month, so you can compare your earning pace against previous months.</li>
+    <li><strong>DSO (rough)</strong> — a rough <em>Days Sales Outstanding</em> figure in days: how long, on average, it takes to collect what you're owed. Lower is better. It also shows a count of quotes needing follow-up. A climbing DSO means money is sitting in receivables longer than it should.</li>
   </ul>
 
-  <h3>Monthly cash-flow table</h3>
-  <p>Below the cards, a month-by-month table breaks down money movement and profitability:</p>
+  <h3>The monthly cash-flow table</h3>
+  <p>Below the cards, a month-by-month table breaks down money movement <em>and</em> profitability side by side. The left columns (In / Out / Net) are pure cash flow — what actually moved through the bank. The right columns (Revenue / COGS / Margin / %) are profitability — what you earned versus what it cost. Reading both together tells you whether a profitable month was also a cash-positive one:</p>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <thead><tr><th>Column</th><th>What it shows</th><th>How to read it</th></tr></thead>
     <tbody>
-      <tr><td>Month</td><td>The calendar month for the row.</td></tr>
-      <tr><td>In</td><td>Money received during the month.</td></tr>
-      <tr><td>Out</td><td>Money paid out during the month.</td></tr>
-      <tr><td>Net</td><td>In minus Out — the net cash movement.</td></tr>
-      <tr><td>Revenue</td><td>Revenue recognised in the month.</td></tr>
-      <tr><td>COGS</td><td>Cost of goods sold for the month.</td></tr>
-      <tr><td>Margin</td><td>Revenue minus COGS.</td></tr>
-      <tr><td>%</td><td>Margin as a percentage of revenue.</td></tr>
+      <tr><td>Month</td><td>The calendar month for the row.</td><td>One row per month — scan down for trends.</td></tr>
+      <tr><td>In</td><td>Money received during the month.</td><td>Actual cash collected, regardless of when it was invoiced.</td></tr>
+      <tr><td>Out</td><td>Money paid out during the month.</td><td>Actual cash spent.</td></tr>
+      <tr><td>Net</td><td>In minus Out — the net cash movement.</td><td>Positive = cash grew that month; negative = it shrank.</td></tr>
+      <tr><td>Revenue</td><td>Revenue recognised in the month.</td><td>What you earned, which can differ from cash <em>In</em>.</td></tr>
+      <tr><td>COGS</td><td>Cost of goods sold for the month.</td><td>The direct cost of what you sold.</td></tr>
+      <tr><td>Margin</td><td>Revenue minus COGS.</td><td>Your gross profit for the month.</td></tr>
+      <tr><td>%</td><td>Margin as a percentage of revenue.</td><td>Your profitability rate — watch for it slipping over time.</td></tr>
     </tbody>
   </table>
   </div>
+  <div class="callout tip"><p>A month can show strong <strong>Margin</strong> but a negative <strong>Net</strong> — that's a profitable month where the cash hasn't landed yet (it's sitting in receivables). That's exactly the gap the DSO card and the Receivables tab are there to close.</p></div>
 
-  <h3>Dashboard actions</h3>
+  <h3>Acting from the Dashboard</h3>
+  <p>The Dashboard isn't read-only — two buttons let you act on what you see without leaving the screen:</p>
   <ul class="feat">
     <li><strong>New</strong> — create a financial document directly from the Dashboard.</li>
-    <li><strong>View all</strong> — jump to the full listing.</li>
+    <li><strong>View all</strong> — jump to the full listing for the figure you're looking at.</li>
   </ul>
 
-  <h2>The sub-pages</h2>
+  <h2>Where to go next — the sub-pages</h2>
+  <p>Finance is deep, so the detail lives on focused sub-pages. Use these cards (or the sidebar) to dive into each area:</p>
   <div class="cards">
     <a class="card" href="finance-receivables-payables.html"><div class="ico">📈</div><h3>Receivables &amp; Payables</h3><p>What you're owed and what you owe, follow-ups, payments and cheques.</p></a>
     <a class="card" href="finance-documents.html"><div class="ico">🧾</div><h3>Documents</h3><p>Invoices, receipts, credit notes, expenses, delivery notes and categories.</p></a>
@@ -74,8 +75,8 @@
     <a class="card" href="pos.html"><div class="ico">🧮</div><h3>Point of Sale</h3><p>Issue receipts and invoices at the counter.</p></a>
   </div>
 
-  <h2>Full tab map</h2>
-  <p>Finance is organised into a wide set of tabs grouped by purpose:</p>
+  <h2>The full tab map</h2>
+  <p>Behind the Dashboard, Finance is organised into a wide set of tabs grouped by purpose. This map shows you everything available so you know where each job lives:</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Group</th><th>Tabs</th></tr></thead>
@@ -89,7 +90,9 @@
   </table>
   </div>
 
-  <div class="callout"><p>Finance is gated by the <code>finance.manage</code> capability and module entitlement. <span class="badge route">/settings</span> redirects here — workspace settings live under Finance. An <strong>Admin</strong> sub-view is available to operators for configuration.</p></div>
+  <h2>Access &amp; what it affects</h2>
+  <p>Finance is gated by the <code>finance.manage</code> capability and module entitlement, so only authorised members reach it. Note that <span class="badge route">/settings</span> redirects here — workspace settings live <em>under</em> Finance, not separately. An <strong>Admin</strong> sub-view is available to operators for configuration.</p>
+  <div class="callout"><p>Everything you do across the sub-pages feeds back into this Dashboard: an issued invoice raises Revenue and AR, a recorded payment moves cash to <em>In</em>, an expense increases AP. The Dashboard is the live mirror of all the work happening in the tabs below it.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

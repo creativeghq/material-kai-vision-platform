@@ -11,31 +11,44 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / Greek e-invoicing</div>
   <h1>Greek e-invoicing (myDATA / ΑΑΔΕ)</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">Issue compliant invoices and transmit them to the Greek tax authority (ΑΑΔΕ / myDATA) directly from the platform.</p>
-  <div class="callout"><p><strong>How to open it:</strong> e-invoicing happens automatically when you issue invoices/receipts; configure it under top navigation → <strong>Finance</strong> → <strong>Settings</strong>.</p></div>
+  <p class="lead">Issue compliant invoices and transmit them to the Greek tax authority (ΑΑΔΕ / myDATA) directly from the platform — no separate accounting portal, no manual re-entry. This guide explains what myDATA actually is, why up-front VAT validation saves you money, and walks the issue-to-transmit flow step by step.</p>
 
-  <h2>What it does</h2>
-  <p>When you issue an invoice (or a receipt from the <a href="pos.html">POS</a>), the platform can transmit it electronically to <strong>myDATA</strong>, the Greek tax authority's e-bookkeeping system. This replaces manual entry into a separate accounting portal — the document you create here becomes the official record.</p>
+  <div class="callout"><p><strong>How to open it:</strong> e-invoicing happens automatically when you issue invoices/receipts. You configure it once under top navigation → <strong>Finance</strong> → <strong>Settings</strong> (see the <a href="finance-settings.html">Settings guide</a>, section <em>e-Invoicing</em>).</p></div>
+
+  <h2>What it is</h2>
+  <p><strong>myDATA</strong> (my Digital Accounting and Tax Application) is the Greek tax authority's electronic bookkeeping system, run by <strong>ΑΑΔΕ</strong>. Every business invoice and receipt in Greece must be reported to it. The platform connects to myDATA through the <strong>Novus</strong> connector, so when you issue a document here it is transmitted electronically to ΑΑΔΕ as the official record. There is no second system to copy figures into — the document you create in Finance <em>is</em> the filed document.</p>
+  <p>In practice this means the invoice you build under <a href="finance-documents.html">Documents → Invoices</a> (or the receipt you ring up at the <a href="pos.html">POS</a>) becomes the tax-authority record the moment you issue it. The manual step of re-keying everything into a separate accounting portal disappears.</p>
+
+  <h2>Why it matters</h2>
+  <p>myDATA reporting is a legal obligation, not an optional integration — Greek businesses must transmit their documents. Doing it inline has two concrete payoffs:</p>
+  <ul class="feat">
+    <li><strong>One source of truth.</strong> The document you issue is the document that's filed, so your books and the authority's records can't drift apart.</li>
+    <li><strong>No double entry.</strong> You stop re-typing invoices into a separate portal, which removes both the work and the transcription errors that come with it.</li>
+  </ul>
 
   <h2>Multi-tenant by design</h2>
-  <p>Transmission is per-workspace: each workspace issues under <strong>its own VAT identity and authorisation</strong>, so businesses sharing the platform never cross-file. Your workspace's issuer details are configured once and used on every submission.</p>
+  <p><strong>What it is —</strong> transmission is per-workspace. Each workspace issues under <strong>its own VAT identity and tax-authority authorisation</strong>, configured once and reused on every submission. <strong>Why it matters —</strong> many businesses share the platform, and this design guarantees they never cross-file: your documents always go out under your VAT number, never anyone else's. Your issuer details are set up a single time (in <a href="finance-settings.html">Settings → Business Identity</a>) and applied automatically thereafter.</p>
 
-  <h2>VAT validation before issuing</h2>
-  <p>Customer/supplier VAT numbers are validated before a document is issued — Greek numbers against the <strong>ΑΑΔΕ registry</strong> and EU numbers against <strong>VIES</strong> — reducing rejected submissions and keeping counter-party details correct. This ties into the Greek business lookup used across <a href="crm.html">CRM</a>.</p>
+  <h2>Why VAT validation matters</h2>
+  <p><strong>What it is —</strong> before a document is issued, the platform validates the counter-party's VAT number: Greek numbers against the <strong>ΑΑΔΕ registry</strong>, EU numbers against <strong>VIES</strong>. This ties into the same Greek business lookup used across <a href="crm.html">CRM</a>.</p>
+  <p><strong>Why it matters —</strong> a wrong or inactive VAT number is one of the most common reasons myDATA rejects a submission. Validating up front catches the problem while it's still cheap to fix — you correct one field before issuing, instead of unwinding a rejected or mis-filed document afterwards. It also keeps your counter-party details accurate, which feeds clean data into CRM and your reports.</p>
+  <div class="callout tip"><p>Because VAT is validated up front, fixing a wrong customer VAT <em>before</em> issuing is much cheaper than correcting a rejected or mis-filed document later. You can make this enforcement strict in <a href="finance-settings.html">Settings → General</a> — toggles there can <em>block</em> issuance when a buyer VAT is ΑΑΔΕ-inactive or was never validated.</p></div>
 
-  <h2>How it fits the document flow</h2>
+  <h2>How it works — the issue-to-transmit flow</h2>
+  <p>From your side it's a single <em>Issue</em> click, but several things happen in sequence behind it. Here is the end-to-end flow:</p>
   <ol>
-    <li>Create an invoice under <a href="finance-documents.html">Documents → Invoices</a> (or issue a receipt at the POS).</li>
-    <li>The counter-party's VAT is validated.</li>
-    <li>On issue, the document is transmitted to ΑΑΔΕ / myDATA and marked accordingly.</li>
-    <li>The issued document feeds your <a href="finance-receivables-payables.html">Receivables</a>, <a href="finance.html">Dashboard</a> and reports.</li>
+    <li><strong>Create the document.</strong> Build an invoice under <a href="finance-documents.html">Documents → Invoices</a>, or issue a receipt at the <a href="pos.html">POS</a>.</li>
+    <li><strong>VAT is validated.</strong> The counter-party's VAT number is checked against the ΑΑΔΕ registry (Greek) or VIES (EU). If your General settings are set to block, an invalid number stops you here — before any filing happens.</li>
+    <li><strong>The document is transmitted.</strong> On issue, it is sent to ΑΑΔΕ / myDATA through the Novus connector and marked accordingly, so you can see it's been filed.</li>
+    <li><strong>It flows into the rest of Finance.</strong> The issued document feeds your <a href="finance-receivables-payables.html">Receivables</a>, the <a href="finance.html">Dashboard</a> KPIs and your reports — automatically.</li>
   </ol>
 
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-settings.png" alt="Finance Settings where e-invoicing is configured"><figcaption>Finance → Settings, where the workspace's fiscal / e-invoicing details are configured.</figcaption></figure>
 
-  <div class="callout"><p><strong>Setup:</strong> e-invoicing requires your workspace's fiscal details and tax-authority authorisation to be configured (under Finance → Settings / by an administrator). Once connected, transmission happens as part of issuing — there's no separate export step.</p></div>
+  <h2>What it affects</h2>
+  <p>Once e-invoicing is connected, transmission is woven into normal issuing — there is no separate export step, and every issued invoice or receipt becomes part of your official myDATA record. It also drives the downstream figures: each transmitted document raises your receivables, updates the Dashboard, and appears in your reports, so the same action that satisfies the tax authority keeps your back-office in sync.</p>
 
-  <div class="callout tip"><p>Because VAT is validated up front, fixing a wrong customer VAT before issuing is much cheaper than correcting a rejected or mis-filed document later.</p></div>
+  <div class="callout"><p><strong>Setup:</strong> e-invoicing requires your workspace's fiscal details and tax-authority authorisation to be configured (under <a href="finance-settings.html">Finance → Settings</a> / by an administrator). Once connected, transmission happens as part of issuing — there's no separate export step.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

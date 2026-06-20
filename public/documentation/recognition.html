@@ -11,58 +11,68 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Material Recognition</div>
   <h1>Material Recognition</h1>
   <div class="routes"><span class="badge route">/recognition</span></div>
-  <p class="lead">Upload one or more photos of a real-world surface and let <strong>Hybrid AI</strong> identify the material, describe its visual properties, and match it against the catalogue — turning a single picture into structured, searchable knowledge.</p>
+  <p class="lead">Upload one or more photos of a real-world surface and let <strong>Hybrid AI</strong> identify the material, describe its visual properties, and match it against the catalogue — turning a single picture into structured, searchable knowledge. This guide teaches every part of that flow: how to get your images in, what the result actually means, and how to act on the matches.</p>
 
   <div class="callout"><p><strong>How to open it:</strong> open your <strong>Profile</strong> menu (top-right) → <strong>Tools</strong>, then under <strong>Catalog tools</strong> (signed-in only) choose <strong>Material Recognition</strong>. Direct route: <span class="badge route">/recognition</span>.</p></div>
 
-  <h2>Step by step: identify a material from a photo</h2>
-  <ol>
-    <li>Open <strong>Material Recognition</strong> at <span class="badge route">/recognition</span>.</li>
-    <li>Click <strong>Choose Files</strong> / <strong>Select Images</strong> — or drag and drop — and add one or more photos of the surface you want to identify.</li>
-    <li>Wait for the hybrid-AI analysis to run; a progress indicator shows the work in flight.</li>
-    <li>Review the recognised attributes for each image — material type, category and sub-category, dominant colours, textures, finish and surface pattern.</li>
-    <li>Browse the visually-matched catalogue products returned alongside each result.</li>
-    <li>Act on a match — open it for full specifications, add it to a <a href="moodboards.html">moodboard</a>, or refine the search in the <a href="agent-hub.html">Agent Hub</a>. You can also line up several candidates on the <a href="compare.html">Compare</a> page or search the <a href="knowledge-base.html">Knowledge Base</a> from the same understanding.</li>
-  </ol>
+  <div class="callout tip"><p><strong>The shape of the page</strong> (so each section below makes sense): an <strong>upload area</strong> at the top where you add and review your photos, a <strong>Start Recognition</strong> button that runs the analysis, and a <strong>results area</strong> where each image returns its identification, visual attributes and matched catalogue products. Read it as a top-to-bottom flow: add → analyse → review → act.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/recognition/recognition.png" alt="Material Recognition — drag and drop images to analyse them with Hybrid AI">
     <figcaption>Material Recognition — drop in one or more images and analyse them with Hybrid AI.</figcaption>
   </figure>
 
-  <h2>What this page is for</h2>
-  <p>Material Recognition answers the question <em>"what is this, and do you have something like it?"</em> Point it at a tile, a fabric swatch, a stone sample, a wood finish or any finished surface, and it returns the most likely material type and sub-category, a description of how the surface looks (colours, textures, finish, surface pattern), and a set of visually-similar products from the catalogue. It's the fastest way to go from a photo on your phone to a shortlist of real, sourceable materials.</p>
+  <!-- 1 -->
+  <h2>1. What Material Recognition is</h2>
+  <p><strong>What it is —</strong> the visual front door to the catalogue. It answers the question <em>"what is this, and do you have something like it?"</em> Point it at a tile, a fabric swatch, a stone sample, a wood finish or any finished surface, and it returns the most likely material type and sub-category, a description of how the surface looks (colours, textures, finish, surface pattern), and a set of visually-similar products from the catalogue.</p>
+  <p><strong>Why it matters —</strong> it's the fastest way to go from a photo on your phone to a shortlist of real, sourceable materials. Instead of describing a surface in words and hoping search understands you, you show the platform the thing itself and get structured, searchable knowledge back.</p>
+  <p><strong>What it affects elsewhere —</strong> the same understanding that powers recognition also drives search across the platform, so a photo here connects naturally to the rest of your workflow: searching the <a href="knowledge-base.html">Knowledge Base</a>, comparing candidates on the <a href="compare.html">Compare</a> page, and building boards and proposals.</p>
 
-  <h2>What "Hybrid AI" means</h2>
-  <p>Rather than relying on a single model, recognition combines several AI models working together on every image:</p>
+  <!-- 2 -->
+  <h2>2. What "Hybrid AI" means</h2>
+  <p><strong>What it is —</strong> rather than relying on a single model, recognition combines several AI models working together on every image:</p>
   <ul class="feat">
     <li><strong>A visual encoder</strong> — converts the picture into a visual "fingerprint" that can be compared against catalogue images to find genuine look-alikes.</li>
     <li><strong>A vision-language analysis</strong> — "reads" the image and writes a structured description: the material type, its category and sub-category, and its visual attributes.</li>
   </ul>
-  <p>Because two complementary techniques are combined — one for matching, one for describing — the result is richer and more reliable than any one model could produce alone. That's why every result carries the <strong>Hybrid AI</strong> badge.</p>
+  <p><strong>Why it matters —</strong> because two complementary techniques are combined — one for matching, one for describing — the result is richer and more reliable than any one model could produce alone. That's why every result carries the <strong>Hybrid AI</strong> badge: it's your signal that both the look-alike matching and the written description came from that combined analysis.</p>
+  <p><strong>What it affects —</strong> the quality of both halves of the result you see in section 5: the visual encoder feeds the <em>Similar products</em>, and the vision-language analysis feeds the <em>Material identification</em> and <em>Visual attributes</em>.</p>
 
   <div class="callout tip"><p>Recognition works best on a clear, well-lit, close-up photo of the surface itself, with the material filling most of the frame. Avoid heavy glare, strong shadows or busy backgrounds for the most accurate read.</p></div>
 
-  <h2>Uploading your images</h2>
-  <p>There are three ways to add photos, and you can analyse several at once:</p>
+  <!-- 3 -->
+  <h2>3. Uploading your images</h2>
+  <p><strong>What it is —</strong> the upload area accepts your photos in three ways, and you can analyse several at once. <strong>Why it matters —</strong> getting a good, correctly-formatted image in is the one thing that most affects the result; the AI can only describe what you give it.</p>
+  <h3>The three ways to add photos</h3>
   <ul class="feat">
     <li><strong>Choose Files / Select Images</strong> — click the button to browse and pick images from your device.</li>
     <li><strong>Drag and drop</strong> — drop one or more images straight onto the upload area.</li>
     <li><strong>Multiple at once</strong> — add a whole batch; each image is analysed independently and gets its own result.</li>
   </ul>
-  <p>The accepted formats are <strong>JPEG</strong>, <strong>PNG</strong> and <strong>WebP</strong>. Selected images appear as thumbnails before analysis, and you can <strong>remove</strong> any individual file or <strong>clear all</strong> and start again.</p>
-
-  <h2>Step by step</h2>
+  <h3>How to upload</h3>
   <ol>
     <li>Add your photos with <strong>Choose Files</strong> / <strong>Select Images</strong>, or drag and drop them onto the upload area.</li>
-    <li>Review the thumbnails of the selected images; remove any you didn't mean to include.</li>
-    <li>Click <strong>Start Recognition</strong> to analyse them with Hybrid AI. A progress indicator shows the work in flight.</li>
-    <li>Read the results — each image returns its identification, visual attributes and similar catalogue products.</li>
-    <li>Act on a result — open a matched product, save it to a moodboard, or take it to the Agent Hub to refine.</li>
+    <li>Check the accepted formats — recognition reads <strong>JPEG</strong>, <strong>PNG</strong> and <strong>WebP</strong>.</li>
+    <li>Review the <strong>thumbnails</strong> of the selected images, which appear before analysis runs.</li>
+    <li><strong>Remove</strong> any individual file you didn't mean to include, or <strong>clear all</strong> to start again.</li>
   </ol>
+  <p><strong>What it affects —</strong> what you stage here is exactly what gets analysed in the next step; remove stray images now so you don't pay attention (or credits) on results you don't want.</p>
 
-  <h2>What you get back</h2>
-  <p>For each analysed image, recognition returns three kinds of information:</p>
+  <!-- 4 -->
+  <h2>4. Running the analysis</h2>
+  <p><strong>What it is —</strong> the step that hands your staged images to Hybrid AI. <strong>Why it matters —</strong> nothing is analysed until you start it, so you stay in control of when the work (and any cost) happens.</p>
+  <h3>How to run it</h3>
+  <ol>
+    <li>Confirm the thumbnails show the photos you want and only those.</li>
+    <li>Click <strong>Start Recognition</strong> to analyse them with Hybrid AI.</li>
+    <li>Watch the <strong>progress indicator</strong> — it shows the work in flight while the models run.</li>
+    <li>Wait for the results area to populate; each image returns its own block.</li>
+  </ol>
+  <p><strong>What it affects —</strong> each image is processed independently, so a batch produces a separate result per photo rather than one blended answer.</p>
+
+  <!-- 5 -->
+  <h2>5. What you get back</h2>
+  <p><strong>What it is —</strong> for each analysed image, recognition returns three kinds of information. <strong>Why it matters —</strong> together they tell you both <em>what the surface is</em> and <em>where to find it</em>, which is the whole point of the tool.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Result</th><th>What it tells you</th></tr></thead>
@@ -73,18 +83,27 @@
     </tbody>
   </table>
   </div>
-  <p>Each identification is shown with an indication of how confident the analysis is, so you can judge how closely the read fits your image.</p>
+  <h3>How to read the confidence</h3>
+  <p>Each identification is shown with an indication of how confident the analysis is, so you can judge how closely the read fits your image. Treat a high-confidence read as a solid starting point; on a lower-confidence read, lean more on the <em>Similar products</em> and your own eye before committing.</p>
+  <p><strong>What it affects —</strong> the <em>Similar products</em> here are the bridge to the rest of the platform; everything in the next section starts from one of those matches.</p>
 
-  <h2>Acting on the results</h2>
+  <!-- 6 -->
+  <h2>6. Acting on the results</h2>
+  <p><strong>What it is —</strong> the actions you can take once a result is in front of you. <strong>Why it matters —</strong> a recognition result is a starting point, not an end point; these actions turn "this looks like that" into a real next step in your workflow.</p>
   <ul class="feat">
     <li><strong>Open a match</strong> — jump from a similar product straight to its full catalogue entry to see specifications, availability and more.</li>
     <li><strong>Add to a moodboard</strong> — collect the materials you like onto a <a href="moodboards.html">moodboard</a> to build out a scheme.</li>
     <li><strong>Compare options</strong> — line up several matched materials side by side on the <a href="compare.html">Compare</a> page.</li>
     <li><strong>Refine in the Agent Hub</strong> — take an image or a result into the <a href="agent-hub.html">Agent Hub</a> and ask in plain language for variations, narrower matches or follow-up searches.</li>
   </ul>
-
-  <h2>Where recognition fits</h2>
-  <p>Recognition is the visual front door to the catalogue. The same understanding that powers it also drives search across the platform, so a photo here connects naturally to the rest of your workflow — searching the <a href="knowledge-base.html">Knowledge Base</a>, comparing candidates, and building boards and proposals.</p>
+  <h3>A typical follow-through</h3>
+  <ol>
+    <li><strong>Open</strong> the most promising match to confirm it has the specs and availability you need.</li>
+    <li>If a few candidates are close, send them to <a href="compare.html">Compare</a> to judge them together.</li>
+    <li><strong>Save</strong> the keepers to a <a href="moodboards.html">moodboard</a> so the scheme builds up as you go.</li>
+    <li>Not quite right? Take the image or result into the <a href="agent-hub.html">Agent Hub</a> and ask for closer variations in plain language.</li>
+  </ol>
+  <p><strong>What it affects —</strong> these actions feed directly into your boards, comparisons and proposals, and the same visual understanding lets you search the <a href="knowledge-base.html">Knowledge Base</a> from what recognition learned about your photo.</p>
 
   <div class="callout"><p>Recognition is powered by AI analysis. Most identification is included in normal use, but some advanced AI actions may consume credits — where that applies, the platform makes the cost clear before you proceed.</p></div>
 </main>

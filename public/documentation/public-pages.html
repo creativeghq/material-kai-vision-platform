@@ -86,28 +86,37 @@
   </table>
   </div>
 
-  <h2>What each page does</h2>
+  <h2>What each page does — and when to send it</h2>
+  <p>The table above is the quick reference; the cards below add the <em>why</em>. For each page you'll find what the recipient sees and does, and the moment in your workflow when sending it makes sense.</p>
   <div class="cards">
-    <div class="card"><h3>🧾 Public quote</h3><p>A clean, read-only presentation of a quote: every line item with its description and specification, sub-totals, taxes and the grand total. The recipient can accept it with one click — turning a proposal into a confirmed order without back-and-forth email.</p></div>
-    <div class="card"><h3>💳 Pay invoice</h3><p>Shows the invoice and an online payment option, so a customer can settle the amount the moment they open the link. The payment is reconciled back against the invoice in your Finance workspace.</p></div>
-    <div class="card"><h3>🎨 Public moodboard</h3><p>A shareable view of a moodboard — the images, materials and products you've gathered — for a client or collaborator to browse at their leisure.</p></div>
-    <div class="card"><h3>📐 Client view</h3><p>The richest deliverable: a project sign-off page that bundles the deck as a PDF, an explorable 3D walkthrough, switchable lighting moods over the hero render, a live FF&amp;E list, and inline approve/comment controls so the client can respond in place.</p></div>
-    <div class="card"><h3>🗂️ Shared sheet</h3><p>A single presentation sheet on its own page — handy when you want to send just one board (a material schedule, a colour palette, an annotated render) rather than a whole deck.</p></div>
-    <div class="card"><h3>📚 Public catalogue</h3><p>A published, browsable catalogue of products. Some catalogues are open; others ask the visitor for an email address first, which also lets you see who's looking.</p></div>
-    <div class="card"><h3>🏬 Online storefront</h3><p>A seller's public shop page, where prospects can browse what's available and find their way into an enquiry or quote.</p></div>
-    <div class="card"><h3>👤 Public profile</h3><p>A member's public-facing page — who they are and the services they provide — useful as a shareable business card.</p></div>
-    <div class="card"><h3>💬 Public inbox thread</h3><p>A shared conversation that an outside party can read and reply to without registering, so they can take part directly in a discussion you've opened to them.</p></div>
-    <div class="card"><h3>🔍 AR material preview</h3><p>An augmented-reality view of a material. Usually reached by scanning a QR code on a desktop screen so the visitor can preview the material in their own space on a phone or tablet.</p></div>
+    <div class="card"><h3>🧾 Public quote</h3><p><strong>What —</strong> a clean, read-only presentation of a quote: every line item with its description and specification, sub-totals, taxes and the grand total, with a one-click <strong>Accept</strong>. <strong>When to send —</strong> the moment a proposal is ready for the customer's decision; their acceptance turns it into a confirmed order with no back-and-forth email.</p></div>
+    <div class="card"><h3>💳 Pay invoice</h3><p><strong>What —</strong> the invoice plus an online payment option. <strong>When to send —</strong> as soon as you want to be paid; the customer can settle the moment they open the link, and the payment is reconciled back against the invoice in your Finance workspace automatically.</p></div>
+    <div class="card"><h3>🎨 Public moodboard</h3><p><strong>What —</strong> a shareable view of a moodboard: the images, materials and products you've gathered. <strong>When to send —</strong> early in a project, to let a client or collaborator browse a direction at their leisure and react before you commit to a full deck.</p></div>
+    <div class="card"><h3>📐 Client view</h3><p><strong>What —</strong> the richest deliverable: a project sign-off page bundling the deck as a PDF, an explorable 3D walkthrough, switchable lighting moods over the hero render, a live FF&amp;E list, and inline approve/comment controls. <strong>When to send —</strong> at a milestone that needs formal client sign-off, when a flat PDF can't convey the experience.</p></div>
+    <div class="card"><h3>🗂️ Shared sheet</h3><p><strong>What —</strong> a single presentation sheet on its own page. <strong>When to send —</strong> when you want to send just one board (a material schedule, a colour palette, an annotated render) rather than a whole deck.</p></div>
+    <div class="card"><h3>📚 Public catalogue</h3><p><strong>What —</strong> a published, browsable catalogue of products. <strong>When to send —</strong> to let a prospect explore your range; gate it with an email request when you want to capture who's looking, leave it open for the widest reach.</p></div>
+    <div class="card"><h3>🏬 Online storefront</h3><p><strong>What —</strong> a seller's public shop page. <strong>When to send —</strong> as your always-on shopfront link, where prospects browse what's available and find their way into an enquiry or quote.</p></div>
+    <div class="card"><h3>👤 Public profile</h3><p><strong>What —</strong> a member's public-facing page: who they are and the services they provide. <strong>When to send —</strong> as a shareable business card whenever someone needs to know who they're dealing with.</p></div>
+    <div class="card"><h3>💬 Public inbox thread</h3><p><strong>What —</strong> a shared conversation an outside party can read and reply to without registering. <strong>When to send —</strong> when you want a customer or supplier to take part in a discussion directly, without making them create an account.</p></div>
+    <div class="card"><h3>🔍 AR material preview</h3><p><strong>What —</strong> an augmented-reality view of a material. <strong>When to send —</strong> usually as a QR code on a desktop screen, so the visitor can preview the material in their own space on a phone or tablet.</p></div>
   </div>
 
   <h2>How sharing works</h2>
+  <p><strong>What it is —</strong> the one consistent mechanism behind every page above. Whatever the deliverable, sharing follows the same rules, so once you understand it for a quote you understand it for all of them. <strong>Why it works this way —</strong> the design keeps you in control: nothing is exposed until you act, links are hard to guess, and you can pull access back whenever you need to.</p>
   <ul class="feat">
     <li><strong>Generated on demand</strong> — you create each link from the screen it belongs to: a quote, an invoice, a moodboard, a project, a catalogue or a conversation. Nothing is public until you choose to share it.</li>
-    <li><strong>Token-protected</strong> — most links carry a unique, hard-to-guess token (the <code>:token</code> in the routes above). Only someone holding that exact link can open the page.</li>
+    <li><strong>Token-protected</strong> — most links carry a unique, hard-to-guess token (the <code>:token</code> in the routes above), so only someone holding that exact link can open the page.</li>
     <li><strong>Revocable and time-limited</strong> — you can <strong>revoke</strong> a link at any time, and many can be set to <strong>expire</strong> on a date. Once revoked or expired, the page stops working for everyone who has it.</li>
-    <li><strong>No account needed</strong> — recipients interact straight away: view, accept, pay, browse or comment. They never see your dashboard or anyone else's data.</li>
+    <li><strong>No account needed</strong> — recipients interact straight away: view, accept, pay, browse or comment, and never see your dashboard or anyone else's data.</li>
     <li><strong>Responses come back to you</strong> — an accepted quote, a paid invoice and a client's approvals or comments all flow back into the originating record, so your workspace always reflects the latest state.</li>
   </ul>
+  <h3>How to share or revoke a link</h3>
+  <ol>
+    <li>Open the record you want to share (the quote, invoice, project, etc.) and use its <strong>share</strong> control to generate the public link — optionally setting an expiry date.</li>
+    <li>Send the link to the intended recipient; they open it and act on it with no sign-in.</li>
+    <li>To cut off access, return to the same record and <strong>revoke</strong> the link — the page immediately stops working for anyone who holds it.</li>
+    <li>If you still need to share the deliverable, generate a fresh link; the underlying record is untouched.</li>
+  </ol>
 
   <h2>Keeping shared links safe</h2>
   <div class="callout warn">
