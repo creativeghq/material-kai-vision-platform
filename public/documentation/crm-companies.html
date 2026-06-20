@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM: Companies | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Companies</div>
+  <h1>CRM · Companies</h1>
+  <div class="routes"><span class="badge route">/crm</span> <span class="badge route">/crm/companies/:id</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">The Companies tab is where you keep the organisations you trade with — your customers, suppliers and partners. A company is your billing counter-party: the legal name, address and VAT number you confirm here are exactly what prints on an invoice, so this is the record that makes your documents legally correct. It is also where the Greek business-registry lookup (ΑΑΔΕ) and the EU <strong>VIES</strong> VAT validation live, and where you decide whether a company sits on your sales side, your purchases side, or both. This guide walks the list, the New Company form group by group — <strong>what each captures, why it matters, how to fill it in, and what it changes elsewhere on the platform.</strong></p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>CRM</strong> → the <strong>Companies</strong> tab (alongside Users, Contacts and Categories). A toolbar <strong>Add Company</strong> button creates a new organisation, and a search box (<em>"Search companies…"</em>) filters the list. Clicking any row opens that company's own detail page at <span class="badge route">/crm/companies/:id</span>.</p>
+
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>CRM</strong> → <strong>Companies</strong> tab. To add one, click <strong>Add Company</strong> on the toolbar.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-companies.png" alt="CRM Companies tab">
+    <figcaption>The Companies tab — organisations, suppliers and customers, searchable and with per-row actions.</figcaption>
+  </figure>
+
+  <h2>What this tab is for</h2>
+  <p><strong>What it is —</strong> the tab for <strong>managing company accounts and business relationships</strong>. <strong>Why it matters —</strong> a company is your billing counter-party. The legal name, address and VAT number you confirm here are exactly what appears on an invoice, so this is the record that makes your documents legally correct. It's also where the Greek registry lookup and the EU VIES validation live, so getting a company on file properly means no re-typing, no mismatched names, and no rejected myDATA submissions because a VAT number was wrong.</p>
+
+  <h2>The Companies list</h2>
+  <p>Each row carries the company's headline details, with per-row <strong>Actions</strong> to manage it. The columns are:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Name</strong></td><td>The organisation's name.</td></tr>
+      <tr><td><strong>Email</strong></td><td>Company email address.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Company phone number.</td></tr>
+      <tr><td><strong>Website</strong></td><td>Company website.</td></tr>
+      <tr><td><strong>Industry</strong></td><td>Industry the company operates in.</td></tr>
+      <tr><td><strong>Created</strong></td><td>When the company was added.</td></tr>
+      <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the company.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>How to add a company and enrich it from ΑΑΔΕ</h2>
+  <ol>
+    <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Companies</strong> tab.</li>
+    <li>Click <strong>Add Company</strong> and enter its core details (at minimum, the <strong>Company Name</strong>).</li>
+    <li>For a Greek company, enter its <strong>ΑΦΜ</strong> (VAT number).</li>
+    <li>Run the <strong>ΑΑΔΕ lookup</strong> to auto-fill the legal name, registered address, tax office (ΔΟΥ), activity codes (ΚΑΔ) and status from the official tax-authority registry.</li>
+    <li>For an EU company, use <strong>Validate (VIES)</strong> to verify the VAT number before you trade on credit or issue documents.</li>
+    <li>Set the <strong>Role</strong> — mark the company a supplier, a customer, or both.</li>
+    <li><strong>Save.</strong> The confirmed billing details flow straight through to documents in <a href="finance.html">Finance</a>.</li>
+  </ol>
+
+  <h2>Greek business lookup (ΑΑΔΕ / myAADE)</h2>
+  <p><strong>What it is —</strong> a one-click pull of a Greek company's official profile from the tax-authority registry (ΑΑΔΕ), using the company's <strong>ΑΦΜ</strong>. <strong>Why it matters —</strong> typing legal details by hand invites typos that get a myDATA submission rejected; the registry is the source of truth, so this is the recommended way to <strong>validate a VAT number before invoicing</strong> a Greek customer or supplier. On a company's detail page, enter the ΑΦΜ and run the lookup; the platform retrieves and fills:</p>
+  <ul class="feat">
+    <li><strong>Legal name</strong> and commercial title.</li>
+    <li><strong>Registered address</strong> — street, number, postcode and city.</li>
+    <li><strong>Tax office</strong> (ΔΟΥ).</li>
+    <li><strong>Activity codes</strong> (ΚΑΔ) — the company's primary and secondary business activities.</li>
+    <li><strong>Status</strong> — whether the VAT number is active or has been deactivated.</li>
+  </ul>
+  <p><strong>What it affects elsewhere:</strong> the same registry data underpins Greek e-invoicing — see <a href="finance-einvoicing.html">Greek e-invoicing</a> for how invoices are transmitted to myDATA / ΑΑΔΕ, and note that <a href="finance-settings.html">Finance settings → General</a> can <em>block issuance</em> against a VAT number the registry shows as inactive.</p>
+
+  <div class="callout tip"><p><strong>Lookups are cached for about 90 days.</strong> Once you've fetched a company's details, repeating the lookup within that window is instant and doesn't re-contact the registry — so there's no penalty for re-opening a record.</p></div>
+
+  <div class="callout warn"><p><strong>Each fresh lookup writes a notification to the looked-up company's TaxisNet inbox.</strong> This is required by tax-authority policy and can't be turned off. For that reason the lookup is meant for verifying your <em>own</em> business or a legitimate customer/supplier you actually trade with — not for researching arbitrary companies.</p></div>
+
+  <h2>Company fields in detail</h2>
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/company-form.png" alt="The New Company form"><figcaption>The New Company form — grouped sections.</figcaption></figure>
+  <p>The New Company form is organised into groups. Required fields are marked with <strong>*</strong>. Each group below explains <em>what</em> it captures, <em>why</em> you'd fill it in, and where the data surfaces.</p>
+
+  <h3>Company Information</h3>
+  <p><strong>What it is —</strong> the organisation's identity and profile. <strong>Why it matters —</strong> the name is what prints on documents and what you search on; the profile fields (industry, size, revenue) help you understand and segment the account.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Company Name *</strong></td><td>Required — the organisation's name.</td></tr>
+      <tr><td><strong>Industry</strong></td><td>Industry the company operates in.</td></tr>
+      <tr><td><strong>Email</strong></td><td>Company email address.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Company phone number.</td></tr>
+      <tr><td><strong>Website</strong></td><td>Company website.</td></tr>
+      <tr><td><strong>Employee Count</strong></td><td>Number of employees.</td></tr>
+      <tr><td><strong>Annual Revenue</strong></td><td>Reported annual revenue.</td></tr>
+      <tr><td><strong>Description</strong></td><td>Free-text description of the company.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Tax &amp; VAT</h3>
+  <p><strong>What it is —</strong> the company's tax identity and the EU VAT-validation button. <strong>Why it matters —</strong> <strong>Validate (VIES)</strong> confirms an EU VAT number is real and active before you extend credit or issue cross-border documents, cutting the risk of a rejected or non-compliant invoice.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Country Code</strong></td><td>Country code for the VAT number.</td></tr>
+      <tr><td><strong>VAT Number</strong></td><td>The company's VAT number.</td></tr>
+      <tr><td><strong>Tax Office</strong></td><td>The company's tax office.</td></tr>
+      <tr><td><strong>Validate (VIES)</strong></td><td>Button to verify EU VAT numbers via VIES. See <a href="finance-einvoicing.html">Greek e-invoicing</a> for related VAT validation.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h4>How to validate a VAT number with VIES</h4>
+  <p><strong>What VIES is —</strong> the EU's official VAT Information Exchange System. The <strong>Validate (VIES)</strong> button checks the company's VAT number against that system and confirms it is real and active. <strong>Why validate —</strong> before you extend credit or issue a cross-border document, you want to be sure the counter-party's VAT number is genuine; an invalid number can mean a rejected or non-compliant invoice. (For Greek ΑΦΜs, the ΑΑΔΕ lookup above does the equivalent against the national registry.)</p>
+  <ol>
+    <li>Enter the company's <strong>Country Code</strong> and <strong>VAT Number</strong>.</li>
+    <li>Click <strong>Validate (VIES)</strong>.</li>
+    <li>If it checks out, the number is confirmed valid; record it as the company's billing VAT.</li>
+    <li><strong>Save.</strong></li>
+  </ol>
+
+  <h3>Address</h3>
+  <p><strong>What it is —</strong> the company's physical/registered address. <strong>Why it matters —</strong> it's the correspondence and delivery address, and the basis for the billing address used on documents.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Street Address</strong></td><td>Street and number.</td></tr>
+      <tr><td><strong>City</strong></td><td>City / town.</td></tr>
+      <tr><td><strong>State/Province</strong></td><td>Region / state / province.</td></tr>
+      <tr><td><strong>Postal Code</strong></td><td>Postcode.</td></tr>
+      <tr><td><strong>Country</strong></td><td>Country.</td></tr>
+      <tr><td><strong>Sub Units</strong></td><td>Additional address sub-units (e.g. floor, suite).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Pricing</h3>
+  <p><strong>What it is —</strong> the company's default commercial terms. <strong>Why it matters —</strong> a <strong>default discount %</strong> is applied automatically so you don't re-negotiate on every quote, and a <strong>credit limit</strong> lets Finance guard against over-extending the account — it can <em>warn</em> or even <em>block</em> an invoice that would push the buyer past it.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Default discount %</strong></td><td>Discount applied by default for this company.</td></tr>
+      <tr><td><strong>Credit limit</strong></td><td>Credit limit on the account.</td></tr>
+      <tr><td><strong>Discount notes</strong></td><td>Free-text notes about the discount arrangement.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>What it affects elsewhere:</strong> the credit limit set here drives the <em>"Warn / Block when the invoice pushes the buyer over their credit limit"</em> rules in <a href="finance-settings.html">Finance settings → General</a>.</p>
+
+  <h3>Invoicing &amp; VAT</h3>
+  <p><strong>What it is —</strong> the company's dedicated billing identity used when you issue a document to it. <strong>Why it matters —</strong> the billing name, VAT (ΑΦΜ), tax office and billing address printed on an invoice can legitimately differ from the day-to-day company details — this group is what guarantees the document is legally addressed. The <strong>Segment</strong> and <strong>VAT-exemption</strong> choices decide which pricing tier and which tax treatment apply, and <strong>Include in ΜΥΦ</strong> governs Greek clientele reporting.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Segment</strong></td><td>Customer segment (e.g. Unsegmented). Managed in <a href="finance-settings.html">Finance settings</a>.</td></tr>
+      <tr><td><strong>Default VAT-exemption category</strong></td><td>The default VAT-exemption category. See <a href="finance-settings.html">Finance settings</a>.</td></tr>
+      <tr><td><strong>Include in ΜΥΦ</strong></td><td>Include this company in the Greek MyData clientele list (ΜΥΦ). Turn this on for parties whose transactions must be reported in your clientele summary.</td></tr>
+      <tr><td><strong>Billing name</strong></td><td>Name to bill under.</td></tr>
+      <tr><td><strong>Billing VAT (ΑΦΜ)</strong></td><td>VAT number for billing.</td></tr>
+      <tr><td><strong>Tax office (ΔΟΥ)</strong></td><td>Greek tax office.</td></tr>
+      <tr><td><strong>Country code</strong></td><td>Billing country code.</td></tr>
+      <tr><td><strong>Street</strong></td><td>Billing street.</td></tr>
+      <tr><td><strong>Number</strong></td><td>Billing street number.</td></tr>
+      <tr><td><strong>Postal code</strong></td><td>Billing postcode.</td></tr>
+      <tr><td><strong>City</strong></td><td>Billing city.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>Why set ΜΥΦ?</strong> Greek MyData requires a clientele summary (ΜΥΦ) of the parties you transact with. Marking a company <em>Include in ΜΥΦ</em> here is what makes their transactions appear in that summary, so the reporting is complete and correct without manual list-keeping.</p>
+  <p><strong>What it affects elsewhere:</strong> these billing details flow straight onto issued documents in <a href="finance.html">Finance</a>; the segment and VAT-exemption come from <a href="finance-settings.html">Finance settings</a>.</p>
+
+  <h3>Role — supplier vs customer</h3>
+  <p><strong>What it is —</strong> which side of the relationship the company sits on. <strong>Why it matters —</strong> marking a company a <strong>supplier</strong> is what feeds it into payables, expense documents and the supplier account overview on the Business page; marking it a <strong>customer</strong> puts it on the sales/receivables side. Both can apply at once for a party you buy from and sell to.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>This is a supplier</strong></td><td>Mark the company as a supplier.</td></tr>
+      <tr><td><strong>This is a customer</strong></td><td>Mark the company as a customer (either or both can apply).</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>Why mark <em>is supplier</em>?</strong> Payables, expense documents and the supplier account overview only pull from parties flagged as suppliers — so this single checkbox is what connects a company to everything you owe and pay. Likewise <em>is customer</em> is what puts the company on the receivables side, so it can carry quotes, sales documents and the invoices you raise.</p>
+
+  <h2>Worked example — onboarding a Greek supplier you'll buy on credit</h2>
+  <div class="callout tip"><p>Open <strong>CRM → Companies</strong> → click <strong>Add Company</strong>. Type the supplier's name into <strong>Company Name</strong>, then put their <strong>ΑΦΜ</strong> in the Tax &amp; VAT group and run the <strong>ΑΑΔΕ lookup</strong> — the legal name, registered address, ΔΟΥ, ΚΑΔ activity codes and active/inactive status fill in from the registry, so you don't risk a typo. Confirm the <strong>Invoicing &amp; VAT</strong> billing identity (billing name, ΑΦΜ, ΔΟΥ, billing address) and set <strong>Include in ΜΥΦ</strong> on so their transactions appear in your Greek clientele summary. Agree terms in <strong>Pricing</strong> — say a default discount and a credit limit. Finally, in <strong>Role</strong>, tick <strong>This is a supplier</strong>. Save. The company now appears on the purchases/payables side and in the Business page's supplier overview, and its confirmed billing details flow straight onto the bills you record against it in <a href="finance.html">Finance</a>.</p></div>
+
+  <h2>The company detail page</h2>
+  <p><strong>What it is —</strong> the full record behind a list row, at <span class="badge route">/crm/companies/:id</span>. <strong>Why it matters —</strong> this is where the whole relationship lives in one view, and where you apply the segments and confirm the billing details that the rest of the platform reads. From there you can:</p>
+  <ul class="feat">
+    <li><strong>Edit core information</strong> — name, email, phone, address, VAT/tax details, notes.</li>
+    <li><strong>Run the ΑΑΔΕ lookup and the VIES validation</strong> — fetch or re-confirm the company's registry profile and EU VAT status.</li>
+    <li><strong>Assign categories</strong> — apply the segment labels you defined in the CRM Categories tab.</li>
+    <li><strong>See associated records</strong> — the contacts linked to the company, and the documents and activity tied to it, so the whole relationship is in one view.</li>
+  </ul>
+  <p>A company's billing details flow straight through to documents, so the legal name, address and VAT number you confirm here are exactly what appears on an invoice in <a href="finance.html">Finance</a>.</p>
+
+  <div class="callout"><p>The <strong>Validate (VIES)</strong> button on a company verifies EU VAT numbers; for Greek customers and suppliers, VAT validation also feeds <a href="finance-einvoicing.html">Greek e-invoicing</a>. <strong>Segments</strong> and <strong>VAT-exemption categories</strong> used in the Invoicing &amp; VAT group are configured in <a href="finance-settings.html">Finance settings</a>. For the rest of the CRM — Users, Contacts and Categories — see <a href="crm.html">CRM</a>.</p></div>
+
+  <h2>Permissions</h2>
+  <p>Access to the CRM is gated by the <code>crm.view</code> capability — users without it won't see this area, including the Companies tab.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

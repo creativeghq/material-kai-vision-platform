@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM: Users | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Users</div>
+  <h1>CRM · Users</h1>
+  <div class="routes"><span class="badge route">/crm</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">The Users tab is where you <strong>manage the platform users in your workspace</strong> — the people who actually have a login. It lists each user alongside their role, subscription tier and credit balance, so the access and spend of every account is visible at a glance. This is the tab you use to keep access correct: a user's role is the gate on what they can see and do across the platform, and the subscription and credit columns tell you what each account can spend.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>CRM</strong> → the <strong>Users</strong> tab (the first of the four CRM tabs: Users, Contacts, Companies, Categories).</p>
+
+  <div class="callout"><p><strong>Users vs. Contacts —</strong> a <em>user</em> has login access to your workspace; a <em>contact</em> is a record of a person you deal with who may or may not have a login. Most users arrive on their own once you invite them (see <a href="finance-settings-team.html">Team invites</a>); this tab is where you see and manage them once they're in.</p></div>
+
+  <h2>What's on the screen</h2>
+  <p>A toolbar sits above a table of users:</p>
+  <ul class="feat">
+    <li><strong>Add User</strong> — a toolbar button that opens the new-user flow (see the step-by-step below).</li>
+    <li><strong>Search</strong> — a search box (<em>"Search users by email…"</em>) that filters the list so you can find someone quickly.</li>
+    <li><strong>The users table</strong> — one row per user, each row exposing the columns described below with per-row <strong>Actions</strong> on the right.</li>
+  </ul>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-users.png" alt="CRM Users tab — platform users, roles and subscriptions">
+    <figcaption>The Users tab — platform users with their role, subscription, credits and status, plus the Add User button and the email search box.</figcaption>
+  </figure>
+
+  <h2>The columns in detail</h2>
+  <p>Each row is one platform user. The columns read left to right:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Email</strong></td><td>The user's login email address — this is also what the search box matches on.</td></tr>
+      <tr><td><strong>Role</strong></td><td>The user's role — admin, user, dealer, factory, and so on. The role is the gate on what the person can see and do across the platform.</td></tr>
+      <tr><td><strong>Subscription</strong></td><td>The user's subscription tier (free, pro, …).</td></tr>
+      <tr><td><strong>Credits</strong></td><td>The user's current credit balance — what the account has left to spend.</td></tr>
+      <tr><td><strong>Status</strong></td><td>The account status (e.g. active).</td></tr>
+      <tr><td><strong>Created</strong></td><td>When the user was added.</td></tr>
+      <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the user.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>How to search</h2>
+  <p>Type into the <strong>Search users by email…</strong> box at the top of the tab to filter the table down to matching users. It's the fastest way to jump to one person in a long list — search on their login email.</p>
+
+  <h2>How to add a user</h2>
+  <ol>
+    <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Users</strong> tab.</li>
+    <li>Click <strong>Add User</strong> in the toolbar to open the new-user flow.</li>
+    <li>Provide the user's details and choose their <strong>role</strong> — the role decides which areas of the platform they'll be able to reach.</li>
+    <li>Save / create the user.</li>
+    <li>The new user appears in the list, where you can read their role, subscription tier, credits and status at a glance, and manage them via the per-row <strong>Actions</strong>.</li>
+  </ol>
+
+  <h2>What the per-row Actions do</h2>
+  <p>Each row carries an <strong>Actions</strong> control at the right end — the per-row way to manage that user (for example to adjust their account from the list rather than navigating away). Use it on the specific user whose role, subscription or status you need to change.</p>
+
+  <h2>What this affects elsewhere</h2>
+  <p>This tab decides <strong>who can log in</strong> and, through each user's role, <strong>what they can see and do platform-wide</strong>:</p>
+  <ul class="feat">
+    <li><strong>Roles gate access.</strong> The role you set here controls which top-nav areas a person can reach across the whole platform — CRM, Finance, Sales, dealer/factory portals, and so on. For the full role-to-access mapping, see <a href="getting-started.html">Getting Started → Roles &amp; access</a>.</li>
+    <li><strong>Roles feed the role-linked categories.</strong> The two auto-populated CRM categories — <strong>Dealer Accounts</strong> and <strong>Factory Accounts</strong> — are populated straight from the <em>dealer</em> and <em>factory</em> roles you assign on this tab.</li>
+    <li><strong>Invites land here.</strong> When you invite a colleague via <a href="finance-settings-team.html">Finance → Settings → Team</a>, they sign up with the role baked into the link and then appear in this Users list, where their role and subscription are managed.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Worked example — onboarding a new dealer.</strong> You've sent a dealer an invite link from <a href="finance-settings-team.html">Team</a>; once they sign up they show up here in the <strong>Users</strong> tab. Use the email <strong>Search</strong> to find them, confirm their <strong>Status</strong> is active, and set their <strong>Role</strong> to <em>dealer</em>. From that point they fall automatically into the <strong>Dealer Accounts</strong> category, and their role grants them the dealer portal — no further manual list-keeping needed.</p></div>
+
+  <div class="callout"><p>Users are one of the four CRM tabs — for the people and organisations you do business with, see <a href="crm.html">CRM</a> (Contacts, Companies and Categories). To invite a new person into the workspace, use <a href="finance-settings-team.html">Finance → Settings → Team</a>; for what each role can do, see <a href="getting-started.html">Getting Started → Roles &amp; access</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

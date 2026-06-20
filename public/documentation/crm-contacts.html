@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM: Contacts | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Contacts</div>
+  <h1>CRM · Contacts</h1>
+  <div class="routes"><span class="badge route">/crm</span> <span class="badge route">/crm/contacts/:id</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">The Contacts tab is where you keep the individual people you deal with — a buyer, an architect, a site contact, a supplier rep. A contact is not just an address-book entry: it carries its own pricing, billing and VAT details, so when Finance issues a quote or an invoice the document is already addressed to the right party with the right legal name, VAT number and terms — no re-keying, no mismatched names. This guide walks the Contacts list and every group of the New Contact form: <strong>what it captures, why it matters, how to fill it in, and what it changes elsewhere on the platform.</strong></p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>CRM</strong> → the <strong>Contacts</strong> tab. A toolbar <strong>Add Contact</strong> button (also labelled <strong>New Contact</strong>) opens the form, and a search box (<em>"Search contacts…"</em>) filters the list. Clicking any row opens that person's detail page at <span class="badge route">/crm/contacts/:id</span>.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-contacts.png" alt="CRM Contacts tab">
+    <figcaption>The Contacts tab — your list of individual people, searchable and filterable by category.</figcaption>
+  </figure>
+
+  <h2>What the list shows</h2>
+  <p><strong>What it is —</strong> a table of every contact on file, one person per row. <strong>Why it matters —</strong> it's your at-a-glance read of who you deal with, and the starting point for editing a record or raising a document against it. Each row carries the person's headline details, with per-row <strong>Actions</strong>.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Name</strong></td><td>The person's name.</td></tr>
+      <tr><td><strong>Email</strong></td><td>Primary email address.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Phone number.</td></tr>
+      <tr><td><strong>Company</strong></td><td>The company the contact is linked to.</td></tr>
+      <tr><td><strong>Created</strong></td><td>When the contact was added.</td></tr>
+      <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the contact.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>How to add a contact</h2>
+  <p>The New Contact form is organised into groups. Required fields are marked with <strong>*</strong>. The quick path is short; the field-by-field walkthrough below explains every group.</p>
+  <ol>
+    <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Contacts</strong> tab.</li>
+    <li>Click <strong>Add Contact</strong> (also labelled <strong>New Contact</strong>) to open the New Contact form.</li>
+    <li>Fill in <strong>Full Name</strong> (required) under <strong>Contact Information</strong>, then add <strong>Email</strong>, <strong>Phone</strong> and any other details you have.</li>
+    <li>Work down the groups that apply — <strong>Lead Information</strong>, <strong>Address</strong>, <strong>Linked User Account</strong>, <strong>Pricing</strong>, <strong>Invoicing &amp; VAT</strong>, <strong>Tax &amp; VAT</strong> and <strong>Role</strong>.</li>
+    <li>Optionally assign a <strong>category</strong> to segment the contact and link them to a <strong>company</strong>.</li>
+    <li><strong>Save.</strong> The person is now on file and can be linked to companies, quotes and projects.</li>
+  </ol>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/contact-form.png" alt="The New Contact form with grouped sections">
+    <figcaption>The New Contact form — grouped sections: Contact Information, Lead Information, Address, Linked User Account, Pricing, Invoicing &amp; VAT, Tax &amp; VAT and Role.</figcaption>
+  </figure>
+
+  <h2>The contact form group by group</h2>
+  <p>Each group below explains <em>what</em> it captures, <em>why</em> you'd fill it in, and where the data surfaces elsewhere on the platform.</p>
+
+  <h3>Contact Information</h3>
+  <p><strong>What it is —</strong> the basic identity of the person. <strong>Why it matters —</strong> the name is what addresses every document and what you search on; title and department help you reach the right person inside a larger organisation.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Full Name *</strong></td><td>Required — the person's name.</td></tr>
+      <tr><td><strong>Email</strong></td><td>Primary email address.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Landline / main phone number.</td></tr>
+      <tr><td><strong>Mobile</strong></td><td>Mobile number.</td></tr>
+      <tr><td><strong>Position/Title</strong></td><td>Job title or role.</td></tr>
+      <tr><td><strong>Department</strong></td><td>Department within their organisation.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Lead Information</h3>
+  <p><strong>What it is —</strong> where the contact sits in your sales pipeline and how they reached you. <strong>Why it matters —</strong> tracking lead status and source lets you tell a hot prospect from a cold one, and shows which channels actually bring you business.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Lead Status</strong></td><td>Where the contact sits in your pipeline.</td></tr>
+      <tr><td><strong>Lead Source</strong></td><td>How the contact came to you.</td></tr>
+      <tr><td><strong>Created</strong></td><td>Set automatically when the record is saved.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Address</h3>
+  <p><strong>What it is —</strong> the contact's physical/postal address. <strong>Why it matters —</strong> it's used for correspondence and delivery, and is distinct from the dedicated billing address in the Invoicing &amp; VAT group below — the place you write to isn't always the legal address you bill.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Street Address</strong></td><td>Street and number.</td></tr>
+      <tr><td><strong>City</strong></td><td>City / town.</td></tr>
+      <tr><td><strong>Postal Code</strong></td><td>Postcode.</td></tr>
+      <tr><td><strong>State/Province</strong></td><td>Region / state / province.</td></tr>
+      <tr><td><strong>Country</strong></td><td>Country.</td></tr>
+      <tr><td><strong>Sub Units</strong></td><td>Additional address sub-units (e.g. floor, suite).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Linked User Account</h3>
+  <p><strong>What it is —</strong> the bridge between a CRM contact (a record) and a platform user (a login). <strong>Why it matters —</strong> linking lets the person you deal with actually <em>use</em> the platform — for example a dealer who needs to see their own portal, or a client you give access to a shared project. You can attach an existing login or create one on the spot.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Search by email</strong></td><td>Search for and link an existing platform user to this contact.</td></tr>
+      <tr><td><strong>Create &amp; Invite User</strong></td><td>Create a login for this contact, inviting them as a user.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <h4>How to link a contact to a login (Create &amp; Invite User)</h4>
+  <ol>
+    <li>In the New Contact form (or on an existing contact's record), go to the <strong>Linked User Account</strong> group.</li>
+    <li>If the person already has a login, use <strong>Search by email</strong> to find and attach it.</li>
+    <li>If they don't, click <strong>Create &amp; Invite User</strong> — this creates a login for the contact and invites them in as a user, so the record you keep and the person who logs in are the same.</li>
+    <li><strong>Save.</strong> The contact and the user are now the same person on the platform.</li>
+  </ol>
+  <p><strong>What it affects elsewhere:</strong> a linked user appears in the <a href="crm.html">CRM → Users</a> tab; if you grant them the <em>dealer</em> or <em>factory</em> role there, they automatically fall into the role-linked categories (Dealer Accounts / Factory Accounts).</p>
+
+  <h3>Pricing</h3>
+  <p><strong>What it is —</strong> the commercial terms you've agreed with this contact. <strong>Why it matters —</strong> a <strong>default discount %</strong> is applied automatically so you don't re-negotiate on every quote, and a <strong>credit limit</strong> protects you from over-extending an account — Finance can <em>warn</em> or even <em>block</em> an invoice that would push the buyer past it.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Default discount %</strong></td><td>Discount applied by default for this contact.</td></tr>
+      <tr><td><strong>Credit limit</strong></td><td>Credit limit on the account.</td></tr>
+      <tr><td><strong>Discount notes</strong></td><td>Free-text notes about the discount arrangement.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>Why set a credit limit?</strong> The limit you enter here drives the <em>"Warn / Block when the invoice pushes the buyer over their credit limit"</em> rules in <a href="finance-settings.html">Finance settings → General</a> — so a single number on the contact record becomes an automatic guard-rail at invoice time, rather than something you have to remember and check by hand.</p>
+
+  <h3>Invoicing &amp; VAT</h3>
+  <p><strong>What it is —</strong> the dedicated billing identity used when you issue a document to this contact. <strong>Why it matters —</strong> the billing name, VAT (ΑΦΜ), tax office and billing address printed on an invoice can legitimately differ from the day-to-day contact details — this group is what guarantees the document is legally addressed. The <strong>Segment</strong> and <strong>VAT-exemption</strong> choices decide which pricing tier and which tax treatment apply, and <strong>Include in ΜΥΦ</strong> governs Greek clientele reporting.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Segment</strong></td><td>Customer segment (e.g. Unsegmented). Managed in <a href="finance-settings.html">Finance settings</a>.</td></tr>
+      <tr><td><strong>Default VAT-exemption category</strong></td><td>The default VAT-exemption category. See <a href="finance-settings.html">Finance settings</a>.</td></tr>
+      <tr><td><strong>Include in ΜΥΦ</strong></td><td>Include this contact in the Greek MyData clientele list (ΜΥΦ). Turn this on for parties whose transactions must be reported in your clientele summary.</td></tr>
+      <tr><td><strong>Billing name</strong></td><td>Name to bill under.</td></tr>
+      <tr><td><strong>Billing VAT (ΑΦΜ)</strong></td><td>VAT number for billing.</td></tr>
+      <tr><td><strong>Tax office (ΔΟΥ)</strong></td><td>Greek tax office.</td></tr>
+      <tr><td><strong>Country code</strong></td><td>Billing country code.</td></tr>
+      <tr><td><strong>Street</strong></td><td>Billing street.</td></tr>
+      <tr><td><strong>Number</strong></td><td>Billing street number.</td></tr>
+      <tr><td><strong>Postal code</strong></td><td>Billing postcode.</td></tr>
+      <tr><td><strong>City</strong></td><td>Billing city.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>Why set a Segment?</strong> The segment is what decides which pricing tier the contact is treated under, so setting it once here means quotes and invoices apply the right tier automatically instead of you choosing it each time. Segments are defined in <a href="finance-settings.html">Finance settings</a>.</p>
+  <p><strong>Why set ΜΥΦ?</strong> Greek MyData requires a clientele summary (ΜΥΦ) of the parties you transact with. Marking a contact <em>Include in ΜΥΦ</em> here is what makes their transactions appear in that summary, so the reporting is complete and correct without manual list-keeping.</p>
+  <p><strong>What it affects elsewhere:</strong> these billing details flow straight onto issued documents in <a href="finance.html">Finance</a>; the segment and VAT-exemption come from <a href="finance-settings.html">Finance settings</a>.</p>
+
+  <h3>Tax &amp; VAT</h3>
+  <p><strong>What it is —</strong> the contact's tax identity, separate from the billing-specific VAT above. <strong>Why it matters —</strong> it records the person's VAT number and tax office for reference and validation, distinct from the dedicated <em>billing</em> VAT you'd print on a document.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>VAT number</strong></td><td>The contact's VAT number.</td></tr>
+      <tr><td><strong>Tax office</strong></td><td>The contact's tax office.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Role</h3>
+  <p><strong>What it is —</strong> which side of the relationship this contact sits on. <strong>Why it matters —</strong> marking a contact as a <strong>supplier</strong> is what makes them eligible to appear on the purchases/payables side of Finance (and on the Business page's supplier overview), while marking them a <strong>customer</strong> puts them on the sales/receivables side. Both can apply at once for a party you buy from and sell to.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>This is a supplier</strong></td><td>Mark the contact as a supplier.</td></tr>
+      <tr><td><strong>This is a customer</strong></td><td>Mark the contact as a customer (either or both can apply).</td></tr>
+      <tr><td><strong>Contact type</strong></td><td>The kind of contact.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>Why mark <em>is supplier</em>?</strong> Payables, expense documents and the supplier account overview only pull from parties flagged as suppliers — so this single checkbox is what connects a contact to everything you owe and pay.</p>
+
+  <h2>Editing a contact</h2>
+  <p>Click any row in the Contacts list (or use the per-row <strong>Actions</strong>) to open the contact's detail page at <span class="badge route">/crm/contacts/:id</span>. This is where the whole relationship lives in one view. From there you can:</p>
+  <ul class="feat">
+    <li><strong>Edit core information</strong> — name, email, phone, address, VAT/tax details, pricing and notes — using the same grouped form described above.</li>
+    <li><strong>Assign categories</strong> — apply the segment labels you defined in the <a href="crm.html">Categories</a> tab, so the contact joins the audiences used for outreach.</li>
+    <li><strong>Link or change the login</strong> — attach an existing user, or use <strong>Create &amp; Invite User</strong> to give the person access.</li>
+    <li><strong>See associated records</strong> — the company the contact belongs to, and the documents and activity tied to them, so the whole relationship is in one place.</li>
+  </ul>
+
+  <h2>What a contact affects elsewhere</h2>
+  <ul class="feat">
+    <li><strong>Quotes &amp; invoices</strong> — the Invoicing &amp; VAT group (billing name, ΑΦΜ, ΔΟΥ, billing address) is exactly what prints on a document in <a href="finance.html">Finance</a>; the Pricing group's default discount and segment pre-fill the commercial terms.</li>
+    <li><strong>Credit control</strong> — the <strong>credit limit</strong> drives the warn/block rules in <a href="finance-settings.html">Finance settings → General</a>.</li>
+    <li><strong>Payables</strong> — a contact flagged <strong>This is a supplier</strong> becomes available on the purchases/payables side and the supplier account overview.</li>
+    <li><strong>Greek clientele reporting (ΜΥΦ)</strong> — <strong>Include in ΜΥΦ</strong> adds the contact's transactions to your MyData clientele summary.</li>
+    <li><strong>Platform access</strong> — a contact linked via <strong>Create &amp; Invite User</strong> appears in <a href="crm.html">CRM → Users</a> with a manageable role and subscription.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Worked example — adding a customer who can also log in.</strong> Open <strong>CRM → Contacts → Add Contact</strong>. Under <strong>Contact Information</strong> enter the buyer's <em>Full Name</em>, <em>Email</em> and <em>Phone</em>. In <strong>Pricing</strong> set a <em>Default discount %</em> you've agreed and a <em>Credit limit</em> so Finance can guard the account. In <strong>Invoicing &amp; VAT</strong> fill the <em>Billing name</em>, <em>Billing VAT (ΑΦΜ)</em>, <em>Tax office (ΔΟΥ)</em> and billing address, pick the right <em>Segment</em>, and (for a Greek customer) switch on <em>Include in ΜΥΦ</em>. Under <strong>Role</strong> tick <em>This is a customer</em>. Finally, in <strong>Linked User Account</strong> click <strong>Create &amp; Invite User</strong> so they get a login to the shared project. <strong>Save.</strong> The person is now a billing-ready customer whose invoices are correctly addressed, capped to their credit limit, reported in your ΜΥΦ — and who can log in to the platform.</p></div>
+
+  <div class="callout"><p>For the other CRM tabs (Users, Companies, Categories) and the Greek ΑΑΔΕ company lookup, see <a href="crm.html">CRM</a>. For what happens once you invoice a contact, see <a href="finance.html">Finance &amp; Invoicing</a>; for the segments, VAT-exemption categories and credit-limit rules referenced above, see <a href="finance-settings.html">Finance settings</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

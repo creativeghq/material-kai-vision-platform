@@ -26,7 +26,12 @@
       { file: "moodboards.html", title: "MoodBoards", icon: "🎨" },
       { file: "projects.html", title: "Projects", icon: "📁" },
       { file: "quotes.html", title: "Quotes & Requests", icon: "🧾" },
-      { file: "crm.html", title: "CRM", icon: "👥" },
+      { file: "crm.html", title: "CRM", icon: "👥", children: [
+        { file: "crm-users.html", title: "Users" },
+        { file: "crm-contacts.html", title: "Contacts" },
+        { file: "crm-companies.html", title: "Companies" },
+        { file: "crm-categories.html", title: "Categories" },
+      ]},
       { file: "finance.html", title: "Finance & Invoicing", icon: "💶", children: [
         { file: "finance-receivables-payables.html", title: "Receivables & Payables" },
         { file: "finance-documents.html", title: "Documents" },
