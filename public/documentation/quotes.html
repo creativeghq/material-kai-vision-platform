@@ -11,23 +11,40 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Quotes &amp; Requests</div>
   <h1>Quotes &amp; Requests</h1>
   <div class="routes"><span class="badge route">/quotes</span> <span class="badge route">/quotes/:id</span> <span class="badge route">/quotes/requests</span></div>
-  <p class="lead">Turn the products and ideas you've gathered into priced, client-ready quotes — capture full FF&amp;E specifications per item, preview a branded PDF, and send a secure link your customer can open and accept without logging in. The same area also collects incoming quote requests so you can triage them and convert them into quotes.</p>
+  <p class="lead">A quote is how you turn the products and ideas you've gathered into a priced, client-ready document — and a quote in MaterialsHub does more than show a total. It captures the full FF&amp;E specification for each item, renders a branded PDF, and produces a secure link your customer can open and accept without ever logging in. This guide teaches the whole flow: what a quote is and why it works the way it does, how to build and send one end to end, and what every field and action affects downstream.</p>
 
   <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Quotes</strong>. Use the <strong>My Quotes</strong> and <strong>Requests</strong> tabs at the top.</p></div>
 
+  <h2>What a quote is — and why it's built this way</h2>
+  <p>At its simplest a quote is a list of <strong>line items</strong> with quantities and prices, and a total the platform calculates for you. But the same document is designed to carry the <em>specification detail</em> your customer needs to actually make a decision — the room each item is for, its dimensions, how it gets installed, and when it lands on site. That extra detail is what turns a price list into a proper <strong>furniture, fixtures &amp; equipment (FF&amp;E) schedule</strong>, and it's why the quote can be both your sales document and your spec sheet at once.</p>
+  <p>Everything you enter flows into two customer-facing outputs: a <strong>branded PDF</strong> and a <strong>public, token-protected web page</strong> the customer can open and accept. Because both are generated from the same quote, you only ever maintain one source of truth — edit the quote, and the PDF and the public page reflect it the next time they're opened.</p>
+
   <h2>The two tabs</h2>
-  <p>Quotes is split into two views you switch between at the top of the page:</p>
+  <p>Quotes is split into two views you switch between at the top of the page. They answer two different questions: "what have I sent?" and "what's come in that I need to price?"</p>
   <ul class="feat">
-    <li><strong>My Quotes</strong> <span class="badge route">/quotes</span> — everything you've created, with a KPI strip and status filtering.</li>
-    <li><strong>Requests</strong> <span class="badge route">/quotes/requests</span> — quote requests that have come in from customers, waiting to be reviewed and converted.</li>
+    <li><strong>My Quotes</strong> <span class="badge route">/quotes</span> — everything you've created, with a KPI strip and status filtering. This is where you spend most of your time.</li>
+    <li><strong>Requests</strong> <span class="badge route">/quotes/requests</span> — quote requests that have come in from customers, waiting to be reviewed and converted into real quotes.</li>
   </ul>
 
-  <h2>My Quotes</h2>
+  <h2>How to build and send a quote (end to end)</h2>
+  <p>Here is the whole flow once, top to bottom. The deep subsections that follow expand each step — start here to see how the pieces connect, then drop into the detail you need.</p>
+  <ol>
+    <li><strong>Open Quotes and click New Quote.</strong> From the top navigation → <strong>Quotes</strong>, then <strong>New Quote</strong>.</li>
+    <li><strong>Name it, and optionally link a project.</strong> Give the quote a name (it defaults to <em>"Untitled Quote"</em> and can be renamed inline later) and optionally add notes and link it to a <a href="public-pages.html">project</a> so it's grouped with related work.</li>
+    <li><strong>Add line items.</strong> On the <strong>Items</strong> tab, add each item as either a <em>catalogue product</em> or a <em>custom product</em>, and set its <strong>quantity</strong> and <strong>price</strong>. The total recalculates as you go.</li>
+    <li><strong>Capture FF&amp;E specs per item.</strong> Where it helps the customer, add <em>room</em>, <em>dimensions</em>, <em>installation requirements</em> and <em>delivery date</em> so the quote doubles as a spec schedule.</li>
+    <li><strong>Add Extras and a Timeline (optional).</strong> Use the <strong>Extras</strong> tab for add-on lines and the <strong>Timeline</strong> tab for a visual delivery/milestone plan the customer will see.</li>
+    <li><strong>Preview the branded PDF.</strong> Open <strong>Preview</strong> <span class="badge route">/quotes/:id/preview</span> to check exactly what the customer will receive.</li>
+    <li><strong>Send it.</strong> Use <strong>Email Quote</strong> or <strong>Share</strong> to deliver the quote.</li>
+    <li><strong>The customer accepts.</strong> They open the token-protected public page <span class="badge route">/q/:token</span> <span class="badge public">Public</span> with no login and accept it. After acceptance the work can flow into your <a href="finance.html">Finance &amp; Invoicing</a>.</li>
+  </ol>
+
+  <h2>My Quotes — your working list</h2>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/quotes/quotes.png" alt="My Quotes tab with the KPI strip and quotes list">
     <figcaption>My Quotes — the KPI strip (Total, Pending, Accepted, Drafts), the New Quote button, status filter, and the quotes list.</figcaption>
   </figure>
-  <p>The main tab lists every quote you've created, newest first. Across the top sits a <strong>KPI strip</strong> that updates as you work:</p>
+  <p><strong>What it is —</strong> the main tab lists every quote you've created, newest first. <strong>Why it matters —</strong> it's your pipeline at a glance: the <strong>KPI strip</strong> across the top tells you where your quotes stand without opening any of them, and it updates as you work.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Metric</th><th>What it counts</th></tr></thead>
@@ -39,38 +56,29 @@
     </tbody>
   </table>
   </div>
+  <h3>What you can do here</h3>
   <ul class="feat">
     <li><strong>New Quote</strong> — start a quote from scratch.</li>
     <li><strong>Filter by status</strong> — narrow the list (e.g. Draft, Pending, Accepted, Rejected, Expired). The filter has a small search box so you can jump straight to a status; the active filter is shown next to the list title.</li>
     <li><strong>Open a quote</strong> — click any row to open its detail page <span class="badge route">/quotes/:id</span> and continue editing, previewing or sending.</li>
   </ul>
 
-  <h2>Building a quote</h2>
+  <h2>Creating and naming a quote</h2>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/quotes/quote-new.png" alt="Create New Quote dialog"><figcaption>Create New Quote — name it and optionally link it to a project.</figcaption></figure>
-  <p>A quote is a list of <strong>line items</strong> plus the specification detail your customer needs to make a decision. You build it on the quote's detail page.</p>
+  <p><strong>What it is —</strong> the New Quote dialog is the starting point for a quote from scratch. <strong>Why it matters —</strong> the name is how you'll recognise the quote in your list (and it appears on the document), and linking it to a project keeps related quotes, moodboards and work together. <strong>How:</strong> give it a name, optionally add notes and pick a project, then create it — you land on the quote's detail page to build it out. The title stays <strong>editable inline</strong> afterwards (it defaults to <strong>"Untitled Quote"</strong> if you don't set one).</p>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/quotes/quote-detail.png" alt="Quote detail page"><figcaption>A quote's detail page — line items plus Submit, Share, Email Quote and Preview actions.</figcaption></figure>
-  <ol>
-    <li><strong>Add line items.</strong> Each item is either a <em>catalogue product</em> (picked from your products) or a <em>custom item</em> (anything you type in yourself). Every item has a <strong>quantity</strong> and a <strong>price</strong>, and the quote total is calculated for you.</li>
-    <li><strong>Capture FF&amp;E specifications per item.</strong> Where relevant, add fit-out detail to any item so the quote doubles as a furniture, fixtures &amp; equipment schedule:
-      <ul class="feat">
-        <li><strong>Room</strong> — where the item belongs (e.g. the space it's specified for).</li>
-        <li><strong>Dimensions</strong> — the size detail for the item.</li>
-        <li><strong>Installation requirements</strong> — what's needed to fit or install it.</li>
-        <li><strong>Delivery date</strong> — when it's expected on site.</li>
-      </ul>
-    </li>
-    <li><strong>Review the item detail.</strong> Each line can be expanded to show its detail row — <em>notes</em>, <em>installation requirements</em> and <em>delivery</em> — so you can check everything before sending without cluttering the main table.</li>
-  </ol>
+  <p><strong>What it affects:</strong> the detail page is the hub for everything that follows — line items, Extras, Timeline, preview and sending.</p>
   <div class="callout tip"><p><strong>Shortcut — generate from a moodboard.</strong> Open a <a href="moodboards.html">moodboard</a> and use its <em>Generate Quote</em> button. The products on the board become the line items of a new quote, ready for you to set quantities, prices and FF&amp;E detail.</p></div>
 
-  <h2>Line items in detail</h2>
-  <p>A quote is built from line items on the <strong>Items</strong> tab. The items table has the following columns: <strong>#</strong>, <strong>Product</strong>, <strong>Room</strong>, <strong>Qty</strong>, <strong>Price</strong>, <strong>Unit</strong>, <strong>Total</strong> and <strong>Actions</strong>. You can edit <strong>Room</strong> and <strong>Qty</strong> inline per row, and remove rows via <strong>Actions</strong>. Add items with <strong>Add Products</strong>, which offers two modes: <strong>Catalog Search</strong> and <strong>Custom Product</strong>.</p>
+  <h2>Line items — the heart of the quote</h2>
+  <p><strong>What it is —</strong> line items are the priced rows that make up the quote, built on the <strong>Items</strong> tab. <strong>Why it matters —</strong> they are what the customer pays for and what the total is calculated from; each row also carries the spec detail that makes the quote useful as a schedule.</p>
+  <p>The items table has these columns: <strong>#</strong>, <strong>Product</strong>, <strong>Room</strong>, <strong>Qty</strong>, <strong>Price</strong>, <strong>Unit</strong>, <strong>Total</strong> and <strong>Actions</strong>. You can edit <strong>Room</strong> and <strong>Qty</strong> inline per row, and remove rows via <strong>Actions</strong>. You add items with <strong>Add Products</strong>, which offers two modes — <strong>Catalog Search</strong> and <strong>Custom Product</strong>. The two modes exist for two genuinely different situations, so it's worth knowing when to reach for each.</p>
 
-  <h3>Catalog Search</h3>
-  <p>Search the catalogue by name, brand, material or colour; tick the items you want, and the button shows <strong>"Add N Products"</strong>. This is the right mode for materials already in your knowledge base.</p>
+  <h3>Catalog Search — for materials already in your knowledge base</h3>
+  <p><strong>What it is —</strong> a search across your existing catalogue. <strong>When to use it —</strong> whenever the item is a real product you've already added to MaterialsHub. <strong>Why —</strong> it reuses the data you've already captured (name, brand, material, colour and any imagery), so the line is consistent with the rest of your catalogue and you don't retype anything. <strong>How:</strong> search by name, brand, material or colour, tick the items you want, and confirm — the button shows <strong>"Add N Products"</strong> for the number you've selected.</p>
 
-  <h3>Custom Product (every field)</h3>
-  <p>For one-off items that aren't in the catalogue. The Custom Product form has these fields:</p>
+  <h3>Custom Product — for one-off items that aren't in the catalogue</h3>
+  <p><strong>What it is —</strong> a form where you type an item in by hand. <strong>When to use it —</strong> for anything that isn't (and won't be) a catalogue product: a bespoke piece, a one-off supply, a subcontracted item. <strong>Why —</strong> it lets you put a fully-specified line on the quote — including FF&amp;E detail — without having to first create a permanent catalogue entry. <strong>How:</strong> fill the fields below and click <strong>"Add Custom Product"</strong>. Every field maps to something the customer sees on the quote or the PDF, so they're worth understanding rather than skipping:</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Field</th><th>Notes</th></tr></thead>
@@ -89,18 +97,29 @@
     </tbody>
   </table>
   </div>
-  <p>Then click <strong>"Add Custom Product"</strong>.</p>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/quotes/custom-product.png" alt="Custom product form in a quote"><figcaption>The Custom Product form — full FF&amp;E-aware fields, with a “Get price” market helper.</figcaption></figure>
+  <p><strong>What it affects:</strong> the line on the quote and its appearance on the branded PDF. The price feeds the line total and the quote total; the <em>"Get price"</em> helper is there so you don't have to research a market figure yourself.</p>
+
+  <h3>FF&amp;E specifications per item — and where they end up</h3>
+  <p><strong>What it is —</strong> the fit-out detail you can add to any item so the quote doubles as an FF&amp;E schedule. <strong>Why it matters —</strong> these fields are exactly what a contractor, installer or client needs to act on the quote, and they're surfaced specifically on the PDF so nothing gets lost. You can add them to catalogue and custom items alike. Each field has a clear job:</p>
+  <ul class="feat">
+    <li><strong>Room</strong> — where the item belongs (the space it's specified for). It becomes a dedicated <strong>Room column</strong> on the PDF items table, so the schedule reads room by room.</li>
+    <li><strong>Dimensions</strong> — the size detail for the item. On the PDF, dimensions are <strong>appended to the product name</strong> so the size travels with the item wherever it appears.</li>
+    <li><strong>Installation requirements</strong> — what's needed to fit or install it. This is pulled into the PDF's <strong>"Specifications &amp; Delivery"</strong> section.</li>
+    <li><strong>Delivery date</strong> — when it's expected on site. Also collected into the <strong>"Specifications &amp; Delivery"</strong> section so the customer can see timing per item.</li>
+  </ul>
+  <p><strong>How:</strong> add the detail on the item, then expand the line to review its <strong>detail row</strong> — <em>notes</em>, <em>installation requirements</em> and <em>delivery</em> — so you can check everything before sending without cluttering the main table.</p>
+  <p><strong>What it affects:</strong> the branded PDF. The Room column, the dimensions-in-name treatment, and the "Specifications &amp; Delivery" section are all driven directly by these fields — fill them in and the schedule writes itself.</p>
 
   <h2>Extras &amp; Timeline</h2>
-  <p>A quote has two further tabs:</p>
-  <ul class="feat">
-    <li><strong>Extras (Extras &amp; Add-ons)</strong> — optional add-on lines beyond the main items.</li>
-    <li><strong>Timeline (Project Timeline)</strong> — a visual delivery/milestone timeline shown to the customer.</li>
-  </ul>
+  <p>Beyond the Items tab, a quote has two further tabs that round out what the customer sees.</p>
+  <h3>Extras (Extras &amp; Add-ons)</h3>
+  <p><strong>What it is —</strong> optional add-on lines beyond the main items. <strong>Why it matters —</strong> it lets you present upsells or optional extras without mixing them into the core item list, so the customer can see what's included versus what's optional. <strong>What it affects:</strong> the add-on section presented alongside the main items.</p>
+  <h3>Timeline (Project Timeline)</h3>
+  <p><strong>What it is —</strong> a visual delivery/milestone timeline. <strong>Why it matters —</strong> it sets expectations on <em>when</em> things happen, which is often as decisive as price for a customer choosing to accept. <strong>What it affects:</strong> a timeline shown to the customer on the quote.</p>
 
-  <h2>Quote actions</h2>
-  <p>The quote header carries these actions:</p>
+  <h2>Quote actions — sending and finalising</h2>
+  <p><strong>What it is —</strong> the buttons on the quote header that take the quote out to the customer. <strong>Why it matters —</strong> this is the hand-off: each action produces a different way for the customer to receive and act on the quote.</p>
   <ul class="feat">
     <li><strong>Submit Quote Request</strong> — submit the quote.</li>
     <li><strong>Share</strong> — produce a shareable public link (token-protected, <span class="badge route">/q/:token</span>).</li>
@@ -111,29 +130,30 @@
   <div class="callout"><p>The quote title is editable inline (it defaults to <strong>"Untitled Quote"</strong>).</p></div>
 
   <h2>Previewing the branded PDF</h2>
-  <p>From the quote you can open a <strong>branded PDF preview</strong> at <span class="badge route">/quotes/:id/preview</span>. The PDF is laid out for your customer and reflects everything you entered:</p>
+  <p><strong>What it is —</strong> a <strong>branded PDF preview</strong> at <span class="badge route">/quotes/:id/preview</span>. <strong>Why it matters —</strong> it shows you exactly what your customer will receive, so you can catch anything missing before you send. The PDF is laid out for your customer and reflects everything you entered:</p>
   <ul class="feat">
     <li>An <strong>items table</strong> that includes a <strong>Room</strong> column, with each item's <strong>dimensions appended to the product name</strong>.</li>
     <li>A dedicated <strong>“Specifications &amp; Delivery”</strong> section that pulls together the per-item notes, installation requirements and delivery dates.</li>
     <li>Your company branding, totals and any applicable VAT, applied from your workspace settings.</li>
   </ul>
-  <p>Preview it as often as you like while drafting — it always shows the current state of the quote.</p>
+  <p><strong>How:</strong> open Preview as often as you like while drafting — it always shows the current state of the quote. <strong>What it affects:</strong> nothing changes by previewing; it's a read-only view of the live quote.</p>
 
-  <h2>Sending a quote &amp; the public page</h2>
-  <p>When you send a quote, your customer receives a link to a <strong>public, token-protected page</strong> at <span class="badge route">/q/:token</span> <span class="badge public">Public</span>. They can open it with <strong>no login required</strong>, review the items, specifications and totals, and <strong>accept</strong> it directly from that page. The link is unique to that quote, so only people you share it with can see it. For more on these shareable surfaces, see <a href="public-pages.html">Public &amp; Shared Pages</a>.</p>
+  <h2>Sending &amp; acceptance — what the customer sees</h2>
+  <p><strong>What it is —</strong> when you send a quote, your customer receives a link to a <strong>public, token-protected page</strong> at <span class="badge route">/q/:token</span> <span class="badge public">Public</span>. <strong>Why it matters —</strong> there's no friction for the customer: they don't need an account, and the link is unique to that quote so only people you share it with can see it. <strong>How it works for them:</strong> they open the page with <strong>no login required</strong>, review the items, specifications and totals, and <strong>accept</strong> it directly from that page. For more on these shareable surfaces, see <a href="public-pages.html">Public &amp; Shared Pages</a>.</p>
   <div class="callout tip"><p>Once a customer accepts, the quote can flow into your back office — see <a href="finance.html">Finance &amp; Invoicing</a> for turning accepted work into invoices and tracking what you're owed.</p></div>
 
-  <h2>Requests</h2>
+  <h2>Requests — and converting them into quotes</h2>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/quotes/quotes-requests.png" alt="The Requests tab listing incoming quote requests">
     <figcaption>The Requests tab — incoming quote requests from customers, with filtering, ready to review and convert.</figcaption>
   </figure>
-  <p>The <strong>Requests</strong> tab <span class="badge route">/quotes/requests</span> collects quote requests that come in from customers. Each request is something a customer has asked you to price. From here you:</p>
+  <p><strong>What it is —</strong> the <strong>Requests</strong> tab <span class="badge route">/quotes/requests</span> collects quote requests that come in from customers. Each request is something a customer has asked you to price. <strong>Why it matters —</strong> it's the front door for inbound demand: instead of starting from a blank quote, you start from what the customer actually asked for. <strong>How:</strong></p>
   <ul class="feat">
     <li><strong>Review</strong> a request to see what the customer is after.</li>
     <li><strong>Convert it into a quote</strong> — start a real quote pre-populated from the request, then add line items, prices and FF&amp;E specifications as usual.</li>
     <li><strong>Filter</strong> the list to focus on what still needs attention.</li>
   </ul>
+  <p><strong>What it affects:</strong> converting a request creates a normal quote that then follows the exact build-and-send flow above — the request just gives you a head start on its contents.</p>
 
   <h2>Step by step: build and send a quote</h2>
   <ol>
