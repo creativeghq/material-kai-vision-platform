@@ -52,7 +52,41 @@
     <li><strong>Categories</strong> — reusable labels you create to segment contacts and companies (for example by relationship type, region or industry). Apply them on a record's detail page, then use them to filter and group.</li>
   </ul>
 
+  <h2>The Users tab</h2>
+  <p>The Users tab is where you <strong>manage platform users, roles, and subscriptions</strong>. A toolbar <strong>Add User</strong> button opens the new-user flow, and a search box (<em>"Search users by email…"</em>) finds someone quickly. The list is a table where each row exposes the user's role, subscription tier and credit balance at a glance, with per-row <strong>Actions</strong>.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Email</strong></td><td>The user's login email address.</td></tr>
+      <tr><td><strong>Role</strong></td><td>The user's role — admin, user, dealer, factory, and so on.</td></tr>
+      <tr><td><strong>Subscription</strong></td><td>Subscription tier (free, pro, …).</td></tr>
+      <tr><td><strong>Credits</strong></td><td>The user's current credit balance.</td></tr>
+      <tr><td><strong>Status</strong></td><td>Account status (e.g. active).</td></tr>
+      <tr><td><strong>Created</strong></td><td>When the user was added.</td></tr>
+      <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the user.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-users.png" alt="CRM Users tab"><figcaption>The Users tab — platform users, roles and subscriptions.</figcaption></figure>
+
+  <h2>The Companies tab</h2>
+  <p>The Companies tab is for <strong>managing company accounts and business relationships</strong>. A toolbar <strong>Add Company</strong> button creates a new organisation, and a search box (<em>"Search companies…"</em>) filters the list. Each row carries the company's headline details, with per-row <strong>Actions</strong>.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Name</strong></td><td>The organisation's name.</td></tr>
+      <tr><td><strong>Email</strong></td><td>Company email address.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Company phone number.</td></tr>
+      <tr><td><strong>Website</strong></td><td>Company website.</td></tr>
+      <tr><td><strong>Industry</strong></td><td>Industry the company operates in.</td></tr>
+      <tr><td><strong>Created</strong></td><td>When the company was added.</td></tr>
+      <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the company.</td></tr>
+    </tbody>
+  </table>
+  </div>
 
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-companies.png" alt="CRM Companies tab"><figcaption>The Companies tab — organisations, suppliers and customers.</figcaption></figure>
 
@@ -62,6 +96,21 @@
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm-contacts.png" alt="CRM Contacts tab">
     <figcaption>The Contacts tab — your list of individual people, searchable and filterable by category.</figcaption>
   </figure>
+
+  <p>The Contacts tab is for <strong>managing non-user contacts and relationships</strong>. A toolbar <strong>Add Contact</strong> button opens the New Contact form, and a search box (<em>"Search contacts…"</em>) filters the list. Each row shows the person's headline details, with per-row <strong>Actions</strong>.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Name</strong></td><td>The person's name.</td></tr>
+      <tr><td><strong>Email</strong></td><td>Primary email address.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Phone number.</td></tr>
+      <tr><td><strong>Company</strong></td><td>The company the contact is linked to.</td></tr>
+      <tr><td><strong>Created</strong></td><td>When the contact was added.</td></tr>
+      <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the contact.</td></tr>
+    </tbody>
+  </table>
+  </div>
 
   <h3>Adding a contact</h3>
   <p>Click <strong>New Contact</strong> on the Contacts tab and fill in the contact's information — full name, email, phone and the other details — then save to add the person to your CRM.</p>
@@ -317,13 +366,40 @@
   <div class="callout"><p>The <strong>Validate (VIES)</strong> button on a company verifies EU VAT numbers; for Greek customers and suppliers, VAT validation also feeds <a href="finance-einvoicing.html">Greek e-invoicing</a>. <strong>Segments</strong> and <strong>VAT-exemption categories</strong> used in the Invoicing &amp; VAT group are configured in <a href="finance-settings.html">Finance settings</a>.</p></div>
 
   <h2>Categories</h2>
-  <p>The <strong>Categories</strong> tab lets you segment contacts and companies — for example by <strong>Professional type</strong> or <strong>Role</strong>. Use it to build the reusable labels you then apply on contact and company records.</p>
+  <p>The <strong>Categories</strong> tab lets you <strong>group platform users, CRM contacts and companies into lists</strong>. Those lists are what the rest of the platform targets for outreach — most directly, the <strong>"Send to Customers"</strong> action on catalogs and other email outreach send to a category rather than to individuals, so a well-kept set of categories is the backbone of your segmentation.</p>
+
+  <p>Each category is shown as a stat card whose <strong>member counts are split by Users / Contacts / Companies</strong>, so you can see at a glance how many of each kind of record a category covers.</p>
+
+  <h3>Toolbar</h3>
   <ul class="feat">
-    <li><strong>New Category</strong> — add a new category.</li>
+    <li><strong>New Category</strong> — create a new category (name it and set its type / role).</li>
     <li><strong>Edit</strong> — modify an existing category.</li>
-    <li><strong>Resync auto</strong> — refreshes the auto-derived categories.</li>
+    <li><strong>Resync auto</strong> — refreshes the auto-derived (role-linked) categories so their memberships reflect the current set of users.</li>
     <li><strong>Search categories</strong> — filters the list to find a category quickly.</li>
   </ul>
+
+  <h3>Seeded example categories</h3>
+  <p>MaterialsHub ships with a set of starter categories you can use straight away or adapt:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Category</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Architecture and design professionals</strong></td><td>Architects, designers and interior designers.</td></tr>
+      <tr><td><strong>Industry consultants</strong></td><td>Consultants working in the industry.</td></tr>
+      <tr><td><strong>B2B sourcing agents</strong></td><td>Agents who source products on behalf of businesses.</td></tr>
+      <tr><td><strong>Suppliers, manufacturers, brands and distributors</strong></td><td>Anyone who supplies products.</td></tr>
+      <tr><td><strong>Other professional types</strong></td><td>A catch-all for professionals who don't fit the categories above.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Role-linked categories (auto-populated)</h3>
+  <p>Two special categories are derived automatically from user roles rather than assigned by hand:</p>
+  <ul class="feat">
+    <li><strong>Dealer Accounts</strong> — users who hold the <em>dealer</em> role.</li>
+    <li><strong>Factory Accounts</strong> — users who hold the <em>factory</em> role.</li>
+  </ul>
+  <p>Because their membership comes from roles, you don't add people to these by hand — use <strong>Resync auto</strong> to refresh them so they reflect the current set of dealer and factory users.</p>
 
   <h3>Step by step: add a category</h3>
   <ol>

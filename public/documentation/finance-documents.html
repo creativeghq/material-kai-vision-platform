@@ -30,12 +30,87 @@
   </table>
   </div>
 
-  <p>The screenshots below show each document tab.</p>
+  <p>The screenshots below show each document tab, followed by the toolbar actions and column layout of each one.</p>
+
+  <div class="callout"><p><strong>Two shared toolbar concepts</strong> you'll see on several tabs:
+  <ul>
+    <li><strong>Sync from myDATA</strong> — pulls the documents the tax authority already has on file for your business (so issued invoices and incoming expenses can be reconciled without re-keying them).</li>
+    <li><strong>Income category</strong> / <strong>Expense category</strong> — opens the manager for the income/expense category list used across the document lists, filters and reports. These categories are also editable inline on a document header. See <a href="finance-settings.html">Finance settings</a>.</li>
+  </ul></p></div>
+
+  <h3>Invoices tab</h3>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-invoices.png" alt="Invoices tab"><figcaption>The Invoices tab.</figcaption></figure>
+  <p><strong>Toolbar:</strong> New · Sync from myDATA · Income category (manage list) · All categories filter · search by number / customer.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Number</strong></td><td>The invoice number.</td></tr>
+      <tr><td><strong>Date</strong></td><td>The issue date.</td></tr>
+      <tr><td><strong>Category</strong></td><td>The income category assigned.</td></tr>
+      <tr><td><strong>Total</strong></td><td>The gross document total.</td></tr>
+      <tr><td><strong>Due</strong></td><td>The amount still outstanding.</td></tr>
+      <tr><td><strong>Status</strong></td><td>The document status.</td></tr>
+      <tr><td><strong>mD</strong></td><td>The myDATA transmission status — whether the document has been transmitted to the tax authority (ΑΑΔΕ).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Receipts tab</h3>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-receipts.png" alt="Receipts tab"><figcaption>The Receipts tab.</figcaption></figure>
+  <p><strong>Toolbar:</strong> New · Open POS · Income category · All categories filter · search by number / customer.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Number</strong></td><td>The receipt number.</td></tr>
+      <tr><td><strong>Date</strong></td><td>The issue date.</td></tr>
+      <tr><td><strong>Category</strong></td><td>The income category assigned.</td></tr>
+      <tr><td><strong>Total</strong></td><td>The gross document total.</td></tr>
+      <tr><td><strong>Due</strong></td><td>The amount still outstanding.</td></tr>
+      <tr><td><strong>Status</strong></td><td>The document status.</td></tr>
+      <tr><td><strong>mD</strong></td><td>The myDATA transmission status (ΑΑΔΕ).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Credit notes tab</h3>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-credit-notes.png" alt="Credit notes tab"><figcaption>The Credit notes tab.</figcaption></figure>
+  <p><strong>Toolbar:</strong> New.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Number</strong></td><td>The credit note number.</td></tr>
+      <tr><td><strong>Date</strong></td><td>The issue date.</td></tr>
+      <tr><td><strong>Type</strong></td><td>The credit note type.</td></tr>
+      <tr><td><strong>Reason</strong></td><td>The reason for the credit.</td></tr>
+      <tr><td><strong>Amount</strong></td><td>The credited amount.</td></tr>
+      <tr><td><strong>mD</strong></td><td>The myDATA transmission status (ΑΑΔΕ).</td></tr>
+      <tr><td><strong>Invoice</strong></td><td>The invoice this credit note offsets.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Expenses tab</h3>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-expenses.png" alt="Expenses tab"><figcaption>The Expenses tab.</figcaption></figure>
+  <p><strong>Toolbar:</strong> Sync from myDATA · Expense category (manage list) · All categories filter · search by supplier / VAT.</p>
+  <p>Expenses are your business costs, categorised; they feed <a href="finance-receivables-payables.html">Payables</a> and the finance <a href="finance.html">Reports</a>.</p>
+
+  <h3>Delivery notes tab</h3>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-delivery-notes.png" alt="Delivery notes tab"><figcaption>The Delivery notes tab.</figcaption></figure>
+  <p><strong>Toolbar:</strong> New.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Number</strong></td><td>The delivery note number.</td></tr>
+      <tr><td><strong>Type</strong></td><td>The delivery note type.</td></tr>
+      <tr><td><strong>Date</strong></td><td>The dispatch date.</td></tr>
+      <tr><td><strong>Status</strong></td><td>The document status.</td></tr>
+    </tbody>
+  </table>
+  </div>
 
   <h2>The invoice detail page</h2>
   <div class="routes"><span class="badge route">/finance/invoices/:id</span></div>

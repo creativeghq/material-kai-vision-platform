@@ -115,12 +115,26 @@
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/credits.png" alt="Credits tab"><figcaption>The Credits tab — balance and usage history.</figcaption></figure>
   <div class="callout"><p>Everyday chatting and searching in the <a href="agent-hub.html">Agent Hub</a> is inexpensive. Only explicit generation actions are metered, and the assistant tells you the cost before it runs one. A full list of which actions cost credits is in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p></div>
 
+  <p>The Credits tab also shows your balance as a <strong>percentage of your monthly allowance</strong>, so you can see at a glance how much of your plan you've used.</p>
+
   <h2>Buying credits</h2>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing-credits.png" alt="Credit packs available for purchase">
     <figcaption>Credit packs at /billing/credits.</figcaption>
   </figure>
-  <p>When you run low, top up at <span class="badge route">/billing/credits</span>. Choose one of the available credit packs and complete the purchase through secure checkout. Your new balance is reflected in the Credits tab right after payment.</p>
+  <p>When you run low, top up at <span class="badge route">/billing/credits</span>. Choose one of the available credit packs and complete the purchase through secure checkout. Your new balance is reflected in the Credits tab right after payment. <strong>Bigger packs earn bigger volume discounts</strong>:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Pay</th><th>You get</th><th>Discount</th></tr></thead>
+    <tbody>
+      <tr><td>€10</td><td>~1,052 credits</td><td>5% off</td></tr>
+      <tr><td>€25</td><td>~2,631 credits</td><td>5% off</td></tr>
+      <tr><td>€50</td><td>~5,555 credits</td><td>10% off</td></tr>
+      <tr><td>€100</td><td>~11,764 credits</td><td>15% off</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>You can also enter a <strong>custom amount</strong> — set your own value and bigger amounts automatically get better rates. Spending <strong>€45 or more</strong> unlocks the <strong>Gold tier</strong> (10% off). Each pack button shows exactly what you'll receive, e.g. <em>"Buy 2,631 Credits for €25"</em>.</p>
 
   <h2>Plans &amp; subscriptions</h2>
   <figure>
@@ -129,18 +143,49 @@
   </figure>
   <p>Your plan is shown in the <strong>Subscription</strong> tab. To upgrade or change it, go to <span class="badge route">/billing/subscriptions</span> and pick a plan. <strong>Higher plans raise your quotas and unlock additional capabilities</strong> across the platform's modules — so if you're hitting limits or want more advanced features, this is where to do it.</p>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/subscription.png" alt="Subscription tab"><figcaption>The Subscription tab — your current plan.</figcaption></figure>
+  <p>Plans are tiered by the <strong>monthly credit allowance</strong> they include:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tier</th><th>Monthly credit allowance</th></tr></thead>
+    <tbody>
+      <tr><td>Entry</td><td>100 credits / month</td></tr>
+      <tr><td>Pro</td><td>1,000 credits / month</td></tr>
+      <tr><td>Enterprise</td><td>5,000 credits / month</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>From the Subscription tab you can <strong>Manage Subscription</strong>, <strong>Cancel Subscription</strong>, or <strong>Subscribe to Enterprise</strong>. Higher plans raise your quotas and unlock additional capabilities across the platform's modules.</p>
+
+  <h3>API Keys</h3>
+  <p>The Subscription tab also manages your <strong>API keys</strong> — credentials that authenticate the <strong>external partner APIs</strong> for price tracking, mention tracking and job tracking, so other projects can call those services on your behalf. Keys are prefixed <code>kai_</code> and are shown <strong>masked</strong> (e.g. <code>kai_••••gBJd</code>) once created.</p>
+  <ul class="feat">
+    <li><strong>Generate Key</strong> — create a new <code>kai_*</code> key.</li>
+    <li><strong>Created / Last used</strong> — each key lists when it was created and when it was last used.</li>
+    <li><strong>Test</strong> — verify that a key works.</li>
+    <li><strong>Changes Log</strong> — review the history of key activity and changes.</li>
+  </ul>
+
   <p>Payment details and the invoices for your subscription live in the <strong>Billing</strong> tab.</p>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/billing.png" alt="Billing tab"><figcaption>The Billing tab — payment details and subscription invoices.</figcaption></figure>
+  <p>The Billing tab also holds your full <strong>ledger</strong> of credit transactions and purchases — every credit-consuming action and every top-up is listed:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Balance After</th><th>Actions</th></tr></thead>
+    <tbody>
+      <tr><td>When the transaction happened.</td><td>Credit (top-up) or Debit (usage).</td><td>What the entry was for, e.g. <em>"Public price scan"</em>.</td><td>Credits added or spent.</td><td>Your running balance after the entry.</td><td>Per-row actions (e.g. view detail).</td></tr>
+    </tbody>
+  </table>
+  </div>
 
   <h2>Social Accounts</h2>
-  <p>The <strong>Social Accounts</strong> tab lets you connect social media platforms to your account. Once connected, you can publish content to them directly from MaterialsHub. Connecting and disconnecting accounts is managed entirely from this tab.</p>
+  <p>The <strong>Social Accounts</strong> tab lets you connect social media platforms to your account. Once connected, you can publish content to them directly from MaterialsHub. Use <strong>Connect</strong> to link a new platform and <strong>Refresh</strong> to re-sync a connected account. Connecting and disconnecting accounts is managed entirely from this tab.</p>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/social-accounts.png" alt="Social Accounts tab"><figcaption>The Social Accounts tab — connect platforms for publishing.</figcaption></figure>
 
   <h2>Inbox, Appointments &amp; Reviews</h2>
   <ul class="feat">
     <li><strong>Inbox</strong> — your personal messages and conversations in one place. For the workspace-wide, multi-channel messaging experience, see the dedicated <a href="inbox.html">Inbox</a> documentation.</li>
-    <li><strong>Appointments</strong> — meetings and bookings that have been scheduled with you, so you can keep track of what's coming up.</li>
-    <li><strong>Reviews</strong> — feedback that others have left about you, visible on your profile.</li>
+    <li><strong>Appointments</strong> — meetings and bookings that have been scheduled with you, so you can keep track of what's coming up. You can <strong>filter by status</strong> (for example "all") to focus the list.</li>
+    <li><strong>Reviews</strong> — feedback left by people who have worked with you, visible on your profile as your reputation. You can <strong>reply to each review</strong>.</li>
   </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/inbox.png" alt="Profile Inbox tab"><figcaption>The Inbox tab — your personal messages.</figcaption></figure>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/appointments.png" alt="Appointments tab"><figcaption>The Appointments tab — scheduled meetings.</figcaption></figure>

@@ -15,31 +15,81 @@
   <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → the <strong>Dispatch board</strong>, <strong>Warehouse</strong>, <strong>Customers &amp; Suppliers</strong>, <strong>Planning</strong>, <strong>Time &amp; billing</strong>, <strong>Reports</strong>, <strong>Marketplace</strong> or <strong>Settings</strong> tab.</p></div>
 
   <h2>Dispatch board</h2>
-  <p>A board view for managing goods going out — tracking orders/deliveries through their stages. Works hand-in-hand with <strong>Delivery notes</strong> under <a href="finance-documents.html">Documents</a>.</p>
+  <p>A board view for managing goods going out — tracking orders/deliveries through their stages. Works hand-in-hand with <strong>Delivery notes</strong> and <strong>Warehouse</strong>.</p>
+  <ul class="feat">
+    <li><strong>Board of outgoing goods</strong> — a single place to see everything going out.</li>
+    <li><strong>Add manual note</strong> — drop a manual note onto the board for items that aren't tied to a formal document.</li>
+    <li>Works with <strong>Delivery notes</strong> (under <a href="finance-documents.html">Documents</a>) and the <strong>Warehouse</strong> stock side.</li>
+  </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-dispatch.png" alt="Dispatch board"><figcaption>The Dispatch board.</figcaption></figure>
 
   <h2>Warehouse</h2>
   <p>The stock side of the business — manage inventory that backs your products and links into delivery/dispatch. Use it to keep on-hand quantities and movements aligned with what you sell and ship.</p>
+  <ul class="feat">
+    <li><strong>Warehouse selector</strong> — switch between <strong>Main (default)</strong> and <strong>Warehouse</strong>.</li>
+    <li><strong>Add item</strong> — register a new stock item.</li>
+  </ul>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
+      <tbody>
+        <tr><td>Item</td><td>The stock item name.</td></tr>
+        <tr><td>SKU</td><td>Stock-keeping unit / code.</td></tr>
+        <tr><td>Location</td><td>Where it sits in the warehouse.</td></tr>
+        <tr><td>On hand</td><td>Quantity physically in stock.</td></tr>
+        <tr><td>Reserved</td><td>Quantity already committed/allocated.</td></tr>
+        <tr><td>Reorder</td><td>Reorder threshold for the item.</td></tr>
+      </tbody>
+    </table>
+  </div>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-warehouse.png" alt="Warehouse"><figcaption>The Warehouse tab.</figcaption></figure>
 
   <h2>Customers &amp; Suppliers</h2>
   <p>A consolidated view of the parties on your documents. It complements the <a href="crm.html">CRM</a> by focusing on the financial relationship — who you invoice and who you pay — and is the place those records surface inside Finance.</p>
+  <ul class="feat">
+    <li><strong>Combined view of every CRM party with finance activity</strong> — customers and suppliers in one list.</li>
+    <li><strong>Click a row</strong> for the full breakdown and to <strong>email a statement</strong>.</li>
+    <li><strong>Filters</strong> — <em>All</em> (customers/suppliers) and <em>All segments</em>.</li>
+    <li><strong>Search</strong> by <em>Name or email</em>.</li>
+    <li><strong>Stats</strong> — <em>Total customers owe</em> (€) and <em>We owe suppliers</em> (€).</li>
+  </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-customers-suppliers.png" alt="Customers and Suppliers"><figcaption>The Customers &amp; Suppliers tab.</figcaption></figure>
 
   <h2>Planning</h2>
-  <p>Forward-looking planning for the business — organising upcoming work and expected financial activity so the numbers aren't only backward-looking.</p>
+  <p>Forward-looking planning for the business — scheduled future payments and expected receipts so the numbers aren't only backward-looking.</p>
+  <ul class="feat">
+    <li><strong>Scheduled future payments + expected receipts</strong> in one forward view.</li>
+    <li><strong>Add planned payment</strong> — schedule an upcoming outflow.</li>
+    <li><strong>Marking Paid creates a real payment + allocation</strong> — a planned item becomes an actual Payment record when settled.</li>
+    <li><strong>Filter</strong> — <em>Upcoming (open)</em>.</li>
+    <li><strong>Stats</strong> — <em>Expected in</em> (€), <em>Planned out</em> (€), <em>Net planned</em> (€).</li>
+  </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-planning.png" alt="Planning"><figcaption>The Planning tab.</figcaption></figure>
 
   <h2>Time &amp; billing</h2>
-  <p>Track billable time and convert it into charges/invoices — useful for service work delivered alongside materials.</p>
+  <p>Track billable time and convert it into invoices — useful for service work delivered alongside materials (e.g. "On-site measurement &amp; consultation").</p>
+  <ul class="feat">
+    <li><strong>Log time</strong> — record billable time entries.</li>
+    <li><strong>Views</strong> — <em>By user</em> and <em>By contact</em>.</li>
+    <li><strong>Convert unbilled time to invoices</strong> — turn logged time into a Finance invoice.</li>
+    <li><strong>Search</strong> by customer.</li>
+  </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-time-billing.png" alt="Time and billing"><figcaption>The Time &amp; billing tab.</figcaption></figure>
 
   <h2>Reports</h2>
-  <p>Financial summaries and exports across your data — revenue, expenses, receivables/payables and more — with export options (e.g. CSV) for your accountant or your own analysis.</p>
+  <p>Financial summaries and exports across your data, with export options for your accountant or your own analysis.</p>
+  <ul class="feat">
+    <li><strong>Report types</strong> — <em>Sales journal</em>, <em>Purchases journal</em>, <em>VAT summary</em>, <em>Sales per day</em>.</li>
+    <li><strong>Period selector</strong> — <em>This month</em>, <em>Last month</em>, or a custom range.</li>
+    <li><strong>Export CSV</strong> — download the report for your accountant or spreadsheet.</li>
+  </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-reports.png" alt="Reports"><figcaption>The Reports tab.</figcaption></figure>
 
   <h2>Marketplace</h2>
   <p>Connects Finance to the platform's surplus/last-stock <a href="discover.html">marketplace</a>, tying marketplace activity into your financial view.</p>
+  <ul class="feat">
+    <li><strong>Surplus / last-stock marketplace tie-in</strong> — your marketplace activity surfaces alongside your financials.</li>
+  </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-marketplace.png" alt="Marketplace"><figcaption>The Marketplace tab.</figcaption></figure>
 
   <h2>Settings</h2>
