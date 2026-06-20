@@ -162,7 +162,7 @@ function condenseForLLM(data: any): Record<string, any> {
     subject: data?.subject_label,
     opportunity_count: ops.length,
     types: byType,
-    ai_overview_present: !!ai && !ai.source?.snapshot_present === false,
+    ai_overview_present: !!ai && ai.source?.snapshot_present !== false,
     ai_overview_brand_mentioned: ai?.source?.brand_mentioned ?? null,
     featured_snippet_held_by: fs?.source?.current_domain || null,
     knowledge_graph_present: kg?.source?.knowledge_graph_present ?? null,
