@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Settings: Online Store | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Online Store</div>
+  <h1>Settings · Online Store</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">The Online Store section turns your priced catalogue into a public storefront at <code>/store/:slug</code> — a shareable page where anyone can browse what you sell, with no login. You set the headline text shoppers see and choose which products are searchable; everything that already has a price flows through automatically.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Online Store</strong> (in the row of settings sub-tabs, after <em>Team</em>).</p>
+
+  <h2>What's on the screen</h2>
+  <p>A short form, top to bottom, followed by the Save button:</p>
+  <ul class="feat">
+    <li><strong>Headline</strong> — the large title at the top of your public store page (for example, "Shop our collection").</li>
+    <li><strong>Subheadline</strong> — the supporting line under the headline (for example, "Curated materials, shipped to you").</li>
+    <li><strong>Product search</strong> — a search box you use to find and confirm which catalogue products appear in the store.</li>
+    <li><strong>Save store settings</strong> — the button that publishes your changes to the live store page.</li>
+  </ul>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-online-store.png" alt="Online Store section: Headline and Subheadline fields, product search, and Save store settings button">
+    <figcaption>The Online Store form — Headline, Subheadline and the product search — with the Save store settings button that publishes to the public <code>/store/:slug</code> page.</figcaption>
+  </figure>
+
+  <h2>Only priced products appear</h2>
+  <p>The store is deliberately a <strong>price-driven</strong> surface: a product only shows up if it has a sell price. If a product is missing from the public store, it almost always means it has no price yet. Set prices through your catalogue markup rules — see <a href="finance-settings-pricing.html">Settings → Pricing</a> for category markups (cost → sell price), and <a href="store/public-pages.html">Store → Public Pages</a> for how the public storefront renders.</p>
+
+  <h2>How to set up your store — step by step</h2>
+  <ol>
+    <li>Go to <strong>Finance → Settings → Online Store</strong>.</li>
+    <li>Type your <strong>Headline</strong> — keep it short and inviting, e.g. <em>"Shop our collection"</em>.</li>
+    <li>Type your <strong>Subheadline</strong> underneath it, e.g. <em>"Curated materials, shipped to you"</em>.</li>
+    <li>Use the <strong>product search</strong> to confirm the products you expect to sell are present. Remember only products with a price will list.</li>
+    <li>Click <strong>Save store settings</strong>. Your changes go live on the public page at <code>/store/:slug</code>.</li>
+    <li>Open <code>/store/:slug</code> in a browser to see exactly what a shopper sees.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example — launching a small storefront.</strong> Open Online Store → set <strong>Headline</strong> to <em>"Shop our collection"</em> and <strong>Subheadline</strong> to <em>"Curated materials, shipped to you"</em> → use product search and notice three items are missing. Hop to <a href="finance-settings-pricing.html">Settings → Pricing</a>, add a category markup so those items get a sell price, come back, and they now appear. Click <strong>Save store settings</strong> and share the <code>/store/:slug</code> link.</p></div>
+
+  <h2>What it affects</h2>
+  <p>Saving here updates your live public storefront at <code>/store/:slug</code> — the headline and subheadline text, and the set of products on display. The product list is governed entirely by which catalogue items have a price, so this section works hand-in-hand with <a href="finance-settings-pricing.html">Settings → Pricing</a>. For the public-facing rendering and the rest of the storefront pages, see <a href="store/public-pages.html">Store → Public Pages</a>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

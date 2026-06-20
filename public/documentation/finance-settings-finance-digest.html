@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Settings: Finance Digest | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Finance Digest</div>
+  <h1>Settings · Finance Digest</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">The Finance Digest section sends a recurring financial summary by email to the people you choose. You set how often it goes out, on which day and hour, and to whom — then the digest arrives automatically on schedule, covering your receivables, payables, cash-flow forecast and open balances at a glance.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Finance Digest</strong> (in the row of settings sub-tabs).</p>
+
+  <h2>What's on the screen</h2>
+  <p>A scheduling form followed by three action buttons:</p>
+  <ul class="feat">
+    <li><strong>Frequency</strong> — how often the digest is sent (for example, <em>Weekly</em>).</li>
+    <li><strong>Day of week</strong> — which day it goes out (for example, <em>Monday</em>).</li>
+    <li><strong>Hour (UTC, 0–23)</strong> — the send hour, given in UTC on a 24-hour clock.</li>
+    <li><strong>Recipients</strong> — the address list. Type an email and click <strong>Add</strong>; repeat to add several recipients.</li>
+    <li><strong>Save digest settings</strong> — saves the schedule and recipient list.</li>
+    <li><strong>Send now to recipients</strong> — sends the digest immediately to everyone on the saved recipient list.</li>
+    <li><strong>Send test</strong> — sends the live digest right now to a single address you type, <em>without</em> changing your recipients or the next-send schedule.</li>
+  </ul>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-finance-digest.png" alt="Finance Digest section: Frequency, Day of week, Hour (UTC) and Recipients fields, with Save, Send now and Send test buttons">
+    <figcaption>The Finance Digest form — Frequency, Day of week, Hour (UTC), and the Recipients list — plus the Save digest settings, Send now to recipients, and Send test buttons.</figcaption>
+  </figure>
+
+  <h2>What's in the digest</h2>
+  <p>Each digest summarises your finance position: <strong>AR</strong> (accounts receivable — what customers owe you), <strong>AP</strong> (accounts payable — what you owe suppliers), a <strong>cash-flow forecast</strong>, your <strong>top open balances</strong>, and <strong>planned payments</strong>. It's a single periodic snapshot for the people who need to keep an eye on the books.</p>
+
+  <h2>How to schedule the digest — step by step</h2>
+  <ol>
+    <li>Go to <strong>Finance → Settings → Finance Digest</strong>.</li>
+    <li>Set <strong>Frequency</strong> to how often you want it — e.g. <em>Weekly</em>.</li>
+    <li>Pick the <strong>Day of week</strong> — e.g. <em>Monday</em>.</li>
+    <li>Set the <strong>Hour (UTC, 0–23)</strong>. Remember this is UTC, so adjust for your local time (e.g. for 9am in a UTC+2 zone, enter <code>7</code>).</li>
+    <li>Under <strong>Recipients</strong>, type an email address and click <strong>Add</strong>. Repeat for each person who should receive it.</li>
+    <li>Click <strong>Save digest settings</strong>. The digest will now go out on that schedule.</li>
+    <li>(Optional) Click <strong>Send test</strong>, type your own address, and confirm the email looks right — this does not touch your recipients or schedule.</li>
+    <li>(Optional) Click <strong>Send now to recipients</strong> if you want everyone to get a copy immediately, outside the schedule.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example — a Monday-morning team digest.</strong> Open Finance Digest → set <strong>Frequency</strong> to <em>Weekly</em>, <strong>Day of week</strong> to <em>Monday</em>, and <strong>Hour (UTC)</strong> to <code>7</code> → add <em>you@company.com</em> and <em>accountant@company.com</em> under Recipients → click <strong>Send test</strong> with your own address to preview it → click <strong>Save digest settings</strong>. From then on, both recipients get the AR/AP, cash-flow forecast and open-balance summary every Monday.</p></div>
+
+  <h2>What it affects</h2>
+  <p>Saving here controls a scheduled outbound email — it never changes any finance data. The schedule and recipient list drive when and to whom the digest is sent; <strong>Send now</strong> dispatches to the saved list once; <strong>Send test</strong> goes only to the address you type and leaves the saved recipients and next-send time untouched.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

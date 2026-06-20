@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Settings: Documents | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Documents</div>
+  <h1>Settings · Documents</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">The Documents section is where you set up everything that controls how your invoices, receipts and other documents are numbered, branded and transmitted. It groups five separate jobs onto one screen: your physical branches (establishments), the numbering series for each document type, the visual template applied to every invoice, your card-payment terminals, and the inbox connection that pulls documents your suppliers have issued to you. Get these right once and every document you raise afterwards inherits them.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Documents</strong> (in the row of settings sub-tabs).</p>
+
+  <h2>What's on the screen</h2>
+  <p>Five stacked blocks, top to bottom:</p>
+  <ul class="feat">
+    <li><strong>Establishments</strong> — your registered branches, each with the establishment (branch) number used when transmitting to myDATA.</li>
+    <li><strong>Document Types &amp; Series</strong> — the numbering series defined per document type and assigned to a branch.</li>
+    <li><strong>Invoice design template</strong> — the visual template ("Classic") plus seven brand colour pickers that style every invoice.</li>
+    <li><strong>EFT-POS Terminals</strong> — the card-payment terminals registered for card receipts.</li>
+    <li><strong>myDATA Inbox (Received Documents)</strong> — the credentials that let the platform pull documents your suppliers issued to you.</li>
+  </ul>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-documents.png" alt="Documents section: Establishments, Document Types & Series, Invoice design template, EFT-POS Terminals and myDATA Inbox blocks">
+    <figcaption>The Documents section: Establishments at the top, then Document Types &amp; Series, the Invoice design template with its colour pickers, EFT-POS Terminals, and the myDATA Inbox credentials.</figcaption>
+  </figure>
+
+  <h2>Establishments</h2>
+  <p>An <strong>establishment</strong> is a physical place of business — a branch. It matters because <strong>branches transmit to myDATA under their establishment number</strong>, so myDATA can tell which location issued a document. Your <strong>headquarters is always branch 0</strong>; additional shops, warehouses or showrooms are branches 1, 2, 3 and so on. Once a branch exists you assign a numbering series to it over in <em>Document Types &amp; Series</em>.</p>
+
+  <h3>How to add an establishment — step by step</h3>
+  <ol>
+    <li>Go to <strong>Finance → Settings → Documents</strong>.</li>
+    <li>In the <strong>Establishments</strong> block, click <strong>Add establishment</strong>. A dialog opens.</li>
+    <li>Fill in the fields (see the table below).</li>
+    <li>Leave the <strong>Active</strong> toggle on so the branch can be used on documents.</li>
+    <li>Click <strong>Save</strong>. (Or <strong>Cancel</strong> to discard.) The new branch appears in the Establishments list, ready to be assigned a numbering series.</li>
+  </ol>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Branch number</strong></td><td>The establishment number that myDATA will recognise. Defaults to <code>1</code> for your first added branch (HQ is branch 0).</td></tr>
+      <tr><td><strong>Name</strong></td><td>A label to recognise the branch by, e.g. <em>"Store — Athens"</em>.</td></tr>
+      <tr><td><strong>Street</strong></td><td>The branch's street name.</td></tr>
+      <tr><td><strong>Number</strong></td><td>The street number.</td></tr>
+      <tr><td><strong>Postal code</strong></td><td>The branch's postal code.</td></tr>
+      <tr><td><strong>City</strong></td><td>The branch's city.</td></tr>
+      <tr><td><strong>Active</strong></td><td>Toggle. On = the branch can be selected on documents.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Document Types &amp; Series</h2>
+  <p>This block is where you <strong>define a numbering series per document type</strong> — for example a series for invoices, another for receipts — and <strong>assign each series to a branch</strong>. This is what produces the running document numbers (and, paired with the establishment number, tells myDATA which branch issued each document). Set up the series you need before you start issuing documents so numbering is consistent from the first one.</p>
+
+  <h2>Invoice design template</h2>
+  <p>This block controls how every invoice looks. The template is <strong>"Classic"</strong> — described as <em>"Centered wordmark, thin hairline rules, monochrome."</em> You don't change the layout, but you do brand it with your own colours through seven pickers.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Colour picker</th><th>What it sets</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Accent</strong></td><td>The highlight colour used for accents on the document.</td></tr>
+      <tr><td><strong>Header background</strong></td><td>The background of the invoice header band.</td></tr>
+      <tr><td><strong>Header text</strong></td><td>The text colour inside the header.</td></tr>
+      <tr><td><strong>Table header</strong></td><td>The colour of the line-items table header row.</td></tr>
+      <tr><td><strong>Text</strong></td><td>The main body text colour.</td></tr>
+      <tr><td><strong>Secondary text</strong></td><td>The colour for less-prominent supporting text.</td></tr>
+      <tr><td><strong>Lines / borders</strong></td><td>The colour of the hairline rules and borders.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <h3>How to brand the invoice — step by step</h3>
+  <ol>
+    <li>In the <strong>Invoice design template</strong> block, confirm the template shows <strong>Classic</strong>.</li>
+    <li>Click each of the seven <strong>Colors</strong> pickers (<em>Accent, Header background, Header text, Table header, Text, Secondary text, Lines / borders</em>) and choose the colour you want.</li>
+    <li>Click <strong>Save template</strong> to apply your colours to every invoice going forward.</li>
+    <li>Changed your mind? Click <strong>Reset to defaults</strong> to put the original monochrome scheme back, then Save again if you want to keep the reset.</li>
+  </ol>
+
+  <h2>EFT-POS Terminals</h2>
+  <p>This block lists the card-payment terminals registered to your business. Until you add one it reads <em>"No terminals registered. Card receipts will transmit without a terminal signature until one is added."</em> — meaning card receipts still go out, just without a terminal signature attached.</p>
+  <h3>How to add a terminal</h3>
+  <ol>
+    <li>In the <strong>EFT-POS Terminals</strong> block, click <strong>Add terminal</strong>.</li>
+    <li>Enter the terminal's details and save. Once a terminal is registered, card receipts can transmit with its signature.</li>
+  </ol>
+
+  <h2>myDATA Inbox (Received Documents)</h2>
+  <p>This block connects the platform to your myDATA inbox so it can pull the documents your <em>suppliers</em> issued to you (rather than the ones you issue out). Once the credentials are saved here, the <strong>"Sync from myDATA"</strong> action can fetch those received documents into the platform.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>User ID</strong></td><td>Your myDATA user id — sent to the API as the <code>aade-user-id</code> header.</td></tr>
+      <tr><td><strong>Subscription Key</strong></td><td>Your myDATA subscription key — sent as the <code>Ocp-Apim-Subscription-Key</code> header. Entered as a password (masked).</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <ol>
+    <li>Paste your <strong>User ID</strong> into the first field.</li>
+    <li>Paste your <strong>Subscription Key</strong> into the second (it's masked like a password).</li>
+    <li>Save. The platform can now run <strong>Sync from myDATA</strong> to pull your received documents.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example — opening a second shop.</strong> You open a store in Athens. Go to <strong>Documents → Establishments → Add establishment</strong>, set <strong>Branch number</strong> <code>1</code>, <strong>Name</strong> <em>"Store — Athens"</em>, fill the address, leave <strong>Active</strong> on, click <strong>Save</strong>. Then in <strong>Document Types &amp; Series</strong> create a numbering series for that branch's invoices and assign it to the new establishment. From then on, invoices raised for the Athens store carry their own running numbers and transmit to myDATA under establishment number 1 — while your HQ documents stay on branch 0.</p></div>
+
+  <h2>What this section affects</h2>
+  <p>Everything here is foundational, not cosmetic-only:</p>
+  <ul class="feat">
+    <li><strong>Document numbering</strong> — establishments and the per-type series determine the running number on, and the branch attribution of, every invoice and receipt you issue.</li>
+    <li><strong>Branding on every document</strong> — the seven invoice colours apply to <em>all</em> invoices once saved.</li>
+    <li><strong>Received documents</strong> — the myDATA Inbox credentials power the "Sync from myDATA" pull of supplier-issued documents.</li>
+  </ul>
+  <p>To see these settings in action on the documents you actually raise, head to <a href="finance-documents.html">Finance → Documents</a>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

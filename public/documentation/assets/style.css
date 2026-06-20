@@ -136,6 +136,8 @@ body {
 .subnav a.active { background: var(--brand-tint); color: var(--brand-ink); font-weight: 600; }
 .subnav a.active::before { left: -17px; top: 6px; bottom: 6px; }
 .nav a.parent-active { color: var(--brand-ink); }
+.subnav-deep { margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--border); }
+.subnav-deep a { font-size: 12.5px; padding: 5px 10px; }
 
 /* Content */
 .content {

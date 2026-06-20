@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Settings: Business Identity | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Business Identity</div>
+  <h1>Settings · Business Identity</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">Business Identity is your <strong>issuer profile</strong> — who you are on every document you put out. It's the name, VAT number, address and contact details that print on each invoice and receipt, and the same block that gets transmitted to myDATA when you issue an e-invoice. Because it feeds both the paperwork and the tax filing, filling it in completely is <strong>mandatory before you can invoice</strong>.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Business Identity</strong> (in the row of settings sub-tabs). The panel is headed <strong>"Business Profile (Invoicing &amp; myDATA)"</strong>, with the reminder underneath: <em>"Shown when issuing e-invoices &amp; receipts and transmitted to myDATA — mandatory."</em></p>
+
+  <h2>Why it's mandatory</h2>
+  <p>Everything you issue carries this profile. A document with no issuer name, VAT number or address isn't a valid invoice, and myDATA won't accept a transmission whose issuer block is incomplete. So unlike most settings — which only tune behaviour — Business Identity is a prerequisite: fill it in once, properly, and the rest of Finance (invoicing, receipts, statements, the storefront) has the issuer details it needs.</p>
+
+  <h2>The EN / GR bilingual toggle</h2>
+  <p>Every text field on this profile is stored in <strong>two languages</strong> — an English (<em>·en</em>) variant and a Greek (<em>·gr</em>) variant. Two buttons at the top, <strong>EN</strong> and <strong>GR</strong>, switch which language you're currently editing. The fields don't change — only which variant you're typing into. Fill the Greek variants for Greek-facing documents, and fill the English variants too if you ever invoice abroad, so the document can print in the right language for each customer.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-business-identity.png" alt="Business Identity: the Business Profile panel with the EN/GR toggle, the five sub-tabs, the Billing fields and the Fetch from ΑΑΔΕ button">
+    <figcaption>Business Identity — issuer profile, entered per language.</figcaption>
+  </figure>
+
+  <h2>The five sub-tabs — you fill each one</h2>
+  <p>The profile is split into five sub-tabs across the top of the panel. Each holds a related set of issuer details; work through them in order and fill each (in both languages where it applies):</p>
+  <ul class="feat">
+    <li><strong>1. Billing</strong> — the core issuer block that prints on documents and goes to myDATA: company name, activity, VAT and GEMI numbers, tax office and full address, plus contact details. This is the one that's covered field-by-field below.</li>
+    <li><strong>2. Customer Contact</strong> — the contact details you want customers to reach you on (the public-facing phone/email shown on what you send out).</li>
+    <li><strong>3. Personal</strong> — the personal / legal-representative details behind the business.</li>
+    <li><strong>4. My Company</strong> — the wider company information for your own records and document footers.</li>
+    <li><strong>Bank &amp; Logo</strong> — your bank account details (for payment instructions on invoices) and your logo image for the document header.</li>
+  </ul>
+
+  <h2>Billing fields</h2>
+  <p>The Billing sub-tab carries the heart of the issuer profile. Each field below has both an EN and a GR variant:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Company name</strong></td><td>Your trading / legal name as it should appear on documents.</td></tr>
+      <tr><td><strong>Activity</strong></td><td>Your line of business / professional activity.</td></tr>
+      <tr><td><strong>VAT number</strong></td><td>Your tax identification number, e.g. <code>EL123456789</code>.</td></tr>
+      <tr><td><strong>GEMI number</strong></td><td>Your General Commercial Registry (ΓΕΜΗ) number.</td></tr>
+      <tr><td><strong>Tax office</strong></td><td>The tax office (ΔΟΥ) you're registered with.</td></tr>
+      <tr><td><strong>Street</strong></td><td>Street name of your business address.</td></tr>
+      <tr><td><strong>Number</strong></td><td>Street number.</td></tr>
+      <tr><td><strong>Postal code</strong></td><td>Postal / ZIP code.</td></tr>
+      <tr><td><strong>City</strong></td><td>City / town.</td></tr>
+      <tr><td><strong>Country</strong></td><td>Country name.</td></tr>
+      <tr><td><strong>Country code</strong></td><td>Two-letter country code, e.g. <code>GR</code>.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Business phone number.</td></tr>
+      <tr><td><strong>Fax</strong></td><td>Fax number (if any).</td></tr>
+      <tr><td><strong>Email</strong></td><td>Business email address.</td></tr>
+      <tr><td><strong>Other</strong></td><td>Free-text for branch or notes.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>How to set up your identity fast</h2>
+  <p>You don't have to type the registry details by hand. The <strong>Fetch from ΑΑΔΕ</strong> button pulls them straight from the Greek tax registry:</p>
+  <ol>
+    <li>Go to <strong>Finance → Settings → Business Identity</strong>, on the <strong>1. Billing</strong> sub-tab.</li>
+    <li>Type your <strong>VAT number</strong> into the VAT field (e.g. <code>EL123456789</code>).</li>
+    <li>Click <strong>Fetch from ΑΑΔΕ</strong>.</li>
+    <li>The registry fills in the rest — <strong>company name, activity, tax office and address</strong> all autofill from your official record.</li>
+    <li>Finish the parts the registry doesn't hold: the <strong>Bank &amp; Logo</strong> sub-tab (your IBAN and logo) and your customer-facing contact details on the <strong>2. Customer Contact</strong> sub-tab.</li>
+    <li>Switch the language toggle to <strong>EN</strong> and fill the English variants too if you invoice abroad.</li>
+    <li>Click <strong>Save</strong>.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example — a Greek studio setting up in two minutes.</strong> Open Business Identity → on <strong>1. Billing</strong>, type <code>EL123456789</code> into VAT number → click <strong>Fetch from ΑΑΔΕ</strong>. The company name, activity, tax office and street address snap into place from the registry. Hop to <strong>Bank &amp; Logo</strong>, paste the IBAN and upload the logo, then to <strong>2. Customer Contact</strong> for the public phone and email. Click <strong>EN</strong> and type the English company name and address (this studio occasionally invoices EU clients). Click <strong>Save</strong> — the profile is now complete and the studio can issue its first invoice.</p></div>
+
+  <h2>What this profile affects</h2>
+  <p>Once saved, the Business Identity flows everywhere your business shows up:</p>
+  <ul class="feat">
+    <li><strong>Every PDF header and footer</strong> — invoices, receipts and other documents print this name, address, VAT/GEMI and logo at the top, with the contact details in the footer.</li>
+    <li><strong>The myDATA issuer block</strong> — when you transmit an e-invoice, this profile is the "who issued it" block sent to myDATA.</li>
+    <li><strong>Statements</strong> — the account statements you email to customers and suppliers carry this identity.</li>
+    <li><strong>The storefront</strong> — your public store shows this business identity.</li>
+  </ul>
+
+  <div class="callout"><p><strong>Note:</strong> the ΑΑΔΕ fetch covers the registry-held fields (name, activity, tax office, address). Bank details, your logo and your chosen customer-facing contact details aren't in the registry, so you always finish those by hand on the <strong>Bank &amp; Logo</strong> and <strong>2. Customer Contact</strong> sub-tabs.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -11,183 +11,27 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / Settings</div>
   <h1>Finance Settings</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">Finance Settings is where you configure the whole money side of your business before you issue your first document. It is one tab on the Finance page, but it opens into <strong>twelve sub-sections</strong>. This guide walks every one of them: what it is, why it matters, exactly how to fill it in, and what it changes elsewhere in the platform.</p>
+  <p class="lead">Finance Settings is where you configure the whole money side of your business before issuing your first document. It's one tab on the Finance page that opens into <strong>twelve sub-sections</strong> — and each one is documented in full, click-by-click, on its own page. Use the cards below (or the sidebar, where the twelve appear nested under <strong>Settings</strong>).</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → the <strong>Settings</strong> tab. A second row of tabs appears — those are the twelve sub-sections below.</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → the <strong>Settings</strong> tab. A second row of sub-tabs appears — one per section below.</p></div>
 
   <div class="callout tip"><p><strong>Recommended setup order</strong> (each step builds on the last): <strong>Business Identity</strong> → <strong>Documents</strong> → <strong>e-Invoicing</strong> → <strong>Categories</strong> → <strong>Pricing</strong> → <strong>Services</strong> → <strong>General</strong> defaults → <strong>Team</strong>. Online Store, Statement PDF and Finance Digest can wait until you're live.</p></div>
 
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-general.png" alt="Finance Settings — General section">
-    <figcaption>Finance → Settings. The row of sub-section tabs (General, Business Identity, Documents, e-Invoicing, Pricing, Categories, Services, Team, Online Store, Statement PDF, Finance Digest, Payments) sits just under the heading.</figcaption>
-  </figure>
-
-  <!-- 1 -->
-  <h2>1. Business Identity</h2>
-  <p><strong>What it is —</strong> the legal details of the business that issues your invoices: name, VAT number, tax office, registered address and contact details. <strong>Why it matters —</strong> every invoice and receipt prints these details, and they are sent to the Greek tax authority (myDATA) on each submission. If they're wrong, your documents are legally wrong. This is the very first thing to set up.</p>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-business-identity.png" alt="Business Identity section">
-    <figcaption>Business Identity — the issuer profile, entered per language (EN / GR).</figcaption>
-  </figure>
-  <p>The section is split into <strong>1. Billing</strong>, <strong>2. Customer Contact</strong>, <strong>3. Personal</strong>, <strong>4. My Company</strong> and <strong>Bank &amp; Logo</strong>, and every text field is <strong>bilingual</strong> — use the <strong>EN / GR</strong> toggle to fill each language (the right one prints depending on the document's language).</p>
-  <h3>How to set it up</h3>
-  <ol>
-    <li>Toggle to <strong>GR</strong> (for Greek businesses) and type your <strong>VAT number</strong> (e.g. <code>EL123456789</code>).</li>
-    <li>Click <strong>Fetch from ΑΑΔΕ</strong> — the platform pulls your official <em>Company name</em>, <em>Activity</em>, <em>Tax office</em> and registered <em>address</em> straight from the tax registry, so you don't type them by hand (and they exactly match what the authority expects).</li>
-    <li>Fill anything ΑΑΔΕ didn't return: <strong>GEMI number</strong>, <strong>Phone</strong>, <strong>Fax</strong>, <strong>Email</strong>, and the <strong>Bank &amp; Logo</strong> (IBAN + the logo that prints on documents).</li>
-    <li>Switch to <strong>EN</strong> and add English versions if you invoice international clients.</li>
-    <li><strong>Save.</strong></li>
-  </ol>
-  <p><strong>What it affects:</strong> the header/footer of every PDF document, the issuer block sent to myDATA, and your public <a href="finance-operations.html">statements</a> and storefront.</p>
-
-  <!-- 2 -->
-  <h2>2. Documents</h2>
-  <p><strong>What it is —</strong> how your documents are numbered, branded and exchanged with the tax authority. <strong>Why it matters —</strong> Greek law requires each document type to run on its own numbered <em>series</em>, and the look of the PDF is your brand in the customer's inbox.</p>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-documents.png" alt="Documents section">
-    <figcaption>Documents — establishments, numbering series, the invoice template, terminals and the myDATA inbox.</figcaption>
-  </figure>
-  <ul class="feat">
-    <li><strong>Establishments</strong> — register each physical premises/branch (<em>Add establishment</em>). myDATA tags documents with the establishment that issued them.</li>
-    <li><strong>Document Types &amp; Series</strong> — define the numbering series for each document type (invoices, receipts, etc.). This is what produces the legal sequential number when you press <em>Issue</em>.</li>
-    <li><strong>Invoice design template</strong> — pick a template (e.g. <em>Classic</em>) and set the brand <strong>Colors</strong>: Accent, Header background, Header text, Table header, Text, Secondary text, and Lines/borders. <em>Save template</em>, or <em>Reset to defaults</em>.</li>
-    <li><strong>EFT-POS Terminals</strong> — register card terminals (<em>Add terminal</em>) so card payments are tied to issued documents.</li>
-    <li><strong>myDATA Inbox (Received Documents)</strong> — to pull documents <em>others</em> issued to you, enter your myDATA REST credentials: <strong>User ID</strong> (sent as <code>aade-user-id</code>) and <strong>Subscription Key</strong> (<code>Ocp-Apim-Subscription-Key</code>). This powers the "Sync from myDATA" buttons on the Invoices/Expenses tabs.</li>
-  </ul>
-  <h3>How to set it up</h3>
-  <ol>
-    <li>Add at least one <strong>Establishment</strong> (your main premises).</li>
-    <li>Create a <strong>series</strong> for each document type you'll issue.</li>
-    <li>Open <strong>Invoice design template</strong>, set your brand colours, <em>Save template</em>.</li>
-    <li>If you want incoming documents to appear automatically, paste your myDATA <strong>User ID</strong> + <strong>Subscription Key</strong>.</li>
-  </ol>
-  <p><strong>What it affects:</strong> document numbering and branding on every <a href="finance-documents.html">document you create</a>, and the <em>Sync from myDATA</em> feature.</p>
-
-  <!-- 3 -->
-  <h2>3. e-Invoicing (Novus → myDATA)</h2>
-  <p><strong>What it is —</strong> the on/off status of electronic transmission to the tax authority through the Novus connector. <strong>Why it matters —</strong> until this is active, documents are created but not electronically filed. <strong>How:</strong> set the <strong>Status</strong> (it starts at <em>Not requested</em>) as you progress the activation, add a <strong>Note</strong> (contract number, date submitted, who handled it) for your own audit trail, and <strong>Save status</strong>.</p>
-  <p><strong>What it affects:</strong> whether <em>Submit to myDATA on issue</em> actually transmits — see <a href="finance-einvoicing.html">Greek e-invoicing</a> for the full transmission flow and VAT validation.</p>
-
-  <!-- 4 -->
-  <h2>4. Categories</h2>
-  <p><strong>What it is —</strong> the income and expense buckets you tag documents with. <strong>Why it matters —</strong> categories are how your <a href="finance-operations.html">Reports</a> (and the VAT summary, sales/purchases journals) break revenue and cost down — without them every figure is one undifferentiated lump.</p>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-categories.png" alt="Categories section">
-    <figcaption>Finance Categories — income/expense buckets used across documents and reports.</figcaption>
-  </figure>
-  <h3>How to add a category</h3>
-  <ol>
-    <li>Click <strong>Import default categories</strong> first — it seeds a sensible standard set so you're not starting blank.</li>
-    <li>To add your own, type a <strong>Name</strong> (e.g. <em>Materials</em>, <em>Rent</em>, <em>Services</em>).</li>
-    <li>Choose the <strong>Kind</strong>: <em>income</em>, <em>expense</em>, or <strong>Both</strong> (use Both for a label that appears on either side, like a project name).</li>
-    <li>Optionally set a default <strong>margin %</strong> for the category.</li>
-    <li>Add it.</li>
-  </ol>
-  <p><strong>What it affects:</strong> the <em>Income category</em> / <em>Expense category</em> pickers on documents, the category filters on the Receivables/Payables/Invoices lists, and every report breakdown.</p>
-
-  <!-- 5 -->
-  <h2>5. Pricing</h2>
-  <p><strong>What it is —</strong> automatic markup rules per product category. <strong>Why it matters —</strong> when you pull a catalogue item onto a document, you usually want to sell it above cost; a rule converts cost to sell price automatically so you don't recalculate every line.</p>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-pricing.png" alt="Pricing section">
-    <figcaption>Category Markup Rules — set a markup % per product category.</figcaption>
-  </figure>
-  <h3>How to set a rule</h3>
-  <ol>
-    <li>Pick a product <strong>Category</strong>.</li>
-    <li>Enter the <strong>Markup %</strong> (e.g. 25).</li>
-    <li>Add the rule. Repeat per category.</li>
-  </ol>
-  <p><strong>What it affects:</strong> the price proposed when you <em>Pick from products</em> on an invoice/quote. A blanket default also lives in <strong>General → Default catalog markup %</strong>; category rules override it.</p>
-
-  <!-- 6 -->
-  <h2>6. Services</h2>
-  <p><strong>What it is —</strong> your billable, non-material lines: labour, delivery, installation, consultation. <strong>Why it matters —</strong> services need a name and price so they can be added to documents and rung up at the till exactly like products. <strong>How:</strong> click <strong>New service</strong>, name it and set a price.</p>
-  <p><strong>What it affects:</strong> services become pickable on <a href="finance-documents.html">invoices/quotes</a> and, importantly, in the <a href="pos.html">POS</a> — items only appear in the register if they have a price, and services are priced here.</p>
-
-  <!-- 7 -->
-  <h2>7. Team — add colleagues and control what they can see</h2>
-  <p>The Team section does two jobs: it shows everyone who already has access to this workspace, and it lets you invite new people by generating a sign-up link tied to a specific role. There are no passwords to set and no seats to buy here — you pick a role, generate a link, and send it.</p>
-
-  <h3>Where it is</h3>
-  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Team</strong> (in the row of settings sub-tabs).</p>
-
-  <h3>What's on the screen</h3>
-  <p>Two stacked areas:</p>
-  <ul class="feat">
-    <li><strong>Members (N)</strong> — the list at the top. Each row is one person who can access the workspace, shown by their email (or a short account id), with a <strong>role badge</strong> on the right — e.g. <em>Admin</em> or <em>Member</em>. This is your at-a-glance "who has access" list.</li>
-    <li><strong>Invite Team Member</strong> — the panel below, where you create an invite: a <strong>Role</strong> dropdown, a one-line description of the role you've picked, and a <strong>Generate invite link</strong> button.</li>
-  </ul>
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-team-invite.png" alt="Team section: members list, Role dropdown with its description, Generate invite link, and the generated link">
-    <figcaption>Team — the Members list (top, with role badges), the Role dropdown showing the selected role's description, and the generated invite link with its "valid 30 days" note.</figcaption>
-  </figure>
-
-  <h3>The roles you can grant, and exactly what each one can do</h3>
-  <p>When you open the <strong>Role</strong> dropdown you get three choices. The grey line under the dropdown updates to describe whatever you select — so you can confirm the access <em>before</em> you send the invite:</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Role</th><th>What that person can do (shown under the dropdown)</th><th>Pick it for…</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Accountant</strong> <span style="color:var(--muted)">(finance ops, no settings)</span></td><td>"Finance only: view invoices/bills/reports, record payments, submit to myDATA. <em>No settings, pricing, CRM, or new documents.</em>"</td><td>A bookkeeper/accountant who reconciles and files but shouldn't change configuration or see customers.</td></tr>
-      <tr><td><strong>Sales rep</strong></td><td>"Sales portal — create quotes/orders for customers. <em>No finance or settings.</em>"</td><td>A salesperson who should live in the <a href="sales.html">Sales portal</a> and raise quotes, but never see the books.</td></tr>
-      <tr><td><strong>Member</strong></td><td>"Standard member access to this workspace."</td><td>A general colleague who needs normal day-to-day access.</td></tr>
-    </tbody>
-  </table>
+  <h2>The twelve sections</h2>
+  <div class="cards">
+    <a class="card" href="finance-settings-general.html"><div class="ico">⚙️</div><h3>1. General</h3><p>Document defaults (email, payment terms, VAT, markup) and the issuance/credit-limit safety rules.</p></a>
+    <a class="card" href="finance-settings-business-identity.html"><div class="ico">🏢</div><h3>2. Business Identity</h3><p>Your legal issuer details for invoicing &amp; myDATA — bilingual, with Fetch-from-ΑΑΔΕ autofill.</p></a>
+    <a class="card" href="finance-settings-documents.html"><div class="ico">🧾</div><h3>3. Documents</h3><p>Establishments, numbering series, invoice template &amp; colours, POS terminals, myDATA inbox.</p></a>
+    <a class="card" href="finance-settings-einvoicing.html"><div class="ico">🏛️</div><h3>4. e-Invoicing</h3><p>Novus → myDATA activation status and notes.</p></a>
+    <a class="card" href="finance-settings-pricing.html"><div class="ico">🏷️</div><h3>5. Pricing</h3><p>Per-category markup rules that turn catalogue cost into sell price.</p></a>
+    <a class="card" href="finance-settings-categories.html"><div class="ico">🗂️</div><h3>6. Categories</h3><p>Income/expense buckets for documents and reports — add your own or import defaults.</p></a>
+    <a class="card" href="finance-settings-services.html"><div class="ico">🛠️</div><h3>7. Services</h3><p>Billable non-stock lines (labour, delivery, installation) for quotes, invoices and POS.</p></a>
+    <a class="card" href="finance-settings-team.html"><div class="ico">👥</div><h3>8. Team</h3><p>See members and invite colleagues by role with a generated sign-up link.</p></a>
+    <a class="card" href="finance-settings-online-store.html"><div class="ico">🛒</div><h3>9. Online Store</h3><p>Your public storefront's headline, subheadline and product search.</p></a>
+    <a class="card" href="finance-settings-statement-pdf.html"><div class="ico">📄</div><h3>10. Statement PDF</h3><p>Brand the account-statement PDF with a cover backdrop and footer.</p></a>
+    <a class="card" href="finance-settings-finance-digest.html"><div class="ico">📧</div><h3>11. Finance Digest</h3><p>Schedule a recurring finance summary email to chosen recipients.</p></a>
+    <a class="card" href="finance-settings-payments.html"><div class="ico">💳</div><h3>12. Payments</h3><p>How customers pay you online from an emailed invoice.</p></a>
   </div>
-
-  <h3>How to invite someone — step by step</h3>
-  <ol>
-    <li>Go to <strong>Finance → Settings → Team</strong>.</li>
-    <li>In the <strong>Invite Team Member</strong> panel, click the <strong>Role</strong> dropdown and choose a role (e.g. <em>Sales rep</em>).</li>
-    <li>Read the grey description that appears under the dropdown to confirm it grants exactly the access you intend.</li>
-    <li>Click <strong>Generate invite link</strong>. A confirmation pops up — <em>"Invite link created · Copied to clipboard"</em> — and the link appears under <strong>Share this link (valid 30 days)</strong>, e.g. <code>https://app.materialshub.gr/auth?mode=signup&amp;invite=…</code>. It's already on your clipboard; the icon button beside it copies it again.</li>
-    <li><strong>Send that link</strong> to your colleague (email, chat, etc.).</li>
-    <li>They open it, land on the sign-up screen, create their account, and are added to <em>this</em> workspace with the role baked into the link. The link works for <strong>30 days</strong>.</li>
-  </ol>
-
-  <div class="callout tip"><p><strong>Worked example.</strong> You hire a part-time bookkeeper. Open Team, set Role to <strong>Accountant (finance ops, no settings)</strong>, click <strong>Generate invite link</strong>, paste the copied link into an email to them. When they sign up they can open invoices, record payments and submit to myDATA — but the CRM, Pricing and Settings tabs simply won't be available to them, so there's nothing to lock down manually.</p></div>
-
-  <h3>After they join</h3>
-  <p>The new person appears in the <strong>Members</strong> list here with their role badge, and also in <a href="crm.html">CRM → Users</a> (where their role and subscription are managed). The role you chose controls which top-nav areas they see across the whole platform — see <a href="getting-started.html">Getting Started → Roles &amp; access</a> for the full picture.</p>
-
-  <div class="callout"><p><strong>Note:</strong> the three roles above are the ones you can hand out from this invite panel. Higher-level roles such as <em>Admin</em>/<em>Operator</em> (which you'll see on existing members) are managed at the platform/CRM level, not granted through a self-serve invite link.</p></div>
-
-  <!-- 8 -->
-  <h2>8. General</h2>
-  <p><strong>What it is —</strong> the defaults applied to every new document, plus the safety rules that protect you at issue time. <strong>Why it matters —</strong> good defaults save you re-typing on every invoice, and the rules stop you issuing documents that will be rejected or never paid. Set this after Business Identity/Documents so the defaults make sense.</p>
-  <h3>Defaults</h3>
-  <ul class="feat">
-    <li><strong>Default email subject / body</strong> — pre-fill what's sent when you email a document.</li>
-    <li><strong>Default payment terms (days)</strong> — sets the due date offset on new invoices.</li>
-    <li><strong>Default VAT %</strong> — the VAT applied to new line items.</li>
-    <li><strong>Default catalog markup %</strong> — fallback markup when no category Pricing rule applies.</li>
-  </ul>
-  <h3>Issuance &amp; credit-limit safety rules</h3>
-  <p>These are toggles — turn them on once you're trading seriously:</p>
-  <ul class="feat">
-    <li><strong>Block issuance when the buyer VAT number is ΑΑΔΕ-inactive</strong> — stops you invoicing a VAT number the registry shows as inactive (a common cause of rejected myDATA submissions).</li>
-    <li><strong>Block issuance when the buyer VAT was never validated (stricter)</strong> — forces every buyer's VAT to be validated before you can issue.</li>
-    <li><strong>Warn when the invoice pushes the buyer over their credit limit</strong> — shows a warning (the credit limit is set per customer in <a href="crm.html">CRM</a>).</li>
-    <li><strong>Block (instead of warn) when over the credit limit</strong> — turns that warning into a hard stop.</li>
-  </ul>
-  <p>Click <strong>Save settings</strong> to apply. <strong>What it affects:</strong> every new document, and the checks that run when you press <em>Issue</em>.</p>
-
-  <!-- 9 -->
-  <h2>9. Online Store</h2>
-  <p><strong>What it is —</strong> the public storefront customers can browse at <span class="badge route">/store/:slug</span>. <strong>Why it matters —</strong> it turns your priced catalogue into a shareable shop. <strong>How:</strong> set the <strong>Headline</strong> and <strong>Subheadline</strong>, confirm the product search, and <strong>Save store settings</strong>. <strong>What it affects:</strong> the public store page; only priced products appear.</p>
-
-  <!-- 10 -->
-  <h2>10. Statement PDF</h2>
-  <p><strong>What it is —</strong> the branding of the account-statement PDF you email to a customer (the running total of what they owe). <strong>Why it matters —</strong> a branded statement looks professional when chasing payment. <strong>How:</strong> upload a <strong>Cover / page backdrop</strong> and an optional <strong>Footer</strong> image. <strong>What it affects:</strong> the statement generated from <a href="finance-operations.html">Customers &amp; Suppliers</a> (click a party → email statement).</p>
-
-  <!-- 11 -->
-  <h2>11. Finance Digest</h2>
-  <p><strong>What it is —</strong> a recurring email summary of your finances. <strong>Why it matters —</strong> it keeps you (or your accountant) on top of cash flow without logging in. <strong>How:</strong> set the <strong>Frequency</strong> (e.g. Weekly), <strong>Day of week</strong>, <strong>Hour (UTC, 0–23)</strong> and one or more <strong>Recipients</strong> (Add), then <strong>Save digest settings</strong>. Use <strong>Send test</strong> to preview it, or <strong>Send now to recipients</strong> to dispatch immediately.</p>
-
-  <!-- 12 -->
-  <h2>12. Payments</h2>
-  <p><strong>What it is —</strong> how customers can pay you online. <strong>Why it matters —</strong> it controls the payment methods/links offered on the public pay page (<span class="badge route">/pay/:token</span>) that a customer opens from an emailed invoice. <strong>What it affects:</strong> the options a customer sees when settling a document online.</p>
 
   <div class="callout tip"><p>Once Business Identity, Documents, e-Invoicing, Categories and Services are done, you can issue compliant invoices and run the <a href="pos.html">POS</a> end-to-end. Everything else here is polish you can add as you grow.</p></div>
 </main>

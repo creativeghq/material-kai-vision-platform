@@ -32,7 +32,20 @@
         { file: "finance-documents.html", title: "Documents" },
         { file: "finance-einvoicing.html", title: "Greek e-invoicing" },
         { file: "finance-operations.html", title: "Operations & Reports" },
-        { file: "finance-settings.html", title: "Settings (12 sections)" },
+        { file: "finance-settings.html", title: "Settings", children: [
+          { file: "finance-settings-general.html", title: "General" },
+          { file: "finance-settings-business-identity.html", title: "Business Identity" },
+          { file: "finance-settings-documents.html", title: "Documents" },
+          { file: "finance-settings-einvoicing.html", title: "e-Invoicing" },
+          { file: "finance-settings-pricing.html", title: "Pricing" },
+          { file: "finance-settings-categories.html", title: "Categories" },
+          { file: "finance-settings-services.html", title: "Services" },
+          { file: "finance-settings-team.html", title: "Team" },
+          { file: "finance-settings-online-store.html", title: "Online Store" },
+          { file: "finance-settings-statement-pdf.html", title: "Statement PDF" },
+          { file: "finance-settings-finance-digest.html", title: "Finance Digest" },
+          { file: "finance-settings-payments.html", title: "Payments" },
+        ]},
       ]},
       { file: "pos.html", title: "Point of Sale", icon: "🧮" },
       { file: "inbox.html", title: "Inbox", icon: "✉️" },
@@ -60,7 +73,10 @@
     GROUPS.forEach(function (g) {
       g.items.forEach(function (it) {
         out.push(it);
-        if (it.children) it.children.forEach(function (c) { out.push(c); });
+        if (it.children) it.children.forEach(function (c) {
+          out.push(c);
+          if (c.children) c.children.forEach(function (gc) { out.push(gc); });
+        });
       });
     });
     return out;
@@ -98,7 +114,16 @@
         if (it.children) {
           html += '<div class="subnav">';
           it.children.forEach(function (c) {
-            html += '<a class="' + (c.file === cur ? "active" : "") + '" href="' + c.file + '">' + c.title + "</a>";
+            var gcActive = c.children && c.children.some(function (gc) { return gc.file === cur; });
+            html += '<a class="' + ((c.file === cur ? "active" : "") + (gcActive ? " parent-active" : "")).trim() + '" href="' + c.file + '">' + c.title + "</a>";
+            // Render grandchildren only when in that sub-area, to keep the sidebar tidy
+            if (c.children && (c.file === cur || gcActive)) {
+              html += '<div class="subnav subnav-deep">';
+              c.children.forEach(function (gc) {
+                html += '<a class="' + (gc.file === cur ? "active" : "") + '" href="' + gc.file + '">' + gc.title + "</a>";
+              });
+              html += "</div>";
+            }
           });
           html += "</div>";
         }
