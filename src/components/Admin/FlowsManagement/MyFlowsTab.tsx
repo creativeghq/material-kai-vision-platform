@@ -118,6 +118,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'inbox.message_received': Inbox,
   'inbox.thread_assigned': UserPlus,
   marketplace_want_match: Package,
+  expense_card_submitted: ClipboardCheck,
+  expense_card_reviewed: CheckCircle2,
+  expense_card_requested: FileText,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -171,6 +174,9 @@ const triggerLabels: Record<TriggerType, string> = {
   'inbox.message_received': 'Inbox Message Received',
   'inbox.thread_assigned': 'Inbox Thread Assigned',
   marketplace_want_match: 'Surplus Match',
+  expense_card_submitted: 'Expense Card Submitted',
+  expense_card_reviewed: 'Expense Card Reviewed',
+  expense_card_requested: 'Expense Card Requested',
 };
 
 const statusColors: Record<FlowStatus, string> = {

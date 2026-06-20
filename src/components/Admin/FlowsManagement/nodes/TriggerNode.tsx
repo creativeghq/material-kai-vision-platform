@@ -60,6 +60,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'inbox.message_received': Inbox,
   'inbox.thread_assigned': UserPlus,
   marketplace_want_match: Package,
+  expense_card_submitted: ClipboardCheck,
+  expense_card_reviewed: CheckCircle2,
+  expense_card_requested: FileText,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

@@ -61,13 +61,20 @@ export type TriggerType =
   | 'inbox.message_received'
   | 'inbox.thread_assigned'
   // #225 — surplus marketplace: a new listing matched a buyer's saved alert
-  | 'marketplace_want_match';
+  | 'marketplace_want_match'
+  // Expense cards (trip / monthly / …): submit→finance, review→rep, request→rep
+  | 'expense_card_submitted'
+  | 'expense_card_reviewed'
+  | 'expense_card_requested';
 
 export interface ManualTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
 export interface MarketplaceWantMatchTriggerConfig {}
+export interface ExpenseCardSubmittedTriggerConfig {}
+export interface ExpenseCardReviewedTriggerConfig {}
+export interface ExpenseCardRequestedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
   cron: string;
@@ -225,6 +232,9 @@ export type TriggerConfigMap = {
   'inbox.message_received': InboxMessageReceivedTriggerConfig;
   'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
   marketplace_want_match: MarketplaceWantMatchTriggerConfig;
+  expense_card_submitted: ExpenseCardSubmittedTriggerConfig;
+  expense_card_reviewed: ExpenseCardReviewedTriggerConfig;
+  expense_card_requested: ExpenseCardRequestedTriggerConfig;
 };
 
 // =====================================================

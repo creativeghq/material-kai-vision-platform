@@ -14,6 +14,8 @@
 // the rep) must be able to read them.
 
 import { supabase } from '@/integrations/supabase/client';
+import { flowEventService } from '@/services/flows/flowEventService';
+import { formatMoney } from '@/modules/finance/services/financeService';
 
 export type TripStatus =
   | 'draft' | 'submitted' | 'partially_approved' | 'approved' | 'rejected' | 'reimbursed';
@@ -61,6 +63,9 @@ export interface TripExpenseReport {
   reviewed_by: string | null;
   reviewed_at: string | null;
   review_notes: string | null;
+  /** Finance user who requested this card on the rep's behalf (null = self-created). */
+  assigned_by: string | null;
+  request_note: string | null;
   reimbursement_planned_payment_id: string | null;
   reimbursed_at: string | null;
   item_count: number;
@@ -246,7 +251,22 @@ export const tripExpenseService = {
   async submit(reportId: string): Promise<TripExpenseReport> {
     const { data, error } = await supabase.rpc('trip_expense_submit', { p_report_id: reportId });
     if (error) throw error;
-    return data as TripExpenseReport;
+    const report = data as TripExpenseReport;
+    // Notify finance reviewers that a card is waiting for review (via Flows).
+    try {
+      const { data: reviewers } = await supabase
+        .from('workspace_members').select('user_id')
+        .eq('workspace_id', report.workspace_id).in('role', ['owner', 'admin']);
+      flowEventService.emit('expense_card_submitted', {
+        card_id: report.id,
+        reviewer_ids: (reviewers || []).map((m: any) => m.user_id),
+        type: 'expense_card_submitted',
+        title: `Expense card submitted: ${report.title}`,
+        body: `An expense card (${EXPENSE_CARD_TYPE_LABEL[report.card_type] ?? report.card_type}) totalling ${formatMoney(Number(report.total_amount), report.currency)} is waiting for your review.`,
+        action_url: '/finance?tab=trip_cards',
+      });
+    } catch { /* fire-and-forget */ }
+    return report;
   },
 
   async reviewItem(itemId: string, decision: ExpenseApproval, note?: string): Promise<TripExpenseReport> {
@@ -254,7 +274,51 @@ export const tripExpenseService = {
       p_item_id: itemId, p_decision: decision, p_note: note ?? null,
     });
     if (error) throw error;
-    return data as TripExpenseReport;
+    const report = data as TripExpenseReport;
+    // Once every line is decided (no pending left), tell the rep the outcome.
+    if (Number(report.pending_amount) === 0 && ['approved', 'partially_approved', 'rejected'].includes(report.status)) {
+      try {
+        const outcome = report.status === 'approved' ? 'approved'
+          : report.status === 'rejected' ? 'rejected' : 'partially approved';
+        flowEventService.emit('expense_card_reviewed', {
+          card_id: report.id,
+          user_id: report.user_id,
+          status: report.status,
+          type: 'expense_card_reviewed',
+          title: `Expense card ${outcome}: ${report.title}`,
+          body: `Finance reviewed your expense card. Approved: ${formatMoney(Number(report.approved_amount), report.currency)}, rejected: ${formatMoney(Number(report.rejected_amount), report.currency)}.`,
+          action_url: '/trip-expenses',
+        });
+      } catch { /* fire-and-forget */ }
+    }
+    return report;
+  },
+
+  /** Finance requests/assigns a new card to a team member, who is notified to fill it. */
+  async requestCard(input: { workspaceId: string; userId: string; cardType?: ExpenseCardType; title: string; note?: string }): Promise<TripExpenseReport> {
+    const { data, error } = await supabase.rpc('trip_expense_request_card', {
+      p_workspace_id: input.workspaceId, p_user_id: input.userId,
+      p_card_type: input.cardType ?? 'trip', p_title: input.title, p_note: input.note ?? null,
+    });
+    if (error) throw error;
+    const report = data as TripExpenseReport;
+    try {
+      flowEventService.emit('expense_card_requested', {
+        card_id: report.id,
+        user_id: report.user_id,
+        type: 'expense_card_requested',
+        title: `Please fill an expense card: ${report.title}`,
+        body: input.note ? `Finance asked you to complete an expense card. Note: ${input.note}` : 'Finance asked you to complete an expense card. Add your expenses and submit when ready.',
+        action_url: '/trip-expenses',
+      });
+    } catch { /* fire-and-forget */ }
+    return report;
+  },
+
+  async listAssignees(workspaceId: string): Promise<{ user_id: string; name: string; email: string | null }[]> {
+    const { data, error } = await supabase.rpc('list_workspace_expense_assignees', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as { user_id: string; name: string; email: string | null }[];
   },
 
   // -------- Receipts + PDF (edge function, service-role) --------

@@ -172,6 +172,17 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Surplus Match', description: 'A new surplus listing matched a buyer\'s saved alert', icon: 'Package', color: 'emerald',
     defaultData: { label: 'Surplus Match', category: 'trigger', triggerType: 'marketplace_want_match', config: {} } as TriggerNodeData },
 
+  // Expense cards (trip / monthly / …)
+  { type: 'triggerNode', category: 'trigger', subType: 'expense_card_submitted', group: 'Finance',
+    label: 'Expense Card Submitted', description: 'A team member submitted an expense card for review', icon: 'ClipboardCheck', color: 'blue',
+    defaultData: { label: 'Expense Card Submitted', category: 'trigger', triggerType: 'expense_card_submitted', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'expense_card_reviewed', group: 'Finance',
+    label: 'Expense Card Reviewed', description: 'Finance finished reviewing an expense card', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'Expense Card Reviewed', category: 'trigger', triggerType: 'expense_card_reviewed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'expense_card_requested', group: 'Finance',
+    label: 'Expense Card Requested', description: 'Finance asked a team member to fill an expense card', icon: 'FileText', color: 'blue',
+    defaultData: { label: 'Expense Card Requested', category: 'trigger', triggerType: 'expense_card_requested', config: {} } as TriggerNodeData },
+
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC
   // ════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin,
+  Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin, UserPlus,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -39,6 +39,7 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
   const [uid, setUid] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
 
   useEffect(() => { void supabase.auth.getUser().then(({ data }) => setUid(data?.user?.id ?? null)); }, []);
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId, canReview]);
@@ -67,7 +68,12 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
               : 'Track your expenses by card — a sales trip, a month of expenses, anything — attach receipts, and submit to finance for approval.'}
           </p>
         </div>
-        <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New card</Button>
+        <div className="flex items-center gap-2">
+          {canReview && (
+            <Button variant="outline" onClick={() => setRequestOpen(true)}><UserPlus className="h-4 w-4 mr-1" /> Request from teammate</Button>
+          )}
+          <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New card</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
@@ -130,6 +136,15 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
         onOpenChange={setNewOpen}
         onCreated={(id) => { setNewOpen(false); setSelectedId(id); void load(); }}
       />
+
+      {canReview && (
+        <RequestCardDialog
+          workspaceId={workspaceId}
+          open={requestOpen}
+          onOpenChange={setRequestOpen}
+          onRequested={(id) => { setRequestOpen(false); setSelectedId(id); void load(); }}
+        />
+      )}
     </div>
   );
 };
@@ -276,6 +291,11 @@ const TripCardDetail: React.FC<{
           <Totals label="Rejected" value={report.rejected_amount} currency={report.currency} tone="red" />
           <Totals label="Pending" value={report.pending_amount} currency={report.currency} tone="amber" />
         </div>
+        {report.assigned_by && report.request_note && (
+          <div className="text-[11px] text-muted-foreground rounded-md border border-border/50 px-2 py-1.5">
+            <span className="font-medium text-foreground">Requested by finance:</span> {report.request_note}
+          </div>
+        )}
         {report.reimbursed_at && (
           <div className="text-[11px] text-emerald-500">Reimbursed on {new Date(report.reimbursed_at).toLocaleDateString()}.</div>
         )}
@@ -442,6 +462,91 @@ const NewTripCardDialog: React.FC<{
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const RequestCardDialog: React.FC<{
+  workspaceId: string;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onRequested: (id: string) => void;
+}> = ({ workspaceId, open, onOpenChange, onRequested }) => {
+  const { toast } = useToast();
+  const [assignees, setAssignees] = useState<{ user_id: string; name: string; email: string | null }[]>([]);
+  const [loadingPeople, setLoadingPeople] = useState(false);
+  const [userId, setUserId] = useState('');
+  const [cardType, setCardType] = useState<ExpenseCardType>('trip');
+  const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      try {
+        setLoadingPeople(true);
+        setAssignees(await tripExpenseService.listAssignees(workspaceId));
+      } catch (err: any) {
+        toast({ title: 'Could not load team members', description: err?.message, variant: 'destructive' });
+      } finally { setLoadingPeople(false); }
+    })();
+  }, [open, workspaceId, toast]);
+
+  const save = async () => {
+    if (!userId) { toast({ title: 'Pick a team member', variant: 'destructive' }); return; }
+    if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
+    try {
+      setSaving(true);
+      const r = await tripExpenseService.requestCard({ workspaceId, userId, cardType, title: title.trim(), note: note.trim() || undefined });
+      setUserId(''); setTitle(''); setNote(''); setCardType('trip');
+      onRequested(r.id);
+      toast({ title: 'Card requested', description: 'The team member has been notified to fill it in.' });
+    } catch (err: any) {
+      toast({ title: 'Could not request card', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Request an expense card</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">Create a card for a team member to fill in — they’ll get a notification with a link to add their expenses and submit.</p>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Team member</label>
+            <Select value={userId} onValueChange={setUserId} disabled={loadingPeople}>
+              <SelectTrigger><SelectValue placeholder={loadingPeople ? 'Loading…' : 'Select a team member'} /></SelectTrigger>
+              <SelectContent>
+                {assignees.map((a) => <SelectItem key={a.user_id} value={a.user_id}>{a.name}{a.email ? ` · ${a.email}` : ''}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Type</label>
+              <Select value={cardType} onValueChange={(v: any) => setCardType(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CARD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Title / category</label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Q3 client tour" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Note to the team member (optional)</label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What this card is for / what to include" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Request'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

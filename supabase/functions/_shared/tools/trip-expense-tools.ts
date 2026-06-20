@@ -159,6 +159,20 @@ export const createSubmitTripCardTool = (userId: string, workspaceId: string, on
         .update({ status: 'submitted', submitted_at: new Date().toISOString() })
         .eq('id', card.id).eq('user_id', userId).eq('status', 'draft');
       if (error) throw error;
+      // Notify finance reviewers (via Flows), mirroring the web submit path.
+      try {
+        const { emitFlowEvent } = await import('../flow-events.ts');
+        const { data: reviewers } = await svc().from('workspace_members').select('user_id')
+          .eq('workspace_id', workspaceId).in('role', ['owner', 'admin']);
+        await emitFlowEvent('expense_card_submitted', {
+          card_id: card.id,
+          reviewer_ids: (reviewers || []).map((m: any) => m.user_id),
+          type: 'expense_card_submitted',
+          title: `Expense card submitted: ${card.title}`,
+          body: 'An expense card is waiting for your review.',
+          action_url: '/finance?tab=trip_cards',
+        });
+      } catch (_) { /* fire-and-forget */ }
       onChunk?.({ type: 'trip_card_submitted', data: { card_id: card.id } });
       return JSON.stringify({ success: true, card_id: card.id, status: 'submitted', message: `"${card.title}" submitted to finance for approval.` });
     } catch (e: any) {
