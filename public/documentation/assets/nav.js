@@ -33,7 +33,13 @@
         { file: "crm-categories.html", title: "Categories" },
       ]},
       { file: "finance.html", title: "Finance & Invoicing", icon: "💶", children: [
-        { file: "finance-receivables-payables.html", title: "Receivables & Payables" },
+        { file: "finance-receivables-payables.html", title: "Receivables & Payables", children: [
+          { file: "finance-rp-receivables.html", title: "Receivables" },
+          { file: "finance-rp-payables.html", title: "Payables" },
+          { file: "finance-rp-payments.html", title: "Payments" },
+          { file: "finance-rp-cheques.html", title: "Cheques" },
+          { file: "finance-rp-followups.html", title: "Follow-ups" },
+        ]},
         { file: "finance-documents.html", title: "Documents", children: [
           { file: "finance-doc-invoices.html", title: "Invoices" },
           { file: "finance-doc-receipts.html", title: "Receipts" },
@@ -42,7 +48,15 @@
           { file: "finance-doc-delivery-notes.html", title: "Delivery notes" },
         ]},
         { file: "finance-einvoicing.html", title: "Greek e-invoicing" },
-        { file: "finance-operations.html", title: "Operations & Reports" },
+        { file: "finance-operations.html", title: "Operations & Reports", children: [
+          { file: "finance-op-dispatch.html", title: "Dispatch board" },
+          { file: "finance-op-warehouse.html", title: "Warehouse" },
+          { file: "finance-op-customers-suppliers.html", title: "Customers & Suppliers" },
+          { file: "finance-op-planning.html", title: "Planning" },
+          { file: "finance-op-time-billing.html", title: "Time & billing" },
+          { file: "finance-op-reports.html", title: "Reports" },
+          { file: "finance-op-marketplace.html", title: "Marketplace" },
+        ]},
         { file: "finance-settings.html", title: "Settings", children: [
           { file: "finance-settings-general.html", title: "General" },
           { file: "finance-settings-business-identity.html", title: "Business Identity" },

@@ -11,165 +11,18 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / Receivables &amp; Payables</div>
   <h1>Receivables &amp; Payables</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">This is the "who owes what" side of Finance. Five tabs — <strong>Receivables</strong>, <strong>Payables</strong>, <strong>Follow-ups</strong>, <strong>Payments</strong> and <strong>Cheques</strong> — let you track money owed <em>to</em> you, money <em>you</em> owe, chase the overdue ones, and record every settlement as it happens. This guide walks each tab: what it is, why it matters, exactly how to work it day to day, and what it changes elsewhere on the platform.</p>
+  <p class="lead">This is the money-in / money-out side of Finance: what customers owe you, what you owe suppliers, the cash you record against them, and the queue of what to chase. Each tab is its own detailed page below.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → the <strong>Receivables</strong>, <strong>Payables</strong>, <strong>Follow-ups</strong>, <strong>Payments</strong> or <strong>Cheques</strong> tab.</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → the <strong>Receivables</strong>, <strong>Payables</strong>, <strong>Payments</strong>, <strong>Cheques</strong> or <strong>Follow-ups</strong> tab.</p></div>
 
-  <div class="callout tip"><p><strong>How the five tabs fit together:</strong> <strong>Receivables</strong> and <strong>Payables</strong> are the two ledgers (in vs. out). <strong>Follow-ups</strong> is your chase queue for quotes that haven't converted yet. <strong>Payments</strong> is where you record money actually moving — and recording one here is what reduces a Receivable's or Payable's outstanding balance. <strong>Cheques</strong> tracks post-dated/received cheques so settlement-by-cheque shows up in your balances too. Everything here rolls up into the <a href="finance.html">Dashboard</a> totals.</p></div>
-
-  <!-- Receivables -->
-  <h2>Receivables</h2>
-  <p><strong>What it is —</strong> the list of everything customers owe you: open invoices <em>plus</em> un-invoiced receivables (deposits, advances, fees). The tab label carries a live count so you can see at a glance how many items are outstanding. Each row tells you the customer, the originating document, the amount, and how overdue it is. <strong>Why it matters —</strong> this is your accounts-receivable ledger; it's the single place to see who hasn't paid and decide who to chase first.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-receivables.png" alt="Finance Receivables tab"><figcaption>The Receivables tab — outstanding amounts owed to you, with search and age-bucket filters.</figcaption></figure>
-  <p>The toolbar gives you <strong>Add receivable</strong>, <strong>New invoice</strong>, an <strong>All categories</strong> filter, and a search box ("Search customer / number…"). Above the list sit five <strong>aging buckets</strong>, each showing a € total and an invoice count: <strong>Current</strong>, <strong>0–30 days</strong>, <strong>31–60 days</strong>, <strong>61–90 days</strong> and <strong>90+ days</strong> — the further right, the more overdue.</p>
-  <h3>How to chase an overdue invoice using the aging buckets</h3>
-  <ol>
-    <li>Look at the buckets from the right: start with <strong>90+ days</strong>, then <strong>61–90</strong>, then <strong>31–60</strong> — oldest debt is the most at-risk, so it gets called first.</li>
-    <li>Click a bucket to focus the list on just those rows.</li>
-    <li>Use the <strong>search box</strong> to jump to a specific customer or document number, and the <strong>All categories</strong> filter to narrow to one income category if you only want to chase, say, a particular project's fees.</li>
-    <li>Open a row to view the source document and act on it — record a payment if it's been settled, or note a follow-up.</li>
-    <li>When the customer pays, record it under <a href="#payments">Payments</a> so the row's <em>Due</em> drops and it falls out of the overdue bucket.</li>
-  </ol>
-  <h3>How to add a receivable</h3>
-  <ol>
-    <li>For amounts that aren't on a formal invoice yet (a deposit, an advance, a fee), click <strong>Add receivable</strong>, fill in the customer, amount, category and due date.</li>
-    <li>To raise a brand-new invoice from here, use <strong>New invoice</strong> on the toolbar.</li>
-  </ol>
-  <div class="callout"><p>To invoice an <strong>accepted quote</strong>, use <strong>Issue invoice</strong> on the quote page — that's what creates the invoice that then appears here. The Receivables tab is where it lands, not where you raise it from a quote.</p></div>
-  <p><strong>How to read each row</strong> — the columns are your working data for every outstanding item:</p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Column</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td>Number</td><td>Document / receivable number.</td></tr>
-        <tr><td>Customer</td><td>The party that owes you.</td></tr>
-        <tr><td>Category</td><td>Income/receivable category.</td></tr>
-        <tr><td>Bucket</td><td>Aging bucket (Current, 0–30, 31–60, 61–90, 90+).</td></tr>
-        <tr><td>Total</td><td>Total amount of the receivable.</td></tr>
-        <tr><td>Paid</td><td>Amount paid so far.</td></tr>
-        <tr><td>Due</td><td>Amount still outstanding.</td></tr>
-        <tr><td>Due date</td><td>When payment is due.</td></tr>
-        <tr><td>Days overdue</td><td>How many days past the due date.</td></tr>
-      </tbody>
-    </table>
+  <h2>The tabs</h2>
+  <div class="cards">
+    <a class="card" href="finance-rp-receivables.html"><div class="ico">📈</div><h3>Receivables</h3><p>What customers owe — aging buckets, columns, add receivable / new invoice.</p></a>
+    <a class="card" href="finance-rp-payables.html"><div class="ico">📉</div><h3>Payables</h3><p>What you owe suppliers — aging buckets, add payable, supplier bill / credit note.</p></a>
+    <a class="card" href="finance-rp-payments.html"><div class="ico">💶</div><h3>Payments</h3><p>Record money received and paid, and how it allocates to documents.</p></a>
+    <a class="card" href="finance-rp-cheques.html"><div class="ico">🧾</div><h3>Cheques</h3><p>Track post-dated and received cheques through their lifecycle.</p></a>
+    <a class="card" href="finance-rp-followups.html"><div class="ico">🔔</div><h3>Follow-ups</h3><p>The action queue — quotes/documents that need chasing.</p></a>
   </div>
-  <p><strong>What it affects elsewhere:</strong> the receivables total on the <a href="finance.html">Dashboard</a> is the sum of the <em>Due</em> column here; recording a payment against a row updates both its balance and that total.</p>
-
-  <!-- Payables -->
-  <h2>Payables</h2>
-  <p><strong>What it is —</strong> the mirror image of Receivables for money <em>you</em> owe: open supplier bills <em>plus</em> un-invoiced payables (rent, utilities, advances). <strong>Why it matters —</strong> seeing your outgoings by age lets you plan cash, pay on time, and avoid late-payment problems with suppliers.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-payables.png" alt="Finance Payables tab"><figcaption>The Payables tab — amounts you owe suppliers.</figcaption></figure>
-  <p>The toolbar gives you <strong>Add payable</strong>, <strong>Supplier credit note</strong>, <strong>New supplier bill</strong>, an <strong>All categories</strong> filter, and a search box ("Search supplier / bill #…"). The same five <strong>aging buckets</strong> appear (each with a € total and a bill count): <strong>Current</strong>, <strong>0–30 days</strong>, <strong>31–60 days</strong>, <strong>61–90 days</strong>, <strong>90+ days</strong>.</p>
-  <h3>How to add a supplier bill</h3>
-  <ol>
-    <li>Click <strong>New supplier bill</strong> for a formal supplier invoice, or <strong>Add payable</strong> for an un-invoiced cost like rent or utilities.</li>
-    <li>Pick the <strong>supplier</strong>, the expense <strong>category</strong>, enter the <strong>amount</strong> and the <strong>due date</strong>.</li>
-    <li>If a supplier has issued you a credit, use <strong>Supplier credit note</strong> instead so it offsets what you owe.</li>
-    <li>When you pay it, record the outgoing under <a href="#payments">Payments</a> — the row's <em>Due</em> reduces and it moves toward <em>Current</em>/cleared.</li>
-  </ol>
-  <div class="callout"><p>Suppliers must be marked <strong>is_supplier</strong> in CRM before they appear here — see <a href="crm.html">CRM</a>. If a supplier isn't showing in the picker, that flag is usually why.</p></div>
-  <p><strong>How to read each row</strong> — work the buckets exactly as on Receivables, but to prioritise <em>what to pay next</em> rather than who to chase:</p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Column</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td>Bill #</td><td>Supplier bill / payable number.</td></tr>
-        <tr><td>Supplier</td><td>The party you owe.</td></tr>
-        <tr><td>Category</td><td>Expense/payable category.</td></tr>
-        <tr><td>Bucket</td><td>Aging bucket (Current, 0–30, 31–60, 61–90, 90+).</td></tr>
-        <tr><td>Total</td><td>Total amount of the bill.</td></tr>
-        <tr><td>Paid</td><td>Amount paid so far.</td></tr>
-        <tr><td>Due</td><td>Amount still outstanding.</td></tr>
-        <tr><td>Due date</td><td>When payment is due.</td></tr>
-        <tr><td>Days overdue</td><td>How many days past the due date.</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <p><strong>What it affects elsewhere:</strong> the payables total on the <a href="finance.html">Dashboard</a> is the sum of the <em>Due</em> column here; supplier credit notes and recorded payments both reduce it.</p>
-
-  <!-- Payments -->
-  <h2 id="payments">Payments</h2>
-  <p><strong>What it is —</strong> the running record of money received and money paid. <strong>Why it matters —</strong> a payment recorded against a receivable or payable is what updates that document's outstanding balance and feeds the Dashboard totals — it's the link between "we agreed they owe X" and "X has actually arrived." Each payment ties back to the customer/supplier and the related document.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-payments.png" alt="Finance Payments tab"><figcaption>The Payments tab — money received and paid.</figcaption></figure>
-  <p>The toolbar has <strong>Record payment</strong> and an <strong>All categories</strong> filter, plus a search box ("Search reference / counterparty…").</p>
-  <h3>How to record a payment</h3>
-  <ol>
-    <li>Click <strong>Record payment</strong>.</li>
-    <li>Set the <strong>Direction</strong> — <em>in</em> when a customer pays you, <em>out</em> when you pay a supplier.</li>
-    <li>Choose the <strong>Method</strong> (how the money moved), the <strong>Category</strong>, and enter a <strong>Reference</strong> and the <strong>Amount</strong>.</li>
-    <li>Allocate the amount to the document(s) it settles — the <strong>Allocated</strong> figure shows how much of the payment has been tied to documents, so a single payment can clear part or all of a receivable/payable.</li>
-    <li>Save. The matched Receivable/Payable's <em>Paid</em> goes up and its <em>Due</em> goes down automatically.</li>
-  </ol>
-  <p><strong>How to read each row</strong> — the list is your settlement history; search by reference or counterparty to find a specific transaction:</p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Column</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td>Date</td><td>Date the payment was made/received.</td></tr>
-        <tr><td>Direction</td><td>in / out.</td></tr>
-        <tr><td>Method</td><td>Payment method.</td></tr>
-        <tr><td>Category</td><td>Payment category.</td></tr>
-        <tr><td>Reference</td><td>Payment reference.</td></tr>
-        <tr><td>Amount</td><td>Payment amount.</td></tr>
-        <tr><td>Allocated</td><td>Amount allocated to documents.</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <p><strong>What it affects elsewhere:</strong> every recorded payment shifts the <em>Paid</em>/<em>Due</em> figures on the linked Receivable or Payable and updates the cash totals on the <a href="finance.html">Dashboard</a>.</p>
-
-  <!-- Cheques -->
-  <h2>Cheques</h2>
-  <p><strong>What it is —</strong> a tracker for post-dated and received cheques as they move through their lifecycle. <strong>Why it matters —</strong> cheques settle later than they're handed over, so tracking them here means cheque-based settlements are reflected in your balances alongside other payments instead of being forgotten until they clear.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-cheques.png" alt="Finance Cheques tab"><figcaption>The Cheques tab — post-dated and received cheques.</figcaption></figure>
-  <h3>How to log a cheque</h3>
-  <ol>
-    <li>Click <strong>New</strong> on the toolbar.</li>
-    <li>Set the <strong>Direction</strong> (<em>in</em> for a cheque you received, <em>out</em> for one you issued), the <strong>Cheque no.</strong>, the issuing <strong>Bank</strong>, the <strong>Due</strong> date and the <strong>Amount</strong>.</li>
-    <li>Track its <strong>Status</strong> through the lifecycle as it progresses (e.g. held, then deposited/cleared).</li>
-  </ol>
-  <p><strong>How to read each row:</strong></p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Column</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td>Direction</td><td>in / out cheque.</td></tr>
-        <tr><td>Cheque no.</td><td>Cheque number.</td></tr>
-        <tr><td>Bank</td><td>Issuing bank.</td></tr>
-        <tr><td>Due</td><td>Cheque due date.</td></tr>
-        <tr><td>Amount</td><td>Cheque amount.</td></tr>
-        <tr><td>Status</td><td>Lifecycle status.</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <p><strong>What it affects elsewhere:</strong> cheque settlements join your other payments in the balances, so post-dated money isn't invisible until the cheque date arrives.</p>
-
-  <!-- Follow-ups -->
-  <h2>Follow-ups</h2>
-  <p><strong>What it is —</strong> your action queue of quotes that need following up — the quotes that haven't yet converted into accepted business. <strong>Why it matters —</strong> a quote sitting idle is potential revenue going cold; this tab is how you keep cash flow healthy <em>before</em> anything becomes a receivable. The tab shows a count so you always know how much is outstanding.</p>
-  <h3>How to work the queue</h3>
-  <ol>
-    <li>Use the <strong>Open</strong> filter to show the quotes that still need attention.</li>
-    <li>Sort your attention by <strong>Days idle</strong> — the longer since the last activity, the more urgent the nudge.</li>
-    <li>Check <strong>Next scheduled</strong> to see when the follow-up is due, and act on the quote (call, re-send, revise).</li>
-  </ol>
-  <p><strong>How to read each row:</strong></p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Column</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td>Quote</td><td>The quote needing follow-up.</td></tr>
-        <tr><td>Status</td><td>Current quote status.</td></tr>
-        <tr><td>Value</td><td>Quote value.</td></tr>
-        <tr><td>Days idle</td><td>Days since the last activity.</td></tr>
-        <tr><td>Next scheduled</td><td>Next scheduled follow-up.</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <p><strong>What it affects elsewhere:</strong> once a quote is accepted and you <strong>Issue invoice</strong> on the quote page, it leaves this queue and becomes a row in <a href="#payables">Receivables</a> above.</p>
-
-  <div class="callout tip"><p><strong>Tip — a weekly rhythm:</strong> use the age-bucket filter on Receivables to build your collections call list (oldest first), work the Follow-ups queue by <em>Days idle</em> to keep new quotes warm, then record each settlement under Payments so the Dashboard and the aging buckets stay accurate.</p></div>
-
-  <div class="callout"><p>These tabs read from the same data as the <a href="finance.html">Dashboard</a> — the receivables/payables totals you see on the overview are the sum of these lists.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

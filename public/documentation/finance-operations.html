@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Finance Operations & Reports | MaterialsHub Documentation</title>
+<title>Operations & Reports | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -11,124 +11,20 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / Operations &amp; Reports</div>
   <h1>Operations &amp; Reports</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">Once your invoices and expenses are flowing, this is the side of Finance that helps you <em>run</em> the business day-to-day: getting goods out the door, keeping stock honest, seeing who owes whom, planning the cash that hasn't moved yet, billing your time, and reporting it all to your accountant. This guide teaches each area the same way — what it is, why it matters and who needs it, exactly how to use it step by step, and what it changes elsewhere.</p>
+  <p class="lead">Once invoices and expenses are flowing, this is the side of Finance that helps you <em>run</em> the business: getting goods out, keeping stock honest, seeing who owes whom, planning cash that hasn't moved yet, billing time, and reporting it all. Each area is its own detailed page below.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → the <strong>Dispatch board</strong>, <strong>Warehouse</strong>, <strong>Customers &amp; Suppliers</strong>, <strong>Planning</strong>, <strong>Time &amp; billing</strong>, <strong>Reports</strong>, <strong>Marketplace</strong> or <strong>Settings</strong> tab.</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Finance</strong> → the <strong>Dispatch board</strong>, <strong>Warehouse</strong>, <strong>Customers &amp; Suppliers</strong>, <strong>Planning</strong>, <strong>Time &amp; billing</strong>, <strong>Reports</strong> or <strong>Marketplace</strong> tab. (Settings has its own <a href="finance-settings.html">12-section guide</a>.)</p></div>
 
-  <div class="callout tip"><p>Several of these tabs shine for <strong>product / stock-based businesses</strong>. If a tab looks empty, it isn't broken — it just means there's no data of that type yet. Start by creating documents (Dispatch, Reports) or stock entries (Warehouse), and the tabs fill themselves in.</p></div>
-
-  <!-- 1 -->
-  <h2>Dispatch board</h2>
-  <p><strong>What it is —</strong> a board view for managing the goods leaving your business, tracking each order or delivery through its stages in one place. <strong>Why it matters / who needs it —</strong> anyone shipping physical materials needs a single screen that answers "what's going out, and where is it in the process?" The board sits between the paperwork (<strong>Delivery notes</strong>) and the physical stock (<strong>Warehouse</strong>), so dispatch staff and owners aren't chasing that picture across three tools.</p>
-  <h3>How to use it</h3>
-  <ol>
-    <li>Open <strong>Finance → Dispatch board</strong> to see every outgoing item laid out as a board.</li>
-    <li>Move items along as they progress through their stages.</li>
-    <li>For something that isn't tied to a formal document, click <strong>Add manual note</strong> and drop a note straight onto the board.</li>
-  </ol>
-  <p><strong>What it affects elsewhere:</strong> it works hand-in-hand with <strong>Delivery notes</strong> (under <a href="finance-documents.html">Documents</a>) and the <strong>Warehouse</strong> stock side — dispatching goods is the natural counterpart to drawing them down from stock.</p>
-  <div class="callout tip"><p>Use manual notes sparingly, for genuinely document-less movements. If goods are leaving against a sale, raise a Delivery note instead so the dispatch is traceable end-to-end.</p></div>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-dispatch.png" alt="Dispatch board"><figcaption>The Dispatch board.</figcaption></figure>
-
-  <!-- 2 -->
-  <h2>Warehouse</h2>
-  <p><strong>What it is —</strong> the stock side of the business: the inventory that backs your products and links into delivery and dispatch. <strong>Why it matters / who needs it —</strong> if you sell and ship physical materials, on-hand quantities have to match reality or you'll oversell, miss reorders, or ship what you don't have. The Warehouse keeps those quantities and movements aligned with what you sell.</p>
-  <h3>How to receive stock into the Warehouse</h3>
-  <ol>
-    <li>Open <strong>Finance → Warehouse</strong>.</li>
-    <li>Use the <strong>Warehouse selector</strong> to choose where the stock lives — switch between <strong>Main (default)</strong> and <strong>Warehouse</strong>.</li>
-    <li>Click <strong>Add item</strong> to register a new stock item.</li>
-    <li>Fill in the item's details (see the columns below) — its name, SKU, where it sits, and the quantity you have on hand.</li>
-    <li>Set the <strong>Reorder</strong> threshold so the item flags itself when stock runs low.</li>
-  </ol>
-  <h3>What the columns mean</h3>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
-      <tbody>
-        <tr><td>Item</td><td>The stock item name.</td></tr>
-        <tr><td>SKU</td><td>Stock-keeping unit / code.</td></tr>
-        <tr><td>Location</td><td>Where it sits in the warehouse.</td></tr>
-        <tr><td>On hand</td><td>Quantity physically in stock.</td></tr>
-        <tr><td>Reserved</td><td>Quantity already committed/allocated.</td></tr>
-        <tr><td>Reorder</td><td>Reorder threshold for the item.</td></tr>
-      </tbody>
-    </table>
+  <h2>The areas</h2>
+  <div class="cards">
+    <a class="card" href="finance-op-dispatch.html"><div class="ico">🚚</div><h3>Dispatch board</h3><p>Manage goods going out, stage by stage.</p></a>
+    <a class="card" href="finance-op-warehouse.html"><div class="ico">📦</div><h3>Warehouse</h3><p>Stock: on-hand, reserved, reorder; receive items.</p></a>
+    <a class="card" href="finance-op-customers-suppliers.html"><div class="ico">🤝</div><h3>Customers &amp; Suppliers</h3><p>Every party with finance activity; email statements.</p></a>
+    <a class="card" href="finance-op-planning.html"><div class="ico">📅</div><h3>Planning</h3><p>Scheduled future payments &amp; expected receipts.</p></a>
+    <a class="card" href="finance-op-time-billing.html"><div class="ico">⏱️</div><h3>Time &amp; billing</h3><p>Log billable time and turn it into charges.</p></a>
+    <a class="card" href="finance-op-reports.html"><div class="ico">📊</div><h3>Reports</h3><p>Sales/purchases journals, VAT summary, CSV export.</p></a>
+    <a class="card" href="finance-op-marketplace.html"><div class="ico">🏪</div><h3>Marketplace</h3><p>Surplus/last-stock marketplace inside Finance.</p></a>
   </div>
-  <p><strong>What it affects elsewhere:</strong> stock here backs your products and links into the delivery/dispatch flow — what you have <em>On hand</em> versus <em>Reserved</em> is what dispatch and delivery draw against. Keeping it current is what makes the Dispatch board trustworthy.</p>
-  <div class="callout tip"><p><em>On hand</em> minus <em>Reserved</em> is what you can actually still promise to a customer — watch the gap, not just the headline quantity.</p></div>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-warehouse.png" alt="Warehouse"><figcaption>The Warehouse tab.</figcaption></figure>
-
-  <!-- 3 -->
-  <h2>Customers &amp; Suppliers</h2>
-  <p><strong>What it is —</strong> a consolidated view of the parties on your documents, focused on the <em>financial</em> relationship: who you invoice and who you pay. <strong>Why it matters / who needs it —</strong> the <a href="crm.html">CRM</a> holds the relationship; this tab is where those same parties surface <em>inside Finance</em> so you can see balances and chase money. It's the screen for whoever runs collections — one list showing what every customer owes and what you owe every supplier.</p>
-  <h3>How to email a customer statement</h3>
-  <ol>
-    <li>Open <strong>Finance → Customers &amp; Suppliers</strong> — every CRM party with finance activity appears in one list.</li>
-    <li>Narrow the list with the <strong>filters</strong> (<em>All</em> customers/suppliers, and <em>All segments</em>) or <strong>search</strong> by <em>Name or email</em>.</li>
-    <li><strong>Click a row</strong> to open the full breakdown for that party.</li>
-    <li>From there, <strong>email a statement</strong> — the running total of what they owe.</li>
-  </ol>
-  <p>At the top, two <strong>stats</strong> keep the big picture in view: <em>Total customers owe</em> (€) and <em>We owe suppliers</em> (€).</p>
-  <p><strong>What it affects elsewhere:</strong> the statement that gets emailed is branded by the <strong>Statement PDF</strong> settings (cover/footer images). This tab complements the <a href="crm.html">CRM</a> rather than replacing it — the party records live there; their money side lives here.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-customers-suppliers.png" alt="Customers and Suppliers"><figcaption>The Customers &amp; Suppliers tab.</figcaption></figure>
-
-  <!-- 4 -->
-  <h2>Planning</h2>
-  <p><strong>What it is —</strong> the forward-looking view of money that hasn't moved yet: scheduled future payments and expected receipts. <strong>Why it matters / who needs it —</strong> invoices and expenses tell you what already happened; Planning tells you what's <em>about</em> to, so the numbers aren't only backward-looking. Anyone managing cash flow needs this to avoid being surprised by an outflow.</p>
-  <h3>How to schedule a planned payment</h3>
-  <ol>
-    <li>Open <strong>Finance → Planning</strong> — scheduled future payments and expected receipts sit in one forward view.</li>
-    <li>Click <strong>Add planned payment</strong> to schedule an upcoming outflow.</li>
-    <li>Use the <strong>filter</strong> (<em>Upcoming (open)</em>) to focus on what's still ahead of you.</li>
-    <li>When a planned item is actually settled, <strong>mark it Paid</strong> — this creates a real Payment record plus its allocation, so the plan turns into actual accounting.</li>
-  </ol>
-  <p>Three <strong>stats</strong> summarise the outlook: <em>Expected in</em> (€), <em>Planned out</em> (€), and <em>Net planned</em> (€).</p>
-  <p><strong>What it affects elsewhere:</strong> marking a planned item Paid promotes it into a genuine Payment + allocation — so planning data flows through into your real cash position once it's confirmed.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-planning.png" alt="Planning"><figcaption>The Planning tab.</figcaption></figure>
-
-  <!-- 5 -->
-  <h2>Time &amp; billing</h2>
-  <p><strong>What it is —</strong> a way to track billable time and turn it into invoices. <strong>Why it matters / who needs it —</strong> materials businesses often deliver service work alongside the goods — "On-site measurement &amp; consultation", installation, advice. That time is revenue too, and it slips through the cracks unless it's logged and billed. This tab is for anyone delivering chargeable hours.</p>
-  <h3>How to use it</h3>
-  <ol>
-    <li>Open <strong>Finance → Time &amp; billing</strong>.</li>
-    <li>Click <strong>Log time</strong> to record a billable time entry.</li>
-    <li>Review entries with the <strong>views</strong> — <em>By user</em> or <em>By contact</em> — and <strong>search</strong> by customer.</li>
-    <li>When you're ready to charge, <strong>convert unbilled time to invoices</strong> — logged time becomes a Finance invoice.</li>
-  </ol>
-  <p><strong>What it affects elsewhere:</strong> converting time produces a real <a href="finance-documents.html">Finance invoice</a>, so billable hours land in the same place as the rest of your revenue.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-time-billing.png" alt="Time and billing"><figcaption>The Time &amp; billing tab.</figcaption></figure>
-
-  <!-- 6 -->
-  <h2>Reports</h2>
-  <p><strong>What it is —</strong> financial summaries and exports across your data. <strong>Why it matters / who needs it —</strong> this is the bridge to your accountant. The journals and the VAT summary are the standard views an accountant expects, and the CSV export hands them the raw numbers without you re-keying anything. Owners use the same reports for their own analysis.</p>
-  <h3>How to run a VAT summary and export CSV</h3>
-  <ol>
-    <li>Open <strong>Finance → Reports</strong>.</li>
-    <li>Choose the report type: <strong>VAT summary</strong> (the other types are <em>Sales journal</em>, <em>Purchases journal</em> and <em>Sales per day</em>).</li>
-    <li>Set the <strong>period</strong> with the selector — <em>This month</em>, <em>Last month</em>, or a custom range.</li>
-    <li>Read the on-screen summary, then click <strong>Export CSV</strong> to download it for your accountant or spreadsheet.</li>
-  </ol>
-  <p><strong>What it affects elsewhere:</strong> the breakdowns here lean on your <strong>Categories</strong> (income/expense buckets) — set those up in Settings so revenue and cost aren't reported as one undifferentiated lump.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-reports.png" alt="Reports"><figcaption>The Reports tab.</figcaption></figure>
-
-  <!-- 7 -->
-  <h2>Marketplace</h2>
-  <p><strong>What it is —</strong> the link between Finance and the platform's surplus / last-stock <a href="discover.html">marketplace</a>. <strong>Why it matters / who needs it —</strong> if you move surplus or last-stock through the marketplace, that activity is part of your financial picture too — this tab surfaces it alongside your other figures instead of leaving it siloed.</p>
-  <h3>How to use it</h3>
-  <ol>
-    <li>Open <strong>Finance → Marketplace</strong> to see your surplus / last-stock marketplace activity tied into your financial view.</li>
-  </ol>
-  <p><strong>What it affects elsewhere:</strong> it ties <a href="discover.html">marketplace</a> activity into Finance, so the two stay connected rather than tracked separately.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-marketplace.png" alt="Marketplace"><figcaption>The Marketplace tab.</figcaption></figure>
-
-  <!-- 8 -->
-  <h2>Settings</h2>
-  <p><strong>What it is —</strong> the workspace's finance configuration: company / issuer details, VAT, the fiscal / e-invoicing connection, document defaults and keys. <strong>Why it matters / who needs it —</strong> this is the setup that makes everything above legal and correct — get it right once and every document, report and statement inherits it. (<span class="badge route">/settings</span> redirects into Finance because workspace settings are managed here.)</p>
-  <div class="callout tip"><p><strong>Settings is deep — it has 12 sub-sections of its own</strong> (General, Business Identity, Documents, e-Invoicing, Pricing, Categories, Services, Team, Online Store, Statement PDF, Finance Digest, Payments). Each is documented field-by-field on the dedicated page: <a href="finance-settings.html"><strong>Finance Settings →</strong></a></p></div>
-  <p><strong>What it affects elsewhere:</strong> almost everything — Categories drive the <strong>Reports</strong> breakdowns, Statement PDF brands the statements you email from <strong>Customers &amp; Suppliers</strong>, and the rest configures how documents are numbered, branded and filed.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-settings.png" alt="Finance Settings"><figcaption>Finance → Settings.</figcaption></figure>
 </main>
 <script src="assets/nav.js"></script>
 </body>
