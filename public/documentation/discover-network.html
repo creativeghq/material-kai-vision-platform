@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discover: Network | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Discover &amp; Network / Network</div>
+  <h1>Discover · Network</h1>
+  <div class="routes"><span class="badge route">/network</span> <span class="badge gated">network.manage</span></div>
+  <p class="lead">Your dealers, architects and their commission — you set the cut on each node's operator-catalog sales. While Discover is about finding people and businesses, Network is your B2B reseller / dealer network: a table of the downstream workspaces that sit beneath you, what they can sell, and what each relationship earns you.</p>
+
+  <div class="callout"><p><strong>How to open it:</strong> reach the network at <span class="badge route">/network</span>, or use the workspace switcher → <strong>Manage network</strong>. Network is capability-gated by <code>network.manage</code> — if you don't see it, your role or plan may not include connection management; an administrator can adjust this.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/discover/network.png" alt="The Network management page for business relationships">
+    <figcaption>Network — manage the connections and business relationships you've built on the platform.</figcaption>
+  </figure>
+
+  <h2>What it is</h2>
+  <p><strong>What it is —</strong> your B2B reseller / dealer network. Each entry is a downstream workspace — a dealer or architect — that sits beneath you: you grant them access to your catalogue and set the commission you take on the sales they make from your operator catalogue. The page is a table of those sub-workspaces, so you can see at a glance who is in your network, where they sit, what they can sell and what each relationship earns you.</p>
+  <p><strong>Why it matters —</strong> this is how a manufacturer or operator runs a distribution channel on the platform. Instead of every dealer or architect keeping a private copy of your range, you grant them controlled access to your catalogue and let them sell from it. The <strong>commission</strong> and <strong>catalog access</strong> columns are the two levers that make that channel work: catalog access decides <em>what</em> each dealer or architect is allowed to sell, and commission decides <em>what you earn</em> when they sell it. Setting these per node means a high-volume dealer and a one-project architect can carry completely different terms.</p>
+
+  <h2>Where it is</h2>
+  <p>Reach the network at <span class="badge route">/network</span>, or open the workspace switcher and choose <strong>Manage network</strong>. The page is gated by the <code>network.manage</code> capability.</p>
+
+  <h2>What's on the screen — the network table</h2>
+  <p>Each row is one sub-workspace (a dealer or architect) in your network. The columns describe how that node fits into your structure and what you take on its sales:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Workspace</strong></td><td>The downstream dealer or architect workspace — the node in your network.</td></tr>
+      <tr><td><strong>Rank</strong></td><td>Where the node sits in the network hierarchy — its level relative to you and to other nodes.</td></tr>
+      <tr><td><strong>Parent</strong></td><td>The workspace directly above this node — who it hangs off in the tree (you, or another node you've placed it under).</td></tr>
+      <tr><td><strong>Catalog access</strong></td><td>How much of your operator catalogue this node may sell — for example <em>Full catalog</em>, or a narrower slice you've granted.</td></tr>
+      <tr><td><strong>Commission %</strong></td><td>The cut you take on that node's operator-catalog sales. You set this per node, so different dealers or architects can carry different commission rates.</td></tr>
+      <tr><td><strong>e-Invoicing</strong></td><td>The node's e-invoicing status — whether that downstream workspace is set up to issue compliant invoices for the sales it makes.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Why catalog access, commission and e-Invoicing matter</h2>
+  <p><strong>Catalog access</strong> is your control over <em>reach</em>. Granting <em>Full catalog</em> turns a dealer into a full-line reseller; granting a narrower slice lets you give an architect only the ranges relevant to their projects, or keep premium lines for selected partners. It's how you tailor the channel without maintaining separate price lists.</p>
+  <p><strong>Commission %</strong> is your control over <em>economics</em>, set per node. Because each dealer or architect can carry a different rate, you can reward a high-volume distributor with keener terms while a low-touch architect carries a standard cut — and you can read, at a glance, what every relationship in the channel is worth to you.</p>
+  <p><strong>e-Invoicing status</strong> tells you whether a downstream node can actually issue compliant invoices for the sales it makes. A dealer or architect that isn't set up for e-invoicing can't close the loop legally on their end, so this column is your readiness signal for each node before you lean on them for volume. See <a href="finance-einvoicing.html">Greek e-invoicing</a> for what that setup involves.</p>
+
+  <h2>How to manage a node — step by step</h2>
+  <ol>
+    <li>Open <span class="badge route">/network</span> (or the workspace switcher → <strong>Manage network</strong>).</li>
+    <li>Find the downstream dealer or architect workspace in the table.</li>
+    <li>Set its <strong>Catalog access</strong> — grant <em>Full catalog</em> for a full-line reseller, or a narrower slice for an architect who needs only certain ranges.</li>
+    <li>Set its <strong>Commission %</strong> — the cut you take on that node's operator-catalog sales, deliberately per node rather than uniformly.</li>
+    <li>Check the <strong>e-Invoicing</strong> column to confirm the node can issue compliant invoices before you lean on it for volume.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example — onboarding a high-volume dealer alongside a one-project architect.</strong> Open Network → for the dealer set <strong>Catalog access</strong> to <em>Full catalog</em> and give them a keener <strong>Commission %</strong> to reward volume; for the architect, grant only the ranges relevant to their project and apply a standard commission. Both appear as rows under their <strong>Parent</strong> with their <strong>Rank</strong> in the tree, and the <strong>e-Invoicing</strong> column tells you which one is ready to close deals legally on their end.</p></div>
+
+  <h2>What it affects</h2>
+  <p>Catalog access governs what each node sees of your products; commission flows through onto the <strong>reseller / dealer sales</strong> they make from your operator catalogue; and e-invoicing readiness ties back to each node's own <a href="finance-settings.html">Finance settings</a>. <strong>Tip:</strong> set catalog access and commission deliberately per node rather than uniformly — that per-node flexibility is the whole point of running the channel here.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
