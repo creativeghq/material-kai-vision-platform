@@ -163,7 +163,9 @@ function drawReport(pdf: PDFDocument, font: any, bold: any, r: any, items: any[]
   let rowsLeft = Math.floor((y - M - 140) / rowH);
 
   function header(p: any): number {
-    p.drawText('TRIP EXPENSE REPORT', { x: M, y: H - M, size: 14, font: bold, color: INK });
+    const heading = r.card_type === 'monthly' ? 'MONTHLY EXPENSE REPORT'
+      : r.card_type === 'other' ? 'EXPENSE REPORT' : 'TRIP EXPENSE REPORT';
+    p.drawText(heading, { x: M, y: H - M, size: 14, font: bold, color: INK });
     const sub = [r.destination, r.purpose].filter(Boolean).join(' · ');
     p.drawText(truncate(r.title + (sub ? ' — ' + sub : ''), 78), { x: M, y: H - M - 16, size: 9, font, color: GRAY });
     const dates = [r.trip_start, r.trip_end].filter(Boolean).join('  →  ') || '—';

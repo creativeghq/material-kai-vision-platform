@@ -25,6 +25,17 @@ export const TRIP_EXPENSE_CATEGORIES = [
 ] as const;
 export type TripExpenseCategory = (typeof TRIP_EXPENSE_CATEGORIES)[number];
 
+export type ExpenseCardType = 'trip' | 'monthly' | 'other';
+
+export const EXPENSE_CARD_TYPES: { value: ExpenseCardType; label: string }[] = [
+  { value: 'trip', label: 'Trip' },
+  { value: 'monthly', label: 'Monthly expenses' },
+  { value: 'other', label: 'Other' },
+];
+export const EXPENSE_CARD_TYPE_LABEL: Record<ExpenseCardType, string> = {
+  trip: 'Trip', monthly: 'Monthly', other: 'Other',
+};
+
 export const TRIP_STATUS_LABEL: Record<TripStatus, string> = {
   draft: 'Draft',
   submitted: 'Under review',
@@ -38,6 +49,7 @@ export interface TripExpenseReport {
   id: string;
   workspace_id: string;
   user_id: string;
+  card_type: ExpenseCardType;
   title: string;
   destination: string | null;
   purpose: string | null;
@@ -90,6 +102,7 @@ export interface TripExpenseItem {
 
 export interface CreateReportInput {
   workspaceId: string;
+  card_type?: ExpenseCardType;
   title: string;
   destination?: string | null;
   purpose?: string | null;
@@ -133,6 +146,7 @@ export const tripExpenseService = {
     /** Only the caller's own cards (reps); finance omits to see every card. */
     mine?: boolean;
     status?: TripStatus[];
+    cardType?: ExpenseCardType;
   }): Promise<TripExpenseReport[]> {
     let q = supabase
       .from('trip_expense_reports')
@@ -140,6 +154,7 @@ export const tripExpenseService = {
       .eq('workspace_id', opts.workspaceId)
       .order('created_at', { ascending: false });
     if (opts.status?.length) q = q.in('status', opts.status);
+    if (opts.cardType) q = q.eq('card_type', opts.cardType);
     if (opts.mine) {
       const { data: auth } = await supabase.auth.getUser();
       if (auth?.user?.id) q = q.eq('user_id', auth.user.id);
@@ -164,6 +179,7 @@ export const tripExpenseService = {
       .from('trip_expense_reports')
       .insert({
         workspace_id: input.workspaceId,
+        card_type: input.card_type ?? 'trip',
         title: input.title,
         destination: input.destination ?? null,
         purpose: input.purpose ?? null,

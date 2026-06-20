@@ -394,12 +394,12 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             </label>
           </div>
 
-          {/* Trip cards — how an approved sales-team trip card posts to the ledger. */}
+          {/* Expense cards — how an approved expense card (trip, monthly, …) posts to the ledger. */}
           <div className="rounded-md border border-border/60 p-3 space-y-3">
             <div>
-              <div className="text-sm font-medium">Trip cards (sales expenses)</div>
+              <div className="text-sm font-medium">Expense cards (team expenses)</div>
               <p className="text-xs text-muted-foreground">
-                When finance approves a rep's trip card, decide whether the approved total is auto-posted as a reimbursement payable (shows in Planning / Payables and can be marked paid).
+                When finance approves a team member's expense card (trip, monthly expenses, …), decide whether the approved total is auto-posted as a reimbursement payable (shows in Planning / Payables and can be marked paid).
               </p>
             </div>
             <label className="flex items-center justify-between gap-3">

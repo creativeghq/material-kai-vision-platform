@@ -288,7 +288,7 @@ const FinancePage: React.FC = () => {
               <CalendarClock className="h-4 w-4 mr-2" /> Planning
             </TabsTrigger>
             <TabsTrigger value="trip_cards" className="w-full justify-start">
-              <Plane className="h-4 w-4 mr-2" /> Trip cards
+              <Plane className="h-4 w-4 mr-2" /> Expense cards
             </TabsTrigger>
             {!isAccountant && (
               <TabsTrigger value="time" className="w-full justify-start">
@@ -654,7 +654,7 @@ const FinancePage: React.FC = () => {
             <PlanningTab workspaceId={workspaceId} />
           </TabsContent>
 
-          {/* ─────────── TRIP CARDS (finance review) ─────────── */}
+          {/* ─────────── EXPENSE CARDS (finance review) ─────────── */}
           <TabsContent value="trip_cards" className="space-y-4">
             <TripExpensesPanel workspaceId={workspaceId} canReview={!isAccountant} />
           </TabsContent>

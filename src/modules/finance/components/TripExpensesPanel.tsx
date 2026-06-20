@@ -13,7 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import {
   tripExpenseService, TRIP_EXPENSE_CATEGORIES, TRIP_STATUS_LABEL,
-  type TripExpenseReport, type TripExpenseItem, type TripStatus, type ExpensePaymentMethod,
+  EXPENSE_CARD_TYPES, EXPENSE_CARD_TYPE_LABEL,
+  type TripExpenseReport, type TripExpenseItem, type TripStatus, type ExpensePaymentMethod, type ExpenseCardType,
 } from '@/modules/finance/services/tripExpenseService';
 
 interface Props {
@@ -59,14 +60,14 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h3 className="text-sm font-semibold">Trip cards</h3>
+          <h3 className="text-sm font-semibold">Expense cards</h3>
           <p className="text-xs text-muted-foreground">
             {canReview
-              ? 'Review the sales team’s trip expenses. Approve or reject each line; approved totals can post a reimbursement payable.'
-              : 'Log your trip expenses day by day, attach receipts, and submit them to finance for approval.'}
+              ? 'Review the team’s expense cards (trips, monthly expenses, …). Approve or reject each line; approved totals can post a reimbursement payable.'
+              : 'Track your expenses by card — a sales trip, a month of expenses, anything — attach receipts, and submit to finance for approval.'}
           </p>
         </div>
-        <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New trip card</Button>
+        <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New card</Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
@@ -86,7 +87,10 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
                       className={`flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/30 ${selectedId === r.id ? 'bg-muted/40' : ''}`}
                     >
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{r.title}</div>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="secondary" className="text-[9px] shrink-0">{EXPENSE_CARD_TYPE_LABEL[r.card_type] ?? 'Trip'}</Badge>
+                          <span className="truncate text-sm font-medium">{r.title}</span>
+                        </div>
                         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                           {r.destination && <><MapPin className="h-3 w-3" /> {r.destination} ·</>}
                           {r.item_count} item{r.item_count === 1 ? '' : 's'}
@@ -243,7 +247,9 @@ const TripCardDetail: React.FC<{
       <CardHeader className="border-b border-border/60 px-5 py-3 space-y-2">
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div>
-            <CardTitle className="text-sm flex items-center gap-2">{report.title}
+            <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
+              <Badge variant="secondary" className="text-[10px]">{EXPENSE_CARD_TYPE_LABEL[report.card_type] ?? 'Trip'}</Badge>
+              {report.title}
               <Badge variant={STATUS_VARIANT[report.status]} className="text-[10px]">{TRIP_STATUS_LABEL[report.status]}</Badge>
             </CardTitle>
             <div className="mt-0.5 text-[11px] text-muted-foreground">
@@ -368,23 +374,26 @@ const NewTripCardDialog: React.FC<{
   onCreated: (id: string) => void;
 }> = ({ workspaceId, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
+  const [cardType, setCardType] = useState<ExpenseCardType>('trip');
   const [title, setTitle] = useState('');
   const [destination, setDestination] = useState('');
   const [purpose, setPurpose] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [saving, setSaving] = useState(false);
+  const isTrip = cardType === 'trip';
 
   const save = async () => {
     if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
     try {
       setSaving(true);
       const r = await tripExpenseService.createReport({
-        workspaceId, title: title.trim(),
-        destination: destination.trim() || null, purpose: purpose.trim() || null,
+        workspaceId, card_type: cardType, title: title.trim(),
+        destination: isTrip ? (destination.trim() || null) : null,
+        purpose: purpose.trim() || null,
         trip_start: start || null, trip_end: end || null,
       });
-      setTitle(''); setDestination(''); setPurpose(''); setStart(''); setEnd('');
+      setCardType('trip'); setTitle(''); setDestination(''); setPurpose(''); setStart(''); setEnd('');
       onCreated(r.id);
     } catch (err: any) {
       toast({ title: 'Could not create card', description: err?.message, variant: 'destructive' });
@@ -394,27 +403,38 @@ const NewTripCardDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>New trip card</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New expense card</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Type</label>
+            <Select value={cardType} onValueChange={(v: any) => setCardType(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {EXPENSE_CARD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Title</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Athens client visits — June" />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTrip ? 'e.g. Athens client visits — June' : 'e.g. June 2026 expenses'} />
           </div>
           <div className="grid grid-cols-2 gap-3">
+            {isTrip && (
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Destination</label>
+                <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Athens" />
+              </div>
+            )}
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Destination</label>
-              <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Athens" />
+              <label className="text-xs text-muted-foreground">{isTrip ? 'Purpose' : 'Note'}</label>
+              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder={isTrip ? 'Client meetings' : 'Optional'} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Purpose</label>
-              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Client meetings" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Trip start</label>
+              <label className="text-xs text-muted-foreground">{isTrip ? 'Trip start' : 'Period from'}</label>
               <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Trip end</label>
+              <label className="text-xs text-muted-foreground">{isTrip ? 'Trip end' : 'Period to'}</label>
               <Input type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />
             </div>
           </div>

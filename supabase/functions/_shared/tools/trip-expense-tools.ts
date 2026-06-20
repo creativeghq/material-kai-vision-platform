@@ -44,32 +44,36 @@ async function resolveCard(userId: string, workspaceId: string, cardId?: string,
 }
 
 // ───────────────────────────── create_trip_card ─────────────────────────────
+const CARD_TYPES = ['trip', 'monthly', 'other'];
+
 export const createCreateTripCardTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
-  tool(async ({ title, destination, purpose, trip_start, trip_end, currency }: {
-    title: string; destination?: string; purpose?: string; trip_start?: string; trip_end?: string; currency?: string;
+  tool(async ({ title, card_type, destination, purpose, trip_start, trip_end, currency }: {
+    title: string; card_type?: string; destination?: string; purpose?: string; trip_start?: string; trip_end?: string; currency?: string;
   }) => {
     if (!await moduleEnabled()) return disabledErr();
     try {
+      const ct = CARD_TYPES.includes((card_type || '').toLowerCase()) ? card_type!.toLowerCase() : 'trip';
       const { data, error } = await svc().from('trip_expense_reports').insert({
-        workspace_id: workspaceId, user_id: userId, title,
-        destination: destination ?? null, purpose: purpose ?? null,
+        workspace_id: workspaceId, user_id: userId, card_type: ct, title,
+        destination: ct === 'trip' ? (destination ?? null) : null, purpose: purpose ?? null,
         trip_start: trip_start ?? null, trip_end: trip_end ?? null, currency: currency ?? 'EUR',
       }).select('*').single();
       if (error) throw error;
-      onChunk?.({ type: 'trip_card_created', data: { id: data.id, title: data.title } });
-      return JSON.stringify({ success: true, card_id: data.id, title: data.title, status: data.status, message: 'Trip card created. Add expenses, then submit for approval.' });
+      onChunk?.({ type: 'trip_card_created', data: { id: data.id, title: data.title, card_type: data.card_type } });
+      return JSON.stringify({ success: true, card_id: data.id, card_type: data.card_type, title: data.title, status: data.status, message: 'Expense card created. Add expenses, then submit for approval.' });
     } catch (e: any) {
-      return JSON.stringify({ success: false, error: e?.message || 'Could not create trip card' });
+      return JSON.stringify({ success: false, error: e?.message || 'Could not create expense card' });
     }
   }, {
     name: 'create_trip_card',
-    description: 'Create a new trip expense card (sales trip) for the current user. Returns the card id to add expenses to.',
+    description: 'Create a new expense card for the current user — a sales trip (default), a month of expenses (card_type="monthly"), or other. Returns the card id to add expenses to.',
     schema: z.object({
-      title: z.string().describe('Short title, e.g. "Athens client visits — June"'),
-      destination: z.string().optional().describe('City / area visited'),
-      purpose: z.string().optional().describe('Reason for the trip'),
-      trip_start: z.string().optional().describe('Start date YYYY-MM-DD'),
-      trip_end: z.string().optional().describe('End date YYYY-MM-DD'),
+      title: z.string().describe('Short title, e.g. "Athens client visits — June" or "June 2026 expenses"'),
+      card_type: z.string().optional().describe('Card category: trip (default) | monthly | other'),
+      destination: z.string().optional().describe('City / area visited (trip cards only)'),
+      purpose: z.string().optional().describe('Reason / note'),
+      trip_start: z.string().optional().describe('Start / period-from date YYYY-MM-DD'),
+      trip_end: z.string().optional().describe('End / period-to date YYYY-MM-DD'),
       currency: z.string().optional().describe('ISO currency (default EUR)'),
     }),
   });
@@ -95,7 +99,7 @@ export const createAddTripExpenseTool = (userId: string, workspaceId: string, on
       if (error) throw error;
       const { data: fresh } = await svc().from('trip_expense_reports').select('item_count, total_amount, currency').eq('id', card.id).single();
       onChunk?.({ type: 'trip_expense_added', data: { card_id: card.id } });
-      return JSON.stringify({ success: true, card_id: card.id, item_count: fresh?.item_count, total: fresh?.total_amount, currency: fresh?.currency, message: 'Expense added. Attach the receipt in the Trip cards screen, then submit when done.' });
+      return JSON.stringify({ success: true, card_id: card.id, item_count: fresh?.item_count, total: fresh?.total_amount, currency: fresh?.currency, message: 'Expense added. Attach the receipt in the Expense cards screen, then submit when done.' });
     } catch (e: any) {
       return JSON.stringify({ success: false, error: e?.message || 'Could not add expense' });
     }
@@ -117,12 +121,13 @@ export const createAddTripExpenseTool = (userId: string, workspaceId: string, on
 
 // ───────────────────────────── list_trip_cards ─────────────────────────────
 export const createListTripCardsTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
-  tool(async ({ status }: { status?: string }) => {
+  tool(async ({ status, card_type }: { status?: string; card_type?: string }) => {
     if (!await moduleEnabled()) return disabledErr();
     try {
-      let q = svc().from('trip_expense_reports').select('id, title, destination, status, item_count, total_amount, approved_amount, pending_amount, currency, created_at')
+      let q = svc().from('trip_expense_reports').select('id, card_type, title, destination, status, item_count, total_amount, approved_amount, pending_amount, currency, created_at')
         .eq('user_id', userId).eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(25);
       if (status) q = q.eq('status', status);
+      if (card_type) q = q.eq('card_type', card_type);
       const { data, error } = await q;
       if (error) throw error;
       onChunk?.({ type: 'trip_cards_list', data: { count: data?.length || 0 } });
@@ -132,8 +137,11 @@ export const createListTripCardsTool = (userId: string, workspaceId: string, onC
     }
   }, {
     name: 'list_trip_cards',
-    description: 'List the current user\'s trip expense cards with their status and totals.',
-    schema: z.object({ status: z.string().optional().describe('Optional filter: draft | submitted | partially_approved | approved | rejected | reimbursed') }),
+    description: 'List the current user\'s expense cards (trips, monthly, …) with their status and totals.',
+    schema: z.object({
+      status: z.string().optional().describe('Optional filter: draft | submitted | partially_approved | approved | rejected | reimbursed'),
+      card_type: z.string().optional().describe('Optional filter: trip | monthly | other'),
+    }),
   });
 
 // ───────────────────────────── submit_trip_card ─────────────────────────────
