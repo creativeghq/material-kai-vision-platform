@@ -39,14 +39,30 @@
   </div>
 
   <h3>Profiles</h3>
-  <p>The Profiles tab lists members of the community — designers, consultants and other users who have a public presence. Opening a profile shows the services they offer and examples of their work, so you can decide whether to reach out or connect.</p>
+  <p>The Profiles tab is the community member directory — designers, consultants, professionals and other users who have a public presence. Opening a member's card takes you to their public profile, where you can see the services they offer and a sample of their work, so you can decide whether to reach out or connect.</p>
+  <div class="feat">
+    <p><strong>All types</strong> — a type filter to narrow the directory to a particular kind of member (for example a profile type or a professional type), or leave it on <em>All types</em> to see everyone.</p>
+    <p><strong>Search</strong> — a search box (<em>“Search by name, service, location…”</em>) that matches on a member's name, the services they offer or their location, so you can find the right person without scrolling the whole directory.</p>
+    <p><strong>Open a profile</strong> — each result is a card; click it to open that member's public profile and review their services and work.</p>
+  </div>
 
   <h3>Factory</h3>
-  <p>The Factory tab is the directory of manufacturers. Each entry leads to that manufacturer's ranges and the product categories they cover, which is the quickest way to discover who makes the kind of material you need.</p>
+  <p>The Factory tab is the manufacturers directory. Each entry leads to that manufacturer's material range and the product categories they cover, which is the quickest way to discover who makes the kind of material you need.</p>
+  <div class="feat">
+    <p><strong>All categories</strong> — a category filter so you can narrow the directory to manufacturers that produce a given category, or leave it on <em>All categories</em> to see every factory.</p>
+    <p><strong>Search</strong> — a search box (<em>“Search factories…”</em>) that matches on the manufacturer, so you can jump straight to a specific factory.</p>
+    <p><strong>Open a factory</strong> — click a card to open the manufacturer and browse its material range and the categories it produces.</p>
+  </div>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/discover/discover-factory.png" alt="Discover Factory tab"><figcaption>The Factory tab — manufacturers and their ranges.</figcaption></figure>
 
   <h3>Products</h3>
-  <p>The Products tab lets you browse materials and products from across the platform in one list, rather than searching workspace by workspace. It's a fast way to see what's available before you go deeper into a specific manufacturer or listing. For richer, conversational product search you can also use the <a href="agent-hub.html">Agent Hub</a>.</p>
+  <p>The Products tab lets you browse all materials and products from across the platform in one list, rather than searching workspace by workspace. It's a fast way to see what's available before you go deeper into a specific manufacturer or listing. For richer, conversational product search you can also use the <a href="agent-hub.html">Agent Hub</a>.</p>
+  <div class="feat">
+    <p><strong>All categories</strong> — a category filter to restrict the list to a single material category, or leave it on <em>All categories</em> to browse everything.</p>
+    <p><strong>View toggle</strong> — switch between a <strong>grid</strong> view (visual cards) and a <strong>list</strong> view (compact rows), whichever suits how you're scanning the catalogue.</p>
+    <p><strong>Pagination</strong> — results are paged (1, 2, 3 …); step through the pages to work down a large catalogue.</p>
+    <p><strong>Search</strong> — a search box (<em>“Search materials by name or factory…”</em>) that matches on the product name or the factory that makes it.</p>
+  </div>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/discover/discover-products.png" alt="Discover Products tab"><figcaption>The Products tab — browse materials/products across the platform.</figcaption></figure>
 
   <h2>Surplus Marketplace</h2>
@@ -92,8 +108,25 @@
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/discover/network.png" alt="The Network management page for business relationships">
     <figcaption>Network — manage the connections and business relationships you've built on the platform.</figcaption>
   </figure>
-  <p>While Discover is about finding people and businesses, <strong>Network</strong> is about keeping the relationships you form. It's where you manage your business connections on the platform — the members and organisations you've linked with — so you can return to them, keep them organised and work with them over time.</p>
+  <p class="lead">Your dealers, architects and their commission — you set the cut on each node's operator-catalog sales.</p>
+  <p>While Discover is about finding people and businesses, <strong>Network</strong> is your B2B reseller / dealer network. Each entry is a downstream workspace — a dealer or architect — that sits beneath you: you grant them access to your catalogue and set the commission you take on the sales they make from your operator catalogue. The page is a table of those sub-workspaces, so you can see at a glance who is in your network, where they sit, what they can sell and what each relationship earns you.</p>
   <p>Network is capability-gated by <code>network.manage</code>. If you don't see it, your role or plan may not include connection management; an administrator can adjust this.</p>
+
+  <h3>The network table</h3>
+  <p>Each row is one sub-workspace (a dealer or architect) in your network. The columns describe how that node fits into your structure and what you take on its sales:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Column</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Workspace</strong></td><td>The downstream dealer or architect workspace — the node in your network.</td></tr>
+      <tr><td><strong>Rank</strong></td><td>Where the node sits in the network hierarchy — its level relative to you and to other nodes.</td></tr>
+      <tr><td><strong>Parent</strong></td><td>The workspace directly above this node — who it hangs off in the tree (you, or another node you've placed it under).</td></tr>
+      <tr><td><strong>Catalog access</strong></td><td>How much of your operator catalogue this node may sell — for example <em>Full catalog</em>, or a narrower slice you've granted.</td></tr>
+      <tr><td><strong>Commission %</strong></td><td>The cut you take on that node's operator-catalog sales. You set this per node, so different dealers or architects can carry different commission rates.</td></tr>
+      <tr><td><strong>e-Invoicing</strong></td><td>The node's e-invoicing status — whether that downstream workspace is set up to issue compliant invoices for the sales it makes.</td></tr>
+    </tbody>
+  </table>
+  </div>
 
   <h2>How it fits together</h2>
   <div class="cards">

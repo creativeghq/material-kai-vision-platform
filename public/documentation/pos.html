@@ -37,6 +37,49 @@
 
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/pos-open-shift.png" alt="POS requires an open shift"><figcaption>Before a shift is open, receipts are blocked — use “Open shift” to start the register.</figcaption></figure>
 
+  <h2>The register in detail</h2>
+  <p>The register is the heart of POS. It has two views and a single keypad that drives the whole sale. Understanding the two views, the document type, and what each keypad key does makes issuing fast and predictable.</p>
+
+  <h3>Register vs Products</h3>
+  <p>The screen has two views — on a phone you switch between them with the tabs at the top; on a wider screen you see both side by side.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>View</th><th>What it's for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Register</strong></td><td>The keypad and the receipt being built — the running list of lines, the document type, the VAT rate and the <strong>ISSUE</strong> key. This is where you finalise the sale.</td></tr>
+      <tr><td><strong>Products</strong></td><td>The pickable catalogue of priced items. Use the <em>“Search products &amp; services…”</em> box to filter, then tap a tile to drop it onto the receipt in the Register view.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Document type</h3>
+  <p>A button at the top of the register chooses what kind of document you're about to issue — for example a <strong>Receipt</strong>. The chosen type determines how the issued document is classified and how it's reported to the tax authority.</p>
+
+  <h3>The keypad keys</h3>
+  <p>Every amount, quantity and rate on the receipt is entered through the keypad. Each key has a specific job:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Key</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>0–9 (digits)</strong></td><td>Type a number — an amount, a quantity, or a free-price line.</td></tr>
+      <tr><td><strong>. (decimal)</strong></td><td>Adds a decimal point so you can enter cents (for example <em>12.50</em>).</td></tr>
+      <tr><td><strong>× (multiply)</strong></td><td>Sets the quantity — type a number then <strong>×</strong> to apply it to the item you add next.</td></tr>
+      <tr><td><strong>x (backspace)</strong></td><td>Deletes the last digit you typed.</td></tr>
+      <tr><td><strong>VAT-rate key (e.g. 24.00&nbsp;%)</strong></td><td>Cycles through the available VAT rates and applies the selected rate to the lines you add.</td></tr>
+      <tr><td><strong>ISSUE</strong></td><td>The large action key — finalises the receipt and produces the document.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Items only appear if they're priced</h3>
+  <p>The Products view only shows items that have a price set for the register. If something is missing, it simply hasn't been priced yet.</p>
+  <ul class="feat">
+    <li><strong>Products (goods)</strong> — set their price in <a href="materials.html">Materials</a>.</li>
+    <li><strong>Services</strong> — set their price in <a href="finance-settings.html">Finance &rarr; Settings &rarr; Services</a>.</li>
+    <li><strong>Free amount</strong> — even with nothing priced, you can punch a free amount straight on the keypad and issue it as a one-off line.</li>
+  </ul>
+  <div class="callout"><p>Once a receipt is issued it transmits to <a href="finance-einvoicing.html">myDATA</a>, just like any other financial document.</p></div>
+
   <h2>Step by step: issue a receipt</h2>
   <p>A receipt is produced in a few taps. The register requires an open shift first — until one is open you'll see <em>“No open shift — receipts are blocked until a shift is opened”</em>.</p>
   <ol>
