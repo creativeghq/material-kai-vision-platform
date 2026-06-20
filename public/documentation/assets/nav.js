@@ -23,9 +23,19 @@
       { file: "compare.html", title: "Material Compare", icon: "⚖️" },
     ]},
     { title: "Workspace", items: [
-      { file: "moodboards.html", title: "MoodBoards", icon: "🎨" },
-      { file: "projects.html", title: "Projects", icon: "📁" },
-      { file: "quotes.html", title: "Quotes & Requests", icon: "🧾" },
+      { file: "moodboards.html", title: "MoodBoards", icon: "🎨", children: [
+        { file: "moodboards-board.html", title: "Building a board" },
+        { file: "moodboards-sheets.html", title: "Presentation sheets" },
+      ]},
+      { file: "projects.html", title: "Projects", icon: "📁", children: [
+        { file: "projects-rooms.html", title: "Rooms" },
+        { file: "projects-client-view.html", title: "Client View" },
+        { file: "projects-tabs.html", title: "Other tabs" },
+      ]},
+      { file: "quotes.html", title: "Quotes & Requests", icon: "🧾", children: [
+        { file: "quotes-build.html", title: "Build & send a quote" },
+        { file: "quotes-requests.html", title: "Requests" },
+      ]},
       { file: "crm.html", title: "CRM", icon: "👥", children: [
         { file: "crm-users.html", title: "Users" },
         { file: "crm-contacts.html", title: "Contacts" },

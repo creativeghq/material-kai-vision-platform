@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects: Client View | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Client View</div>
+  <h1>Projects · Client View</h1>
+  <div class="routes"><span class="badge route">/projects/:id</span> <span class="badge gated">owner-only</span></div>
+  <p class="lead">The Client View is the project-level deliverable — the thing you actually send to the client. It bundles selected presentation sheets, drawn from <em>any</em> of the project's boards, into one client-ready package: a PDF plus a revocable online page. This guide covers the full builder (every field), what the client experiences at the online page, and exactly how to assemble and deliver one.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>Projects</strong> → open a project to reach its detail page (<span class="badge route">/projects/:id</span>) → the <strong>Client View</strong> tab (owner-only) → <strong>New Client View</strong>.</p>
+
+  <h2>What a Client View is, and why it matters</h2>
+  <p><strong>What it is —</strong> a project-level deliverable that bundles selected <a href="moodboards.html">presentation sheets</a> — drawn from <em>any</em> of the project's boards — into one client-ready package: a <strong>PDF</strong> plus a revocable <strong>online page</strong>.</p>
+  <p><strong>Why it matters —</strong> by the end of a project your best work is scattered across several boards as individual sheets. The client shouldn't have to receive five separate boards and stitch the story together themselves. A Client View bundles the sheets <em>you choose</em>, in the <em>order you choose</em>, into a single coherent presentation — so the client gets one polished thing instead of a pile of parts. It sits one level above a single board's deck: a board's deck is the lightweight, single-board PDF; the Client View combines sheets from <em>several</em> boards and adds an interactive online surface on top of the PDF.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-client-view.png" alt="A project's Client View tab">
+    <figcaption>A project's Client View tab — the client-ready deliverable.</figcaption>
+  </figure>
+
+  <h2>What's on the screen — the builder (every field)</h2>
+  <p>Open the <strong>Client View</strong> tab and click <strong>New Client View</strong>. The builder offers these fields:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Title</td><td>The deliverable's title (e.g. <em>Modern Bathroom Design</em>).</td></tr>
+      <tr><td>Subtitle</td><td>A secondary line under the title.</td></tr>
+      <tr><td>Client name</td><td>Shown as "Prepared for…".</td></tr>
+      <tr><td>Date</td><td>The date for the deliverable.</td></tr>
+      <tr><td>Sheets to include</td><td>Pick and order the presentation sheets — drawn from any board in the project.</td></tr>
+      <tr><td>FF&amp;E source quote</td><td>Choose a <a href="quotes.html">quote</a> to render its live FF&amp;E table.</td></tr>
+      <tr><td>3D world</td><td>Choose a generated Marble world to embed an explorable walkthrough.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>When you're done, <strong>Save &amp; generate PDF</strong> — or <strong>Save draft</strong> to come back later.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/client-view-builder.png" alt="The New Client View builder">
+    <figcaption>The New Client View builder.</figcaption>
+  </figure>
+
+  <h2>What the client experiences at /cv/:token</h2>
+  <p>When you share a Client View, the client opens a public page at <span class="badge route">/cv/:token</span> — no login required, just the link. They see the bundled deck (the PDF you generated) plus whichever interactive extras you switched on:</p>
+  <ul class="feat">
+    <li><strong>3D walkthrough</strong> — an explorable Marble world embedded right in the page.</li>
+    <li><strong>Lighting moods</strong> — switch the hero render between lighting presets so the client sees the space in different light.</li>
+    <li><strong>Live FF&amp;E table</strong> — a furniture, fixtures &amp; equipment list pulled live from a linked <a href="quotes.html">quote</a>, so it stays accurate.</li>
+    <li><strong>Inline approve / comment</strong> — the client can sign off or leave feedback directly on the page.</li>
+  </ul>
+  <p>Because access is tied to that token, you can <strong>revoke the share link at any time</strong> to cut off access — useful once a project is closed or if a link was sent in error. For more on how the public-facing page behaves, see <a href="public-pages.html">Public pages &amp; sharing</a>.</p>
+
+  <h2>How to deliver a Client View — step by step</h2>
+  <ol>
+    <li>Open the project → <strong>Client View</strong> → <strong>New Client View</strong>.</li>
+    <li>Set the <strong>Title</strong>, <strong>Subtitle</strong>, <strong>Client name</strong> and <strong>Date</strong>.</li>
+    <li><strong>Select and order</strong> the sheets to include — you can draw them from any of the project's <a href="moodboards.html">boards</a>.</li>
+    <li>Optionally pick an <strong>FF&amp;E source quote</strong> (to render its live FF&amp;E table) and a <strong>3D world</strong> (to embed a walkthrough).</li>
+    <li><strong>Save &amp; generate PDF</strong> to produce the downloadable version of the package — or <strong>Save draft</strong> to come back later.</li>
+    <li><strong>Copy the share link</strong> and send it to the client; revoke it at any time to cut off access. See <a href="public-pages.html">Public pages &amp; sharing</a> for how the public page behaves.</li>
+    <li>Read the client's inline <strong>approvals and comments</strong> back in the project.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example — handing over a bathroom design.</strong> Open the project → <strong>Client View</strong> → <strong>New Client View</strong> → set the <strong>Title</strong> to <em>Modern Bathroom Design</em>, add a subtitle, the client's name and a date → pick the strongest sheets from across the project's boards and order them → choose the FF&amp;E source quote so the page shows a live FF&amp;E table, and the 3D world for a walkthrough → <strong>Save &amp; generate PDF</strong> → copy the share link and email it. The client opens <span class="badge route">/cv/:token</span>, explores the walkthrough, tries the lighting moods, and approves inline — and that approval comes back into the project.</p></div>
+
+  <h2>What it affects</h2>
+  <p>Anything the client does on the online page — an approval or a comment — comes <strong>back into the project</strong>, so you read their feedback in one place rather than chasing it across email. Switch on only the embeds you actually have ready — there's no point enabling a 3D walkthrough or lighting moods if you haven't generated the underlying world or render yet.</p>
+
+  <div class="callout"><p><strong>In short:</strong> assemble the chosen sheets into a Client View, generate the PDF, and send the revocable share link. The client opens it at <span class="badge route">/cv/:token</span>, explores the interactive extras, and approves or comments — and their feedback returns to the project.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

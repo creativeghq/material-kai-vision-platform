@@ -11,183 +11,21 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Projects</div>
   <h1>Projects</h1>
   <div class="routes"><span class="badge route">/projects</span> <span class="badge route">/projects/:id</span></div>
-  <p class="lead">A project is the top-level container that ties together everything for one piece of work — the moodboards, presentation sheets, quotes and people involved — and gives you a single place to assemble and share a polished deliverable with the client. This guide walks you through it the way you'd actually use it: how to create one, what each tab does, why you'd break it into rooms, how to bundle everything into a Client View, and how to bring teammates and clients in. Each part is taught the same way — what it is, why it matters, exactly how to do it, and what it changes elsewhere.</p>
+  <p class="lead">Projects are the top-level container for a piece of work — they tie together the moodboards, sheets, quotes and people involved, and let you deliver a polished online <strong>Client View</strong>. The detailed areas are on their own pages below.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Projects</strong> (module-gated — if it isn't shown, the Projects module isn't enabled for your workspace).</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Projects</strong> (module-gated — if it isn't shown, the Projects module isn't enabled for your workspace). Use <strong>New Project</strong> to create one; <strong>Show archived</strong> reveals archived projects.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/projects.png" alt="Projects list">
-    <figcaption>The Projects list. Create your first project to get started.</figcaption>
+    <figcaption>The Projects list — create your first project to get started.</figcaption>
   </figure>
 
-  <h2>Why projects exist</h2>
-  <p><strong>What it is —</strong> the container that sits one level above the rest of your design work. Where a <a href="moodboards.html">moodboard</a> is the working surface and a <a href="quotes.html">quote</a> is a single document, a <strong>project</strong> wraps both — it groups all the boards, sheets and quotes for one client or job, keeps the people involved in one place, and is where you produce the finished package you hand over.</p>
-  <p><strong>Why it matters —</strong> design work for a single client rarely lives in one artifact. You sketch ideas across several boards, price line items in one or more quotes, and eventually need to present a coherent story. Without a container, those pieces drift apart. The project keeps them together so that, when it's time to deliver, everything you need is already in one home base. If you run work by client or by room, the project is that home base.</p>
-
-  <div class="callout"><p>Projects are <strong>module-gated</strong> — if you don't see <strong>Projects</strong> in the navigation, the module isn't enabled for your workspace.</p></div>
-
-  <h2>The list page</h2>
-  <p><strong>What it is —</strong> the <span class="badge route">/projects</span> page, which shows every active project as a card and is your jumping-off point. <strong>Why it matters —</strong> it's the index of all your work; from here you start new jobs, find old ones, and step into any project's detail page.</p>
-  <h3>How to use it</h3>
-  <ul class="feat">
-    <li><strong>New Project</strong> — create a project and name it for the client or job.</li>
-    <li><strong>Show archived</strong> — reveal projects you've archived so they're out of the way but still findable.</li>
-    <li><strong>Open a project</strong> — click any card to go to its detail page.</li>
-  </ul>
-  <p><strong>What it affects:</strong> creating a project here gives you a fresh detail page with all its tabs ready to fill in; archiving simply hides a card from this list (see <a href="#archiving">Archiving</a>).</p>
-
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/new-project.png" alt="New Project dialog"><figcaption>Creating a new project (name + scope/briefing notes).</figcaption></figure>
-
-  <h2>Step by step: create a project</h2>
-  <ol>
-    <li>From the top navigation, open <strong>Projects</strong>, then click <strong>New Project</strong>.</li>
-    <li>Enter a <strong>name</strong> for the client or job, and add any <strong>scope / briefing notes</strong> to describe the work.</li>
-    <li>Create it, then <strong>open the project</strong> to reach its detail page.</li>
-    <li>Work across its tabs — rooms, products, <a href="moodboards.html">moodboards</a>, <a href="quotes.html">quotes</a>, sheets, and the rest — to assemble everything in one place.</li>
-  </ol>
-  <div class="callout tip"><p>Name the project for who or what it's <em>for</em> (the client, the address, the job) rather than for the design idea — the design ideas live in the moodboards inside it. A clear scope note up front saves you re-explaining the brief to collaborators you invite later.</p></div>
-
-  <h2>Inside a project: the tabs</h2>
-  <p><strong>What it is —</strong> a project's detail page (<span class="badge route">/projects/:id</span>) is organised into tabs that cover the work and its deliverables. <strong>Why it matters —</strong> the tabs are how a project's many moving parts stay separated but reachable from one place; the set you see depends on your role — some tabs are owner-only or shown only when their module is enabled. Shared collaborators get a reduced set (the owner-only tabs stay private).</p>
-
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Tab</th><th>What it's for</th></tr></thead>
-    <tbody>
-      <tr><td>Overview</td><td>A summary of the project — client, budget and deadline, status, key counts and a starting point.</td></tr>
-      <tr><td>Rooms</td><td>Break the project down by room or area for organisation and budgeting.</td></tr>
-      <tr><td>Products</td><td>The products/materials gathered for this project (owner-only).</td></tr>
-      <tr><td>Moodboards</td><td>The <a href="moodboards.html">moodboards</a> attached to the project.</td></tr>
-      <tr><td>Quotes</td><td>The <a href="quotes.html">quotes</a> for the project.</td></tr>
-      <tr><td>Billing</td><td>Billing for the project (owner-only).</td></tr>
-      <tr><td>Finance</td><td>Project-linked finance, when the Finance module is available.</td></tr>
-      <tr><td>Sheets</td><td>Presentation sheets across the project's boards.</td></tr>
-      <tr><td>Client View</td><td>The client-ready deliverable — see below (owner-only).</td></tr>
-      <tr><td>Tasks</td><td>To-dos for the project.</td></tr>
-      <tr><td>Timeline</td><td>Activity history (owner-only — kept private from clients).</td></tr>
-    </tbody>
-  </table>
+  <h2>Inside a project</h2>
+  <div class="cards">
+    <a class="card" href="projects-rooms.html"><div class="ico">🚪</div><h3>Rooms</h3><p>Break a project into rooms with budgets and types.</p></a>
+    <a class="card" href="projects-client-view.html"><div class="ico">🖥️</div><h3>Client View</h3><p>The headline deliverable — bundle sheets into a PDF + revocable online page (3D, lighting, FF&amp;E, approvals).</p></a>
+    <a class="card" href="projects-tabs.html"><div class="ico">🗂️</div><h3>Other tabs</h3><p>Overview, Products, Moodboards, Quotes, Billing, Finance, Sheets, Tasks, Timeline — and inviting collaborators.</p></a>
   </div>
-
-  <p>The headline capability — the reason most of the other tabs exist — is the <strong>Client View</strong>. Everything you assemble (boards, sheets, a quote for the FF&amp;E list) feeds into it.</p>
-
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-overview.png" alt="A project's Overview tab">
-    <figcaption>A project's Overview tab.</figcaption>
-  </figure>
-
-  <h3>Rooms</h3>
-  <p><strong>What it is —</strong> a way to split the project's scope and budget per space, each room captured as its own entry under the Rooms tab. <strong>Why it matters —</strong> most real jobs aren't one undifferentiated space — a home is a master bath, a kitchen, a living room. Breaking the project into rooms lets you organise the work the way the building is actually laid out and, crucially, allocate a budget to each space so you can see where the money is going room by room instead of as one lump sum. It mirrors how clients think and talk about their own project.</p>
-  <h3>How to add a room</h3>
-  <ol>
-    <li>Open the <strong>Rooms</strong> tab and click <strong>Add a room</strong>.</li>
-    <li>Enter the <strong>Room name</strong> — e.g. <em>Master Bath</em>.</li>
-    <li>Choose the <strong>Type</strong> — the kind of space.</li>
-    <li>Set the <strong>Budget</strong> — the amount allocated to that room.</li>
-    <li>Set a <strong>Date</strong> for the room, and save.</li>
-  </ol>
-  <p><strong>What it affects:</strong> rooms give the project a per-space structure and per-room budgets, so the project is organised and costed by area rather than as a single figure. Repeat for each space in the job.</p>
-
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-rooms.png" alt="The Rooms tab — break a project into rooms with budgets">
-    <figcaption>The Rooms tab — break a project into rooms with budgets.</figcaption>
-  </figure>
-
-  <h3>The other tabs at a glance</h3>
-  <p>Beyond Rooms, each tab on the detail page does the following:</p>
-
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Tab</th><th>Purpose</th></tr></thead>
-    <tbody>
-      <tr><td>Overview</td><td>Client, budget and deadline summary.</td></tr>
-      <tr><td>Rooms</td><td>Per-room breakdown of the project.</td></tr>
-      <tr><td>Products</td><td>Materials used in the project.</td></tr>
-      <tr><td>Moodboards</td><td>Boards attached to the project.</td></tr>
-      <tr><td>Quotes</td><td>The project's quotes.</td></tr>
-      <tr><td>Billing</td><td>Billing for the project.</td></tr>
-      <tr><td>Finance</td><td>Project-linked finance.</td></tr>
-      <tr><td>Sheets</td><td>Presentation sheets.</td></tr>
-      <tr><td>Client View</td><td>The client deliverable.</td></tr>
-      <tr><td>Tasks</td><td>To-dos for the project.</td></tr>
-      <tr><td>Timeline</td><td>Activity history.</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>Client Views <span class="badge gated">owner-only</span></h2>
-  <p><strong>What it is —</strong> a project-level deliverable that bundles selected <a href="moodboards.html">presentation sheets</a> — drawn from <em>any</em> of the project's boards — into one client-ready package: a <strong>PDF</strong> plus a revocable <strong>online page</strong>. It's the thing you actually send to the client.</p>
-  <p><strong>Why it matters —</strong> by the end of a project your best work is scattered across several boards as individual sheets. The client shouldn't have to receive five separate boards and stitch the story together themselves. A Client View bundles the sheets <em>you choose</em>, in the <em>order you choose</em>, into a single coherent presentation — so the client gets one polished thing instead of a pile of parts. It sits one level above a single board's deck: a board's deck is the lightweight, single-board PDF; the Client View combines sheets from <em>several</em> boards and adds an interactive online surface on top of the PDF.</p>
-  <p>That online page is the real payoff, because it can carry things a static PDF simply can't:</p>
-  <ul class="feat">
-    <li><strong>3D walkthrough</strong> — an explorable Marble world embedded right in the page.</li>
-    <li><strong>Lighting moods</strong> — switch the hero render between lighting presets so the client sees the space in different light.</li>
-    <li><strong>Live FF&amp;E table</strong> — a furniture, fixtures &amp; equipment list pulled live from a linked <a href="quotes.html">quote</a>, so it stays accurate.</li>
-    <li><strong>Inline approve / comment</strong> — the client can sign off or leave feedback directly on the page.</li>
-  </ul>
-
-  <h3>What the client experiences at /cv/:token</h3>
-  <p>When you share a Client View, the client opens a public page at <span class="badge route">/cv/:token</span> — no login required, just the link. They see the bundled deck (the PDF you generated) plus whichever interactive extras you switched on: an explorable 3D walkthrough, the hero render with <strong>switchable lighting moods</strong>, and the live FF&amp;E table from the linked quote. They can <strong>approve or comment inline</strong>, right on the page. Because access is tied to that token, you can <strong>revoke the share link at any time</strong> to cut off access — useful once a project is closed or if a link was sent in error. For more on how the public-facing page behaves, see <a href="public-pages.html">Public pages &amp; sharing</a>.</p>
-  <p><strong>What it affects:</strong> anything the client does on the online page — an approval or a comment — comes <strong>back into the project</strong>, so you read their feedback in one place rather than chasing it across email.</p>
-
-  <h3>Building a Client View (every field)</h3>
-  <p>Open the <strong>Client View</strong> tab and click <strong>New Client View</strong>. The builder offers these fields:</p>
-
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
-    <tbody>
-      <tr><td>Title</td><td>The deliverable's title (e.g. <em>Modern Bathroom Design</em>).</td></tr>
-      <tr><td>Subtitle</td><td>A secondary line under the title.</td></tr>
-      <tr><td>Client name</td><td>Shown as "Prepared for…".</td></tr>
-      <tr><td>Date</td><td>The date for the deliverable.</td></tr>
-      <tr><td>Sheets to include</td><td>Pick and order the presentation sheets — drawn from any board in the project.</td></tr>
-      <tr><td>FF&amp;E source quote</td><td>Choose a <a href="quotes.html">quote</a> to render its live FF&amp;E table.</td></tr>
-      <tr><td>3D world</td><td>Choose a generated Marble world to embed an explorable walkthrough.</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <p>When you're done, <strong>Save &amp; generate PDF</strong> — or <strong>Save draft</strong> to come back later.</p>
-
-  <ul class="feat">
-    <li>The online client page (<span class="badge route">/cv/:token</span>) can also show <strong>switchable lighting moods</strong> on the hero render.</li>
-    <li>Clients can <strong>approve or comment inline</strong> directly on the page.</li>
-    <li>The <strong>share link is revocable</strong> — disable it at any time to cut off access.</li>
-  </ul>
-
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/client-view-builder.png" alt="The New Client View builder">
-    <figcaption>The New Client View builder.</figcaption>
-  </figure>
-
-  <h3>Step by step: deliver a Client View</h3>
-  <ol>
-    <li>Open the project → <strong>Client View</strong> → <strong>New Client View</strong>.</li>
-    <li>Set the <strong>Title</strong>, <strong>Subtitle</strong>, <strong>Client name</strong> and <strong>Date</strong>.</li>
-    <li><strong>Select and order</strong> the sheets to include — you can draw them from any of the project's <a href="moodboards.html">boards</a>.</li>
-    <li>Optionally pick an <strong>FF&amp;E source quote</strong> (to render its live FF&amp;E table) and a <strong>3D world</strong> (to embed a walkthrough).</li>
-    <li><strong>Save &amp; generate PDF</strong> to produce the downloadable version of the package.</li>
-    <li><strong>Copy the share link</strong> and send it to the client; revoke it at any time to cut off access. See <a href="public-pages.html">Public pages &amp; sharing</a> for how the public page behaves.</li>
-    <li>Read the client's inline <strong>approvals and comments</strong> back in the project.</li>
-  </ol>
-
-  <div class="callout tip"><p>The Client View is one level above a single board's deck: it can combine sheets from <em>several</em> boards in the project, and adds the interactive online surface on top of the PDF. Switch on only the embeds you actually have ready — there's no point enabling a 3D walkthrough or lighting moods if you haven't generated the underlying world or render yet.</p></div>
-
-  <h2>Inviting collaborators &amp; clients</h2>
-  <p><strong>What it is —</strong> a way to bring other people — teammates or the client — into a project via an invite link (<span class="badge route">/projects/invite/:token</span>). <strong>Why it matters —</strong> projects are collaborative: you may want a colleague working alongside you in the same boards and quotes, or the client looking in on progress. Invitations let you do that without handing over your whole workspace — shared users see the project marked as shared and get a reduced set of tabs, so the owner-only tabs (Products, Billing, Client View, Timeline) stay private.</p>
-  <h3>Step by step: invite a collaborator</h3>
-  <ol>
-    <li><strong>Create an invite</strong> for the teammate or client you want to bring into the project.</li>
-    <li><strong>Share the invite link</strong> (<span class="badge route">/projects/invite/:token</span>) with them.</li>
-    <li>The invitee lands on a <strong>public landing page</strong> and <strong>accepts</strong> the invite after signing in, gaining access to the project.</li>
-  </ol>
-  <p><strong>What it affects:</strong> accepted invitees gain access to the project's non-private tabs and see it flagged as shared; the owner-only tabs remain hidden from them.</p>
-
-  <h2 id="archiving">Archiving</h2>
-  <p><strong>What it is —</strong> a way to put a finished project out of sight without deleting it. <strong>Why it matters —</strong> completed jobs clutter the active list and slow you down, but you rarely want them gone for good — you may need to reference them later. Archiving hides a project from the active list while keeping everything intact. <strong>How:</strong> archive a project when it's finished; use <strong>Show archived</strong> on the list page to bring archived projects back into view at any time.</p>
-
-  <div class="callout"><p><strong>In short:</strong> create a project per client or job, do the design work in <a href="moodboards.html">moodboards</a> and price it in <a href="quotes.html">quotes</a>, break the scope into <strong>rooms</strong> if it helps with budgeting, then assemble the chosen sheets into a <strong>Client View</strong> and send the share link. The client opens it at <span class="badge route">/cv/:token</span>, explores the interactive extras, and approves or comments — and their feedback returns to the project.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

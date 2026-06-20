@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects: Other tabs | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Other tabs</div>
+  <h1>Projects · Other tabs</h1>
+  <div class="routes"><span class="badge route">/projects/:id</span></div>
+  <p class="lead">A project's detail page is organised into tabs that cover the work and its deliverables. This guide summarises the remaining tabs — the ones beyond <a href="projects-rooms.html">Rooms</a> and the <a href="projects-client-view.html">Client View</a> — in one line each, and shows how to bring teammates and clients into a project with an invite link.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>Projects</strong> → open a project to reach its detail page (<span class="badge route">/projects/:id</span>). The tabs run across the project's detail page. The set you see depends on your role — some tabs are owner-only or shown only when their module is enabled, and shared collaborators get a reduced set.</p>
+
+  <h2>What's on the screen — the tabs</h2>
+  <p>Each tab on the detail page does the following:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tab</th><th>What it's for</th></tr></thead>
+    <tbody>
+      <tr><td>Overview</td><td>A summary of the project — client, budget and deadline, status, key counts and a starting point.</td></tr>
+      <tr><td>Products</td><td>The products/materials gathered for this project <span class="badge gated">owner-only</span>.</td></tr>
+      <tr><td>Moodboards</td><td>The <a href="moodboards.html">moodboards</a> attached to the project.</td></tr>
+      <tr><td>Quotes</td><td>The <a href="quotes.html">quotes</a> for the project.</td></tr>
+      <tr><td>Billing</td><td>Billing for the project <span class="badge gated">owner-only</span>.</td></tr>
+      <tr><td>Finance</td><td>Project-linked finance, when the Finance module is available.</td></tr>
+      <tr><td>Sheets</td><td>Presentation sheets across the project's boards.</td></tr>
+      <tr><td>Tasks</td><td>To-dos for the project.</td></tr>
+      <tr><td>Timeline</td><td>Activity history <span class="badge gated">owner-only</span> — kept private from clients.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The two tabs covered in their own guides are <a href="projects-rooms.html">Rooms</a> (break the project down by room or area for organisation and budgeting) and the <a href="projects-client-view.html">Client View</a> (the client-ready deliverable, owner-only) — the headline capability the other tabs feed into.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-overview.png" alt="A project's Overview tab">
+    <figcaption>A project's Overview tab.</figcaption>
+  </figure>
+
+  <h2>Inviting collaborators &amp; clients</h2>
+  <p><strong>What it is —</strong> a way to bring other people — teammates or the client — into a project via an invite link (<span class="badge route">/projects/invite/:token</span>).</p>
+  <p><strong>Why it matters —</strong> projects are collaborative: you may want a colleague working alongside you in the same boards and quotes, or the client looking in on progress. Invitations let you do that without handing over your whole workspace — shared users see the project marked as shared and get a reduced set of tabs, so the owner-only tabs (Products, Billing, Client View, Timeline) stay private.</p>
+
+  <h2>How to invite a collaborator — step by step</h2>
+  <ol>
+    <li><strong>Create an invite</strong> for the teammate or client you want to bring into the project.</li>
+    <li><strong>Share the invite link</strong> (<span class="badge route">/projects/invite/:token</span>) with them.</li>
+    <li>The invitee lands on a <strong>public landing page</strong> and <strong>accepts</strong> the invite after signing in, gaining access to the project.</li>
+  </ol>
+  <p><strong>What it affects:</strong> accepted invitees gain access to the project's non-private tabs and see it flagged as shared; the owner-only tabs remain hidden from them.</p>
+
+  <div class="callout tip"><p><strong>Worked example — bringing in a colleague.</strong> Create an invite for the teammate → send them the link at <span class="badge route">/projects/invite/:token</span> → they open the public landing page, sign in, and accept. They now see the project's non-private tabs (Overview, Moodboards, Quotes, Finance, Sheets, Rooms, Tasks) marked as shared, while Products, Billing, Client View and Timeline stay private to you.</p></div>
+
+  <div class="callout"><p><strong>In short:</strong> the tabs keep a project's many moving parts separated but reachable from one place; <a href="projects-rooms.html">Rooms</a> and the <a href="projects-client-view.html">Client View</a> have their own guides, and invite links bring teammates and clients in with a reduced, owner-safe set of tabs.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

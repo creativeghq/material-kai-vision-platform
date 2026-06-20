@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoodBoards: Presentation sheets | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="moodboards.html">MoodBoards</a> / Presentation sheets</div>
+  <h1>MoodBoards · Presentation sheets</h1>
+  <div class="routes"><span class="badge route">/moodboard/:id</span></div>
+  <p class="lead">Presentation sheets are polished, client-ready A3 pages produced from a board — a material grid, a colour scheme, a lighting plan, a full deck. They are how a board stops being an internal collection and becomes a deliverable a client understands. This guide explains <strong>what each sheet type is, whether it's interactive or passive, what it costs and the inputs it expects</strong>, how sheets are generated through the Agent Hub (with an in-chat canvas for the interactive ones), and how the finished PDFs are stored on the board and bundled into a Client View.</p>
+
+  <h2>Where it is</h2>
+  <p>Open a board at <span class="badge route">/moodboard/:id</span>. Sheets are started from the board's <strong>Tools</strong> tab via <strong>New Tool</strong>, or simply by asking the <a href="agent-hub.html">Agent Hub</a> for the sheet you want. The finished PDF is attached to the board so you can re-open and re-render it later.</p>
+
+  <h2>What's on the screen</h2>
+  <p><strong>What it is —</strong> sheets are generated through the <a href="agent-hub.html">Agent Hub</a>: you describe the sheet you want, the assistant assembles it, and the finished PDF is attached to the board. <strong>Why it matters —</strong> each sheet is stored with the moodboard and can later be bundled into a project-level <a href="projects.html">Client View</a>. <strong>How —</strong> for <strong>passive</strong> sheets the assistant assembles the content and renders to PDF immediately; for <strong>interactive</strong> sheets it first opens an <strong>in-chat canvas</strong> where you place fixture symbols, draw dimensions, or position callouts directly on the image, and only then is the PDF rendered.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboard-detail.png" alt="MoodBoard detail">
+    <figcaption>A board's detail view — the Tools tab and New Tool are where presentation sheets begin.</figcaption>
+  </figure>
+  <div class="callout"><p><strong>Interactive vs passive:</strong> three sheet types — <strong>Lighting plan</strong>, <strong>Annotated render</strong> and <strong>Elevation / render pair</strong> — open an in-chat canvas first. You choose interactive types when the value is in <em>where</em> things sit on an image. The passive sheet types render immediately because their content is just a list or layout.</p></div>
+
+  <h2>The sheet types</h2>
+  <p>Reach for the <strong>passive</strong> sheets (Material board, Color palette, Concept board, FF&amp;E schedule, Area breakdown, Full deck) when the content is a list, a layout or a roll-up the assistant can assemble outright — they cost less or nothing and need no manual placement. Reach for the <strong>interactive</strong> sheets (Lighting plan, Annotated render, Elevation / render pair) when the whole point of the page is precise positioning on an image.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Sheet</th><th>Type</th><th>Cost</th><th>Key inputs</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Material board</strong><br><span class="muted">A grid of selected products with descriptive chips.</span></td><td>Passive</td><td>0 cr</td><td>Product IDs (up to 8) and, optionally, a short chip description per product.</td></tr>
+      <tr><td><strong>Color palette</strong><br><span class="muted">Named colour swatches for the scheme.</span></td><td>Passive</td><td>0 cr</td><td>Swatches, each with a hex value and a name, optionally sampled from a source image on the board.</td></tr>
+      <tr><td><strong>Concept board</strong><br><span class="muted">A free-form image layout telling the mood or story.</span></td><td>Passive</td><td>0 cr</td><td>An image layout with an optional caption per image.</td></tr>
+      <tr><td><strong>Lighting plan</strong><br><span class="muted">Fixture symbols placed over a backdrop, with a legend.</span></td><td>Interactive</td><td>3 cr</td><td>A backdrop, fixture symbols you place on it, and a legend.</td></tr>
+      <tr><td><strong>Annotated render</strong><br><span class="muted">Callouts pointing to specific products on a render.</span></td><td>Interactive</td><td>3 cr</td><td>A backdrop image plus callouts you position to point at products.</td></tr>
+      <tr><td><strong>Elevation / render pair</strong><br><span class="muted">An elevation and render side by side.</span></td><td>Interactive</td><td>2 cr</td><td>An elevation image and a render image, with dimensions and tile callouts you add.</td></tr>
+      <tr><td><strong>FF&amp;E schedule</strong><br><span class="muted">A furniture, fixtures &amp; equipment table.</span></td><td>Passive</td><td>0 cr</td><td>A linked quote (which supplies the items) or an explicit list of items.</td></tr>
+      <tr><td><strong>Area breakdown</strong><br><span class="muted">A one-page room spec.</span></td><td>Passive</td><td>2 cr</td><td>A hero render plus a plan, an elevation, a materials &amp; finishes list, fitting columns, a palette strip and notes.</td></tr>
+      <tr><td><strong>Full deck</strong><br><span class="muted">Several sheets combined into one PDF.</span></td><td>Passive</td><td>3 cr</td><td>The selected sheets to include (in order) plus a cover page.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>When to use each sheet</h3>
+  <ul class="feat">
+    <li><strong>Material board</strong> — when the client just needs to see the chosen products together, with a word or two of context per item. The everyday "here's the palette of materials" page.</li>
+    <li><strong>Color palette</strong> — when the colour scheme is the point: a clean strip of named swatches you can sample straight from images already on the board.</li>
+    <li><strong>Concept board</strong> — early in a project, when you're selling a <em>mood or story</em> rather than specific products: a free-form image collage with captions.</li>
+    <li><strong>Lighting plan</strong> (interactive) — when fixture positions matter: drop light symbols onto a backdrop and add a legend so an electrician or client reads the intent.</li>
+    <li><strong>Annotated render</strong> (interactive) — when you want a render that explicitly points at the products in it, so the viewer knows exactly what they're looking at.</li>
+    <li><strong>Elevation / render pair</strong> (interactive) — for the technical side-by-side: an elevation next to a render with dimensions and tile callouts you draw on.</li>
+    <li><strong>FF&amp;E schedule</strong> — when you need the formal furniture/fixtures/equipment table, typically pulled straight from a quote so pricing and the schedule agree.</li>
+    <li><strong>Area breakdown</strong> — when one page must say everything about a room: hero render, plan, elevation, materials &amp; finishes, fittings and a palette strip together.</li>
+    <li><strong>Full deck</strong> — at hand-off, to combine several finished sheets behind a cover page into one PDF you can send as the proposal.</li>
+  </ul>
+
+  <h2>Step by step: produce a presentation sheet</h2>
+  <ol>
+    <li>From the board, choose a sheet type — for example a <strong>material board</strong>, <strong>colour palette</strong>, <strong>lighting plan</strong>, <strong>FF&amp;E schedule</strong> or <strong>full deck</strong> — via the <strong>Tools</strong> tab's <strong>New Tool</strong>, or simply ask the assistant for it.</li>
+    <li>The <a href="agent-hub.html">Agent Hub</a> drives the sheet: describe what you want and the assistant assembles it.</li>
+    <li>For an interactive sheet, complete the <strong>in-chat canvas</strong> — place fixture symbols, draw dimensions, or position callouts directly on the image.</li>
+    <li>The finished sheet renders as an <strong>A3 PDF attached to the board</strong>, ready to re-open and re-render later.</li>
+  </ol>
+
+  <h2>Worked example — building a full deck for hand-off</h2>
+  <div class="callout tip"><p>Ask the <a href="agent-hub.html">Agent Hub</a> for a <strong>Material board</strong> (0 cr) of your chosen products with a chip description each, and a <strong>Color palette</strong> (0 cr) sampling swatches from images already on the board — both render to PDF immediately and attach to the board. Then ask for a <strong>Lighting plan</strong> (interactive, 3 cr): the in-chat canvas opens, you drop fixture symbols onto the backdrop and add a legend before it renders. Finally ask for a <strong>Full deck</strong> (3 cr), select those three sheets in the order you want plus a cover page, and the assistant combines them into one A3 PDF you can send as the proposal — or bundle into a <a href="projects.html">Projects → Client View</a>.</p></div>
+
+  <h2>What it affects</h2>
+  <p>On interactive sheets every symbol, callout and dimension is placed <strong>relative to the backdrop image</strong>, so the canvas and the rendered PDF stay in sync whatever the image size. Every sheet outputs an <strong>A3 PDF stored with the moodboard</strong>, so you can re-open and re-render it later — and the same sheets can be bundled into a project-level deliverable via <a href="projects.html">Projects → Client Views</a>. The complete catalogue of what the assistant can build is in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

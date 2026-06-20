@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quotes: Requests | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="quotes.html">Quotes &amp; Requests</a> / Requests</div>
+  <h1>Quotes · Requests</h1>
+  <div class="routes"><span class="badge route">/quotes/requests</span></div>
+  <p class="lead">The Requests tab is the front door for inbound demand. Instead of starting from a blank quote, you start from what a customer actually asked you to price. Each request is something a customer has asked you to quote; this tab collects them, lets you filter the list to focus on what still needs attention, and lets you convert any request into a real quote that then follows the normal build-and-send flow.</p>
+
+  <div class="callout"><p><strong>Where it is:</strong> top navigation → <strong>Quotes</strong> → the <strong>Requests</strong> tab at the top of the page (next to <strong>My Quotes</strong>).</p></div>
+
+  <h2>Where it is</h2>
+  <p>Quotes is split into two views you switch between at the top of the page: <strong>My Quotes</strong> <span class="badge route">/quotes</span> (everything you've created) and <strong>Requests</strong> <span class="badge route">/quotes/requests</span> (incoming quote requests from customers). This guide covers the Requests tab. For building and sending a quote once you've started one, see <a href="quotes-build.html">Quotes · Build &amp; send</a>.</p>
+
+  <h2>What's on the screen</h2>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/quotes/quotes-requests.png" alt="The Requests tab listing incoming quote requests">
+    <figcaption>The Requests tab — incoming quote requests from customers, with filtering, ready to review and convert.</figcaption>
+  </figure>
+  <p><strong>What it is —</strong> the <strong>Requests</strong> tab <span class="badge route">/quotes/requests</span> collects quote requests that come in from customers. <strong>Why it matters —</strong> it's the front door for inbound demand: instead of starting from a blank quote, you start from what the customer actually asked for. The tab gives you:</p>
+  <ul class="feat">
+    <li><strong>The requests list</strong> — incoming quote requests from customers, each one something a customer has asked you to price.</li>
+    <li><strong>Filter</strong> — narrow the list so you can focus on what still needs attention.</li>
+    <li><strong>Review</strong> — open a request to see exactly what the customer is after.</li>
+    <li><strong>Convert into a quote</strong> — start a real quote pre-populated from the request.</li>
+  </ul>
+
+  <h2>How to convert a request into a quote — step by step</h2>
+  <ol>
+    <li>Open <strong>Quotes</strong> from the top navigation and switch to the <strong>Requests</strong> tab <span class="badge route">/quotes/requests</span>.</li>
+    <li>Optionally <strong>Filter</strong> the list to focus on what still needs attention.</li>
+    <li>Open a request from the list.</li>
+    <li><strong>Review</strong> what the customer is asking for.</li>
+    <li><strong>Convert it into a quote</strong> — a real quote pre-populated from the request.</li>
+    <li>Continue as usual: add line items, prices and FF&amp;E specifications, preview the branded PDF, then send. See <a href="quotes-build.html">Quotes · Build &amp; send</a> for that flow.</li>
+  </ol>
+
+  <h2>Worked example — pricing a customer enquiry</h2>
+  <div class="callout tip">
+    <p><strong>A customer sends in a request and you turn it around.</strong></p>
+    <ol>
+      <li>Open <strong>Quotes → Requests</strong> <span class="badge route">/quotes/requests</span>. Use <strong>Filter</strong> to surface the requests still needing attention.</li>
+      <li>Open the customer's request and <strong>review</strong> what they've asked you to price.</li>
+      <li>Click to <strong>convert it into a quote</strong> — you get a real quote pre-populated from the request, so you're not starting from a blank page.</li>
+      <li>Add the remaining line items, set quantities and prices, fill in FF&amp;E specs where useful (room, dimensions, installation requirements, delivery date), then open <strong>Preview</strong> and send with <strong>Email Quote</strong> or <strong>Share</strong>.</li>
+    </ol>
+  </div>
+
+  <h2>What it affects</h2>
+  <p><strong>Converting a request creates a normal quote</strong> that then follows the exact build-and-send flow — the request just gives you a head start on its contents. From there the quote behaves like any other: it produces a branded PDF and a public, token-protected page at <span class="badge route">/q/:token</span> the customer can accept without logging in, and accepted work can flow into your <a href="finance.html">Finance &amp; Invoicing</a>. For the full builder — line items, the Custom Product FF&amp;E fields, Extras, Timeline and the send actions — see <a href="quotes-build.html">Quotes · Build &amp; send</a>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

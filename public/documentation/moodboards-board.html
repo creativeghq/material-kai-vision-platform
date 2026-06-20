@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoodBoards: Building a board | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="moodboards.html">MoodBoards</a> / Building a board</div>
+  <h1>MoodBoards · Building a board</h1>
+  <div class="routes"><span class="badge route">/moodboard</span> <span class="badge route">/moodboard/:id</span> <span class="badge route">/board/:id</span></div>
+  <p class="lead">A MoodBoard is where a project starts to take shape: you gather materials, finishes and inspiration images into one board, let the platform suggest matching products, and then turn that board into something a client can hold — a priced quote or a shareable public page. This guide covers the everyday work of building a board: creating it, the Items and Tools tabs, adding products, importing from Pinterest, finding complementary materials, generating a quote, and sharing. For each part it explains <strong>what it is, why it matters, how to do it, and what it changes elsewhere</strong>.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>MoodBoards</strong>. Click a board to open it at <span class="badge route">/moodboard/:id</span>, or click <strong>New MoodBoard</strong> to create one. A board you publish is reachable by anyone with its link at <span class="badge route">/board/:id</span>.</p>
+
+  <div class="callout tip"><p><strong>The natural workflow</strong> (each step builds on the last): <strong>create a board</strong> → <strong>Add Products</strong> and/or <strong>Import from Pinterest</strong> → run <strong>Find Products</strong> to round it out → ask the <a href="agent-hub.html">Agent Hub</a> to build <a href="moodboards-sheets.html">presentation sheets</a> → either <strong>Generate Quote</strong> for pricing or assemble the sheets into a project-level <a href="projects.html">Client View</a> for the final hand-off.</p></div>
+
+  <h2>What's on the screen</h2>
+
+  <h3>The list page</h3>
+  <p><strong>What it is —</strong> the home for every board you own. <strong>Why it matters —</strong> it is your overview of in-flight concepts at a glance, and the launch point for creating, opening, renaming and managing boards. Each board appears as a card showing its <strong>name</strong>, its <strong>visibility</strong> (a <span class="badge public">Public</span> or <span class="badge gated">Private</span> badge) and its <strong>item count</strong> (how many materials and images are on the board).</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/new-moodboard.png" alt="Create New MoodBoard dialog">
+    <figcaption>Creating a new moodboard (title + optional description).</figcaption>
+  </figure>
+  <p><strong>What it affects:</strong> deleting a board removes it <em>and its generated sheets</em> — but it does <strong>not</strong> delete the underlying catalogue products, so the materials remain available for other boards and quotes.</p>
+
+  <h3>The board detail page</h3>
+  <p><strong>What it is —</strong> the screen you reach when you open a board: two tabs (<strong>Items</strong> and <strong>Tools</strong>) plus an action toolbar. <strong>Why it matters —</strong> this is your workspace for the board — everything you do to build, enrich, price and publish a board happens here.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboard-detail.png" alt="MoodBoard detail">
+    <figcaption>A board's detail view with the Items / Tools tabs and the action toolbar.</figcaption>
+  </figure>
+  <ul class="feat">
+    <li><strong>Items tab</strong> — the board itself: the materials and images you've collected, arranged as a visual grid. Review what's on the board, open an individual item to inspect it, arrange items, or remove ones you no longer want. The products visible here are what feed <strong>Generate Quote</strong> and the product-based presentation sheets, so curating this tab directly shapes those deliverables.</li>
+    <li><strong>Tools tab</strong> — board-level helpers. The key one is <strong>Find Products</strong>, which looks across the catalogue for materials that match what's already on the board. It is also where you reach <strong>New Tool</strong> to start a <a href="moodboards-sheets.html">presentation sheet</a>.</li>
+  </ul>
+
+  <h3>The action toolbar</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Action</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Add Products</strong></td><td>Add catalogue materials directly to the board.</td></tr>
+      <tr><td><strong>Import from Pinterest</strong></td><td>Paste a single pin URL, or connect your Pinterest account to browse boards and import images in bulk. Imported images are automatically matched against the catalogue so the platform can suggest the products that look closest.</td></tr>
+      <tr><td><strong>Generate Quote</strong></td><td>Turn the board's products into a <a href="quotes.html">quote</a>. Enabled once the board contains at least one product.</td></tr>
+      <tr><td><strong>Public / Private</strong></td><td>Toggle the board's visibility. Public boards can be opened by anyone with the share link.</td></tr>
+      <tr><td><strong>Delete</strong></td><td>Remove the board and its generated sheets.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Add Products</h3>
+  <p><strong>What it is —</strong> the direct route to put catalogue materials on the board. <strong>Why it matters —</strong> the products you add are the raw material for everything downstream — a quote, a material board, an FF&amp;E schedule all draw on them. <strong>How —</strong> open <strong>Add Products</strong>, search the catalogue, and add the materials you want. <strong>What it affects:</strong> every added product increases the board's item count, enables <strong>Generate Quote</strong> (which needs at least one product), and becomes available to the product-based sheet types.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/add-products.png" alt="Add Products dialog">
+    <figcaption>Add Products — search the catalogue to add materials to the board.</figcaption>
+  </figure>
+
+  <h3>Import from Pinterest</h3>
+  <p><strong>What it is —</strong> a way to pull inspiration images into the board from Pinterest. <strong>Why it matters —</strong> clients and designers often gather references on Pinterest first; this brings those references in and connects them back to real, purchasable products. <strong>How —</strong> paste a single <strong>pin URL</strong>, or connect your Pinterest account to browse your boards and import images in <strong>bulk</strong>. <strong>What it affects:</strong> imported images are automatically matched against the catalogue, so the platform suggests the products that look closest — turning loose inspiration into candidate materials you can add to the board.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/pinterest-import.png" alt="Import from Pinterest dialog">
+    <figcaption>Import from Pinterest — paste a pin URL (or connect Pinterest); images are auto-matched to catalogue products.</figcaption>
+  </figure>
+
+  <h3>Find Products</h3>
+  <p><strong>What it is —</strong> the board-level catalogue matcher in the <strong>Tools</strong> tab. <strong>Why it matters —</strong> it rounds out a concept with complementary items so you don't have to guess what else pairs well. <strong>How —</strong> open the <strong>Tools</strong> tab and run <strong>Find Products</strong>; it reads what's already on the board and suggests matching catalogue materials. <strong>What it affects:</strong> suggestions you accept become board products — feeding the same downstream quote and sheets as anything you add manually.</p>
+
+  <h3>Generate Quote</h3>
+  <p><strong>What it is —</strong> the action that converts the board's products into a <a href="quotes.html">quote</a>. <strong>Why it matters —</strong> it is the moment a visual concept becomes a priced proposal — no re-entering products. <strong>How —</strong> once the board contains at least one product the button is enabled; click it to generate the quote from those products. <strong>What it affects:</strong> it creates a quote you then refine in the Quotes area; that quote can in turn supply the items for an <strong>FF&amp;E schedule</strong> sheet, closing the loop between board, pricing and presentation.</p>
+
+  <h3>Public / Private</h3>
+  <p><strong>What it is —</strong> the visibility toggle for the board. <strong>Why it matters —</strong> it decides whether the board is a private working space or a shareable reference. <strong>How —</strong> flip <strong>Public / Private</strong>. <strong>What it affects:</strong> a public board can be opened by anyone with its link at <span class="badge route">/board/:id</span>; a private board is visible only to you and your workspace.</p>
+
+  <div class="callout tip"><p><strong>Saving from the AI chat:</strong> when the <a href="agent-hub.html">Agent Hub</a> returns a product or generated image you like, you can save it straight into a moodboard. A <em>copy</em> of the image is kept on the board, so it survives even if you later delete the conversation it came from.</p></div>
+
+  <h2>Step by step: create a board</h2>
+  <ol>
+    <li>From the top navigation open <strong>MoodBoards</strong>, then click <strong>New MoodBoard</strong>.</li>
+    <li>Enter a <strong>title</strong> for the board (and an optional <strong>description</strong>), then confirm.</li>
+    <li>Open the new board to reach its detail page with the <strong>Items</strong> and <strong>Tools</strong> tabs.</li>
+  </ol>
+
+  <h2>Step by step: add materials</h2>
+  <ol>
+    <li>On the board's detail page, use <strong>Add Products</strong> to search the catalogue and add materials to the board.</li>
+    <li>Optionally use <strong>Import from Pinterest</strong> to bring in images — they are auto-matched to catalogue products — or open the <strong>Tools</strong> tab and run <strong>Find Products</strong> to surface complementary materials.</li>
+    <li>Arrange the items on the <strong>Items</strong> tab until the board reflects your concept.</li>
+    <li>When the board has at least one product, click <strong>Generate Quote</strong> if you want to turn it into a priced <a href="quotes.html">quote</a>.</li>
+  </ol>
+
+  <h2>Step by step: share a board</h2>
+  <ol>
+    <li>Set the board to <span class="badge public">Public</span> using the <strong>Public / Private</strong> toggle.</li>
+    <li>Copy its share link at <span class="badge route">/board/:id</span> and send it to your client or colleague — no account needed to open it.</li>
+    <li>For a richer, project-level deliverable that bundles sheets across boards — with an embedded 3D walkthrough, lighting moods, a live FF&amp;E table and inline client approval — bundle them into a <a href="projects.html">Projects → Client View</a> instead.</li>
+  </ol>
+
+  <h2>Worked example — turning a Pinterest reference into a priced board</h2>
+  <div class="callout tip"><p>Open <strong>MoodBoards → New MoodBoard</strong> and give it a title and short description → on the detail page click <strong>Import from Pinterest</strong> and paste a pin URL; the platform auto-matches that image against the catalogue and suggests the closest products, which you add to the board → run <strong>Find Products</strong> from the <strong>Tools</strong> tab to round out the concept with complementary materials → arrange everything on the <strong>Items</strong> tab → click <strong>Generate Quote</strong> to convert the board's products into a priced proposal, then set the board <span class="badge public">Public</span> and send the <span class="badge route">/board/:id</span> link so the client can see the visual reference while you finish the quote.</p></div>
+
+  <h2>What it affects</h2>
+  <p>Everything you collect on a board can be re-used downstream: the products become a <a href="quotes.html">quote</a>, the board becomes <a href="moodboards-sheets.html">presentation sheets</a>, and the sheets feed a Client View. Deleting a board removes it and its generated sheets but leaves the underlying catalogue products intact. For larger deliverables that combine sheets from <em>several</em> boards, MoodBoards feed into <a href="projects.html">Projects → Client Views</a>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
