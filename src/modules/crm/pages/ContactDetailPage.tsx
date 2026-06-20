@@ -500,28 +500,22 @@ export const ContactDetailPage: React.FC = () => {
               <FileText className="h-4 w-4 mr-2" />
               Notes & Activity
             </TabsTrigger>
-            {/* Finance tabs need a saved contact to query against — hide them
-                while creating a new contact (nothing exists to show yet). */}
-            {!isNew && (
-              <>
-                <TabsTrigger value="account">
-                  <Wallet className="h-4 w-4 mr-2" />
-                  Account
-                </TabsTrigger>
-                <TabsTrigger value="quotes">
-                  <ScrollText className="h-4 w-4 mr-2" />
-                  Quotes
-                </TabsTrigger>
-                <TabsTrigger value="invoices">
-                  <Receipt className="h-4 w-4 mr-2" />
-                  Invoices
-                </TabsTrigger>
-                <TabsTrigger value="payments">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Payments
-                </TabsTrigger>
-              </>
-            )}
+            <TabsTrigger value="account">
+              <Wallet className="h-4 w-4 mr-2" />
+              Account
+            </TabsTrigger>
+            <TabsTrigger value="quotes">
+              <ScrollText className="h-4 w-4 mr-2" />
+              Quotes
+            </TabsTrigger>
+            <TabsTrigger value="invoices">
+              <Receipt className="h-4 w-4 mr-2" />
+              Invoices
+            </TabsTrigger>
+            <TabsTrigger value="payments">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Payments
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -1162,26 +1156,32 @@ export const ContactDetailPage: React.FC = () => {
 
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
-            {contact.id && <CustomerAccountOverview contactId={contact.id} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />}
-            {contact.id && <CustomerFinanceRulesCard contactId={contact.id} />}
+            {contact.id ? (
+              <>
+                <CustomerAccountOverview contactId={contact.id} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
+                <CustomerFinanceRulesCard contactId={contact.id} />
+              </>
+            ) : (
+              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to see their account overview.</CardContent></Card>
+            )}
           </TabsContent>
 
           {/* Quotes Tab */}
           <TabsContent value="quotes" className="space-y-4">
             {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
-            {contact.id && <CustomerQuotesTab contactId={contact.id} />}
+            <CustomerQuotesTab contactId={contact.id} customerName={contact.name} />
           </TabsContent>
 
           {/* Invoices Tab */}
           <TabsContent value="invoices" className="space-y-4">
             {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
-            {contact.id && <CustomerInvoicesTab contactId={contact.id} />}
+            <CustomerInvoicesTab contactId={contact.id} customerName={contact.name} />
           </TabsContent>
 
           {/* Payments Tab */}
           <TabsContent value="payments" className="space-y-4">
             {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
-            {contact.id && <CustomerPaymentsTab contactId={contact.id} />}
+            <CustomerPaymentsTab contactId={contact.id} customerName={contact.name} />
           </TabsContent>
         </Tabs>
       </div>

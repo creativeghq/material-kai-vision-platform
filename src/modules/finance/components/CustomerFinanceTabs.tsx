@@ -2,8 +2,8 @@
 // Mounts inside ContactDetailPage / CompanyDetailPage. Each tab is self-contained
 // and lazy-loads its data on first render.
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Loader2, FileText, ArrowUpRight, Mail, Wallet, ShoppingBag } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Loader2, FileText, ArrowUpRight, Mail, Wallet, ShoppingBag, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -17,8 +17,13 @@ import {
   type PaymentWithAllocation,
   type CustomerTopProductRow,
 } from '@/modules/finance/services/financeService';
+import { quotesService } from '@/modules/quotes/services/QuotesService';
+import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 
-type Target = { contactId?: string; companyId?: string };
+// `customerName` is optional metadata used only to label the customer inside the
+// create dialogs; the ids are what actually scope the created records.
+type Target = { contactId?: string; companyId?: string; customerName?: string };
 
 export const CustomerFinanceSummary: React.FC<Target> = ({ contactId, companyId }) => {
   const [summary, setSummary] = useState<{
@@ -287,17 +292,21 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   );
 };
 
-export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId }) => {
+export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId, customerName }) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [rows, setRows] = useState<Array<{
     id: string; quote_number: string | null; name: string | null; status: string;
     grand_total: number | null; currency: string | null; created_at: string;
   }>>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const enabled = Boolean(contactId || companyId);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId]);
 
   const load = async () => {
-    if (!contactId && !companyId) return;
+    if (!enabled) { setLoading(false); return; }
     let q = supabase
       .from('quotes')
       .select('id, quote_number, name, status, grand_total, currency, created_at')
@@ -309,10 +318,30 @@ export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId }) =>
     setLoading(false);
   };
 
+  const createQuote = async () => {
+    if (!enabled) return;
+    setCreating(true);
+    try {
+      const quote = await quotesService.createQuote({
+        name: customerName ? `Quote for ${customerName}` : undefined,
+        customer_contact_id: contactId ?? null,
+        customer_company_id: companyId ?? null,
+      });
+      navigate(`/quotes/${quote.id}`);
+    } catch (e: any) {
+      toast({ title: 'Could not create quote', description: e?.message, variant: 'destructive' });
+      setCreating(false);
+    }
+  };
+
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3">
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm">Quotes ({rows.length})</CardTitle>
+        <Button size="sm" className="rounded-full" onClick={createQuote} disabled={!enabled || creating}>
+          {creating ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-2" />}
+          New quote
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">
@@ -328,8 +357,16 @@ export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId }) =>
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
+            ) : !enabled ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">Save this customer first to create a quote.</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No quotes for this customer.</td></tr>
+              <tr><td colSpan={5} className="px-6 py-8 text-center">
+                <div className="text-sm text-muted-foreground mb-3">No quotes for this customer yet.</div>
+                <Button size="sm" variant="outline" className="rounded-full" onClick={createQuote} disabled={creating}>
+                  {creating ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-2" />}
+                  Create the first quote
+                </Button>
+              </td></tr>
             ) : (
               rows.map((q) => (
                 <tr key={q.id} className="border-b border-border/30 hover:bg-muted/30">
@@ -350,14 +387,17 @@ export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId }) =>
   );
 };
 
-export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId }) => {
+export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId, customerName }) => {
+  const { activeWorkspaceId } = useWorkspace();
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const enabled = Boolean(contactId || companyId);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId]);
 
   const load = async () => {
-    if (!contactId && !companyId) return;
+    if (!enabled) { setLoading(false); return; }
     const invoices = await financeService.listInvoices({
       customerContactId: contactId,
       customerCompanyId: companyId,
@@ -366,10 +406,18 @@ export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId }) 
     setLoading(false);
   };
 
+  const initialCustomer = enabled
+    ? { type: (companyId ? 'company' : 'contact') as 'company' | 'contact', id: (companyId ?? contactId)!, label: customerName ?? 'Selected customer' }
+    : null;
+
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3">
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm">Invoices ({rows.length})</CardTitle>
+        <Button size="sm" className="rounded-full" onClick={() => setDialogOpen(true)} disabled={!enabled || !activeWorkspaceId}>
+          <Plus className="h-3.5 w-3.5 mr-2" />
+          New invoice
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">
@@ -387,8 +435,16 @@ export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId }) 
           <tbody>
             {loading ? (
               <tr><td colSpan={7} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
+            ) : !enabled ? (
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">Save this customer first to create an invoice.</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">No invoices for this customer.</td></tr>
+              <tr><td colSpan={7} className="px-6 py-8 text-center">
+                <div className="text-sm text-muted-foreground mb-3">No invoices for this customer yet.</div>
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDialogOpen(true)} disabled={!activeWorkspaceId}>
+                  <Plus className="h-3.5 w-3.5 mr-2" />
+                  Create the first invoice
+                </Button>
+              </td></tr>
             ) : (
               rows.map((i) => (
                 <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30">
@@ -409,18 +465,30 @@ export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId }) 
           </tbody>
         </table>
       </CardContent>
+      {activeWorkspaceId && (
+        <NewInvoiceDialog
+          workspaceId={activeWorkspaceId}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          initialCustomer={initialCustomer}
+          onCreated={() => { setDialogOpen(false); void load(); }}
+        />
+      )}
     </Card>
   );
 };
 
-export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId }) => {
+export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId, customerName }) => {
+  const { activeWorkspaceId } = useWorkspace();
   const [rows, setRows] = useState<PaymentWithAllocation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const enabled = Boolean(contactId || companyId);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId]);
 
   const load = async () => {
-    if (!contactId && !companyId) return;
+    if (!enabled) { setLoading(false); return; }
     const data = await financeService.listPayments({
       counterpartyContactId: contactId,
       counterpartyCompanyId: companyId,
@@ -432,8 +500,12 @@ export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId }) 
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3">
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm">Payments received ({rows.length})</CardTitle>
+        <Button size="sm" className="rounded-full" onClick={() => setDialogOpen(true)} disabled={!enabled || !activeWorkspaceId}>
+          <Plus className="h-3.5 w-3.5 mr-2" />
+          Record payment
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">
@@ -449,8 +521,16 @@ export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId }) 
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
+            ) : !enabled ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">Save this customer first to record a payment.</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No payments recorded from this customer.</td></tr>
+              <tr><td colSpan={5} className="px-6 py-8 text-center">
+                <div className="text-sm text-muted-foreground mb-3">No payments recorded from this customer yet.</div>
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDialogOpen(true)} disabled={!activeWorkspaceId}>
+                  <Plus className="h-3.5 w-3.5 mr-2" />
+                  Record a payment
+                </Button>
+              </td></tr>
             ) : (
               rows.map((p) => (
                 <tr key={p.id} className="border-b border-border/30">
@@ -483,6 +563,15 @@ export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId }) 
           </tbody>
         </table>
       </CardContent>
+      {activeWorkspaceId && (
+        <RecordPaymentDialog
+          workspaceId={activeWorkspaceId}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          initialCounterparty={{ contactId: contactId ?? null, companyId: companyId ?? null }}
+          onSaved={() => { setDialogOpen(false); void load(); }}
+        />
+      )}
     </Card>
   );
 };

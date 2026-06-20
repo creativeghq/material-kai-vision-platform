@@ -57,7 +57,14 @@ interface LineItem {
   advancedOpen?: boolean;
 }
 
-interface Props { workspaceId: string; open: boolean; onOpenChange: (open: boolean) => void; onCreated: (invoiceId: string) => void; }
+interface Props {
+  workspaceId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (invoiceId: string) => void;
+  /** Pre-select the buyer (e.g. opened from a CRM party page). */
+  initialCustomer?: Customer | null;
+}
 
 const DOC_FAMILY: Record<string, string> = {
   '1': 'Sales invoices', '2': 'Service invoices', '3': 'Proof of expense', '5': 'Credit notes',
@@ -102,7 +109,7 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
   return { unit: meta.unit, color: typeof color === 'string' ? color : '', size: typeof size === 'string' ? size : '' };
 }
 
-export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer }) => {
   const { toast } = useToast();
   const handleQuotaError = useQuotaErrorHandler();
   const navigate = useNavigate();
@@ -229,7 +236,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // ── Reset on open ──
   useEffect(() => {
     if (!open) return;
-    setCustomer(null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
+    // Pre-select the buyer when opened from a party page; the [customer] effect
+    // below loads its address. Otherwise start blank.
+    setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
     setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
     setDocumentType('1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(''); setIssueNow(true);
@@ -243,7 +252,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setVehicleNumber(''); setResponsible(''); setMovePurpose('1');
     setIsB2g(false); setB2gContractRef(''); setB2gBuyerRef(''); setB2gBuyerReg('');
     setB2gBuyerIdentifier(''); setB2gBudgetIdentifier(''); setB2gDueDate('');
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialCustomer?.id, initialCustomer?.type]);
 
   // ── Load catalogs + issuer ──
   useEffect(() => {

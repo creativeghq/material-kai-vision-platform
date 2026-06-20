@@ -39,7 +39,10 @@ export const RecordPaymentDialog: React.FC<{
   onOpenChange: (v: boolean) => void;
   onSaved: () => void;
   preset?: RecordPaymentPreset | null;
-}> = ({ workspaceId, open, onOpenChange, onSaved, preset }) => {
+  /** Tie the payment to a specific party when there's no allocation target
+   *  (e.g. opened from a CRM party page → records as customer credit). */
+  initialCounterparty?: { contactId?: string | null; companyId?: string | null } | null;
+}> = ({ workspaceId, open, onOpenChange, onSaved, preset, initialCounterparty }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -156,6 +159,13 @@ export const RecordPaymentDialog: React.FC<{
         allocations = [{ target_id: selectedTarget.man.id, target_type: 'manual_entry', amount: amt }];
         counterpartyCompanyId = selectedTarget.man.counterparty_company_id ?? null;
         counterpartyContactId = selectedTarget.man.counterparty_contact_id ?? null;
+      }
+
+      // No target chosen (unallocated / on-account) → tie it to the party the
+      // dialog was opened for so it still rolls up under that customer.
+      if (!counterpartyCompanyId && !counterpartyContactId && initialCounterparty) {
+        counterpartyCompanyId = initialCounterparty.companyId ?? null;
+        counterpartyContactId = initialCounterparty.contactId ?? null;
       }
 
       await financeService.recordPayment({
