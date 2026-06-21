@@ -581,6 +581,22 @@ All colors MUST be HSL.
     flex: 0 0 auto;
     scroll-snap-align: start;
   }
+
+  /* "There's more" affordance: fade whichever edge still has off-screen tabs.
+     Driven by the data-overflow attribute the TabsList sets from its scroll
+     position (see tabs.tsx). 24px keeps a label edge faintly visible. */
+  [role='tablist'][data-overflow='right'] {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  }
+  [role='tablist'][data-overflow='left'] {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px);
+    mask-image: linear-gradient(to right, transparent 0, #000 24px);
+  }
+  [role='tablist'][data-overflow='both'] {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  }
 }
 
 @layer components {
