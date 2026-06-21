@@ -40,7 +40,7 @@ function _syncEnvIntoPolyfill() {
 _syncEnvIntoPolyfill();
 
 // ── Imports ──
-import { generateText, generateImage, experimental_generateVideo as generateVideo, Output, isStepCount } from 'npm:ai@6';
+import { generateText, generateImage, experimental_generateVideo as generateVideo, Output, stepCountIs } from 'npm:ai@6';
 import { createGoogleGenerativeAI } from 'npm:@ai-sdk/google@3';
 import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
 import { createKlingAI } from 'npm:@ai-sdk/klingai';
@@ -411,7 +411,7 @@ export async function generateWithClaudeTools(
       temperature: config.temperature ?? 0.4,
       maxTokens: config.maxTokens ?? 1024,
       tools: config.tools,
-      stopWhen: isStepCount(config.maxSteps ?? 6),
+      stopWhen: stepCountIs(config.maxSteps ?? 6),
     });
 
     const usage = await result.usage;
