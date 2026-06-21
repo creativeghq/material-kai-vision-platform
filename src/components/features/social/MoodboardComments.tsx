@@ -60,12 +60,24 @@ export const MoodboardComments: React.FC<MoodboardCommentsProps> = ({
       toast({ title: 'Error', description: 'Could not post comment.', variant: 'destructive' });
     } else {
       setComments((prev) => [...prev, data as Comment]);
+      const snippet = text.trim().slice(0, 100);
       setText('');
+      // Notify the moodboard owner (unless they're commenting on their own board).
+      const { data: mb } = await supabase
+        .from('moodboards').select('user_id, title').eq('id', moodboardId).maybeSingle();
+      const ownerId = mb?.user_id && mb.user_id !== currentUserId ? mb.user_id : null;
       flowEventService.emit('moodboard_commented', {
         moodboard_id: moodboardId,
         comment_id: data.id,
         commenter_id: currentUserId,
-        content_snippet: text.trim().slice(0, 100),
+        content_snippet: snippet,
+        ...(ownerId ? {
+          user_id: ownerId, // recipient — consumed by create_notification
+          type: 'moodboard_commented',
+          title: `New comment on "${mb?.title || 'your moodboard'}"`,
+          body: snippet,
+          action_url: `/moodboard/${moodboardId}`,
+        } : {}),
       });
     }
     setSubmitting(false);

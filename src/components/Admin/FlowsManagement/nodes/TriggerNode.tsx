@@ -37,6 +37,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   profile_followed: UserPlus,
   profile_published: UserPlus,
   material_reviewed: CheckCircle2,
+  review_submitted: CheckCircle2,
   preferred_factory_added: Package,
   quote_pdf_generated: FileCheck,
   factory_approved: CheckCircle2,

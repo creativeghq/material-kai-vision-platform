@@ -103,8 +103,13 @@ export const ReviewModal: React.FC<{
 
     if (!existingReview) {
       flowEventService.emit('review_submitted', {
+        user_id: toUserId, // recipient (the reviewed professional) — consumed by create_notification
         to_user_id: toUserId,
         from_user_id: user.id,
+        type: 'review_submitted',
+        title: 'You received a new review',
+        body: `Someone left you a ${overall}-star review.`,
+        action_url: '/profile',
         overall_rating: overall,
         service_name: payload.service_name,
         submitted_at: new Date().toISOString(),

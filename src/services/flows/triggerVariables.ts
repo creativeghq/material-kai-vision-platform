@@ -83,6 +83,12 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'follower_id', label: 'Follower ID', note: 'The user who started following.' },
     { key: 'following_id', label: 'Followed ID', note: 'The profile being followed.' },
   ]),
+  review_submitted: withStandard([
+    { key: 'to_user_id', label: 'Reviewed user ID', note: 'The professional who received the review (recipient).' },
+    { key: 'from_user_id', label: 'Reviewer ID', note: 'Who left the review.' },
+    { key: 'overall_rating', label: 'Rating', note: 'Star rating left.', example: '5' },
+    { key: 'service_name', label: 'Service', note: 'The service the review is about, if any.' },
+  ]),
   material_reviewed: withStandard([
     { key: 'product_id', label: 'Product ID', note: 'The reviewed material.' },
     { key: 'reviewer_id', label: 'Reviewer ID', note: 'Who left the review.' },
@@ -241,6 +247,7 @@ export const TRIGGER_TITLES: Record<string, string> = {
   pricing_change_decided: 'Discount approval decided',
   profile_followed: 'New follower',
   material_reviewed: 'Material reviewed',
+  review_submitted: 'Profile review received',
   preferred_factory_added: 'Preferred factory added',
   vr_world_created: 'VR world ready',
   vr_world_failed: 'VR world failed',

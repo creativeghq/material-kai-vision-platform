@@ -36,6 +36,7 @@ export type TriggerType =
   | 'profile_followed'
   | 'profile_published'
   | 'material_reviewed'
+  | 'review_submitted'
   | 'preferred_factory_added'
   // ── Added 2026-05-30: event vocabulary for notification→flow migration ──
   | 'quote_pdf_generated'
@@ -81,6 +82,7 @@ export interface ExpenseCardReviewedTriggerConfig {}
 export interface ExpenseCardRequestedTriggerConfig {}
 export interface PricingChangeRequestedTriggerConfig {}
 export interface PricingChangeDecidedTriggerConfig {}
+export interface ReviewSubmittedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
   cron: string;
@@ -217,6 +219,7 @@ export type TriggerConfigMap = {
   profile_followed: ProfileFollowedTriggerConfig;
   profile_published: ProfilePublishedTriggerConfig;
   material_reviewed: MaterialReviewedTriggerConfig;
+  review_submitted: ReviewSubmittedTriggerConfig;
   preferred_factory_added: PreferredFactoryAddedTriggerConfig;
   quote_pdf_generated: QuotePdfGeneratedTriggerConfig;
   factory_approved: FactoryApprovedTriggerConfig;
