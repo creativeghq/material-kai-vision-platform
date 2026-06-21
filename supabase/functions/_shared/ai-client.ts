@@ -55,6 +55,10 @@ import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
 // AI_PRICING in _shared/ai-logger.ts. Markup is applied as 1.5×.
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+// Lazy getter (NOT a module-load capture) so values bootstrapped into Deno.env
+// inside the request handler are picked up. Used by the raw-fetch Gemini multi-image
+// + Veo paths (the AI SDK `google` proxy covers the single-image path separately).
+const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -551,7 +555,7 @@ async function generateMultiImageWithGemini(
   prompt: { text: string; images: (Uint8Array | string)[] },
   config: { model: GeminiImageModel },
 ): Promise<GeminiImageResult> {
-  if (!GOOGLE_API_KEY) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
+  if (!GOOGLE_API_KEY()) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
 
   /** Safe base64 encoder that doesn't blow the call stack on large Uint8Arrays */
   const toBase64 = (bytes: Uint8Array): string => {
@@ -603,7 +607,7 @@ async function generateMultiImageWithGemini(
   parts.push({ text: prompt.text });
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${GOOGLE_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${GOOGLE_API_KEY()}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -691,7 +695,7 @@ async function generateVideoWithVeoRaw(
   modelId: VeoModel,
   config?: { aspectRatio?: string; durationSeconds?: number; resolution?: string },
 ): Promise<VeoVideoResult> {
-  if (!GOOGLE_API_KEY) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
+  if (!GOOGLE_API_KEY()) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
 
   // Fetch source image → base64
   const imgRes = await fetch(imageUrl);
@@ -709,7 +713,7 @@ async function generateVideoWithVeoRaw(
 
   // Submit long-running operation
   const submitRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:predictLongRunning?key=${GOOGLE_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:predictLongRunning?key=${GOOGLE_API_KEY()}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -741,7 +745,7 @@ async function generateVideoWithVeoRaw(
     await new Promise(r => setTimeout(r, 10_000));
 
     const pollRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/${opName}?key=${GOOGLE_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/${opName}?key=${GOOGLE_API_KEY()}`,
     );
     if (!pollRes.ok) continue;
 
@@ -771,8 +775,8 @@ async function generateVideoWithVeoRaw(
       if (sample.video.uri) {
         // The URI is a generativelanguage.googleapis.com endpoint — requires API key
         const videoFetchUrl = sample.video.uri.includes('?')
-          ? `${sample.video.uri}&key=${GOOGLE_API_KEY}`
-          : `${sample.video.uri}?key=${GOOGLE_API_KEY}`;
+          ? `${sample.video.uri}&key=${GOOGLE_API_KEY()}`
+          : `${sample.video.uri}?key=${GOOGLE_API_KEY()}`;
         const vidRes = await fetch(videoFetchUrl);
         if (!vidRes.ok) throw new Error(`Veo: failed to download video (${vidRes.status}): ${await vidRes.text()}`);
         const vidBytes = new Uint8Array(await vidRes.arrayBuffer());
