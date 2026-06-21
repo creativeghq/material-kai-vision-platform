@@ -547,9 +547,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     </Select>
                     <p className="text-xs text-muted-foreground leading-snug">
                       {effectiveLocked
-                        ? 'Locked — cannot be deleted and is preserved across a platform reset.'
+                        ? 'Locked — cannot be manually deleted.'
                         : 'Unlocked — can be deleted normally.'}
                       {' '}Agent-readable categories lock their docs by default; choose <span className="font-medium">Unlocked</span> to override and allow deletion.
+                      {' '}All Knowledge Base articles are preserved on a platform reset regardless of this setting — the lock only blocks manual deletion.
                     </p>
                   </div>
                 );
