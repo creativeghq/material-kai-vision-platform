@@ -992,17 +992,33 @@ async function handleJwtAction(
         return true;
       });
 
+      // Buyer emails for the send_email branch of the seeded flow (notify branch
+      // needs only user_id; email branch needs `email` + `subject`).
+      const uniqueUserIds = [...new Set(matches.map((w) => w.user_id))];
+      const emailById = new Map<string, string>();
+      if (uniqueUserIds.length > 0) {
+        const { data: profs } = await db
+          .from('user_profiles').select('user_id, email').in('user_id', uniqueUserIds);
+        for (const p of (profs || []) as Array<{ user_id: string; email: string | null }>) {
+          if (p.email) emailById.set(p.user_id, p.email);
+        }
+      }
+
       // One notification per buyer even if several of their want-lists match.
       const seen = new Set<string>();
       let notified = 0;
       for (const w of matches) {
         if (seen.has(w.user_id)) continue;
         seen.add(w.user_id);
+        const listingTitle = l.title || 'a listing';
+        const priceLine = price != null ? ` — ${l.currency || ''} ${price}`.trimEnd() : '';
         await emitFlowEvent('marketplace_want_match', {
           user_id: w.user_id, // recipient — consumed by create_notification
+          email: emailById.get(w.user_id) || null, // consumed by send_email (skips if null)
           type: 'marketplace_want_match',
-          title: `New surplus match: ${l.title || 'a listing'}`,
-          body: `A listing matching your saved alert${w.label ? ` "${w.label}"` : ''} was just posted${price != null ? ` — ${l.currency || ''} ${price}`.trimEnd() : ''}.`,
+          subject: `New surplus match: ${listingTitle}`,
+          title: `New surplus match: ${listingTitle}`,
+          body: `A listing matching your saved alert${w.label ? ` "${w.label}"` : ''} was just posted${priceLine}.`,
           action_url: '/discover',
           listing_id: listingId,
           listing_title: l.title || null,
