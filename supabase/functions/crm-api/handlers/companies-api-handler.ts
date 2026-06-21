@@ -22,6 +22,7 @@ const COMPANY_WRITABLE_COLUMNS = [
   'linkedin', 'twitter', 'facebook', 'description',
   'is_supplier', 'is_customer', 'discount_percent', 'discount_notes', 'credit_limit',
   'user_level_key', // #227 — pricing level
+  'prices_vat_inclusive', // #227 — show this customer gross (VAT-incl) prices
 
   // #207 — commercial depth: segmentation, ΜΥΦ inclusion, on-invoice VAT-exemption
   // reason, and a separate billing identity (consumed by partyFromCrm at issue).

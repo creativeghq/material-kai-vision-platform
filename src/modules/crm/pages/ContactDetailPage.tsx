@@ -81,6 +81,7 @@ interface Contact {
   discount_notes?: string | null;
   credit_limit?: number | null;
   user_level_key?: string | null; // #227 — pricing level
+  prices_vat_inclusive?: boolean | null; // #227 — gross display for this customer
   is_supplier?: boolean | null;
   is_client?: boolean | null;
   contact_type?: string | null;
@@ -954,6 +955,22 @@ export const ContactDetailPage: React.FC = () => {
                     placeholder="e.g. Long-term partner — 30% per 2025 agreement, valid until renewal."
                     rows={2}
                   />
+                </div>
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="prices_vat_inclusive"
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-input accent-primary"
+                      checked={!!contact.prices_vat_inclusive}
+                      onChange={(e) => updateField('prices_vat_inclusive', e.target.checked)}
+                      disabled={!editing}
+                    />
+                    <Label htmlFor="prices_vat_inclusive" className="font-normal">Show VAT-inclusive (gross) prices</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Display only — this customer's quotes show prices with VAT included. Stored amounts stay ex-VAT. Leave off for B2B (net).
+                  </p>
                 </div>
               </CardContent>
             </Card>

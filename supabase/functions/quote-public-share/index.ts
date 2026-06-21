@@ -83,16 +83,20 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     };
   });
 
-  // Resolve a friendly bill-to name (no contact details exposed publicly).
+  // Resolve a friendly bill-to name (no contact details exposed publicly) + the customer's
+  // VAT-inclusive display preference (#227 — gross prices for retail/consumer customers).
   let client_name: string | null = null;
+  let prices_vat_inclusive = false;
   if (quote.customer_company_id) {
     const { data: c } = await supabase
-      .from('crm_companies').select('name').eq('id', quote.customer_company_id).maybeSingle();
+      .from('crm_companies').select('name, prices_vat_inclusive').eq('id', quote.customer_company_id).maybeSingle();
     client_name = c?.name ?? null;
+    prices_vat_inclusive = !!c?.prices_vat_inclusive;
   } else if (quote.customer_contact_id) {
     const { data: c } = await supabase
-      .from('crm_contacts').select('name').eq('id', quote.customer_contact_id).maybeSingle();
+      .from('crm_contacts').select('name, prices_vat_inclusive').eq('id', quote.customer_contact_id).maybeSingle();
     client_name = c?.name ?? null;
+    prices_vat_inclusive = !!c?.prices_vat_inclusive;
   }
 
   // #177 white-label: render the public quote under the seller workspace's identity
@@ -163,6 +167,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       grand_total: quote.grand_total != null ? Number(quote.grand_total) : null,
       extras_total: quote.extras_total != null ? Number(quote.extras_total) : null,
       cash_discount_pct: quote.cash_discount_pct != null ? Number(quote.cash_discount_pct) : 0,
+      prices_vat_inclusive,
       expires_at: quote.expires_at,
       created_at: quote.created_at,
       client_name,
