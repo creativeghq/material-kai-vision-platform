@@ -37,7 +37,7 @@ The platform uses **6 buckets** (down from 17). Routing is path-based; feature i
 | Bucket | Public | Folders / use |
 |---|---|---|
 | `pdf-documents` | 🔒 private (signed URLs) | KB raw PDFs at `{user_id}/...` · `catalog-source/{catalog_id}/...` · `catalog-output/{catalog_id}/...` · `quote-output/{quote_id}/...` · `moodboard-output/{moodboard_id}/sheet-{sheet_id}.pdf` · `client-view-output/{project_id}/cv-{client_view_id}.pdf` |
-| `pdf-tiles` | 🔒 RLS read=authenticated (not literally public) | `extracted/{document_id}/...` (KB) · `catalog-extracted/{source_pdf_id}/page-NNNN-{bbox}.png` |
+| `pdf-tiles` | ✅ public read (bucket `public=true`) | `extracted/{document_id}/...` (KB) · `catalog-extracted/{source_pdf_id}/page-NNNN-{bbox}.png` |
 | `generation-images` | ✅ public, 100 MB, image/video | `{user_id}/...`, `gemini/`, `videos/`, `user-uploads/`, `social/`, `product-crops/...` (SAM crops + segmentation), `agent/` (chat uploads), `3d/` (3D models), `designer/` (designer module) |
 | `quote-templates` | 🔒 private, 50 MB | Quote template PNGs at root (`template-cover.png`, `template-content.png`, `template-backcover.png`, `template-intro.png`) · `catalog/cover.png` / `catalog/backcover.png` (catalog templates) |
 | `moodboard-sheet-references` | ✅ public | Static admin-curated illustrations for the sheet-type picker (`material_board.png`, `color_palette.png`, etc.) |
@@ -45,7 +45,7 @@ The platform uses **6 buckets** (down from 17). Routing is path-based; feature i
 
 **Privacy model:**
 - `pdf-documents` is private — every reader mints a fresh signed URL via `createSignedUrl()`. Stop persisting full URLs in DB rows; store the storage path (`storage_bucket` + `storage_object_path`) and re-derive on each render. The 2026-05-23 audit hardened both write side (upload routers no longer persist `file_url` in metadata; resume reads `storage_bucket`/`storage_object_path` and signs fresh) and read side (`KnowledgeBasePDFViewer.handleOpenOriginalPdf` calls `createSignedUrl` on demand instead of opening a stale persisted URL).
-- `pdf-tiles` read is gated to `auth.role()='authenticated'` (despite the "public" label in older docs — the bucket is created public but read policy is authenticated-only). Writes are service-role.
+- `pdf-tiles` is a **public-read** bucket (`storage.buckets.public=true`, verified 2026-06-21) — object GETs via the `/object/public/pdf-tiles/...` URL succeed for anon (extracted tile/crop images are not sensitive). Earlier docs claiming "authenticated-only read" were wrong. Writes are service-role. (This is what lets the public KB / brand pages show product thumbnails to logged-out visitors.)
 - `generation-images` is public-readable but writes are RLS-gated to authenticated users or service role.
 - `quote-templates` is admin-only RW via the `quote_templates_admin_all` policy (admin / super_admin / owner roles, plus service_role).
 
