@@ -221,6 +221,7 @@ function KnowledgeWidget() {
         .select('id, title, slug, created_at, category_id')
         .eq('status', 'published')
         .eq('visibility', 'public')
+        .eq('content_tier', 1) // FEATURED only — keep low-value brand/product fragments out of the dashboard
         .in('category_id', publicCategoryIds)
         .order('created_at', { ascending: false })
         .limit(6);

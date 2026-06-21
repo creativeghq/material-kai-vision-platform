@@ -105,12 +105,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   useEffect(() => {
     Promise.all([
       supabase.from('kb_categories').select('*').eq('access_level', 'public').order('sort_order', { ascending: true }),
-      // Public browse = curated/brand articles only. Per-product auto-extracted
-      // fragments (specs, compliance, certifications, care) carry a
-      // metadata.product_id and are surfaced on the PRODUCT page's Knowledge tab
-      // instead — excluding them here keeps the public KB from being a dump of
-      // hundreds of tiny spec pages.
-      supabase.from('kb_docs').select('category_id').eq('status', 'published').eq('visibility', 'public').is('metadata->>product_id', null),
+      supabase.from('kb_docs').select('category_id').eq('status', 'published').eq('visibility', 'public'),
     ]).then(([{ data: cats }, { data: docCounts }]) => {
       const countMap: Record<string, number> = {};
       (docCounts || []).forEach((d) => {
@@ -138,11 +133,11 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     (async () => {
       const { data } = await supabase
         .from('kb_docs')
-        .select('id, title, slug, summary, status, visibility, view_count, created_at, updated_at, workspace_id, content, content_markdown, category_id, created_by, updated_by, embedding_status, embedding_generated_at, embedding_model')
+        .select('id, title, slug, summary, status, visibility, view_count, created_at, updated_at, workspace_id, content, content_markdown, category_id, created_by, updated_by, embedding_status, embedding_generated_at, embedding_model, content_tier, metadata')
         .in('category_id', missingCategoryIds)
         .eq('status', 'published')
         .eq('visibility', 'public')
-        .is('metadata->>product_id', null) // product fragments live on the product page, not the public KB
+        .order('content_tier', { ascending: true }) // FEATURED (tier 1) first, SECONDARY after
         .order('created_at', { ascending: false });
 
       const grouped: Record<string, KBDocument[]> = {};
@@ -212,17 +207,24 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     const collapse = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
     const qCollapsed = collapse(search);
     const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
-    return allDocs.filter((d) => {
+    const matched = allDocs.filter((d) => {
       if (scopeCatId && d.category_id !== scopeCatId) return false;
       const hay = `${d.title} ${d.summary || ''}`.toLowerCase();
       if (qCollapsed && collapse(hay).includes(qCollapsed)) return true;
       return tokens.length > 0 && tokens.every((t) => hay.includes(t));
     });
+    // Secondary (brand/product) pages still appear, but high-value pages rank first.
+    return matched.sort((a, b) => (((a as any).content_tier || 1) - ((b as any).content_tier || 1)));
   }, [search, scopeCatId, allDocs]);
 
-  // Most-read articles across all public categories (Popular Articles section).
+  // Featured section: high-value (tier 1) pages first, then by reads. Secondary
+  // pages only surface here when there aren't enough featured ones.
   const popularDocs = useMemo(
-    () => [...allDocs].sort((a, b) => (b.view_count || 0) - (a.view_count || 0)).slice(0, 6),
+    () => [...allDocs]
+      .sort((a, b) =>
+        (((a as any).content_tier || 1) - ((b as any).content_tier || 1)) ||
+        ((b.view_count || 0) - (a.view_count || 0)))
+      .slice(0, 6),
     [allDocs],
   );
 
