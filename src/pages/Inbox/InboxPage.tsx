@@ -4,7 +4,7 @@ import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
-  User as UserIcon, MessagesSquare,
+  User as UserIcon, MessagesSquare, Settings2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -18,13 +18,16 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/core/ui/avatar';
 import { Separator } from '@/components/core/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
+import { Switch } from '@/components/core/ui/switch';
+import { Label } from '@/components/core/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
 import {
   inboxApi, signInboxAttachment,
   type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel,
-  type WhatsAppWindow, type InboxThreadContext,
+  type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings,
 } from '@/services/inboxApi';
 
 type ChannelFilter = 'all' | InboxChannel;
@@ -247,12 +250,16 @@ const InboxPage: React.FC = () => {
       });
       setDraft('');
       setAttachment(null);
+      // Human takeover: a member's text reply pauses the assistant server-side — reflect it locally.
+      if (!isNote && isMember && activeThread?.agent_state === 'active') {
+        setActiveThread((t) => (t ? { ...t, agent_state: 'paused' } : t));
+      }
     } catch (e) {
       toast({ title: 'Send failed', description: (e as Error).message, variant: 'destructive' });
     } finally {
       setSending(false);
     }
-  }, [activeId, draft, attachment, isNote, toast]);
+  }, [activeId, draft, attachment, isNote, isMember, activeThread, toast]);
 
   const visibleThreads = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -390,7 +397,13 @@ const InboxPage: React.FC = () => {
                     <Button
                       variant={activeThread.agent_state === 'active' ? 'default' : 'outline'}
                       size="icon" className="rounded-full h-9 w-9"
-                      title={activeThread.agent_state === 'active' ? 'AI assistant is handling this — click to take back' : 'Hand this conversation to the AI assistant'}
+                      title={
+                        activeThread.agent_state === 'active'
+                          ? 'AI assistant is handling this — click to take back'
+                          : activeThread.agent_state === 'paused'
+                            ? 'You took over — click to let the AI respond again'
+                            : 'Hand this conversation to the AI assistant'
+                      }
                       onClick={async () => {
                         const next = activeThread.agent_state === 'active' ? 'off' : 'active';
                         try {
@@ -401,6 +414,7 @@ const InboxPage: React.FC = () => {
                     >
                       <Bot className="w-4 h-4" />
                     </Button>
+                    <InboxAgentSettingsButton workspaceId={activeThread.workspace_id} />
                     <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="Add a teammate" onClick={() => setShowAdd(true)}>
                       <UserPlus className="w-4 h-4" />
                     </Button>
@@ -752,6 +766,96 @@ const DetailsRail: React.FC<{
 // ──────────────────────────────────────────────────────────────────────────
 // Dialogs
 // ──────────────────────────────────────────────────────────────────────────
+
+/** Per-workspace AI-assistant settings, read/written via inbox-api. Edits gated to owner/admin. */
+const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [settings, setSettings] = useState<InboxAgentSettings | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+  const [replyCost, setReplyCost] = useState(1);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    inboxApi.getAgentSettings(workspaceId)
+      .then((r) => { setSettings(r.settings); setCanEdit(r.can_edit); setReplyCost(r.reply_cost); })
+      .catch((e) => toast({ title: 'Failed to load settings', description: (e as Error).message, variant: 'destructive' }))
+      .finally(() => setLoading(false));
+  }, [open, workspaceId, toast]);
+
+  const update = async (key: keyof InboxAgentSettings, value: boolean) => {
+    if (!settings) return;
+    const prev = settings;
+    setSettings({ ...settings, [key]: value });
+    setSaving(key);
+    try {
+      const r = await inboxApi.setAgentSettings(workspaceId, { [key]: value });
+      setSettings(r.settings);
+    } catch (e) {
+      setSettings(prev);
+      toast({ title: 'Failed to save', description: (e as Error).message, variant: 'destructive' });
+    } finally { setSaving(null); }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="AI assistant settings">
+          <Settings2 className="w-4 h-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        <div className="space-y-4">
+          <div>
+            <div className="text-sm font-medium">AI assistant</div>
+            <div className="text-xs text-muted-foreground">
+              Applies to every customer conversation in this workspace. {replyCost} credit{replyCost === 1 ? '' : 's'} per reply.
+            </div>
+          </div>
+          {loading || !settings ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
+            </div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label className="text-sm">Auto-respond to new chats</Label>
+                  <div className="text-xs text-muted-foreground">The assistant answers first on new customer conversations.</div>
+                </div>
+                <Switch
+                  checked={settings.auto_respond}
+                  disabled={!canEdit || saving === 'auto_respond'}
+                  onCheckedChange={(v) => update('auto_respond', v)}
+                />
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label className="text-sm">Answer account &amp; billing</Label>
+                  <div className="text-xs text-muted-foreground">
+                    Let it share the customer’s own statement, open invoices, and pay links. On WhatsApp the
+                    customer is identified by phone number.
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.allow_account_data}
+                  disabled={!canEdit || saving === 'allow_account_data'}
+                  onCheckedChange={(v) => update('allow_account_data', v)}
+                />
+              </div>
+              {!canEdit && (
+                <div className="text-xs text-muted-foreground">Only a workspace owner or admin can change these.</div>
+              )}
+            </>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCreated: (id: string) => void }> = ({ workspaceId, onClose, onCreated }) => {
   const { toast } = useToast();

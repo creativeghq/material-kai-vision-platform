@@ -132,6 +132,14 @@ export interface InboxThreadContext {
   projects: InboxProjectRef[];
 }
 
+/** Per-workspace AI-assistant config (workspaces.settings.inbox_agent). Both default true server-side. */
+export interface InboxAgentSettings {
+  /** Auto-engage the assistant so it first-responds on new customer threads. */
+  auto_respond: boolean;
+  /** Allow the assistant to answer the customer's own account/billing questions (statement, invoices). */
+  allow_account_data: boolean;
+}
+
 export interface NewParticipantInput {
   type: InboxParticipantType;
   user_id?: string;
@@ -200,6 +208,14 @@ export const inboxApi = {
   },
   setAgent(thread_id: string, agent_state: 'off' | 'suggesting' | 'active', agent_id?: string) {
     return call<{ ok: boolean; agent_state: string }>('set_agent', { thread_id, agent_state, agent_id });
+  },
+  getAgentSettings(workspace_id: string) {
+    return call<{ settings: InboxAgentSettings; can_edit: boolean; reply_cost: number }>(
+      'get_agent_settings', { workspace_id },
+    );
+  },
+  setAgentSettings(workspace_id: string, changes: Partial<InboxAgentSettings>) {
+    return call<{ settings: InboxAgentSettings }>('set_agent_settings', { workspace_id, ...changes });
   },
 
   // ── Token actions (public customer thread) ──

@@ -198,10 +198,19 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
   let customerParticipantId: string | null = null;
 
   if (!threadId) {
+    // Auto-engage the AI assistant on new inbound WhatsApp threads unless the workspace opted out
+    // (settings.inbox_agent.auto_respond === false). The internal_agent_reply call below only acts
+    // when agent_state='active', so this is what makes the agent reply first to support questions.
+    const { data: wsRow } = await supabase.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
+    const agentCfg = (((wsRow as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>)
+      .inbox_agent as Record<string, unknown> | undefined;
+    const autoRespond = agentCfg?.auto_respond !== false;
+
     // New thread + customer participant + owner member participant (assign-on-reply).
     const { data: thread, error: threadErr } = await supabase.from('inbox_threads').insert({
       workspace_id: workspaceId, thread_type: 'customer', channel: 'whatsapp',
       subject: contactName || phone, status: 'open', metadata: meta,
+      agent_state: autoRespond ? 'active' : 'off', agent_id: autoRespond ? 'kai' : null,
       last_message_at: msg.sentAt || new Date().toISOString(),
     }).select('id').single();
     if (threadErr) {
@@ -211,6 +220,16 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
     }
     threadId = thread?.id ?? null;
     if (!threadId) throw new Error('inbox_threads insert returned no id');
+
+    if (autoRespond) {
+      await supabase.from('inbox_participants').insert({
+        thread_id: threadId, participant_type: 'agent', agent_id: 'kai', thread_role: 'agent',
+      });
+      await supabase.from('inbox_messages').insert({
+        thread_id: threadId, message_type: 'system',
+        body: 'The AI assistant is responding to new messages on this conversation.',
+      });
+    }
 
     const { data: cust, error: custErr } = await supabase.from('inbox_participants').insert({
       thread_id: threadId, participant_type: 'customer', contact_id: contactId, thread_role: 'participant',

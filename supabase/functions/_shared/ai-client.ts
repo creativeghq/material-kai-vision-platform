@@ -40,7 +40,7 @@ function _syncEnvIntoPolyfill() {
 _syncEnvIntoPolyfill();
 
 // ── Imports ──
-import { generateText, generateImage, experimental_generateVideo as generateVideo, Output } from 'npm:ai@6';
+import { generateText, generateImage, experimental_generateVideo as generateVideo, Output, isStepCount } from 'npm:ai@6';
 import { createGoogleGenerativeAI } from 'npm:@ai-sdk/google@3';
 import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
 import { createKlingAI } from 'npm:@ai-sdk/klingai';
@@ -375,6 +375,66 @@ export async function generateWithClaude(
   } catch (err) {
     void _logTrackedCall({
       task: config?.task ?? 'claude_text_generation',
+      model: modelId,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+// ── Claude: multi-step tool-using generation (agentic loop) ──
+//
+// Runs an agentic tool-call loop: Claude may call the provided `tools` (AI SDK `tool(...)`
+// definitions), the SDK executes each and feeds the result back, repeating up to `maxSteps`
+// before producing the final text. Tool execution + scoping is the caller's responsibility —
+// pass tools whose filters are derived from trusted server-side identity, never from model input.
+export async function generateWithClaudeTools(
+  prompt: string,
+  config: AIGenerateConfig & {
+    systemPrompt?: string;
+    // deno-lint-ignore no-explicit-any
+    tools: Record<string, any>;
+    maxSteps?: number;
+  },
+): Promise<AIGenerateResult<string>> {
+  const modelId = config.model || DEFAULT_CLAUDE_MODEL;
+  const _start = Date.now();
+
+  try {
+    const result = await generateText({
+      model: anthropic(modelId),
+      system: config.systemPrompt,
+      prompt,
+      temperature: config.temperature ?? 0.4,
+      maxTokens: config.maxTokens ?? 1024,
+      tools: config.tools,
+      stopWhen: isStepCount(config.maxSteps ?? 6),
+    });
+
+    const usage = await result.usage;
+    const inputTokens = usage?.promptTokens ?? 0;
+    const outputTokens = usage?.completionTokens ?? 0;
+
+    void _logTrackedCall({
+      task: config.task ?? 'claude_tool_generation',
+      model: modelId,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - _start,
+    });
+
+    return {
+      output: result.text,
+      text: result.text,
+      usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+      model: modelId,
+    };
+  } catch (err) {
+    void _logTrackedCall({
+      task: config.task ?? 'claude_tool_generation',
       model: modelId,
       inputTokens: 0,
       outputTokens: 0,

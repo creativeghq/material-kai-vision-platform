@@ -31,6 +31,8 @@ const ATTACHMENT_BUCKET = 'generation-images';
 // Phase-2 agent takeover (§9): the workspace owner is billed per auto-reply.
 const INBOX_AGENT_REPLY_COST = 1;
 const DEFAULT_INBOX_AGENT_ID = 'kai';
+// Base URL for customer-facing links the agent may hand out (e.g. invoice pay links).
+const PUBLIC_APP_URL = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
 
 type Json = Record<string, unknown>;
 
@@ -209,23 +211,181 @@ async function workspaceOwner(db: SupabaseClient, workspaceId: string): Promise<
   return (data as { user_id?: string } | null)?.user_id ?? null;
 }
 
+type InboxAgentSettings = { autoRespond: boolean; allowAccountData: boolean };
+
 /**
- * Phase-2 agent takeover (§9). When a thread is in `agent_state='active'`, an inbound customer
- * message triggers an AI reply: thread history → Claude → posted as message_type='agent', billed
- * to the workspace owner via debit_user_credits. Available to every workspace (no module gate);
- * every reply costs credits and is skipped (left for a human) when the owner can't pay.
- * Best-effort — any failure leaves the thread for a human, never throws to the caller.
+ * Per-workspace inbox-agent config at `workspaces.settings.inbox_agent`. Both default ON so the
+ * assistant works platform-wide out of the box: `auto_respond` makes it first-respond on new
+ * customer threads, `allow_account_data` lets it answer the customer's OWN account/billing
+ * questions. A workspace opts out by setting either to `false`.
+ */
+async function inboxAgentSettings(db: SupabaseClient, workspaceId: string): Promise<InboxAgentSettings> {
+  const { data } = await db.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
+  const root = ((data as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>;
+  const cfg = (root.inbox_agent || {}) as Record<string, unknown>;
+  return {
+    autoRespond: cfg.auto_respond !== false,
+    allowAccountData: cfg.allow_account_data !== false,
+  };
+}
+
+/** The customer this thread is about: the active customer participant's CRM contact + their company. */
+async function resolveThreadCustomerScope(
+  db: SupabaseClient,
+  threadId: string,
+): Promise<{ contactId: string | null; companyId: string | null }> {
+  const { data: custP } = await db
+    .from('inbox_participants').select('contact_id')
+    .eq('thread_id', threadId).eq('participant_type', 'customer').eq('status', 'active')
+    .not('contact_id', 'is', null).limit(1).maybeSingle();
+  const contactId = (custP as { contact_id?: string } | null)?.contact_id ?? null;
+  if (!contactId) return { contactId: null, companyId: null };
+  const { data: q } = await db
+    .from('quotes').select('customer_company_id')
+    .eq('customer_contact_id', contactId).not('customer_company_id', 'is', null)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  return { contactId, companyId: (q as { customer_company_id?: string } | null)?.customer_company_id ?? null };
+}
+
+/**
+ * Read-only self-service tools for the customer-facing agent. CRITICAL: every query is scoped by
+ * (workspace_id, contact_id) captured from the THREAD — never from tool arguments or the customer's
+ * message — so the customer can only ever read their own records and cannot widen scope by prompt
+ * injection. The tools intentionally take no scoping parameters.
+ */
+function buildCustomerSupportTools(db: SupabaseClient, scope: { workspaceId: string; contactId: string }) {
+  return {
+    get_account_statement: tool({
+      description:
+        "The customer's current outstanding balance split into aging buckets (not yet due, 0-30, " +
+        '31-90, and 90+ days overdue), the total owed, how many documents are open, and the most ' +
+        'overdue day count. Use for any question about how much they owe or their statement.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { data } = await db
+          .from('vw_customer_aging_buckets')
+          .select('total_outstanding, not_due, due_0_30, due_31_90, due_90_plus, max_days_overdue, open_doc_count')
+          .eq('workspace_id', scope.workspaceId)
+          .eq('customer_contact_id', scope.contactId);
+        const rows = (data || []) as Array<Record<string, number>>;
+        if (!rows.length) return { has_balance: false, message: 'No outstanding balance on record.' };
+        const sum = (k: string) => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
+        const { data: inv } = await db.from('invoices').select('currency')
+          .eq('workspace_id', scope.workspaceId).eq('customer_contact_id', scope.contactId)
+          .gt('amount_due', 0).limit(1).maybeSingle();
+        return {
+          has_balance: true,
+          currency: (inv as { currency?: string } | null)?.currency || 'EUR',
+          total_outstanding: sum('total_outstanding'),
+          not_due: sum('not_due'),
+          due_0_30: sum('due_0_30'),
+          due_31_90: sum('due_31_90'),
+          due_90_plus: sum('due_90_plus'),
+          open_document_count: sum('open_doc_count'),
+          max_days_overdue: Math.max(0, ...rows.map((r) => Number(r.max_days_overdue || 0))),
+        };
+      },
+    }),
+    list_open_invoices: tool({
+      description:
+        "The customer's unpaid or partially-paid invoices: document number, amount still due, " +
+        'currency, due date, status, and a secure payment link when one is available. Use to ' +
+        'itemise what is open or to give them a way to pay.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { data } = await db.from('invoices')
+          .select('internal_number, legal_number, amount_due, currency, due_at, status, pay_token, pay_token_expires_at')
+          .eq('workspace_id', scope.workspaceId).eq('customer_contact_id', scope.contactId)
+          .gt('amount_due', 0).order('due_at', { ascending: true }).limit(10);
+        const now = Date.now();
+        return ((data || []) as Array<Record<string, unknown>>).map((r) => {
+          const tokenOk = r.pay_token &&
+            (!r.pay_token_expires_at || new Date(String(r.pay_token_expires_at)).getTime() > now);
+          return {
+            number: r.legal_number || r.internal_number,
+            amount_due: Number(r.amount_due || 0),
+            currency: r.currency || 'EUR',
+            due_at: r.due_at,
+            status: r.status,
+            pay_url: tokenOk ? `${PUBLIC_APP_URL}/pay/${r.pay_token}` : null,
+          };
+        });
+      },
+    }),
+    list_quotes_and_projects: tool({
+      description:
+        "The customer's recent quotes (with status and total) and projects. Use for questions about " +
+        'their orders, quotes, proposals, or project status.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const [{ data: quotes }, { data: projects }] = await Promise.all([
+          db.from('quotes').select('quote_number, name, status, grand_total, currency, created_at')
+            .eq('customer_contact_id', scope.contactId).order('created_at', { ascending: false }).limit(8),
+          db.from('projects').select('name, status, created_at')
+            .eq('client_contact_id', scope.contactId).order('created_at', { ascending: false }).limit(8),
+        ]);
+        return { quotes: quotes || [], projects: projects || [] };
+      },
+    }),
+  };
+}
+
+// Fallback persona if the editable DB row (prompts: prompt_type='agent', category='inbox') is missing.
+const FALLBACK_INBOX_PERSONA =
+  'You are a customer-support assistant for a business, replying inside a customer conversation. ' +
+  "Reply in the customer's language; be concise, warm, and professional. Never invent facts — only " +
+  'state amounts, balances, dates, invoice numbers, statuses, or links returned by a tool. For anything ' +
+  'that needs a person (negotiation, discounts, complaints, refunds, account changes, legal), say a team ' +
+  'member will follow up shortly and do not make commitments on the business’s behalf.';
+
+/** Editable inbox-agent persona/policy (prompts row), with an inline fallback. */
+async function loadInboxAgentPersona(db: SupabaseClient): Promise<string> {
+  const { data } = await db.from('prompts').select('system_prompt')
+    .eq('prompt_type', 'agent').eq('category', 'inbox').eq('is_active', true)
+    .order('updated_at', { ascending: false }).limit(1).maybeSingle();
+  return (data as { system_prompt?: string } | null)?.system_prompt?.trim() || FALLBACK_INBOX_PERSONA;
+}
+
+/**
+ * Phase-2 agent takeover (§9). When a thread is `agent_state='active'`, an inbound customer message
+ * triggers an AI reply: it can look up THIS customer's own account (statement/aging, open invoices +
+ * pay links, quotes & projects) via read-only thread-scoped tools, then posts the answer as
+ * message_type='agent', billed to the workspace owner via debit_user_credits. Available to every
+ * workspace (no module gate); every reply costs credits and is skipped (left for a human) when the
+ * owner can't pay. Only fires on a fresh inbound CUSTOMER message (loop/takeover guard below).
+ * Best-effort — any failure leaves the thread for a human, never throws.
  */
 async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise<void> {
   try {
     const thread = await getThreadOrThrow(db, threadId);
     if (thread.agent_state !== 'active') return;
-
     const workspaceId = String(thread.workspace_id);
+
+    // Recent conversation (exclude private notes), newest first — used for the guard and transcript.
+    const { data: history } = await db
+      .from('inbox_messages')
+      .select('body, message_type, sender_participant_id')
+      .eq('thread_id', threadId)
+      .is('deleted_at', null)
+      .neq('message_type', 'note')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    const rows = (history || []) as Array<{ body: string | null; message_type: string; sender_participant_id: string | null }>;
+
+    // Loop / human-takeover guard: only answer when the most recent message is a fresh inbound
+    // CUSTOMER text. Skip if it was the assistant (already replied), a member (staff is handling),
+    // or a system event — prevents double-replies, billing loops, and talking over a human.
+    const latest = rows[0];
+    if (!latest || latest.message_type !== 'text' || !latest.sender_participant_id) return;
+    const { data: latestSender } = await db.from('inbox_participants')
+      .select('participant_type').eq('id', latest.sender_participant_id).maybeSingle();
+    if ((latestSender as { participant_type?: string } | null)?.participant_type !== 'customer') return;
+
     const owner = await workspaceOwner(db, workspaceId);
     if (!owner) return;
+    const settings = await inboxAgentSettings(db, workspaceId);
 
-    // Bill the owner first; skip the turn (leave for a human) if they can't pay.
+    // Bill the owner only now that we've committed to replying; skip (leave for a human) if unpaid.
     const { data: debit } = await db.rpc('debit_user_credits', {
       p_user_id: owner,
       p_amount: INBOX_AGENT_REPLY_COST,
@@ -236,36 +396,37 @@ async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise
     const debitRes = Array.isArray(debit) ? debit[0] : debit;
     if (!debitRes?.success) return;
 
-    // Build the recent conversation (exclude private notes) for context.
-    const { data: history } = await db
-      .from('inbox_messages')
-      .select('body, message_type, sender_participant_id')
-      .eq('thread_id', threadId)
-      .is('deleted_at', null)
-      .neq('message_type', 'note')
-      .order('created_at', { ascending: false })
-      .limit(20);
     const { data: ws } = await db.from('workspaces').select('name').eq('id', workspaceId).maybeSingle();
     const businessName = (ws as { name?: string } | null)?.name || 'our team';
 
-    const transcript = ((history || []) as Array<{ body: string | null; message_type: string }>)
-      .reverse()
+    const transcript = rows.slice().reverse()
       .map((m) => `${m.message_type === 'agent' ? 'Assistant' : 'Customer/Team'}: ${m.body || '[attachment]'}`)
       .join('\n');
 
-    const systemPrompt =
-      `You are a helpful assistant replying to a customer on behalf of ${businessName} over ${thread.channel}. ` +
-      `Be concise, warm, and professional. Answer what you can from the conversation. If you cannot help or the ` +
-      `customer needs a human (pricing commitments, account changes, complaints), say a team member will follow up shortly.`;
+    // Self-service tools — only when we know which customer this is AND the workspace allows account
+    // answers. Scope is derived from the thread, never from the message (injection-proof).
+    const scope = await resolveThreadCustomerScope(db, threadId);
+    const tools = (settings.allowAccountData && scope.contactId)
+      ? buildCustomerSupportTools(db, { workspaceId, contactId: scope.contactId })
+      : {};
 
-    const result = await generateWithClaude(
+    const personaBase = await loadInboxAgentPersona(db);
+    const systemPrompt =
+      `${personaBase}\n\n` +
+      `Business: ${businessName}. Channel: ${thread.channel}. ` +
+      (Object.keys(tools).length
+        ? "Use the tools to look up THIS customer's own account (statement/balance, open invoices, " +
+          'quotes & projects); always call a tool for real figures and only share a payment link a tool returns.'
+        : 'You do not have access to account data in this conversation.');
+
+    const result = await generateWithClaudeTools(
       `Conversation so far:\n${transcript}\n\nWrite the next reply to the customer.`,
-      { systemPrompt, maxTokens: 600, temperature: 0.5, task: 'inbox_agent_reply' },
+      { systemPrompt, maxTokens: 700, temperature: 0.4, task: 'inbox_agent_reply', tools, maxSteps: 6 },
     );
     const replyText = (result.text || '').trim();
     if (!replyText) return;
 
-    // The agent participant (created when the thread was handed over).
+    // The agent participant (created when the thread was handed over / auto-engaged).
     const { data: agentP } = await db
       .from('inbox_participants').select('id')
       .eq('thread_id', threadId).eq('participant_type', 'agent').eq('status', 'active')
@@ -601,6 +762,26 @@ async function handleJwtAction(
         }
       }
 
+      // Auto-engage the AI assistant on customer-initiated threads (per-workspace opt-out via
+      // settings.inbox_agent.auto_respond). It stays quiet until the customer actually messages —
+      // maybeRunAgentReply only fires on inbound customer messages.
+      if (threadType === 'customer' && creatorIsCustomer) {
+        const settings = await inboxAgentSettings(db, workspaceId);
+        if (settings.autoRespond) {
+          await db.from('inbox_threads')
+            .update({ agent_state: 'active', agent_id: DEFAULT_INBOX_AGENT_ID })
+            .eq('id', (thread as { id: string }).id);
+          await db.from('inbox_participants').insert({
+            thread_id: (thread as { id: string }).id, participant_type: 'agent',
+            agent_id: DEFAULT_INBOX_AGENT_ID, thread_role: 'agent', added_by: userId,
+          });
+          await db.from('inbox_messages').insert({
+            thread_id: (thread as { id: string }).id, message_type: 'system',
+            body: 'The AI assistant is responding to new messages on this conversation.',
+          });
+        }
+      }
+
       return json({ thread });
     }
 
@@ -699,6 +880,15 @@ async function handleJwtAction(
       if (senderParticipantId) {
         await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', senderParticipantId);
       }
+      if (!access.isMember && messageType !== 'note') {
+        // A customer (claimed-account) message lets the agent take first crack. No-op unless the
+        // thread is agent-active; maybeRunAgentReply gates + bills internally.
+        await maybeRunAgentReply(db, threadId);
+      } else if (access.isMember && messageType === 'text' && thread.agent_state === 'active') {
+        // Human takeover: a staff reply pauses the assistant so it stops auto-replying. Resume via
+        // the Bot toggle (set_agent → 'active'). Notes don't pause (they're private to members).
+        await db.from('inbox_threads').update({ agent_state: 'paused' }).eq('id', threadId);
+      }
       return json({ message: msg });
     }
 
@@ -756,6 +946,41 @@ async function handleJwtAction(
         body: state === 'off' ? 'Conversation handed back to the team.' : `Conversation handed to the AI assistant (${state}).`,
       });
       return json({ ok: true, agent_state: state });
+    }
+
+    case 'get_agent_settings': {
+      // Per-workspace AI-assistant config (workspaces.settings.inbox_agent). Any workspace member
+      // may read it (drives UI state); only owner/admin may change it (set_agent_settings).
+      const workspaceId = String(payload.workspace_id || '');
+      if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
+      const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && !callerRole) throw new HttpError(403, 'You are not a member of that workspace');
+      const settings = await inboxAgentSettings(db, workspaceId);
+      return json({
+        settings,
+        can_edit: operator || callerRole === 'owner' || callerRole === 'admin',
+        reply_cost: INBOX_AGENT_REPLY_COST,
+      });
+    }
+
+    case 'set_agent_settings': {
+      const workspaceId = String(payload.workspace_id || '');
+      if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
+      const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && callerRole !== 'owner' && callerRole !== 'admin') {
+        throw new HttpError(403, 'Only a workspace owner or admin may change AI assistant settings');
+      }
+      // Read-modify-write the jsonb so sibling settings keys are preserved.
+      const { data: wsRow } = await db.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
+      const current = ((wsRow as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>;
+      const prevAgent = (current.inbox_agent || {}) as Record<string, unknown>;
+      const nextAgent: Record<string, unknown> = { ...prevAgent };
+      if (typeof payload.auto_respond === 'boolean') nextAgent.auto_respond = payload.auto_respond;
+      if (typeof payload.allow_account_data === 'boolean') nextAgent.allow_account_data = payload.allow_account_data;
+      const { error } = await db.from('workspaces')
+        .update({ settings: { ...current, inbox_agent: nextAgent } }).eq('id', workspaceId);
+      if (error) throw new HttpError(500, `Failed to save settings: ${error.message}`);
+      return json({ settings: await inboxAgentSettings(db, workspaceId) });
     }
 
     case 'list_threads': {
