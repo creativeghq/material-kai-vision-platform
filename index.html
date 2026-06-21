@@ -24,6 +24,22 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MaterialsHub" />
 
+    <!-- Capture the install prompt as early as possible. Chrome's
+         `beforeinstallprompt` can fire before the React app mounts and is not
+         replayable, so we stash it on window for the in-app "Install app"
+         button to replay on demand (see usePwaInstall). -->
+    <script>
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__mkDeferredInstallPrompt = e;
+        window.dispatchEvent(new Event('mk-install-available'));
+      });
+      window.addEventListener('appinstalled', function () {
+        window.__mkDeferredInstallPrompt = null;
+        window.dispatchEvent(new Event('mk-app-installed'));
+      });
+    </script>
+
     <!-- Preconnect to Google Fonts for faster loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

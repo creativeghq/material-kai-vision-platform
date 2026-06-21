@@ -28,6 +28,10 @@ function detectIOS(): boolean {
   return isIOSDevice || isIPadOS;
 }
 
+interface InstallWindow extends Window {
+  __mkDeferredInstallPrompt?: BeforeInstallPromptEvent | null;
+}
+
 export interface PwaInstallState {
   /** True once the browser has offered a programmatic install (Chrome/Edge/Android). */
   canPrompt: boolean;
@@ -50,17 +54,30 @@ export interface PwaInstallState {
  * - Already-installed (standalone) sessions report `isInstallable = false`.
  */
 export function usePwaInstall(): PwaInstallState {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  // Seed from the prompt captured at page load (index.html) — it can fire
+  // before React mounts and is not replayable.
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
+    () => (typeof window !== 'undefined' ? (window as InstallWindow).__mkDeferredInstallPrompt ?? null : null),
+  );
   const [isStandalone, setIsStandalone] = useState<boolean>(detectStandalone);
   const isIOS = detectIOS();
 
   useEffect(() => {
+    // Pick up a prompt captured by the early index.html listener.
+    const adopt = () => {
+      const stashed = (window as InstallWindow).__mkDeferredInstallPrompt;
+      if (stashed) setDeferred(stashed);
+    };
+    adopt();
+
     const onBeforeInstall = (e: Event) => {
       // Stop Chrome's default mini-infobar; we drive the prompt from the menu.
       e.preventDefault();
+      (window as InstallWindow).__mkDeferredInstallPrompt = e as BeforeInstallPromptEvent;
       setDeferred(e as BeforeInstallPromptEvent);
     };
     const onInstalled = () => {
+      (window as InstallWindow).__mkDeferredInstallPrompt = null;
       setDeferred(null);
       setIsStandalone(true);
     };
@@ -69,11 +86,15 @@ export function usePwaInstall(): PwaInstallState {
 
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
     window.addEventListener('appinstalled', onInstalled);
+    window.addEventListener('mk-install-available', adopt);
+    window.addEventListener('mk-app-installed', onInstalled);
     mql?.addEventListener?.('change', onDisplayChange);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onInstalled);
+      window.removeEventListener('mk-install-available', adopt);
+      window.removeEventListener('mk-app-installed', onInstalled);
       mql?.removeEventListener?.('change', onDisplayChange);
     };
   }, []);
@@ -83,12 +104,19 @@ export function usePwaInstall(): PwaInstallState {
     await deferred.prompt();
     const choice = await deferred.userChoice;
     // The event is single-use; drop it so the button reflects reality.
+    (window as InstallWindow).__mkDeferredInstallPrompt = null;
     setDeferred(null);
     return choice.outcome;
   }, [deferred]);
 
   const canPrompt = deferred !== null;
-  const isInstallable = !isStandalone && (canPrompt || isIOS);
+  // Surface the affordance on every non-installed session. The button itself
+  // routes to the right flow: native prompt (canPrompt), iOS Share steps
+  // (isIOS), or generic browser-menu instructions as a last resort — so the
+  // user always has a path to the home screen even when Chrome hasn't fired
+  // `beforeinstallprompt` yet. (The button only renders inside the mobile-only
+  // bottom-nav sheet, so this never shows on desktop.)
+  const isInstallable = !isStandalone;
 
   return { canPrompt, isIOS, isStandalone, isInstallable, promptInstall };
 }

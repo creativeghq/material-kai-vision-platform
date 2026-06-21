@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Share, SquarePlus, X } from 'lucide-react';
+import { Download, Share, SquarePlus, X, MoreVertical } from 'lucide-react';
 
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 
@@ -12,14 +12,17 @@ interface MobileInstallButtonProps {
  * "Install app" affordance for the mobile menu. Adds MaterialsHub to the phone's
  * home screen as a standalone app icon.
  *
- * - Chromium (Android/desktop): fires the native install prompt.
- * - iOS Safari: there is no programmatic prompt, so it reveals the manual
- *   Share → "Add to Home Screen" steps inline.
- * - Renders nothing when already installed or when the platform can't install.
+ * - Chromium (Android/desktop) with a captured prompt: fires the native install
+ *   prompt directly.
+ * - iOS Safari: no programmatic prompt — reveals the Share → "Add to Home
+ *   Screen" steps inline.
+ * - Anything else (e.g. Android before Chrome fired `beforeinstallprompt`):
+ *   reveals generic "open the browser menu" steps so there's always a path.
+ * - Renders nothing once the app is already installed.
  */
 export const MobileInstallButton: React.FC<MobileInstallButtonProps> = ({ onDone }) => {
   const { isInstallable, canPrompt, isIOS, promptInstall } = usePwaInstall();
-  const [showIosHelp, setShowIosHelp] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   if (!isInstallable) return null;
 
@@ -29,7 +32,9 @@ export const MobileInstallButton: React.FC<MobileInstallButtonProps> = ({ onDone
       if (outcome) onDone?.();
       return;
     }
-    if (isIOS) setShowIosHelp((v) => !v);
+    // No programmatic prompt available (iOS, or Android before the event
+    // fired) → show the manual steps for this platform.
+    setShowHelp((v) => !v);
   };
 
   return (
@@ -51,36 +56,57 @@ export const MobileInstallButton: React.FC<MobileInstallButtonProps> = ({ onDone
         </span>
       </button>
 
-      {showIosHelp && isIOS && (
+      {showHelp && (
         <div className="relative mt-2 rounded-xl bg-white/5 px-4 py-3 text-sm text-muted-foreground">
           <button
             type="button"
-            onClick={() => setShowIosHelp(false)}
+            onClick={() => setShowHelp(false)}
             aria-label="Close"
             className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
           <p className="mb-2 font-light text-foreground">Add to Home Screen</p>
-          <ol className="space-y-1.5">
-            <li className="flex items-center gap-2">
-              <span className="text-foreground">1.</span>
-              <span>Tap the Share icon</span>
-              <Share className="h-4 w-4 text-foreground" />
-              <span>in Safari's toolbar</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-foreground">2.</span>
-              <span>Choose</span>
-              <span className="inline-flex items-center gap-1 text-foreground">
-                Add to Home Screen <SquarePlus className="h-4 w-4" />
-              </span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-foreground">3.</span>
-              <span>Tap Add — the icon appears on your home screen.</span>
-            </li>
-          </ol>
+          {isIOS ? (
+            <ol className="space-y-1.5">
+              <li className="flex items-center gap-2">
+                <span className="text-foreground">1.</span>
+                <span>Tap the Share icon</span>
+                <Share className="h-4 w-4 text-foreground" />
+                <span>in Safari's toolbar</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-foreground">2.</span>
+                <span>Choose</span>
+                <span className="inline-flex items-center gap-1 text-foreground">
+                  Add to Home Screen <SquarePlus className="h-4 w-4" />
+                </span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-foreground">3.</span>
+                <span>Tap Add — the icon appears on your home screen.</span>
+              </li>
+            </ol>
+          ) : (
+            <ol className="space-y-1.5">
+              <li className="flex items-center gap-2">
+                <span className="text-foreground">1.</span>
+                <span>Open the browser menu</span>
+                <MoreVertical className="h-4 w-4 text-foreground" />
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-foreground">2.</span>
+                <span>
+                  Tap <span className="text-foreground">Install app</span> or{' '}
+                  <span className="text-foreground">Add to Home screen</span>.
+                </span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-foreground">3.</span>
+                <span>Confirm — the icon appears on your home screen.</span>
+              </li>
+            </ol>
+          )}
         </div>
       )}
     </div>
