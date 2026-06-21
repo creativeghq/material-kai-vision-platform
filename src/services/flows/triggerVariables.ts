@@ -62,6 +62,12 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'requester_name', label: 'Requester name', note: 'Display name of the requester.' },
     { key: 'quote_request_id', label: 'Quote request ID', note: 'The generated quote request.' },
   ]),
+  marketplace_want_match: withStandard([
+    { key: 'listing_id', label: 'Listing ID', note: 'The newly published surplus listing.' },
+    { key: 'listing_title', label: 'Listing title', note: 'Title of the matched listing.' },
+    { key: 'want_list_id', label: 'Want-list ID', note: 'The buyer saved alert that matched.' },
+    { key: 'want_list_label', label: 'Want-list label', note: 'The buyer label for their saved alert.' },
+  ]),
   profile_followed: withStandard([
     { key: 'follower_id', label: 'Follower ID', note: 'The user who started following.' },
     { key: 'following_id', label: 'Followed ID', note: 'The profile being followed.' },
@@ -219,6 +225,7 @@ export function getTriggerVariables(trigger: string | undefined): Array<TriggerV
 export const TRIGGER_TITLES: Record<string, string> = {
   hire_me_received: 'Hire Me request',
   moodboard_quote_requested: 'Moodboard quote request',
+  marketplace_want_match: 'Surplus alert match',
   profile_followed: 'New follower',
   material_reviewed: 'Material reviewed',
   preferred_factory_added: 'Preferred factory added',

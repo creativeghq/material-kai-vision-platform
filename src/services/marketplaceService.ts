@@ -144,7 +144,18 @@ export const marketplaceService = {
       p_image_urls: i.imageUrls ?? [],
     });
     if (error) throw error;
-    return data as string;
+    const listingId = data as string;
+    // #225 — fan out "saved surplus alert" notifications to buyers whose want-list matches.
+    // Server-side (cross-tenant) match + throttle lives in inbox-api. Best-effort: never block
+    // publishing on an alerting failure.
+    try {
+      await supabase.functions.invoke('inbox-api', {
+        body: { action: 'notify_want_matches', listing_id: listingId },
+      });
+    } catch {
+      /* alerting is best-effort */
+    }
+    return listingId;
   },
 
   /** Withdraw a listing and release its reserved stock. */
