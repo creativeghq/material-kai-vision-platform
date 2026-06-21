@@ -10,7 +10,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
@@ -1304,11 +1304,17 @@ Deno.serve(withApiLogging('flow-engine', async (req) => {
 
   try {
     const auth = await authenticate(req);
-    if (!auth.success) {
+    const { action, ...body } = await req.json();
+
+    // `trigger-event` is internal server-to-server dispatch (DB triggers, pg_cron).
+    // Accept the stable cron secret (x-cron-secret → CRON_SECRET) in addition to a normal
+    // authenticated caller, so DB-trigger notifications keep working independently of the
+    // rotating service-role key the trigger sends (which can drift to a stale/placeholder
+    // vault value). Every other action still requires a real authenticated caller.
+    if (!auth.success && !(action === 'trigger-event' && isCronAuthorized(req))) {
       return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
     }
 
-    const { action, ...body } = await req.json();
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     switch (action) {
