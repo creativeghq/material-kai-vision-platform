@@ -36,6 +36,7 @@ const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => (
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
+const BrandKnowledgePage = lazy(() => import('./pages/BrandKnowledgePage').then(m => ({ default: m.BrandKnowledgePage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
 const InboxPage = lazy(() => import('./pages/Inbox/InboxPage'));
@@ -675,6 +676,15 @@ const App = () => (
                   element={
                     <PageErrorBoundary name="Public Knowledge Base">
                       <PublicKnowledgeBasePage />
+                    </PageErrorBoundary>
+                  }
+                />
+                {/* Brand Knowledge hub — aggregates a brand's docs + products */}
+                <Route
+                  path="/knowledge-base/brand/:slug"
+                  element={
+                    <PageErrorBoundary name="Brand Knowledge Page">
+                      <BrandKnowledgePage />
                     </PageErrorBoundary>
                   }
                 />

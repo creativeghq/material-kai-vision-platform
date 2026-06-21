@@ -71,13 +71,22 @@ function KbRelatedProducts({ doc }: { doc: KBDocument }) {
 
   if (products.length === 0) return null;
   const brand = products[0]?.brand || brandFromTitle(doc.title) || 'this brand';
+  const brandSlug = (products[0]?.brand || brandFromTitle(doc.title) || '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   const signupHref = '/auth?mode=signup&redirect=/discover';
 
   return (
     <section className="mt-12" aria-labelledby="related-products-heading">
-      <h2 id="related-products-heading" className="text-xl font-medium tracking-tight mb-1">
-        Products from {brand}
-      </h2>
+      <div className="flex items-end justify-between gap-3 mb-1">
+        <h2 id="related-products-heading" className="text-xl font-medium tracking-tight">
+          Products from {brand}
+        </h2>
+        {brandSlug && (
+          <Link to={`/knowledge-base/brand/${brandSlug}`} className="text-sm text-primary hover:underline shrink-0">
+            {brand} brand page →
+          </Link>
+        )}
+      </div>
       <p className="text-sm text-muted-foreground mb-4">
         {user
           ? 'Explore matching products in the catalog.'
