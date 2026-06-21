@@ -229,7 +229,11 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             email_type: body.emailType || 'transactional',
             tags: body.tags || {},
             variables: body.variables || {},
-            created_by: user.id,
+            // Server-to-server callers (Flows send_email, send-quote-email, price/
+            // mention alerts, …) authenticate with the secret key and carry no user,
+            // so auth.user is null. created_by is nullable for exactly these system
+            // sends — guard it so the whole send doesn't 500 on `null.id`.
+            created_by: user?.id ?? null,
           })
           .select()
           .single();
