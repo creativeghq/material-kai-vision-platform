@@ -118,6 +118,18 @@ Sentry.init({
 // Production only — the dev server runs its own SW/HMR machinery and a stale
 // pass-through worker just adds noise locally.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  // Auto-update: when a new deploy's service worker activates and claims the
+  // page, reload once into the fresh build so mobile clients are never stuck on
+  // a stale version. Guarded so it ONLY fires for a real update (the page was
+  // already controlled by a worker) and never loops or reloads on first install.
+  if (navigator.serviceWorker.controller) {
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    });
+  }
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
       // Non-fatal: install-to-home-screen is a progressive enhancement.
