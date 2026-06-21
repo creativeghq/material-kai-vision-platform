@@ -66,7 +66,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     status: 'draft',
     visibility: 'public',
     seo_keywords: [],
-  });
+    content_tier: 1,
+  } as Partial<KBDocument>);
   const [categories, setCategories] = useState<KBCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -252,6 +253,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             price_doc_type: priceDocTypeToSave,
             is_locked: document.is_locked ?? null,
             allowed_agents: document.allowed_agents && document.allowed_agents.length > 0 ? document.allowed_agents : null,
+            content_tier: (document as any).content_tier ?? 1,
             updated_at: new Date().toISOString(),
           })
           .eq('id', documentId)
@@ -281,6 +283,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             price_doc_type: priceDocTypeToSave,
             is_locked: document.is_locked ?? null,
             allowed_agents: document.allowed_agents && document.allowed_agents.length > 0 ? document.allowed_agents : null,
+            content_tier: (document as any).content_tier ?? 1,
             workspace_id: workspaceId,
             embedding_status: 'pending',
           })
@@ -467,6 +470,26 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     <SelectItem value="archived">📦 Archived</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Priority / value tier */}
+              <div className="space-y-2">
+                <Label htmlFor="content_tier">Priority</Label>
+                <Select
+                  value={String((document as any).content_tier ?? 1)}
+                  onValueChange={(value) => setDocument({ ...document, content_tier: Number(value) } as any)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">⭐ Featured (informational)</SelectItem>
+                    <SelectItem value="2">📄 Secondary (brand / product / low-value)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground leading-snug">
+                  Featured pages lead the public KB, dashboard and search. Secondary pages stay public &amp; searchable but rank after featured ones.
+                </p>
               </div>
 
               {/* Visibility */}
