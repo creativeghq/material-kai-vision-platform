@@ -16,6 +16,9 @@ import { Product } from './types';
 import { trackProductView } from '@/services/manufacturerAnalyticsService';
 import { getManufacturer, getProductName } from '@/utils/productMetadata';
 import { resolveUploadCategory } from '@/lib/categoryFieldRegistry';
+import { useShowPrices } from '@/hooks/useShowPrices';
+
+const sym = (c?: string) => (c === 'USD' ? '$' : c === 'GBP' ? '£' : c && c !== 'EUR' ? `${c} ` : '€');
 
 // Coerce a metadata field (typed as `unknown` because ProductMetadata
 // fields are wrapper-or-primitive polymorphic) into a plain string for
@@ -37,6 +40,9 @@ interface ProductCardProps {
   onViewDetails: (product: Product) => void;
   categoryColor?: string;
   showActions?: boolean;
+  /** #227 — the viewer's own resolved price (reseller buy price + discount, or retail).
+   *  Supplied by the parent grid via the bulk catalog-price RPC to avoid an N+1. */
+  viewerPrice?: { price: number | null; discount_pct: number; currency: string } | null;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -44,7 +50,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onViewDetails,
   categoryColor = '#3b82f6',
   showActions = true,
+  viewerPrice = null,
 }) => {
+  const { showPrices } = useShowPrices();
   const cardRef = useRef<HTMLDivElement>(null);
   const trackedRef = useRef(false);
   const [showLighting, setShowLighting] = useState(false);
@@ -136,17 +144,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         </div>
 
-        {/* Pricing — #227: show the retail (sell) price only. NEVER the procurement cost
-            (the old "Wholesale" column rendered products.cost and leaked it to every viewer). */}
-        {product.pricing.retail > 0 && (
-          <div className="mb-3 pb-3 border-b border-gray-200">
-            <p className="text-xs text-gray-600 mb-0.5">Retail <span className="text-gray-400">(excl. VAT)</span></p>
-            <p className="font-semibold text-gray-900">
-              {product.pricing.currency === 'EUR' ? '€' : '$'}
-              {product.pricing.retail.toFixed(2)}
-            </p>
-          </div>
-        )}
+        {/* Pricing — #227: per-viewer price (reseller buy price + discount, or retail) gated on the
+            Show Prices toggle. NEVER the procurement cost (the old "Wholesale" column leaked products.cost). */}
+        {showPrices && (() => {
+          const price = viewerPrice?.price ?? (product.pricing.retail > 0 ? product.pricing.retail : null);
+          if (price == null) return null;
+          const disc = viewerPrice?.discount_pct ?? 0;
+          const cur = viewerPrice?.currency ?? product.pricing.currency;
+          return (
+            <div className="mb-3 pb-3 border-b border-gray-200">
+              <p className="text-xs text-gray-600 mb-0.5">
+                {disc > 0 ? 'Your price' : 'Retail'} <span className="text-gray-400">(excl. VAT)</span>
+              </p>
+              <p className="font-semibold text-gray-900">
+                {sym(cur)}{price.toFixed(2)}
+                {disc > 0 && <span className="text-xs font-normal text-primary ml-1">({disc}% off)</span>}
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Stock Status */}
         <div className="mb-3">

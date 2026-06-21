@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import type { Product } from '@/components/features/products/types';
+import ProductCard from '@/components/features/products/ProductCard';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import Design3DModal from './Design3DModal';
 import SEOArticleViewer from './SEOArticleViewer';
@@ -68,56 +69,18 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           </Badge>
         </div>
 
-        {/* Product Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {result.data.map((product: Product) => {
-            const primaryImage = product.images?.find((img) => img.isPrimary) || product.images?.[0];
-
-            return (
-              <div
-                key={product.id}
-                className="group cursor-pointer rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-gray-300 transition-all"
-                onClick={() => handleViewDetails(product)}
-              >
-                {/* Image */}
-                <div className="aspect-square bg-gray-100 overflow-hidden relative">
-                  {primaryImage ? (
-                    <img
-                      src={primaryImage.url}
-                      alt={primaryImage.alt || product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="h-8 w-8 text-gray-300" />
-                    </div>
-                  )}
-                  {/* Category badge overlay */}
-                  {product.category && (
-                    <Badge className="absolute top-2 left-2 text-[10px] px-1.5 py-0 h-5 bg-white/90 text-gray-700 border-0 backdrop-blur-sm shadow-sm">
-                      {product.category}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="p-2.5">
-                  <p className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight group-hover:text-primary transition-colors">
-                    {getProductName(product)}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1 line-clamp-1">
-                    {getManufacturer((product as any).metadata) || ''}
-                  </p>
-                  {product.pricing?.retail != null && (
-                    <p className="text-sm font-semibold text-gray-900 mt-1.5">
-                      €{Number(product.pricing.retail).toFixed(2)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        {/* Product Grid — #227: restored to the shared ProductCard (was inlined to a compact card,
+            orphaning ProductCard). Rich card showcases AR / Lighting / Add-to-Quote in the demo and
+            carries the per-viewer price + Show Prices gating. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {result.data.map((product: Product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onViewDetails={handleViewDetails}
+              categoryColor={categoryColors[product.category] || categoryColors[product.type]}
+            />
+          ))}
         </div>
 
         <ProductDetailModal
