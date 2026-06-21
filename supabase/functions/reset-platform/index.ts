@@ -16,9 +16,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // RPC). Lockable tables today are flows + facet_canonical_values (both already
 // preserved); the guard is future-proof for anything lockable that later lands
 // in the clear list. Knowledge Base CATEGORIES are preserved in full; KB DOCS
-// are preserved except UNPROTECTED docs (public/unlocked/non-auto-synced — i.e.
-// the auto-extracted "Materials Knowledge Base" catalog docs), which are cleaned
-// in STEP 1.5 via wipe_unprotected_kb_docs(). Locked/agent-level KB docs survive.
+// are preserved except UNPROTECTED docs (public/unlocked/non-auto-synced — the
+// auto-extracted catalog docs in the public per-material categories that mirror
+// the ingestion taxonomy: Tiles/Wood/Heating/…/General), which are cleaned in
+// STEP 1.5 via wipe_unprotected_kb_docs(). Locked/agent-level KB docs survive.
 //
 // PRESERVED (never deleted during platform reset):
 //
@@ -631,7 +632,7 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     // can't be expressed by the generic neq-delete). Instead we call a helper
     // that mirrors kb_block_locked_doc_delete()'s effective_locked rule and drops
     // only docs that are public/unlocked/non-auto-synced (the auto-extracted
-    // "Materials Knowledge Base" catalog docs). Agent-level + is_locked categories
+    // catalog docs in the per-material public categories). Agent-level + is_locked categories
     // (HeatPumps, Product Management, Internal Configuration) and their docs, plus
     // every category row, survive. Categories are left intact (unlocked ones just
     // end empty and are re-used by upsert_kb_doc on the next ingest).

@@ -122,7 +122,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             <li>Document Entities &amp; Relationships (product-document, chunk-product, chunk-image)</li>
             <li>PDF Processing (jobs, queues, batch jobs, stage/recovery history)</li>
             <li>Products &amp; Materials Catalog (products, images, properties, visual analysis) — the materials <em>taxonomy</em> is kept</li>
-            <li>Knowledge Base — the auto-extracted public &ldquo;Materials Knowledge Base&rdquo; catalog docs (locked &amp; agent-level KB docs are kept)</li>
+            <li>Knowledge Base — the auto-extracted docs in the public per-material categories (Tiles, Wood, Heating, …, General); locked &amp; agent-level KB docs are kept</li>
             <li>Document Data (chunks, embeddings, images, documents, OCR, spatial &amp; layout analysis)</li>
             <li>PaddleOCR Layout Data (layout regions, extracted tables)</li>
             <li>Chunk derivatives (boundaries, classifications, quality flags, validation scores)</li>
@@ -140,7 +140,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             ✅ The following data will be PRESERVED:
           </p>
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-            <li><strong>Knowledge Base</strong> — all <strong>categories</strong>, plus every <strong>locked</strong> and <strong>agent-level</strong> doc (HeatPumps, Product Management, Internal Configuration), attachments &amp; search analytics. Only the unprotected public &ldquo;Materials Knowledge Base&rdquo; docs are cleaned.</li>
+            <li><strong>Knowledge Base</strong> — all <strong>categories</strong> (incl. the per-material categories mirroring the ingestion taxonomy), plus every <strong>locked</strong> and <strong>agent-level</strong> doc (HeatPumps, Product Management, Internal Configuration), attachments &amp; search analytics. Only the unprotected public per-material docs are cleaned.</li>
             <li><strong>Locked rows</strong> — any row marked <span className="font-mono">is_locked = true</span> is never deleted, in any table. KB docs/categories also honor agent-level access and auto-synced config as locks.</li>
             <li>Users, Profiles &amp; Workspaces</li>
             <li>CRM (contacts, companies, relationships)</li>

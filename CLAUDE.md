@@ -1183,6 +1183,16 @@ The `messaging` module switched from **Twilio (SMS + WhatsApp)** to **Zernio Wha
 - **Fast-follow (NOT shipped 2026-06-08)**: the agent-facing **Inbox UI tab** (conversation list + assignment + reply box via `sendWhatsAppReply`) and a seeded `system-default` flow for `whatsapp.reply_received` (so the notify actually delivers). Service methods already exist (`listConversations`/`getConversationMessages`/`assignConversation`/`updateConversationStatus`).
 - **Flow engine**: the `send_sms` action is now a legacy alias for `send_whatsapp` (both → `messaging-api` `send`, debit `zernio-whatsapp`).
 
+## Knowledge Base — taxonomy mirror & ingest routing (2026-06-21)
+
+KB categories now MIRROR the ingestion/PDF-processing taxonomy (`material_categories`), and auto-extracted catalog knowledge is filed into the matching per-material KB category instead of one flat bucket. The old `Materials Knowledge Base` category was removed (its docs re-routed: live-product docs → their material category, the rest → `General`).
+
+- **Link**: `kb_categories.material_category_id` FK → `material_categories.id` (unique per workspace, partial index). `kb_upsert_mirrored_category(workspace, material_category_id)` find-or-creates/updates the mirrored KB category (parents materialized recursively → subcategories nest); mirrored categories are `access_level='public'` (visible + wipeable).
+- **Sync**: trigger `material_categories_sync_kb` (AFTER INSERT/UPDATE OF name/display_name/description/parent_category_id/sort_order) propagates taxonomy changes to every workspace that already mirrors it; a new category/subcategory appears in those workspaces automatically.
+- **Routing is centralized in the `upsert_kb_doc` RPC** — ALL ingest paths that create KB docs with a `product_id` route correctly without per-path code. Resolution: `products.category_id` → else `products.metadata->>'material_category'` (classifier vocab, matches `material_categories.category_key`) → else explicit `material_category` on the KB-doc metadata → else the workspace `General` fallback (slug `general`, `material_category_id=NULL`). NOTE: `metadata.category` on a KB doc is the KNOWLEDGE TYPE (certification/compliance/care/packaging/brand), NOT the material category.
+- **Today only the PDF catalog path generates KB docs** (`auto_kb_document_service` / `catalog_knowledge_extractor` / `catalog_legend_extractor_v2` in MIVAA, all via `upsert_kb_doc`). XML import + Firecrawl scrape do NOT yet create KB docs — when they do (separate MIVAA task), they inherit correct routing for free by calling `upsert_kb_doc` with a `product_id`.
+- **Reset interaction**: mirrored categories are public → their docs are cleaned by `wipe_unprotected_kb_docs()` (STEP 1.5 of reset-platform); category shells + agent/locked docs survive. `material_categories` itself is in NEVER_CLEAR (preserved).
+
 ## Design System Summary
 Full reference: `.claude/design-system.md`
 - **Theme**: Dark mode. **Background**: near black (`--background: 0 0% 7%`). **Foreground**: light (`--foreground: 0 0% 92%`).
