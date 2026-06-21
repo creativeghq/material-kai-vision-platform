@@ -92,7 +92,8 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
           </div>
           <AlertDialogDescription className="text-left pt-2">
             Permanently clears user-generated and AI-derived data while preserving
-            accounts, finance/fiscal records, secrets, admin config, and the Knowledge Base.
+            accounts, finance/fiscal records, secrets, admin config, the materials
+            taxonomy, and the locked / agent-level Knowledge Base.
             Review the full breakdown below, then type the confirmation phrase.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -120,7 +121,8 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             <li>Search caches &amp; derived state (suggestions, trending, query understanding, similarity cache, duplicate detection)</li>
             <li>Document Entities &amp; Relationships (product-document, chunk-product, chunk-image)</li>
             <li>PDF Processing (jobs, queues, batch jobs, stage/recovery history)</li>
-            <li>Products &amp; Materials Catalog (products, images, properties, categories, visual analysis)</li>
+            <li>Products &amp; Materials Catalog (products, images, properties, visual analysis) — the materials <em>taxonomy</em> is kept</li>
+            <li>Knowledge Base — the auto-extracted public &ldquo;Materials Knowledge Base&rdquo; catalog docs (locked &amp; agent-level KB docs are kept)</li>
             <li>Document Data (chunks, embeddings, images, documents, OCR, spatial &amp; layout analysis)</li>
             <li>PaddleOCR Layout Data (layout regions, extracted tables)</li>
             <li>Chunk derivatives (boundaries, classifications, quality flags, validation scores)</li>
@@ -138,8 +140,8 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             ✅ The following data will be PRESERVED:
           </p>
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-            <li><strong>Knowledge Base &amp; Documentation</strong> (kb_docs, kb_categories, attachments, search analytics) — <strong>fully preserved</strong>, never deleted on reset (locked or not)</li>
-            <li><strong>Locked rows</strong> — any row marked <span className="font-mono">is_locked = true</span> is never deleted, in any table. (Today the only lockable tables — KB docs/categories, flow definitions, facet canonical values — are already fully preserved, so this is a forward-looking safety guard.)</li>
+            <li><strong>Knowledge Base</strong> — all <strong>categories</strong>, plus every <strong>locked</strong> and <strong>agent-level</strong> doc (HeatPumps, Product Management, Internal Configuration), attachments &amp; search analytics. Only the unprotected public &ldquo;Materials Knowledge Base&rdquo; docs are cleaned.</li>
+            <li><strong>Locked rows</strong> — any row marked <span className="font-mono">is_locked = true</span> is never deleted, in any table. KB docs/categories also honor agent-level access and auto-synced config as locks.</li>
             <li>Users, Profiles &amp; Workspaces</li>
             <li>CRM (contacts, companies, relationships)</li>
             <li>Credits &amp; Billing (user_credits, transactions, packages)</li>
@@ -152,6 +154,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             <li>Global Upsells &amp; Timeline Steps (admin-managed)</li>
             <li>Roles, permissions &amp; RBAC</li>
             <li>AI model pricing, subscription plans, webhook endpoints, modules</li>
+            <li><strong>Materials taxonomy</strong> (the ingestion / PDF-processing categories &amp; subcategories that drive product classification &amp; discovery)</li>
             <li>PDF files in pdf-documents bucket</li>
             <li><strong>System Settings &amp; Configuration</strong> (quote expiration, PDF template, company details, VAT rate)</li>
             <li><strong>Uploaded branding &amp; template images</strong> (business/invoice logo in <span className="font-mono">business-logos/</span>; invoice &amp; statement template covers/footers, quote &amp; catalog cover/back-cover images — all in the <span className="font-mono">quote-templates</span> bucket)</li>

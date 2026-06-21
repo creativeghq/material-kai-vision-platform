@@ -15,7 +15,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // any cleared table (discovered dynamically via the reset_lock_aware_tables
 // RPC). Lockable tables today are flows + facet_canonical_values (both already
 // preserved); the guard is future-proof for anything lockable that later lands
-// in the clear list. Knowledge Base is preserved in full regardless.
+// in the clear list. Knowledge Base CATEGORIES are preserved in full; KB DOCS
+// are preserved except UNPROTECTED docs (public/unlocked/non-auto-synced — i.e.
+// the auto-extracted "Materials Knowledge Base" catalog docs), which are cleaned
+// in STEP 1.5 via wipe_unprotected_kb_docs(). Locked/agent-level KB docs survive.
 //
 // PRESERVED (never deleted during platform reset):
 //
@@ -29,8 +32,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - ai_model_pricing         ← pricing reference data
 //   - subscription_plans       ← billing plans
 //   - webhook_endpoints        ← configured webhook URLs
-//   - kb_docs / kb_categories / kb_doc_attachments / kb_search_analytics
-//                              ← Knowledge Base (admin-managed docs)
+//   - kb_categories / kb_doc_attachments / kb_search_analytics
+//                              ← KB categories preserved in full
+//   - kb_docs                  ← Knowledge Base docs — preserved EXCEPT unprotected
+//                                (public/unlocked/non-auto-synced) docs, which are
+//                                cleaned in STEP 1.5 (wipe_unprotected_kb_docs)
 //   - crm_companies / crm_contacts / crm_contact_relationships / crm_company_contacts
 //                              ← CRM (user request — keep contacts)
 //   - profiles / auth.users / workspaces / workspace_members
@@ -108,6 +114,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - modules / api_endpoints / mydata_reference / aade_lookup_log
 //   - xml_mapping_templates / flow_area_registry / category_complement_rules
 //   - catalog_templates           ← admin branding assets (parallels quote-templates)
+//   - material_categories         ← admin-curated materials taxonomy that drives the
+//                                    ingestion/PDF-processing classifier (ai_extraction_
+//                                    enabled, prototype embeddings). NOT user content —
+//                                    wiping it breaks discovery until re-seeded.
 //
 // Storage Buckets (6 buckets post-consolidation 2026-05-23):
 //   - pdf-documents            ← KB raw uploads + catalog-output/ + quote-output/ + moodboard-output/
@@ -301,7 +311,7 @@ const TABLES_TO_CLEAR = [
   // ── Materials & Catalog (user-populated) ────────────────────────────
   'material_images',               // Material images
   'material_properties',           // Material properties
-  'material_categories',           // Material categories
+  // NOTE: 'material_categories' (admin-curated ingestion taxonomy) is PRESERVED — see NEVER_CLEAR.
   'materials_catalog',             // Materials catalog entries
 
   // ── Processing Results ──────────────────────────────────────────────
@@ -391,6 +401,10 @@ const NEVER_CLEAR = new Set<string>([
   'user_credits', 'credit_transactions', 'credit_packages', 'workspaces',
   'workspace_members', 'user_profiles', 'roles', 'role_permissions',
   'prompts', 'extraction_prompts', 'system_settings', 'modules',
+  // Admin-curated materials taxonomy that drives the ingestion/PDF-processing
+  // classifier (categories + subcategories, ai_extraction_enabled, prototype
+  // embeddings). Config, not user content — must survive a reset.
+  'material_categories',
 ]);
 
 // Tables whose primary key is NOT a uuid `id` column — the default
@@ -612,6 +626,32 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
       }
     }
 
+    // STEP 1.5: Clean the Knowledge Base — delete UNPROTECTED kb_docs only.
+    // kb_* tables are intentionally NOT in TABLES_TO_CLEAR (their FK/lock model
+    // can't be expressed by the generic neq-delete). Instead we call a helper
+    // that mirrors kb_block_locked_doc_delete()'s effective_locked rule and drops
+    // only docs that are public/unlocked/non-auto-synced (the auto-extracted
+    // "Materials Knowledge Base" catalog docs). Agent-level + is_locked categories
+    // (HeatPumps, Product Management, Internal Configuration) and their docs, plus
+    // every category row, survive. Categories are left intact (unlocked ones just
+    // end empty and are re-used by upsert_kb_doc on the next ingest).
+    console.log('\n🗑️  STEP 1.5: Clean Knowledge Base (unprotected docs only)');
+    results.knowledge_base = { deleted: 0 };
+    try {
+      const { data: kbDeleted, error: kbErr } = await supabase.rpc('wipe_unprotected_kb_docs');
+      if (kbErr) {
+        console.error('   ❌ KB clean failed:', kbErr);
+        results.knowledge_base = { deleted: 0, error: kbErr.message };
+      } else {
+        const deleted = typeof kbDeleted === 'number' ? kbDeleted : 0;
+        console.log(`   ✅ Deleted ${deleted} unprotected KB docs (locked/agent docs preserved)`);
+        results.knowledge_base = { deleted };
+      }
+    } catch (error: any) {
+      console.error('   ❌ KB clean error:', error);
+      results.knowledge_base = { deleted: 0, error: error.message };
+    }
+
     // STEP 2: Clear storage buckets (AI/processing content only — NOT quote-templates or pdf-documents)
     console.log('\n🗑️  STEP 2: Clear storage buckets');
 
@@ -778,12 +818,12 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
 
     const successfulTables = results.tables.filter((r: any) => !r.error).length;
     const failedTables = results.tables.filter((r: any) => r.error).length;
-    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows across ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} errors), Storage: ${totalStorageDeleted} files, VECS: ${totalVecsDeleted} embeddings, prompt_history trimmed: ${results.prompt_history.deleted}, server /tmp: ${results.server_tmp.ok ? 'cleaned' : 'skipped/failed'}`);
+    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows across ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} errors), KB docs cleaned: ${results.knowledge_base.deleted}, Storage: ${totalStorageDeleted} files, VECS: ${totalVecsDeleted} embeddings, prompt_history trimmed: ${results.prompt_history.deleted}, server /tmp: ${results.server_tmp.ok ? 'cleaned' : 'skipped/failed'}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        summary: `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), ${totalStorageDeleted} files from storage, ${totalVecsDeleted} embeddings from VECS, trimmed ${results.prompt_history.deleted} prompt_history rows, and ${results.server_tmp.ok ? 'cleaned' : 'failed to clean'} MIVAA /tmp`,
+        summary: `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), cleaned ${results.knowledge_base.deleted} unprotected KB docs, ${totalStorageDeleted} files from storage, ${totalVecsDeleted} embeddings from VECS, trimmed ${results.prompt_history.deleted} prompt_history rows, and ${results.server_tmp.ok ? 'cleaned' : 'failed to clean'} MIVAA /tmp`,
         results,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
