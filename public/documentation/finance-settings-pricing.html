@@ -79,6 +79,17 @@
   <h2>Card 5 — Pending Discount Approvals</h2>
   <p><strong>Why:</strong> when a quote's discount goes beyond what's allowed (or a line would sell below cost), it isn't applied silently — it's raised for approval. This card lists those requests for a finance approver to <strong>release or decline</strong>. The salesperson is told it's pending; once released, the discount takes effect. (See the sales side on <a href="quotes-build.html">building a quote</a>.)</p>
 
+  <h2>Who sees which price — per-viewer pricing &amp; the “Show Prices” toggle</h2>
+  <p>Because the same product costs different customers different amounts, the price shown is computed <strong>for the viewer</strong>, and you can hide prices entirely when you don't want them on screen.</p>
+  <ul class="feat">
+    <li><strong>Per-viewer price.</strong> Product cards, agent-chat results and the public catalogue show the price <em>for the current viewer/customer</em> — their level discount applied — rather than a single list price. A customer browsing sees their price; a guest sees the public price (if prices are shown at all).</li>
+    <li><strong>VAT-inclusive (gross) display.</strong> Where a customer should see gross figures, prices are shown <strong>VAT-inclusive</strong> for that customer, so the number on screen is what they'd actually pay.</li>
+    <li><strong>“Show Prices” toggle (in the header).</strong> A global <strong>Show Prices</strong> switch lets anyone hide every price across the browsing experience in one click — product cards, the public catalogue and agent-chat results all respect it. Use it for screen-sharing, showrooming, or presenting to a client without prices in view. The choice is remembered on your device.</li>
+    <li><strong>Public catalogue gating.</strong> A published catalogue only shows prices when the toggle allows it — so you can publish a catalogue as a visual showcase with prices off, or with per-viewer prices on.</li>
+  </ul>
+
+  <div class="callout"><p><strong>Category tree &amp; rule inheritance.</strong> Markup and level discounts follow the <strong>material-category tree</strong>: a rule set on a parent category is <em>inherited</em> by its sub-categories unless a sub-category has its own rule. Material categories (their sub-category tree and name <strong>aliases</strong> used to match imported data) are maintained by admins in the Materials area; the inheritance is what lets you set broad rules once and override only where needed.</p></div>
+
   <h2>What this powers</h2>
   <ul class="feat">
     <li>Every catalogue line you add to a <a href="quotes-build.html">quote</a> is priced through these layers automatically.</li>

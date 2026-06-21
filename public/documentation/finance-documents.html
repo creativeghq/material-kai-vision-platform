@@ -25,6 +25,22 @@
   </div>
 
   <div class="callout tip"><p>All document types share the same editor and the same myDATA behaviour — the Invoices page documents that editor in full; the other pages focus on what's specific to each type.</p></div>
+
+  <h2>The totals breakdown (every final document)</h2>
+  <p>Every customer-facing final document — quotes, invoices and their PDFs/exports — now foots with the <strong>same explicit five-line totals block</strong>, so VAT and any discount are never hidden inside one number. The five lines are:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Line</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Price</strong></td><td>The net subtotal, after any per-line / per-customer discounts.</td></tr>
+      <tr><td><strong>Discount</strong></td><td>The order-level <em>paid-upfront (cash)</em> discount only (per-line discounts already show on each row).</td></tr>
+      <tr><td><strong>Price after Discount</strong></td><td>Price − Discount = the net taxable base.</td></tr>
+      <tr><td><strong>VAT</strong></td><td>VAT calculated on the post-discount net.</td></tr>
+      <tr><td><strong>Final</strong></td><td>Price after Discount + VAT = the grand total the customer pays.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The block is the same on the in-app preview and the generated PDF, and it <strong>foots</strong> (the lines add up), so a customer can always see exactly how the total was reached. The paid-upfront discount line is driven by the <a href="finance-settings-pricing.html">resale pricing engine</a>'s cash-discount rule and flows from an accepted <a href="quotes-build.html">quote</a> through to its <a href="finance-doc-invoices.html">invoice</a>.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Inbox</div>
   <h1>Inbox</h1>
   <div class="routes"><span class="badge route">/inbox</span> <span class="badge gated">inbox.use</span></div>
-  <p class="lead">The Inbox is one place for every conversation your team relies on — internal chats between colleagues, customer threads, and WhatsApp messages — organised, searchable, and assigned to the right person. This guide walks every part of it: what each control is, why it matters, exactly how to use it, and what it changes elsewhere in the platform.</p>
+  <p class="lead">The Inbox is one place for every conversation your team relies on — internal chats between colleagues, customer threads, and WhatsApp messages — organised, searchable, and assigned to the right person. An <strong>AI assistant</strong> can also answer customer threads automatically and step aside the moment a human replies. This guide walks every part of it: what each control is, why it matters, exactly how to use it, and what it changes elsewhere in the platform.</p>
 
   <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Inbox</strong>.</p></div>
 
@@ -82,6 +82,32 @@
     <li>Optionally <strong>share a public thread link</strong> (<span class="badge route">/i/:token</span>) so an outside party can take part without a MaterialsHub account — see <a href="public-pages.html">Public &amp; Shared Pages</a>.</li>
   </ol>
   <p><strong>What it affects:</strong> connecting a number makes its threads appear under the <strong>WhatsApp</strong> filter; incoming replies are assigned automatically, and whether a send goes free-form or via template depends entirely on the 24-hour window above.</p>
+
+  <h2>The AI assistant in the Inbox (auto-replies)</h2>
+  <p><strong>What it is —</strong> an AI assistant that can <strong>answer customer threads for you automatically</strong>. When a customer message comes in (in-app customer thread or WhatsApp), the assistant replies first — grounded in <em>that customer's own data</em> (their statement, invoices and quotes, scoped to the thread's customer) — so routine questions are handled instantly, day or night. <strong>Why it matters —</strong> it covers first response when no one's at the desk, but is built to <strong>step aside the moment a human steps in</strong>, so it never talks over your team.</p>
+
+  <h3>Human takeover — the assistant gets out of the way</h3>
+  <ul class="feat">
+    <li><strong>A staff reply pauses the bot.</strong> The instant a team member sends a <strong>text reply</strong> in a conversation, the assistant is <strong>paused</strong> for that thread — it stops auto-replying so it won't talk over the human who just took over.</li>
+    <li><strong>Private notes don't pause it.</strong> Internal <em>notes</em> are private and don't count as taking over, so jotting a note won't switch the bot off.</li>
+    <li><strong>Resume with the Bot toggle.</strong> When you're done and want the assistant to handle the thread again, flip the conversation's <strong>Bot</strong> toggle back on.</li>
+    <li><strong>No double-replies, no loops.</strong> The assistant only fires when the <em>most recent</em> message is a fresh inbound <strong>customer</strong> message — never in response to itself, a teammate, or a system event — and it's only charged when it actually replies (skipped turns cost nothing).</li>
+    <li><strong>Audit trail.</strong> When the assistant auto-engages it posts a system note (<em>“The AI assistant is responding…”</em>) into the thread, so the transcript shows the hand-off just like a manual one — on both the in-app and WhatsApp paths.</li>
+  </ul>
+
+  <h3>Settings — control what the assistant does <span class="badge gated">owner / admin / operator</span></h3>
+  <p>Open the <strong>gear (Settings)</strong> in the Inbox header for two live switches (any member can read them; owners/admins/operators can change them):</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Auto-respond to new chats</strong></td><td>Whether the assistant answers inbound customer chats automatically. Turn off to make every thread human-first (the assistant only helps when you ask).</td></tr>
+      <tr><td><strong>Answer account &amp; billing</strong></td><td>Whether the assistant may answer account/billing questions using the customer's own statement/invoices/quotes. The helper text flags the <strong>WhatsApp phone-identity caveat</strong> — on WhatsApp a sender is identified only by phone number — so you decide, informed, whether billing answers should go out on that channel.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout"><p><strong>Editable persona.</strong> The assistant's tone and instructions (its system prompt) are <strong>configurable without a redeploy</strong> — an admin can tune the inbox assistant's persona the same way the main KAI agent's prompt is edited. There's a sensible built-in default if you change nothing.</p></div>
+  <div class="callout tip"><p>Auto-respond is <strong>on by default</strong> per workspace. Each auto-reply uses credits; pausing (a human reply) or turning off <em>Auto-respond</em> stops the charges.</p></div>
 
   <h2>Sharing a customer / public thread</h2>
   <p><strong>What it is —</strong> a way to open a conversation up to someone outside your team. When a thread is shared, the platform creates a <strong>token link</strong> (<span class="badge route">/i/:token</span> <span class="badge public">Public</span>) that the outside party can open in a browser to read and reply — no MaterialsHub account required. <strong>Why it matters —</strong> it lets a customer, supplier or contractor take part in the exact thread you're already working in, instead of starting a separate email chain. This is the same approach used for other shared customer-facing pages, so the experience is familiar to recipients.</p>
