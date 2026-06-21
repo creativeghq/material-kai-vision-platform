@@ -31,7 +31,8 @@ import {
 } from '@/components/core/ui/select';
 import { QuoteActivityPanel } from '@/modules/finance/components/QuoteActivityPanel';
 import { IssueInvoiceButton } from '@/modules/finance/components/IssueInvoiceButton';
-import { formatMoney } from '@/modules/finance/services/financeService';
+import { formatMoney, financeService } from '@/modules/finance/services/financeService';
+import { Switch } from '@/components/core/ui/switch';
 
 const sendQuoteNotification = (userId: string, title: string, quoteId: string) => {
   supabase.from('user_notifications').insert({
@@ -87,6 +88,15 @@ export const QuoteDetailPage: React.FC = () => {
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, string>>({});
   const [vatRate, setVatRate] = useState<string>('24');
   const [savingPrices, setSavingPrices] = useState(false);
+  // #227 — order-level paid-upfront (cash) discount
+  const [paidUpfront, setPaidUpfront] = useState(false);
+  const [cashPct, setCashPct] = useState(0);
+  useEffect(() => {
+    if (!quote) return;
+    setPaidUpfront(!!(quote as any).paid_upfront);
+    const ws = (quote as any).workspace_id;
+    if (ws) financeService.getActiveCashDiscountPct(ws).then(setCashPct).catch(() => {});
+  }, [quote?.id]);
 
   // PDF generation state
   const [generatingPDF, setGeneratingPDF] = useState(false);
@@ -381,8 +391,12 @@ export const QuoteDetailPage: React.FC = () => {
   }, 0);
 
   const pricingVatRate = parseFloat(vatRate) || 0;
-  const pricingVatAmount = pricingSubtotal * (pricingVatRate / 100);
-  const pricingGrandTotal = pricingSubtotal + pricingVatAmount;
+  // #227 — paid-upfront (cash) discount applies to the net subtotal before VAT
+  const pricingCashPct = paidUpfront ? cashPct : 0;
+  const pricingCashDiscount = pricingSubtotal * (pricingCashPct / 100);
+  const pricingNetAfterCash = pricingSubtotal - pricingCashDiscount;
+  const pricingVatAmount = pricingNetAfterCash * (pricingVatRate / 100);
+  const pricingGrandTotal = pricingNetAfterCash + pricingVatAmount;
 
   const allItemsHavePrices = (quote?.items || []).length > 0 &&
     (quote?.items || []).every(item => {
@@ -406,6 +420,8 @@ export const QuoteDetailPage: React.FC = () => {
           line_total: effectivePrice * item.quantity,
         };
       });
+      // #227 — persist the paid-upfront flag first so saveItemPrices applies the cash discount.
+      await supabase.from('quotes').update({ paid_upfront: paidUpfront }).eq('id', quote.id);
       const result = await quotePDFService.saveItemPrices(quote.id, items, pricingVatRate);
       if (result.success) {
         toast({ title: 'Prices saved', description: 'Item prices and totals updated.' });
@@ -1057,6 +1073,19 @@ export const QuoteDetailPage: React.FC = () => {
                           <span className="text-muted-foreground">Subtotal</span>
                           <span className="font-medium">€{pricingSubtotal.toFixed(2)}</span>
                         </div>
+                        {/* #227 — paid-upfront (cash) discount */}
+                        <div className="flex items-center justify-between text-sm">
+                          <label className="flex items-center gap-2 text-muted-foreground">
+                            <Switch checked={paidUpfront} onCheckedChange={setPaidUpfront} />
+                            Paid upfront (cash){cashPct > 0 ? ` − ${cashPct}%` : ''}
+                          </label>
+                          {pricingCashDiscount > 0 && (
+                            <span className="font-medium text-primary">− €{pricingCashDiscount.toFixed(2)}</span>
+                          )}
+                        </div>
+                        {paidUpfront && cashPct === 0 && (
+                          <p className="text-[11px] text-muted-foreground">No cash-payment rule set — configure it in Finance → Settings → Pricing.</p>
+                        )}
                         <div className="flex justify-between items-center text-sm">
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">VAT</span>

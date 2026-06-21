@@ -101,8 +101,26 @@ class QuotePDFService {
 
     // Calculate totals
     const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
-    const vatAmount = subtotal * (vatRate / 100);
-    const grandTotal = subtotal + vatAmount;
+
+    // #227 — order-level paid-upfront (cash) discount: applied to the net subtotal before VAT
+    // when the quote is flagged paid_upfront, using the workspace's active cash_payment rule.
+    let cashPct = 0;
+    const { data: quoteRow } = await supabase
+      .from('quotes').select('workspace_id, paid_upfront').eq('id', quoteId).single();
+    if (quoteRow?.paid_upfront && quoteRow?.workspace_id) {
+      const { data: rule } = await supabase
+        .from('pricing_custom_rules')
+        .select('discount_pct')
+        .eq('workspace_id', quoteRow.workspace_id)
+        .eq('rule_type', 'cash_payment')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .limit(1);
+      cashPct = rule && rule[0] ? Number(rule[0].discount_pct) || 0 : 0;
+    }
+    const netAfterCash = subtotal * (1 - cashPct / 100);
+    const vatAmount = netAfterCash * (vatRate / 100);
+    const grandTotal = netAfterCash + vatAmount;
 
     // Update quote totals
     const { error: quoteError } = await supabase
@@ -112,6 +130,7 @@ class QuotePDFService {
         vat_rate: vatRate,
         vat_amount: Math.round(vatAmount * 100) / 100,
         grand_total: Math.round(grandTotal * 100) / 100,
+        cash_discount_pct: cashPct,
         updated_at: new Date().toISOString(),
       })
       .eq('id', quoteId);

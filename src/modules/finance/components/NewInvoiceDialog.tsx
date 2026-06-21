@@ -127,6 +127,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // Buyer risk-gate (finance_settings) + the buyer's current open balance for the credit-limit check.
   const [riskRules, setRiskRules] = useState({ block_inactive: true, block_unvalidated: false, warn_over: true, block_over: false });
   const [buyerOutstanding, setBuyerOutstanding] = useState(0);
+  // #227 — order-level paid-upfront (cash) discount
+  const [paidUpfront, setPaidUpfront] = useState(false);
+  const [cashPct, setCashPct] = useState(0);
+  useEffect(() => {
+    if (!workspaceId) return;
+    financeService.getActiveCashDiscountPct(workspaceId).then(setCashPct).catch(() => {});
+  }, [workspaceId]);
 
   // #193 — validate the counterpart's VAT via VIES before invoicing (caches onto crm_companies).
   const validateCounterpartVat = async () => {
@@ -450,12 +457,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       fees += parseFloat(l.fees) || 0; stamp += parseFloat(l.stamp_duty) || 0;
       other += parseFloat(l.other_taxes) || 0; deduct += parseFloat(l.deductions) || 0;
     }
+    // #227 — paid-upfront (cash) discount: scale net + vat proportionally (preserves per-line VAT rates).
+    const cashFactor = paidUpfront ? (1 - cashPct / 100) : 1;
+    const cashDiscount = net * (1 - cashFactor);
+    net = net * cashFactor;
+    vat = vat * cashFactor;
     const digital = parseFloat(digitalFee) || 0;
     const wh = withholdings.find((w) => w.code === withholdingCode);
     const withheld = wh?.rate ? net * (Number(wh.rate) / 100) : 0;
     const total = net + vat + fees + stamp + other + digital - withheld - deduct;
-    return { net, vat, fees, stamp, other, deduct, digital, withheld, total };
-  }, [lines, vatRate, withholdingCode, withholdings, pricesIncludeVat, digitalFee]);
+    return { net, vat, fees, stamp, other, deduct, digital, withheld, cashDiscount, total };
+  }, [lines, vatRate, withholdingCode, withholdings, pricesIncludeVat, digitalFee, paidUpfront, cashPct]);
 
   // Buyer risk evaluation against the workspace rules. `vat_validated===false` means ΑΑΔΕ flagged
   // the ΑΦΜ inactive (or VIES rejected it); `null` means it was never checked. Credit limit lives
@@ -548,6 +560,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         vat_payment_suspension: vatSuspension, self_pricing: selfPricing,
         exchange_rate: currency !== 'EUR' && exchangeRate ? parseFloat(exchangeRate) : null,
         prices_include_vat: pricesIncludeVat,
+        paid_upfront: paidUpfront,
+        cash_discount_pct: paidUpfront ? cashPct : 0,
         digital_transaction_fee: parseFloat(digitalFee) || 0,
         related_document: relatedDocument || null,
         print_terms: printTerms, include_in_myf: includeInMyf, print_online_code: printOnlineCode, move_stock: moveStock,
@@ -874,6 +888,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
                     <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={pricesIncludeVat} onChange={(e) => setPricesIncludeVat(e.target.checked)} />
                     Prices include VAT
+                  </label>
+                  {/* #227 — paid-upfront (cash) discount; disabled until a cash rule exists */}
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer" title={cashPct === 0 ? 'Set a Paid-upfront rule in Finance → Settings → Pricing' : `${cashPct}% off when paid upfront`}>
+                    <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={paidUpfront} disabled={cashPct === 0} onChange={(e) => setPaidUpfront(e.target.checked)} />
+                    Paid upfront{cashPct > 0 ? ` (−${cashPct}%)` : ''}
                   </label>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
                 </div>

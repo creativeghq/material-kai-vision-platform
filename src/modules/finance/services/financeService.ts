@@ -880,6 +880,20 @@ const _financeServiceCore = {
     if (error) throw error;
   },
 
+  // #227 — the workspace's active paid-upfront (cash) discount %, applied at the order level.
+  async getActiveCashDiscountPct(workspaceId: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('pricing_custom_rules')
+      .select('discount_pct')
+      .eq('workspace_id', workspaceId)
+      .eq('rule_type', 'cash_payment')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .limit(1);
+    if (error) throw error;
+    return data && data[0] ? Number(data[0].discount_pct) || 0 : 0;
+  },
+
   // #227 — customer discount/level change: applied directly for finance/admin, or routed to
   // a pending approval request for the 'sales' persona (enforced server-side in the RPC).
   async proposeOrApplyCustomerPricing(input: {

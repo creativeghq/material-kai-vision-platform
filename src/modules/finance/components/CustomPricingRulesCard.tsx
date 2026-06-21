@@ -23,6 +23,7 @@ interface Rule {
 const TYPE_LABELS: Record<string, string> = {
   volume_category: 'Volume discount (per category)',
   category_extra: 'Category extra discount',
+  cash_payment: 'Paid upfront (cash)',
 };
 
 export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -31,7 +32,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [type, setType] = useState<'volume_category' | 'category_extra'>('category_extra');
+  const [type, setType] = useState<'volume_category' | 'category_extra' | 'cash_payment'>('category_extra');
   const [cat, setCat] = useState('');
   const [minQty, setMinQty] = useState('');
   const [pct, setPct] = useState('');
@@ -43,8 +44,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
         financeService.listCustomRules(workspaceId),
         financeService.listMaterialCategories(workspaceId).catch(() => []),
       ]);
-      // Only show the two wired types here.
-      setRules(rs.filter((r) => r.rule_type === 'volume_category' || r.rule_type === 'category_extra'));
+      setRules(rs.filter((r) => r.rule_type === 'volume_category' || r.rule_type === 'category_extra' || r.rule_type === 'cash_payment'));
       setCategories(cats);
     } catch (err: any) {
       toast({ title: 'Failed to load rules', description: err?.message, variant: 'destructive' });
@@ -54,7 +54,8 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
 
   const add = async () => {
     const p = parseFloat(pct);
-    if (!cat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
+    const isCash = type === 'cash_payment';
+    if (!isCash && !cat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
     if (!Number.isFinite(p) || p < 0) { toast({ title: 'Enter a discount %', variant: 'destructive' }); return; }
     let params: any = {};
     if (type === 'volume_category') {
@@ -64,7 +65,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
     }
     setBusy(true);
     try {
-      await financeService.upsertCustomRule({ workspaceId, ruleType: type, categoryKey: cat, params, discountPct: p, sortOrder: rules.length });
+      await financeService.upsertCustomRule({ workspaceId, ruleType: type, categoryKey: isCash ? null : cat, params, discountPct: p, sortOrder: rules.length });
       setCat(''); setMinQty(''); setPct(''); await load();
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -77,6 +78,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
   };
 
   const describe = (r: Rule) => {
+    if (r.rule_type === 'cash_payment') return `Paid upfront → ${r.discount_pct}% off the whole order`;
     const c = String(r.category_key ?? '').replace(/_/g, ' ');
     if (r.rule_type === 'volume_category') return `${c}: ≥ ${r.params?.min_qty ?? '?'} units → ${r.discount_pct}% off`;
     return `${c}: ${r.discount_pct}% off (all customers)`;
@@ -120,20 +122,23 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
               <SelectContent>
                 <SelectItem value="category_extra">Category extra</SelectItem>
                 <SelectItem value="volume_category">Volume (per category)</SelectItem>
+                <SelectItem value="cash_payment">Paid upfront (cash)</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Category</Label>
-            <Select value={cat} onValueChange={setCat} disabled={categories.length === 0}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder={categories.length === 0 ? 'No categories' : 'Category'} />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c.replace(/_/g, ' ')}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {type !== 'cash_payment' && (
+            <div className="space-y-1">
+              <Label className="text-xs">Category</Label>
+              <Select value={cat} onValueChange={setCat} disabled={categories.length === 0}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder={categories.length === 0 ? 'No categories' : 'Category'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c.replace(/_/g, ' ')}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {type === 'volume_category' && (
             <div className="space-y-1">
               <Label className="text-xs">Min qty</Label>
@@ -144,7 +149,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
             <Label className="text-xs">% off</Label>
             <Input className="h-8 w-20 text-xs" type="number" step="0.5" min="0" max="100" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="0" />
           </div>
-          <Button size="sm" variant="outline" onClick={add} disabled={busy || !cat}>
+          <Button size="sm" variant="outline" onClick={add} disabled={busy || (type !== 'cash_payment' && !cat)}>
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           </Button>
         </div>
