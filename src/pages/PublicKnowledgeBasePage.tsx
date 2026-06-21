@@ -240,8 +240,10 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   }, [categories]);
 
   // Resolve the article from the :slug route param. The URL is the source of
-  // truth, so Back/forward and shareable links work. KB reads are GLOBAL —
-  // never filtered by the viewer's workspace, only published+public.
+  // truth, so Back/forward and shareable links work. Visibility is enforced by
+  // RLS, not an app filter: anon → published+public+public-category only
+  // (kb_docs_public_read); workspace members → any doc in their workspace
+  // (kb_docs_select), so admin "view" links open workspace/draft docs too.
   useEffect(() => {
     if (!slug) { setSelectedDoc(null); setNotFound(false); return; }
     let cancelled = false;
@@ -250,8 +252,6 @@ export const PublicKnowledgeBasePage: React.FC = () => {
       .from('kb_docs')
       .select('*')
       .eq('slug', slug)
-      .eq('status', 'published')
-      .eq('visibility', 'public')
       .order('updated_at', { ascending: false })
       .limit(1)
       .then(({ data }) => {
@@ -271,6 +271,8 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   }, [slug]);
 
   // Back-compat: legacy ?doc=<uuid> links → resolve and redirect to the slug URL.
+  // RLS gates access; if it doesn't resolve, show "not found" instead of silently
+  // falling back to the home page.
   useEffect(() => {
     const docId = searchParams.get('doc');
     if (!docId || slug) return;
@@ -278,11 +280,10 @@ export const PublicKnowledgeBasePage: React.FC = () => {
       .from('kb_docs')
       .select('id, slug')
       .eq('id', docId)
-      .eq('status', 'published')
-      .eq('visibility', 'public')
       .maybeSingle()
       .then(({ data }) => {
         if (data) navigate(`/knowledge-base/${data.slug || data.id}`, { replace: true });
+        else setNotFound(true);
       });
   }, [searchParams, slug, navigate]);
 
@@ -373,10 +374,10 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   }
 
   // ── Article not found ──────────────────────────────────────────────────────
-  if (slug && notFound) {
+  if ((slug || searchParams.get('doc')) && notFound) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-4 text-center">
-        <SeoHead title="Article not found" noIndex canonicalPath={`/knowledge-base/${slug}`} />
+        <SeoHead title="Article not found" noIndex canonicalPath={`/knowledge-base/${slug || ''}`} />
         <p className="text-lg font-light">That article doesn’t exist or isn’t public.</p>
         <Button className="rounded-full" onClick={() => navigate('/knowledge-base')}>Browse the knowledge base</Button>
       </div>
