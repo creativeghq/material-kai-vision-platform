@@ -4817,7 +4817,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       }
                     }}
                     placeholder="Type your message... (Shift+Enter for new line, / for tools)"
-                    className="min-h-[80px] max-h-[400px] !resize-y border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 text-sm bg-transparent w-full"
+                    className="min-h-[56px] sm:min-h-[80px] max-h-[400px] !resize-y border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 text-sm bg-transparent w-full"
                   />
                 </div>
 
