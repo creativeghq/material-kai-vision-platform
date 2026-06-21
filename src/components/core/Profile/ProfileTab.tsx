@@ -879,17 +879,17 @@ export const ProfileTab: React.FC = () => {
       {/* Visibility */}
       <Card className={`rounded-2xl border-2 transition-colors ${isPublic ? 'border-primary/30' : ''}`}>
         <CardContent className="pt-5 pb-5">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 min-w-0">
               {isPublic ? <Eye className="h-5 w-5 text-primary shrink-0" /> : <EyeOff className="h-5 w-5 text-muted-foreground shrink-0" />}
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium text-sm">{isPublic ? 'Public Profile' : 'Private Profile'}</p>
                 <p className="text-xs text-muted-foreground">
                   {isPublic ? 'Anyone can discover and view your profile.' : 'Only you can see your profile.'}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
               {isPublic && (
                 <>
                   <Button size="sm" variant="outline" asChild className="gap-1.5">

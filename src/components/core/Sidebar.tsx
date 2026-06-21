@@ -6,9 +6,8 @@ import { useShowPrices } from '@/hooks/useShowPrices';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { usePermissions } from '@/hooks/usePermissions';
-import type { Capability } from '@/auth/capabilities';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { SIDEBAR_NAV_ITEMS, type SidebarNavItem } from '@/config/nav-items';
+import { SIDEBAR_NAV_ITEMS, filterNavItems } from '@/config/nav-items';
 import { ModuleHeaderActions } from '@/modules/_core';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { Button } from '@/components/core/ui/button';
@@ -42,28 +41,6 @@ const ShowPricesToggle: React.FC = () => {
     </button>
   );
 };
-
-function filterNavItems(
-  items: readonly SidebarNavItem[],
-  ctx: { isFactory: boolean; isAdmin: boolean; isPlatformOperator: boolean; isAccountant: boolean; isSalesRep: boolean; isModuleAvailable: (slug: string) => boolean; can: (c: Capability) => boolean },
-): SidebarNavItem[] {
-  return items.filter((item) => {
-    // Scoped invited roles see a focused subset only (overrides the gates below).
-    if (ctx.isAccountant) return item.id === 'dashboard' || item.id === 'finance';
-    if (ctx.isSalesRep) return item.id === 'dashboard' || item.id === 'quotes';
-    if (item.requirePlatform && !ctx.isPlatformOperator) return false;
-    // Factory analytics is for verified factories only — not dealers/operators.
-    if (item.requireRole === 'factory' && !ctx.isFactory) return false;
-    if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
-    // #195 capability gate (the unified persona model — drives end-user restriction).
-    if (item.requireCapability && !ctx.can(item.requireCapability)) return false;
-    // #212 entitlement gate — hide a paid module unless the active workspace owns it.
-    // isModuleAvailable already folds in platform-enabled (the access RPC only returns enabled
-    // modules) + free baseline tiers + per-workspace entitlement, and fails OPEN while loading.
-    if (item.moduleSlug && !ctx.isModuleAvailable(item.moduleSlug)) return false;
-    return true;
-  });
-}
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
@@ -142,7 +119,7 @@ export const Sidebar: React.FC = () => {
   if (isMobile) {
     return (
       <>
-        <div className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 bg-sidebar border-b border-white/8">
+        <div className="mobile-topbar fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 bg-sidebar border-b border-white/8">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 text-foreground/70 hover:text-foreground hover:bg-white/5">
@@ -199,7 +176,7 @@ export const Sidebar: React.FC = () => {
             {profileMenu}
           </div>
         </div>
-        <div className="h-14 flex-shrink-0" />
+        <div className="mobile-topbar-spacer flex-shrink-0" />
       </>
     );
   }

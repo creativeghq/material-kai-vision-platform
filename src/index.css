@@ -531,6 +531,58 @@ All colors MUST be HSL.
   }
 }
 
+/* ============================================================
+   Mobile app chrome — safe-area insets, bottom tab bar, tab strips.
+   Designed to make the platform feel like a native mobile app rather than
+   a desktop layout squeezed onto a phone. The `md` breakpoint (768px) is the
+   boundary used everywhere (useIsMobile, the `md:hidden` bottom bar).
+   ============================================================ */
+
+/* The fixed mobile top bar and its in-flow spacer both clear the status bar /
+   notch. env(safe-area-inset-top) is 0 on non-notch devices, so these are
+   safe to apply unconditionally. */
+.mobile-topbar {
+  height: calc(3.5rem + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+}
+.mobile-topbar-spacer {
+  height: calc(3.5rem + env(safe-area-inset-top));
+}
+/* Bottom-bar cushion that fills the iOS home-indicator strip. */
+.mobile-safe-bottom {
+  height: env(safe-area-inset-bottom);
+}
+
+@media (max-width: 767px) {
+  /* Reserve room for the fixed bottom tab bar so page content (and any
+     sticky composer like the Agent Hub) never sits beneath it. */
+  .mobile-content {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* Horizontal tab rows become a single swipeable strip instead of a ragged,
+     space-wasting multi-row wrap. Scoped to HORIZONTAL tablists so vertical
+     sidebar tabs (e.g. Finance) are left alone. */
+  [role='tablist'][aria-orientation='horizontal'],
+  [role='tablist']:not([aria-orientation]) {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+  [role='tablist'][aria-orientation='horizontal']::-webkit-scrollbar,
+  [role='tablist']:not([aria-orientation])::-webkit-scrollbar {
+    display: none;
+  }
+  [role='tablist'][aria-orientation='horizontal'] > *,
+  [role='tablist']:not([aria-orientation]) > * {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+}
+
 @layer components {
   /* Page wrapper - Consistent layout system */
   .page-wrapper {

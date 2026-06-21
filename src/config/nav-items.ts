@@ -69,3 +69,59 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   },
   { id: 'admin', label: 'Admin', path: '/admin', icon: Settings, requirePlatform: true },
 ];
+
+/** Context the nav gates resolve against. Computed from hooks by the consuming component. */
+export interface NavGateContext {
+  isFactory: boolean;
+  isAdmin: boolean;
+  isPlatformOperator: boolean;
+  isAccountant: boolean;
+  isSalesRep: boolean;
+  isModuleAvailable: (slug: string) => boolean;
+  can: (c: Capability) => boolean;
+}
+
+/**
+ * Single source of truth for which nav entries the active persona may see.
+ * Shared by the desktop top nav, the mobile drawer, and the mobile bottom bar
+ * so all three surfaces stay perfectly in sync.
+ */
+export function filterNavItems(
+  items: readonly SidebarNavItem[],
+  ctx: NavGateContext,
+): SidebarNavItem[] {
+  return items.filter((item) => {
+    // Scoped invited roles see a focused subset only (overrides the gates below).
+    if (ctx.isAccountant) return item.id === 'dashboard' || item.id === 'finance';
+    if (ctx.isSalesRep) return item.id === 'dashboard' || item.id === 'quotes';
+    if (item.requirePlatform && !ctx.isPlatformOperator) return false;
+    // Factory analytics is for verified factories only — not dealers/operators.
+    if (item.requireRole === 'factory' && !ctx.isFactory) return false;
+    if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
+    // #195 capability gate (the unified persona model — drives end-user restriction).
+    if (item.requireCapability && !ctx.can(item.requireCapability)) return false;
+    // #212 entitlement gate — hide a paid module unless the active workspace owns it.
+    if (item.moduleSlug && !ctx.isModuleAvailable(item.moduleSlug)) return false;
+    return true;
+  });
+}
+
+/**
+ * Priority order for the mobile bottom tab bar. The first N visible entries
+ * (after gating) fill the bar; everything else is reachable via the "More" sheet.
+ * Dashboard and Agent Hub lead because they're the most-used surfaces.
+ */
+export const BOTTOM_NAV_PRIORITY: readonly string[] = [
+  'dashboard',
+  'agent-hub',
+  'moodboard',
+  'projects',
+  'quotes',
+  'inbox',
+  'crm',
+  'discover',
+  'finance',
+  'sales',
+  'factory-analytics',
+  'admin',
+];
