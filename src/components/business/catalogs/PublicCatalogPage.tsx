@@ -7,6 +7,7 @@ import { Label } from '@/components/core/ui/label';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useShowPrices } from '@/hooks/useShowPrices';
 
 interface PublicMeta {
   title: string;
@@ -227,6 +228,7 @@ const CatalogReader: React.FC<{
   branding?: { logo_url: string | null; company_name: string | null; contact_line: string | null };
   onDownload: (pdfUrl: string) => void;
 }> = ({ catalog, branding, onDownload }) => {
+  const { showPrices } = useShowPrices();
   const sections = catalog.body_data?.sections || [];
   const dateStr = useMemo(() => {
     const raw = catalog.cover_data?.date;
@@ -286,7 +288,7 @@ const CatalogReader: React.FC<{
                         {Object.entries(m.specs).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(' • ')}
                       </p>
                     )}
-                    {m.price != null && (
+                    {showPrices && m.price != null && (
                       <div className="text-base font-semibold pt-1">
                         {formatPrice(m.price, m.currency)}
                       </div>
