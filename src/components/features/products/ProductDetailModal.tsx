@@ -17,7 +17,9 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Package, Layers, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Package, Layers, ShieldCheck, Wand2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { buildTestOnRoomUrl } from '@/utils/testOnRoom';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -232,6 +234,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // preserving the old `workspace_members.role IN (owner,admin)` behaviour for the active workspace.
   const { can } = usePermissions();
   const isAdmin = can('pricing.manage');
+  const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
@@ -1717,36 +1720,40 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      {/* grid-cols-1 caps the implicit grid track to the dialog width (the base
+          DialogContent is display:grid with an auto column that otherwise sizes
+          to max-content and overflows on mobile); min-w-0 lets children shrink
+          and wrap. Tighter padding on mobile. */}
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto overflow-x-hidden grid-cols-1 [&>*]:min-w-0 p-4 sm:p-6">
         {/* Header with Factory/Brand Info + Quick Actions.
             Quote-based platform — no pricing/stock shown. Action buttons live
             in the header so users can quote / save from the first screen. */}
         <DialogHeader className="border-b pb-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <Factory className="h-5 w-5 text-muted-foreground" />
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{factory}</span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0 sm:flex-1">
+              <div className="flex items-center gap-2 mb-2 min-w-0">
+                <Factory className="h-5 w-5 text-muted-foreground shrink-0" />
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-semibold truncate">{factory}</span>
                   {origin && (
                     <>
                       <span className="text-muted-foreground/40">•</span>
-                      <span className="text-sm text-muted-foreground">{origin}</span>
+                      <span className="text-sm text-muted-foreground truncate">{origin}</span>
                     </>
                   )}
                 </div>
               </div>
-              <DialogTitle className="text-2xl mb-1">
+              <DialogTitle className="text-xl sm:text-2xl mb-1 break-words">
                 {safeString(product.name, 'Unnamed Product')}
               </DialogTitle>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
                 {collection && <span className="font-medium">{collection}</span>}
                 {collection && <span className="text-muted-foreground/40">•</span>}
                 <span>SKU: {safeString(product.sku, 'N/A')}</span>
               </div>
             </div>
-            {/* Quick actions — compact, right-aligned, mirrors the name area */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Quick actions — full-width on mobile (below the title), compact on the right from sm up */}
+            <div className="flex items-center gap-2 flex-shrink-0 pr-8 sm:pr-0">
               <AddToQuoteButton
                 productId={product.id}
                 productName={product.name}
@@ -2324,6 +2331,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 )}
               </div>
             )}
+
+            {/* Test on a room — always available; pre-pins this material into
+                the Interior Designer agent, which then asks for a room photo. */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1.5 text-xs rounded-full"
+                onClick={() => {
+                  navigate(buildTestOnRoomUrl({ productId: product.id, productName: product.name, productImage: currentImage?.url }));
+                  onClose();
+                }}
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+                Test on a room
+              </Button>
+            </div>
           </div>
         </div>
 
