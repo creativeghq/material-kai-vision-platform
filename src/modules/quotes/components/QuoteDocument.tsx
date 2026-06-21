@@ -13,6 +13,7 @@
 
 import React, { forwardRef } from 'react';
 import { QuoteDocumentData, QuoteDocumentItem } from '../hooks/useQuoteDocument';
+import { computeTotalsBreakdown, totalsRows } from '../utils/quoteTotals';
 
 // ─── Output dimensions ────────────────────────────────────────────────────────
 
@@ -356,38 +357,34 @@ const ItemsPage: React.FC<{
   );
 };
 
-const TotalsBlock: React.FC<{ data: QuoteDocumentData }> = ({ data }) => (
-  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-    <tbody>
-      <tr>
-        <td style={{ fontSize: 56, color: C.gray, paddingBottom: 30 }}>Subtotal</td>
-        <td style={{ fontSize: 56, color: C.black, textAlign: 'right', paddingBottom: 30 }}>
-          {fmt(data.subtotal, data.currency)}
-        </td>
-      </tr>
-      {data.cash_discount_pct > 0 && (
-        <tr>
-          <td style={{ fontSize: 56, color: C.primary, paddingBottom: 30 }}>Paid upfront (−{data.cash_discount_pct}%)</td>
-          <td style={{ fontSize: 56, color: C.primary, textAlign: 'right', paddingBottom: 30 }}>
-            − {fmt(data.subtotal * data.cash_discount_pct / 100, data.currency)}
-          </td>
-        </tr>
-      )}
-      <tr>
-        <td style={{ fontSize: 56, color: C.gray, paddingBottom: 40 }}>VAT ({data.vat_rate}%)</td>
-        <td style={{ fontSize: 56, color: C.gray, textAlign: 'right', paddingBottom: 40 }}>
-          {fmt(data.vat_amount, data.currency)}
-        </td>
-      </tr>
-      <tr style={{ borderTop: `6px solid ${C.lightGray}` }}>
-        <td style={{ fontSize: 73, fontWeight: 700, color: C.primary, paddingTop: 40 }}>GRAND TOTAL</td>
-        <td style={{ fontSize: 73, fontWeight: 700, color: C.primary, textAlign: 'right', paddingTop: 40 }}>
-          {fmt(data.grand_total, data.currency)}
-        </td>
-      </tr>
-    </tbody>
-  </table>
-);
+const TotalsBlock: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
+  // #227 — universal 5-line breakdown (Price / Discount / Price after Discount / VAT / Final).
+  const rows = totalsRows(computeTotalsBreakdown({
+    subtotal: data.subtotal, cashDiscountPct: data.cash_discount_pct,
+    vatAmount: data.vat_amount, vatRate: data.vat_rate, grandTotal: data.grand_total,
+  }));
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <tbody>
+        {rows.map((row, i) => row.kind === 'final' ? (
+          <tr key={i} style={{ borderTop: `6px solid ${C.lightGray}` }}>
+            <td style={{ fontSize: 73, fontWeight: 700, color: C.primary, paddingTop: 40 }}>{row.label.toUpperCase()}</td>
+            <td style={{ fontSize: 73, fontWeight: 700, color: C.primary, textAlign: 'right', paddingTop: 40 }}>
+              {fmt(row.value, data.currency)}
+            </td>
+          </tr>
+        ) : (
+          <tr key={i}>
+            <td style={{ fontSize: 56, color: row.kind === 'discount' ? C.primary : C.gray, paddingBottom: 30 }}>{row.label}</td>
+            <td style={{ fontSize: 56, color: row.kind === 'discount' ? C.primary : C.black, textAlign: 'right', paddingBottom: 30 }}>
+              {row.negative ? '− ' : ''}{fmt(row.value, data.currency)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};
 
 // ─── Page: Back cover (pure image) ────────────────────────────────────────────
 

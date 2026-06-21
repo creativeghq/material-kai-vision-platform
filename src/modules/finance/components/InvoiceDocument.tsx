@@ -213,9 +213,17 @@ export function InvoiceDocument({
           </>
         )}
       </div>
-      {/* Totals (right) */}
+      {/* Totals (right) — #227 universal breakdown: Price / Discount / Price after Discount / VAT / … / Final */}
       <div style={{ width: 260, ...totalsBoxStyle }}>
-        {totalRow(L.subtotalNet, money(data.totals.subtotalNet))}
+        {data.totals.discount > 0 ? (
+          <>
+            {totalRow(L.price, money(data.totals.subtotalNet))}
+            {totalRow(L.discount, `- ${money(data.totals.discount)}`)}
+            {totalRow(L.priceAfterDiscount, money(data.totals.priceAfterDiscount))}
+          </>
+        ) : (
+          totalRow(L.subtotalNet, money(data.totals.subtotalNet))
+        )}
         {totalRow(L.totalVat, money(data.totals.totalVat))}
         {data.totals.extras.map((e, i) => (
           <React.Fragment key={i}>{totalRow(e.label, `${e.negative ? '- ' : ''}${money(e.value)}`)}</React.Fragment>

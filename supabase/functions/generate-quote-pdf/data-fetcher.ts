@@ -119,6 +119,7 @@ export async function fetchQuoteData(
     vat_rate: parseFloat(quote.vat_rate) || 24,
     vat_amount: parseFloat(quote.vat_amount) || 0,
     grand_total: parseFloat(quote.grand_total) || 0,
+    cash_discount_pct: parseFloat(quote.cash_discount_pct) || 0,
     currency: quote.currency || 'EUR',
     expires_at: quote.expires_at,
     created_at: quote.created_at,

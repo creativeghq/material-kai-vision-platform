@@ -44,6 +44,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     descr: 'Περιγραφή', qty: 'Ποσ.', unit: 'Μ.Μ.', unitPrice: 'Τιμή Μον.', net: 'Καθαρή Αξία',
     vatPct: 'ΦΠΑ%', vatAmt: 'Αξία ΦΠΑ', lineTotal: 'Σύνολο',
     vatAnalysis: 'Ανάλυση ΦΠΑ', subtotalNet: 'Καθαρή Αξία', totalVat: 'Σύνολο ΦΠΑ',
+    price: 'Αξία', discount: 'Έκπτωση', priceAfterDiscount: 'Αξία μετά Έκπτωσης',
     withheld: 'Παρακρατήσεις', total: 'Πληρωτέο Ποσό', paid: 'Πληρωμένο', due2: 'Υπόλοιπο',
     fees: 'Τέλη', stamp: 'Χαρτόσημο', otherTaxes: 'Λοιποί Φόροι', deductions: 'Κρατήσεις',
     digitalFee: 'Ψηφιακό Τέλος Συναλλαγής', related: 'Σχετ. Παραστατικό',
@@ -61,6 +62,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     descr: 'Description', qty: 'Qty', unit: 'Unit', unitPrice: 'Unit price', net: 'Net',
     vatPct: 'VAT%', vatAmt: 'VAT', lineTotal: 'Total',
     vatAnalysis: 'VAT analysis', subtotalNet: 'Net total', totalVat: 'Total VAT',
+    price: 'Price', discount: 'Discount', priceAfterDiscount: 'Price after Discount',
     withheld: 'Withholding', total: 'Amount due', paid: 'Paid', due2: 'Balance',
     fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
     digitalFee: 'Digital transaction fee', related: 'Related doc',
@@ -421,8 +423,20 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   };
   const fees = Number(inv.total_fees_amount ?? 0), stamp = Number(inv.total_stamp_duty_amount ?? 0);
   const otherTax = Number(inv.total_other_taxes_amount ?? 0), deductions = Number(inv.total_deductions_amount ?? 0);
-  row(L.subtotalNet, money(totNet));
-  row(L.totalVat, money(totVat));
+  // #227 — universal breakdown: Price / Discount / Price after Discount / VAT. The paid-upfront
+  // (cash) discount scales the net + VAT so they foot to the stored grand total.
+  const cashPct = Number(inv.cash_discount_pct ?? 0);
+  const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;
+  const netAfter = Math.round(totNet * cashFactor * 100) / 100;
+  const vatAfter = Math.round(totVat * cashFactor * 100) / 100;
+  if (cashFactor < 1) {
+    row(L.price, money(totNet));
+    row(L.discount, `- ${money(Math.round((totNet - netAfter) * 100) / 100)}`);
+    row(L.priceAfterDiscount, money(netAfter));
+  } else {
+    row(L.subtotalNet, money(netAfter));
+  }
+  row(L.totalVat, money(vatAfter));
   const digitalFee = Number(inv.digital_transaction_fee ?? 0);
   if (fees > 0) row(L.fees, money(fees));
   if (stamp > 0) row(L.stamp, money(stamp));

@@ -4,6 +4,7 @@ import { Loader2, Download, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { computeTotalsBreakdown, totalsRows } from '@/modules/quotes/utils/quoteTotals';
 
 /**
  * /q/:token — public, unauthenticated viewer for a shared quote.
@@ -135,11 +136,17 @@ export default function PublicQuotePage() {
   }
 
   const currency = quote.currency || 'EUR';
-  // #227 — VAT-inclusive (gross) display for retail/consumer customers. Stored amounts are
-  // NET; we only multiply what's shown by (1 + vat_rate). The grand total is already gross.
-  const gross = !!quote.prices_vat_inclusive;
-  const vatMul = gross ? 1 + ((quote.vat_rate ?? 0) / 100) : 1;
-  const baseSubtotal = quote.subtotal ?? itemsTotal;
+  // #227 — universal 5-line totals breakdown (Price / Discount / Price after Discount / VAT / Final).
+  const breakdown = computeTotalsBreakdown({
+    subtotal: quote.subtotal ?? itemsTotal,
+    cashDiscountPct: quote.cash_discount_pct,
+    vatAmount: quote.vat_amount,
+    vatRate: quote.vat_rate,
+    grandTotal: quote.grand_total,
+  });
+  const rows = totalsRows(breakdown, {
+    extras: quote.extras_total ? [{ label: 'Extras', value: quote.extras_total }] : [],
+  });
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
@@ -208,8 +215,8 @@ export default function PublicQuotePage() {
                         </div>
                       </td>
                       <td className="p-3 text-center">{it.quantity}</td>
-                      <td className="p-3 text-right">{money(effective != null ? effective * vatMul : null, currency)}</td>
-                      <td className="p-3 text-right font-medium">{money(it.line_total != null ? it.line_total * vatMul : null, currency)}</td>
+                      <td className="p-3 text-right">{money(effective, currency)}</td>
+                      <td className="p-3 text-right font-medium">{money(it.line_total, currency)}</td>
                     </tr>
                   );
                 })}
@@ -221,44 +228,20 @@ export default function PublicQuotePage() {
           </div>
         </Card>
 
-        {/* Totals */}
+        {/* Totals — universal 5-line breakdown (#227) */}
         <div className="flex justify-end">
           <div className="w-64 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal{gross ? ' (incl. VAT)' : ''}</span>
-              <span>{money(baseSubtotal * vatMul, currency)}</span>
-            </div>
-            {quote.extras_total ? (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Extras</span>
-                <span>{money(quote.extras_total * vatMul, currency)}</span>
+            {rows.map((row, i) => row.kind === 'final' ? (
+              <div key={i} className="flex justify-between border-t border-white/10 pt-2">
+                <span className="font-semibold">{row.label}</span>
+                <span className="font-bold text-base">{money(row.value, currency)}</span>
               </div>
-            ) : null}
-            {quote.cash_discount_pct ? (
-              <div className="flex justify-between text-primary">
-                <span>Paid upfront (−{quote.cash_discount_pct}%)</span>
-                <span>− {money(baseSubtotal * quote.cash_discount_pct / 100 * vatMul, currency)}</span>
+            ) : (
+              <div key={i} className={`flex justify-between ${row.kind === 'discount' ? 'text-primary' : 'text-muted-foreground'}`}>
+                <span>{row.label}</span>
+                <span>{row.negative ? '− ' : ''}{money(row.value, currency)}</span>
               </div>
-            ) : null}
-            {/* Net mode: VAT is an addend that bridges net subtotal → gross total.
-                Gross mode: the rows above are already VAT-inclusive, so VAT must NOT be added
-                again — it's shown as an "of which" note below the total instead. */}
-            {!gross && quote.vat_amount != null && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">VAT{quote.vat_rate != null ? ` (${quote.vat_rate}%)` : ''}</span>
-                <span>{money(quote.vat_amount, currency)}</span>
-              </div>
-            )}
-            <div className="flex justify-between border-t border-white/10 pt-2">
-              <span className="font-semibold">Total</span>
-              <span className="font-bold text-base">{money(quote.grand_total, currency)}</span>
-            </div>
-            {gross && quote.vat_amount != null && (
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>incl. VAT{quote.vat_rate != null ? ` (${quote.vat_rate}%)` : ''}</span>
-                <span>{money(quote.vat_amount, currency)}</span>
-              </div>
-            )}
+            ))}
           </div>
         </div>
 

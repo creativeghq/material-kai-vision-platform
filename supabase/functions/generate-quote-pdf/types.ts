@@ -23,6 +23,7 @@ export interface QuoteData {
   vat_rate: number;
   vat_amount: number;
   grand_total: number;
+  cash_discount_pct?: number;
   currency: string;
   expires_at: string;
   created_at: string;

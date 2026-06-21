@@ -485,18 +485,32 @@ function drawTotals(
     color: COLOR_DARK,
   });
 
-  // Subtotal
-  page.drawText('Subtotal', { x: labelX, y, size: 10, font, color: COLOR_BLACK });
-  drawRightAligned(page, formatCurrency(quote.subtotal, quote.currency), rightEdge, y, 10, font, COLOR_BLACK);
+  // #227 — universal 5-line breakdown: Price / Discount / Price after Discount / VAT / Final.
+  const cashPct = quote.cash_discount_pct ?? 0;
+  const price = quote.subtotal;
+  const discount = Math.round(price * cashPct / 100 * 100) / 100;
+
+  // Price
+  page.drawText('Price', { x: labelX, y, size: 10, font, color: COLOR_BLACK });
+  drawRightAligned(page, formatCurrency(price, quote.currency), rightEdge, y, 10, font, COLOR_BLACK);
   y -= 18;
 
+  // Discount + Price after Discount (only when an order-level discount applies)
+  if (discount > 0) {
+    page.drawText('Discount', { x: labelX, y, size: 10, font, color: COLOR_GRAY });
+    drawRightAligned(page, `- ${formatCurrency(discount, quote.currency)}`, rightEdge, y, 10, font, COLOR_GRAY);
+    y -= 18;
+    page.drawText('Price after Discount', { x: labelX, y, size: 10, font, color: COLOR_BLACK });
+    drawRightAligned(page, formatCurrency(price - discount, quote.currency), rightEdge, y, 10, font, COLOR_BLACK);
+    y -= 18;
+  }
+
   // VAT
-  const vatLabel = `VAT (${quote.vat_rate}%)`;
-  page.drawText(vatLabel, { x: labelX, y, size: 10, font, color: COLOR_GRAY });
+  page.drawText(`VAT (${quote.vat_rate}%)`, { x: labelX, y, size: 10, font, color: COLOR_GRAY });
   drawRightAligned(page, formatCurrency(quote.vat_amount, quote.currency), rightEdge, y, 10, font, COLOR_GRAY);
   y -= 22;
 
-  // Grand Total separator
+  // Final separator
   page.drawLine({
     start: { x: labelX, y: y + 8 },
     end: { x: rightEdge, y: y + 8 },
@@ -504,8 +518,8 @@ function drawTotals(
     color: COLOR_LIGHT_GRAY,
   });
 
-  // Grand Total
-  page.drawText('GRAND TOTAL', { x: labelX, y, size: 12, font: fontBold, color: COLOR_DARK });
+  // Final
+  page.drawText('FINAL', { x: labelX, y, size: 12, font: fontBold, color: COLOR_DARK });
   drawRightAligned(page, formatCurrency(quote.grand_total, quote.currency), rightEdge, y, 12, fontBold, COLOR_DARK);
 }
 
