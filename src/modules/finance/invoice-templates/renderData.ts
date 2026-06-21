@@ -116,6 +116,17 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   if (deductions > 0) extras.push({ label: L.deductions, value: deductions, negative: true });
   if (withheld > 0) extras.push({ label: L.withheld, value: withheld, negative: true });
 
+  // #227 — paid-upfront (cash) discount: show the pre-discount subtotal + a discount line.
+  // Display-only — the stored/reported subtotal_net stays the post-discount taxable base.
+  const cashPct = Number(inv.cash_discount_pct ?? 0);
+  let displaySubtotalNet = totNet;
+  if (cashPct > 0 && cashPct < 100) {
+    const preNet = totNet / (1 - cashPct / 100);
+    const cashDisc = Math.round((preNet - totNet) * 100) / 100;
+    displaySubtotalNet = Math.round(preNet * 100) / 100;
+    extras.unshift({ label: `Paid upfront (−${cashPct}%)`, value: cashDisc, negative: true });
+  }
+
   // ── Payment + bank accounts ──
   const accounts: string[] = [];
   const arr: any[] = Array.isArray(fs?.bank_accounts) ? fs.bank_accounts : [];
@@ -158,7 +169,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     items: rows,
     vatAnalysis,
     totals: {
-      subtotalNet: totNet, totalVat: totVat, extras, grand,
+      subtotalNet: displaySubtotalNet, totalVat: totVat, extras, grand,
       amountPaid: Number(inv.amount_paid ?? 0), amountDue: Number(inv.amount_due ?? grand),
     },
     payment: {

@@ -27,19 +27,27 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   const [busy, setBusy] = useState(false);
   const [newCat, setNewCat] = useState('');
   const [newMarkup, setNewMarkup] = useState('');
+  const [defaultMarkup, setDefaultMarkup] = useState('');
 
   const load = async () => {
     try {
       setLoading(true);
-      const [all, cats] = await Promise.all([
+      const [all, cats, settings] = await Promise.all([
         financeService.listPricingRules(workspaceId),
         financeService.listMaterialCategories(workspaceId).catch(() => []),
+        financeService.getSettings(workspaceId).catch(() => null),
       ]);
       setRules(all.filter((r) => r.scope === 'category'));
       setCategories(cats);
+      if (settings) setDefaultMarkup(String(settings.default_markup_pct ?? 0));
     } catch (err: any) {
       toast({ title: 'Failed to load rules', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
+  };
+
+  const saveDefaultMarkup = async (val: number) => {
+    try { await financeService.updateSettings(workspaceId, { default_markup_pct: val }); }
+    catch (err: any) { toast({ title: 'Save failed', description: err?.message, variant: 'destructive' }); void load(); }
   };
   useEffect(() => { void load(); }, [workspaceId]);
 
@@ -76,9 +84,29 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">
-          Override the default markup for a whole material category when you add a catalog product to a quote.
-          Precedence: <strong>per-product → per-category → default</strong>.
+          Markup turns your <strong>cost</strong> (KB purchase price) into the <strong>retail price</strong>.
+          Precedence: <strong>per-product → per-category → default</strong>. Customer level discounts then apply off retail.
         </p>
+
+        {/* Default markup — the fallback when no per-category/per-product rule matches */}
+        <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
+          <div>
+            <div className="text-sm font-medium">Default markup</div>
+            <p className="text-[11px] text-muted-foreground">Applied to any category without its own rule below.</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <Input
+              className="h-8 w-20 text-right text-xs" type="number" step="0.5" min="0"
+              value={defaultMarkup}
+              onChange={(e) => setDefaultMarkup(e.target.value)}
+              onBlur={(e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v) && v >= 0) void saveDefaultMarkup(v); }}
+              placeholder="0"
+            />
+            <span className="text-xs text-muted-foreground">%</span>
+          </div>
+        </div>
+
+        <div className="pt-1 text-xs font-medium text-muted-foreground">Per-category overrides</div>
 
         {loading ? (
           <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
