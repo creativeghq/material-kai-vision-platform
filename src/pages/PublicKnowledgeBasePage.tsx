@@ -6,7 +6,7 @@ import GithubSlugger from 'github-slugger';
 import {
   LayoutDashboard, Search, ChevronDown,
   ChevronRight, Bot, Sparkles, Hash, ArrowLeft,
-  FileText, TrendingUp, BookOpen, Eye,
+  FileText, TrendingUp, BookOpen, Eye, Package,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
@@ -36,6 +36,75 @@ function extractHeadings(markdown: string): TocItem[] {
     }
   }
   return items;
+}
+
+/** Best-effort brand from a brand/product doc title: "About HARMONY" → HARMONY,
+ *  "MAISON - Certifications" / "HARMONY — Standards" → first segment. */
+function brandFromTitle(title: string): string | null {
+  if (!title) return null;
+  const about = title.match(/^about\s+(.+)$/i);
+  if (about) return about[1].trim();
+  const seg = title.split(/\s[—–-]\s/)[0];
+  return seg && seg !== title ? seg.trim() : null;
+}
+
+/** Lead-gen: tease catalog products related to a KB article's brand and funnel
+ *  unregistered visitors to sign up. Renders nothing when no related products. */
+function KbRelatedProducts({ doc }: { doc: KBDocument }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [products, setProducts] = useState<Array<{ id: string; name: string; brand: string | null }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await (supabase.rpc as any)('kb_doc_related_products', {
+        p_doc_id: doc.id,
+        p_brand: brandFromTitle(doc.title),
+        p_limit: 6,
+      });
+      if (!cancelled && !error) setProducts((data as any[]) || []);
+    })();
+    return () => { cancelled = true; };
+  }, [doc.id, doc.title]);
+
+  if (products.length === 0) return null;
+  const brand = products[0]?.brand || brandFromTitle(doc.title) || 'this brand';
+  const signupHref = '/auth?mode=signup&redirect=/discover';
+
+  return (
+    <section className="mt-12" aria-labelledby="related-products-heading">
+      <h2 id="related-products-heading" className="text-xl font-medium tracking-tight mb-1">
+        Products from {brand}
+      </h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        {user
+          ? 'Explore matching products in the catalog.'
+          : 'Create a free account to view full specs, pricing and availability.'}
+      </p>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {products.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => navigate(user ? `/discover?product=${p.id}` : signupHref)}
+            className="text-left rounded-2xl border bg-white p-4 hover:border-primary hover:shadow-sm transition group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+              <Package className="h-4 w-4 text-primary" />
+            </div>
+            <p className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">{p.name}</p>
+            <p className="text-xs text-muted-foreground mt-1">{user ? 'View product →' : 'Sign up to view →'}</p>
+          </button>
+        ))}
+      </div>
+      {!user && (
+        <Button className="rounded-full mt-4" onClick={() => navigate(signupHref)}>
+          Create a free account to see our catalog
+        </Button>
+      )}
+    </section>
+  );
 }
 
 /** Read the authored FAQ list off a doc's metadata, tolerating shape drift. */
@@ -435,6 +504,9 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 </div>
               </section>
             )}
+
+            {/* Lead-gen: related catalog products by brand → sign-up funnel */}
+            <KbRelatedProducts doc={selectedDoc} />
 
             <div className="mt-12 rounded-2xl border bg-primary/5 p-6 flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
