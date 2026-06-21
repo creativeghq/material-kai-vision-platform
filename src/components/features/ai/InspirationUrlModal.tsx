@@ -40,7 +40,7 @@ export function InspirationUrlModal({ onSubmit, onClose }: InspirationUrlModalPr
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-background rounded-2xl shadow-2xl border border-white/20 w-full max-w-lg overflow-hidden"
+        className="bg-background rounded-2xl shadow-2xl border border-white/20 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
