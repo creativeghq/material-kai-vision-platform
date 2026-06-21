@@ -68,14 +68,15 @@ export const Sidebar: React.FC = () => {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+          aria-label="Profile"
+          className={`flex items-center gap-2 px-2 md:px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
             isActive('/profile')
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
           }`}
         >
           <User className="w-4 h-4" />
-          <span className="font-light">Profile</span>
+          <span className="font-light hidden md:inline">Profile</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 rounded-xl" align="end" forceMount>
@@ -119,10 +120,11 @@ export const Sidebar: React.FC = () => {
   if (isMobile) {
     return (
       <>
-        <div className="mobile-topbar fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 bg-sidebar border-b border-white/8">
+        <div className="mobile-topbar fixed top-0 left-0 right-0 z-50 flex items-center justify-between gap-2 px-3 bg-sidebar border-b border-white/8">
+          <div className="flex items-center gap-1 min-w-0">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 text-foreground/70 hover:text-foreground hover:bg-white/5">
+              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-foreground/70 hover:text-foreground hover:bg-white/5">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -165,12 +167,13 @@ export const Sidebar: React.FC = () => {
             </SheetContent>
           </Sheet>
 
-          <div className="flex items-center">
-            <img src="/mh-logo.png" alt="materialshub" className="h-7 w-auto block dark:hidden" />
-            <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-7 w-auto hidden dark:block" />
+            <Link to="/" className="flex items-center shrink-0" aria-label="Home">
+              <img src="/mh-logo.png" alt="materialshub" className="h-7 w-auto block dark:hidden" />
+              <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-7 w-auto hidden dark:block" />
+            </Link>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 shrink-0">
             <WorkspaceSwitcher />
             <ModuleHeaderActions />
             {profileMenu}

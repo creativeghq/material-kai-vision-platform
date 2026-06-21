@@ -36,16 +36,31 @@ export const WorkspaceSwitcher: React.FC = () => {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="gap-2 max-w-[220px]">
+          {/* Mobile: a compact icon button (name/badges/chevron live in the
+              dropdown). Desktop: full label with rank + plan badges. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 md:max-w-[220px] px-2 md:px-3"
+            title={activeWorkspace?.name ?? 'Workspace'}
+            aria-label={`Workspace: ${activeWorkspace?.name ?? 'Workspace'}`}
+          >
             <Building2 className="h-4 w-4 shrink-0" />
-            <span className="truncate font-light">{activeWorkspace?.name ?? 'Workspace'}</span>
+            <span className="truncate font-light hidden md:inline">{activeWorkspace?.name ?? 'Workspace'}</span>
             {rank && <Badge variant="outline" className="text-[10px] uppercase hidden md:inline-flex">{rank}</Badge>}
             <Badge variant="secondary" className="text-[10px] hidden md:inline-flex">{planName}</Badge>
-            <ChevronsUpDown className="h-3.5 w-3.5 opacity-60 shrink-0" />
+            <ChevronsUpDown className="h-3.5 w-3.5 opacity-60 shrink-0 hidden md:inline" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+          <DropdownMenuLabel className="flex flex-col gap-1.5">
+            <span className="truncate">{activeWorkspace?.name ?? 'Workspace'}</span>
+            <span className="flex items-center gap-1.5 font-normal">
+              {rank && <Badge variant="outline" className="text-[10px] uppercase">{rank}</Badge>}
+              <Badge variant="secondary" className="text-[10px]">{planName}</Badge>
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           {memberships.map((m) => (
             <DropdownMenuItem key={m.workspaceId} onClick={() => switchWorkspace(m.workspaceId)} className="gap-2">
               <Check className={`h-4 w-4 ${m.workspaceId === activeWorkspaceId ? 'opacity-100' : 'opacity-0'}`} />
