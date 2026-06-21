@@ -59,6 +59,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 // inside the request handler are picked up. Used by the raw-fetch Gemini multi-image
 // + Veo paths (the AI SDK `google` proxy covers the single-image path separately).
 const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
+// Lazy getter (same rationale as GOOGLE_API_KEY) for the xAI Grok/Aurora image
+// + edit + masked-inpaint paths (generateImageWithGrok / editImageWithGrok).
+const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
 const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -859,14 +862,14 @@ export async function generateImageWithGrok(
   prompt: string,
   config?: { model?: string },
 ): Promise<GrokImageResult> {
-  if (!XAI_API_KEY) throw new Error('XAI_API_KEY not set');
+  if (!XAI_API_KEY()) throw new Error('XAI_API_KEY not set');
 
   const modelId = config?.model ?? GROK_IMAGE_MODEL;
 
   const response = await fetch('https://api.x.ai/v1/images/generations', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${XAI_API_KEY}`,
+      'Authorization': `Bearer ${XAI_API_KEY()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -906,7 +909,7 @@ export async function editImageWithGrok(
     imageMimeType?: string;
   },
 ): Promise<GrokImageResult> {
-  if (!XAI_API_KEY) throw new Error('XAI_API_KEY not set');
+  if (!XAI_API_KEY()) throw new Error('XAI_API_KEY not set');
 
   const modelId = config?.model ?? GROK_IMAGE_MODEL;
   const mimeType = config?.imageMimeType ?? 'image/jpeg';
@@ -924,7 +927,7 @@ export async function editImageWithGrok(
 
   const response = await fetch('https://api.x.ai/v1/images/edits', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${XAI_API_KEY}` },
+    headers: { 'Authorization': `Bearer ${XAI_API_KEY()}` },
     body: form,
   });
 
