@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { FileText, Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { FileText, Star, Tag } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import {
@@ -37,6 +38,7 @@ interface Props {
  *  appear under "More results". Filtering is custom (shouldFilter=false) so it
  *  matches "heatpump" ↔ "Heat Pump" and respects the chips. */
 export const KbCommandSearch: React.FC<Props> = ({ open, onOpenChange, allDocs, categories, onSelect }) => {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [catId, setCatId] = useState<string | null>(null);
   const [brand, setBrand] = useState<string | null>(null);
@@ -55,6 +57,16 @@ export const KbCommandSearch: React.FC<Props> = ({ open, onOpenChange, allDocs, 
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allDocs]);
+
+  const matchedBrands = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (q ? brands.filter((b) => b.toLowerCase().includes(q)) : brands).slice(0, 6);
+  }, [brands, query]);
+
+  const openBrand = (b: string) => {
+    onOpenChange(false);
+    navigate(`/knowledge-base/brand/${b.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`);
+  };
 
   const filtered = useMemo(() => {
     const qCollapsed = collapse(query);
@@ -117,6 +129,17 @@ export const KbCommandSearch: React.FC<Props> = ({ open, onOpenChange, allDocs, 
 
           <CommandList className="max-h-[55vh]">
             <CommandEmpty>No articles found.</CommandEmpty>
+
+            {matchedBrands.length > 0 && (
+              <CommandGroup heading="Brands">
+                {matchedBrands.map((b) => (
+                  <CommandItem key={`b-${b}`} value={`brand-${b}`} onSelect={() => openBrand(b)} className="gap-2">
+                    <Tag className="h-4 w-4 text-primary shrink-0" />
+                    <span className="flex-1 truncate">Open {b} page</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
 
             {featured.length > 0 && (
               <CommandGroup heading="Featured">

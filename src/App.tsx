@@ -37,6 +37,7 @@ const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m 
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
 const BrandKnowledgePage = lazy(() => import('./pages/BrandKnowledgePage').then(m => ({ default: m.BrandKnowledgePage })));
+const BrandsIndexPage = lazy(() => import('./pages/BrandsIndexPage').then(m => ({ default: m.BrandsIndexPage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
 const InboxPage = lazy(() => import('./pages/Inbox/InboxPage'));
@@ -676,6 +677,15 @@ const App = () => (
                   element={
                     <PageErrorBoundary name="Public Knowledge Base">
                       <PublicKnowledgeBasePage />
+                    </PageErrorBoundary>
+                  }
+                />
+                {/* Brand directory */}
+                <Route
+                  path="/knowledge-base/brands"
+                  element={
+                    <PageErrorBoundary name="Brands Index">
+                      <BrandsIndexPage />
                     </PageErrorBoundary>
                   }
                 />

@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { SeoHead } from '@/components/seo/SeoHead';
+import { ProductTeaser } from '@/components/features/knowledge/ProductTeaser';
 
 interface BrandDoc {
   id: string;
@@ -15,7 +16,7 @@ interface BrandDoc {
   content_tier: number;
   category_name: string | null;
 }
-interface BrandProduct { id: string; name: string; }
+interface BrandProduct { id: string; name: string; image_url: string | null; }
 interface BrandData {
   brand: string;
   slug: string;
@@ -116,9 +117,9 @@ export const BrandKnowledgePage: React.FC = () => {
             <ArrowLeft className="h-4 w-4" /> Knowledge Base
           </button>
           <h1 className="text-3xl font-medium tracking-tight">{data.brand}</h1>
-          {data.overview?.summary && (
-            <p className="mt-2 text-muted-foreground max-w-2xl">{data.overview.summary}</p>
-          )}
+          <p className="mt-2 text-muted-foreground max-w-2xl">
+            {data.overview?.summary || `Documentation, certifications and products from ${data.brand}.`}
+          </p>
           {data.overview?.slug && (
             <Link
               to={`/knowledge-base/${data.overview.slug}`}
@@ -158,18 +159,13 @@ export const BrandKnowledgePage: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {data.products.map((p) => (
-                <button
+                <ProductTeaser
                   key={p.id}
-                  type="button"
+                  name={p.name}
+                  imageUrl={p.image_url}
+                  cta={user ? 'View product →' : 'Sign up to view →'}
                   onClick={() => navigate(user ? `/discover?product=${p.id}` : signupHref)}
-                  className="text-left rounded-2xl border bg-white p-4 hover:border-primary hover:shadow-sm transition group"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-                    <Package className="h-4 w-4 text-primary" />
-                  </div>
-                  <p className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">{p.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{user ? 'View product →' : 'Sign up to view →'}</p>
-                </button>
+                />
               ))}
             </div>
           </section>
@@ -193,6 +189,28 @@ export const BrandKnowledgePage: React.FC = () => {
             </div>
           </section>
         )}
+
+        {/* Fallback when the brand has no KB documentation yet */}
+        {featured.length === 0 && groupNames.length === 0 && (
+          <section className="rounded-2xl border bg-muted/30 p-6 text-center">
+            <p className="text-sm text-muted-foreground">Documentation for {data.brand} is being added.</p>
+          </section>
+        )}
+
+        {/* Synthesized lead-gen section — always present, the catalog funnel */}
+        <section className="rounded-2xl border bg-primary/5 p-6 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1">
+            <p className="font-medium">Interested in {data.brand}?</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {user
+                ? 'Browse the full catalog for specs, pricing and availability.'
+                : 'Create a free account to view the full catalog — specs, pricing and availability.'}
+            </p>
+          </div>
+          <Button className="rounded-full shrink-0" onClick={() => navigate(user ? '/discover' : signupHref)}>
+            {user ? 'Open catalog' : 'Create a free account'}
+          </Button>
+        </section>
       </main>
     </div>
   );

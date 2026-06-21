@@ -1735,6 +1735,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <Factory className="h-5 w-5 text-muted-foreground shrink-0" />
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-sm font-semibold truncate">{factory}</span>
+                  {factory !== '—' && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/knowledge-base/brand/${factory.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`)}
+                      className="text-xs text-primary hover:underline shrink-0"
+                      title="View brand knowledge page"
+                    >
+                      Brand page →
+                    </button>
+                  )}
                   {origin && (
                     <>
                       <span className="text-muted-foreground/40">•</span>

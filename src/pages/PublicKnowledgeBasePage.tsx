@@ -6,7 +6,7 @@ import GithubSlugger from 'github-slugger';
 import {
   LayoutDashboard, Search, ChevronDown,
   ChevronRight, Bot, Sparkles, Hash, ArrowLeft,
-  FileText, TrendingUp, BookOpen, Eye, Package,
+  FileText, TrendingUp, BookOpen, Eye, Tag,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
@@ -16,6 +16,7 @@ import { agentChatHistoryService } from '@/services/agents/agentChatHistoryServi
 import { KBCategory, KBDocument, KBFaqItem } from '@/services/knowledgeBaseService';
 import { SeoHead } from '@/components/seo/SeoHead';
 import { KbCommandSearch } from '@/components/features/knowledge/KbCommandSearch';
+import { ProductTeaser } from '@/components/features/knowledge/ProductTeaser';
 
 // ── TOC heading extraction (ids match rehype-slug / github-slugger) ──────────
 interface TocItem { id: string; text: string; level: number; }
@@ -54,7 +55,7 @@ function brandFromTitle(title: string): string | null {
 function KbRelatedProducts({ doc }: { doc: KBDocument }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [products, setProducts] = useState<Array<{ id: string; name: string; brand: string | null }>>([]);
+  const [products, setProducts] = useState<Array<{ id: string; name: string; brand: string | null; image_url: string | null }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,18 +95,13 @@ function KbRelatedProducts({ doc }: { doc: KBDocument }) {
       </p>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {products.map((p) => (
-          <button
+          <ProductTeaser
             key={p.id}
-            type="button"
+            name={p.name}
+            imageUrl={p.image_url}
+            cta={user ? 'View product →' : 'Sign up to view →'}
             onClick={() => navigate(user ? `/discover?product=${p.id}` : signupHref)}
-            className="text-left rounded-2xl border bg-white p-4 hover:border-primary hover:shadow-sm transition group"
-          >
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-              <Package className="h-4 w-4 text-primary" />
-            </div>
-            <p className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">{p.name}</p>
-            <p className="text-xs text-muted-foreground mt-1">{user ? 'View product →' : 'Sign up to view →'}</p>
-          </button>
+          />
         ))}
       </div>
       {!user && (
@@ -650,6 +646,12 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             categories={categories}
             onSelect={(d) => navigate(docHref(d))}
           />
+
+          <div className="mt-4 text-center">
+            <Link to="/knowledge-base/brands" className="inline-flex items-center gap-1.5 text-sm text-white/85 hover:text-white">
+              <Tag className="h-4 w-4" /> Browse by brand
+            </Link>
+          </div>
 
           {/* Popular topic chips */}
           {categories.length > 0 && (
