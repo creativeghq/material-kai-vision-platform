@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Menu, LogOut, Wrench } from 'lucide-react';
+import { User, Menu, LogOut, Wrench, Eye, EyeOff } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useShowPrices } from '@/hooks/useShowPrices';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
@@ -24,6 +25,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
+
+/** #227 — header toggle to hide/show all prices across browse surfaces (demos / material research). */
+const ShowPricesToggle: React.FC = () => {
+  const { showPrices, toggle } = useShowPrices();
+  return (
+    <button
+      type="button"
+      onClick={() => toggle()}
+      title={showPrices ? 'Prices shown — click to hide (demo / research mode)' : 'Prices hidden — click to show'}
+      aria-pressed={!showPrices}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+    >
+      {showPrices ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+      <span className="font-light hidden lg:inline">{showPrices ? 'Prices' : 'Prices hidden'}</span>
+    </button>
+  );
+};
 
 function filterNavItems(
   items: readonly SidebarNavItem[],
@@ -212,6 +230,7 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       <div className="flex items-center gap-2">
+        <ShowPricesToggle />
         <WorkspaceSwitcher />
         <ModuleHeaderActions />
         {profileMenu}
