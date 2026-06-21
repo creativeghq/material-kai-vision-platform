@@ -654,6 +654,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setShowNewDesignModal(true);
       return;
     }
+    if (qs.opensModal === 'gemini-edit') {
+      // Apply-material / redesign work on a ROOM photo. Open the guided edit
+      // canvas in-place when an image is available (attached or just generated);
+      // otherwise fall through to the prompt, which asks the user to attach one.
+      const hasImage = attachedImages.length > 0
+        || messages.some((m) => m.geminiImageData?.image_url || m.virtualStagingData?.image_url || m.designData?.images?.[0] || m.images?.[0]);
+      if (hasImage) {
+        setGeminiEditRoomType(null);
+        setGeminiEditStyle(null);
+        setShowGeminiEditModal(true);
+        return;
+      }
+      // else fall through to the seeded prompt
+    }
     if (qs.opensModal === 'virtual-staging') {
       // Staging needs an image — resolve the latest one; fall back to the
       // prompt (which asks the user to attach a photo) when none is present.
