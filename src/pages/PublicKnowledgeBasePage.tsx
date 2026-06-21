@@ -105,13 +105,24 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   useEffect(() => {
     Promise.all([
       supabase.from('kb_categories').select('*').eq('access_level', 'public').order('sort_order', { ascending: true }),
-      supabase.from('kb_docs').select('category_id').eq('status', 'published').eq('visibility', 'public'),
+      // Public browse = curated/brand articles only. Per-product auto-extracted
+      // fragments (specs, compliance, certifications, care) carry a
+      // metadata.product_id and are surfaced on the PRODUCT page's Knowledge tab
+      // instead — excluding them here keeps the public KB from being a dump of
+      // hundreds of tiny spec pages.
+      supabase.from('kb_docs').select('category_id').eq('status', 'published').eq('visibility', 'public').is('metadata->>product_id', null),
     ]).then(([{ data: cats }, { data: docCounts }]) => {
       const countMap: Record<string, number> = {};
       (docCounts || []).forEach((d) => {
         if (d.category_id) countMap[d.category_id] = (countMap[d.category_id] || 0) + 1;
       });
-      setCategories((cats || []).map((c) => ({ ...c, document_count: countMap[c.id] || 0 })));
+      // Hide categories with no curated public docs (e.g. material categories
+      // whose only content is per-product fragments shown on the product page).
+      setCategories(
+        (cats || [])
+          .map((c) => ({ ...c, document_count: countMap[c.id] || 0 }))
+          .filter((c) => c.document_count > 0),
+      );
       setLoadingCats(false);
     });
   }, []);
@@ -131,6 +142,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
         .in('category_id', missingCategoryIds)
         .eq('status', 'published')
         .eq('visibility', 'public')
+        .is('metadata->>product_id', null) // product fragments live on the product page, not the public KB
         .order('created_at', { ascending: false });
 
       const grouped: Record<string, KBDocument[]> = {};
