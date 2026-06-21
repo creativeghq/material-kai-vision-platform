@@ -75,9 +75,6 @@ verify_jwt = false
 [functions.auto-recovery-cron]
 verify_jwt = false
 
-[functions.batch-update-sessions]
-verify_jwt = false
-
 [functions.campaign-processor]
 verify_jwt = false
 
@@ -88,9 +85,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.email-webhooks]
-verify_jwt = false
-
-[functions.field-templates]
 verify_jwt = false
 
 [functions.finance-invoice-pdf]
@@ -172,9 +166,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.stripe-webhooks]
-verify_jwt = false
-
-[functions.suggest-fields]
 verify_jwt = false
 
 [functions.generate-interior-video-v2]

@@ -576,7 +576,9 @@ const OperationsDashboardInner: React.FC = () => {
       const [pdfJobs, xmlJobs, scrapingSessions] = await Promise.all([
         supabase.from('background_jobs').select('*').eq('job_type', 'pdf_processing'),
         supabase.from('data_import_jobs').select('*'),
-        supabase.from('scraping_sessions').select('*'),
+        // Web-scrape→product path removed; scraping_sessions table dropped. Keep
+        // the result shape so the legacy stats card renders zeros, not an error.
+        Promise.resolve({ data: [] as any[], error: null }),
       ]);
 
       // Check for auth errors in data processing queries
