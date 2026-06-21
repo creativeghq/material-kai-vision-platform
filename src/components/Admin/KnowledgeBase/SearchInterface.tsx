@@ -47,38 +47,63 @@ export const SearchInterface: React.FC = () => {
     try {
       setIsSearching(true);
       const startTime = Date.now();
+      const q = query.trim();
 
-      // Semantic (vector) search via MIVAA → kb_match_docs. Must be 'semantic'
-      // (NOT 'multi_vector') — the endpoint only runs the embedding path for
-      // 'semantic'; anything else falls back to ILIKE substring matching, which
-      // can't match e.g. "heatpump" against the title "Heat Pump …".
-      const response = await fetch('https://v1api.materialshub.gr/api/kb/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          workspace_id: workspaceId,
-          query: query.trim(),
-          search_type: 'semantic',
-          // recall-oriented for an admin tool (default 0.5 drops near-misses
-          // like "heatpump" vs "Heat Pump …")
-          match_threshold: 0.3,
-          limit: 20,
-        }),
-      });
+      // Hybrid search: run a tolerant keyword pass (DB) and the semantic/vector
+      // pass (MIVAA → kb_match_docs) in parallel, then merge keyword-first so an
+      // exact term match wins. Semantic alone is noisy for short/mashed queries
+      // (e.g. "heatpump" buries the manual under a tile-cert cluster ~0.53);
+      // keyword alone can't do concept matching. Together they cover both.
+      const [keywordResults, semanticResults] = await Promise.all([
+        // Tolerant keyword (collapses spaces/punctuation: "heatpump" ⇒ "Heat Pump …")
+        (async (): Promise<KBDocument[]> => {
+          // kb_keyword_search isn't in the generated types yet — cast the call.
+          const { data, error } = await (supabase.rpc as any)('kb_keyword_search', {
+            p_workspace_id: workspaceId,
+            p_query: q,
+            p_limit: 20,
+          });
+          if (error) {
+            console.warn('keyword search failed:', error.message);
+            return [];
+          }
+          return (data as KBDocument[]) || [];
+        })(),
+        // Semantic via MIVAA — must be 'semantic' (the endpoint only runs the
+        // embedding path for that; anything else falls back to ILIKE substring).
+        (async (): Promise<KBDocument[]> => {
+          try {
+            const response = await fetch('https://v1api.materialshub.gr/api/kb/search', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                workspace_id: workspaceId,
+                query: q,
+                search_type: 'semantic',
+                match_threshold: 0.3, // recall-oriented for an admin tool
+                limit: 20,
+              }),
+            });
+            if (!response.ok) return [];
+            const data = await response.json();
+            return (data.results as KBDocument[]) || [];
+          } catch (e) {
+            console.warn('semantic search failed:', e);
+            return [];
+          }
+        })(),
+      ]);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Search failed');
-      }
+      // Merge: exact keyword hits first, then semantic, deduped by id.
+      const byId = new Map<string, KBDocument>();
+      keywordResults.forEach((d) => byId.set(d.id, d));
+      semanticResults.forEach((d) => { if (!byId.has(d.id)) byId.set(d.id, d); });
+      const merged = Array.from(byId.values()).slice(0, 20);
 
-      const data = await response.json();
-      const endTime = Date.now();
-      setResults(data.results || []);
-      setSearchTime(endTime - startTime);
+      setResults(merged);
+      setSearchTime(Date.now() - startTime);
 
-      if (!data || data.length === 0) {
+      if (merged.length === 0) {
         toast({
           title: 'No Results',
           description: 'No documents found matching your query',
