@@ -6,10 +6,19 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+/** A single authored FAQ entry, rendered at the bottom of an article and
+ *  emitted as schema.org FAQPage structured data. Stored on metadata.faq. */
+export interface KBFaqItem {
+  question: string;
+  answer: string;
+}
+
 export interface KBDocument {
   id: string;
   workspace_id: string;
   title: string;
+  /** URL slug for the SEO-friendly route /knowledge-base/:slug */
+  slug?: string | null;
   content: string;
   content_markdown?: string;
   summary?: string;

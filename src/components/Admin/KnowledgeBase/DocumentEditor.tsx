@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Eye, Code, Bold, Italic, Heading1, Heading2, List, ListOrdered, Link, Quote, Minus, Table, Settings2, ExternalLink } from 'lucide-react';
+import { Save, Eye, Code, Bold, Italic, Heading1, Heading2, List, ListOrdered, Link, Quote, Minus, Table, Settings2, ExternalLink, Search as SearchIcon, Plus, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -28,12 +28,14 @@ import { useToast } from '@/hooks/use-toast';
 import {
   KBDocument,
   KBCategory,
+  KBFaqItem,
   KnowledgeBaseService,
   PRICE_DOC_TYPE_LABELS,
   PriceDocType,
   parseSupplierCostListDoc,
 } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
+import { slugifyKbTitle } from '@/utils/kbSlug';
 
 const knowledgeBaseService = KnowledgeBaseService.getInstance();
 
@@ -186,6 +188,18 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   };
 
+  // Generate a globally-unique slug from the title (KB routing is global).
+  // Respects a manually-edited slug; only fills/dedupes when needed.
+  const ensureUniqueSlug = async (preferred: string, title: string, currentId?: string | null): Promise<string> => {
+    const base = slugifyKbTitle(preferred?.trim() || title);
+    const { data } = await supabase.from('kb_docs').select('id, slug').ilike('slug', `${base}%`);
+    const taken = new Set((data || []).filter((r) => r.id !== currentId && r.slug).map((r) => r.slug as string));
+    if (!taken.has(base)) return base;
+    let n = 2;
+    while (taken.has(`${base}-${n}`)) n++;
+    return `${base}-${n}`;
+  };
+
   const handleSave = async () => {
     if (!document.title || !document.content) {
       toast({
@@ -217,12 +231,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         return;
       }
 
+      // Ensure the doc has a unique URL slug for the public /knowledge-base/:slug route.
+      const slug = await ensureUniqueSlug(document.slug || '', document.title, documentId);
+
       if (documentId) {
         // Update directly in Supabase — embedding already generated on create
         const { error } = await supabase
           .from('kb_docs')
           .update({
             title: document.title,
+            slug,
             content: document.content,
             content_markdown: document.content_markdown,
             summary: document.summary,
@@ -251,6 +269,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           .from('kb_docs')
           .insert({
             title: document.title,
+            slug,
             content: document.content,
             content_markdown: document.content_markdown,
             summary: document.summary,
@@ -477,7 +496,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                 {document.visibility === 'public' && document.id && (
                   <div className="rounded-md border border-border bg-muted/40 p-2.5 space-y-1.5">
                     <a
-                      href={`/knowledge-base?doc=${document.id}`}
+                      href={document.slug ? `/knowledge-base/${document.slug}` : `/knowledge-base?doc=${document.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-500 hover:underline"
@@ -485,6 +504,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                       <ExternalLink className="h-3.5 w-3.5" />
                       View on public Knowledge Base
                     </a>
+                    {document.slug && (
+                      <p className="text-[10px] text-muted-foreground font-mono break-all">/knowledge-base/{document.slug}</p>
+                    )}
                     {document.status !== 'published' && (
                       <p className="text-xs text-amber-500 leading-snug">
                         Set Status to <span className="font-medium">Published</span> for this link to be live and detectable externally.
@@ -584,6 +606,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   <TabsTrigger value="preview">
                     <Eye className="h-4 w-4 mr-2" />
                     Preview
+                  </TabsTrigger>
+                  <TabsTrigger value="seo">
+                    <SearchIcon className="h-4 w-4 mr-2" />
+                    SEO &amp; FAQ
                   </TabsTrigger>
                   {/* Special-purpose Manage tab for docs that wire to a typed table.
                       Driven by metadata.doc_kind. Today: job_research_sites only;
@@ -702,6 +728,128 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   ) : (
                     <p className="text-sm text-muted-foreground italic">No content yet — switch to Edit to start writing.</p>
                   )}
+                </div>
+              </TabsContent>
+
+              {/* SEO & FAQ tab — drives the public article's <title>, slug, meta keywords,
+                  and the FAQ accordion + schema.org FAQPage structured data. */}
+              <TabsContent value="seo" className="flex-1 overflow-y-auto m-0">
+                <div className="p-6 space-y-6 max-w-2xl">
+                  {/* URL slug */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="slug">URL slug</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-mono shrink-0">/knowledge-base/</span>
+                      <Input
+                        id="slug"
+                        value={document.slug ?? ''}
+                        onChange={(e) => setDocument({ ...document, slug: e.target.value })}
+                        placeholder={slugifyKbTitle(document.title || 'article')}
+                        className="font-mono text-sm"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => setDocument({ ...document, slug: slugifyKbTitle(document.title || '') })}
+                      >
+                        From title
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      The permanent public URL. Leave blank to auto-generate from the title on save. Changing it after publishing breaks old links.
+                    </p>
+                  </div>
+
+                  {/* SEO title override */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="seo_title">SEO title (&lt;title&gt; / og:title)</Label>
+                    <Input
+                      id="seo_title"
+                      value={(document.metadata as Record<string, any> | undefined)?.seo_title ?? ''}
+                      onChange={(e) => setDocument({ ...document, metadata: { ...(document.metadata || {}), seo_title: e.target.value } })}
+                      placeholder={document.title || 'Defaults to the article title'}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional. Overrides the browser tab / search-result title. Falls back to the article title.
+                    </p>
+                  </div>
+
+                  {/* SEO keywords */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="seo_keywords">SEO keywords (comma-separated)</Label>
+                    <Input
+                      id="seo_keywords"
+                      value={(document.seo_keywords ?? []).join(', ')}
+                      onChange={(e) => setDocument({ ...document, seo_keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                      placeholder="heat pump, installation, manual"
+                    />
+                  </div>
+
+                  {/* FAQ repeater */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Frequently asked questions</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Rendered at the bottom of the article and emitted as Google FAQ rich-result data.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 gap-1"
+                        onClick={() => {
+                          const faq: KBFaqItem[] = Array.isArray((document.metadata as any)?.faq) ? [...(document.metadata as any).faq] : [];
+                          faq.push({ question: '', answer: '' });
+                          setDocument({ ...document, metadata: { ...(document.metadata || {}), faq } });
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add
+                      </Button>
+                    </div>
+
+                    {(Array.isArray((document.metadata as any)?.faq) ? (document.metadata as any).faq as KBFaqItem[] : []).map((f, i) => (
+                      <div key={i} className="rounded-lg border p-3 space-y-2 bg-muted/20">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={f.question}
+                            onChange={(e) => {
+                              const faq = [...((document.metadata as any).faq as KBFaqItem[])];
+                              faq[i] = { ...faq[i], question: e.target.value };
+                              setDocument({ ...document, metadata: { ...(document.metadata || {}), faq } });
+                            }}
+                            placeholder="Question"
+                            className="font-medium"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              const faq = ((document.metadata as any).faq as KBFaqItem[]).filter((_, idx) => idx !== i);
+                              setDocument({ ...document, metadata: { ...(document.metadata || {}), faq } });
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Textarea
+                          value={f.answer}
+                          onChange={(e) => {
+                            const faq = [...((document.metadata as any).faq as KBFaqItem[])];
+                            faq[i] = { ...faq[i], answer: e.target.value };
+                            setDocument({ ...document, metadata: { ...(document.metadata || {}), faq } });
+                          }}
+                          placeholder="Answer (Markdown supported)"
+                          rows={3}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </TabsContent>
 

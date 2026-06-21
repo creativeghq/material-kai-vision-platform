@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 // @ts-ignore - QueryClient types are available at runtime (react-query version conflict with React 18 types)
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { Toaster } from '@/components/core/ui/toaster';
@@ -147,6 +148,7 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <CriticalErrorBoundary name="Application Root">
+    <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <WorkspaceProvider>
@@ -667,11 +669,20 @@ const App = () => (
                   }
                 />
 
-                {/* Public Knowledge Base — no auth required */}
+                {/* Public Knowledge Base — no auth required. Global (not per-workspace). */}
                 <Route
                   path="/knowledge-base"
                   element={
                     <PageErrorBoundary name="Public Knowledge Base">
+                      <PublicKnowledgeBasePage />
+                    </PageErrorBoundary>
+                  }
+                />
+                {/* Individual article — real, slug-based, SEO-friendly URL */}
+                <Route
+                  path="/knowledge-base/:slug"
+                  element={
+                    <PageErrorBoundary name="Public Knowledge Base Article">
                       <PublicKnowledgeBasePage />
                     </PageErrorBoundary>
                   }
@@ -777,6 +788,7 @@ const App = () => (
         </WorkspaceProvider>
       </AuthProvider>
     </QueryClientProvider>
+    </HelmetProvider>
   </CriticalErrorBoundary>
 );
 

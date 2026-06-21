@@ -30,6 +30,7 @@ interface LatestMaterial {
 interface LatestDocument {
   id: string;
   title: string | null;
+  slug: string | null;
   created_at: string;
   category_id: string | null;
 }
@@ -217,7 +218,7 @@ function KnowledgeWidget() {
       }
       const { data } = await supabase
         .from('kb_docs')
-        .select('id, title, created_at, category_id')
+        .select('id, title, slug, created_at, category_id')
         .eq('status', 'published')
         .eq('visibility', 'public')
         .in('category_id', publicCategoryIds)
@@ -231,7 +232,12 @@ function KnowledgeWidget() {
   return (
     <Widget icon={BookOpen} title="Latest Knowledge" viewAllLink="/knowledge-base" loading={loading} empty={items.length === 0}>
       {items.map((doc) => (
-        <div key={doc.id} className="flex items-center gap-2 min-w-0">
+        <Link
+          key={doc.id}
+          to={`/knowledge-base/${doc.slug || doc.id}`}
+          aria-label={`Read knowledge base article: ${doc.title || 'Untitled'}`}
+          className="flex items-center gap-2 min-w-0 rounded-lg hover:bg-accent/40 transition-colors -mx-1 px-1 py-0.5"
+        >
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <FileText className="h-3.5 w-3.5 text-primary" />
           </div>
@@ -239,7 +245,7 @@ function KnowledgeWidget() {
             <p className="text-xs font-medium truncate leading-tight">{doc.title || 'Untitled'}</p>
             <p className="text-[11px] text-muted-foreground truncate">{new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
           </div>
-        </div>
+        </Link>
       ))}
     </Widget>
   );

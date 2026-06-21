@@ -11,6 +11,14 @@
   ],
   "rewrites": [
     {
+      "source": "/knowledge-base/:slug",
+      "destination": "/api/kb-prerender?slug=:slug"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
       "source": "/((?!api|assets|models|static|documentation|favicon.ico|robots.txt|sitemap.xml).*)",
       "destination": "/index.html"
     }
