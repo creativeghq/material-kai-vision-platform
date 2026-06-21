@@ -31,9 +31,12 @@ export function PageHeader({ icon: Icon, title, subtitle, actions, children }: P
           </div>
         </div>
 
-        {/* Right: page-scoped action buttons only — profile + notifications live in the top nav */}
+        {/* Right: page-scoped action buttons only — profile + notifications live in
+            the top nav. Always allowed to wrap so action-heavy headers (e.g. a
+            quote with submit / share / email / download) never overflow at narrow
+            and mid widths; on wide screens they stay on one line and align right. */}
         {actions && (
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:shrink-0">{actions}</div>
+          <div className="flex items-center gap-2 flex-wrap sm:justify-end">{actions}</div>
         )}
       </div>
 

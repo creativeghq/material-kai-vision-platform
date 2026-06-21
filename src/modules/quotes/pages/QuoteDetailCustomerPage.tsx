@@ -254,7 +254,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         title={quote.name || 'Untitled Quote'}
         subtitle={`Created ${new Date(quote.created_at).toLocaleDateString()} · Expires ${new Date(quote.expires_at).toLocaleDateString()}`}
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <QuoteStatusBadge status={quote.status} />
             {quote.status === 'draft' && (
               <Button
