@@ -934,6 +934,12 @@ async function executeFlowGraph(
   ];
   const visited = new Set<string>();
   let executionOrder = 0;
+  // A node failure must NOT abort independent (sibling) branches — e.g. a best-effort
+  // send_email failure can't be allowed to block the reliable create_notification on a
+  // parallel branch. We remember the first error, skip only the failed node's subtree,
+  // finish the rest of the walk, then surface the error afterwards.
+  let pendingError: (Error & { __runAlreadyFailed?: boolean }) | null = null;
+  let pendingErrorNodeId: string | null = null;
 
   while (queue.length > 0) {
     const { nodeId } = queue.shift()!;
@@ -1096,22 +1102,33 @@ async function executeFlowGraph(
         })
         .eq('id', step.id);
 
-      // Update run as failed (single authoritative write — outer handler will skip its own write)
-      await supabase
-        .from('flow_runs')
-        .update({
-          status: 'failed',
-          error_message: errorMessage,
-          error_node_id: nodeId,
-          completed_at: new Date().toISOString(),
-          duration_ms: Date.now() - stepStartTime,
-        })
-        .eq('id', runId);
-
-      // Tag the error so the outer handler knows the run record is already updated
-      (error as any).__runAlreadyFailed = true;
-      throw error;
+      // Record the first failure but KEEP DRAINING the queue so sibling branches still run.
+      // Crucially we do NOT enqueue this node's downstream edges here, so the failed node's
+      // subtree is skipped while parallel branches (already queued) execute.
+      if (!pendingError) {
+        pendingError = (error instanceof Error ? error : new Error(errorMessage)) as Error & {
+          __runAlreadyFailed?: boolean;
+        };
+        pendingErrorNodeId = nodeId;
+      }
     }
+  }
+
+  // A node failed mid-walk: every independent branch has now run (so the bell still went
+  // out even if the email branch failed). Record the run as failed — single authoritative
+  // write, then surface the error so the outer handler skips its own write.
+  if (pendingError) {
+    await supabase
+      .from('flow_runs')
+      .update({
+        status: 'failed',
+        error_message: pendingError.message,
+        error_node_id: pendingErrorNodeId,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', runId);
+    pendingError.__runAlreadyFailed = true;
+    throw pendingError;
   }
 }
 

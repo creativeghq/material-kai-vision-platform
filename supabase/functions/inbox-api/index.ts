@@ -19,9 +19,10 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { sendWhatsAppReply } from '../_shared/zernio.ts';
-import { generateWithClaude } from '../_shared/ai-client.ts';
-import { isModuleEnabled } from '../_shared/modules/registry.ts';
+import { generateWithClaudeTools } from '../_shared/ai-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { tool } from 'npm:ai@6';
+import { z } from 'npm:zod@3';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -211,14 +212,14 @@ async function workspaceOwner(db: SupabaseClient, workspaceId: string): Promise<
 /**
  * Phase-2 agent takeover (§9). When a thread is in `agent_state='active'`, an inbound customer
  * message triggers an AI reply: thread history → Claude → posted as message_type='agent', billed
- * to the workspace owner via debit_user_credits. Gated on the `inbox` module + owner balance.
+ * to the workspace owner via debit_user_credits. Available to every workspace (no module gate);
+ * every reply costs credits and is skipped (left for a human) when the owner can't pay.
  * Best-effort — any failure leaves the thread for a human, never throws to the caller.
  */
 async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise<void> {
   try {
     const thread = await getThreadOrThrow(db, threadId);
     if (thread.agent_state !== 'active') return;
-    if (!(await isModuleEnabled(db, 'inbox'))) return;
 
     const workspaceId = String(thread.workspace_id);
     const owner = await workspaceOwner(db, workspaceId);
@@ -940,102 +941,6 @@ async function handleJwtAction(
 
       await db.from('marketplace_inquiries').update({ inbox_thread_id: threadId }).eq('id', inquiryId);
       return json({ inquiry_id: inquiryId, thread_id: threadId });
-    }
-
-    case 'notify_want_matches': {
-      // Surplus Marketplace (#225) — when a SELLER publishes an active listing, notify buyers in
-      // OTHER workspaces whose saved want-list matches. Cross-tenant + throttled, so it runs here
-      // under the service role (a seller cannot read other tenants' want-lists). Best-effort:
-      // the caller (createListing) ignores failures so alerting never blocks publishing.
-      const listingId = String(payload.listing_id || '');
-      if (!listingId) throw new HttpError(400, 'listing_id is required');
-
-      const { data: listing } = await db
-        .from('marketplace_listings')
-        .select('id, workspace_id, title, material_category, price, currency, location_city, status')
-        .eq('id', listingId)
-        .maybeSingle();
-      const l = listing as {
-        workspace_id?: string; title?: string; material_category?: string | null;
-        price?: number; currency?: string; location_city?: string | null; status?: string;
-      } | null;
-      if (!l || l.status !== 'active') throw new HttpError(404, 'Listing not available');
-      const sellerWorkspaceId = String(l.workspace_id);
-
-      // Only a member of the seller workspace may trigger the fan-out (prevents abuse).
-      const callerRole = await callerRoleInWorkspace(db, userId, sellerWorkspaceId);
-      if (!callerRole) throw new HttpError(403, 'Not a member of the listing workspace');
-
-      // Candidate want-lists: active, owned by a DIFFERENT workspace, not notified in the last 6h.
-      // Category / keyword / price / city are narrowed in code below.
-      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-      const { data: candidates } = await db
-        .from('marketplace_want_lists')
-        .select('id, user_id, workspace_id, label, material_category, keyword, max_price, location_city, last_notified_at')
-        .eq('is_active', true)
-        .neq('workspace_id', sellerWorkspaceId)
-        .or(`last_notified_at.is.null,last_notified_at.lt.${sixHoursAgo}`);
-
-      const title = (l.title || '').toLowerCase();
-      const cat = (l.material_category || '').toLowerCase();
-      const price = typeof l.price === 'number' ? l.price : null;
-      const city = (l.location_city || '').toLowerCase();
-
-      const matches = ((candidates || []) as Array<{
-        id: string; user_id: string; label: string | null; material_category: string | null;
-        keyword: string | null; max_price: number | null; location_city: string | null;
-      }>).filter((w) => {
-        if (w.material_category && cat && w.material_category.toLowerCase() !== cat) return false;
-        if (w.keyword && !title.includes(w.keyword.toLowerCase())) return false;
-        if (w.max_price != null && price != null && price > Number(w.max_price)) return false;
-        if (w.location_city && city && !city.includes(w.location_city.toLowerCase())) return false;
-        return true;
-      });
-
-      // Buyer emails for the send_email branch of the seeded flow (notify branch
-      // needs only user_id; email branch needs `email` + `subject`).
-      const uniqueUserIds = [...new Set(matches.map((w) => w.user_id))];
-      const emailById = new Map<string, string>();
-      if (uniqueUserIds.length > 0) {
-        const { data: profs } = await db
-          .from('user_profiles').select('user_id, email').in('user_id', uniqueUserIds);
-        for (const p of (profs || []) as Array<{ user_id: string; email: string | null }>) {
-          if (p.email) emailById.set(p.user_id, p.email);
-        }
-      }
-
-      // One notification per buyer even if several of their want-lists match.
-      const seen = new Set<string>();
-      let notified = 0;
-      for (const w of matches) {
-        if (seen.has(w.user_id)) continue;
-        seen.add(w.user_id);
-        const listingTitle = l.title || 'a listing';
-        const priceLine = price != null ? ` — ${l.currency || ''} ${price}`.trimEnd() : '';
-        await emitFlowEvent('marketplace_want_match', {
-          user_id: w.user_id, // recipient — consumed by create_notification
-          email: emailById.get(w.user_id) || null, // consumed by send_email (skips if null)
-          type: 'marketplace_want_match',
-          subject: `New surplus match: ${listingTitle}`,
-          title: `New surplus match: ${listingTitle}`,
-          body: `A listing matching your saved alert${w.label ? ` "${w.label}"` : ''} was just posted${priceLine}.`,
-          action_url: '/discover',
-          listing_id: listingId,
-          listing_title: l.title || null,
-          want_list_id: w.id,
-          want_list_label: w.label || null,
-        });
-        notified++;
-      }
-
-      // Throttle-stamp every matched want-list (incl. deduped) so it cools down for 6h.
-      const matchedIds = matches.map((w) => w.id);
-      if (matchedIds.length > 0) {
-        await db.from('marketplace_want_lists')
-          .update({ last_notified_at: new Date().toISOString() })
-          .in('id', matchedIds);
-      }
-      return json({ matched: matches.length, notified });
     }
 
     case 'get_thread_context': {
