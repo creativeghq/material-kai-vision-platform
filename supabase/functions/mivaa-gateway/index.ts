@@ -628,11 +628,21 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     const mivaaUrl = `${MIVAA_SERVICE_URL()}${finalPath}`;
     console.log(`📡 Calling MIVAA: ${endpoint.method} ${mivaaUrl}`);
 
+    // Forward the real end-user JWT (not the platform service key) so MIVAA resolves the actual
+    // user and enforces workspace ownership/scoping on its side (e.g. authorize_rag_workspace and
+    // the /api/rag resource-ownership dependency). Forwarding the service key made MIVAA see the
+    // trusted `service=mivaa` identity and trust the client-supplied workspace_id / skip ownership
+    // → cross-tenant reads. Admin-secret + cron/no-JWT callers keep the MIVAA service key. Mirrors
+    // the upload path's forwarding.
+    const callerAuthHeader = req.headers.get('authorization');
+    const forwardedAuthHeader = (!isAdmin && callerAuthHeader && callerAuthHeader.startsWith('Bearer '))
+      ? callerAuthHeader
+      : `Bearer ${MIVAA_API_KEY()}`;
     const fetchOptions: RequestInit = {
       method: endpoint.method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MIVAA_API_KEY()}`,
+        'Authorization': forwardedAuthHeader,
       },
     };
 
