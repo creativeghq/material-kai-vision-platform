@@ -192,12 +192,15 @@ export const Sidebar: React.FC = () => {
         <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-8 w-auto hidden dark:block" />
       </Link>
 
-      <nav className="flex items-center gap-1 flex-1">
+      {/* Scrolls horizontally when there are more nav items than fit (e.g. the
+          operator's full set on a 1280 laptop) so the right-side controls below
+          are never pushed off-screen and clipped by Layout's overflow-hidden. */}
+      <nav className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {navigationItems.map((item) => (
           <Link
             key={item.id}
             to={item.path}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap shrink-0 transition-all duration-200 ${
               isActive(item.path)
                 ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
                 : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
@@ -209,7 +212,7 @@ export const Sidebar: React.FC = () => {
         ))}
       </nav>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0 pl-2">
         <ShowPricesToggle />
         <WorkspaceSwitcher />
         <ModuleHeaderActions />
