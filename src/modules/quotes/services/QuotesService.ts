@@ -1547,6 +1547,22 @@ export class QuotesService {
    * Validates that all upsells have been decided before accepting
    */
   async acceptQuote(quoteId: string): Promise<{ success: boolean; error?: string }> {
+    // Reject acceptance of a lapsed offer. The daily `expire_due_quotes` cron flips
+    // 'quoted' → 'expired', but guard here too to close the up-to-24h window between
+    // expiry and the next cron run, and to surface a clear message.
+    const { data: q } = await supabase
+      .from('quotes')
+      .select('status, expires_at')
+      .eq('id', quoteId)
+      .single();
+    if (
+      (q as { status?: string } | null)?.status === 'expired' ||
+      ((q as { expires_at?: string } | null)?.expires_at &&
+        new Date((q as { expires_at: string }).expires_at).getTime() < Date.now())
+    ) {
+      return { success: false, error: 'This quote has expired. Please request an updated quote.' };
+    }
+
     // Get quote upsells
     const upsells = await this.getQuoteUpsells(quoteId);
 
