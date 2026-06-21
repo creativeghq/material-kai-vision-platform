@@ -13,6 +13,7 @@ import {
   getMaterialCategory,
 } from '@/utils/productMetadata';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -37,6 +38,8 @@ interface QuoteItemsListProps {
   editPricing?: boolean;
   /** When false, price/total columns are hidden entirely (e.g. customer view before quote is priced). Defaults to true. */
   showPricing?: boolean;
+  /** #227 — when false AND the viewer is a sales rep, the per-line margin is hidden. Defaults to true. */
+  salesCanSeeCost?: boolean;
   /** When true, unit column is editable via dropdown (admin only). Defaults to false. */
   editUnits?: boolean;
   emptyMessage?: string;
@@ -172,6 +175,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   onRemoveItem,
   editPricing = false,
   showPricing = true,
+  salesCanSeeCost = true,
   editUnits = false,
   emptyMessage = 'No items in this quote yet',
   emptyButtonText = 'Add Your First Product',
@@ -187,6 +191,9 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   // Price lookup drawer state — one instance, reused for any row the admin clicks.
   const [lookupItem, setLookupItem] = useState<QuoteItemWithProduct | null>(null);
+  // #227 — hide the per-line margin from a sales rep when sales_can_see_cost is off.
+  const { isSalesRep } = usePermissions();
+  const showMargin = !(isSalesRep && !salesCanSeeCost);
 
   const handleViewProduct = (product: SimpleProduct) => {
     setSelectedProduct(convertToDisplayProduct(product));
@@ -441,7 +448,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                               const marginPct = cost != null && final != null && cost > 0 ? Math.round(((final - cost) / cost) * 100) : null;
                               const parts: string[] = [];
                               if (retail != null && off != null && off > 0) parts.push(`Retail ${fmtPrice(retail)} · ${off}% off`);
-                              if (marginPct != null) parts.push(`margin ${marginPct}%`);
+                              if (showMargin && marginPct != null) parts.push(`margin ${marginPct}%`);
                               if (parts.length === 0) return null;
                               return (
                                 <div className={`mt-1 text-[10px] ${marginPct != null && marginPct < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>

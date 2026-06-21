@@ -91,11 +91,19 @@ export const QuoteDetailPage: React.FC = () => {
   // #227 — order-level paid-upfront (cash) discount
   const [paidUpfront, setPaidUpfront] = useState(false);
   const [cashPct, setCashPct] = useState(0);
+  const [negMarginPolicy, setNegMarginPolicy] = useState<string>('warn');
+  const [salesCanSeeCost, setSalesCanSeeCost] = useState(true);
   useEffect(() => {
     if (!quote) return;
     setPaidUpfront(!!(quote as any).paid_upfront);
     const ws = (quote as any).workspace_id;
-    if (ws) financeService.getActiveCashDiscountPct(ws).then(setCashPct).catch(() => {});
+    if (ws) {
+      financeService.getActiveCashDiscountPct(ws).then(setCashPct).catch(() => {});
+      financeService.getSettings(ws).then((s) => {
+        setNegMarginPolicy((s as any)?.negative_margin_policy || 'warn');
+        setSalesCanSeeCost((s as any)?.sales_can_see_cost !== false);
+      }).catch(() => {});
+    }
   }, [quote?.id]);
 
   // PDF generation state
@@ -406,6 +414,23 @@ export const QuoteDetailPage: React.FC = () => {
 
   const handleSavePrices = async () => {
     if (!quote?.id || !quote.items) return;
+    // #227 — negative-margin guardrail (block / require_approval prevent saving below cost)
+    if (negMarginPolicy === 'block' || negMarginPolicy === 'require_approval') {
+      const neg = (quote.items || []).filter((item) => {
+        const price = getItemEffectivePrice(item.id);
+        const cost = (item as any).cost_snapshot != null ? Number((item as any).cost_snapshot)
+          : (item.product as any)?.cost != null ? Number((item.product as any).cost) : null;
+        return cost != null && price > 0 && price < cost;
+      });
+      if (neg.length > 0) {
+        toast({
+          title: 'Below-cost pricing blocked',
+          description: `${neg.length} line(s) are priced below cost. ${negMarginPolicy === 'require_approval' ? 'Finance approval is required for negative margin.' : 'Adjust the price, or change the policy in Finance → Settings → Pricing.'}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
     try {
       setSavingPrices(true);
       const items = quote.items.map(item => {
@@ -898,6 +923,7 @@ export const QuoteDetailPage: React.FC = () => {
               items={quote.items || []}
               variant="detailed"
               showAddButton={quote.status !== 'accepted' && quote.status !== 'rejected'}
+              salesCanSeeCost={salesCanSeeCost}
               customerCompanyId={quote.customer_company_id}
               customerContactId={quote.customer_contact_id}
               onAddProducts={() => setIsAddProductsOpen(true)}
