@@ -257,7 +257,7 @@ const FinancePage: React.FC = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={onTabChange} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <TabsList className="flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+          <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
             {!isAccountant && (
               <Link
                 to="/pos"

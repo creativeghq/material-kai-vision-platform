@@ -67,7 +67,7 @@ export const NotificationsPanel: React.FC = () => {
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(null);
+  const [panelPos, setPanelPos] = useState<{ top: number; right: number; width: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
 
@@ -177,9 +177,17 @@ export const NotificationsPanel: React.FC = () => {
   const handleToggle = () => {
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
+      // Cap the panel to the viewport (with 8px gutters) and clamp its right
+      // offset so it never spills past the left edge on narrow screens — the
+      // bell sits mid-bar, so a fixed 320px panel anchored to it would otherwise
+      // run off-screen on mobile.
+      const width = Math.min(320, window.innerWidth - 16);
+      const rawRight = window.innerWidth - rect.right;
+      const right = Math.min(Math.max(rawRight, 8), window.innerWidth - width - 8);
       setPanelPos({
         top: rect.bottom + window.scrollY + 8,
-        right: window.innerWidth - rect.right,
+        right,
+        width,
       });
     }
     setOpen((v) => !v);
@@ -204,7 +212,7 @@ export const NotificationsPanel: React.FC = () => {
 
       {/* Panel */}
       {open && panelPos && createPortal(
-        <div ref={panelRef} style={{ position: 'absolute', top: panelPos.top, right: panelPos.right, zIndex: 99999 }} className="w-80 rounded-2xl border bg-card shadow-xl overflow-hidden">
+        <div ref={panelRef} style={{ position: 'absolute', top: panelPos.top, right: panelPos.right, width: panelPos.width, zIndex: 99999 }} className="rounded-2xl border bg-card shadow-xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b bg-card/80 backdrop-blur-sm">
             <span className="text-sm font-semibold">Notifications</span>

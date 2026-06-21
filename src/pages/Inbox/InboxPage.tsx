@@ -4,7 +4,7 @@ import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
-  User as UserIcon, MessagesSquare, Settings2,
+  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, PanelRight,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -19,8 +19,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/core/ui/avatar';
 import { Separator } from '@/components/core/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
+import { Sheet, SheetContent } from '@/components/core/ui/sheet';
 import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -105,7 +107,18 @@ const InboxPage: React.FC = () => {
 
   const [showNew, setShowNew] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+
+  // Mobile drill-in: return from the open conversation to the thread list.
+  const backToList = useCallback(() => {
+    setActiveId(null);
+    setActiveThread(null);
+    setMessages([]);
+    setShowDetails(false);
+    setSearchParams((p) => { p.delete('thread'); return p; }, { replace: true });
+  }, [setSearchParams]);
 
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null)); }, []);
 
@@ -276,6 +289,51 @@ const InboxPage: React.FC = () => {
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
 
+  // The per-thread member action cluster (AI toggle, settings, add teammate,
+  // status). Reused inline in the desktop header and inside the mobile details
+  // sheet so the controls stay reachable without crowding the mobile header.
+  const memberControls = isMember && activeThread ? (
+    <>
+      <Button
+        variant={activeThread.agent_state === 'active' ? 'default' : 'outline'}
+        size="icon" className="rounded-full h-9 w-9"
+        title={
+          activeThread.agent_state === 'active'
+            ? 'AI assistant is handling this — click to take back'
+            : activeThread.agent_state === 'paused'
+              ? 'You took over — click to let the AI respond again'
+              : 'Hand this conversation to the AI assistant'
+        }
+        onClick={async () => {
+          const next = activeThread.agent_state === 'active' ? 'off' : 'active';
+          try {
+            await inboxApi.setAgent(activeThread.id, next);
+            setActiveThread({ ...activeThread, agent_state: next });
+          } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+        }}
+      >
+        <Bot className="w-4 h-4" />
+      </Button>
+      <InboxAgentSettingsButton workspaceId={activeThread.workspace_id} />
+      <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="Add a teammate" onClick={() => setShowAdd(true)}>
+        <UserPlus className="w-4 h-4" />
+      </Button>
+      <select
+        className="bg-transparent border border-white/10 rounded-full px-3 py-1.5 text-xs capitalize focus:outline-none focus:ring-2 focus:ring-primary/30"
+        value={activeThread.status}
+        onChange={async (e) => {
+          const status = e.target.value as InboxThread['status'];
+          await inboxApi.setStatus(activeThread.id, status).catch((err) => toast({ title: 'Failed', description: (err as Error).message, variant: 'destructive' }));
+          setActiveThread({ ...activeThread, status });
+        }}
+      >
+        <option value="open">Open</option>
+        <option value="snoozed">Snoozed</option>
+        <option value="closed">Closed</option>
+      </select>
+    </>
+  ) : null;
+
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <PageHeader
@@ -303,9 +361,11 @@ const InboxPage: React.FC = () => {
         }
       />
 
-      <div className="grid grid-cols-12 gap-4 flex-1 min-h-0 px-4 sm:px-6 py-4">
+      {/* Desktop: 3-pane grid. Mobile: single-pane drill-in (list ↔ conversation),
+          with the details rail moved into a slide-up sheet. */}
+      <div className="flex flex-col md:grid md:grid-cols-12 gap-4 flex-1 min-h-0 px-4 sm:px-6 py-4">
         {/* ── Column 1 · Conversations ── */}
-        <div className="dashboard-card rounded-2xl border-0 col-span-3 flex flex-col overflow-hidden p-0">
+        <div className={`dashboard-card rounded-2xl border-0 md:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-3 border-b border-white/10 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
@@ -370,7 +430,7 @@ const InboxPage: React.FC = () => {
         </div>
 
         {/* ── Column 2 · Conversation ── */}
-        <div className="dashboard-card rounded-2xl border-0 col-span-6 flex flex-col overflow-hidden p-0">
+        <div className={`dashboard-card rounded-2xl border-0 md:col-span-6 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
           {!activeThread ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
               <MessageSquare className="w-10 h-10 opacity-30" />
@@ -378,7 +438,16 @@ const InboxPage: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="px-4 py-3 border-b border-white/10 flex items-center gap-3">
+              <div className="px-3 sm:px-4 py-3 border-b border-white/10 flex items-center gap-2 sm:gap-3">
+                {/* Mobile: back to the conversation list */}
+                <button
+                  type="button"
+                  onClick={backToList}
+                  aria-label="Back to conversations"
+                  className="md:hidden shrink-0 h-9 w-9 -ml-1 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
                 <Avatar className="h-10 w-10 shrink-0">
                   <AvatarFallback className={`text-sm ${avatarTint(threadDisplayName(activeThread))}`}>
                     {initials(threadDisplayName(activeThread))}
@@ -392,47 +461,17 @@ const InboxPage: React.FC = () => {
                     <span>{activeCount} participant{activeCount === 1 ? '' : 's'}</span>
                   </div>
                 </div>
-                {isMember && (
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      variant={activeThread.agent_state === 'active' ? 'default' : 'outline'}
-                      size="icon" className="rounded-full h-9 w-9"
-                      title={
-                        activeThread.agent_state === 'active'
-                          ? 'AI assistant is handling this — click to take back'
-                          : activeThread.agent_state === 'paused'
-                            ? 'You took over — click to let the AI respond again'
-                            : 'Hand this conversation to the AI assistant'
-                      }
-                      onClick={async () => {
-                        const next = activeThread.agent_state === 'active' ? 'off' : 'active';
-                        try {
-                          await inboxApi.setAgent(activeThread.id, next);
-                          setActiveThread({ ...activeThread, agent_state: next });
-                        } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
-                      }}
-                    >
-                      <Bot className="w-4 h-4" />
-                    </Button>
-                    <InboxAgentSettingsButton workspaceId={activeThread.workspace_id} />
-                    <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="Add a teammate" onClick={() => setShowAdd(true)}>
-                      <UserPlus className="w-4 h-4" />
-                    </Button>
-                    <select
-                      className="bg-transparent border border-white/10 rounded-full px-3 py-1.5 text-xs capitalize focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      value={activeThread.status}
-                      onChange={async (e) => {
-                        const status = e.target.value as InboxThread['status'];
-                        await inboxApi.setStatus(activeThread.id, status).catch((err) => toast({ title: 'Failed', description: (err as Error).message, variant: 'destructive' }));
-                        setActiveThread({ ...activeThread, status });
-                      }}
-                    >
-                      <option value="open">Open</option>
-                      <option value="snoozed">Snoozed</option>
-                      <option value="closed">Closed</option>
-                    </select>
-                  </div>
-                )}
+                {/* Desktop: inline member controls. Mobile: collapsed into the details sheet. */}
+                {memberControls && <div className="hidden md:flex items-center gap-1.5">{memberControls}</div>}
+                {/* Mobile: open the contact/details rail as a sheet */}
+                <button
+                  type="button"
+                  onClick={() => setShowDetails(true)}
+                  aria-label="Conversation details"
+                  className="md:hidden shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+                >
+                  <PanelRight className="w-5 h-5" />
+                </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -501,8 +540,8 @@ const InboxPage: React.FC = () => {
           )}
         </div>
 
-        {/* ── Column 3 · Details ── */}
-        <div className="dashboard-card rounded-2xl border-0 col-span-3 flex flex-col overflow-hidden p-0">
+        {/* ── Column 3 · Details (desktop only; mobile uses the sheet below) ── */}
+        <div className="dashboard-card rounded-2xl border-0 md:col-span-3 hidden md:flex flex-col overflow-hidden p-0">
           {!activeThread ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-xs px-6 text-center gap-2">
               <UserIcon className="w-8 h-8 opacity-30" />
@@ -533,6 +572,28 @@ const InboxPage: React.FC = () => {
           onClose={() => setShowAdd(false)}
           onAdded={() => { setShowAdd(false); openThread(activeThread.id); }}
         />
+      )}
+
+      {/* Mobile: contact/details rail + member controls in a slide-up sheet */}
+      {isMobile && activeThread && (
+        <Sheet open={showDetails} onOpenChange={setShowDetails}>
+          <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-2xl bg-card overflow-hidden flex flex-col">
+            {memberControls && (
+              <div className="flex flex-wrap items-center gap-1.5 px-4 py-3 border-b border-white/10 shrink-0">
+                {memberControls}
+              </div>
+            )}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <DetailsRail
+                thread={activeThread}
+                context={context}
+                participants={participants}
+                labels={labels}
+                isMember={isMember}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   );

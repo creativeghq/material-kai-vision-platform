@@ -34,13 +34,21 @@ function useTabStripAffordance(elRef: React.RefObject<HTMLElement>) {
 
   const centerActive = React.useCallback(() => {
     const el = elRef.current;
-    if (!el || el.scrollWidth - el.clientWidth <= 1) return;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 1) return;
     const active = el.querySelector<HTMLElement>('[role="tab"][data-state="active"]');
     if (!active) return;
-    const elRect = el.getBoundingClientRect();
-    const aRect = active.getBoundingClientRect();
-    const delta = aRect.left - elRect.left - (el.clientWidth - aRect.width) / 2;
-    el.scrollLeft += delta;
+    const er = el.getBoundingClientRect();
+    const ar = active.getBoundingClientRect();
+    // Already fully in view → leave the scroll position alone. This keeps a
+    // leading tab (the common case) resting at the start instead of being
+    // yanked toward centre, and prevents transient mid-mount re-centres.
+    if (ar.left >= er.left && ar.right <= er.right) return;
+    // Active tab's offset within the scroll content, then centre it — clamped
+    // to the valid scroll range so a stale measurement can't fling the strip.
+    const target = el.scrollLeft + (ar.left - er.left) - (el.clientWidth - ar.width) / 2;
+    el.scrollLeft = Math.max(0, Math.min(target, max));
   }, [elRef]);
 
   React.useEffect(() => {

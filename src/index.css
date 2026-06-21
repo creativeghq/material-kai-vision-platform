@@ -566,6 +566,9 @@ All colors MUST be HSL.
   [role='tablist'][aria-orientation='horizontal'],
   [role='tablist']:not([aria-orientation]) {
     flex-wrap: nowrap !important;
+    /* The base TabsList is justify-center; once the row scrolls, centring
+       clips BOTH ends and hides the leading tab — anchor to the start. */
+    justify-content: flex-start;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -596,6 +599,33 @@ All colors MUST be HSL.
   [role='tablist'][data-overflow='both'] {
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
     mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  }
+}
+
+/* Finance's section navigation is a VERTICAL tab list (sidebar on lg+). Below
+   the lg breakpoint — where it would otherwise stack 19 full-width rows and
+   bury the content far below the fold — collapse it into a single horizontal
+   scroll strip: content-width chips, no section dividers. */
+@media (max-width: 1023px) {
+  .finance-tabs-list {
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .finance-tabs-list::-webkit-scrollbar {
+    display: none;
+  }
+  .finance-tabs-list > [role='tab'],
+  .finance-tabs-list > a {
+    width: auto !important;
+    flex: 0 0 auto;
+  }
+  /* Section dividers (Documents / Tools) don't belong in a horizontal strip. */
+  .finance-tabs-list > div {
+    display: none;
   }
 }
 
