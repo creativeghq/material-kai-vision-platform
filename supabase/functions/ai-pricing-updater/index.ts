@@ -29,7 +29,7 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     // Anthropic published pricing — https://www.anthropic.com/pricing
     // Canonical 3 latest-tier models only.
     fallback_prices: {
-      'claude-opus-4-7':            { input: 15.00, output: 75.00 },
+      'claude-opus-4-8':            { input: 15.00, output: 75.00 },
       'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
     },
   },

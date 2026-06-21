@@ -31,7 +31,7 @@ interface ReRankRequest {
   results: SearchResult[];
   maxResults?: number;
   includeExplanations?: boolean;
-  model?: 'claude-opus-4-7' | 'claude-haiku-4-5';
+  model?: 'claude-opus-4-8' | 'claude-haiku-4-5';
 }
 
 interface ReRankResponse {
@@ -72,7 +72,7 @@ Deno.serve(withApiLogging('ai-rerank', async (req) => {
   }
 
   try {
-    const { query, results, maxResults, includeExplanations = false, model = 'claude-opus-4-7' } = requestData;
+    const { query, results, maxResults, includeExplanations = false, model = 'claude-opus-4-8' } = requestData;
 
     // Validate input
     if (!query || !results || !Array.isArray(results)) {
@@ -148,7 +148,7 @@ Response format:
 
     // Calculate cost (approximate)
     const { inputTokens, outputTokens } = aiResult.usage;
-    const costPerMToken = model === 'claude-opus-4-7' ? 15.0 : 1.0;
+    const costPerMToken = model === 'claude-opus-4-8' ? 15.0 : 1.0;
     const cost = ((inputTokens + outputTokens) / 1_000_000) * costPerMToken;
 
     const processingTimeMs = Date.now() - startTime;

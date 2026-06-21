@@ -97,7 +97,7 @@ export class KaiTaskAgent implements AgentRunner {
   readonly name         = 'KAI Background Task';
   readonly description  = 'Executes any natural-language task dispatched from KAI chat — research, enrichment, analysis, and more.';
   readonly defaultTools = ['material_search', 'knowledge_base_search', 'web_search'];
-  readonly defaultModel = 'claude-opus-4-7';
+  readonly defaultModel = 'claude-opus-4-8';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const {

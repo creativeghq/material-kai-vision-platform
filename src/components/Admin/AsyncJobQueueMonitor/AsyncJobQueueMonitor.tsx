@@ -4171,7 +4171,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   'claude-opus': { input: 15.00, output: 75.00, type: 'token' },
                   'claude-vision': { input: 3.00, output: 15.00, type: 'token' },
                   // Modal GPU endpoints (per GPU hour). 'qwen-vision' removed
-                  // 2026-05-01 — vision discovery is on Claude Opus 4.7 (token-priced).
+                  // 2026-05-01 — vision discovery is on Claude Opus 4.8 (token-priced).
                   'slig-embeddings': { gpuHourly: 0.45, type: 'gpu', description: 'SLIG-768D Visual Embeddings (Modal)' },
                   'paddleocr': { gpuHourly: 0.80, type: 'gpu', description: 'PaddleOCR-VL Structural Pass (layout + OCR + figure boxes)' },
                   // Free/bundled models
@@ -4208,7 +4208,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   const totalTimeSeconds = (endTime - startTime) / 1000;
 
                   // Vision/Discovery — 'qwen' bucket removed 2026-05-01.
-                  // Discovery now runs on Claude Opus 4.7 and is captured under
+                  // Discovery now runs on Claude Opus 4.8 and is captured under
                   // the claude-opus row of `model_versions` aggregated below
                   // by the Claude estimation block.
 

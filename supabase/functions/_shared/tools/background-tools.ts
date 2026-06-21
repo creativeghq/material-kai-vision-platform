@@ -127,7 +127,7 @@ export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: st
       schema: z.object({
         task_prompt:      z.string().describe('The complete task description — be detailed, include all context the background agent will need.'),
         reason:           z.string().describe('One sentence explaining WHY you are dispatching this to the background (e.g., "requires processing 500 products which would exceed the response time limit").'),
-        model_override:   z.string().optional().describe('Specific model to use, e.g. claude-opus-4-7, claude-haiku-4-5. Omit to use default.'),
+        model_override:   z.string().optional().describe('Specific model to use, e.g. claude-opus-4-8, claude-haiku-4-5. Omit to use default.'),
         context_snippet:  z.string().optional().describe('Relevant excerpt from the current conversation for context (max 500 chars).'),
       }),
     }

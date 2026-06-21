@@ -1017,7 +1017,7 @@ const OperationsDashboardInner: React.FC = () => {
                           <div className="text-sm text-blue-700">Est. Total Cost</div>
                           <div className="text-2xl font-bold text-blue-600">
                             ${agentChats.reduce((sum, chat) => {
-                              const model = chat.metadata?.model || 'claude-opus-4-7';
+                              const model = chat.metadata?.model || 'claude-opus-4-8';
                               const inputTokens = estimateTokens(chat.content);
                               const outputTokens = estimateTokens(chat.content);
                               return sum + calculateCost(model, inputTokens, outputTokens).total;
@@ -1090,7 +1090,7 @@ const OperationsDashboardInner: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {agentChats.slice(0, 20).map((chat) => {
-                      const model = chat.metadata?.model || 'claude-opus-4-7';
+                      const model = chat.metadata?.model || 'claude-opus-4-8';
                       const inputTokens = estimateTokens(chat.content);
                       const outputTokens = estimateTokens(chat.content);
                       const cost = calculateCost(model, inputTokens, outputTokens);
@@ -1765,7 +1765,7 @@ const OperationsDashboardInner: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
               <p className="text-muted-foreground text-sm">
-                Monitoring all AI models — Claude Opus 4.7 (vision + classification), Claude Sonnet 4.6 (chunking), Claude Haiku 4.5, and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
+                Monitoring all AI models — Claude Opus 4.8 (vision + classification), Claude Sonnet 4.6 (chunking), Claude Haiku 4.5, and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
               </p>
             </div>
 
@@ -1961,7 +1961,7 @@ const OperationsDashboardInner: React.FC = () => {
                         <>
                           {/* Placeholder rows — canonical Claude models + vision/embedding */}
                           {[
-                            { name: 'Claude Opus 4.7' },
+                            { name: 'Claude Opus 4.8' },
                             { name: 'Claude Sonnet 4.6' },
                             { name: 'Claude Haiku 4.5' },
                             { name: 'voyage-4' },

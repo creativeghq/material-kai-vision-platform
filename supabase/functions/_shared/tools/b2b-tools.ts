@@ -360,7 +360,7 @@ export const createCompanyWebsiteScrapeTool = (userId: string, onProgress?: (sta
         let companyData;
         try {
           const analysisModel = new ChatAnthropic({
-            model: 'claude-opus-4-7',
+            model: 'claude-opus-4-8',
             temperature: 0.3,
             maxTokens: 2048,
           });
@@ -414,7 +414,7 @@ ${markdown.substring(0, 15000)}`;
               await supabase.from('ai_usage_logs').insert({
                 user_id: userId,
                 operation_type: 'company_website_scrape_analysis',
-                model_name: 'claude-opus-4-7',
+                model_name: 'claude-opus-4-8',
                 api_provider: 'anthropic',
                 input_tokens: inputTokens,
                 output_tokens: outputTokens,

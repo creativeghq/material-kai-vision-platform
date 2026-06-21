@@ -122,7 +122,7 @@ Body:
     }
   ],
   "agentId": "search",  // Optional, defaults to "search"
-  "model": "claude-opus-4-7",  // Optional
+  "model": "claude-opus-4-8",  // Optional
   "images": []  // Optional, for multimodal input
 }
 ```
@@ -134,7 +134,7 @@ Body:
   "success": true,
   "text": "Here are the sustainable concrete materials I found...",
   "agentId": "routing",
-  "model": "claude-opus-4-7",
+  "model": "claude-opus-4-8",
   "timestamp": "2025-11-09T18:30:00.000Z"
 }
 ```

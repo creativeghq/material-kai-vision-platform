@@ -116,7 +116,7 @@ async function initRuntime() {
     apiKey: ANTHROPIC_API_KEY,
   });
   modelOpus = new ChatAnthropic({
-    model: 'claude-opus-4-7',
+    model: 'claude-opus-4-8',
     temperature: 1,
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
@@ -789,7 +789,7 @@ function getModelNameForAgent(
 ): string {
   return shouldRouteToHaiku(agentId, messages, images)
     ? 'claude-haiku-4-5'
-    : 'claude-opus-4-7';
+    : 'claude-opus-4-8';
 }
 
 interface AgentConfig {
@@ -2605,7 +2605,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             }).catch((e: any) => console.warn('ai_call_logs write failed:', e));
           }
 
-          const modelUsed = finalResult.usage?.modelName || 'claude-opus-4-7';
+          const modelUsed = finalResult.usage?.modelName || 'claude-opus-4-8';
           const finalChunk = {
             type: 'final_result',
             text: finalResult.text,
@@ -2664,7 +2664,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               type: 'final_result',
               text: `Error: ${errorMessage}`,
               agentId,
-              model: 'claude-opus-4-7',
+              model: 'claude-opus-4-8',
               error: true,
               errorMessage: errorMessage
             });

@@ -164,7 +164,7 @@ export const creditsAPI = {
     // ai_model_pricing DB table and Python AIPricingConfig.
     const pricing: Record<string, { input: number; output: number }> = {
       // Claude Models — canonical 3 latest-tier
-      'claude-opus-4-7':            { input: 15.00, output: 75.00 },
+      'claude-opus-4-8':            { input: 15.00, output: 75.00 },
       'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
 
       // OpenAI Embeddings (chat models removed — platform uses Claude only)

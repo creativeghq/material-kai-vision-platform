@@ -144,7 +144,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-7',
+    defaultModel: 'anthropic/claude-opus-4-8',
   },
   {
     id: 'interior-designer',
@@ -154,7 +154,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-7',
+    defaultModel: 'anthropic/claude-opus-4-8',
   },
   {
     id: 'demo',
@@ -171,11 +171,11 @@ const AGENTS: AgentDefinition[] = [
 // AI Models available (format: provider/model-name for Mastra)
 const AI_MODELS = [
   // Language Models — Claude only (canonical 3 latest-tier)
-  { id: 'anthropic/claude-opus-4-7',           name: 'Claude Opus 4.7',   provider: 'anthropic', type: 'language' },
+  { id: 'anthropic/claude-opus-4-8',           name: 'Claude Opus 4.8',   provider: 'anthropic', type: 'language' },
   { id: 'anthropic/claude-haiku-4-5', name: 'Claude Haiku 4.5',  provider: 'anthropic', type: 'language' },
 
   // Vision Models — Qwen3-VL was removed 2026-05-01 (vision is Anthropic-only
-  // via Claude Opus 4.7). The Anthropic entry above is the active vision path.
+  // via Claude Opus 4.8). The Anthropic entry above is the active vision path.
 
   // Visual Embedding Models
   { id: 'google/siglip-so400m-patch14-384', name: 'SigLIP-SO400M', provider: 'google', type: 'visual-embedding' },
@@ -522,7 +522,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-opus-4-7',
+    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-opus-4-8',
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());

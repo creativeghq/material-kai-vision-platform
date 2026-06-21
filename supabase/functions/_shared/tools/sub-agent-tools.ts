@@ -47,7 +47,7 @@ async function logSubAgentUsage(opName: string, response: any, userId: string | 
     await supabase.from('ai_usage_logs').insert({
       user_id: userId ?? null,
       operation_type: opName,
-      model_name: 'claude-opus-4-7',
+      model_name: 'claude-opus-4-8',
       api_provider: 'anthropic',
       input_tokens: inputTokens,
       output_tokens: outputTokens,
@@ -117,7 +117,7 @@ export const createResearchAnalysisTool = (workspaceId: string, userId?: string)
 
         // Create a mini-agent execution with research context
         const researchModel = new ChatAnthropic({
-          model: 'claude-opus-4-7',
+          model: 'claude-opus-4-8',
           temperature: 0.7,
           maxTokens: 2048,
         });
@@ -182,7 +182,7 @@ export const createAnalyticsAnalysisTool = (userId?: string, workspaceId?: strin
         const systemPrompt = await getAgentSystemPrompt('analytics');
 
         const analyticsModel = new ChatAnthropic({
-          model: 'claude-opus-4-7',
+          model: 'claude-opus-4-8',
           temperature: 0.5,
           maxTokens: 2048,
         });
@@ -244,7 +244,7 @@ export const createBusinessAnalysisTool = (workspaceId: string, userId?: string)
         const systemPrompt = await getAgentSystemPrompt('business');
 
         const businessModel = new ChatAnthropic({
-          model: 'claude-opus-4-7',
+          model: 'claude-opus-4-8',
           temperature: 0.7,
           maxTokens: 2048,
         });
@@ -308,7 +308,7 @@ export const createProductAnalysisTool = (workspaceId: string, userId?: string) 
         const systemPrompt = await getAgentSystemPrompt('product');
 
         const productModel = new ChatAnthropic({
-          model: 'claude-opus-4-7',
+          model: 'claude-opus-4-8',
           temperature: 0.7,
           maxTokens: 2048,
         });

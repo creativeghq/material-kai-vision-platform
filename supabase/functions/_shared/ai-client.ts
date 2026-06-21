@@ -68,7 +68,7 @@ const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
 
 const _PRICING_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
   // Anthropic Claude
-  'claude-opus-4-7':   { input: 15.00, output: 75.00 },
+  'claude-opus-4-8':   { input: 15.00, output: 75.00 },
   'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
   // Google Gemini (per Google AI Studio pricing)
   // NOTE: gemini-3.5-flash numbers carried forward from the 3-flash-preview
@@ -182,7 +182,7 @@ const klingai = new Proxy(function () {}, {
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
-const DEFAULT_CLAUDE_MODEL = 'claude-opus-4-7';
+const DEFAULT_CLAUDE_MODEL = 'claude-opus-4-8';
 
 // ── Types ──
 export interface AIGenerateConfig {
@@ -851,7 +851,11 @@ export async function generateVideoWithKling(
 
 // ── Grok (xAI Aurora): Image generation + editing ──────────────────────────
 
-export const GROK_IMAGE_MODEL = 'grok-2-image-1212';
+// Current xAI image model (the older grok-2-image-1212 is legacy). Note: this
+// model is prompt-driven and does NOT do mask-based inpainting — generate-region-edit
+// still sends a mask, which this model ignores (edit applies from the prompt). The
+// mask param is harmless/optional on /v1/images/edits.
+export const GROK_IMAGE_MODEL = 'grok-imagine-image-quality';
 
 export interface GrokImageResult {
   base64: string;

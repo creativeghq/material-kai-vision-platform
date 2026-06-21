@@ -226,7 +226,7 @@ export function PlatformOverviewTab() {
       week, debit: h[i]*8, purchase: f[i]*6, refund: b[i], bonus: i%4===0?50:0, monthly_grant: i===0?200:0,
     })));
     setAiModelCosts([
-      {model:'Claude Opus 4.7',credits:840,cost:8.40},{model:'Claude Sonnet 4.6',credits:480,cost:4.80},
+      {model:'Claude Opus 4.8',credits:840,cost:8.40},{model:'Claude Sonnet 4.6',credits:480,cost:4.80},
       {model:'voyage-4',credits:280,cost:2.80},{model:'SLIG (SigLIP2-base, Modal)',credits:180,cost:1.80},
       {model:'Claude Haiku 4.5',credits:60,cost:0.60},{model:'PaddleOCR-VL',credits:80,cost:0.80},
     ]);
