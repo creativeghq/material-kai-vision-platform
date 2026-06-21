@@ -70,6 +70,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'moodboard_commented', group: 'Moodboards',
     label: 'Moodboard Commented', description: 'Someone comments on a moodboard', icon: 'MessageCircle', color: 'emerald',
     defaultData: { label: 'Moodboard Commented', category: 'trigger', triggerType: 'moodboard_commented', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'moodboard_quote_requested', group: 'Moodboards',
+    label: 'Quote Requested', description: 'Someone requests a quote from a moodboard', icon: 'FileText', color: 'emerald',
+    defaultData: { label: 'Moodboard Quote Requested', category: 'trigger', triggerType: 'moodboard_quote_requested', config: {} } as TriggerNodeData },
 
   // ── Profiles ──
   { type: 'triggerNode', category: 'trigger', subType: 'hire_me_received', group: 'Profiles',

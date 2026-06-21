@@ -972,7 +972,15 @@ async function executeFlowGraph(
       let branch: string | undefined;
 
       if (node.type === 'triggerNode') {
-        output = { ...triggerData };
+        // Keep BOTH shapes reachable from downstream templates. The run context
+        // is initialised as { trigger: { data: triggerData } } (so seeded system
+        // flows can template {{trigger.data.X}}), but storing this node's output
+        // below (`context[nodeId] = output`) overwrites context.trigger. If we
+        // only spread the fields flat here, {{trigger.data.X}} stops resolving and
+        // every create_notification skips with "unresolved_user_id" — which had
+        // silently broken hire_me / profile / moodboard notifications. Re-nest
+        // `data` while also keeping the flat fields for any {{trigger.X}} usage.
+        output = { ...triggerData, data: triggerData };
       } else if (node.type === 'conditionNode' && node.data.conditionType === 'loop') {
         // Fan-out: run the directly-connected downstream action node(s) once per
         // item in a collection. config: { collection_field: 'trigger.data.items',

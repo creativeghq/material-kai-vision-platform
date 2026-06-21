@@ -10,7 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { Palette, ExternalLink, Lock, ArrowRight } from 'lucide-react';
+import { Palette, ExternalLink, Lock, ArrowRight, FileText, Loader2, Check } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { moodboardAPI } from '@/services/moodboardAPI';
 
 interface PublicBoard {
   id: string;
@@ -18,6 +20,7 @@ interface PublicBoard {
   description: string | null;
   is_public: boolean;
   created_at: string;
+  user_id: string;
 }
 
 interface PublicItem {
@@ -38,18 +41,24 @@ interface PublicItem {
 export default function PublicMoodBoardPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [board, setBoard] = useState<PublicBoard | null>(null);
   const [items, setItems] = useState<PublicItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [requesting, setRequesting] = useState(false);
+  const [requested, setRequested] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     (async () => {
       setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
       const { data: boardData, error: boardError } = await supabase
         .from('moodboards')
-        .select('id, title, description, is_public, created_at')
+        .select('id, title, description, is_public, created_at, user_id')
         .eq('id', id)
         .eq('is_public', true)
         .maybeSingle();
@@ -74,6 +83,31 @@ export default function PublicMoodBoardPage() {
       setLoading(false);
     })();
   }, [id]);
+
+  const handleRequestQuote = async () => {
+    if (!id) return;
+    if (!userId) {
+      navigate(`/auth?redirect=/board/${id}`);
+      return;
+    }
+    setRequesting(true);
+    try {
+      await moodboardAPI.requestQuoteFromMoodboard(id);
+      setRequested(true);
+      toast({
+        title: 'Quote requested',
+        description: 'The creator has been notified and will follow up with you.',
+      });
+    } catch (e) {
+      toast({
+        title: 'Could not request a quote',
+        description: e instanceof Error ? e.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRequesting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -106,6 +140,25 @@ export default function PublicMoodBoardPage() {
 
   const materialItems = items.filter((i) => i.material_id && i.material);
   const mediaItems = items.filter((i) => i.media_url && !i.material_id);
+  const isOwner = !!userId && board!.user_id === userId;
+  const canRequestQuote = materialItems.length > 0 && !isOwner;
+
+  const RequestQuoteButton = ({ className = '' }: { className?: string }) => (
+    <Button
+      className={`rounded-full gap-2 ${className}`}
+      onClick={handleRequestQuote}
+      disabled={requesting || requested}
+    >
+      {requested ? (
+        <Check className="h-4 w-4" />
+      ) : requesting ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <FileText className="h-4 w-4" />
+      )}
+      {requested ? 'Quote requested' : userId ? 'Request a quote' : 'Sign in to request a quote'}
+    </Button>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -149,6 +202,7 @@ export default function PublicMoodBoardPage() {
           <p className="text-white/40 text-xs mt-2">
             {items.length} item{items.length !== 1 ? 's' : ''}
           </p>
+          {canRequestQuote && <RequestQuoteButton className="mt-4" />}
         </div>
       </div>
 
@@ -227,10 +281,18 @@ export default function PublicMoodBoardPage() {
 
         {/* Footer CTA */}
         <div className="text-center py-8 border-t border-border/40 space-y-3">
+          {canRequestQuote && (
+            <div className="pb-4">
+              <p className="text-sm text-muted-foreground mb-3">
+                Like these materials? Request a quote from the creator.
+              </p>
+              <RequestQuoteButton />
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             Create your own moodboards and discover materials on Materials Hub
           </p>
-          <Button className="rounded-full gap-2" onClick={() => navigate('/auth')}>
+          <Button variant="outline" className="rounded-full gap-2" onClick={() => navigate('/auth')}>
             <Palette className="h-4 w-4" />
             Get started free
           </Button>

@@ -32,6 +32,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   moodboard_item_added: ImagePlus,
   moodboard_shared: Share2,
   moodboard_commented: ImagePlus,
+  moodboard_quote_requested: FileText,
   hire_me_received: UserPlus,
   profile_followed: UserPlus,
   profile_published: UserPlus,

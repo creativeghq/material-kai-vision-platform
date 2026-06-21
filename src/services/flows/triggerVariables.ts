@@ -55,6 +55,13 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'from_email', label: 'Sender email', note: 'Email of the person sending the hire request.' },
     { key: 'services_requested', label: 'Services', note: 'Array of requested service names.' },
   ]),
+  moodboard_quote_requested: withStandard([
+    { key: 'moodboard_id', label: 'Moodboard ID', note: 'The moodboard the quote was requested from.' },
+    { key: 'moodboard_title', label: 'Moodboard title', note: 'Title of the moodboard.' },
+    { key: 'requester_id', label: 'Requester ID', note: 'The user who requested the quote.' },
+    { key: 'requester_name', label: 'Requester name', note: 'Display name of the requester.' },
+    { key: 'quote_request_id', label: 'Quote request ID', note: 'The generated quote request.' },
+  ]),
   profile_followed: withStandard([
     { key: 'follower_id', label: 'Follower ID', note: 'The user who started following.' },
     { key: 'following_id', label: 'Followed ID', note: 'The profile being followed.' },
@@ -211,6 +218,7 @@ export function getTriggerVariables(trigger: string | undefined): Array<TriggerV
 /** Human display title for every trigger that has a documented payload. */
 export const TRIGGER_TITLES: Record<string, string> = {
   hire_me_received: 'Hire Me request',
+  moodboard_quote_requested: 'Moodboard quote request',
   profile_followed: 'New follower',
   material_reviewed: 'Material reviewed',
   preferred_factory_added: 'Preferred factory added',

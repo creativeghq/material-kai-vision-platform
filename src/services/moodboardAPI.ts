@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { MoodBoard, MoodBoardItem } from '@/types/materials';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { getProductName } from '@/utils/productMetadata';
 import { moodboardPath, generationPathFromUrl } from '@/utils/storagePaths';
 
@@ -544,6 +545,104 @@ class MoodBoardAPI {
       .eq('id', generationId);
 
     if (error) throw error;
+  }
+
+  /**
+   * Request a quote from someone else's (shared) moodboard.
+   *
+   * The signed-in viewer becomes the requester: we build a quote owned by them
+   * from the board's products, submit it (→ a `quote_requests` row), then record
+   * a `moodboard_quote_requests` link so the board's CREATOR gets the lead (this
+   * is what populates the "Quote reqs" stat on their profile). The creator is
+   * notified through the `moodboard_quote_requested` Flow — no hardcoded
+   * notification insert. Commission is left at the table default; actual pricing
+   * is governed by the marketplace pyramid, not a per-request commission.
+   *
+   * Throws with a user-facing message on the guarded cases (not signed in, own
+   * board, empty board) so the caller can toast it directly.
+   */
+  async requestQuoteFromMoodboard(
+    moodboardId: string,
+  ): Promise<{ quote_id: string; quote_request_id: string }> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Please sign in to request a quote.');
+
+    const { data: board, error: boardErr } = await supabase
+      .from('moodboards')
+      .select('id, title, user_id, is_public')
+      .eq('id', moodboardId)
+      .maybeSingle();
+    if (boardErr) throw boardErr;
+    if (!board) throw new Error('Moodboard not found.');
+    if (board.user_id === user.id) {
+      throw new Error("You can't request a quote from your own moodboard.");
+    }
+
+    const { data: items, error: itemsErr } = await supabase
+      .from('moodboard_items')
+      .select('material_id, notes')
+      .eq('moodboard_id', moodboardId);
+    if (itemsErr) throw itemsErr;
+    const products = (items || []).filter((i) => i.material_id);
+    if (products.length === 0) {
+      throw new Error('This moodboard has no products to quote.');
+    }
+
+    // Build + submit a quote owned by the requester from the board's products.
+    const quote = await quotesService.createQuote({
+      name: `Quote request: ${board.title}`,
+      notes: `Requested from shared moodboard "${board.title}"`,
+    });
+    for (const item of products) {
+      await quotesService.addItem({
+        quote_id: quote.id,
+        product_id: item.material_id as string,
+        quantity: 1,
+        notes: item.notes || '',
+        added_from: 'moodboard',
+      });
+    }
+    await quotesService.submitQuote(quote.id, `From moodboard: ${board.title}`);
+
+    const { data: qr, error: qrErr } = await supabase
+      .from('quote_requests')
+      .select('id')
+      .eq('quote_id', quote.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (qrErr) throw qrErr;
+    if (!qr) throw new Error('Could not create the quote request. Please try again.');
+
+    const { error: linkErr } = await supabase
+      .from('moodboard_quote_requests')
+      .insert({
+        moodboard_id: board.id,
+        moodboard_creator_id: board.user_id,
+        requester_id: user.id,
+        quote_request_id: qr.id,
+        status: 'pending',
+      });
+    if (linkErr) throw linkErr;
+
+    // Notify the moodboard creator via the Flows engine (the seeded
+    // `moodboard_quote_requested` system flow turns this into a notification).
+    const requesterName =
+      (user.user_metadata?.full_name as string | undefined) || user.email || 'A member';
+    flowEventService.emit('moodboard_quote_requested', {
+      user_id: board.user_id, // recipient — consumed by create_notification
+      type: 'moodboard_quote',
+      title: `Quote requested from "${board.title}"`,
+      body: `${requesterName} requested a quote based on your moodboard "${board.title}".`,
+      action_url: '/profile',
+      moodboard_id: board.id,
+      moodboard_title: board.title,
+      requester_id: user.id,
+      requester_name: requesterName,
+      quote_request_id: qr.id,
+    });
+
+    return { quote_id: quote.id, quote_request_id: qr.id };
   }
 }
 

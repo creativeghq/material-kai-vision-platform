@@ -31,6 +31,7 @@ export type TriggerType =
   | 'moodboard_item_added'
   | 'moodboard_shared'
   | 'moodboard_commented'
+  | 'moodboard_quote_requested'
   | 'hire_me_received'
   | 'profile_followed'
   | 'profile_published'
@@ -137,6 +138,8 @@ export interface MoodboardItemAddedTriggerConfig {
   filter_moodboard_id?: string;
 }
 
+export interface MoodboardQuoteRequestedTriggerConfig {}
+
 export interface MoodboardSharedTriggerConfig {}
 
 export interface MoodboardCommentedTriggerConfig {
@@ -204,6 +207,7 @@ export type TriggerConfigMap = {
   moodboard_item_added: MoodboardItemAddedTriggerConfig;
   moodboard_shared: MoodboardSharedTriggerConfig;
   moodboard_commented: MoodboardCommentedTriggerConfig;
+  moodboard_quote_requested: MoodboardQuoteRequestedTriggerConfig;
   hire_me_received: HireMeReceivedTriggerConfig;
   profile_followed: ProfileFollowedTriggerConfig;
   profile_published: ProfilePublishedTriggerConfig;
