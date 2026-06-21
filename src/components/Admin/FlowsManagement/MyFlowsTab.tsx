@@ -122,6 +122,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   expense_card_submitted: ClipboardCheck,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,
+  pricing_change_requested: ClipboardCheck,
+  pricing_change_decided: CheckCircle2,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -179,6 +181,8 @@ const triggerLabels: Record<TriggerType, string> = {
   expense_card_submitted: 'Expense Card Submitted',
   expense_card_reviewed: 'Expense Card Reviewed',
   expense_card_requested: 'Expense Card Requested',
+  pricing_change_requested: 'Discount Approval Requested',
+  pricing_change_decided: 'Discount Approval Decided',
 };
 
 const statusColors: Record<FlowStatus, string> = {

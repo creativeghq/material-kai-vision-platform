@@ -16,6 +16,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 
@@ -506,6 +507,21 @@ async function handleRequest(
     );
 
     console.log(`[generate-pbr-maps] Complete. Status: ${pbrMaps.status}`);
+
+    // Notify the requester their AR/PBR maps are ready. Delivered by the seeded
+    // "SVBRDF Extracted → Notify User" flow (best-effort; never fails the response).
+    try {
+      await emitFlowEvent('svbrdf_extraction_complete', {
+        user_id: userId, // recipient — consumed by create_notification
+        type: 'svbrdf_extraction_complete',
+        title: 'PBR maps ready',
+        body: `Your AR material maps finished generating (status: ${pbrMaps.status}).`,
+        action_url: `/ar/${product_id}`,
+        product_id,
+      });
+    } catch (_e) {
+      /* notification is best-effort */
+    }
 
     return jsonResponse({
       success: true,

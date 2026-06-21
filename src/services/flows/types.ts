@@ -66,7 +66,10 @@ export type TriggerType =
   // Expense cards (trip / monthly / …): submit→finance, review→rep, request→rep
   | 'expense_card_submitted'
   | 'expense_card_reviewed'
-  | 'expense_card_requested';
+  | 'expense_card_requested'
+  // #227 — pricing-pyramid discount-approval workflow
+  | 'pricing_change_requested'
+  | 'pricing_change_decided';
 
 export interface ManualTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
@@ -76,6 +79,8 @@ export interface MarketplaceWantMatchTriggerConfig {}
 export interface ExpenseCardSubmittedTriggerConfig {}
 export interface ExpenseCardReviewedTriggerConfig {}
 export interface ExpenseCardRequestedTriggerConfig {}
+export interface PricingChangeRequestedTriggerConfig {}
+export interface PricingChangeDecidedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
   cron: string;
@@ -239,6 +244,8 @@ export type TriggerConfigMap = {
   expense_card_submitted: ExpenseCardSubmittedTriggerConfig;
   expense_card_reviewed: ExpenseCardReviewedTriggerConfig;
   expense_card_requested: ExpenseCardRequestedTriggerConfig;
+  pricing_change_requested: PricingChangeRequestedTriggerConfig;
+  pricing_change_decided: PricingChangeDecidedTriggerConfig;
 };
 
 // =====================================================

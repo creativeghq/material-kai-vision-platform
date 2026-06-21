@@ -64,6 +64,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   expense_card_submitted: ClipboardCheck,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,
+  pricing_change_requested: ClipboardCheck,
+  pricing_change_decided: CheckCircle2,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

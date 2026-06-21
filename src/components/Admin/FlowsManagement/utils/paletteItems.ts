@@ -185,6 +185,12 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'expense_card_requested', group: 'Finance',
     label: 'Expense Card Requested', description: 'Finance asked a team member to fill an expense card', icon: 'FileText', color: 'blue',
     defaultData: { label: 'Expense Card Requested', category: 'trigger', triggerType: 'expense_card_requested', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'pricing_change_requested', group: 'Finance',
+    label: 'Discount Approval Requested', description: 'A customer discount change needs finance approval', icon: 'ClipboardCheck', color: 'blue',
+    defaultData: { label: 'Discount Approval Requested', category: 'trigger', triggerType: 'pricing_change_requested', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'pricing_change_decided', group: 'Finance',
+    label: 'Discount Approval Decided', description: 'A finance approver approved or declined a discount change', icon: 'CheckCircle2', color: 'blue',
+    defaultData: { label: 'Discount Approval Decided', category: 'trigger', triggerType: 'pricing_change_decided', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

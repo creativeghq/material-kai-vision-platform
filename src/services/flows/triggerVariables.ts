@@ -68,6 +68,17 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'want_list_id', label: 'Want-list ID', note: 'The buyer saved alert that matched.' },
     { key: 'want_list_label', label: 'Want-list label', note: 'The buyer label for their saved alert.' },
   ]),
+  pricing_change_requested: withStandard([
+    { key: 'request_id', label: 'Request ID', note: 'The discount-change request awaiting approval.' },
+    { key: 'workspace_id', label: 'Workspace ID', note: 'The workspace the request belongs to.' },
+    { key: 'subject_type', label: 'Subject type', note: "'company' or 'contact' the discount applies to." },
+    { key: 'subject_id', label: 'Subject ID', note: 'The company/contact id.' },
+  ]),
+  pricing_change_decided: withStandard([
+    { key: 'request_id', label: 'Request ID', note: 'The decided discount-change request.' },
+    { key: 'workspace_id', label: 'Workspace ID', note: 'The workspace the request belongs to.' },
+    { key: 'approved', label: 'Approved', note: 'true if the change was approved, false if declined.' },
+  ]),
   profile_followed: withStandard([
     { key: 'follower_id', label: 'Follower ID', note: 'The user who started following.' },
     { key: 'following_id', label: 'Followed ID', note: 'The profile being followed.' },
@@ -226,6 +237,8 @@ export const TRIGGER_TITLES: Record<string, string> = {
   hire_me_received: 'Hire Me request',
   moodboard_quote_requested: 'Moodboard quote request',
   marketplace_want_match: 'Surplus alert match',
+  pricing_change_requested: 'Discount approval requested',
+  pricing_change_decided: 'Discount approval decided',
   profile_followed: 'New follower',
   material_reviewed: 'Material reviewed',
   preferred_factory_added: 'Preferred factory added',
