@@ -39,7 +39,6 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'price-monitoring', label: 'price-monitoring', sublabel: 'Track competitor prices' },
   { id: 'quotes-api', label: 'quotes-api', sublabel: 'Quotes CRUD operations' },
   { id: 'recommendations-api', label: 'recommendations-api', sublabel: 'Product recommendations' },
-  { id: 'scrape-session-manager', label: 'scrape-session-manager', sublabel: 'Web scraping orchestrator' },
   { id: 'stripe-api', label: 'stripe-api', sublabel: 'Stripe checkout / customer portal' },
   { id: 'suggest-fields', label: 'suggest-fields', sublabel: 'AI field suggestions' },
   { id: 'xml-import-orchestrator', label: 'xml-import-orchestrator', sublabel: 'XML catalog import' },

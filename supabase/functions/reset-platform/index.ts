@@ -318,11 +318,6 @@ const TABLES_TO_CLEAR = [
   // ── Processing Results ──────────────────────────────────────────────
   'processing_results',            // Processing results
 
-  // ── Web Scraping ────────────────────────────────────────────────────
-  'scraped_materials_temp',        // Temporary scraped materials
-  'scraping_pages',                // Scraping pages (child of sessions)
-  'scraping_sessions',             // Scraping sessions
-
   // ── Data Import ─────────────────────────────────────────────────────
   'data_import_job_products',      // Imported product staging rows (child, CASCADE)
   'data_import_jobs',              // Data import jobs

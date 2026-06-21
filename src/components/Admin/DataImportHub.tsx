@@ -4,12 +4,11 @@
  * Unified interface for importing products from multiple sources:
  * - PDF Processing (redirects to async queue monitor)
  * - XML files (with dynamic field mapping)
- * - Web scraping (Firecrawl)
  * - Manual entry
  */
 
 import React, { useState, useEffect } from 'react';
-import { Upload, Globe, FileText, FileType, ExternalLink, AlertCircle, Tags } from 'lucide-react';
+import { Upload, FileText, FileType, ExternalLink, AlertCircle, Tags } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -20,7 +19,6 @@ import ImportHistoryTab from './DataImport/ImportHistoryTab';
 import MaterialCategoriesTab from './DataImport/MaterialCategoriesTab';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { PDFUploadSection } from '@/components/features/pdf/PDFUploadSection';
-import { NewScraperPage } from '@/components/experimental/scraper/NewScraperPage';
 import { supabase } from '@/integrations/supabase/client';
 
 // PDFProcessingStepsMonitor has been removed - all monitoring now happens in AsyncJobQueueMonitor
@@ -37,7 +35,7 @@ const DataImportHub: React.FC = () => {
   useEffect(() => {
     checkActiveJobs();
     // Set active tab from URL parameter if present
-    if (tabParam && ['pdf', 'xml', 'firecrawl', 'history', 'categories'].includes(tabParam)) {
+    if (tabParam && ['pdf', 'xml', 'history', 'categories'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -72,7 +70,7 @@ const DataImportHub: React.FC = () => {
     <div className="min-h-screen">
       <GlobalAdminHeader
         title="Data Import Hub"
-        description="Import products from XML files, web scraping, or manual entry"
+        description="Import products from XML files or manual entry"
         badge="Admin"
       />
 
@@ -95,10 +93,6 @@ const DataImportHub: React.FC = () => {
                 <TabsTrigger value="xml">
                   <FileText className="h-4 w-4 mr-2" />
                   XML Import
-                </TabsTrigger>
-                <TabsTrigger value="firecrawl">
-                  <Globe className="h-4 w-4 mr-2" />
-                  Web Scraping
                 </TabsTrigger>
                 <TabsTrigger value="history">
                   <Upload className="h-4 w-4 mr-2" />
@@ -200,10 +194,6 @@ const DataImportHub: React.FC = () => {
 
               <TabsContent value="xml" className="mt-6">
                 <XMLImportTab />
-              </TabsContent>
-
-              <TabsContent value="firecrawl" className="mt-6">
-                <NewScraperPage embedded={true} />
               </TabsContent>
 
               <TabsContent value="history" className="mt-6">

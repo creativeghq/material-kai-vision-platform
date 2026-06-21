@@ -128,7 +128,6 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             <li>Chunk derivatives (boundaries, classifications, quality flags, validation scores)</li>
             <li><strong>VECS Vector Collections</strong> (visual/SLIG, color, texture, style, material, <strong>understanding</strong>)</li>
             <li>Processing Results &amp; Quality Data</li>
-            <li>Web Scraping (sessions, pages, temp materials)</li>
             <li>Data Import (jobs, history)</li>
             <li>AI / API / webhook call logs (ai_call_logs, ai_usage_logs, api_usage_logs, mivaa_api_usage_logs, webhook_calls)</li>
             <li>Public lead-gen tools cache &amp; logs; pipeline &amp; OCR metrics</li>

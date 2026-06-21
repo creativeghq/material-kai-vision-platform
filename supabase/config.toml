@@ -28,13 +28,7 @@ verify_jwt = false
 [functions.mivaa-gateway]
 verify_jwt = false
 
-[functions.parse-sitemap]
-verify_jwt = false
-
 [functions.pdf-batch-process]
-verify_jwt = false
-
-[functions.scrape-session-manager]
 verify_jwt = false
 
 [functions.seo-research]
@@ -50,9 +44,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.seo-pipeline]
-verify_jwt = false
-
-[functions.scrape-single-page]
 verify_jwt = false
 
 [functions.xml-import-orchestrator]
@@ -169,9 +160,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.recommendations-api]
-verify_jwt = false
-
-[functions.scrape-preview]
 verify_jwt = false
 
 [functions.ses-webhook]
