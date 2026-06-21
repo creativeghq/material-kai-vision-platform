@@ -9,8 +9,8 @@
  *   4. floor-plan-text   — text description → 2D floor plan diagram
  *
  * Models:
- *   - gemini-3.1-flash-image-preview (fast, 6 credits)
- *   - gemini-3-pro-image-preview     (4K quality, 15 credits)
+ *   - gemini-3.1-flash-image (fast, 6 credits)
+ *   - gemini-3-pro-image     (4K quality, 15 credits)
  *
  * Requires: GOOGLE_GENERATIVE_AI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
@@ -64,7 +64,7 @@ async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promi
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GOOGLE_API_KEY()}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GOOGLE_API_KEY()}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -332,8 +332,8 @@ async function callFluxDepthPro(
 
 // Credit costs
 const CREDIT_COSTS: Record<string, number> = {
-  'gemini-3.1-flash-image-preview': 6,
-  'gemini-3-pro-image-preview': 15,
+  'gemini-3.1-flash-image': 6,
+  'gemini-3-pro-image': 15,
   'flux-depth-pro': 20,
   'grok-aurora': 15,
 };
@@ -537,8 +537,8 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   const useGrok = body.model_tier === 'grok';
   const model: GeminiImageModel =
     body.model_tier === 'pro'
-      ? 'gemini-3-pro-image-preview'
-      : 'gemini-3.1-flash-image-preview';
+      ? 'gemini-3-pro-image'
+      : 'gemini-3.1-flash-image';
   const aspectRatio: ImageAspectRatio = body.aspect_ratio ?? '16:9';
   const mode: GenerationMode = body.mode ?? detectMode(body);
   const isFluxMode = (mode === 'redesign') || (mode === 'copy-style' && !useGrok);

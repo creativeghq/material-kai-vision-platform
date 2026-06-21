@@ -156,7 +156,7 @@ Deno.serve(withApiLogging('seed-sheet-references', async (req: Request) => {
     ? body.types.filter((t): t is SheetType => SHEET_TYPES.includes(t as SheetType))
     : [...SHEET_TYPES];
   const overwrite = body.overwrite ?? false;
-  const modelId = body.model === 'pro' ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview';
+  const modelId = body.model === 'pro' ? 'gemini-3-pro-image' : 'gemini-3.1-flash-image';
 
   const result: SeedResult = {
     success: true,

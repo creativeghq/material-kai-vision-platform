@@ -71,6 +71,9 @@ const _PRICING_PER_M_TOKENS: Record<string, { input: number; output: number }> =
   'claude-opus-4-7':   { input: 15.00, output: 75.00 },
   'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
   // Google Gemini (per Google AI Studio pricing)
+  // NOTE: gemini-3.5-flash numbers carried forward from the 3-flash-preview
+  // estimate — confirm against current Google AI Studio pricing.
+  'gemini-3.5-flash':       { input: 0.50, output: 3.00 },
   'gemini-3-flash-preview': { input: 0.50, output: 3.00 },
   'gemini-3.1-pro':         { input: 2.00, output: 12.00 },
 };
@@ -178,7 +181,7 @@ const klingai = new Proxy(function () {}, {
 }) as unknown as ReturnType<typeof createKlingAI>;
 
 // ── Default models ──
-const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-4-7';
 
 // ── Types ──
@@ -507,7 +510,9 @@ export async function generateStructuredWithClaude<T>(
 }
 
 // ── Gemini: Image generation + editing ──
-export type GeminiImageModel = 'gemini-3.1-flash-image-preview' | 'gemini-3-pro-image-preview';
+// GA image models (Nano Banana 2 / Pro). The `-preview` aliases were deprecated
+// and shut down 2026-06-25; the GA ids use the identical generateContent API.
+export type GeminiImageModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image';
 export type ImageAspectRatio = '1:1' | '16:9' | '3:2' | '4:3' | '9:16' | '3:4' | '4:5' | '5:4' | '21:9' | '2:3';
 
 export interface GeminiImageResult {
@@ -523,7 +528,7 @@ export async function generateImageWithGemini(
     aspectRatio?: ImageAspectRatio;
   },
 ): Promise<GeminiImageResult> {
-  const modelId: GeminiImageModel = config?.model ?? 'gemini-3.1-flash-image-preview';
+  const modelId: GeminiImageModel = config?.model ?? 'gemini-3.1-flash-image';
 
   // Any prompt with images must go through the raw Gemini generateContent API.
   // The Vercel AI SDK generateImage() is text-to-image only — it does not support
