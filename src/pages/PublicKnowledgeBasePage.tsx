@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { agentChatHistoryService } from '@/services/agents/agentChatHistoryService';
 import { KBCategory, KBDocument, KBFaqItem } from '@/services/knowledgeBaseService';
 import { SeoHead } from '@/components/seo/SeoHead';
+import { KbCommandSearch } from '@/components/features/knowledge/KbCommandSearch';
 
 // ── TOC heading extraction (ids match rehype-slug / github-slugger) ──────────
 interface TocItem { id: string; text: string; level: number; }
@@ -164,6 +165,19 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [search, setSearch] = useState('');
+  const [cmdOpen, setCmdOpen] = useState(false);
+
+  // ⌘K / Ctrl+K opens the command-palette search.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCmdOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [scopeCatId, setScopeCatId] = useState<string>('');
   const [askingAI, setAskingAI] = useState(false);
 
@@ -596,6 +610,14 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 aria-label="Search knowledge base articles"
                 className="w-full pl-11 pr-4 py-3 bg-transparent rounded-l-full text-white placeholder:text-white/50 focus:outline-none text-sm"
               />
+              <button
+                type="button"
+                onClick={() => setCmdOpen(true)}
+                aria-label="Open quick search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 rounded-full border border-white/25 px-2 py-0.5 text-[10px] text-white/70 hover:bg-white/10 transition"
+              >
+                <span className="font-sans">⌘</span>K
+              </button>
             </div>
             {categories.length > 0 && (
               <select
@@ -611,6 +633,14 @@ export const PublicKnowledgeBasePage: React.FC = () => {
               </select>
             )}
           </div>
+
+          <KbCommandSearch
+            open={cmdOpen}
+            onOpenChange={setCmdOpen}
+            allDocs={allDocs}
+            categories={categories}
+            onSelect={(d) => navigate(docHref(d))}
+          />
 
           {/* Popular topic chips */}
           {categories.length > 0 && (
