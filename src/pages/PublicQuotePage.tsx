@@ -40,6 +40,7 @@ interface PublicQuote {
   vat_amount: number | null;
   grand_total: number | null;
   extras_total: number | null;
+  cash_discount_pct: number | null;
   expires_at: string | null;
   created_at: string | null;
   client_name: string | null;
@@ -225,6 +226,12 @@ export default function PublicQuotePage() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Extras</span>
                 <span>{money(quote.extras_total, currency)}</span>
+              </div>
+            ) : null}
+            {quote.cash_discount_pct ? (
+              <div className="flex justify-between text-primary">
+                <span>Paid upfront (−{quote.cash_discount_pct}%)</span>
+                <span>− {money((quote.subtotal ?? itemsTotal) * quote.cash_discount_pct / 100, currency)}</span>
               </div>
             ) : null}
             {quote.vat_amount != null && (

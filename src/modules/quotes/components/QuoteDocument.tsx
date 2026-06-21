@@ -365,6 +365,14 @@ const TotalsBlock: React.FC<{ data: QuoteDocumentData }> = ({ data }) => (
           {fmt(data.subtotal, data.currency)}
         </td>
       </tr>
+      {data.cash_discount_pct > 0 && (
+        <tr>
+          <td style={{ fontSize: 56, color: C.primary, paddingBottom: 30 }}>Paid upfront (−{data.cash_discount_pct}%)</td>
+          <td style={{ fontSize: 56, color: C.primary, textAlign: 'right', paddingBottom: 30 }}>
+            − {fmt(data.subtotal * data.cash_discount_pct / 100, data.currency)}
+          </td>
+        </tr>
+      )}
       <tr>
         <td style={{ fontSize: 56, color: C.gray, paddingBottom: 40 }}>VAT ({data.vat_rate}%)</td>
         <td style={{ fontSize: 56, color: C.gray, textAlign: 'right', paddingBottom: 40 }}>

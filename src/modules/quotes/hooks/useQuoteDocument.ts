@@ -58,6 +58,7 @@ export interface QuoteDocumentData {
   vat_rate: number;
   vat_amount: number;
   grand_total: number;
+  cash_discount_pct: number;
   currency: string;
   items: QuoteDocumentItem[];
   client: QuoteDocumentClient;
@@ -189,6 +190,7 @@ export function useQuoteDocument(quoteId: string) {
           vat_rate: parseFloat(quote.vat_rate) || 24,
           vat_amount: parseFloat(quote.vat_amount) || 0,
           grand_total: parseFloat(quote.grand_total) || 0,
+          cash_discount_pct: parseFloat(quote.cash_discount_pct) || 0,
           currency: quote.currency || 'EUR',
           items,
           client,

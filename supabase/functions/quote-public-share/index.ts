@@ -44,7 +44,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     .from('quotes')
     .select(
       'id, name, quote_number, status, currency, subtotal, vat_rate, vat_amount, ' +
-      'grand_total, extras_total, expires_at, created_at, pdf_storage_path, ' +
+      'grand_total, extras_total, cash_discount_pct, expires_at, created_at, pdf_storage_path, ' +
       'public_share_enabled, customer_company_id, customer_contact_id, workspace_id',
     )
     .eq('public_share_token', token)
@@ -162,6 +162,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       vat_amount: quote.vat_amount != null ? Number(quote.vat_amount) : null,
       grand_total: quote.grand_total != null ? Number(quote.grand_total) : null,
       extras_total: quote.extras_total != null ? Number(quote.extras_total) : null,
+      cash_discount_pct: quote.cash_discount_pct != null ? Number(quote.cash_discount_pct) : 0,
       expires_at: quote.expires_at,
       created_at: quote.created_at,
       client_name,
