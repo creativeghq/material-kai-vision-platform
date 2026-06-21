@@ -41,8 +41,9 @@ interface ProductCardProps {
   categoryColor?: string;
   showActions?: boolean;
   /** #227 — the viewer's own resolved price (reseller buy price + discount, or retail).
-   *  Supplied by the parent grid via the bulk catalog-price RPC to avoid an N+1. */
-  viewerPrice?: { price: number | null; discount_pct: number; currency: string } | null;
+   *  Supplied by the parent grid via the bulk catalog-price RPC to avoid an N+1.
+   *  `kind` ('your_price' | 'retail' | 'seller') drives the label authoritatively. */
+  viewerPrice?: { price: number | null; discount_pct: number; currency: string; kind?: string } | null;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -151,10 +152,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           if (price == null) return null;
           const disc = viewerPrice?.discount_pct ?? 0;
           const cur = viewerPrice?.currency ?? product.pricing.currency;
+          // Label off the resolved kind when present; fall back to discount magnitude otherwise.
+          const isYourPrice = viewerPrice?.kind === 'your_price' || (viewerPrice?.kind == null && disc > 0);
           return (
             <div className="mb-3 pb-3 border-b border-gray-200">
               <p className="text-xs text-gray-600 mb-0.5">
-                {disc > 0 ? 'Your price' : 'Retail'} <span className="text-gray-400">(excl. VAT)</span>
+                {isYourPrice ? 'Your price' : 'Retail'} <span className="text-gray-400">(excl. VAT)</span>
               </p>
               <p className="font-semibold text-gray-900">
                 {sym(cur)}{price.toFixed(2)}

@@ -687,6 +687,9 @@ export class QuotesService {
                 discountedPrice = null;       // engine price replaces any prior per-line discount
                 payload.unit_price = recomputed;
                 payload.discounted_price = null;
+                // Keep the pre-discount retail anchor in sync with the same resolver call, else the
+                // "X% off retail" line breakdown goes stale after a qty change.
+                if (p?.retail != null) payload.retail_price = Number(p.retail);
               }
             }
           } catch { /* non-fatal — keep the existing price */ }

@@ -69,6 +69,9 @@ export async function handleContacts(req: Request): Promise<Response> {
     if (method === 'POST' && path.length === 0) {
       const body = await req.json();
       const { name, email, phone, company, notes } = body;
+      // #227 — persist customer-pricing fields on create too (parity with companies; the PATCH
+      // path already handled them, so a contact created with these set used to lose them).
+      const { user_level_key, prices_vat_inclusive, discount_percent } = body;
 
       if (!name) {
         return new Response(
@@ -106,6 +109,9 @@ export async function handleContacts(req: Request): Promise<Response> {
           phone,
           company,
           notes,
+          ...(user_level_key !== undefined ? { user_level_key } : {}),
+          ...(prices_vat_inclusive !== undefined ? { prices_vat_inclusive } : {}),
+          ...(discount_percent !== undefined ? { discount_percent } : {}),
           workspace_id: targetWs,
           created_by: userId || 'system',
         })

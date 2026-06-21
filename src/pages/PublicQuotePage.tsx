@@ -240,11 +240,12 @@ export default function PublicQuotePage() {
                 <span>− {money(baseSubtotal * quote.cash_discount_pct / 100 * vatMul, currency)}</span>
               </div>
             ) : null}
-            {quote.vat_amount != null && (
+            {/* Net mode: VAT is an addend that bridges net subtotal → gross total.
+                Gross mode: the rows above are already VAT-inclusive, so VAT must NOT be added
+                again — it's shown as an "of which" note below the total instead. */}
+            {!gross && quote.vat_amount != null && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  {gross ? 'incl. VAT' : 'VAT'}{quote.vat_rate != null ? ` (${quote.vat_rate}%)` : ''}
-                </span>
+                <span className="text-muted-foreground">VAT{quote.vat_rate != null ? ` (${quote.vat_rate}%)` : ''}</span>
                 <span>{money(quote.vat_amount, currency)}</span>
               </div>
             )}
@@ -252,6 +253,12 @@ export default function PublicQuotePage() {
               <span className="font-semibold">Total</span>
               <span className="font-bold text-base">{money(quote.grand_total, currency)}</span>
             </div>
+            {gross && quote.vat_amount != null && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>incl. VAT{quote.vat_rate != null ? ` (${quote.vat_rate}%)` : ''}</span>
+                <span>{money(quote.vat_amount, currency)}</span>
+              </div>
+            )}
           </div>
         </div>
 

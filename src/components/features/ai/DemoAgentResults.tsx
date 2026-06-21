@@ -11,8 +11,7 @@ import Design3DModal from './Design3DModal';
 import SEOArticleViewer from './SEOArticleViewer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
-import { Package } from 'lucide-react';
-import { getManufacturer, getProductName } from '@/utils/productMetadata';
+import { useShowPrices } from '@/hooks/useShowPrices';
 
 
 interface DemoAgentResultsProps {
@@ -41,6 +40,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   onUseIn3DScene,
   vrGenerating,
 }) => {
+  const { showPrices } = useShowPrices();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selected3DDesign, setSelected3DDesign] = useState<any>(null);
@@ -70,8 +70,9 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
         </div>
 
         {/* Product Grid — #227: restored to the shared ProductCard (was inlined to a compact card,
-            orphaning ProductCard). Rich card showcases AR / Lighting / Add-to-Quote in the demo and
-            carries the per-viewer price + Show Prices gating. */}
+            orphaning ProductCard). The rich card showcases AR / Lighting / Add-to-Quote and respects
+            the Show Prices toggle. Demo products keep their embedded retail (no live RPC for fake ids);
+            real catalog grids pass a `viewerPrice` prop for per-viewer pricing. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {result.data.map((product: Product) => (
             <ProductCard
@@ -219,17 +220,19 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
                   </div>
                 </div>
 
-                {/* Pricing */}
-                <div className="grid grid-cols-2 gap-3 pb-3 border-b border-gray-200">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-0.5">Retail</p>
-                    <p className="font-semibold text-gray-900">€{(model.price_retail ?? 0).toFixed(2)}</p>
+                {/* Pricing — demo data, but still respects the Show Prices toggle (#227 review). */}
+                {showPrices && (
+                  <div className="grid grid-cols-2 gap-3 pb-3 border-b border-gray-200">
+                    <div>
+                      <p className="text-xs text-gray-600 mb-0.5">Retail</p>
+                      <p className="font-semibold text-gray-900">€{(model.price_retail ?? 0).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 mb-0.5">Wholesale</p>
+                      <p className="font-semibold text-gray-900">€{(model.price_wholesale ?? 0).toFixed(2)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-600 mb-0.5">Wholesale</p>
-                    <p className="font-semibold text-gray-900">€{(model.price_wholesale ?? 0).toFixed(2)}</p>
-                  </div>
-                </div>
+                )}
 
                 {/* Stock */}
                 <div className="flex justify-between items-center">

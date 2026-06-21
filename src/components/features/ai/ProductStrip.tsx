@@ -3,7 +3,7 @@
  * Table/list layout for products displayed at the end of agent chat messages
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { Package } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
@@ -35,12 +35,14 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
   // #227 — resolve each viewer's OWN price (reseller buy price + discount, end-user retail)
   // in one bulk call rather than the raw catalog retail shown to everyone.
   const [viewerPrices, setViewerPrices] = useState<Record<string, ViewerPrice>>({});
+  // Stable key so the fetch fires on the actual product set, not on every parent re-render
+  // (agent message lists are rebuilt inline each render).
+  const idsKey = useMemo(() => (products ?? []).map((p) => p.id).filter(Boolean).join(','), [products]);
 
   useEffect(() => {
-    if (!activeWorkspaceId || !products?.length) return;
+    if (!activeWorkspaceId || !idsKey) return;
     let cancelled = false;
-    const ids = products.map((p) => p.id).filter(Boolean);
-    if (!ids.length) return;
+    const ids = idsKey.split(',');
     supabase
       .rpc('get_catalog_prices_for_workspace', { p_workspace_id: activeWorkspaceId, p_product_ids: ids })
       .then(({ data }) => {
@@ -57,7 +59,7 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [activeWorkspaceId, products]);
+  }, [activeWorkspaceId, idsKey]);
 
   if (!products || products.length === 0) return null;
 
