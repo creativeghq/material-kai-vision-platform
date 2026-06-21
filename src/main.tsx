@@ -113,6 +113,18 @@ Sentry.init({
   ],
 });
 
+// Register the PWA service worker so the app is installable to the home screen
+// (Chrome/Edge require an SW with a fetch handler to fire `beforeinstallprompt`).
+// Production only — the dev server runs its own SW/HMR machinery and a stale
+// pass-through worker just adds noise locally.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
+      // Non-fatal: install-to-home-screen is a progressive enhancement.
+    });
+  });
+}
+
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element not found');
 

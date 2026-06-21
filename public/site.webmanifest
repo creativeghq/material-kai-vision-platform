@@ -1,19 +1,32 @@
 {
-  "name": "MaterialsHub",
+  "id": "/",
+  "name": "MaterialsHub — Materials Intelligence",
   "short_name": "MaterialsHub",
+  "description": "Discover materials, manage catalogs, quotes and projects, and chat with the AI agent — on the go.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#121212",
+  "background_color": "#121212",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/android-chrome-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ],
-  "theme_color": "#121212",
-  "background_color": "#121212",
-  "display": "standalone"
+  ]
 }

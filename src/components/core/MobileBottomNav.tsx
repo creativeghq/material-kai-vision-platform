@@ -13,6 +13,7 @@ import {
   type SidebarNavItem,
 } from '@/config/nav-items';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/core/ui/sheet';
+import { MobileInstallButton } from './MobileInstallButton';
 
 /** Number of destinations shown directly in the bar; the rest fall under "More". */
 const BAR_SLOTS = 4;
@@ -180,6 +181,7 @@ export const MobileBottomNav: React.FC = () => {
               <span className="text-[11px] leading-tight font-light">Profile</span>
             </Link>
           </div>
+          <MobileInstallButton onDone={() => setMoreOpen(false)} />
         </SheetContent>
       </Sheet>
     </>
