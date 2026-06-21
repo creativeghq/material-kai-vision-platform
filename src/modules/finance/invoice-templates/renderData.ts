@@ -96,8 +96,19 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       net, vatPct: pct, vatAmount: vat, lineTotal: net + vat,
     };
   });
+  // #227 — paid-upfront (cash) discount is order-level; line items + per-rate VAT are PRE-discount
+  // (the discount is not distributed to lines), so multiply by the cash factor to get the
+  // post-discount taxable figures. "Price" = pre-discount net; "Price after Discount" = taxable.
+  const cashPct = Number(inv.cash_discount_pct ?? 0);
+  const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const priceNet = r2(totNet);
+  const netAfter = r2(totNet * cashFactor);
+  const cashDisc = r2(priceNet - netAfter);
+  const vatAfter = r2(totVat * cashFactor);
+
   const vatAnalysis: VatAnalysisRow[] = Object.entries(vatByRate)
-    .map(([pct, agg]) => ({ pct: Number(pct), net: agg.net, vat: agg.vat }))
+    .map(([pct, agg]) => ({ pct: Number(pct), net: r2(agg.net * cashFactor), vat: r2(agg.vat * cashFactor) }))
     .sort((a, b) => b.pct - a.pct);
 
   // ── Totals ──
@@ -107,7 +118,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const digitalFee = Number(inv.digital_transaction_fee ?? 0);
   const deductions = Number(inv.total_deductions_amount ?? 0);
   const withheld = Number(inv.total_withheld_amount ?? 0);
-  const grand = Number(inv.total ?? (totNet + totVat - withheld));
+  const grand = Number(inv.total ?? (netAfter + vatAfter + fees + stamp + otherTax + digitalFee - withheld - deductions));
   const extras: TotalsExtraRow[] = [];
   if (fees > 0) extras.push({ label: L.fees, value: fees });
   if (stamp > 0) extras.push({ label: L.stamp, value: stamp });
@@ -115,18 +126,6 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   if (digitalFee > 0) extras.push({ label: L.digitalFee, value: digitalFee });
   if (deductions > 0) extras.push({ label: L.deductions, value: deductions, negative: true });
   if (withheld > 0) extras.push({ label: L.withheld, value: withheld, negative: true });
-
-  // #227 — paid-upfront (cash) discount surfaced as explicit breakdown lines (Price → Discount →
-  // Price after Discount). Display-only — the stored/reported subtotal_net stays the post-discount
-  // taxable base; fees/stamp/withholding remain in `extras`.
-  const cashPct = Number(inv.cash_discount_pct ?? 0);
-  let displaySubtotalNet = totNet;
-  let cashDisc = 0;
-  if (cashPct > 0 && cashPct < 100) {
-    const preNet = totNet / (1 - cashPct / 100);
-    cashDisc = Math.round((preNet - totNet) * 100) / 100;
-    displaySubtotalNet = Math.round(preNet * 100) / 100;
-  }
 
   // ── Payment + bank accounts ──
   const accounts: string[] = [];
@@ -170,8 +169,8 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     items: rows,
     vatAnalysis,
     totals: {
-      subtotalNet: displaySubtotalNet, discount: cashDisc, priceAfterDiscount: totNet,
-      totalVat: totVat, extras, grand,
+      subtotalNet: priceNet, discount: cashDisc, priceAfterDiscount: netAfter,
+      totalVat: vatAfter, extras, grand,
       amountPaid: Number(inv.amount_paid ?? 0), amountDue: Number(inv.amount_due ?? grand),
     },
     payment: {

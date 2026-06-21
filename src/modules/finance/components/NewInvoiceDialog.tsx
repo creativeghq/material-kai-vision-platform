@@ -669,6 +669,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       internal_number: nextNumber?.number != null ? `${nextNumber.series ?? ''}${nextNumber.number}` : 'DRAFT',
       issued_at: issueDate || null, due_at: dueDatePreview, related_document: relatedDocument || null,
       vat_rate: parseFloat(vatRate) || 0,
+      cash_discount_pct: paidUpfront ? cashPct : 0,
       total: totals.total, amount_paid: 0, amount_due: totals.total,
       total_fees_amount: totals.fees, total_stamp_duty_amount: totals.stamp,
       total_other_taxes_amount: totals.other, total_deductions_amount: totals.deduct,
@@ -694,7 +695,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     settings: issuer,
     customer: customerAddr ?? (customer ? { name: customer.label.replace(' (company)', '') } : null),
     branch: null, logoUrl: null,
-  }), [issuer, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr]);
+  }), [issuer, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
