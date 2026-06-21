@@ -245,12 +245,16 @@ export const ContactDetailPage: React.FC = () => {
           });
           pricingPending = res.status === 'pending';
           if (pricingPending) {
-            flowEventService.emit('pricing_change_requested', {
-              workspace_id: activeWorkspaceId, request_id: res.request_id,
-              subject_type: 'contact', subject_id: id!,
-              title: 'Discount change needs approval',
-              body: 'A sales team member proposed a customer discount/level change.',
-            });
+            // Fan out to every finance approver (owner/admin) — one event per recipient.
+            const approvers = await financeService.listWorkspaceApproverIds(activeWorkspaceId!).catch(() => []);
+            for (const uid of approvers) {
+              flowEventService.emit('pricing_change_requested', {
+                workspace_id: activeWorkspaceId, request_id: res.request_id, user_id: uid,
+                subject_type: 'contact', subject_id: id!,
+                title: 'Discount change needs approval',
+                body: 'A sales team member proposed a customer discount/level change.',
+              });
+            }
           }
         } catch (e: any) {
           toast({ title: 'Pricing change failed', description: e?.message, variant: 'destructive' });

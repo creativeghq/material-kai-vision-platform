@@ -910,6 +910,17 @@ const _financeServiceCore = {
     return (data ?? { status: 'unchanged' }) as any;
   },
 
+  // #227 — finance approvers (owner/admin) of a workspace, for fanning out approval notifications.
+  async listWorkspaceApproverIds(workspaceId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .in('role', ['owner', 'admin']);
+    if (error) throw error;
+    return (data ?? []).map((r: any) => r.user_id).filter(Boolean);
+  },
+
   async listPendingDiscountRequests(workspaceId: string): Promise<Array<{
     id: string; target_id: string; before: any; after: any; requested_by: string | null; created_at: string;
   }>> {
