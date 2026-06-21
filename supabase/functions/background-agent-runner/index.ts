@@ -65,15 +65,17 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
   const isServiceRole =
     !!SUPABASE_SERVICE_ROLE_KEY && authHeader.includes(SUPABASE_SERVICE_ROLE_KEY);
 
+  let authedUserId: string | null = null;
   if (!isServiceRole) {
     let authed = false;
     try {
       const auth = await authenticate(req);
       authed = auth.success;
+      authedUserId = auth.userId ?? null;
     } catch {
       authed = false;
     }
-    if (!authed) {
+    if (!authed || !authedUserId) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -121,6 +123,25 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
     return new Response(JSON.stringify({ error: 'Agent is disabled' }), {
       status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+  }
+
+  // Tenancy: a JWT caller may only run agents in a workspace they belong to. Service-role
+  // callers (scheduler cron / event / chain / agent-chat dispatch) are exempt. Without this,
+  // any authenticated user could force-run ANOTHER tenant's agent (forced execution + credit/
+  // resource burn on that tenant) by passing its agent_id.
+  if (!isServiceRole) {
+    const { data: membership } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', agentConfig.workspace_id)
+      .eq('user_id', authedUserId)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (!membership) {
+      return new Response(JSON.stringify({ error: "You are not a member of this agent's workspace" }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   // ── Look up runner ───────────────────────────────────────────────────────
