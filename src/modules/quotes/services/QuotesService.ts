@@ -622,19 +622,65 @@ export class QuotesService {
       price_lookup_call_id?: string | null;
     },
   ): Promise<QuoteItem> {
-    // Recalculate line_total when pricing or quantity changes
+    // Recalculate line_total when pricing or quantity changes.
     const payload: Record<string, any> = { ...data };
     if (data.unit_price !== undefined || data.discounted_price !== undefined || data.quantity !== undefined) {
-      // Fetch current item to get missing values for recalculation
       const { data: current } = await supabase
         .from('quote_items')
-        .select('unit_price, discounted_price, quantity')
+        .select('unit_price, discounted_price, quantity, quote_id, product_id')
         .eq('id', itemId)
         .single();
       if (current) {
         const qty = data.quantity ?? current.quantity ?? 1;
-        const discountedPrice = data.discounted_price !== undefined ? data.discounted_price : current.discounted_price;
-        const unitPrice = data.unit_price !== undefined ? data.unit_price : current.unit_price;
+        let unitPrice = data.unit_price !== undefined ? data.unit_price : current.unit_price;
+        let discountedPrice = data.discounted_price !== undefined ? data.discounted_price : current.discounted_price;
+
+        // #227 (Option B) — a quantity change (without an explicit price edit) ALWAYS re-runs the
+        // engine so the line stays correct (e.g. crossing a volume threshold), overwriting any
+        // prior price. Explicit price edits (data.unit_price set) are respected.
+        if (data.quantity !== undefined && data.unit_price === undefined && current.product_id) {
+          try {
+            const { data: q } = await supabase
+              .from('quotes')
+              .select('workspace_id, customer_company_id, customer_contact_id')
+              .eq('id', current.quote_id).single();
+            if (q?.workspace_id) {
+              const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
+                p_workspace_id: q.workspace_id, p_product_id: current.product_id,
+                p_company_id: q.customer_company_id ?? null, p_contact_id: q.customer_contact_id ?? null,
+                p_audience: 'seller',
+              });
+              const p: any = priced;
+              let recomputed = p?.suggested_sell != null ? Number(p.suggested_sell) : null;
+              if (recomputed != null) {
+                const { data: prod } = await supabase.from('products').select('metadata').eq('id', current.product_id).single();
+                const cat = prod?.metadata?.material_category ?? null;
+                if (cat) {
+                  const { data: rules } = await supabase
+                    .from('pricing_custom_rules')
+                    .select('rule_type, category_key, params, discount_pct')
+                    .eq('workspace_id', q.workspace_id).eq('is_active', true);
+                  let factor = 1;
+                  for (const r of (rules ?? []) as any[]) {
+                    if (r.category_key && r.category_key !== cat) continue;
+                    const d = Number(r.discount_pct) || 0; if (d <= 0) continue;
+                    if (r.rule_type === 'category_extra') factor *= 1 - d / 100;
+                    else if (r.rule_type === 'volume_category') {
+                      const mq = Number(r.params?.min_qty ?? 0);
+                      if (mq > 0 && qty >= mq) factor *= 1 - d / 100;
+                    }
+                  }
+                  if (factor < 1) recomputed = Math.round(recomputed * factor * 100) / 100;
+                }
+                unitPrice = recomputed;
+                discountedPrice = null;       // engine price replaces any prior per-line discount
+                payload.unit_price = recomputed;
+                payload.discounted_price = null;
+              }
+            }
+          } catch { /* non-fatal — keep the existing price */ }
+        }
+
         const effectivePrice = discountedPrice ?? unitPrice;
         payload.line_total = effectivePrice != null ? Math.round(Number(effectivePrice) * qty * 100) / 100 : null;
       }
