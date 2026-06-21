@@ -93,6 +93,11 @@ export const MaterialCategoriesTab: React.FC = () => {
     default_unit: 'pcs',
   });
   const [saving, setSaving] = useState(false);
+  // #227 — category aliases (operator-managed normalization for drifted import keys).
+  const [aliases, setAliases] = useState<Array<{ alias: string; category_key: string }>>([]);
+  const [newAlias, setNewAlias] = useState('');
+  const [newAliasCat, setNewAliasCat] = useState('');
+  const [aliasBusy, setAliasBusy] = useState(false);
 
   useEffect(() => {
     void load();
@@ -114,7 +119,43 @@ export const MaterialCategoriesTab: React.FC = () => {
     }
 
     setRows((data ?? []) as MaterialCategoryRow[]);
+
+    const { data: aliasData } = await supabase
+      .from('material_category_aliases')
+      .select('alias, category_key')
+      .order('alias', { ascending: true });
+    setAliases((aliasData ?? []) as Array<{ alias: string; category_key: string }>);
+
     setIsLoading(false);
+  };
+
+  const addAlias = async () => {
+    const a = newAlias.trim().toLowerCase();
+    if (!a || !newAliasCat) {
+      toast({ title: 'Alias + target category required', variant: 'destructive' });
+      return;
+    }
+    setAliasBusy(true);
+    const { error } = await supabase
+      .from('material_category_aliases')
+      .upsert({ alias: a, category_key: newAliasCat });
+    setAliasBusy(false);
+    if (error) {
+      toast({ title: 'Failed to add alias', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setNewAlias('');
+    setNewAliasCat('');
+    void load();
+  };
+
+  const deleteAlias = async (alias: string) => {
+    const { error } = await supabase.from('material_category_aliases').delete().eq('alias', alias);
+    if (error) {
+      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setAliases((prev) => prev.filter((x) => x.alias !== alias));
   };
 
   // Depth-first tree order: top-levels by sort_order, children nested under their parent.
@@ -300,6 +341,7 @@ export const MaterialCategoriesTab: React.FC = () => {
   };
 
   return (
+    <div className="space-y-6">
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-4">
@@ -502,6 +544,74 @@ export const MaterialCategoriesTab: React.FC = () => {
         </DialogContent>
       </Dialog>
     </Card>
+
+    {/* #227 — category aliases: map drifted/supplier keys to a canonical category so imports
+        auto-normalize (the products write-trigger reads this table). */}
+    <Card>
+      <CardHeader>
+        <CardTitle>Category Aliases</CardTitle>
+        <CardDescription className="mt-1">
+          Map an incoming key (e.g. a supplier's <span className="font-mono">ceramic_tile</span>) to one of your
+          categories. On import, products with that key are auto-normalized to the canonical category
+          (original kept for reference). Matching is case-insensitive.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="alias-key" className="text-xs">Incoming key</Label>
+            <Input
+              id="alias-key"
+              value={newAlias}
+              onChange={(e) => setNewAlias(e.target.value)}
+              placeholder="ceramic_tile"
+              className="font-mono h-9 w-56"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">→ Canonical category</Label>
+            <Select value={newAliasCat} onValueChange={setNewAliasCat}>
+              <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Pick a category" /></SelectTrigger>
+              <SelectContent>
+                {displayRows.map((r) => (
+                  <SelectItem key={r.id} value={r.category_key} className="whitespace-pre">
+                    {'  '.repeat(r.depth) + (r.depth > 0 ? '↳ ' : '') + r.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={addAlias} disabled={aliasBusy} className="rounded-full h-9">
+            {aliasBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+            Add alias
+          </Button>
+        </div>
+
+        {aliases.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No aliases yet.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {aliases.map((a) => (
+              <div key={a.alias} className="flex items-center gap-2 rounded-full border border-border bg-card/50 pl-3 pr-1 py-1 text-xs">
+                <span className="font-mono">{a.alias}</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="font-mono">{a.category_key}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-destructive hover:text-destructive"
+                  onClick={() => deleteAlias(a.alias)}
+                  aria-label={`Delete alias ${a.alias}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+    </div>
   );
 };
 
