@@ -130,19 +130,22 @@
   </table>
   </div>
 
-  <h3>Pricing</h3>
-  <p><strong>What it is —</strong> the company's default commercial terms. <strong>Why it matters —</strong> a <strong>default discount %</strong> is applied automatically so you don't re-negotiate on every quote, and a <strong>credit limit</strong> lets Finance guard against over-extending the account — it can <em>warn</em> or even <em>block</em> an invoice that would push the buyer past it.</p>
+  <h3>Pricing &amp; Payment Rules</h3>
+  <p><strong>What it is —</strong> the company's commercial terms: which <strong>pricing tier</strong> it buys at, and its <strong>payment/credit rules</strong>. <strong>Why it matters —</strong> the <strong>Pricing Level</strong> decides the standing discount this customer gets on every quote (via the <a href="finance-settings-pricing.html">resale pricing engine</a>), and the <strong>Payment Rules</strong> let you override the workspace defaults for this one account — so Finance can guard against over-extending it.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Field</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td><strong>Default discount %</strong></td><td>Discount applied by default for this company.</td></tr>
-      <tr><td><strong>Credit limit</strong></td><td>Credit limit on the account.</td></tr>
-      <tr><td><strong>Discount notes</strong></td><td>Free-text notes about the discount arrangement.</td></tr>
+      <tr><td><strong>Pricing Level</strong></td><td>The customer tier (e.g. <em>Importer</em>) — applies that level's discount, defined in <a href="finance-settings-pricing.html">Settings → Pricing</a>. Leave unset to use the default level / list price.</td></tr>
+      <tr><td><strong>Default discount %</strong></td><td>An ad-hoc discount applied by default for this company (on top of / instead of the level).</td></tr>
+      <tr><td><strong>Credit limit / balance hold</strong></td><td>How much this customer may owe before the credit check trips — overrides the General default.</td></tr>
+      <tr><td><strong>Payment terms (days)</strong></td><td>This customer's payment window — overrides the General default.</td></tr>
+      <tr><td><strong>Minimum order value</strong></td><td>The smallest order accepted for this customer — overrides the General default.</td></tr>
+      <tr><td><strong>Discount notes</strong></td><td>Free-text notes about the arrangement.</td></tr>
     </tbody>
   </table>
   </div>
-  <p><strong>What it affects elsewhere:</strong> the credit limit set here drives the <em>"Warn / Block when the invoice pushes the buyer over their credit limit"</em> rules in <a href="finance-settings.html">Finance settings → General</a>.</p>
+  <p><strong>What it affects elsewhere:</strong> the Pricing Level prices every catalogue line on this customer's <a href="quotes-build.html">quotes</a>; the credit limit, payment terms and minimum order override the <em>order &amp; credit rules</em> defaults in <a href="finance-settings-general.html">Finance settings → General</a> (which can <em>warn</em>, <em>block</em>, or raise an approval for issuance).</p>
 
   <h3>Invoicing &amp; VAT</h3>
   <p><strong>What it is —</strong> the company's dedicated billing identity used when you issue a document to it. <strong>Why it matters —</strong> the billing name, VAT (ΑΦΜ), tax office and billing address printed on an invoice can legitimately differ from the day-to-day company details — this group is what guarantees the document is legally addressed. The <strong>Segment</strong> and <strong>VAT-exemption</strong> choices decide which pricing tier and which tax treatment apply, and <strong>Include in ΜΥΦ</strong> governs Greek clientele reporting.</p>

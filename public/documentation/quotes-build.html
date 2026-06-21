@@ -96,6 +96,16 @@
   <p><strong>How:</strong> add the detail on the item, then expand the line to review its <strong>detail row</strong> — <em>notes</em>, <em>installation requirements</em> and <em>delivery</em> — so you can check everything before sending without cluttering the main table.</p>
   <p><strong>What it affects:</strong> the branded PDF. The Room column, the dimensions-in-name treatment, and the "Specifications &amp; Delivery" section are all driven directly by these fields — fill them in and the schedule writes itself.</p>
 
+  <h2>Pricing &amp; discounts — how each line is priced</h2>
+  <p><strong>What it is —</strong> when you add a <em>catalogue</em> product, its price isn't typed in by hand — it's calculated for the customer on the quote using the <a href="finance-settings-pricing.html">resale pricing engine</a>. <strong>Why it matters —</strong> the right customer gets the right price automatically, and you're stopped from quoting below cost by accident.</p>
+  <ul class="feat">
+    <li><strong>Level-based price.</strong> The line starts from the catalogue cost + the category <strong>markup</strong>, then the customer's <strong>pricing level</strong> discount is applied (with any per-category override). A customer's level is set on their <a href="crm.html">CRM</a> record; with no level they get list price. (You can still edit any line manually.)</li>
+    <li><strong>Paid-upfront (cash) discount.</strong> If a <em>Paid upfront (cash)</em> custom rule applies, a dedicated <strong>cash-discount line</strong> is shown on the quote (and on the customer's public quote). When the quote becomes an <a href="finance-doc-invoices.html">invoice</a>, that cash discount carries over.</li>
+    <li><strong>Cost &amp; margin visibility.</strong> Whether a salesperson can see the underlying cost/margin on a line is gated by role — sales reps building <a href="sales.html">orders</a> may see the sell price without the cost. Finance managers see both.</li>
+    <li><strong>Negative-margin guardrail.</strong> If a line's price would fall <strong>below its cost</strong>, the quote flags it — you can't silently sell at a loss.</li>
+    <li><strong>Discount approval.</strong> If you push a discount beyond what your role is allowed (or past the guardrail), it isn't applied silently — it <strong>fans out to finance for approval</strong> (it appears under <a href="finance-settings-pricing.html">Pricing → Pending Discount Approvals</a>). You're told it's pending; once an approver releases it, the price updates.</li>
+  </ul>
+
   <h2>Extras &amp; Timeline</h2>
   <p>Beyond the Items tab, a quote has two further tabs that round out what the customer sees.</p>
   <h3>Extras (Extras &amp; Add-ons)</h3>

@@ -20,7 +20,7 @@
   <p>Two areas, top to bottom:</p>
   <ul class="feat">
     <li><strong>Default fields</strong> — a set of inline fields holding the values applied to new documents: email subject and body, payment terms, VAT % and catalogue markup %.</li>
-    <li><strong>Issuance &amp; credit-limit toggles</strong> — four switches (all off by default) that turn buyer-VAT and credit-limit checks into either warnings or hard blocks when you issue a document.</li>
+    <li><strong>Order &amp; credit rules</strong> — buyer-VAT and credit-limit switches <em>plus</em> a default credit/balance hold and a minimum order value. These are the <strong>defaults</strong>; each customer can override them in CRM.</li>
   </ul>
   <p>Everything is edited in place; a single <strong>Save settings</strong> button at the bottom commits your changes.</p>
   <figure>
@@ -43,20 +43,23 @@
   </table>
   </div>
 
-  <h2>The four issuance &amp; credit-limit toggles</h2>
-  <p>These are safety rules that fire at <em>Issue</em> time. All four are <strong>off by default</strong> — turn on the ones that match how careful you need to be about who you bill. The first two check the buyer's VAT number; the last two check the buyer's credit limit.</p>
+  <h2>Order &amp; credit rules (defaults — overridable per customer)</h2>
+  <p>These are safety rules that fire at <em>Issue</em> time. They're the <strong>workspace defaults</strong>; <em>each customer can override them in CRM</em>. The VAT switches are off by default; the credit/minimum-order limits are off (“No limit” / “No minimum”) until you set a number.</p>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Toggle</th><th>When / why to turn it on</th></tr></thead>
+    <thead><tr><th>Setting</th><th>What to set / when to turn it on</th></tr></thead>
     <tbody>
-      <tr><td><strong>Block issuance when the buyer VAT number is ΑΑΔΕ-inactive</strong></td><td>Stops you from issuing to a buyer whose VAT number is flagged inactive by ΑΑΔΕ. Turn on when you want to be certain you never bill a deregistered VAT number.</td></tr>
-      <tr><td><strong>Block issuance when the buyer VAT was never validated (stricter)</strong></td><td>The stricter version: blocks issuance unless the buyer's VAT has actually been validated. Turn on when an unverified VAT number is not acceptable on any document.</td></tr>
-      <tr><td><strong>Warn when the invoice pushes the buyer over their credit limit</strong></td><td>Shows a warning (but still lets you proceed) when issuing this invoice would take the buyer past their credit limit. Turn on to stay aware of over-limit customers without being stopped.</td></tr>
-      <tr><td><strong>Block (instead of warn) when over the credit limit</strong></td><td>Upgrades the credit-limit warning into a hard block. Turn on when going over a buyer's credit limit should never be allowed.</td></tr>
+      <tr><td><strong>Block issuance when the buyer VAT number is ΑΑΔΕ-inactive</strong></td><td>Stops you issuing to a buyer whose VAT number is flagged inactive by ΑΑΔΕ. Turn on to be certain you never bill a deregistered VAT number.</td></tr>
+      <tr><td><strong>Block issuance when the buyer VAT was never validated (stricter)</strong></td><td>Blocks issuance unless the buyer's VAT has actually been validated. Turn on when an unverified VAT number is unacceptable on any document.</td></tr>
+      <tr><td><strong>Default credit / balance hold (€)</strong></td><td>The default credit limit checked when you issue against a CRM customer (blank = “No limit”). The amount a customer may owe before the credit check trips.</td></tr>
+      <tr><td><strong>Block (instead of warn) when over the credit limit</strong></td><td>Upgrades the credit-limit check from a warning into a hard block. Turn on when going over a buyer's limit should never be allowed.</td></tr>
+      <tr><td><strong>Minimum order value (€)</strong></td><td>The smallest order you'll accept (blank = “No minimum”).</td></tr>
+      <tr><td><strong>Block issuance when the order is below the minimum value</strong></td><td>Stops (rather than just flags) orders under the minimum.</td></tr>
     </tbody>
   </table>
   </div>
-  <p>The credit limit itself is set per customer in the CRM — see <a href="crm.html">CRM</a>.</p>
+  <div class="callout"><p><strong>What a block does:</strong> a blocked issuance isn't a dead end — it <strong>raises an approval request and notifies the responsible sales team</strong> (via the platform's notification/Flows engine), and an approver can release it. So the guardrail protects you without permanently stopping a legitimate deal.</p></div>
+  <p>The credit limit, minimum order and these rules can each be <strong>overridden per customer</strong> on their CRM record (the “Payment Rules” card) — see <a href="crm.html">CRM</a>. The defaults here apply to any customer without an override.</p>
 
   <h2>How to change a default — step by step</h2>
   <ol>

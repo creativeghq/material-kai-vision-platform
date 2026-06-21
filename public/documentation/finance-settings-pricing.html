@@ -9,38 +9,83 @@
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Pricing</div>
-  <h1>Settings · Pricing</h1>
+  <h1>Settings · Pricing (resale pricing engine)</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">The Pricing section lets you set <strong>Category Markup Rules</strong> — per-category percentages that turn a catalogue product's cost into its sell price automatically when you add it to a document. Set a rule once per category and every product in that category gets priced consistently, without you doing the maths each time.</p>
+  <p class="lead">Pricing is where you set up <strong>how a catalogue product's cost becomes the price a specific customer pays</strong> — automatically, every time you add it to a quote. It works in layers: a <strong>markup</strong> turns cost into a list price, a customer's <strong>pricing level</strong> gives them their standing discount, optional <strong>per-category</strong> tweaks fine-tune that, and <strong>custom rules</strong> add volume or cash discounts on top. This page explains every card on the screen — what each field does, where it is, and why you'd use it.</p>
 
-  <h2>Where it is</h2>
-  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Pricing</strong> (in the row of settings sub-tabs).</p>
+  <div class="callout"><p><strong>Where:</strong> top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Pricing</strong>. The page stacks five cards top to bottom: <strong>Category Markup Rules</strong>, <strong>Customer Pricing Levels</strong>, <strong>Level Discounts by Category</strong>, <strong>Custom Pricing Rules</strong>, and (when there's anything waiting) <strong>Pending Discount Approvals</strong>.</p></div>
 
-  <h2>What's on the screen</h2>
-  <p>The panel is headed <strong>Category Markup Rules</strong>. To create a rule you give it two things and add it:</p>
-  <ul class="feat">
-    <li><strong>Category</strong> — the product category the rule applies to. You pick this from the existing product categories.</li>
-    <li><strong>Markup %</strong> — the percentage added on top of the catalogue cost to arrive at the sell price (for example, <em>25</em>).</li>
-    <li><strong>Add</strong> — saves the rule so it applies to that category from then on.</li>
-  </ul>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-pricing.png" alt="Pricing section: Category Markup Rules with a Category picker, a Markup percent field, and an add button">
-    <figcaption>The Category Markup Rules panel: pick a Category, enter a Markup % (e.g. 25), and add the rule.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-pricing.png" alt="Pricing settings: Category Markup Rules, Customer Pricing Levels, Level Discounts by Category, Custom Pricing Rules">
+    <figcaption>Finance → Settings → Pricing — the resale pricing engine, card by card.</figcaption>
   </figure>
 
-  <h2>How to add a markup rule — step by step</h2>
+  <h2>How the layers fit together</h2>
+  <p>When you add a catalogue product to a quote for a customer, the price is built in this order:</p>
   <ol>
-    <li>Go to <strong>Finance → Settings → Pricing</strong>.</li>
-    <li>Pick the product <strong>Category</strong> the rule should cover.</li>
-    <li>Enter the <strong>Markup %</strong> — for example, type <em>25</em> for a 25% markup.</li>
-    <li>Click <strong>add</strong> to save the rule. It now applies to every catalogue product in that category.</li>
-    <li>Repeat for each category that should have its own markup.</li>
+    <li><strong>Cost → list price</strong> using the product category's <strong>markup</strong> (Card 1), falling back to the default markup.</li>
+    <li><strong>Apply the customer's pricing level</strong> discount (Card 2) — overridden for specific categories by Card 3.</li>
+    <li><strong>Apply any custom rules</strong> that match (Card 4) — e.g. a volume break or a paid-upfront cash discount, on top of the level discount.</li>
   </ol>
+  <p>All discounts are calculated <strong>ex-VAT</strong>. A customer's <strong>level</strong> is assigned on their <a href="crm.html">CRM</a> record; if they have none, they pay the list price.</p>
 
-  <div class="callout tip"><p><strong>Worked example — pricing a category at 25%.</strong> Open Pricing → choose the category (say, "Tiles") → enter <strong>25</strong> in <strong>Markup %</strong> → click <strong>add</strong>. From now on, when you pick a tile onto a quote or invoice, its sell price is its catalogue cost plus 25% — calculated for you the moment you add it.</p></div>
+  <h2>Card 1 — Category Markup Rules <span style="color:var(--muted);font-size:15px">(cost → list price)</span></h2>
+  <p><strong>Why:</strong> so you never price by hand. Set a markup per category and every product in it is priced consistently the moment you add it.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Default markup (Markup %)</strong></td><td>A blanket percentage, e.g. <code>25</code>.</td><td>Applied to any category that doesn't have its own rule below — “Applied to any category without its own rule.”</td></tr>
+      <tr><td><strong>Per-category overrides</strong> — <strong>Category</strong> + <strong>Markup %</strong></td><td>Pick a category, set its own markup, add it.</td><td>Gives that category a different uplift from the default (e.g. tiles 25%, lighting 40%).</td></tr>
+    </tbody>
+  </table></div>
+  <p class="lead" style="font-size:15px">Empty state: <em>“No category rules — the default markup applies to everything.”</em> This default is the same value as <em>Default catalog markup %</em> in <a href="finance-settings-general.html">General</a>.</p>
 
-  <h2>What it affects</h2>
-  <p>A Category Markup Rule converts a catalogue product's <strong>cost into a sell price</strong> at the point you pick that product onto a document (a quote, invoice or receipt). For products in a category that has a rule, that rule's percentage is used and it <strong>overrides the <em>Default catalog markup %</em></strong> set in <a href="finance-settings-general.html">General</a>. Categories without a rule fall back to that General default. Changing a rule affects future documents — products already added to existing documents keep the price they were given at the time.</p>
+  <h2>Card 2 — Customer Pricing Levels <span style="color:var(--muted);font-size:15px">(who gets what discount)</span></h2>
+  <p><strong>Why:</strong> different customer tiers (retail, installer, importer…) buy at different prices. A level is a named tier with a standing discount off the list price; you then assign each customer a level in CRM.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field / control</th><th>What to do</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><strong>New level</strong> (name)</td><td>Type a tier name, e.g. <em>Importer</em>, and add it.</td><td>Creates the tier customers can be put in.</td></tr>
+      <tr><td><strong>% off</strong></td><td>The level's default discount off list, e.g. <code>15</code>.</td><td>The standing discount everyone on that level gets.</td></tr>
+      <tr><td><strong>Set default</strong></td><td>Mark one level as the default.</td><td>New customers fall into this level until you change them.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Card 3 — Level Discounts by Category <span style="color:var(--muted);font-size:15px">(fine-tuning per category)</span></h2>
+  <p><strong>Why:</strong> a tier might get a bigger discount on one category than another. This overrides a level's default % for a specific category only.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Level</strong></td><td>The pricing level to adjust.</td><td>Which tier this override applies to.</td></tr>
+      <tr><td><strong>Category</strong></td><td>The product category.</td><td>Which category gets the different discount.</td></tr>
+      <tr><td><strong>% off</strong></td><td>The category-specific discount for that level.</td><td>Replaces the level's default discount for that one category.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="lead" style="font-size:15px">Empty state: <em>“No category overrides — each level's default discount applies everywhere.”</em></p>
+
+  <h2>Card 4 — Custom Pricing Rules <span style="color:var(--muted);font-size:15px">(automatic extra discounts)</span></h2>
+  <p><strong>Why:</strong> reward bulk orders or upfront payment without anyone remembering to apply it. <em>“Extra discounts applied automatically on quotes, on top of the customer's level discount (all ex-VAT).”</em></p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Type</strong></td><td><strong>Volume (per category)</strong> — a quantity break — or <strong>Paid upfront (cash)</strong>.</td><td>Chooses the trigger for the extra discount.</td></tr>
+      <tr><td><strong>Category</strong></td><td>The category the rule applies to.</td><td>Scopes the rule.</td></tr>
+      <tr><td><strong>Min qty</strong> (volume rules)</td><td>The quantity that unlocks the discount.</td><td>e.g. 100+ units of a category.</td></tr>
+      <tr><td><strong>Category extra (%)</strong></td><td>The additional discount to apply.</td><td>The bonus on top of the level discount.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="lead" style="font-size:15px">Empty state: <em>“No custom rules yet.”</em> A <strong>Paid upfront (cash)</strong> rule is what produces the cash-discount line you see on <a href="quotes-build.html">quotes</a> and <a href="finance-doc-invoices.html">invoices</a>.</p>
+
+  <h2>Card 5 — Pending Discount Approvals</h2>
+  <p><strong>Why:</strong> when a quote's discount goes beyond what's allowed (or a line would sell below cost), it isn't applied silently — it's raised for approval. This card lists those requests for a finance approver to <strong>release or decline</strong>. The salesperson is told it's pending; once released, the discount takes effect. (See the sales side on <a href="quotes-build.html">building a quote</a>.)</p>
+
+  <h2>What this powers</h2>
+  <ul class="feat">
+    <li>Every catalogue line you add to a <a href="quotes-build.html">quote</a> is priced through these layers automatically.</li>
+    <li>A customer's <strong>level</strong> and any per-customer overrides live on their <a href="crm.html">CRM</a> record.</li>
+    <li>The <em>Paid upfront (cash)</em> rule drives the cash-discount line that flows from quote to <a href="finance-doc-invoices.html">invoice</a>.</li>
+    <li>Over-limit discounts and below-cost lines route to <strong>Pending Discount Approvals</strong> (and the order/credit guardrails in <a href="finance-settings-general.html">General</a>).</li>
+  </ul>
 </main>
 <script src="assets/nav.js"></script>
 </body>
