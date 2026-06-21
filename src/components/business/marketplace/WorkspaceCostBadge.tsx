@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useShowPrices } from '@/hooks/useShowPrices';
 import { marketplacePricingService, type WorkspacePrice } from '@/services/marketplacePricingService';
 
 /**
- * Shows the active workspace's cascade cost for an operator-catalog product
- * (base + ancestor commissions, C2). Renders nothing for the operator itself or
- * when there's no commission uplift — so it's safe to drop anywhere.
+ * Shows a reseller (dealer/architect) workspace its own buy price for an operator-catalog
+ * product — i.e. what THEY pay (cost_basis = the resale-chain cost). Hidden for the operator
+ * itself, for products with no resolvable cost, and when the global Show-Prices toggle is off.
+ * #227: commission was retired from the price path, so this no longer gates on a commission %.
  */
 export const WorkspaceCostBadge: React.FC<{ productId: string; className?: string }> = ({ productId, className }) => {
   const { activeWorkspaceId } = useWorkspace();
+  const { isOperator } = usePermissions();
+  const { showPrices } = useShowPrices();
   const [price, setPrice] = useState<WorkspacePrice | null>(null);
 
   useEffect(() => {
@@ -21,9 +26,10 @@ export const WorkspaceCostBadge: React.FC<{ productId: string; className?: strin
     return () => { cancelled = true; };
   }, [activeWorkspaceId, productId]);
 
-  if (!price || price.mode !== 'operator_catalog' || !price.cost_basis || price.ancestor_commission_pct <= 0) {
-    return null;
-  }
+  // Only for resellers (the operator sees its own pricing elsewhere), and respects Show Prices.
+  if (isOperator || !showPrices) return null;
+  if (!price || price.mode !== 'operator_catalog' || price.cost_basis == null) return null;
+
   const cur = price.currency || 'EUR';
   return (
     <div className={`text-xs rounded-md border border-primary/30 bg-primary/5 p-2 ${className ?? ''}`}>
@@ -31,11 +37,8 @@ export const WorkspaceCostBadge: React.FC<{ productId: string; className?: strin
         <span className="text-muted-foreground">Your cost</span>
         <span className="font-medium">{cur} {price.cost_basis.toFixed(2)}</span>
       </div>
-      <div className="text-[11px] text-muted-foreground">
-        base {cur} {price.base_price?.toFixed(2)} + {price.ancestor_commission_pct}% commission
-      </div>
       <div className="text-[10px] text-muted-foreground/80 italic mt-0.5">
-        Indicative — finalised at the base price on the invoice date.
+        Indicative — finalised on the invoice date.
       </div>
     </div>
   );
