@@ -634,8 +634,14 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     // trusted `service=mivaa` identity and trust the client-supplied workspace_id / skip ownership
     // → cross-tenant reads. Admin-secret + cron/no-JWT callers keep the MIVAA service key. Mirrors
     // the upload path's forwarding.
+    // Scope JWT-forwarding to /api/rag/* — those routes are EXCLUDED from MIVAA's JWT middleware
+    // and decode the bearer in-handler via get_optional_workspace_context (same as the upload
+    // path), so a real user JWT resolves the actual user + enforces ownership there. Other
+    // prefixes (/api/search, /api/images, /api/kb) are middleware-validated, so keep sending the
+    // service key to avoid coupling to user-JWT middleware behavior.
     const callerAuthHeader = req.headers.get('authorization');
-    const forwardedAuthHeader = (!isAdmin && callerAuthHeader && callerAuthHeader.startsWith('Bearer '))
+    const isRagPath = typeof endpoint.path === 'string' && endpoint.path.startsWith('/api/rag');
+    const forwardedAuthHeader = (!isAdmin && isRagPath && callerAuthHeader && callerAuthHeader.startsWith('Bearer '))
       ? callerAuthHeader
       : `Bearer ${MIVAA_API_KEY()}`;
     const fetchOptions: RequestInit = {
