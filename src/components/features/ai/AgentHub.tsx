@@ -90,7 +90,8 @@ import {
 } from './agentToolsCatalog';
 import { ToolkitOnboardingCard } from './workflows/ToolkitOnboardingCard';
 import { WorkflowWizardCard } from './workflows/WorkflowWizardCard';
-import PromptBuilderModal from './PromptBuilderModal';
+// PromptBuilderModal removed (2026-06-21) — Interior processes + discovery now
+// live entirely under the toolkit picker. The separate ✨ "prompts" surface is gone.
 import { useEnabledModules } from '@/modules/_core';
 import { WorkflowTracker } from './workflows/WorkflowTracker';
 import { WorkflowInlineForm } from './workflows/WorkflowInlineForm';
@@ -433,6 +434,11 @@ interface AgentHubProps {
   initialConversationId?: string;
   /** When arriving from a moodboard, products added from the agent go here. */
   initialMoodboardId?: string;
+  /** Deep-link: pre-select an agent (e.g. 'interior-designer' from a product's "Test on a room"). */
+  initialAgent?: string;
+  /** Deep-link: pre-pin a catalog material (e.g. from a product page) so the
+   *  interior flow already knows which material to apply. */
+  initialPinnedMaterial?: { id: string; name: string; imageUrl?: string };
   onConversationChange?: (conversationId: string | null) => void;
 }
 
@@ -491,6 +497,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   initialPrompt,
   initialConversationId,
   initialMoodboardId,
+  initialAgent,
+  initialPinnedMaterial,
   onConversationChange,
 }) => {
   const { toast } = useToast();
@@ -511,7 +519,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return () => { cancelled = true; };
   }, [initialMoodboardId]);
   const [mobileConvOpen, setMobileConvOpen] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<string>('kai');
+  const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
     AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-opus-4-7',
@@ -553,7 +561,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [showNewDesignModal, setShowNewDesignModal] = useState(false);
   // showStarterPrompts removed — merged into showPromptBuilder modal
   const [showToolkitPicker, setShowToolkitPicker] = useState(false);
-  const [showPromptBuilder, setShowPromptBuilder] = useState(false);
   // Active toolkits — per-conversation when one is loaded, otherwise the
   // localStorage default for the next new chat. Always force-includes Core.
   // Hydration order:
@@ -621,6 +628,55 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
     return true;
   }, []);
+
+  /**
+   * Single dispatcher for a toolkit quick-start. This is THE launch path now
+   * that the separate ✨ prompts surface is gone — the toolkit picker calls it.
+   * Order of resolution:
+   *   1. switch agent if the quick-start belongs to a different one
+   *   2. `form`         → open ToolkitFormModal to collect fields, then auto-send
+   *   3. `run`          → fire the target tool deterministically (no prompt)
+   *   4. `opensModal`   → open the guided design canvas (new-design / staging)
+   *   5. fallback       → inject `prompt` + auto-send (also the graceful path
+   *                       when a modal can't open yet, e.g. no image attached)
+   */
+  const handleQuickStart = useCallback((qs: ToolkitQuickStart, tk: ToolkitDefinition, agentId?: string) => {
+    const target = agentId || (getToolkitOwnerAgents(tk)[0] ?? selectedAgent);
+    if (target && target !== selectedAgent) setSelectedAgent(target);
+
+    if (qs.form?.length) {
+      setToolkitFormState({ quickStart: qs, toolkit: tk });
+      return;
+    }
+    if (qs.run && fireDirectRun(qs, tk)) return;
+
+    if (qs.opensModal === 'new-design') {
+      setShowNewDesignModal(true);
+      return;
+    }
+    if (qs.opensModal === 'virtual-staging') {
+      // Staging needs an image — resolve the latest one; fall back to the
+      // prompt (which asks the user to attach a photo) when none is present.
+      let imageUrl: string | null = attachedImages[0] || null;
+      if (!imageUrl) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i];
+          if (m.geminiImageData?.image_url) { imageUrl = m.geminiImageData.image_url; break; }
+          if (m.virtualStagingData?.image_url) { imageUrl = m.virtualStagingData.image_url; break; }
+          if (m.designData?.images?.[0]) { imageUrl = m.designData.images[0]; break; }
+          if (m.images?.[0]) { imageUrl = m.images[0]; break; }
+        }
+      }
+      if (imageUrl) { setVirtualStagingImageUrl(imageUrl); return; }
+      // else fall through to the prompt
+    }
+
+    // Fallback (also covers 'gemini-edit' + image-required prompts): seed +
+    // auto-send. The interior agent applies pinned materials / edits the
+    // attached photo via the verified generate-interior-gemini image-edit path.
+    setInput(qs.prompt);
+    setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+  }, [selectedAgent, fireDirectRun, attachedImages, messages]);
 
   // Toolkit setter — writes to local state, persists to localStorage (browser
   // default for new chats), and saves to the current conversation's row when
@@ -885,7 +941,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [pendingReplacement, setPendingReplacement] = useState<{ id: string; name: string; imageUrl?: string } | null>(null);
 
   // Pinned materials tray — catalog products pinned for Gemini multi-reference generation
-  const [pinnedMaterials, setPinnedMaterials] = useState<{ id: string; name: string; imageUrl?: string }[]>([]);
+  const [pinnedMaterials, setPinnedMaterials] = useState<{ id: string; name: string; imageUrl?: string }[]>(
+    initialPinnedMaterial ? [initialPinnedMaterial] : [],
+  );
 
   const handlePinMaterial = useCallback((material: { id: string; name: string; imageUrl?: string }) => {
     setPinnedMaterials(prev => {
@@ -4716,19 +4774,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <TooltipContent side="left"><p>Design inspiration from URL</p></TooltipContent>
                   </Tooltip>
 
-                  {/* Prompt Builder — unified starters surface (toolkit cards
-                       + admin-curated DB starters merged into one modal) */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => setShowPromptBuilder(true)}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                      >
-                        <Sparkles className="h-4 w-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left"><p>Starter prompts — browse toolkits + curated templates</p></TooltipContent>
-                  </Tooltip>
+                  {/* ✨ Prompt Builder button removed (2026-06-21). Starter
+                       processes now live inside the Toolkits picker (below),
+                       each launchable as a guided process. One surface. */}
 
                   {/* Toolkits — primary picker. Visual cards, no checkboxes. */}
                   <Tooltip>
@@ -4890,7 +4938,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
       </div>
 
-      {/* Toolkit Picker Modal — primary tool-enabling surface (visual cards) */}
+      {/* Toolkit Picker Modal — the SINGLE tool surface: toggle clusters AND
+          launch each toolkit's guided processes (quick-starts). Replaces the
+          old separate ✨ prompts modal. */}
       <ToolkitPickerModal
         open={showToolkitPicker}
         onClose={() => setShowToolkitPicker(false)}
@@ -4899,54 +4949,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         activeToolkitIds={activeToolkits}
         onChange={updateActiveToolkits}
         currentAgentId={selectedAgent}
-      />
-
-
-      {/* Prompt Builder Modal — toolkit-cluster discovery surface. Cards
-          show TOOLKITS with their quick_starts as primary CTAs. Clicking
-          a quick-start auto-fires the prompt (catalog contract:
-          quick_starts always auto-send). */}
-      <PromptBuilderModal
-        open={showPromptBuilder}
-        onClose={() => setShowPromptBuilder(false)}
-        role={userRole}
-        currentAgentId={selectedAgent}
-        hasUploadedImage={attachedImages.length > 0}
-        enabledModules={enabledModulesArray}
-        onQuickStart={({ agentId, prompt, quickStart, toolkit }) => {
-          if (agentId !== selectedAgent) setSelectedAgent(agentId);
-          // Form-bearing quick-starts collect their fields first, then auto-send.
-          if (quickStart?.form?.length && toolkit) {
-            setToolkitFormState({ quickStart, toolkit });
-            return;
-          }
-          // Formless deterministic run — fire the tool directly, no prompt.
-          if (quickStart?.run && toolkit && fireDirectRun(quickStart, toolkit)) {
-            return;
-          }
-          setInput(prompt);
-          // Auto-send on next tick so the agent switch (if any) settles + the
-          // input state is committed before send. handleSendMessageRef reads
-          // current state inside the closure.
-          setTimeout(() => {
-            void handleSendMessageRef.current?.();
-          }, 50);
-        }}
-        onTriggerVirtualStaging={() => {
-          // Resolve the most recent image URL from attached images or messages.
-          // Mirrors the previous PromptLibrary behavior — the staging wizard
-          // needs an image input before it can render variants.
-          let imageUrl: string | null = attachedImages[0] || null;
-          if (!imageUrl) {
-            for (let i = messages.length - 1; i >= 0; i--) {
-              const m = messages[i];
-              if (m.geminiImageData?.image_url) { imageUrl = m.geminiImageData.image_url; break; }
-              if (m.virtualStagingData?.image_url) { imageUrl = m.virtualStagingData.image_url; break; }
-              if (m.designData?.images?.[0]) { imageUrl = m.designData.images[0]; break; }
-              if (m.images?.[0]) { imageUrl = m.images[0]; break; }
-            }
-          }
-          setVirtualStagingImageUrl(imageUrl || '');
+        onLaunchQuickStart={(qs, tk) => {
+          setShowToolkitPicker(false);
+          handleQuickStart(qs, tk);
         }}
       />
 

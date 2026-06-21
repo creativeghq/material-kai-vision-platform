@@ -911,6 +911,19 @@ export interface ToolkitQuickStart {
    * the collected form values instead of sending a prompt. See ToolkitQuickStartRun.
    */
   run?: ToolkitQuickStartRun;
+  /**
+   * When set, clicking this quick-start opens an interactive design modal in
+   * AgentHub (a guided canvas) instead of just sending a prompt. The host maps
+   * the id to the right surface:
+   *   - 'new-design'      → from-scratch room designer (room/style/details)
+   *   - 'virtual-staging' → stage an attached room photo with furniture
+   *   - 'gemini-edit'     → targeted edit / apply-material on an attached photo
+   * If the host can't open the modal (e.g. no image yet) it falls back to
+   * sending `prompt`, so the quick-start is never inert.
+   */
+  opensModal?: 'new-design' | 'virtual-staging' | 'gemini-edit';
+  /** Hint that this process needs an attached image to do its best work. */
+  imageRequired?: boolean;
 }
 
 export interface ToolkitDefinition {
@@ -1136,24 +1149,65 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'generation',
-    name: 'Image / 3D / VR Generation',
-    description: '3D renders, Gemini image edits, virtual staging, lighting presets, VR worlds.',
+    name: 'Interior Design',
+    description: 'Design a room, test a material on your photo, stage, re-light, render a floor plan, build a VR world — each is a guided process, not a blank prompt.',
     icon: 'Sparkles',
     tool_ids: [
       'generate_3d', 'apply_lighting_preset', 'generate_vr_world',
     ],
     quick_starts: [
       {
-        label: '3D render', description: 'Generate an interior render', icon: 'Sparkles',
-        prompt: 'Render a modern Athens loft kitchen with travertine floors and warm lighting.',
-        promptTemplate: 'Render {{scene}}.',
-        run: { tool: 'generate_3d', argMap: { scene: 'prompt' } },
-        form: [
-          { key: 'scene', label: 'Describe the room to render', kind: 'textarea', required: true, placeholder: 'a modern Athens loft kitchen with travertine floors and warm lighting' },
-        ],
+        label: 'Test on a room',
+        description: 'Apply a material from the catalog onto a photo of your room',
+        icon: 'ImageIcon',
+        opensModal: 'gemini-edit',
+        imageRequired: true,
+        prompt: 'I will attach a photo of my room — apply the selected material/finish onto a surface (floor or wall) and show me the result, keeping everything else in place.',
       },
-      { label: 'Re-light a room', description: 'Apply a lighting preset to an attached image', prompt: 'I will attach a room image — re-render it under "Golden Hour" lighting.', icon: 'Sparkles' },
-      { label: 'VR world', description: 'Build an explorable Gaussian Splat from a room image', prompt: 'I will attach a room image — turn it into an explorable VR world (draft model).', icon: 'Sparkles' },
+      {
+        label: 'Design a room',
+        description: 'Generate a room from scratch — pick room, style, and details',
+        icon: 'Sparkles',
+        opensModal: 'new-design',
+        prompt: 'Design a modern living room from scratch with warm minimal styling.',
+      },
+      {
+        label: 'Stage a room',
+        description: 'Furnish an empty room photo with furniture and decor',
+        icon: 'LayoutTemplate',
+        opensModal: 'virtual-staging',
+        imageRequired: true,
+        prompt: 'I will attach an empty room photo — stage it with furniture and decor.',
+      },
+      {
+        label: 'Redesign from a photo',
+        description: 'Change the style, materials, or finishes on an existing room photo',
+        icon: 'Sparkles',
+        opensModal: 'gemini-edit',
+        imageRequired: true,
+        prompt: 'I will attach a room photo — redesign its style, materials, and finishes while keeping the layout.',
+      },
+      {
+        label: 'Re-light a room',
+        description: 'Re-render an attached room photo under a different lighting mood',
+        icon: 'Sparkles',
+        imageRequired: true,
+        prompt: 'I will attach a room photo — re-render it under "Golden Hour" lighting.',
+      },
+      {
+        label: 'Floor plan → 3D',
+        description: 'Turn an attached 2D floor plan into a photorealistic 3D interior',
+        icon: 'LayoutTemplate',
+        imageRequired: true,
+        prompt: 'I will attach a 2D floor plan — render it as a photorealistic 3D interior view.',
+      },
+      {
+        label: 'VR world',
+        description: 'Build an explorable Gaussian Splat world from a room image',
+        icon: 'Globe',
+        imageRequired: true,
+        prompt: 'I will attach a room image — turn it into an explorable VR world (draft model).',
+      },
     ],
   },
   {

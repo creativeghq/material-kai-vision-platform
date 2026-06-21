@@ -5,11 +5,13 @@
  */
 
 import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { ChevronRight, Sun, Smartphone } from 'lucide-react';
+import { ChevronRight, Sun, Smartphone, Wand2 } from 'lucide-react';
+import { buildTestOnRoomUrl } from '@/utils/testOnRoom';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { Product } from './types';
@@ -54,6 +56,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   viewerPrice = null,
 }) => {
   const { showPrices } = useShowPrices();
+  const navigate = useNavigate();
   const cardRef = useRef<HTMLDivElement>(null);
   const trackedRef = useRef(false);
   const [showLighting, setShowLighting] = useState(false);
@@ -236,6 +239,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 AR View
               </Button>
             </div>
+
+            {/* Test on a room — hands off to the Interior Designer agent with
+                this material pre-pinned; the agent asks for a room photo. */}
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(buildTestOnRoomUrl({ productId: product.id, productName: displayName, productImage: primaryImage?.url }));
+              }}
+              variant="outline"
+              size="sm"
+              className="w-full text-xs gap-1.5"
+              title="See this material applied on a photo of your room"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              Test on a room
+            </Button>
 
             {/* View Details Button */}
             <Button

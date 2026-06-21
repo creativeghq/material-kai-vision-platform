@@ -33,8 +33,9 @@ import { cn } from '@/lib/utils';
 import {
   TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getAccessibleToolkits,
   getToolkitOwnerAgents, toolkitTokenEstimate, resolveToolkitsToTools,
-  type ToolkitDefinition,
+  type ToolkitDefinition, type ToolkitQuickStart,
 } from './agentToolsCatalog';
+import { Play } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Compass, BookOpen, Megaphone, LayoutTemplate, Sparkles, Search, Globe, Link2,
@@ -52,11 +53,15 @@ interface Props {
    *  toolkits, Interior Designer only sees Interior toolkits. Always-on
    *  toolkits show regardless. */
   currentAgentId?: string;
+  /** Launch a toolkit's guided process (quick-start). This is the single
+   *  starter surface now that the separate ✨ prompts modal is gone — each
+   *  toolkit card lists its processes as launchable buttons. */
+  onLaunchQuickStart?: (qs: ToolkitQuickStart, tk: ToolkitDefinition) => void;
 }
 
 export const ToolkitPickerModal: React.FC<Props> = ({
   open, onClose, role, enabledModules, activeToolkitIds, onChange,
-  currentAgentId,
+  currentAgentId, onLaunchQuickStart,
 }) => {
   const accessible = useMemo(
     () => {
@@ -171,7 +176,10 @@ export const ToolkitPickerModal: React.FC<Props> = ({
             <ToolkitSection title="Always loaded" subtitle="Available in every conversation. Cannot be disabled.">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {groups.core.map((tk) => (
-                  <ToolkitCard key={tk.id} toolkit={tk} active={true} alwaysOn onClick={() => {}} />
+                  <ToolkitCard
+                    key={tk.id} toolkit={tk} active={true} alwaysOn onClick={() => {}}
+                    onLaunch={onLaunchQuickStart ? (qs) => onLaunchQuickStart(qs, tk) : undefined}
+                  />
                 ))}
               </div>
             </ToolkitSection>
@@ -186,6 +194,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
                     toolkit={tk}
                     active={draft.has(tk.id)}
                     onClick={() => toggle(tk.id)}
+                    onLaunch={onLaunchQuickStart ? (qs) => onLaunchQuickStart(qs, tk) : undefined}
                   />
                 ))}
               </div>
@@ -201,6 +210,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
                     toolkit={tk}
                     active={draft.has(tk.id)}
                     onClick={() => toggle(tk.id)}
+                    onLaunch={onLaunchQuickStart ? (qs) => onLaunchQuickStart(qs, tk) : undefined}
                   />
                 ))}
               </div>
@@ -254,19 +264,19 @@ const ToolkitCard: React.FC<{
   active: boolean;
   alwaysOn?: boolean;
   onClick: () => void;
-}> = ({ toolkit, active, alwaysOn, onClick }) => {
+  /** Launch one of this toolkit's guided processes (quick-starts). */
+  onLaunch?: (qs: ToolkitQuickStart) => void;
+}> = ({ toolkit, active, alwaysOn, onClick, onLaunch }) => {
   const Icon = ICON_MAP[toolkit.icon] || Wrench;
   const tokens = toolkitTokenEstimate(toolkit);
+  const quickStarts = toolkit.quick_starts || [];
   return (
-    <button
-      onClick={onClick}
-      disabled={alwaysOn}
+    <div
       className={cn(
-        'group relative text-left rounded-xl border p-3.5 transition-all',
+        'group relative rounded-xl border p-3.5 transition-all flex flex-col',
         active
           ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(208,72,160,0.15)]'
           : 'border-border bg-card hover:border-primary/40 hover:bg-muted/30',
-        alwaysOn && 'opacity-90 cursor-default',
       )}
     >
       {active && !alwaysOn && (
@@ -280,42 +290,69 @@ const ToolkitCard: React.FC<{
         </span>
       )}
 
-      <div className="flex items-start gap-2.5 mb-2">
-        <div
-          className={cn(
-            'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-colors',
-            active ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary',
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
-            {toolkit.name}
-            {toolkit.adminOnly && (
-              <Badge variant="outline" className="text-[9px] gap-1 py-0">
-                <Lock className="h-2 w-2" /> admin
-              </Badge>
+      {/* Toggle area — clicking the header/stats flips the toolkit on/off */}
+      <button
+        onClick={onClick}
+        disabled={alwaysOn}
+        className={cn('text-left', alwaysOn && 'cursor-default')}
+      >
+        <div className="flex items-start gap-2.5 mb-2">
+          <div
+            className={cn(
+              'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-colors',
+              active ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary',
             )}
-            {toolkit.moduleSlug && (
-              <Badge variant="outline" className="text-[9px] gap-1 py-0 border-amber-500/40 text-amber-300">
-                <AlertCircle className="h-2 w-2" /> module
-              </Badge>
-            )}
+          >
+            <Icon className="h-4 w-4" />
           </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
-            {toolkit.description}
-          </p>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
+              {toolkit.name}
+              {toolkit.adminOnly && (
+                <Badge variant="outline" className="text-[9px] gap-1 py-0">
+                  <Lock className="h-2 w-2" /> admin
+                </Badge>
+              )}
+              {toolkit.moduleSlug && (
+                <Badge variant="outline" className="text-[9px] gap-1 py-0 border-amber-500/40 text-amber-300">
+                  <AlertCircle className="h-2 w-2" /> module
+                </Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+              {toolkit.description}
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{toolkit.tool_ids.length} tool{toolkit.tool_ids.length === 1 ? '' : 's'}</span>
-        <span className="flex items-center gap-1">
-          <Coins className="h-2.5 w-2.5" /> ~{tokens.toLocaleString()} tok
-        </span>
-      </div>
-    </button>
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>{toolkit.tool_ids.length} tool{toolkit.tool_ids.length === 1 ? '' : 's'}</span>
+          <span className="flex items-center gap-1">
+            <Coins className="h-2.5 w-2.5" /> ~{tokens.toLocaleString()} tok
+          </span>
+        </div>
+      </button>
+
+      {/* Guided processes — launch a quick-start directly from the card */}
+      {onLaunch && quickStarts.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
+          {quickStarts.map((qs, i) => (
+            <button
+              key={i}
+              onClick={(e) => { e.stopPropagation(); onLaunch(qs); }}
+              className="w-full text-left bg-muted/40 hover:bg-primary/10 rounded-md px-2.5 py-1.5 border border-border/50 hover:border-primary/40 transition group/qs flex items-start gap-2"
+              title={qs.description}
+            >
+              <Play className="h-3 w-3 text-primary/70 shrink-0 mt-0.5" />
+              <span className="flex-1 min-w-0">
+                <span className="text-xs font-medium block truncate">{qs.label}</span>
+                <span className="text-[10px] text-muted-foreground line-clamp-1">{qs.description}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
