@@ -29,7 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
 export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [rules, setRules] = useState<Rule[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Array<{ key: string; label: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [type, setType] = useState<'volume_category' | 'category_extra' | 'cash_payment'>('category_extra');
@@ -42,7 +42,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
       setLoading(true);
       const [rs, cats] = await Promise.all([
         financeService.listCustomRules(workspaceId),
-        financeService.listMaterialCategories(workspaceId).catch(() => []),
+        financeService.listMaterialCategoryTree(workspaceId).catch(() => []),
       ]);
       setRules(rs.filter((r) => r.rule_type === 'volume_category' || r.rule_type === 'category_extra' || r.rule_type === 'cash_payment'));
       setCategories(cats);
@@ -134,7 +134,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
                   <SelectValue placeholder={categories.length === 0 ? 'No categories' : 'Category'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c.replace(/_/g, ' ')}</SelectItem>)}
+                  {categories.map((c) => <SelectItem key={c.key} value={c.key} className="capitalize whitespace-pre">{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

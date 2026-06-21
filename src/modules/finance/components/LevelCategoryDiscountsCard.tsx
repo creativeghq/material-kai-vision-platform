@@ -20,7 +20,7 @@ interface Lvl { id: string; level_key: string; label: string; }
 export const LevelCategoryDiscountsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [levels, setLevels] = useState<Lvl[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Array<{ key: string; label: string }>>([]);
   const [discounts, setDiscounts] = useState<Disc[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -33,7 +33,7 @@ export const LevelCategoryDiscountsCard: React.FC<{ workspaceId: string }> = ({ 
       setLoading(true);
       const [lvls, cats, discs] = await Promise.all([
         financeService.listUserLevels(workspaceId),
-        financeService.listMaterialCategories(workspaceId).catch(() => []),
+        financeService.listMaterialCategoryTree(workspaceId).catch(() => []),
         financeService.listLevelDiscounts(workspaceId),
       ]);
       setLevels(lvls.map((l) => ({ id: l.id, level_key: l.level_key, label: l.label })));
@@ -117,7 +117,7 @@ export const LevelCategoryDiscountsCard: React.FC<{ workspaceId: string }> = ({ 
                 <SelectValue placeholder={categories.length === 0 ? 'No categories yet' : 'Category'} />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c.replace(/_/g, ' ')}</SelectItem>)}
+                {categories.map((c) => <SelectItem key={c.key} value={c.key} className="capitalize whitespace-pre">{c.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

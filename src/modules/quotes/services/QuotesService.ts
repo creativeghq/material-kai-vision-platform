@@ -487,26 +487,11 @@ export class QuotesService {
       }
     } catch { /* non-fatal — leaves the line unpriced for manual entry */ }
 
-    // Layer B (#227): quote-time custom rules (volume per category, category extra) stack
-    // multiplicatively on top of the level discount. Needs line context (qty + category).
+    // Layer B (#227): quote-time custom rules (volume per category, category extra) applied on
+    // top of the level discount, with category-tree inheritance (most-specific-wins).
     if (unitPrice != null && quoteWorkspaceId && productCategory) {
       try {
-        const { data: cRules } = await supabase
-          .from('pricing_custom_rules')
-          .select('rule_type, category_key, params, discount_pct')
-          .eq('workspace_id', quoteWorkspaceId)
-          .eq('is_active', true);
-        let factor = 1;
-        for (const r of (cRules ?? []) as any[]) {
-          if (r.category_key && r.category_key !== productCategory) continue;
-          const d = Number(r.discount_pct) || 0;
-          if (d <= 0) continue;
-          if (r.rule_type === 'category_extra') factor *= 1 - d / 100;
-          else if (r.rule_type === 'volume_category') {
-            const minQty = Number(r.params?.min_qty ?? 0);
-            if (minQty > 0 && qtyNow >= minQty) factor *= 1 - d / 100;
-          }
-        }
+        const factor = await this._layerBFactor(quoteWorkspaceId, productCategory, qtyNow);
         if (factor < 1) unitPrice = Math.round(unitPrice * factor * 100) / 100;
       } catch { /* non-fatal — Layer B is additive on top of the resolved price */ }
     }
@@ -600,6 +585,45 @@ export class QuotesService {
   }
 
   /**
+   * #227 Layer B — combined quote-time custom-rule factor for a product category, with tree
+   * inheritance + most-specific-wins. For each category-scoped rule type (category_extra,
+   * volume_category) the rule on the most-specific ancestor of the product's category applies
+   * (a subcategory rule beats its parent's; a global/null-category rule is least specific).
+   */
+  private async _layerBFactor(workspaceId: string, category: string | null, qty: number): Promise<number> {
+    if (!category) return 1;
+    let anc: string[] = [category];
+    try {
+      const { data } = await supabase.rpc('pricing_category_ancestry', { p_category_key: category });
+      if (Array.isArray(data) && data.length) anc = data as string[];
+    } catch { /* fall back to exact-category match */ }
+    const { data: cRules } = await supabase
+      .from('pricing_custom_rules')
+      .select('rule_type, category_key, params, discount_pct')
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true);
+    const ancIndex = (k: string | null) => {
+      if (k == null) return Number.MAX_SAFE_INTEGER;
+      const i = anc.indexOf(k);
+      return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    let factor = 1;
+    for (const type of ['category_extra', 'volume_category'] as const) {
+      const candidates = ((cRules ?? []) as any[])
+        .filter((r) => r.rule_type === type)
+        .filter((r) => r.category_key == null || anc.includes(r.category_key))
+        .filter((r) => (Number(r.discount_pct) || 0) > 0)
+        .filter((r) => type === 'volume_category'
+          ? (Number(r.params?.min_qty ?? 0) > 0 && qty >= Number(r.params?.min_qty ?? 0))
+          : true);
+      if (!candidates.length) continue;
+      candidates.sort((a, b) => ancIndex(a.category_key) - ancIndex(b.category_key));
+      factor *= 1 - (Number(candidates[0].discount_pct) || 0) / 100;
+    }
+    return factor;
+  }
+
+  /**
    * Update quote item
    */
   async updateItem(
@@ -656,20 +680,7 @@ export class QuotesService {
                 const { data: prod } = await supabase.from('products').select('metadata').eq('id', current.product_id).single();
                 const cat = prod?.metadata?.material_category ?? null;
                 if (cat) {
-                  const { data: rules } = await supabase
-                    .from('pricing_custom_rules')
-                    .select('rule_type, category_key, params, discount_pct')
-                    .eq('workspace_id', q.workspace_id).eq('is_active', true);
-                  let factor = 1;
-                  for (const r of (rules ?? []) as any[]) {
-                    if (r.category_key && r.category_key !== cat) continue;
-                    const d = Number(r.discount_pct) || 0; if (d <= 0) continue;
-                    if (r.rule_type === 'category_extra') factor *= 1 - d / 100;
-                    else if (r.rule_type === 'volume_category') {
-                      const mq = Number(r.params?.min_qty ?? 0);
-                      if (mq > 0 && qty >= mq) factor *= 1 - d / 100;
-                    }
-                  }
+                  const factor = await this._layerBFactor(q.workspace_id, cat, qty);
                   if (factor < 1) recomputed = Math.round(recomputed * factor * 100) / 100;
                 }
                 unitPrice = recomputed;

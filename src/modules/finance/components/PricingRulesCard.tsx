@@ -22,7 +22,7 @@ interface Rule {
 export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [rules, setRules] = useState<Rule[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Array<{ key: string; label: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [newCat, setNewCat] = useState('');
@@ -34,7 +34,7 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       setLoading(true);
       const [all, cats, settings] = await Promise.all([
         financeService.listPricingRules(workspaceId),
-        financeService.listMaterialCategories(workspaceId).catch(() => []),
+        financeService.listMaterialCategoryTree(workspaceId).catch(() => []),
         financeService.getSettings(workspaceId).catch(() => null),
       ]);
       setRules(all.filter((r) => r.scope === 'category'));
@@ -54,7 +54,7 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   // Only offer categories that don't already have a rule.
   const availableCategories = useMemo(() => {
     const taken = new Set(rules.map((r) => r.target_id));
-    return categories.filter((c) => !taken.has(c));
+    return categories.filter((c) => !taken.has(c.key));
   }, [categories, rules]);
 
   const addRule = async () => {
@@ -137,7 +137,7 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
               </SelectTrigger>
               <SelectContent>
                 {availableCategories.map((c) => (
-                  <SelectItem key={c} value={c} className="capitalize">{c.replace(/_/g, ' ')}</SelectItem>
+                  <SelectItem key={c.key} value={c.key} className="capitalize whitespace-pre">{c.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -722,6 +722,20 @@ const _financeServiceCore = {
     return ((data ?? []) as Array<{ category: string }>).map((r) => r.category).filter(Boolean);
   },
 
+  // #227 — ordered category tree (parents + subcategories) for pricing pickers; children
+  // get an indented label so the hierarchy is visible in a flat <Select>.
+  async listMaterialCategoryTree(workspaceId: string): Promise<Array<{ key: string; label: string; level: number }>> {
+    const { data, error } = await supabase.rpc('finance_list_category_tree', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return ((data ?? []) as Array<{ category_key: string; label: string; level: number }>)
+      .filter((r) => r.category_key)
+      .map((r) => ({
+        key: r.category_key,
+        label: (r.level > 0 ? '  '.repeat(r.level) + '↳ ' : '') + (r.label || r.category_key),
+        level: r.level ?? 0,
+      }));
+  },
+
   async listPricingRules(workspaceId: string): Promise<Array<{
     id: string; scope: 'category' | 'product'; target_id: string;
     markup_pct: number | null; sell_price: number | null; currency: string;
