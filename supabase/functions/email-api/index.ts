@@ -10,7 +10,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 
@@ -94,6 +94,20 @@ Deno.serve(withApiLogging('email-api', async (req) => {
     switch (action) {
       case 'send': {
         if (req.method !== 'POST') throw new Error('Method not allowed');
+
+        // Gate freeform send: a regular authenticated user must NOT be able to send arbitrary
+        // email (any to/subject/html) from the platform's verified domain — that's spam/phishing
+        // + domain-reputation risk. Server-to-server callers (Flows, quote/alert dispatchers) use
+        // the admin secret → isAdminAccess; interactive callers must be an operator.
+        if (!isAdminAccess(auth)) {
+          const opAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
+          if (!opAuth.success) {
+            return new Response(
+              JSON.stringify({ success: false, error: 'Email send requires operator privileges' }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
+        }
 
         // Pre-flight: require Resend API key. Without this, sendViaResend()
         // throws deep inside the send pipeline and surfaces as an opaque 500.

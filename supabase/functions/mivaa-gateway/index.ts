@@ -452,6 +452,27 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       );
     }
 
+    // Cross-tenant guard: this gateway forwards the platform SERVICE key to MIVAA, and MIVAA's
+    // /api/rag/* routes trust the body `workspace_id` for the `service=mivaa` identity without
+    // re-checking membership. So a non-admin caller could read another tenant's chunks/products/
+    // images by spoofing `workspace_id`. Validate the requested workspace against the caller's
+    // own memberships here before forwarding. (Admin-secret callers are exempt — trusted backend.)
+    if (!isAdmin && auth.userId && payload && typeof payload.workspace_id === 'string' && payload.workspace_id) {
+      const wsCheck = createClient(SUPABASE_URL(), SUPABASE_SERVICE_ROLE_KEY());
+      const { data: wsMember } = await wsCheck
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', auth.userId)
+        .eq('workspace_id', payload.workspace_id)
+        .maybeSingle();
+      if (!wsMember) {
+        return new Response(
+          JSON.stringify({ error: 'You are not a member of the requested workspace', action }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
     // Validate action BEFORE any billing/debit so an unknown-but-priced action
     // can never debit credits and then 400 without a refund.
     if (!action || !MIVAA_ENDPOINTS[action]) {

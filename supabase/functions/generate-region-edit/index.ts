@@ -146,9 +146,13 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
       imageMimeType,
     });
 
+    // Upload the result FIRST, before debiting — otherwise a storage/upload failure lands in
+    // the catch below and returns 500 with the credit already gone (user charged, no image).
+    const imageUrl = await uploadResult(supabase, result.base64, result.mimeType, jobId, { userId, conversationId: body.conversation_id });
+
     // Debit credits — check the RPC's success flag, otherwise a transient
     // race (balance drained between the upfront check and now) silently
-    // uploads the result without charging the user.
+    // delivers the result without charging the user.
     const { data: debitData, error: debitErr } = await supabase.rpc('debit_user_credits', {
       p_user_id: userId,
       p_amount: CREDITS_REQUIRED,
@@ -164,9 +168,6 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
         return jsonResponse({ success: false, error: msg }, 402);
       }
     }
-
-    // Upload result
-    const imageUrl = await uploadResult(supabase, result.base64, result.mimeType, jobId, { userId, conversationId: body.conversation_id });
 
     return jsonResponse({
       success: true,

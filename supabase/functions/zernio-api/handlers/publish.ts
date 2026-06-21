@@ -13,7 +13,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate } from '../../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { zernioApi } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -41,28 +41,35 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
     return jsonResponse({ success: false, error: 'scheduled_at is required for schedule action' }, 400);
   }
 
-  // Fetch post data — scoped to the authenticated user's workspace
-  const postQuery = supabase
+  // Fetch post + account by id. This runs under the SERVICE-ROLE client (RLS bypassed), so we
+  // must authorize the caller against the post's OWN workspace — never trust a caller-supplied
+  // workspace_id (it was an optional filter, so omitting it let any user publish another tenant's
+  // post through another tenant's connected account — IDOR).
+  const { data: post, error: postErr } = await supabase
     .from('social_posts')
     .select('*')
-    .eq('id', post_id);
-  if (workspace_id) postQuery.eq('workspace_id', workspace_id);
-  const { data: post, error: postErr } = await postQuery.single();
-
+    .eq('id', post_id)
+    .single();
   if (postErr || !post) {
     return jsonResponse({ success: false, error: 'Post not found' }, 404);
   }
 
-  // Fetch social account — verify it belongs to the same workspace
-  const accountQuery = supabase
+  const { data: account, error: accountErr } = await supabase
     .from('social_accounts')
     .select('zernio_account_id, platform, handle, workspace_id')
-    .eq('id', social_account_id);
-  if (workspace_id) accountQuery.eq('workspace_id', workspace_id);
-  const { data: account, error: accountErr } = await accountQuery.single();
-
+    .eq('id', social_account_id)
+    .single();
   if (accountErr || !account) {
-    return jsonResponse({ success: false, error: 'Social account not found or not in your workspace' }, 404);
+    return jsonResponse({ success: false, error: 'Social account not found' }, 404);
+  }
+
+  // Authorization: the account must belong to the post's workspace, and the caller must be an
+  // active member of that workspace.
+  if (!post.workspace_id || account.workspace_id !== post.workspace_id) {
+    return jsonResponse({ success: false, error: 'Post and social account are not in the same workspace' }, 403);
+  }
+  if (!(await userCanAccessWorkspace(supabase, auth.user.id, post.workspace_id))) {
+    return jsonResponse({ success: false, error: 'You are not a member of this workspace' }, 403);
   }
 
   try {
