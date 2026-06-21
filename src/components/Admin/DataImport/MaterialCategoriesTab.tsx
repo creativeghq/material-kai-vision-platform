@@ -15,12 +15,19 @@
  * still offered but warns first.
  */
 
-import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, Loader2, CornerDownRight } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/core/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +56,8 @@ interface MaterialCategoryRow {
   sort_order: number | null;
   is_active: boolean | null;
   default_unit: string;
+  parent_category_id: string | null;
+  hierarchy_level: number | null;
 }
 
 type EditableCategory = Partial<MaterialCategoryRow> & {
@@ -56,6 +65,8 @@ type EditableCategory = Partial<MaterialCategoryRow> & {
   name: string;
   display_name: string;
 };
+
+const PARENT_NONE = '__none__';
 
 const KEY_PATTERN = /^[a-z0-9_]+$/;
 
@@ -92,7 +103,7 @@ export const MaterialCategoriesTab: React.FC = () => {
     const { data, error } = await supabase
       .from('material_categories')
       .select(
-        'id, category_key, name, display_name, description, sort_order, is_active, default_unit',
+        'id, category_key, name, display_name, description, sort_order, is_active, default_unit, parent_category_id, hierarchy_level',
       )
       .order('sort_order', { ascending: true, nullsFirst: false });
 
@@ -106,9 +117,47 @@ export const MaterialCategoriesTab: React.FC = () => {
     setIsLoading(false);
   };
 
-  const openCreate = () => {
+  // Depth-first tree order: top-levels by sort_order, children nested under their parent.
+  const displayRows = useMemo(() => {
+    const byParent = new Map<string | null, MaterialCategoryRow[]>();
+    for (const r of rows) {
+      const p = r.parent_category_id ?? null;
+      if (!byParent.has(p)) byParent.set(p, []);
+      byParent.get(p)!.push(r);
+    }
+    for (const arr of byParent.values()) arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const out: Array<MaterialCategoryRow & { depth: number; isFirst: boolean; isLast: boolean }> = [];
+    const walk = (parentId: string | null, depth: number) => {
+      const sibs = byParent.get(parentId) ?? [];
+      sibs.forEach((r, i) => {
+        out.push({ ...r, depth, isFirst: i === 0, isLast: i === sibs.length - 1 });
+        walk(r.id, depth + 1);
+      });
+    };
+    walk(null, 0);
+    return out;
+  }, [rows]);
+
+  // A row can't be its own parent or a child of its own descendant (cycle guard for the picker).
+  const invalidParentIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!editing.id) return ids;
+    ids.add(editing.id);
+    const byParent = new Map<string | null, MaterialCategoryRow[]>();
+    for (const r of rows) {
+      const p = r.parent_category_id ?? null;
+      if (!byParent.has(p)) byParent.set(p, []);
+      byParent.get(p)!.push(r);
+    }
+    const walk = (pid: string) => { for (const r of byParent.get(pid) ?? []) { ids.add(r.id); walk(r.id); } };
+    walk(editing.id);
+    return ids;
+  }, [rows, editing.id]);
+
+  const openCreate = (parentId: string | null = null) => {
     setIsEditing(false);
-    const nextSortOrder = rows.length > 0 ? Math.max(...rows.map((r) => r.sort_order ?? 0)) + 1 : 1;
+    const siblings = rows.filter((r) => (r.parent_category_id ?? null) === parentId);
+    const nextSortOrder = siblings.length > 0 ? Math.max(...siblings.map((r) => r.sort_order ?? 0)) + 1 : 1;
     setEditing({
       category_key: '',
       name: '',
@@ -117,6 +166,7 @@ export const MaterialCategoriesTab: React.FC = () => {
       sort_order: nextSortOrder,
       is_active: true,
       default_unit: 'pcs',
+      parent_category_id: parentId,
     });
     setEditorOpen(true);
   };
@@ -132,6 +182,7 @@ export const MaterialCategoriesTab: React.FC = () => {
       sort_order: row.sort_order ?? 0,
       is_active: row.is_active ?? true,
       default_unit: row.default_unit ?? 'pcs',
+      parent_category_id: row.parent_category_id ?? null,
     });
     setEditorOpen(true);
   };
@@ -173,6 +224,7 @@ export const MaterialCategoriesTab: React.FC = () => {
       sort_order: Number(editing.sort_order ?? 0),
       is_active: editing.is_active ?? true,
       default_unit: (editing.default_unit ?? 'pcs').trim() || 'pcs',
+      parent_category_id: editing.parent_category_id ?? null,
     };
 
     const { error } = isEditing && editing.id
@@ -204,21 +256,21 @@ export const MaterialCategoriesTab: React.FC = () => {
   };
 
   const move = async (row: MaterialCategoryRow, direction: -1 | 1) => {
-    const idx = rows.findIndex((r) => r.id === row.id);
+    // Reorder within siblings (same parent) only.
+    const siblings = rows
+      .filter((r) => (r.parent_category_id ?? null) === (row.parent_category_id ?? null))
+      .sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0));
+    const idx = siblings.findIndex((r) => r.id === row.id);
     const swapIdx = idx + direction;
-    if (idx < 0 || swapIdx < 0 || swapIdx >= rows.length) return;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= siblings.length) return;
 
-    const a = rows[idx];
-    const b = rows[swapIdx];
-    const aOrder = a.sort_order ?? idx + 1;
-    const bOrder = b.sort_order ?? swapIdx + 1;
+    const a = siblings[idx];
+    const b = siblings[swapIdx];
+    const aOrder = a.sort_order ?? idx;
+    const bOrder = b.sort_order ?? swapIdx;
 
-    // Optimistic reorder so the UI moves immediately
-    const reordered = [...rows];
-    reordered[idx] = { ...a, sort_order: bOrder };
-    reordered[swapIdx] = { ...b, sort_order: aOrder };
-    reordered.sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0));
-    setRows(reordered);
+    setRows((prev) => prev.map((r) =>
+      r.id === a.id ? { ...r, sort_order: bOrder } : r.id === b.id ? { ...r, sort_order: aOrder } : r));
 
     const [{ error: e1 }, { error: e2 }] = await Promise.all([
       supabase.from('material_categories').update({ sort_order: bOrder }).eq('id', a.id),
@@ -257,7 +309,7 @@ export const MaterialCategoriesTab: React.FC = () => {
               The dropdown options shown on PDF upload and XML import. Disabled rows are hidden from the dropdowns but kept for historical reference.
             </CardDescription>
           </div>
-          <Button onClick={openCreate} className="rounded-full shrink-0">
+          <Button onClick={() => openCreate()} className="rounded-full shrink-0">
             <Plus className="h-4 w-4 mr-2" />
             New Category
           </Button>
@@ -284,7 +336,7 @@ export const MaterialCategoriesTab: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row, idx) => (
+              {displayRows.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -293,7 +345,7 @@ export const MaterialCategoriesTab: React.FC = () => {
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => move(row, -1)}
-                        disabled={idx === 0}
+                        disabled={row.isFirst}
                         aria-label="Move up"
                       >
                         <ArrowUp className="h-4 w-4" />
@@ -303,14 +355,19 @@ export const MaterialCategoriesTab: React.FC = () => {
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => move(row, 1)}
-                        disabled={idx === rows.length - 1}
+                        disabled={row.isLast}
                         aria-label="Move down"
                       >
                         <ArrowDown className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{row.display_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <span style={{ paddingLeft: `${row.depth * 1.5}rem` }} className="inline-flex items-center gap-1.5">
+                      {row.depth > 0 && <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                      {row.display_name}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">{row.category_key}</TableCell>
                   <TableCell className="text-muted-foreground">{row.default_unit}</TableCell>
                   <TableCell>
@@ -318,6 +375,9 @@ export const MaterialCategoriesTab: React.FC = () => {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openCreate(row.id)} aria-label="Add subcategory" title="Add subcategory">
+                        <Plus className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(row)} aria-label="Edit">
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -363,6 +423,24 @@ export const MaterialCategoriesTab: React.FC = () => {
                 placeholder="Building Materials"
               />
               <p className="text-xs text-muted-foreground">Shown in the dropdown to users.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cat-parent">Parent category</Label>
+              <Select
+                value={editing.parent_category_id ?? PARENT_NONE}
+                onValueChange={(v) => setEditing({ ...editing, parent_category_id: v === PARENT_NONE ? null : v })}
+              >
+                <SelectTrigger id="cat-parent"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={PARENT_NONE}>None (top-level)</SelectItem>
+                  {displayRows.filter((r) => !invalidParentIds.has(r.id)).map((r) => (
+                    <SelectItem key={r.id} value={r.id} className="whitespace-pre">
+                      {'  '.repeat(r.depth) + (r.depth > 0 ? '↳ ' : '') + r.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Leave as top-level, or nest under a parent to make this a subcategory.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="cat-key">Key (slug)</Label>
