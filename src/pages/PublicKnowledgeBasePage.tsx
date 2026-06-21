@@ -195,11 +195,17 @@ export const PublicKnowledgeBasePage: React.FC = () => {
 
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
-    const q = search.toLowerCase();
-    return allDocs.filter((d) =>
-      (!scopeCatId || d.category_id === scopeCatId) &&
-      (d.title.toLowerCase().includes(q) || (d.summary || '').toLowerCase().includes(q)),
-    );
+    // Normalize away spaces/punctuation so "heatpump" matches "Heat Pump", and
+    // also accept order-independent token matches ("manual pump" → "Heat Pump … Manual").
+    const collapse = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const qCollapsed = collapse(search);
+    const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
+    return allDocs.filter((d) => {
+      if (scopeCatId && d.category_id !== scopeCatId) return false;
+      const hay = `${d.title} ${d.summary || ''}`.toLowerCase();
+      if (qCollapsed && collapse(hay).includes(qCollapsed)) return true;
+      return tokens.length > 0 && tokens.every((t) => hay.includes(t));
+    });
   }, [search, scopeCatId, allDocs]);
 
   // Most-read articles across all public categories (Popular Articles section).

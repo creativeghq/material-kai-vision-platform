@@ -48,7 +48,10 @@ export const SearchInterface: React.FC = () => {
       setIsSearching(true);
       const startTime = Date.now();
 
-      // Call MIVAA API for multi-vector search (7-vector fusion: text, visual, understanding, color, texture, style, material)
+      // Semantic (vector) search via MIVAA → kb_match_docs. Must be 'semantic'
+      // (NOT 'multi_vector') — the endpoint only runs the embedding path for
+      // 'semantic'; anything else falls back to ILIKE substring matching, which
+      // can't match e.g. "heatpump" against the title "Heat Pump …".
       const response = await fetch('https://v1api.materialshub.gr/api/kb/search', {
         method: 'POST',
         headers: {
@@ -57,7 +60,10 @@ export const SearchInterface: React.FC = () => {
         body: JSON.stringify({
           workspace_id: workspaceId,
           query: query.trim(),
-          search_type: 'multi_vector',
+          search_type: 'semantic',
+          // recall-oriented for an admin tool (default 0.5 drops near-misses
+          // like "heatpump" vs "Heat Pump …")
+          match_threshold: 0.3,
           limit: 20,
         }),
       });
@@ -123,7 +129,6 @@ export const SearchInterface: React.FC = () => {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               Found {results.length} results in {searchTime}ms
-              <Badge variant="outline">multi_vector</Badge>
             </div>
           )}
         </CardContent>
