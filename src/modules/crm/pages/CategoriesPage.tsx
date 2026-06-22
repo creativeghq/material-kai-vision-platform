@@ -145,11 +145,10 @@ export const CategoriesPanel: React.FC = () => {
   };
 
   const handleDelete = async (c: CrmCategorySummary) => {
-    if (c.kind !== 'manual') {
-      toast({ title: 'Cannot delete', description: 'Auto-synced categories can only be hidden via "Active" toggle.', variant: 'destructive' });
-      return;
-    }
-    if (!window.confirm(`Delete "${c.name}"? Members will be removed but the underlying users / contacts stay.`)) return;
+    const autoNote = c.kind !== 'manual'
+      ? ` This is auto-built from ${c.kind === 'role' ? 'a role' : 'a professional type'}, so it will reappear on the next "Resync auto".`
+      : '';
+    if (!window.confirm(`Delete "${c.name}"? Members are removed but the underlying users / contacts stay.${autoNote}`)) return;
     try {
       await crmCategoriesService.remove(c.id);
       toast({ title: 'Deleted' });
@@ -162,9 +161,12 @@ export const CategoriesPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm text-muted-foreground">
-          Group platform users + CRM contacts + companies into lists. Used by "Send to Customers" on catalogs and other email outreach.
-        </p>
+        <div className="text-sm text-muted-foreground max-w-2xl space-y-1">
+          <p>Group platform users + CRM contacts + companies into lists — used by "Send to Customers" and other outreach. Every category here is fully editable: rename, recolour, toggle active, add/remove members, or delete.</p>
+          <p className="text-xs">
+            <b className="text-foreground">Role</b> &amp; <b className="text-foreground">Professional type</b> categories are <i>auto-built</i> from each role / professional type and keep their members in sync — but you can still add anyone to them manually on top. <b className="text-foreground">Custom</b> lists are entirely yours. The same person can sit in a role list, a professional-type list, and custom lists at once.
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleResync} disabled={busyAction === 'resync'}>
             {busyAction === 'resync' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
@@ -236,11 +238,9 @@ export const CategoriesPanel: React.FC = () => {
                             </div>
                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                               <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>Edit</Button>
-                              {c.kind === 'manual' && (
-                                <Button size="sm" variant="ghost" onClick={() => handleDelete(c)}>
-                                  <Trash2 className="h-3 w-3 text-destructive" />
-                                </Button>
-                              )}
+                              <Button size="sm" variant="ghost" onClick={() => handleDelete(c)} title={c.kind !== 'manual' ? 'Delete (auto categories reappear on resync)' : 'Delete'}>
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
                             </div>
                           </div>
                         </CardContent>
@@ -311,7 +311,7 @@ export const CategoriesPanel: React.FC = () => {
               </div>
               {editing.kind !== 'manual' && (
                 <p className="text-xs text-muted-foreground">
-                  Auto-synced category — slug + kind cannot be changed; underlying source is {editing.kind === 'professional_type' ? 'user_profiles.professional_type' : 'roles.name'} = "{editing.source_value}".
+                  Auto-built from {editing.kind === 'professional_type' ? 'professional type' : 'role'} "{editing.source_value}". You can rename, recolour, toggle Active, and add/remove members freely — auto members just re-sync on "Resync auto". (Only the slug/kind stay fixed so the sync keeps matching.)
                 </p>
               )}
             </div>
