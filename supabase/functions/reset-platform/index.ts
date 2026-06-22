@@ -706,6 +706,42 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
       results.knowledge_base = { deleted: 0, error: error.message };
     }
 
+    // STEP 1.6: Purge ORPHANED Agent Fabric rows (workspace_id IS NULL).
+    // The Agent Fabric persistent layer (agent_projects/agent_definitions + the
+    // CASCADE children secrets/deployments/snapshots) is in NEVER_CLEAR so that
+    // legitimately workspace-owned, deployed agents + their secrets survive a
+    // reset. But a row with NULL workspace_id is unreachable — the RLS policy is
+    // `is_workspace_admin(workspace_id)`, which never grants on NULL — so it can
+    // never be seen or owned by anyone; it's pure orphan junk (e.g. an early test
+    // project). Delete those; deleting an orphan agent_projects row CASCADEs to its
+    // secrets/deployments/snapshots. Each table is independent so a missing
+    // workspace_id column on one never blocks the others.
+    console.log('\n🗑️  STEP 1.6: Purge orphaned Agent Fabric rows (NULL workspace)');
+    results.orphan_agent_fabric = [];
+    for (const tableName of ['agent_projects', 'agent_definitions']) {
+      try {
+        const { count } = await supabase
+          .from(tableName)
+          .select('*', { count: 'exact', head: true })
+          .is('workspace_id', null);
+        if (!count) {
+          results.orphan_agent_fabric.push({ table: tableName, deleted: 0 });
+          continue;
+        }
+        const { error } = await supabase.from(tableName).delete().is('workspace_id', null);
+        if (error) {
+          console.error(`   ❌ Failed to purge orphan ${tableName}:`, error);
+          results.orphan_agent_fabric.push({ table: tableName, deleted: 0, error: error.message });
+        } else {
+          console.log(`   ✅ Purged ${count} orphan row(s) from ${tableName} (NULL workspace)`);
+          results.orphan_agent_fabric.push({ table: tableName, deleted: count });
+        }
+      } catch (error: any) {
+        console.error(`   ❌ Error purging orphan ${tableName}:`, error);
+        results.orphan_agent_fabric.push({ table: tableName, deleted: 0, error: error.message });
+      }
+    }
+
     // STEP 2: Clear storage buckets (AI/processing content only — NOT quote-templates or pdf-documents)
     console.log('\n🗑️  STEP 2: Clear storage buckets');
 
