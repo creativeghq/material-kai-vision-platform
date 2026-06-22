@@ -30,6 +30,8 @@ const KIND_LABELS: Record<CrmCategoryKind, string> = {
   role: 'Role',
   manual: 'Custom',
   industry: 'Industry',
+  lead_status: 'Lead status',
+  lead_source: 'Lead source',
 };
 
 const KIND_VARIANTS: Record<CrmCategoryKind, 'default' | 'secondary' | 'outline'> = {
@@ -37,10 +39,17 @@ const KIND_VARIANTS: Record<CrmCategoryKind, 'default' | 'secondary' | 'outline'
   role: 'outline',
   manual: 'default',
   industry: 'secondary',
+  lead_status: 'outline',
+  lead_source: 'outline',
 };
 
 /** Kinds an operator may create directly (the auto kinds are owned by resync). */
 const AUTO_KINDS: CrmCategoryKind[] = ['professional_type', 'role'];
+
+/** Pick-one attribute vocabularies — stored as a string on the contact, not as
+ * a membership list. They have no members, so the card opens Edit (not the
+ * members dialog) and the member-count footer is hidden. */
+const VOCAB_KINDS: CrmCategoryKind[] = ['lead_status', 'lead_source'];
 
 export const CategoriesPanel: React.FC = () => {
   const { toast } = useToast();
@@ -54,7 +63,7 @@ export const CategoriesPanel: React.FC = () => {
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
   const [createColor, setCreateColor] = useState('#22c55e');
-  const [createKind, setCreateKind] = useState<'manual' | 'industry'>('manual');
+  const [createKind, setCreateKind] = useState<'manual' | 'industry' | 'lead_status' | 'lead_source'>('manual');
 
   const [editing, setEditing] = useState<CrmCategorySummary | null>(null);
   const [editName, setEditName] = useState('');
@@ -84,7 +93,9 @@ export const CategoriesPanel: React.FC = () => {
   }, [categories, search]);
 
   const grouped = useMemo(() => {
-    const out = { professional_type: [] as CrmCategorySummary[], role: [] as CrmCategorySummary[], manual: [] as CrmCategorySummary[], industry: [] as CrmCategorySummary[] };
+    const out: Record<CrmCategoryKind, CrmCategorySummary[]> = {
+      professional_type: [], role: [], manual: [], industry: [], lead_status: [], lead_source: [],
+    };
     for (const c of filtered) out[c.kind].push(c);
     return out;
   }, [filtered]);
@@ -208,7 +219,7 @@ export const CategoriesPanel: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {(['industry', 'manual', 'professional_type', 'role'] as CrmCategoryKind[]).map((kind) => {
+            {(['lead_status', 'lead_source', 'industry', 'manual', 'professional_type', 'role'] as CrmCategoryKind[]).map((kind) => {
               const list = grouped[kind];
               if (list.length === 0) return null;
               return (
@@ -221,10 +232,13 @@ export const CategoriesPanel: React.FC = () => {
                     {AUTO_KINDS.includes(kind) && (
                       <span className="text-xs text-muted-foreground">— synced from {kind === 'professional_type' ? 'user_profiles.professional_type' : 'roles.name'}</span>
                     )}
+                    {VOCAB_KINDS.includes(kind) && (
+                      <span className="text-xs text-muted-foreground">— pick-one options for the contact {kind === 'lead_status' ? 'Lead Status' : 'Lead Source'} dropdown</span>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {list.map((c) => (
-                      <Card key={c.id} className="dashboard-card cursor-pointer hover:border-primary/40" onClick={() => setMembersOpen(c)}>
+                      <Card key={c.id} className="dashboard-card cursor-pointer hover:border-primary/40" onClick={() => (VOCAB_KINDS.includes(c.kind) ? openEdit(c) : setMembersOpen(c))}>
                         <CardContent className="p-4 space-y-2">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
@@ -241,10 +255,16 @@ export const CategoriesPanel: React.FC = () => {
                           {c.description && <p className="text-xs text-muted-foreground line-clamp-2">{c.description}</p>}
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex gap-3 text-muted-foreground">
-                              <span>{c.total_count} total</span>
-                              {c.user_count > 0    && <span>{c.user_count}u</span>}
-                              {c.contact_count > 0 && <span>{c.contact_count}c</span>}
-                              {c.company_count > 0 && <span>{c.company_count}co</span>}
+                              {VOCAB_KINDS.includes(c.kind) ? (
+                                <span>option</span>
+                              ) : (
+                                <>
+                                  <span>{c.total_count} total</span>
+                                  {c.user_count > 0    && <span>{c.user_count}u</span>}
+                                  {c.contact_count > 0 && <span>{c.contact_count}c</span>}
+                                  {c.company_count > 0 && <span>{c.company_count}co</span>}
+                                </>
+                              )}
                             </div>
                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                               <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>Edit</Button>
@@ -270,17 +290,23 @@ export const CategoriesPanel: React.FC = () => {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Type</Label>
-              <Select value={createKind} onValueChange={(v) => setCreateKind(v as 'manual' | 'industry')}>
+              <Select value={createKind} onValueChange={(v) => setCreateKind(v as 'manual' | 'industry' | 'lead_status' | 'lead_source')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="manual">Custom list</SelectItem>
                   <SelectItem value="industry">Industry</SelectItem>
+                  <SelectItem value="lead_status">Lead status</SelectItem>
+                  <SelectItem value="lead_source">Lead source</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
                 {createKind === 'industry'
                   ? 'Industries are the taxonomy you assign to companies (multi-select on the company page).'
-                  : 'A free-form list you assign people / companies to.'}
+                  : createKind === 'lead_status'
+                    ? 'Pick-one options for a contact’s Lead Status dropdown.'
+                    : createKind === 'lead_source'
+                      ? 'Pick-one options for a contact’s Lead Source dropdown.'
+                      : 'A free-form list you assign people / companies to.'}
               </p>
             </div>
             <div className="space-y-1">

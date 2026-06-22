@@ -15,6 +15,8 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,6 +86,9 @@ function groupDocTypes(types: { code: string; description: string }[]) {
 }
 
 
+// The four document types offered as quick-pick chips; everything else lives in the "More types" dropdown.
+const COMMON_DOC_CODES = ['1.1', '2.1', '11.1', '9.3'];
+
 const MOVE_PURPOSES: [string, string][] = [
   ['1', 'Sale'], ['2', 'Sale on behalf of third party'], ['3', 'Sampling'], ['4', 'Exhibition'],
   ['5', 'Return'], ['6', 'Movement between premises'], ['7', 'Consignment'],
@@ -115,6 +120,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  // Inner tabs split the dense myDATA form into Details / Items / Taxes / Options.
+  const [tab, setTab] = useState<'details' | 'items' | 'taxes' | 'options'>('details');
 
   // Parties
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -243,6 +250,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // ── Reset on open ──
   useEffect(() => {
     if (!open) return;
+    setTab('details');
     // Pre-select the buyer when opened from a party page; the [customer] effect
     // below loads its address. Otherwise start blank.
     setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
@@ -514,10 +522,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   };
 
   const handleSave = async () => {
-    if (!customer) { toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
+    if (!customer) { setTab('details'); toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
     const clean = lines.filter((l) => l.description.trim() && parseFloat(l.quantity) > 0);
-    if (clean.length === 0) { toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
+    if (clean.length === 0) { setTab('items'); toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
     if (buyerRisk.hardBlocked) {
+      setTab('details');
       toast({
         title: 'Invoice blocked by risk check',
         description: `Cannot issue because ${buyerRisk.blocks.join('; ')}. Fix the buyer in CRM, or relax the rule under Finance → Settings → Buyer risk checks.`,
@@ -697,6 +706,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     branch: null, logoUrl: null,
   }), [issuer, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr]);
 
+  const itemCount = useMemo(() => lines.filter((l) => l.description.trim()).length, [lines]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 flex flex-col">
@@ -707,23 +718,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         {/* ───────── Editable form (left) + live styled-template preview (right) ───────── */}
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 overflow-y-auto bg-muted/20">
-          <div className="mx-auto max-w-3xl space-y-5 rounded-lg border border-border/50 bg-background px-6 py-6 my-6 shadow-sm">
-            {/* Document type quick-pick (segmented control) — mirrors Oxygen's top tabs */}
-            <div className="flex flex-wrap gap-2">
-              {([['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']] as const)
-                .filter(([code]) => !docTypes.length || docTypes.some((t) => t.code === code))
-                .map(([code, label]) => (
-                  <button
-                    key={code}
-                    type="button"
-                    onClick={() => { setDocumentType(code); applyDocDefault(code); }}
-                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${documentType === code ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-            </div>
+          <div className="mx-auto max-w-3xl rounded-lg border border-border/50 bg-background px-6 py-6 my-6 shadow-sm">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="items">Items{itemCount ? ` · ${itemCount}` : ''}</TabsTrigger>
+                <TabsTrigger value="taxes">Taxes</TabsTrigger>
+                <TabsTrigger value="options">Options</TabsTrigger>
+              </TabsList>
 
+              <TabsContent value="details" className="mt-5 space-y-5">
             {/* Parties + document */}
             <section className="space-y-3">
               <div className="flex items-center justify-between">
@@ -800,19 +804,34 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
             <section className="grid grid-cols-2 gap-3">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground col-span-2">Invoice details</Label>
-              <div className="space-y-1 col-span-2">
-                <Label className="text-xs">Document type (myDATA)</Label>
-                <Select value={documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent>
-                    {groupDocTypes(docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }]).map((g) => (
-                      <React.Fragment key={g.family}>
-                        <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">{g.label}</div>
-                        {g.items.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}
-                      </React.Fragment>
+              <div className="space-y-1.5 col-span-2">
+                <Label className="text-xs">Document type</Label>
+                {/* One control: common types as chips + the long myDATA tail in a "More types" dropdown. */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {([['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']] as const)
+                    .filter(([code]) => !docTypes.length || docTypes.some((t) => t.code === code))
+                    .map(([code, label]) => (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => { setDocumentType(code); applyDocDefault(code); }}
+                        className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${documentType === code ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                      >
+                        {label}
+                      </button>
                     ))}
-                  </SelectContent>
-                </Select>
+                  <Select value={COMMON_DOC_CODES.includes(documentType) ? '' : documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
+                    <SelectTrigger className="h-9 w-auto gap-1 rounded-full px-3.5 text-sm font-medium"><SelectValue placeholder="More types…" /></SelectTrigger>
+                    <SelectContent>
+                      {groupDocTypes(docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }]).map((g) => (
+                        <React.Fragment key={g.family}>
+                          <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">{g.label}</div>
+                          {g.items.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}
+                        </React.Fragment>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <p className="text-[11px] text-muted-foreground">
                   {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'No series — auto-numbered (set series in Settings → Documents)'}
                 </p>
@@ -860,7 +879,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </section>
 
             {/* Shipping — combined invoice + delivery note (document-level, kept high near the doc type) */}
-            <section className="rounded-md border border-border/60 p-3 space-y-3">
+            <section className="border-t border-border/40 pt-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium">Invoice with shipping</div>
@@ -902,30 +921,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </div>
               )}
             </section>
+              </TabsContent>
 
-            {/* Global line defaults */}
-            <section className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Global line defaults — applied to all rows</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={gUnit || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGUnit(val); applyGlobal('measurement_unit_code', val); }}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Measurement unit" /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">Unit…</SelectItem>{units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={gVat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGVat(val); applyGlobal('vat_category', val); }}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VAT category" /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">VAT category…</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={gIncType || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncType(val); applyGlobal('income_classification_type', val); }}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income type" /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">Income type…</SelectItem>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={gIncCat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncCat(val); applyGlobal('income_classification_category', val); }}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income category" /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">Income category…</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.description}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            </section>
-
+              <TabsContent value="items" className="mt-5 space-y-5">
             {/* Line items */}
             <section className="space-y-2">
               <div className="flex items-center justify-between">
@@ -940,6 +938,33 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={paidUpfront} disabled={cashPct === 0} onChange={(e) => setPaidUpfront(e.target.checked)} />
                     Paid upfront{cashPct > 0 ? ` (−${cashPct}%)` : ''}
                   </label>
+                  {/* Row defaults — apply measurement unit / VAT / income classification to every row */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button size="sm" variant="outline" className="rounded-full">
+                        Row defaults{(gUnit || gVat || gIncType || gIncCat) ? ' •' : ''}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-72 space-y-2">
+                      <p className="text-[11px] text-muted-foreground">Applied to every row.</p>
+                      <Select value={gUnit || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGUnit(val); applyGlobal('measurement_unit_code', val); }}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Measurement unit" /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">Unit…</SelectItem>{units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Select value={gVat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGVat(val); applyGlobal('vat_category', val); }}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VAT category" /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">VAT category…</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Select value={gIncType || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncType(val); applyGlobal('income_classification_type', val); }}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income type" /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">Income type…</SelectItem>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Select value={gIncCat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncCat(val); applyGlobal('income_classification_category', val); }}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income category" /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">Income category…</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.description}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </PopoverContent>
+                  </Popover>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
                 </div>
               </div>
@@ -1051,7 +1076,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 })}
               </div>
             </section>
+              </TabsContent>
 
+              <TabsContent value="taxes" className="mt-5 space-y-5">
             {/* Document taxes */}
             <section className="grid grid-cols-2 gap-3">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground col-span-2">Taxes</Label>
@@ -1099,7 +1126,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </label>
               </div>
             </section>
+              </TabsContent>
 
+              <TabsContent value="options" className="mt-5 space-y-5">
             <section className="space-y-1">
               <Label className="text-xs">Notes</Label>
               <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
@@ -1107,7 +1136,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
             {/* #207 — B2G (public-sector e-invoicing). Hidden for retail (11.x) docs. */}
             {!documentType.startsWith('11') && (
-              <section className="rounded-md border border-border/60 p-3 space-y-2">
+              <section className="border-t border-border/40 pt-4 space-y-2">
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="text-xs uppercase tracking-wide text-muted-foreground">B2G — public-sector invoice</span>
                   <input type="checkbox" className="h-4 w-4 rounded" checked={isB2g} onChange={(e) => setIsB2g(e.target.checked)} />
@@ -1129,7 +1158,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             )}
 
             {/* Document & delivery options (Ρυθμίσεις Παραστατικού) */}
-            <section className="rounded-md border border-border/60 p-3 space-y-2">
+            <section className="border-t border-border/40 pt-4 space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Document &amp; delivery options</Label>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                 <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><input type="checkbox" className="h-4 w-4 rounded" checked={submitNow} onChange={(e) => setSubmitNow(e.target.checked)} /></label>
@@ -1151,11 +1180,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Input className="h-8 text-xs" maxLength={250} value={infoBox} onChange={(e) => setInfoBox(e.target.value)} placeholder="Extra printed note, e.g. warranty / delivery terms" />
               </div>
             </section>
-
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="h-4 w-4 rounded" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} />
-              Issue now (assigns the legal number + date)
-            </label>
+              </TabsContent>
+            </Tabs>
           </div>
           </div>
 
@@ -1173,7 +1199,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </div>
         </div>
 
-        <DialogFooter className="border-t border-border/60 px-5 py-3 shrink-0">
+        <DialogFooter className="border-t border-border/60 px-5 py-3 shrink-0 sm:justify-start">
+          <label className="mr-auto flex items-center gap-2 text-sm" title="Assigns the legal number + date on create">
+            <input type="checkbox" className="h-4 w-4 rounded" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} />
+            Issue now
+          </label>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant="outline" onClick={() => setShowPreview(true)} disabled={busy}><Eye className="h-4 w-4 mr-1.5" /> Preview</Button>
           <Button onClick={handleSave} disabled={busy || buyerRisk.hardBlocked} title={buyerRisk.hardBlocked ? buyerRisk.blocks.join('; ') : undefined}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>

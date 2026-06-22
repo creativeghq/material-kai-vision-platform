@@ -629,6 +629,9 @@ export const UserDetailPage: React.FC = () => {
                 </CardContent>
               </Card>
 
+              {/* item 6 — Role & Permissions and the Linked CRM Contact stack in the
+                  right column so the contact sits directly under the role card. */}
+              <div className="space-y-6">
               {/* Role & Permissions Card — Role + Professional type are
                   admin classifications, both inline-editable (no "Edit" mode
                   required). Professional type drives the auto-synced CRM
@@ -695,9 +698,8 @@ export const UserDetailPage: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
 
-            {/* Linked Contact Card */}
+            {/* item 6 — Linked CRM Contact now sits directly under Role & Permissions. */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -736,6 +738,8 @@ export const UserDetailPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+              </div>
+            </div>
 
             <CategoryAssignmentPicker target={{ kind: 'user', id: user.user_id }} />
 

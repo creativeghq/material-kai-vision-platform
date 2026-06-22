@@ -43,6 +43,7 @@ import {
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
+import { LeadFieldSelect } from '@/components/business/crm/LeadFieldSelect';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
@@ -65,8 +66,8 @@ interface Contact {
   linkedin?: string;
   twitter?: string;
   facebook?: string;
-  lead_source?: string;
-  lead_status?: string;
+  lead_source?: string | null;
+  lead_status?: string | null;
   industry?: string;
   annual_revenue?: string;
   employee_count?: string;
@@ -622,8 +623,8 @@ export const ContactDetailPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    <InlineText alwaysEdit={isNew} label="Lead Status" value={contact.lead_status} onSave={(v) => patchInline({ lead_status: v })} placeholder="e.g. New, Qualified, Contacted" copy={false} />
-                    <InlineText alwaysEdit={isNew} label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="e.g. Website, Referral, Trade Show" copy={false} />
+                    <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => patchInline({ lead_status: v })} placeholder="Not set" />
+                    <LeadFieldSelect alwaysEdit={isNew} kind="lead_source" label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="Not set" />
                     <div>
                       <div className="text-xs font-medium text-muted-foreground">Created</div>
                       <div className="flex items-center gap-2 mt-0.5 text-sm text-muted-foreground"><Calendar className="h-3.5 w-3.5" />{new Date(contact.created_at).toLocaleDateString()}</div>
@@ -759,6 +760,9 @@ export const ContactDetailPage: React.FC = () => {
               </Card>
             </div>
 
+            {/* item 7 — remaining cards organised into two-column rows. Row 1 groups the
+                commercial info (Pricing + Invoicing & VAT). */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
             <Card>
               <CardHeader>
@@ -920,7 +924,10 @@ export const ContactDetailPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+            </div>
 
+            {/* item 7 — Row 2 groups the tax identity (Tax & VAT + Role). */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Tax & VAT — admin-managed billing details. If the contact is
                 attached to a Company (B2B), the company's VAT takes priority
                 for invoicing — this VAT is the contact's personal one (used
@@ -1001,6 +1008,7 @@ export const ContactDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+            </div>
 
             {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
           </TabsContent>

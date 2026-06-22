@@ -85,7 +85,9 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
 
   const grouped = useMemo(() => {
     const out = { manual: [] as CrmCategorySummary[], professional_type: [] as CrmCategorySummary[], role: [] as CrmCategorySummary[] };
-    for (const c of categories) out[c.kind].push(c);
+    // Only these three kinds are rendered here; other kinds (industry, lead_status,
+    // lead_source — pick-one vocabularies, not memberships) are intentionally skipped.
+    for (const c of categories) out[c.kind as keyof typeof out]?.push(c);
     return out;
   }, [categories]);
 

@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type CrmCategoryKind = 'professional_type' | 'role' | 'manual' | 'industry';
+export type CrmCategoryKind = 'professional_type' | 'role' | 'manual' | 'industry' | 'lead_status' | 'lead_source';
 export type CrmCategoryMemberKind = 'platform_user' | 'crm_contact' | 'crm_company';
 
 export interface CrmCategory {
@@ -76,9 +76,10 @@ class CrmCategoriesService {
     description?: string;
     color_hex?: string;
     icon?: string;
-    /** Operator-managed kinds only ('manual' default, or 'industry'). The auto
-     * kinds (professional_type / role) are owned by the resync RPC. */
-    kind?: Extract<CrmCategoryKind, 'manual' | 'industry'>;
+    /** Operator-managed kinds only ('manual' default, 'industry', or the
+     * pick-one lead vocabularies). The auto kinds (professional_type / role)
+     * are owned by the resync RPC. */
+    kind?: Extract<CrmCategoryKind, 'manual' | 'industry' | 'lead_status' | 'lead_source'>;
   }): Promise<CrmCategory> {
     const { data: { user } } = await supabase.auth.getUser();
     const slug = (input.slug || input.name).toLowerCase().trim()

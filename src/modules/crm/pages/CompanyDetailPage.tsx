@@ -548,7 +548,9 @@ export const CompanyDetailPage: React.FC = () => {
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-4">
             {/* item 7 — accessibility-first myAADE import: start from the ΑΦΜ at the top
-                and prefill name / address / ΔΟΥ / activity, instead of a row deep in the form. */}
+                and prefill name / address / ΔΟΥ / activity. item 4 — hidden once ΑΑΔΕ
+                data has already been imported (nothing left to import). */}
+            {!company.aade_data_at && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="p-4 flex flex-col sm:flex-row sm:items-end gap-3">
                 <div className="flex-1 space-y-1.5">
@@ -574,7 +576,11 @@ export const CompanyDetailPage: React.FC = () => {
                 </Button>
               </CardContent>
             </Card>
+            )}
 
+            {/* items 2 & 5 — Company Information (with a minimal Role row) sits next to
+                Tax & VAT in a two-column layout. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             <Card>
               <CardHeader>
                 <CardTitle>Company Information</CardTitle>
@@ -607,6 +613,19 @@ export const CompanyDetailPage: React.FC = () => {
                   <InlineText alwaysEdit={isNew} label="Annual Revenue" value={company.annual_revenue} onSave={(v) => patchInline({ annual_revenue: v })} placeholder="e.g. $1M - $10M" copy={false} />
                   <div className="md:col-span-2">
                     <InlineText alwaysEdit={isNew} multiline label="Description" value={company.description} onSave={(v) => patchInline({ description: v })} placeholder="Brief description of the company…" copy={false} />
+                  </div>
+                  {/* item 5 — Role moved in here as a minimal inline switch row.
+                      Supplier still controls whether the Products tab appears. */}
+                  <div className="md:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 mt-1 border-t">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5"/>Role</span>
+                    <label htmlFor="is_supplier" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Switch id="is_supplier" checked={!!company.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v })} />
+                      Supplier
+                    </label>
+                    <label htmlFor="is_customer" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Switch id="is_customer" checked={!!company.is_customer} onCheckedChange={(v) => patchInline({ is_customer: v })} />
+                      Customer
+                    </label>
                   </div>
                 </div>
               </CardContent>
@@ -706,7 +725,14 @@ export const CompanyDetailPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+            </div>
 
+            {/* item 1 — CRM Categories moved up here, right under the business
+                information instead of at the very bottom of the tab. */}
+            {company.id && <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>}
+
+            {/* item 3 — Address + Sub Units side by side. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             {/* Address Card */}
             <Card>
               <CardHeader>
@@ -727,6 +753,7 @@ export const CompanyDetailPage: React.FC = () => {
 
             {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
             <AddressUnitsManager companyId={isNew ? undefined : id} />
+            </div>
 
             {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
             <Card>
@@ -831,48 +858,6 @@ export const CompanyDetailPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Role — who this party is to the workspace. Controls which tabs
-                (Products / supplier-bills) appear and how the finance Parties
-                view classifies them. */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Tag className="h-4 w-4"/>
-                  Role
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="is_supplier" className="cursor-pointer">This is a supplier</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Enables the Products tab below. Includes manufacturers, brands and distributors —
-                      anyone who supplies products to us.
-                    </p>
-                  </div>
-                  <Switch
-                    id="is_supplier"
-                    checked={!!company.is_supplier}
-                    onCheckedChange={(v) => patchInline({ is_supplier: v })}
-/>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="is_customer" className="cursor-pointer">This is a customer</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Means we sell to them — quotes / invoices / statements get raised against this company.
-                    </p>
-                  </div>
-                  <Switch
-                    id="is_customer"
-                    checked={!!company.is_customer}
-                    onCheckedChange={(v) => patchInline({ is_customer: v })}
-/>
-                </div>
-              </CardContent>
-            </Card>
-
-            {company.id && <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>}
           </TabsContent>
 
           {/* Products Tab — only when is_supplier=true. Matches products by name
