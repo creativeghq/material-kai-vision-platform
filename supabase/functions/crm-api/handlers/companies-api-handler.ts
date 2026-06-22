@@ -81,7 +81,11 @@ export async function handleCompanies(req: Request): Promise<Response> {
   try {
     // Authenticate request
     const auth = await authenticate(req, {
-      allowedRoles: ['admin', 'factory'],
+      // Business-ops gate: a workspace OWNER (the primary business persona, often global
+      // role 'user') and platform super_admin must be allowed — matches finance/messaging/
+      // email/agent handlers. The earlier ['admin','factory'] locked owners out of their
+      // own CRM (list AND write). Tenant isolation is still enforced by getCrmScope below.
+      allowedRoles: ['admin', 'super_admin', 'owner', 'factory'],
     });
 
     // authenticate() already grants success for secret-key (level='secret') access and

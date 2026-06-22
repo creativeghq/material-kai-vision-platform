@@ -47,7 +47,10 @@ export async function handleContacts(req: Request): Promise<Response> {
 
     // Authenticate request
     const auth = await authenticate(req, {
-      allowedRoles: ['admin', 'factory'],
+      // Include workspace owner + super_admin so the primary business persona can manage
+      // their own CRM contacts (was ['admin','factory'], which locked owners out). Tenant
+      // isolation stays enforced by the workspace scope below.
+      allowedRoles: ['admin', 'super_admin', 'owner', 'factory'],
     });
 
     // authenticate() already grants success for secret-key (level='secret') access and
