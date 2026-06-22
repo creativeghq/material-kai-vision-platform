@@ -36,7 +36,6 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'mivaa-gateway', label: 'mivaa-gateway', sublabel: 'MIVAA embedding gateway' },
   { id: 'notification-dispatcher', label: 'notification-dispatcher', sublabel: 'Push notification delivery' },
   { id: 'pdf-batch-process', label: 'pdf-batch-process', sublabel: 'Batch PDF extraction' },
-  { id: 'price-monitoring', label: 'price-monitoring', sublabel: 'Track competitor prices' },
   { id: 'quotes-api', label: 'quotes-api', sublabel: 'Quotes CRUD operations' },
   { id: 'recommendations-api', label: 'recommendations-api', sublabel: 'Product recommendations' },
   { id: 'stripe-api', label: 'stripe-api', sublabel: 'Stripe checkout / customer portal' },

@@ -13,37 +13,10 @@ max_rows = 10000
 [functions.inbox-api]
 verify_jwt = false
 
-[functions.crm-companies-api]
-verify_jwt = false
-
-[functions.crm-contacts-api]
-verify_jwt = false
-
-[functions.crm-stripe-api]
-verify_jwt = false
-
-[functions.crm-users-api]
-verify_jwt = false
-
 [functions.mivaa-gateway]
 verify_jwt = false
 
 [functions.pdf-batch-process]
-verify_jwt = false
-
-[functions.seo-research]
-verify_jwt = false
-
-[functions.seo-plan]
-verify_jwt = false
-
-[functions.seo-write]
-verify_jwt = false
-
-[functions.seo-analyze]
-verify_jwt = false
-
-[functions.seo-pipeline]
 verify_jwt = false
 
 [functions.xml-import-orchestrator]
@@ -79,9 +52,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.email-api]
-verify_jwt = false
-
-[functions.email-webhook]
 verify_jwt = false
 
 [functions.email-webhooks]
@@ -144,9 +114,6 @@ verify_jwt = false
 [functions.notification-dispatcher]
 verify_jwt = false
 
-[functions.price-monitoring]
-verify_jwt = false
-
 [functions.price-monitoring-cron]
 verify_jwt = false
 
@@ -157,12 +124,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.ses-webhook]
-verify_jwt = false
-
-[functions.stripe-checkout]
-verify_jwt = false
-
-[functions.stripe-customer-portal]
 verify_jwt = false
 
 [functions.stripe-webhooks]
