@@ -706,19 +706,19 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
       results.knowledge_base = { deleted: 0, error: error.message };
     }
 
-    // STEP 1.6: Purge ORPHANED Agent Fabric rows (workspace_id IS NULL).
-    // The Agent Fabric persistent layer (agent_projects/agent_definitions + the
-    // CASCADE children secrets/deployments/snapshots) is in NEVER_CLEAR so that
-    // legitimately workspace-owned, deployed agents + their secrets survive a
-    // reset. But a row with NULL workspace_id is unreachable — the RLS policy is
+    // STEP 1.6: Purge ORPHANED Agent Fabric projects (workspace_id IS NULL).
+    // The Agent Fabric persistent layer (agent_projects + its CASCADE children
+    // secrets/deployments/snapshots) is in NEVER_CLEAR so legitimately
+    // workspace-owned, deployed agents + their secrets survive a reset. But an
+    // agent_projects row with NULL workspace_id is unreachable — the RLS policy is
     // `is_workspace_admin(workspace_id)`, which never grants on NULL — so it can
     // never be seen or owned by anyone; it's pure orphan junk (e.g. an early test
-    // project). Delete those; deleting an orphan agent_projects row CASCADEs to its
-    // secrets/deployments/snapshots. Each table is independent so a missing
-    // workspace_id column on one never blocks the others.
-    console.log('\n🗑️  STEP 1.6: Purge orphaned Agent Fabric rows (NULL workspace)');
+    // project). Delete those; the delete CASCADEs to its secrets/deployments/
+    // snapshots. NOTE: agent_definitions is intentionally NOT here — it's a GLOBAL,
+    // un-workspaced agent-type registry (developer/qa-reviewer/…), preserved config.
+    console.log('\n🗑️  STEP 1.6: Purge orphaned Agent Fabric projects (NULL workspace)');
     results.orphan_agent_fabric = [];
-    for (const tableName of ['agent_projects', 'agent_definitions']) {
+    for (const tableName of ['agent_projects']) {
       try {
         const { count } = await supabase
           .from(tableName)
