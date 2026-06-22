@@ -39,6 +39,33 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       return jsonResponse({ success: false, error: 'Missing quote_id' }, 400);
     }
 
+    // Tenant boundary: this handler runs under the service role (RLS bypassed), so we MUST
+    // verify the caller belongs to the quote's workspace before reading/generating/mutating
+    // it. Without this, any authenticated user could read another tenant's quote PDF (signed
+    // URL) or flip its pdf_generation_status by quote_id (cross-tenant IDOR). Internal
+    // service-role / admin-secret callers (level 'secret') legitimately operate cross-tenant.
+    {
+      const { data: ownerRow, error: ownerErr } = await supabase
+        .from('quotes')
+        .select('workspace_id')
+        .eq('id', quoteId)
+        .single();
+      if (ownerErr || !ownerRow) {
+        return jsonResponse({ success: false, error: 'Quote not found' }, 404);
+      }
+      if (auth.level !== 'secret') {
+        const { data: member } = await supabase
+          .from('workspace_members')
+          .select('user_id')
+          .eq('workspace_id', (ownerRow as any).workspace_id)
+          .eq('user_id', auth.userId ?? '')
+          .maybeSingle();
+        if (!member) {
+          return jsonResponse({ success: false, error: 'Forbidden' }, 403);
+        }
+      }
+    }
+
     // Check if PDF already exists and regeneration not requested
     if (!body.regenerate) {
       const { data: existing } = await supabase
