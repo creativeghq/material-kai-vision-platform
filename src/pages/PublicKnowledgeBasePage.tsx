@@ -9,7 +9,7 @@ import {
   FileText, TrendingUp, BookOpen, Eye, Tag,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { agentChatHistoryService } from '@/services/agents/agentChatHistoryService';
@@ -162,6 +162,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { user } = useAuth();
 
   const [categories, setCategories] = useState<KBCategory[]>([]);
@@ -184,6 +185,15 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // On the browse view, scroll to a #cat-faq-<id> anchor (e.g. when arriving
+  // from an article breadcrumb's category link). Retries once docs are loaded.
+  useEffect(() => {
+    if (slug || !location.hash) return;
+    const id = location.hash.slice(1);
+    const t = setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+    return () => clearTimeout(t);
+  }, [slug, location.hash, docsByCategory]);
   const [scopeCatId, setScopeCatId] = useState<string>('');
   const [askingAI, setAskingAI] = useState(false);
 
@@ -476,11 +486,17 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             {/* Breadcrumb (visible) */}
             <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5 flex-wrap">
               <Link to="/knowledge-base" className="hover:text-foreground">Knowledge Base</Link>
-              {docBrandSlug ? (
+              {docBrandSlug && (
                 <><span>/</span><Link to={`/brand/${docBrandSlug}`} className="hover:text-foreground">{docBrand}</Link></>
-              ) : selectedCategory ? (
-                <><span>/</span><span>{selectedCategory.name}</span></>
-              ) : null}
+              )}
+              {selectedCategory && (
+                <>
+                  <span>/</span>
+                  <Link to={`/knowledge-base#cat-faq-${selectedCatId}`} className="hover:text-foreground">
+                    {selectedCategory.name}
+                  </Link>
+                </>
+              )}
               <span>/</span>
               <span className="text-foreground/70">{selectedDoc.title}</span>
             </nav>
