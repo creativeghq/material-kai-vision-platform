@@ -346,6 +346,7 @@ const TABLES_TO_CLEAR = [
   'api_usage_logs',                // API usage logs
   'mivaa_api_usage_logs',          // MIVAA API usage logs
   'webhook_calls',                 // Webhook call history
+  'storage_cleanup_log',           // Orphan-cleanup cron audit log (derived)
   // NOTE: system_logs is NOT here — at ~1M+ rows a PostgREST delete-all hits the
   // statement timeout. It (plus the id-less metric/cache tables + all vecs.*
   // collections) is TRUNCATEd via the reset_truncate_heavy() RPC in STEP 3.
