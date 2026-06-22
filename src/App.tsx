@@ -680,24 +680,28 @@ const App = () => (
                     </PageErrorBoundary>
                   }
                 />
-                {/* Brand directory */}
+                {/* Brand/Factory main page + directory (top-level, public). The
+                    brand's KB docs live UNDER this page as its Documentation
+                    section — it is the canonical "company page" for a brand. */}
                 <Route
-                  path="/knowledge-base/brands"
+                  path="/brands"
                   element={
                     <PageErrorBoundary name="Brands Index">
                       <BrandsIndexPage />
                     </PageErrorBoundary>
                   }
                 />
-                {/* Brand Knowledge hub — aggregates a brand's docs + products */}
                 <Route
-                  path="/knowledge-base/brand/:slug"
+                  path="/brand/:slug"
                   element={
-                    <PageErrorBoundary name="Brand Knowledge Page">
+                    <PageErrorBoundary name="Brand Page">
                       <BrandKnowledgePage />
                     </PageErrorBoundary>
                   }
                 />
+                {/* Back-compat: the brand hub used to live under /knowledge-base */}
+                <Route path="/knowledge-base/brands" element={<Navigate to="/brands" replace />} />
+                <Route path="/knowledge-base/brand/:slug" element={<BrandKnowledgePage />} />
                 {/* Individual article — real, slug-based, SEO-friendly URL */}
                 <Route
                   path="/knowledge-base/:slug"

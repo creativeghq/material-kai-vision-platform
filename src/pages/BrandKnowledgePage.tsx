@@ -84,7 +84,7 @@ export const BrandKnowledgePage: React.FC = () => {
   if (!data || ((data.docs?.length ?? 0) === 0 && (data.products?.length ?? 0) === 0)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-4 text-center">
-        <SeoHead title="Brand not found" noIndex canonicalPath={`/knowledge-base/brand/${slug}`} />
+        <SeoHead title="Brand not found" noIndex canonicalPath={`/brand/${slug}`} />
         <p className="text-lg font-light">No brand knowledge found for “{slug}”.</p>
         <Button className="rounded-full" onClick={() => navigate('/knowledge-base')}>Browse the knowledge base</Button>
       </div>
@@ -104,17 +104,17 @@ export const BrandKnowledgePage: React.FC = () => {
       <SeoHead
         title={`${data.brand} — Brand Knowledge`}
         description={data.overview?.summary || `Documentation, certifications and products from ${data.brand}.`}
-        canonicalPath={`/knowledge-base/brand/${data.slug}`}
+        canonicalPath={`/brand/${data.slug}`}
       />
 
       {/* Hero */}
       <header className="bg-gradient-to-b from-primary/10 to-background border-b">
         <div className="max-w-5xl mx-auto px-6 py-10">
           <button
-            onClick={() => navigate('/knowledge-base')}
+            onClick={() => navigate('/brands')}
             className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-4"
           >
-            <ArrowLeft className="h-4 w-4" /> Knowledge Base
+            <ArrowLeft className="h-4 w-4" /> All brands
           </button>
           <h1 className="text-3xl font-medium tracking-tight">{data.brand}</h1>
           <p className="mt-2 text-muted-foreground max-w-2xl">

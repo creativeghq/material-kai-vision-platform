@@ -114,7 +114,7 @@ function KbRelatedProducts({ doc }: { doc: KBDocument }) {
           Products from {brand}
         </h2>
         {brandSlug && (
-          <Link to={`/knowledge-base/brand/${brandSlug}`} className="text-sm text-primary hover:underline shrink-0">
+          <Link to={`/brand/${brandSlug}`} className="text-sm text-primary hover:underline shrink-0">
             {brand} brand page →
           </Link>
         )}
@@ -424,6 +424,12 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     const canonicalPath = docHref(selectedDoc);
     const url = `${SITE_ORIGIN}${canonicalPath}`;
 
+    // Brand-prefixed docs breadcrumb up to their Brand page (the brand's main page).
+    const docBrand = brandFromTitle(selectedDoc.title);
+    const docBrandSlug = docBrand
+      ? docBrand.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      : '';
+
     const jsonLd: Array<Record<string, unknown>> = [
       {
         '@context': 'https://schema.org',
@@ -500,7 +506,11 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             {/* Breadcrumb (visible) */}
             <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5 flex-wrap">
               <Link to="/knowledge-base" className="hover:text-foreground">Knowledge Base</Link>
-              {selectedCategory && (<><span>/</span><span>{selectedCategory.name}</span></>)}
+              {docBrandSlug ? (
+                <><span>/</span><Link to={`/brand/${docBrandSlug}`} className="hover:text-foreground">{docBrand}</Link></>
+              ) : selectedCategory ? (
+                <><span>/</span><span>{selectedCategory.name}</span></>
+              ) : null}
               <span>/</span>
               <span className="text-foreground/70">{selectedDoc.title}</span>
             </nav>
@@ -669,7 +679,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           />
 
           <div className="mt-4 text-center">
-            <Link to="/knowledge-base/brands" className="inline-flex items-center gap-1.5 text-sm text-white/85 hover:text-white">
+            <Link to="/brands" className="inline-flex items-center gap-1.5 text-sm text-white/85 hover:text-white">
               <Tag className="h-4 w-4" /> Browse by brand
             </Link>
           </div>

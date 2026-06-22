@@ -1738,7 +1738,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {factory !== '—' && (
                     <button
                       type="button"
-                      onClick={() => navigate(`/knowledge-base/brand/${factory.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`)}
+                      onClick={() => navigate(`/brand/${factory.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`)}
                       className="text-xs text-primary hover:underline shrink-0"
                       title="View brand knowledge page"
                     >

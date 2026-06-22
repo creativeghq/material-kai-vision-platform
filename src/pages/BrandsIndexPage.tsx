@@ -36,7 +36,7 @@ export const BrandsIndexPage: React.FC = () => {
       <SeoHead
         title="Brands — Knowledge Base"
         description="Browse brands and explore their documentation, certifications and products."
-        canonicalPath="/knowledge-base/brands"
+        canonicalPath="/brands"
       />
 
       <header className="bg-gradient-to-b from-primary/10 to-background border-b">
@@ -69,7 +69,7 @@ export const BrandsIndexPage: React.FC = () => {
             {brands.map((b) => (
               <Link
                 key={b.slug}
-                to={`/knowledge-base/brand/${b.slug}`}
+                to={`/brand/${b.slug}`}
                 className="rounded-2xl border bg-white overflow-hidden hover:border-primary hover:shadow-sm transition group"
               >
                 {b.image_url ? (

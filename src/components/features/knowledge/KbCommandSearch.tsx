@@ -65,7 +65,7 @@ export const KbCommandSearch: React.FC<Props> = ({ open, onOpenChange, allDocs, 
 
   const openBrand = (b: string) => {
     onOpenChange(false);
-    navigate(`/knowledge-base/brand/${b.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`);
+    navigate(`/brand/${b.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`);
   };
 
   const filtered = useMemo(() => {
