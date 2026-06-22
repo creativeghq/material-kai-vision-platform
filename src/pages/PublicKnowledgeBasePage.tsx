@@ -9,7 +9,7 @@ import {
   FileText, TrendingUp, BookOpen, Eye, Tag,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { useNavigate, useParams, useSearchParams, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { agentChatHistoryService } from '@/services/agents/agentChatHistoryService';
@@ -123,31 +123,39 @@ function getFaq(doc: KBDocument | null): KBFaqItem[] {
     .filter((f) => f.question && f.answer);
 }
 
-// ── FAQ accordion item (landing list) ───────────────────────────────────────
-function FaqItem({ doc, href }: { doc: KBDocument; href: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const preview = doc.summary || (doc.content_markdown || doc.content || '').slice(0, 300);
+/** Compact brand card for the article sidebar — pulls the brand's image + counts
+ *  and links back to the brand's main page. */
+function BrandSidebar({ slug, name }: { slug: string; name: string }) {
+  const [info, setInfo] = useState<{ hero_image: string | null; products?: any[]; docs?: any[] } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase.rpc as any)('kb_brand_page', { p_brand_slug: slug });
+      if (!cancelled) setInfo(data || null);
+    })();
+    return () => { cancelled = true; };
+  }, [slug]);
 
   return (
-    <div className="border-b last:border-b-0">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between gap-4 py-4 text-left text-sm font-medium hover:text-primary transition-colors"
-      >
-        <span>{doc.title}</span>
-        <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
-      {expanded && (
-        <div className="pb-5 text-sm text-muted-foreground space-y-3">
-          <p className="leading-relaxed">{preview}</p>
-          <Link
-            to={href}
-            className="text-primary text-xs font-medium hover:underline flex items-center gap-1"
-          >
-            Read full article <ChevronRight className="h-3 w-3" />
-          </Link>
+    <div className="mt-8 pt-6 border-t">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Brand</p>
+      <Link to={`/brand/${slug}`} className="block rounded-xl border bg-white overflow-hidden hover:border-primary hover:shadow-sm transition group">
+        {info?.hero_image && (
+          <img src={info.hero_image} alt={name} loading="lazy" className="w-full h-20 object-cover bg-muted"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+        )}
+        <div className="p-3">
+          <p className="text-sm font-medium group-hover:text-primary transition-colors">{name}</p>
+          {info && (
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {info.products?.length || 0} products · {info.docs?.length || 0} articles
+            </p>
+          )}
+          <span className="mt-2 inline-flex items-center gap-1 text-xs text-primary">
+            <ArrowLeft className="h-3 w-3" /> Back to {name}
+          </span>
         </div>
-      )}
+      </Link>
     </div>
   );
 }
@@ -162,7 +170,6 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
-  const location = useLocation();
   const { user } = useAuth();
 
   const [categories, setCategories] = useState<KBCategory[]>([]);
@@ -186,14 +193,6 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // On the browse view, scroll to a #cat-faq-<id> anchor (e.g. when arriving
-  // from an article breadcrumb's category link). Retries once docs are loaded.
-  useEffect(() => {
-    if (slug || !location.hash) return;
-    const id = location.hash.slice(1);
-    const t = setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-    return () => clearTimeout(t);
-  }, [slug, location.hash, docsByCategory]);
   const [scopeCatId, setScopeCatId] = useState<string>('');
   const [askingAI, setAskingAI] = useState(false);
 
@@ -492,7 +491,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
               {selectedCategory && (
                 <>
                   <span>/</span>
-                  <Link to={`/knowledge-base#cat-faq-${selectedCatId}`} className="hover:text-foreground">
+                  <Link to={`/knowledge-base?cat=${selectedCatId}`} className="hover:text-foreground">
                     {selectedCategory.name}
                   </Link>
                 </>
@@ -559,9 +558,11 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             </div>
           </article>
 
-          {tocItems.length > 0 && (
+          {(tocItems.length > 0 || docBrandSlug) && (
             <aside className="w-48 shrink-0 hidden lg:block sticky top-24 self-start">
+              {tocItems.length > 0 && (
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">On this page</p>
+              )}
               <nav className="space-y-1" aria-label="Table of contents">
                 {tocItems.map((item) => (
                   <a
@@ -579,6 +580,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                   </a>
                 )}
               </nav>
+              {docBrandSlug && <BrandSidebar slug={docBrandSlug} name={docBrand || 'Brand'} />}
             </aside>
           )}
         </div>
@@ -587,6 +589,9 @@ export const PublicKnowledgeBasePage: React.FC = () => {
   }
 
   // ── Home / landing view ───────────────────────────────────────────────────
+  const catParam = searchParams.get('cat');
+  const catLanding = catParam ? categories.find((c) => c.id === catParam) : null;
+  const catLandingDocs = catParam ? (docsByCategory[catParam] || []) : [];
   return (
     <div className="min-h-screen bg-background">
       <SeoHead
@@ -636,7 +641,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 type="button"
                 onClick={() => setCmdOpen(true)}
                 aria-label="Open quick search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 rounded-full border border-white/25 px-2 py-0.5 text-[10px] text-white/70 hover:bg-white/10 transition"
+                className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 rounded-full border border-white/40 px-2 py-0.5 text-[10px] text-white/90 hover:bg-white/15 transition"
               >
                 <span className="font-sans">⌘</span>K
               </button>
@@ -646,7 +651,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 value={scopeCatId}
                 onChange={(e) => setScopeCatId(e.target.value)}
                 aria-label="Filter by category"
-                className="shrink-0 max-w-[42%] bg-transparent border-l border-white/20 text-white/80 text-xs px-3 rounded-r-full focus:outline-none cursor-pointer [&>option]:text-foreground"
+                className="shrink-0 max-w-[42%] bg-transparent border-l border-white/30 text-white text-xs px-3 rounded-r-full focus:outline-none cursor-pointer [&>option]:text-foreground"
               >
                 <option value="">All categories</option>
                 {categories.map((c) => (
@@ -673,12 +678,12 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           {/* Popular topic chips */}
           {categories.length > 0 && (
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <span className="text-white/50 text-xs">Popular topics</span>
+              <span className="text-white/75 text-xs">Popular topics</span>
               {categories.slice(0, 5).map((cat) => (
                 <button
                   key={cat.id}
-                  onClick={() => scrollToId(`cat-faq-${cat.id}`)}
-                  className="text-xs text-white/85 bg-white/10 hover:bg-white/20 transition-colors rounded-full px-3 py-1"
+                  onClick={() => navigate(`/knowledge-base?cat=${cat.id}`)}
+                  className="text-xs text-white bg-white/15 hover:bg-white/25 transition-colors rounded-full px-3 py-1"
                 >
                   {cat.name}
                 </button>
@@ -690,7 +695,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="text-white/70 hover:text-white hover:bg-white/10 rounded-full gap-1.5"
+            className="text-white/90 hover:text-white hover:bg-white/15 rounded-full gap-1.5"
             onClick={() => navigate('/')}
           >
             <LayoutDashboard className="h-3.5 w-3.5" />
@@ -729,6 +734,36 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                     </Link>
                   );
                 })}
+              </div>
+            )}
+          </section>
+        ) : catParam ? (
+          /* Category landing — a filtered internal page for one topic */
+          <section>
+            <button
+              onClick={() => navigate('/knowledge-base')}
+              className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-4"
+            >
+              <ArrowLeft className="h-4 w-4" /> Knowledge Base
+            </button>
+            <h1 className="text-2xl font-medium tracking-tight flex items-center gap-2">
+              {catLanding?.icon && <span>{catLanding.icon}</span>}{catLanding?.name || 'Topic'}
+            </h1>
+            {catLanding?.description && <p className="text-muted-foreground mt-1 max-w-2xl">{catLanding.description}</p>}
+            {catLandingDocs.length === 0 ? (
+              <p className="text-muted-foreground text-sm mt-6">No articles in this topic yet.</p>
+            ) : (
+              <div className="mt-6 border rounded-2xl overflow-hidden bg-white divide-y">
+                {catLandingDocs.map((doc) => (
+                  <Link
+                    key={doc.id}
+                    to={docHref(doc)}
+                    className="block px-5 py-4 hover:bg-accent/30 transition-colors"
+                  >
+                    <p className="font-medium text-sm">{doc.title}</p>
+                    {doc.summary && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{doc.summary}</p>}
+                  </Link>
+                ))}
               </div>
             )}
           </section>
@@ -784,7 +819,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
-                      onClick={() => scrollToId(`cat-faq-${cat.id}`)}
+                      onClick={() => navigate(`/knowledge-base?cat=${cat.id}`)}
                       className="text-left rounded-2xl border bg-white p-5 hover:shadow-md transition-all group flex items-start gap-3"
                     >
                       <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl shrink-0">
@@ -833,24 +868,6 @@ export const PublicKnowledgeBasePage: React.FC = () => {
               </section>
             )}
 
-            {/* Per-category article lists (topic anchors) */}
-            {categories.map((cat) => {
-              const docs = docsByCategory[cat.id];
-              if (!docs || docs.length === 0) return null;
-              return (
-                <section key={cat.id} id={`cat-faq-${cat.id}`} className="scroll-mt-6">
-                  <h2 className="text-lg font-light mb-4 flex items-center gap-2">
-                    <span>{cat.icon}</span>
-                    {cat.name}
-                  </h2>
-                  <div className="border rounded-2xl px-5 bg-white divide-y">
-                    {docs.map((doc) => (
-                      <FaqItem key={doc.id} doc={doc} href={docHref(doc)} />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
           </>
         )}
       </div>

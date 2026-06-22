@@ -8,8 +8,18 @@ import { type Components } from 'react-markdown';
 // light-weight heading aesthetic). Body stays readable, not bold.
 export const mdComponents: Components = {
   h1: ({ node, ...p }) => <h2 className="text-2xl font-medium tracking-tight text-foreground mt-8 mb-3" {...p} />,
-  h2: ({ node, ...p }) => <h2 className="text-xl font-medium tracking-tight text-foreground mt-8 mb-3 pb-1.5 border-b border-border scroll-mt-24" {...p} />,
-  h3: ({ node, ...p }) => <h3 className="text-base font-semibold text-foreground mt-6 mb-2 scroll-mt-24" {...p} />,
+  // h2/h3 carry rehype-slug ids on the article view; make them clickable anchor
+  // links (a per-headline shareable URL) when an id is present.
+  h2: ({ node, id, children }) => (
+    <h2 id={id} className="text-xl font-medium tracking-tight text-foreground mt-8 mb-3 pb-1.5 border-b border-border scroll-mt-24 group">
+      {id ? <a href={`#${id}`} className="no-underline text-foreground hover:text-primary">{children}<span className="ml-1 opacity-0 group-hover:opacity-40 text-primary">#</span></a> : children}
+    </h2>
+  ),
+  h3: ({ node, id, children }) => (
+    <h3 id={id} className="text-base font-semibold text-foreground mt-6 mb-2 scroll-mt-24 group">
+      {id ? <a href={`#${id}`} className="no-underline text-foreground hover:text-primary">{children}<span className="ml-1 opacity-0 group-hover:opacity-40 text-primary">#</span></a> : children}
+    </h3>
+  ),
   h4: ({ node, ...p }) => <h4 className="text-sm font-semibold text-foreground mt-4 mb-1.5" {...p} />,
   p: ({ node, ...p }) => <p className="text-[15px] leading-7 text-foreground/80 my-3" {...p} />,
   ul: ({ node, ...p }) => <ul className="list-disc pl-6 my-3 space-y-1.5 marker:text-muted-foreground/60" {...p} />,
