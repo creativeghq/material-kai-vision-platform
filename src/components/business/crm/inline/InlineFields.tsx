@@ -181,68 +181,41 @@ interface InlineSelectProps {
   alwaysEdit?: boolean;
 }
 
-/** Click-to-edit select. Renders the chosen option's label as text until clicked. */
+/**
+ * Inline select. Renders a single always-mounted Radix Select so there is no
+ * view↔edit state to race with the dropdown's open/close (an earlier version used
+ * `defaultOpen` + `onOpenChange→setEditing(false)` which collapsed before a pick
+ * could register). In view mode the trigger is borderless and reads like text,
+ * with the chevron fading in on hover; `alwaysEdit` (create form) shows a normal
+ * bordered control.
+ */
 export const InlineSelect: React.FC<InlineSelectProps> = ({
   value, onSave, options, label, hint, placeholder = 'Not set', displayValue, unsetValue = '__unset', copyValue, alwaysEdit,
 }) => {
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const current = options.find((o) => o.value === value);
-
-  if (alwaysEdit) {
-    return (
-      <Field label={label} hint={hint}>
-        <Select value={value ?? unsetValue} onValueChange={(v) => onSave(v === unsetValue ? null : v)}>
-          <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={unsetValue}>{placeholder}</SelectItem>
-            {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </Field>
-    );
-  }
-
-  if (editing) {
-    return (
-      <Field label={label} hint={hint}>
+  const triggerClass = alwaysEdit
+    ? ''
+    : 'border-0 shadow-none h-auto py-1 px-1 -mx-1 hover:bg-muted/40 focus:ring-0 focus:ring-offset-0 [&>svg]:opacity-0 group-hover:[&>svg]:opacity-50';
+  return (
+    <Field label={label} hint={hint}>
+      <div className="group flex items-center gap-1">
         <Select
-          defaultOpen
           value={value ?? unsetValue}
           onValueChange={async (v) => {
             setSaving(true);
-            try {
-              await onSave(v === unsetValue ? null : v);
-              setEditing(false);
-            } finally { setSaving(false); }
+            try { await onSave(v === unsetValue ? null : v); } finally { setSaving(false); }
           }}
-          onOpenChange={(open) => { if (!open) setEditing(false); }}
         >
-          <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
+          <SelectTrigger className={triggerClass}>
+            <SelectValue placeholder={placeholder}>{displayValue}</SelectValue>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value={unsetValue}>{placeholder}</SelectItem>
             {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
           </SelectContent>
         </Select>
-      </Field>
-    );
-  }
-
-  return (
-    <Field label={label} hint={hint}>
-      <div
-        className="group flex items-center gap-2 min-h-[28px] cursor-pointer rounded px-1 -mx-1 hover:bg-muted/40"
-        onClick={() => setEditing(true)}
-      >
-        <span className="flex-1 text-sm">
-          {displayValue ?? current?.label ?? <span className="text-muted-foreground">{placeholder}</span>}
-        </span>
-        {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : (
-          <>
-            {copyValue && <CopyButton value={copyValue} />}
-            <Pencil className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover:opacity-60" />
-          </>
-        )}
+        {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />}
+        {!alwaysEdit && copyValue && <CopyButton value={copyValue} />}
       </div>
     </Field>
   );
