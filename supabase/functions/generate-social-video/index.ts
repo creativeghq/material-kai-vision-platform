@@ -173,7 +173,8 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
       return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
     }
 
-    // ② Debit upfront — non-refundable
+    // ② Debit upfront — REFUNDED on any failure path (see refundCredits + creditsDebited
+    // guard below; audit #217 H4). The earlier "non-refundable" note was stale.
     const { data: debitData, error: debitError } = await supabase.rpc('debit_user_credits', {
       p_user_id: userId,
       p_amount: creditCost,

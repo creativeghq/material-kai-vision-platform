@@ -251,6 +251,27 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         return jsonResponse({ granted_access: false });
       }
 
+      // Immediate revocation: a 30-day cookie token must not outlive the access that
+      // produced it. Re-validate that the email STILL matches (grant revoked, CRM contact
+      // removed, or workspace membership lost since the token was minted) using the SAME
+      // resolution as the original `request` grant, so legit viewers keep access.
+      let recheckWorkspaceId: string | null = null;
+      if (catalog.owner_user_id) {
+        const { data: mem } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', catalog.owner_user_id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        recheckWorkspaceId = mem?.workspace_id ?? null;
+      }
+      const recheck = await resolveEmailMatch(supabase, catalog.id, log.email, recheckWorkspaceId);
+      if (!recheck.granted) {
+        return jsonResponse({ granted_access: false, reason: 'access_revoked' });
+      }
+
       const branding = await resolveOwnerBranding(supabase, catalog.workspace_id ?? null, catalog.owner_user_id);
 
       return jsonResponse({

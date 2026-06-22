@@ -60,9 +60,16 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       if (!view.feedback_enabled) return jsonResponse({ error: 'Feedback disabled' }, 403);
       const kind = ['comment', 'approval', 'change_request'].includes(feedback.kind) ? feedback.kind : 'comment';
       const status = ['approved', 'changes_requested'].includes(feedback.status) ? feedback.status : null;
+      // Only accept a sheet_id that actually belongs to THIS client view — an anonymous
+      // commenter shouldn't be able to pin feedback to an arbitrary/other-tenant sheet id.
+      const fbSheetId = (typeof feedback.sheet_id === 'string'
+        && Array.isArray(view.sheet_ids)
+        && view.sheet_ids.includes(feedback.sheet_id))
+        ? feedback.sheet_id
+        : null;
       const { error: fErr } = await supabase.from('client_view_feedback').insert({
         client_view_id: view.id,
-        sheet_id: feedback.sheet_id ?? null,
+        sheet_id: fbSheetId,
         author_name: typeof feedback.author_name === 'string' ? feedback.author_name.slice(0, 120) : null,
         session_id: typeof session_id === 'string' ? session_id : null,
         kind,

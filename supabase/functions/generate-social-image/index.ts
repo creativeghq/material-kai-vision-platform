@@ -228,15 +228,6 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
   }
 
-  // ② Debit upfront — non-refundable
-  const debitResult = await debitExternalServiceCredits(
-    supabase, userId, serviceKey, 'social_image_generation', 1,
-    { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id },
-  );
-  if (!debitResult.success) {
-    return jsonResponse({ success: false, error: debitResult.error || 'Credit debit failed' }, 402);
-  }
-
   try {
     // ③ Generate image
     let imageUrl: string;
@@ -258,7 +249,18 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     const filename = `${Date.now()}-${resolvedModel}.${resolvedModel === 'flux' ? 'webp' : 'png'}`;
     const storedUrl = await storeImage(supabase, imageUrl!, filename);
 
-    // ⑤ Update social_posts if post_id provided
+    // ⑤ Debit ONLY after a usable image is generated AND stored — never charge when the
+    // model call or the storage upload fails (deduct-on-success, matching
+    // generate-interior-gemini / generate-region-edit; closes the charge-on-failure gap).
+    const debitResult = await debitExternalServiceCredits(
+      supabase, userId, serviceKey, 'social_image_generation', 1,
+      { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id },
+    );
+    if (!debitResult.success) {
+      return jsonResponse({ success: false, error: debitResult.error || 'Credit debit failed' }, 402);
+    }
+
+    // ⑥ Update social_posts if post_id provided
     if (post_id) {
       const { data: existingPost } = await supabase
         .from('social_posts')
