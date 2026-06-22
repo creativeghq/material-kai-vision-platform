@@ -422,6 +422,14 @@ export const DiscoverPage: React.FC = () => {
   const [factorySearch, setFactorySearch] = useState('');
   const [factoryCat, setFactoryCat] = useState('all');
 
+  // Extra filters / sorting
+  const [profileLocation, setProfileLocation] = useState('all');
+  const [profileSort, setProfileSort] = useState<'followers' | 'views' | 'name'>('followers');
+  const [factorySort, setFactorySort] = useState<'count' | 'name'>('count');
+  const [productFactory, setProductFactory] = useState('all');
+  const [productSurplusOnly, setProductSurplusOnly] = useState(false);
+  const [productSort, setProductSort] = useState<'name' | 'factory'>('name');
+
   // Modals
   const [selectedFactory, setSelectedFactory] = useState<Factory | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
@@ -525,8 +533,14 @@ export const DiscoverPage: React.FC = () => {
       );
     }
     if (profileType !== 'all') r = r.filter((c) => c.professional_type === profileType);
+    if (profileLocation !== 'all') r = r.filter((c) => c.location?.trim() === profileLocation);
+    r = [...r].sort((a, b) =>
+      profileSort === 'name' ? (a.full_name || '').localeCompare(b.full_name || '') :
+      profileSort === 'views' ? (b.profile_views || 0) - (a.profile_views || 0) :
+      (b.follower_count || 0) - (a.follower_count || 0),
+    );
     return r;
-  }, [creators, profileSearch, profileType]);
+  }, [creators, profileSearch, profileType, profileLocation, profileSort]);
 
   const filteredFactories = useMemo(() => {
     let r = factories;
@@ -535,8 +549,11 @@ export const DiscoverPage: React.FC = () => {
       r = r.filter((f) => f.name.toLowerCase().includes(q));
     }
     if (factoryCat !== 'all') r = r.filter((f) => f.categories.includes(factoryCat));
+    r = [...r].sort((a, b) =>
+      factorySort === 'name' ? a.name.localeCompare(b.name) : b.productCount - a.productCount,
+    );
     return r;
-  }, [factories, factorySearch, factoryCat]);
+  }, [factories, factorySearch, factoryCat, factorySort]);
 
   const filteredProducts = useMemo(() => {
     let r = products;
@@ -549,8 +566,15 @@ export const DiscoverPage: React.FC = () => {
       );
     }
     if (productCat !== 'all') r = r.filter((p) => p.detectedCat === productCat);
+    if (productFactory !== 'all') r = r.filter((p) => p.factoryName === productFactory);
+    if (productSurplusOnly) r = r.filter((p) => !!surplus[p.id]);
+    r = [...r].sort((a, b) =>
+      productSort === 'factory'
+        ? a.factoryName.localeCompare(b.factoryName) || a.name.localeCompare(b.name)
+        : a.name.localeCompare(b.name),
+    );
     return r;
-  }, [products, productSearch, productCat]);
+  }, [products, productSearch, productCat, productFactory, productSurplusOnly, productSort, surplus]);
 
   const factoryModalProducts = useMemo(() =>
     selectedFactory ? products.filter((p) => p.factoryName === selectedFactory.name) : [],
@@ -560,6 +584,17 @@ export const DiscoverPage: React.FC = () => {
   const availableTypes = useMemo(() =>
     Array.from(new Set(creators.filter((c) => c.professional_type).map((c) => c.professional_type!))),
     [creators],
+  );
+
+  const availableLocations = useMemo(() =>
+    Array.from(new Set(creators.map((c) => c.location?.trim()).filter(Boolean) as string[])).sort(),
+    [creators],
+  );
+
+  // Factory names sorted A–Z for the Products → factory filter dropdown.
+  const factoryNamesAZ = useMemo(() =>
+    factories.map((f) => f.name).sort((a, b) => a.localeCompare(b)),
+    [factories],
   );
 
   return (
@@ -589,21 +624,36 @@ export const DiscoverPage: React.FC = () => {
 
           {/* ── PROFILES ──────────────────────────────────────────────── */}
           <TabsContent value="profiles" className="mt-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input value={profileSearch} onChange={(e) => setProfileSearch(e.target.value)}
                   placeholder="Search by name, service, location…" className="pl-9" />
               </div>
               <Select value={profileType} onValueChange={setProfileType}>
-                <SelectTrigger className="w-full sm:w-52">
-                  <SelectValue placeholder="Professional type" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Professional type" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All types</SelectItem>
                   {availableTypes.map((t) => (
                     <SelectItem key={t} value={t}>{PROFESSIONAL_TYPE_LABELS[t] ?? t}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              {availableLocations.length > 0 && (
+                <Select value={profileLocation} onValueChange={setProfileLocation}>
+                  <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Location" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All locations</SelectItem>
+                    {availableLocations.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={profileSort} onValueChange={(v) => setProfileSort(v as 'followers' | 'views' | 'name')}>
+                <SelectTrigger className="w-[48%] sm:w-40"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="followers">Most followed</SelectItem>
+                  <SelectItem value="views">Most viewed</SelectItem>
+                  <SelectItem value="name">Name A–Z</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -690,21 +740,26 @@ export const DiscoverPage: React.FC = () => {
 
           {/* ── FACTORY ───────────────────────────────────────────────── */}
           <TabsContent value="factory" className="mt-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input value={factorySearch} onChange={(e) => setFactorySearch(e.target.value)}
                   placeholder="Search factories…" className="pl-9" />
               </div>
               <Select value={factoryCat} onValueChange={setFactoryCat}>
-                <SelectTrigger className="w-full sm:w-52">
-                  <SelectValue placeholder="Material category" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Material category" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All categories</SelectItem>
                   {MATERIAL_CATS.map((c) => (
                     <SelectItem key={c} value={c}>{catLabel(c)}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={factorySort} onValueChange={(v) => setFactorySort(v as 'count' | 'name')}>
+                <SelectTrigger className="w-[48%] sm:w-40"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="count">Most materials</SelectItem>
+                  <SelectItem value="name">Name A–Z</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -756,16 +811,14 @@ export const DiscoverPage: React.FC = () => {
 
           {/* ── PRODUCTS ──────────────────────────────────────────────── */}
           <TabsContent value="products" className="mt-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
                   placeholder="Search materials by name or factory…" className="pl-9" />
               </div>
               <Select value={productCat} onValueChange={setProductCat}>
-                <SelectTrigger className="w-full sm:w-52">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All categories</SelectItem>
                   {MATERIAL_CATS.map((c) => (
@@ -773,6 +826,32 @@ export const DiscoverPage: React.FC = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={productFactory} onValueChange={setProductFactory}>
+                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Factory" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All factories</SelectItem>
+                  {factoryNamesAZ.map((n) => (<SelectItem key={n} value={n}>{n}</SelectItem>))}
+                </SelectContent>
+              </Select>
+              <Select value={productSort} onValueChange={(v) => setProductSort(v as 'name' | 'factory')}>
+                <SelectTrigger className="w-[48%] sm:w-36"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name A–Z</SelectItem>
+                  <SelectItem value="factory">By factory</SelectItem>
+                </SelectContent>
+              </Select>
+              {Object.keys(surplus).length > 0 && (
+                <Button
+                  type="button"
+                  variant={productSurplusOnly ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-9 gap-1.5"
+                  onClick={() => setProductSurplusOnly((v) => !v)}
+                  title="Show only materials available as surplus on the Marketplace"
+                >
+                  <Store className="h-3.5 w-3.5" /> Surplus only
+                </Button>
+              )}
             </div>
 
             {loading ? (
