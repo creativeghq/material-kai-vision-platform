@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import GithubSlugger from 'github-slugger';
@@ -39,6 +39,37 @@ function extractHeadings(markdown: string): TocItem[] {
   }
   return items;
 }
+
+// Explicit, theme-safe typography for rendered KB markdown. (The repo has no
+// @tailwindcss/typography plugin, so `prose-*` classes were dead no-ops and the
+// content rendered flat — no heading hierarchy, no list bullets.) Hierarchy
+// comes from size + a section underline, not heavy weights (matches the
+// platform's light-weight heading aesthetic). Body stays readable, not bold.
+const mdComponents: Components = {
+  h1: ({ node, ...p }) => <h2 className="text-2xl font-medium tracking-tight text-foreground mt-8 mb-3" {...p} />,
+  h2: ({ node, ...p }) => <h2 className="text-xl font-medium tracking-tight text-foreground mt-8 mb-3 pb-1.5 border-b border-border scroll-mt-24" {...p} />,
+  h3: ({ node, ...p }) => <h3 className="text-base font-semibold text-foreground mt-6 mb-2 scroll-mt-24" {...p} />,
+  h4: ({ node, ...p }) => <h4 className="text-sm font-semibold text-foreground mt-4 mb-1.5" {...p} />,
+  p: ({ node, ...p }) => <p className="text-[15px] leading-7 text-foreground/80 my-3" {...p} />,
+  ul: ({ node, ...p }) => <ul className="list-disc pl-6 my-3 space-y-1.5 marker:text-muted-foreground/60" {...p} />,
+  ol: ({ node, ...p }) => <ol className="list-decimal pl-6 my-3 space-y-1.5 marker:text-muted-foreground/60" {...p} />,
+  li: ({ node, ...p }) => <li className="text-[15px] leading-7 text-foreground/80 pl-1" {...p} />,
+  a: ({ node, ...p }) => <a className="text-primary underline underline-offset-2 hover:opacity-80" {...p} />,
+  strong: ({ node, ...p }) => <strong className="font-semibold text-foreground" {...p} />,
+  em: ({ node, ...p }) => <em className="italic" {...p} />,
+  hr: () => <hr className="my-6 border-border" />,
+  blockquote: ({ node, ...p }) => <blockquote className="border-l-2 border-primary/40 pl-4 my-4 italic text-muted-foreground" {...p} />,
+  code: ({ node, ...p }) => <code className="rounded bg-muted px-1.5 py-0.5 text-[0.85em] font-mono" {...p} />,
+  pre: ({ node, ...p }) => <pre className="bg-muted rounded-xl border border-border p-4 overflow-x-auto my-4 text-sm [&_code]:bg-transparent [&_code]:p-0" {...p} />,
+  table: ({ node, ...p }) => (
+    <div className="my-4 overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-sm border-collapse" {...p} />
+    </div>
+  ),
+  thead: ({ node, ...p }) => <thead className="bg-muted/60" {...p} />,
+  th: ({ node, ...p }) => <th className="border-b border-border px-3 py-2 text-left font-medium" {...p} />,
+  td: ({ node, ...p }) => <td className="border-b border-border px-3 py-2 align-top text-foreground/80" {...p} />,
+};
 
 /** Best-effort brand from a brand/product doc title: "About HARMONY" → HARMONY,
  *  "MAISON - Certifications" / "HARMONY — Standards" → first segment. */
@@ -488,19 +519,8 @@ export const PublicKnowledgeBasePage: React.FC = () => {
               Updated <time dateTime={selectedDoc.updated_at}>{new Date(selectedDoc.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>
               {selectedDoc.view_count > 0 && ` · ${selectedDoc.view_count} views`}
             </p>
-            <div className="prose prose-sm max-w-none
-              prose-headings:font-medium prose-headings:tracking-tight
-              prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-h2:scroll-mt-20
-              prose-h3:text-base prose-h3:mt-6 prose-h3:mb-2 prose-h3:scroll-mt-20
-              prose-p:text-foreground/85 prose-p:leading-relaxed
-              prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-              prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
-              prose-pre:bg-muted prose-pre:rounded-xl prose-pre:border
-              prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground
-              prose-ul:my-3 prose-li:my-1
-              prose-table:text-sm prose-th:bg-muted prose-td:border prose-th:border
-            ">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]}>
+            <div className="max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]} components={mdComponents}>
                 {articleMarkdown}
               </ReactMarkdown>
             </div>
@@ -516,8 +536,8 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                         {f.question}
                         <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 transition-transform group-open:rotate-180" />
                       </summary>
-                      <div className="pt-3 text-sm text-muted-foreground leading-relaxed prose prose-sm max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{f.answer}</ReactMarkdown>
+                      <div className="pt-3 max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{f.answer}</ReactMarkdown>
                       </div>
                     </details>
                   ))}
