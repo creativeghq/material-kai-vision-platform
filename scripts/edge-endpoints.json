@@ -5399,5 +5399,497 @@
       }
     ],
     "response": "{received:true, event:string}"
+  },
+  {
+    "name": "inbox-api",
+    "tag": "Messaging",
+    "summary": "Multi-tenant unified inbox: threads, participants, messages, agent takeover",
+    "description": "Action-based handler for the multi-tenant Inbox (#209). Three auth surfaces: JWT actions (authenticated member/operator/customer-account flows), token actions (token_*, service-role + scoped customer share token), and internal_agent_reply (service-role, called by the agent runtime). Threads are workspace-scoped with directional ACLs (internal/customer/upstream); the AI agent can auto-respond and be assigned per-thread.",
+    "security": [
+      "supabaseJwt",
+      "queryToken",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "create_thread",
+        "summary": "Open a thread in a workspace (internal/customer/upstream) with optional initial participants",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Owning workspace"
+          },
+          {
+            "name": "thread_type",
+            "type": "string ('internal'|'customer'|'upstream')",
+            "required": false,
+            "desc": "Defaults to 'internal'"
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "required": false,
+            "desc": "Defaults to 'internal'"
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "required": false,
+            "desc": "Thread subject"
+          },
+          {
+            "name": "participants",
+            "type": "array",
+            "required": false,
+            "desc": "Initial participants to add"
+          },
+          {
+            "name": "metadata",
+            "type": "object",
+            "required": false
+          }
+        ],
+        "response": "{data: thread}"
+      },
+      {
+        "name": "list_threads",
+        "summary": "List threads visible to the caller, filterable by status/type",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": false
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "thread_type",
+            "type": "string",
+            "required": false
+          }
+        ],
+        "response": "{data: thread[]}"
+      },
+      {
+        "name": "get_thread",
+        "summary": "Fetch one thread with its participants and messages",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{data: {thread, participants, messages}}"
+      },
+      {
+        "name": "send_message",
+        "summary": "Post a message to a thread (member or customer participant)",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": true,
+            "desc": "Message text"
+          },
+          {
+            "name": "message_type",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "attachments",
+            "type": "array",
+            "required": false
+          }
+        ],
+        "response": "{data: message}"
+      },
+      {
+        "name": "mark_read",
+        "summary": "Mark a thread read for the caller",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{success}"
+      },
+      {
+        "name": "set_status",
+        "summary": "Change thread status (open/closed/etc.)",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{data: thread}"
+      },
+      {
+        "name": "set_agent",
+        "summary": "Assign/unassign the AI agent to a thread (takeover)",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "agent_id",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "auto_respond",
+            "type": "boolean",
+            "required": false
+          }
+        ],
+        "response": "{data: thread}"
+      },
+      {
+        "name": "add_participant",
+        "summary": "Add a participant to a thread",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "user_id",
+            "type": "string (uuid)",
+            "required": false
+          },
+          {
+            "name": "contact_id",
+            "type": "string (uuid)",
+            "required": false
+          },
+          {
+            "name": "thread_role",
+            "type": "string",
+            "required": false
+          }
+        ],
+        "response": "{data: participant}"
+      },
+      {
+        "name": "remove_participant",
+        "summary": "Remove a participant from a thread",
+        "params": [
+          {
+            "name": "participant_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{success}"
+      },
+      {
+        "name": "get_agent_settings",
+        "summary": "Read per-workspace agent inbox settings",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{data: settings}"
+      },
+      {
+        "name": "set_agent_settings",
+        "summary": "Update per-workspace agent inbox settings (auto-respond default, data scope)",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "auto_respond",
+            "type": "boolean",
+            "required": false
+          },
+          {
+            "name": "allow_account_data",
+            "type": "boolean",
+            "required": false
+          }
+        ],
+        "response": "{data: settings}"
+      },
+      {
+        "name": "create_marketplace_inquiry",
+        "summary": "Open a cross-tenant inquiry thread from a surplus-marketplace listing",
+        "params": [
+          {
+            "name": "listing_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "buyer_workspace_id",
+            "type": "string (uuid)",
+            "required": false
+          },
+          {
+            "name": "qty_wanted",
+            "type": "number",
+            "required": false
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "required": false
+          }
+        ],
+        "response": "{data: thread}"
+      },
+      {
+        "name": "get_thread_context",
+        "summary": "Fetch grounding context for the agent (thread customer statement/invoices/quotes scoped to the thread)",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{data: context}"
+      },
+      {
+        "name": "token_get_thread",
+        "summary": "Public/tokenized read of a thread (scoped customer share token)",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{data: {thread, messages}}"
+      },
+      {
+        "name": "token_send_message",
+        "summary": "Tokenized customer reply to a thread",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{data: message}"
+      },
+      {
+        "name": "token_claim",
+        "summary": "Claim a tokenized thread into an authenticated customer account",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{success}"
+      },
+      {
+        "name": "internal_agent_reply",
+        "summary": "Service-role: post an AI agent reply into a thread (called by the agent runtime)",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "agent_state",
+            "type": "object",
+            "required": false
+          }
+        ],
+        "response": "{data: message}"
+      }
+    ]
+  },
+  {
+    "name": "trip-expense-ops",
+    "tag": "Finance",
+    "summary": "Sales trip-expense receipts: upload, sign, and render the expense PDF",
+    "description": "Service-role-backed receipt operations for sales trip-expense cards (receipts live in the private pdf-documents bucket and feed per-line finance approval / reimbursement to planned_payment). The caller is the authenticated trip owner; the function writes via service role.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "upload_receipt",
+        "summary": "Upload a base64 receipt image/PDF for a trip-expense line",
+        "params": [
+          {
+            "name": "item_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Trip-expense line"
+          },
+          {
+            "name": "filename",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "content_type",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "data_base64",
+            "type": "string",
+            "required": true,
+            "desc": "Base64-encoded receipt bytes"
+          }
+        ],
+        "response": "{success, storage_path}"
+      },
+      {
+        "name": "sign_receipt",
+        "summary": "Mint a fresh signed URL for an uploaded receipt",
+        "params": [
+          {
+            "name": "item_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{signed_url}"
+      },
+      {
+        "name": "generate_pdf",
+        "summary": "Render the trip-expense report PDF",
+        "params": [
+          {
+            "name": "report_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{success, pdf_url, pdf_storage_path}"
+      }
+    ]
+  },
+  {
+    "name": "generate-purchase-sheet-pdf",
+    "tag": "Finance",
+    "summary": "Render a project purchase sheet (doors/windows + other purchase items) to PDF",
+    "description": "Builds the purchase schedule and/or per-item spec sheets for a project (item types include door/window) using pdf-lib, uploads to pdf-documents storage, and returns a signed URL. Reads items under the caller RLS by project_id (+ optional item_ids); inline items require service-role auth.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "project_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Project whose purchase items to render (required unless inline items given)"
+      },
+      {
+        "name": "item_ids",
+        "type": "string[]",
+        "required": false,
+        "desc": "Subset of purchase items to include"
+      },
+      {
+        "name": "items",
+        "type": "array",
+        "required": false,
+        "desc": "Inline purchase items (service-role only)"
+      },
+      {
+        "name": "mode",
+        "type": "string ('schedule'|'per_item'|'both')",
+        "required": false,
+        "desc": "Defaults to 'both'"
+      },
+      {
+        "name": "project_name",
+        "type": "string",
+        "required": false,
+        "desc": "Override the rendered project name"
+      }
+    ],
+    "response": "{success, pdf_url, pdf_storage_path, page_count}"
+  },
+  {
+    "name": "kb-embedding-backfill",
+    "tag": "Knowledge Base",
+    "summary": "Backfill Voyage embeddings for knowledge-base documents missing them",
+    "description": "Re-embeds kb_docs that have no/stale embedding via the embeddings service, bounded by a limit. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.",
+    "security": [
+      "apiKeySecret",
+      "cronSecret",
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "limit",
+        "type": "integer",
+        "required": false,
+        "desc": "Max docs to process this run (clamped to an internal MAX_LIMIT)"
+      },
+      {
+        "name": "workspace_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Restrict backfill to one workspace"
+      }
+    ],
+    "response": "{success, processed, embedded, failed}"
   }
 ]

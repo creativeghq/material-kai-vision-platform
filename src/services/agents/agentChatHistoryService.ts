@@ -279,14 +279,13 @@ export class AgentChatHistoryService {
   /**
    * Delete a conversation and all its messages.
    *
-   * The FK on agent_chat_messages.conversation_id is ON DELETE CASCADE, and
-   * AFTER DELETE triggers on both `agent_chat_messages` and
-   * `agent_chat_conversations` scrub any storage URLs found in
-   * `metadata` / `content` / `messages`. After the 2026-05-23 storage
-   * consolidation every URL produced by chat lives under the 5 anchor buckets
-   * (pdf-documents, pdf-tiles, generation-images, quote-templates,
-   * moodboard-sheet-references). So a single conversation delete is enough —
-   * no client-side message wipe needed.
+   * The FK on agent_chat_messages.conversation_id is ON DELETE CASCADE, so the
+   * message rows go in one transaction. Session storage files (under
+   * generation-images `u/{uid}/sessions/{conversationId}/`) are NOT deleted
+   * synchronously — there is no AFTER DELETE storage trigger. Once the conversation
+   * row is gone its session prefix and message URLs drop out of
+   * build_storage_reference_set, and storage-orphan-cleanup-cron garbage-collects the
+   * files (generation-images 14d grace).
    */
   async deleteConversation(conversationId: string): Promise<boolean> {
     try {

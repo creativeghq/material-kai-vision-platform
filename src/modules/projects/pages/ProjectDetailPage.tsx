@@ -18,6 +18,7 @@ import {
   Receipt,
   Package,
   Wallet,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -72,7 +73,7 @@ export const ProjectDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { can } = usePermissions();
+  const { can, persona } = usePermissions();
   const [project, setProject] = useState<ProjectWithClient | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'overview' | 'rooms' | 'products' | 'moodboards' | 'quotes' | 'finance' | 'sheets' | 'client-view' | 'tasks' | 'timeline'>('overview');
@@ -85,6 +86,9 @@ export const ProjectDetailPage: React.FC = () => {
   // Finance + Products are professional surfaces (operator/dealer/architect), never the
   // end customer. Gated identically to Billing: owner + finance.manage capability.
   const canFinance = isOwner && can('finance.manage');
+  // Hard-delete is a principal action: the owner, and only the business personas
+  // (operator / dealer / architect) — not project-client end-users or staff.
+  const canDeleteProject = isOwner && ['operator', 'dealer', 'architect'].includes(persona);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -122,6 +126,23 @@ export const ProjectDetailPage: React.FC = () => {
     if (!confirm('Archive this project? It will be hidden from the active list. You can still find it via "Show archived".')) return;
     await handleStatusChange('archived');
     navigate('/projects');
+  };
+
+  const handleDelete = async () => {
+    if (!project) return;
+    if (!confirm(
+      'Delete this project permanently?\n\n' +
+      'Its rooms, tasks, product lines, client views and collaborators will be deleted. ' +
+      'Linked moodboards, quotes and invoices are kept but unlinked from the project.\n\n' +
+      'This cannot be undone.',
+    )) return;
+    try {
+      await projectsService.deleteProject(project.id);
+      toast({ title: 'Project deleted' });
+      navigate('/projects');
+    } catch (err) {
+      toast({ title: 'Failed to delete project', variant: 'destructive' });
+    }
   };
 
   if (loading) {
@@ -167,6 +188,17 @@ export const ProjectDetailPage: React.FC = () => {
               <Button variant="outline" size="sm" onClick={handleArchive}>
                 <Archive className="h-4 w-4 mr-1" />
                 Archive
+              </Button>
+            )}
+            {canDeleteProject && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDelete}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
               </Button>
             )}
           </>

@@ -133,11 +133,11 @@ class MoodboardSheetsService {
   }
 
   async remove(sheetId: string): Promise<void> {
-    // Best-effort: clean up the PDF in storage BEFORE deleting the row, so
-    // that even if the storage delete fails (network, race) we don't end up
-    // with an orphan file and a missing row to remediate from. The DB-side
-    // trigger `cleanup_moodboard_sheet_storage` is the canonical guarantee;
-    // this is a fast-path that keeps the round trip down by 1.
+    // Clean up the PDF in storage BEFORE deleting the row — this remove() IS the
+    // cleanup (there is no AFTER DELETE storage trigger). If it fails (network,
+    // race), the row's pdf_storage_path drops out of build_storage_reference_set
+    // once deleted, so storage-orphan-cleanup-cron garbage-collects the file
+    // (pdf-documents, 72h grace) as the backstop.
     const { data: row } = await supabase
       .from('moodboard_presentation_sheets')
       .select('pdf_storage_path')
@@ -149,7 +149,7 @@ class MoodboardSheetsService {
         .from('pdf-documents')
         .remove([row.pdf_storage_path])
         .then(({ error }) => {
-          if (error) console.warn('Sheet PDF storage cleanup failed (will be picked up by trigger):', error);
+          if (error) console.warn('Sheet PDF storage cleanup failed (orphan-cleanup cron will reap it):', error);
         });
     }
 

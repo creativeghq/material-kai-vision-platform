@@ -1,8 +1,10 @@
 # MIVAA API Documentation
 
-**Version:** 2.5.0
-**Last Updated:** 2025-12-30
+**Version:** 2.6.0
+**Last Updated:** 2026-06-22
 **Base URL:** `https://v1api.materialshub.gr`
+
+> **This is a hand-written index.** The authoritative, always-current schema is the FastAPI-generated **OpenAPI** at `/openapi.json` below (the MIVAA Python backend lives in a separate repo, `creativeghq/mivaa-pdf-extractor`). For the **Supabase Edge Functions** surface (a separate Deno runtime with no auto-generated schema), see the companion hand-maintained spec at [docs/api/openapi-edge.json](./api/openapi-edge.json) (served live at `/api/edge-swagger.html`).
 
 ---
 
@@ -14,14 +16,13 @@
 
 ---
 
-## 🎯 Latest Enhancement: Image Re-classification (v2.5.0)
+## 🧱 PDF structural backbone: PaddleOCR-VL (since 2026-06-13)
 
-**New in v2.5.0:**
-- **Image Re-classification Endpoint**: `/api/images/reclassify/{image_id}` - Re-run AI classification on specific images
-- **Force Validation**: Optional secondary model validation for improved accuracy
-- **Updated Classification Results**: Real-time updates to database with new classification data
+The catalog/PDF pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B), a two-stage document parser hosted on **Modal**: **PP-DocLayoutV2** localizes/labels regions and predicts reading order, then the 0.9B VLM recognizes content inside each region (text, tables→markdown, formulas→LaTeX, charts). It **replaced Surya-2** (which had earlier replaced YOLO + Chandra). The structural pass runs as **Stage 1, before product discovery**, persisting `document_layout_analysis` rows with `processing_version="paddleocr-vl"`; discovery, chunking, and crop stages all read from that cache. Per-image OCR also runs on PaddleOCR. There is **no longer any HuggingFace-hosted model** — both GPU endpoints (PaddleOCR-VL and SLIG/SigLIP2) are **Modal-only** (SLIG moved off HF 2026-06-14). See `CLAUDE.md` and `docs/pdf-processing-pipeline.md` for the full architecture.
 
-**Previous Enhancement: Multi-Vector Search (v2.3.0)**
+---
+
+## 🎯 Multi-Vector Search (the comprehensive search solution)
 
 ### Overview
 

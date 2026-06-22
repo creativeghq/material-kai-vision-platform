@@ -239,12 +239,13 @@ class MoodBoardAPI {
 
   // Delete a moodboard
   //
-  // FKs on moodboard_items.moodboard_id and
-  // moodboard_presentation_sheets.moodboard_id are ON DELETE CASCADE, and
-  // both child tables have AFTER DELETE triggers that wipe their storage
-  // objects (designer-assets / generation-images / moodboard-sheets) row
-  // by row. So this single delete is sufficient — items, sheets, and every
-  // associated file are gone in one transaction.
+  // FKs on moodboard_items.moodboard_id and moodboard_presentation_sheets.moodboard_id
+  // are ON DELETE CASCADE, so every child row is removed in one transaction.
+  // Storage files (moodboard images in generation-images, sheet PDFs in pdf-documents)
+  // are NOT deleted synchronously — there is no AFTER DELETE storage trigger. Once the
+  // rows are gone the files are unreferenced and storage-orphan-cleanup-cron garbage-
+  // collects them (generation-images 14d grace, pdf-documents 72h) via
+  // build_storage_reference_set / find_orphan_storage_objects.
   async deleteMoodBoard(id: string): Promise<void> {
     const { error } = await supabase.from('moodboards').delete().eq('id', id);
 

@@ -136,8 +136,9 @@ class ClientViewsService {
   }
 
   async remove(id: string): Promise<void> {
-    // The AFTER DELETE trigger removes the PDF from storage; this fast-path
-    // mirrors the sheet service to keep the round trip down.
+    // This remove() IS the storage cleanup (there is no AFTER DELETE trigger).
+    // If it fails, the deleted row drops out of build_storage_reference_set and
+    // storage-orphan-cleanup-cron reaps the PDF (pdf-documents, 72h grace).
     const { data: row } = await supabase
       .from('project_client_views')
       .select('pdf_storage_path')
@@ -145,7 +146,7 @@ class ClientViewsService {
       .maybeSingle();
     if (row?.pdf_storage_path) {
       await supabase.storage.from('pdf-documents').remove([row.pdf_storage_path])
-        .then(({ error }) => { if (error) console.warn('Client view PDF cleanup (trigger will catch):', error); });
+        .then(({ error }) => { if (error) console.warn('Client view PDF cleanup failed (orphan-cleanup cron will reap it):', error); });
     }
     const { error } = await supabase.from('project_client_views').delete().eq('id', id);
     if (error) throw error;

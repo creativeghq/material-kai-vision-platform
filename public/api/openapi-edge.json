@@ -11171,6 +11171,885 @@
           }
         }
       }
+    },
+    "/inbox-api": {
+      "post": {
+        "tags": [
+          "Messaging"
+        ],
+        "summary": "Multi-tenant unified inbox: threads, participants, messages, agent takeover",
+        "operationId": "post_inbox_api",
+        "description": "Action-based handler for the multi-tenant Inbox (#209). Three auth surfaces: JWT actions (authenticated member/operator/customer-account flows), token actions (token_*, service-role + scoped customer share token), and internal_agent_reply (service-role, called by the agent runtime). Threads are workspace-scoped with directional ACLs (internal/customer/upstream); the AI agent can auto-respond and be assigned per-thread.",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "queryToken": []
+          },
+          {
+            "apiKeySecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create_thread"
+                        ],
+                        "description": "Open a thread in a workspace (internal/customer/upstream) with optional initial participants"
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Owning workspace (string (uuid))"
+                      },
+                      "thread_type": {
+                        "type": "string",
+                        "description": "Defaults to 'internal' (one of: string ('internal'|'customer'|'upstream'))"
+                      },
+                      "channel": {
+                        "type": "string",
+                        "description": "Defaults to 'internal'"
+                      },
+                      "subject": {
+                        "type": "string",
+                        "description": "Thread subject"
+                      },
+                      "participants": {
+                        "type": "array",
+                        "description": "Initial participants to add"
+                      },
+                      "metadata": {
+                        "type": "object"
+                      }
+                    },
+                    "description": "Returns: {data: thread}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list_threads"
+                        ],
+                        "description": "List threads visible to the caller, filterable by status/type"
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "thread_type": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {data: thread[]}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get_thread"
+                        ],
+                        "description": "Fetch one thread with its participants and messages"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {data: {thread, participants, messages}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "body"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "send_message"
+                        ],
+                        "description": "Post a message to a thread (member or customer participant)"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "body": {
+                        "type": "string",
+                        "description": "Message text"
+                      },
+                      "message_type": {
+                        "type": "string"
+                      },
+                      "attachments": {
+                        "type": "array"
+                      }
+                    },
+                    "description": "Returns: {data: message}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "mark_read"
+                        ],
+                        "description": "Mark a thread read for the caller"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {success}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "status"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "set_status"
+                        ],
+                        "description": "Change thread status (open/closed/etc.)"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "status": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {data: thread}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "set_agent"
+                        ],
+                        "description": "Assign/unassign the AI agent to a thread (takeover)"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "agent_id": {
+                        "type": "string"
+                      },
+                      "auto_respond": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "Returns: {data: thread}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "add_participant"
+                        ],
+                        "description": "Add a participant to a thread"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "thread_role": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {data: participant}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "participant_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "remove_participant"
+                        ],
+                        "description": "Remove a participant from a thread"
+                      },
+                      "participant_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {success}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get_agent_settings"
+                        ],
+                        "description": "Read per-workspace agent inbox settings"
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {data: settings}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "set_agent_settings"
+                        ],
+                        "description": "Update per-workspace agent inbox settings (auto-respond default, data scope)"
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "auto_respond": {
+                        "type": "boolean"
+                      },
+                      "allow_account_data": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "Returns: {data: settings}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "listing_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create_marketplace_inquiry"
+                        ],
+                        "description": "Open a cross-tenant inquiry thread from a surplus-marketplace listing"
+                      },
+                      "listing_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "buyer_workspace_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "qty_wanted": {
+                        "type": "number"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {data: thread}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get_thread_context"
+                        ],
+                        "description": "Fetch grounding context for the agent (thread customer statement/invoices/quotes scoped to the thread)"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {data: context}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "token_get_thread"
+                        ],
+                        "description": "Public/tokenized read of a thread (scoped customer share token)"
+                      },
+                      "token": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {data: {thread, messages}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token",
+                      "body"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "token_send_message"
+                        ],
+                        "description": "Tokenized customer reply to a thread"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "body": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {data: message}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "token_claim"
+                        ],
+                        "description": "Claim a tokenized thread into an authenticated customer account"
+                      },
+                      "token": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {success}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "body"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "internal_agent_reply"
+                        ],
+                        "description": "Service-role: post an AI agent reply into a thread (called by the agent runtime)"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "body": {
+                        "type": "string"
+                      },
+                      "agent_state": {
+                        "type": "object"
+                      }
+                    },
+                    "description": "Returns: {data: message}"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trip-expense-ops": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Sales trip-expense receipts: upload, sign, and render the expense PDF",
+        "operationId": "post_trip_expense_ops",
+        "description": "Service-role-backed receipt operations for sales trip-expense cards (receipts live in the private pdf-documents bucket and feed per-line finance approval / reimbursement to planned_payment). The caller is the authenticated trip owner; the function writes via service role.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "item_id",
+                      "filename",
+                      "content_type",
+                      "data_base64"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upload_receipt"
+                        ],
+                        "description": "Upload a base64 receipt image/PDF for a trip-expense line"
+                      },
+                      "item_id": {
+                        "type": "string",
+                        "description": "Trip-expense line (string (uuid))"
+                      },
+                      "filename": {
+                        "type": "string"
+                      },
+                      "content_type": {
+                        "type": "string"
+                      },
+                      "data_base64": {
+                        "type": "string",
+                        "description": "Base64-encoded receipt bytes"
+                      }
+                    },
+                    "description": "Returns: {success, storage_path}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "item_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "sign_receipt"
+                        ],
+                        "description": "Mint a fresh signed URL for an uploaded receipt"
+                      },
+                      "item_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {signed_url}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "report_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "generate_pdf"
+                        ],
+                        "description": "Render the trip-expense report PDF"
+                      },
+                      "report_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {success, pdf_url, pdf_storage_path}"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generate-purchase-sheet-pdf": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Render a project purchase sheet (doors/windows + other purchase items) to PDF",
+        "operationId": "post_generate_purchase_sheet_pdf",
+        "description": "Builds the purchase schedule and/or per-item spec sheets for a project (item types include door/window) using pdf-lib, uploads to pdf-documents storage, and returns a signed URL. Reads items under the caller RLS by project_id (+ optional item_ids); inline items require service-role auth.\n\n**Response:** `{success, pdf_url, pdf_storage_path, page_count}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "apiKeySecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "description": "Project whose purchase items to render (required unless inline items given) (string (uuid))"
+                  },
+                  "item_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Subset of purchase items to include"
+                  },
+                  "items": {
+                    "type": "array",
+                    "description": "Inline purchase items (service-role only)"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "description": "Defaults to 'both' (one of: string ('schedule'|'per_item'|'both'))"
+                  },
+                  "project_name": {
+                    "type": "string",
+                    "description": "Override the rendered project name"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/kb-embedding-backfill": {
+      "post": {
+        "tags": [
+          "Knowledge Base"
+        ],
+        "summary": "Backfill Voyage embeddings for knowledge-base documents missing them",
+        "operationId": "post_kb_embedding_backfill",
+        "description": "Re-embeds kb_docs that have no/stale embedding via the embeddings service, bounded by a limit. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.\n\n**Response:** `{success, processed, embedded, failed}`",
+        "security": [
+          {
+            "apiKeySecret": []
+          },
+          {
+            "cronSecret": []
+          },
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "description": "Max docs to process this run (clamped to an internal MAX_LIMIT)"
+                  },
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Restrict backfill to one workspace (string (uuid))"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

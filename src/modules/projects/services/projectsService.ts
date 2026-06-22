@@ -357,6 +357,16 @@ class ProjectsService {
     if (error) throw error;
   }
 
+  // Hard-delete a project. RLS (projects_owner_all) restricts this to the owner.
+  // FK CASCADE removes rooms, tasks, product lines, client views, collaborators and
+  // events; moodboards, quotes and invoices are SET NULL (kept, just unlinked). Any
+  // storage files (e.g. client-view PDFs) become unreferenced and are reclaimed by
+  // storage-orphan-cleanup-cron.
+  async deleteProject(id: string): Promise<void> {
+    const { error } = await (supabase as any).from('projects').delete().eq('id', id);
+    if (error) throw error;
+  }
+
   // ---------- ROOMS ----------
 
   async listRooms(projectId: string): Promise<ProjectRoom[]> {

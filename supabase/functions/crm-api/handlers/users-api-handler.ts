@@ -10,6 +10,55 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
+ * Recursively delete every object under `prefix` in a storage bucket.
+ * Supabase's list() is per-folder and paginated, so we walk folders and page through files.
+ * Returns the number of objects removed. Best-effort: errors are logged, not thrown.
+ */
+async function deleteStoragePrefix(bucket: string, prefix: string): Promise<number> {
+  const toRemove: string[] = [];
+
+  async function walk(folder: string): Promise<void> {
+    let offset = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .list(folder, { limit: 1000, offset });
+      if (error) {
+        console.error(`[crm-users-api] storage list ${bucket}/${folder} failed:`, error.message);
+        return;
+      }
+      if (!data || data.length === 0) return;
+      for (const entry of data) {
+        const full = folder ? `${folder}/${entry.name}` : entry.name;
+        // Folders come back with a null id; files have an id.
+        if (entry.id === null) {
+          await walk(full);
+        } else {
+          toRemove.push(full);
+        }
+      }
+      if (data.length < 1000) break;
+      offset += 1000;
+    }
+  }
+
+  await walk(prefix);
+
+  let removed = 0;
+  for (let i = 0; i < toRemove.length; i += 100) {
+    const batch = toRemove.slice(i, i + 100);
+    const { error } = await supabase.storage.from(bucket).remove(batch);
+    if (error) {
+      console.error(`[crm-users-api] storage remove ${bucket} batch failed:`, error.message);
+    } else {
+      removed += batch.length;
+    }
+  }
+  return removed;
+}
+
+/**
  * CRM Users API
  * Handles user management operations: list, get, update, delete
  *
@@ -340,38 +389,44 @@ export async function handleUsers(req: Request): Promise<Response> {
       );
     }
 
-    // DELETE /api/users/{id} - Delete user
+    // DELETE /api/users/{id} - Delete user account + all personal data + files
     if (method === 'DELETE' && path.length === 1) {
-      const userId = path[0];
+      const targetUserId = path[0];
 
-      // Delete user profile
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('user_id', userId);
-
-      if (profileError) {
+      // 1. Delete the auth user. Foreign keys on auth.users now CASCADE all of the user's
+      //    personal data (user_profiles, user_credits, moodboards, projects, quotes,
+      //    conversations, generations, api keys, social accounts, tracked queries/mentions/
+      //    jobs, notifications, preferences, …) and SET NULL on shared/business records they
+      //    merely authored (catalog products/documents, KB docs, CRM, finance). AFTER DELETE
+      //    storage triggers fire during this cascade for entity-keyed outputs (moodboard
+      //    sheets, quote / catalog / client-view PDFs).
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(targetUserId);
+      if (authDeleteError) {
+        // Surface the real failure — do NOT report success on a failed delete.
+        console.error(`[crm-users-api] Failed to delete auth user ${targetUserId}:`, authDeleteError.message);
         return new Response(
-          JSON.stringify({ error: profileError.message }),
-          { status: 400, headers: corsHeaders },
+          JSON.stringify({ error: `Failed to delete user: ${authDeleteError.message}` }),
+          { status: 500, headers: corsHeaders },
         );
       }
 
-      // Delete user credits
-      await supabase
-        .from('user_credits')
-        .delete()
-        .eq('user_id', userId);
+      // 2. jwt_tokens_log keys the user by a text column (no FK to auth.users), so the
+      //    cascade can't reach it — clean it explicitly.
+      await supabase.from('jwt_tokens_log').delete().eq('user_id', targetUserId);
 
-      // Delete the auth user so it doesn't remain orphaned
-      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
-      if (authDeleteError) {
-        console.error(`[crm-users-api] Failed to delete auth user ${userId}:`, authDeleteError.message);
-        // Non-fatal: profile already deleted; log and continue
-      }
+      // 3. Remove storage objects keyed by the user-id prefix (avatars, AI generations,
+      //    uploaded chat images, KB raw PDFs). The account is already gone, so this is
+      //    best-effort; storage-orphan-cleanup-cron is the backstop for anything missed.
+      const storageRemoved = {
+        'profile-avatars': await deleteStoragePrefix('profile-avatars', targetUserId),
+        'generation-images':
+          (await deleteStoragePrefix('generation-images', `u/${targetUserId}`)) +
+          (await deleteStoragePrefix('generation-images', targetUserId)),
+        'pdf-documents': await deleteStoragePrefix('pdf-documents', targetUserId),
+      };
 
       return new Response(
-        JSON.stringify({ message: 'User deleted successfully' }),
+        JSON.stringify({ message: 'User deleted successfully', storage_objects_removed: storageRemoved }),
         { status: 200, headers: corsHeaders },
       );
     }
