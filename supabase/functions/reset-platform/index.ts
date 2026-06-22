@@ -88,6 +88,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - document_series             ← legal invoice/receipt numbering sequences
 //   - fiscal_connectors / fiscal_submissions   ← AADE/Novus transmission ledger
 //   - finance_settings / finance_branches / finance_categories / pricing_rules
+//   - finance_manual_entries / trip_expense_items / trip_expense_reports
 //   - workspace_fiscal_bindings / workspace_inbound_credentials
 //     / workspace_payment_config / workspace_storefront / workspace_doc_type
 //     / workspace_module_entitlements
@@ -106,6 +107,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - tracked_jobs + job_listings / job_excluded_urls / job_match_corrections
 //     / job_alert_log / job_classifier_verdict_cache / job_research_sites
 //   - seo_tracked_domains / seo_research_runs / seo_domain_audit_history
+//
+//   ── Agent Fabric persistent layer (#132 — NEVER WIPE, secrets cascade) ──
+//   - agent_definitions / agent_projects / agent_project_secrets
+//     / agent_project_deployments / agent_project_snapshots
+//     (only the runtime — agent_runs/agent_artifacts/agent_inbox_messages — is cleared)
 //
 //   ── Connection tokens (NEVER WIPE — re-auth pain) ──
 //   - social_accounts / social_zernio_profiles
@@ -151,6 +157,14 @@ const TABLES_TO_CLEAR = [
   'agent_memories',                // Agent long-term memory (hallucination risk)
   'agent_usage_logs',              // Per-run token/cost usage
   'agent_tasks',                   // Agent task records
+
+  // ── Agent Fabric runtime (#132) — runtime only; the persistent layer
+  //    (agent_definitions / agent_projects / agent_project_secrets /
+  //    agent_project_deployments / agent_project_snapshots) is PRESERVED in
+  //    NEVER_CLEAR — agent_project_secrets CASCADEs from agent_projects, so the
+  //    whole persistent layer must survive to keep secrets safe.
+  'agent_artifacts',               // Run output artifacts (CASCADE child of agent_runs)
+  'agent_inbox_messages',          // Inter-agent inbox messages (SET NULL from agent_runs)
 
   // ── Flow Engine ─────────────────────────────────────────────────────
   'flow_run_steps',                // Step runs (child of flow_runs)
@@ -332,6 +346,40 @@ const TABLES_TO_CLEAR = [
   'api_usage_logs',                // API usage logs
   'mivaa_api_usage_logs',          // MIVAA API usage logs
   'webhook_calls',                 // Webhook call history
+  'system_logs',                   // Platform-wide system/audit log (derived, unbounded)
+  'ai_pricing_update_logs',        // AI pricing auto-update audit log
+  'email_events',                  // Email open/click/bounce events (child of email_logs)
+  'email_analytics',               // Email engagement analytics (derived)
+  'email_actions',                 // Email action log (derived)
+  'email_logs',                    // Email send log (derived; templates/settings PRESERVED)
+  'social_account_insights',       // Social follower/engagement insights (derived; accounts PRESERVED)
+  'facet_merge_log',               // Facet canonicalization merge audit (derived; vocab PRESERVED)
+
+  // ── Surplus Marketplace (#219) — user-generated cross-tenant listings ───
+  'marketplace_inquiries',         // Buyer inquiries (child of listings)
+  'marketplace_want_lists',        // Buyer want-lists
+  'marketplace_listings',          // Last-stock listings (product_id SET NULL on product wipe)
+
+  // ── Pricing Pyramid (#227) — user-generated requests ────────────────
+  'master_requests',               // Master/resale requests
+  'pricing_change_requests',       // Pricing change requests
+
+  // ── Appointments (user-generated) ───────────────────────────────────
+  'appointments',                  // Booked appointments
+  'appointment_availability',      // Availability slots
+
+  // ── Connected Websites (user-generated + crawled) ───────────────────
+  'user_website_pages',            // Crawled website pages (child of user_websites)
+  'user_websites',                 // Connected website configs
+
+  // ── Profile / social requests & follows (user-generated) ────────────
+  'profile_reviews',               // Reviews left on profiles
+  'profile_contact_requests',      // Contact requests
+  'factory_access_requests',       // Factory data-access requests
+  'factory_registration_requests', // Factory registration requests
+  'role_upgrade_requests',         // Role-upgrade requests
+  'user_follows',                  // Follow graph
+  'notifications',                 // Legacy/secondary notifications table (derived)
 
   // ============================================================
   // PRESERVED (not in this list — see header comment for full list):
@@ -374,6 +422,7 @@ const NEVER_CLEAR = new Set<string>([
   'pos_sessions', 'pos_cash_movements', 'pos_signatures', 'pos_terminals',
   'document_series', 'fiscal_connectors', 'fiscal_submissions',
   'finance_settings', 'finance_branches', 'finance_categories', 'pricing_rules',
+  'finance_manual_entries', 'trip_expense_items', 'trip_expense_reports',
   'workspace_fiscal_bindings', 'workspace_inbound_credentials',
   'workspace_payment_config', 'workspace_storefront', 'workspace_doc_type',
   'workspace_module_entitlements',
@@ -393,6 +442,12 @@ const NEVER_CLEAR = new Set<string>([
   // Connection tokens + compliance
   'social_accounts', 'social_zernio_profiles', 'messaging_channels',
   'messaging_settings', 'messaging_optouts',
+  // Agent Fabric persistent layer (#132) — definitions + projects + secrets +
+  // deployments + snapshots. agent_project_secrets CASCADEs from agent_projects,
+  // so the entire persistent layer must be preserved to keep secrets safe; only
+  // the runtime (agent_runs/agent_artifacts/agent_inbox_messages) is cleared.
+  'agent_definitions', 'agent_projects', 'agent_project_secrets',
+  'agent_project_deployments', 'agent_project_snapshots',
   // Accounts / credits / RBAC / admin config
   'user_credits', 'credit_transactions', 'credit_packages', 'workspaces',
   'workspace_members', 'user_profiles', 'roles', 'role_permissions',
@@ -408,6 +463,7 @@ const NEVER_CLEAR = new Set<string>([
 // Map each to a non-null column we can use as an always-true predicate.
 const IDLESS_DELETE_COLUMN: Record<string, string> = {
   public_lookup_cache: 'query_hash', // composite PK (query_hash, scan_type)
+  facet_merge_log: 'id',             // PK `id` is bigint, not uuid — zero-uuid predicate can't target it
 };
 
 // ============================================================

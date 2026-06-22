@@ -115,6 +115,11 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             <li>Designer module (projects, materials, assets)</li>
             <li>Storefront carts (shopping carts &amp; cart items)</li>
             <li>Social post content &amp; Messaging conversations (connection tokens are kept)</li>
+            <li>Surplus Marketplace listings, inquiries &amp; want-lists</li>
+            <li>Pricing-pyramid &amp; master requests, role-upgrade / factory / contact requests, profile reviews &amp; follows</li>
+            <li>Appointments &amp; availability; connected websites &amp; crawled pages</li>
+            <li>Agent Fabric runtime (run artifacts &amp; agent inbox) — project definitions, projects &amp; secrets are kept</li>
+            <li>Derived logs (system logs, email send/event/analytics logs, AI-pricing-update log, social insights, facet-merge log)</li>
             <li>3D / Video / VR generation history (incl. WorldLabs VR worlds)</li>
             <li>Analytics (events, manufacturer analytics, quality &amp; recommendation metrics)</li>
             <li>User behavior profiles &amp; personalization state</li>
@@ -144,7 +149,8 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             <li>Users, Profiles &amp; Workspaces</li>
             <li>CRM (contacts, companies, relationships)</li>
             <li>Credits &amp; Billing (user_credits, transactions, packages)</li>
-            <li><strong>Finance &amp; Fiscal (legally retained)</strong> — invoices, credit notes, payments, supplier bills, POS sessions, time entries, stock movements, delivery/purchase orders, document numbering series, AADE/myDATA fiscal submissions &amp; connectors</li>
+            <li><strong>Finance &amp; Fiscal (legally retained)</strong> — invoices, credit notes, payments, supplier bills, POS sessions, time entries, stock movements, delivery/purchase orders, document numbering series, AADE/myDATA fiscal submissions &amp; connectors, manual finance entries &amp; trip-expense reports</li>
+            <li><strong>Agent Fabric persistent layer</strong> — agent definitions, projects, secrets, deployments &amp; snapshots (only the run-time artifacts are cleared)</li>
             <li><strong>Secrets &amp; API keys</strong> (platform secrets, customer API keys, material KAI keys)</li>
             <li><strong>Mention, Job &amp; SEO Monitoring</strong> (tracked subjects, history, classifier caches — long-running customer-facing state)</li>
             <li><strong>Social &amp; Messaging connections</strong> (OAuth/WhatsApp account tokens, channels, opt-outs)</li>
