@@ -190,10 +190,12 @@ export function InvoiceDocument({
   const grandStyle: React.CSSProperties =
     spec.totalsBoxStyle === 'accent'
       ? { background: colors.accent, color: '#ffffff', borderRadius: 4, padding: '8px 10px', marginTop: 6 }
+      : spec.totalsBoxStyle === 'accent-text'
+      ? { borderTop: `1.5px solid ${colors.accent}`, paddingTop: 6, marginTop: 4 }
       : { borderTop: `1.5px solid ${colors.line}`, paddingTop: 6, marginTop: 4 };
 
-  const totalRow = (label: string, value: string, opts: { bold?: boolean; accent?: boolean } = {}) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: opts.bold ? 12 : 10, fontWeight: opts.bold ? 800 : 400, color: opts.accent ? '#ffffff' : (opts.bold ? colors.text : colors.muted), padding: '2px 0' }}>
+  const totalRow = (label: string, value: string, opts: { bold?: boolean; accent?: boolean; accentText?: boolean } = {}) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: opts.bold ? 12 : 10, fontWeight: opts.bold ? 800 : 400, color: opts.accent ? '#ffffff' : opts.accentText ? colors.accent : (opts.bold ? colors.text : colors.muted), padding: '2px 0' }}>
       <span>{label}</span><span style={{ whiteSpace: 'nowrap' }}>{value}</span>
     </div>
   );
@@ -229,7 +231,7 @@ export function InvoiceDocument({
           <React.Fragment key={i}>{totalRow(e.label, `${e.negative ? '- ' : ''}${money(e.value)}`)}</React.Fragment>
         ))}
         <div style={grandStyle}>
-          {totalRow(L.total, money(data.totals.grand), { bold: true, accent: spec.totalsBoxStyle === 'accent' })}
+          {totalRow(L.total, money(data.totals.grand), { bold: true, accent: spec.totalsBoxStyle === 'accent', accentText: spec.totalsBoxStyle === 'accent-text' })}
         </div>
         {data.totals.amountPaid > 0 && (
           <div style={{ marginTop: 4 }}>
@@ -245,12 +247,15 @@ export function InvoiceDocument({
   const Payment = () => {
     const hasPay = data.payment.method || data.payment.info || data.payment.accounts.length > 0;
     if (!hasPay) return null;
+    // Sidebar (Modern) renders bank details in the accent color, like the design reference.
+    const bankStyle: React.CSSProperties = spec.headerStyle === 'sidebar'
+      ? { color: colors.accent, fontWeight: 600 } : {};
     return (
       <div style={{ marginBottom: 12, fontSize: 9.5, ...muted }}>
         {data.payment.method && <div>{L.paymentMethod}: {data.payment.method}</div>}
         {data.payment.info && <div>{data.payment.info}</div>}
         {data.payment.accounts.map((a, i) => (
-          <div key={i}>{i === 0 ? `${L.bank}: ${a}` : a}</div>
+          <div key={i} style={bankStyle}>{i === 0 ? `${L.bank}: ${a}` : a}</div>
         ))}
       </div>
     );
@@ -301,8 +306,8 @@ export function InvoiceDocument({
     );
   };
 
-  return (
-    <div style={sheet} data-invoice-template={spec.id}>
+  const Body = () => (
+    <>
       <Header />
       <Customer />
       <Items />
@@ -311,6 +316,40 @@ export function InvoiceDocument({
       <Shipping />
       <Notes />
       <Fiscal />
+    </>
+  );
+
+  // Sidebar (Modern): a narrow left gutter holding the vertical accent wordmark, body to its right.
+  if (spec.headerStyle === 'sidebar') {
+    return (
+      <div style={sheet} data-invoice-template={spec.id}>
+        <div style={{ display: 'flex', gap: '7mm' }}>
+          <div style={{ flexShrink: 0, width: 24 }}>
+            <div
+              style={{
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                fontSize: 16,
+                fontWeight: 800,
+                letterSpacing: '0.05em',
+                color: colors.accent,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {data.issuer.name}
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Body />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={sheet} data-invoice-template={spec.id}>
+      <Body />
     </div>
   );
 }

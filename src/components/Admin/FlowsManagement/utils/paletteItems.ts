@@ -178,6 +178,10 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Surplus Match', description: 'A new surplus listing matched a buyer\'s saved alert', icon: 'Package', color: 'emerald',
     defaultData: { label: 'Surplus Match', category: 'trigger', triggerType: 'marketplace_want_match', config: {} } as TriggerNodeData },
 
+  // Account receivable/payable → finance asked to issue a receipt/invoice
+  { type: 'triggerNode', category: 'trigger', subType: 'finance_document_requested', group: 'Finance',
+    label: 'Finance Document Requested', description: 'A receivable/payable was recorded asking finance to issue a receipt or invoice', icon: 'ClipboardCheck', color: 'blue',
+    defaultData: { label: 'Finance Document Requested', category: 'trigger', triggerType: 'finance_document_requested', config: {} } as TriggerNodeData },
   // Expense cards (trip / monthly / …)
   { type: 'triggerNode', category: 'trigger', subType: 'expense_card_submitted', group: 'Finance',
     label: 'Expense Card Submitted', description: 'A team member submitted an expense card for review', icon: 'ClipboardCheck', color: 'blue',

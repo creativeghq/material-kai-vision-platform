@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Edit2, Users, Trash2, Plus, Search, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerAccountOverview,
@@ -9,7 +9,6 @@ import {
   CustomerPaymentsTab,
 } from '@/modules/finance/components/CustomerFinanceTabs';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
-import CompanySEOPanel from '@/components/business/seo-toolkit/CompanySEOPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -30,6 +29,7 @@ import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDr
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
 import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
+import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
 import {
@@ -54,6 +54,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
+import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
+import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
 
 interface Company {
   id: string;
@@ -134,7 +137,6 @@ export const CompanyDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [viesBusy, setViesBusy] = useState(false);
   const [aadeBusy, setAadeBusy] = useState(false);
-  const [editing, setEditing] = useState(isNew); // Start in editing mode for new companies
   const [company, setCompany] = useState<Company | null>(isNew ? {
     id: '',
     name: '',
@@ -193,82 +195,54 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
+  // Create-new only. Existing companies self-save per field (view-first inline edit).
   const handleSave = async () => {
     if (!company) return;
-
-    // Validate required fields
     if (!company.name || company.name.trim() === '') {
-      toast({
-        title: 'Validation Error',
-        description: 'Company name is required',
-        variant: 'destructive',
-      });
+      toast({ title: 'Validation Error', description: 'Company name is required', variant: 'destructive' });
       return;
     }
-
     try {
       setSaving(true);
-
-      if (isNew) {
-        // Create new company
-        const response = await companiesAPI.createCompany(company);
-        toast({
-          title: 'Success',
-          description: 'Company created successfully',
-        });
-        // Navigate to the new company's page
-        navigate(`/admin/crm/companies/${response.data.id}`, { replace: true });
-      } else {
-        // #227 — route customer discount/level through the approval RPC (sales → pending,
-        // others → applied) and strip them from the generic update so the handler never
-        // applies them directly (which would bypass approval).
-        const { user_level_key, discount_percent, ...rest } = company as any;
-        await companiesAPI.updateCompany(id!, rest);
-        let pricingPending = false;
-        try {
-          const res = await financeService.proposeOrApplyCustomerPricing({
-            subjectType: 'company', subjectId: id!,
-            userLevelKey: company.user_level_key ?? null,
-            discountPercent: company.discount_percent ?? null,
-          });
-          pricingPending = res.status === 'pending';
-          if (pricingPending) {
-            // Fan out to every finance approver (owner/admin) — one event per recipient.
-            const approvers = await financeService.listWorkspaceApproverIds(activeWorkspaceId!).catch(() => []);
-            for (const uid of approvers) {
-              flowEventService.emit('pricing_change_requested', {
-                workspace_id: activeWorkspaceId, request_id: res.request_id, user_id: uid,
-                subject_type: 'company', subject_id: id!,
-                title: 'Discount change needs approval',
-                body: 'A sales team member proposed a customer discount/level change.',
-              });
-            }
-          }
-        } catch (e: any) {
-          toast({ title: 'Pricing change failed', description: e?.message, variant: 'destructive' });
-        }
-        toast({
-          title: pricingPending ? 'Saved — discount change sent for approval' : 'Success',
-          description: pricingPending ? undefined : 'Company updated successfully',
-        });
-        setEditing(false);
-        await loadCompany();
-      }
+      const response = await companiesAPI.createCompany(company);
+      toast({ title: 'Success', description: 'Company created successfully' });
+      navigate(`/admin/crm/companies/${response.data.id}`, { replace: true });
     } catch (error) {
-      console.error('Error saving company:', error);
-      toast({
-        title: 'Error',
-        description: isNew ? 'Failed to create company' : 'Failed to save company',
-        variant: 'destructive',
-      });
+      console.error('Error creating company:', error);
+      toast({ title: 'Error', description: 'Failed to create company', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
   };
 
-  const updateField = (field: keyof Company, value: any) => {
+  /** #227 — pricing level/discount route through the approval RPC, not patchInline. */
+  const savePricing = async (updates: { user_level_key?: string | null; discount_percent?: number | null }) => {
     if (!company) return;
-    setCompany({ ...company, [field]: value });
+    const next = { ...company, ...updates };
+    setCompany(next);
+    if (isNew || !id) return;
+    try {
+      const res = await financeService.proposeOrApplyCustomerPricing({
+        subjectType: 'company', subjectId: id,
+        userLevelKey: next.user_level_key ?? null,
+        discountPercent: next.discount_percent ?? null,
+      });
+      if (res.status === 'pending') {
+        const approvers = await financeService.listWorkspaceApproverIds(activeWorkspaceId!).catch(() => []);
+        for (const uid of approvers) {
+          flowEventService.emit('pricing_change_requested', {
+            workspace_id: activeWorkspaceId, request_id: res.request_id, user_id: uid,
+            subject_type: 'company', subject_id: id,
+            title: 'Discount change needs approval',
+            body: 'A sales team member proposed a customer discount/level change.',
+          });
+        }
+        toast({ title: 'Discount change sent for approval' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Pricing change failed', description: e?.message, variant: 'destructive' });
+      await loadCompany();
+    }
   };
 
   // #227 — load this workspace's pricing levels for the customer-level dropdown.
@@ -350,10 +324,9 @@ export const CompanyDetailPage: React.FC = () => {
       }
       if ('ok' in res && res.ok) {
         adoptAadeAll(res);
-        if (!editing) setEditing(true);
         toast({
           title: res.source === 'cache' ? 'AADE data (cached)' : 'AADE data fetched',
-          description: res.basic_rec.onomasia ? `Registered as ${res.basic_rec.onomasia} — review and Save.` : 'Business details pre-filled — review and Save.',
+          description: res.basic_rec.onomasia ? `Imported ${res.basic_rec.onomasia} from ΑΑΔΕ.` : 'Business details imported from ΑΑΔΕ.',
         });
       }
     } finally {
@@ -361,46 +334,42 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
-  /** Adopt every ΑΑΔΕ field into the form. Persisted on Save (createCompany/updateCompany). */
+  /** Adopt every ΑΑΔΕ field. Self-saves via patchInline (persists for existing, local for new). */
   const adoptAadeAll = (res: AadeLookupResult) => {
+    if (!company) return;
     const r = res.basic_rec;
     const primaryAct = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
     const secondaryActs = res.activities.filter((a) => a.kind !== 1);
     const combinedAddress = r.postal_address
       ? `${r.postal_address} ${r.postal_address_no ?? ''}`.replace(/\s+/g, ' ').trim()
       : null;
-    setCompany((prev) => prev ? {
-      ...prev,
-      // Authoritative for Greek businesses
-      name: r.onomasia ?? prev.name,
-      // Structured myDATA-grade address + the combined display address
-      street: r.postal_address ?? prev.street,
-      street_number: r.postal_address_no ?? prev.street_number,
-      address: combinedAddress ?? prev.address,
-      postal_code: r.postal_zip_code ?? prev.postal_code,
-      city: r.postal_area_description ?? prev.city,
-      country: r.postal_area_description ? (prev.country || 'Greece') : prev.country,
-      country_code: prev.country_code || 'EL',
-      tax_office: r.doy_descr ?? prev.tax_office,
-      profession: primaryAct?.description ?? prev.profession,
-      // ΑΑΔΕ structured columns (mirror what the edge function persists)
+    patchInline({
+      name: r.onomasia ?? company.name,
+      street: r.postal_address ?? company.street,
+      street_number: r.postal_address_no ?? company.street_number,
+      address: combinedAddress ?? company.address,
+      postal_code: r.postal_zip_code ?? company.postal_code,
+      city: r.postal_area_description ?? company.city,
+      country: r.postal_area_description ? (company.country || 'Greece') : company.country,
+      country_code: company.country_code || 'EL',
+      tax_office: r.doy_descr ?? company.tax_office,
+      profession: primaryAct?.description ?? company.profession,
       commercial_title: r.commer_title,
       legal_status: r.legal_status_descr,
       kad_primary: primaryAct?.code ?? null,
       kad_primary_description: primaryAct?.description ?? null,
-      kad_secondary: secondaryActs.length> 0 ? secondaryActs : null,
+      kad_secondary: secondaryActs.length > 0 ? secondaryActs : null,
       business_start_date: r.regist_date ? (r.regist_date.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null,
       aade_data: { basic_rec: r, activities: res.activities },
       aade_data_at: res.checked_at,
-      // ΑΑΔΕ active-flag is authoritative — fill the VIES-style verification columns too
       vat_validated: r.deactivation_flag === '1' ? true : (r.deactivation_flag === '2' ? false : null),
       vat_validated_at: res.checked_at,
       vat_validated_name: r.onomasia,
       vat_validated_address: combinedAddress
         ? `${combinedAddress} ${r.postal_zip_code ?? ''} ${r.postal_area_description ?? ''}`.replace(/\s+/g, ' ').trim()
-        : prev.vat_validated_address,
+        : company.vat_validated_address,
       vat_validation_source: 'aade',
-    } : prev);
+    } as Partial<Company>);
   };
 
   /**
@@ -521,31 +490,16 @@ export const CompanyDetailPage: React.FC = () => {
             <ArrowLeft className="h-4 w-4 mr-2"/>
             Back to CRM
           </Button>
-          <div className="flex gap-2">
-            {editing ? (
-              <>
-                <Button variant="outline" onClick={() => {
-                  if (isNew) {
-                    navigate('/admin/crm');
-                  } else {
-                    setEditing(false);
-                    loadCompany();
-                  }
-                }}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2"/>
-                  {saving ? 'Saving...' : (isNew ? 'Create Company' : 'Save Changes')}
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => setEditing(true)}>
-                <Edit2 className="h-4 w-4 mr-2"/>
-                Edit Company
+          {/* View-first: existing companies save per field inline. Only create needs Create/Cancel. */}
+          {isNew && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate('/admin/crm')}>Cancel</Button>
+              <Button onClick={handleSave} disabled={saving}>
+                <Save className="h-4 w-4 mr-2"/>
+                {saving ? 'Saving...' : 'Create Company'}
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -566,10 +520,6 @@ export const CompanyDetailPage: React.FC = () => {
             <TabsTrigger value="notes">
               <FileText className="h-4 w-4 mr-2"/>
               Notes
-            </TabsTrigger>
-            <TabsTrigger value="seo">
-              <Search className="h-4 w-4 mr-2"/>
-              SEO
             </TabsTrigger>
             <TabsTrigger value="account">
               <Wallet className="h-4 w-4 mr-2"/>
@@ -597,132 +547,67 @@ export const CompanyDetailPage: React.FC = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-4">
+            {/* item 7 — accessibility-first myAADE import: start from the ΑΦΜ at the top
+                and prefill name / address / ΔΟΥ / activity, instead of a row deep in the form. */}
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <Label htmlFor="aade-vat" className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Import with myAADE</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Enter a Greek VAT number (ΑΦΜ) to pull the official business name, address, tax office (ΔΟΥ) and activity straight from the ΑΑΔΕ registry.
+                  </p>
+                  <Input
+                    id="aade-vat"
+                    value={company.vat_number || ''}
+                    onChange={(e) => setCompany((prev) => prev ? { ...prev, vat_number: e.target.value } : prev)}
+                    onBlur={(e) => { if ((e.target.value || '') !== '') patchInline({ vat_number: e.target.value }); }}
+                    placeholder="9-digit ΑΦΜ"
+                    className="max-w-xs"
+                  />
+                </div>
+                <Button
+                  onClick={lookupAade}
+                  disabled={aadeBusy || (company.vat_number || '').replace(/[^0-9]/g, '').length !== 9}
+                >
+                  {aadeBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                  Import with myAADE
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Company Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Name */}
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Company Name *</Label>
-                    <Input
-                      id="name"
-                      value={company.name}
-                      onChange={(e) => updateField('name', e.target.value)}
-                      disabled={!editing}
-                      required
-/>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                  <div className="md:col-span-2">
+                    <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
                   </div>
-
-                  {/* Industry */}
-                  <div className="space-y-2">
-                    <Label htmlFor="industry">Industry</Label>
-                    <Input
-                      id="industry"
-                      value={company.industry || ''}
-                      onChange={(e) => updateField('industry', e.target.value)}
-                      disabled={!editing}
-                      placeholder="e.g., Technology, Healthcare"
-/>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">Industry</div>
+                    {isNew ? (
+                      <p className="text-sm text-muted-foreground mt-0.5">Save the company first to assign industries.</p>
+                    ) : (
+                      <div className="mt-1"><IndustrySelect companyId={id!} onChange={(names) => patchInline({ industry: names.join(', ') })} /></div>
+                    )}
                   </div>
-
-                  {/* Email */}
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <div className="flex gap-2 items-start">
-                      <Mail className="h-4 w-4 mt-3 text-muted-foreground"/>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={company.email || ''}
-                        onChange={(e) => updateField('email', e.target.value)}
-                        disabled={!editing}
-                        placeholder="contact@company.com"
-/>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        onClick={() => setShowEmailDialog(true)}
-                        disabled={!company.email}
-                        title={company.email ? `Send email to ${company.email}` : 'No email on file'}
-                        className="shrink-0"
->
-                        <Send className="h-4 w-4"/>
-                      </Button>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <InlineText alwaysEdit={isNew} type="email" label="Email" value={company.email} onSave={(v) => patchInline({ email: v })} placeholder="contact@company.com" />
                     </div>
+                    <Button type="button" size="icon" variant="outline" onClick={() => setShowEmailDialog(true)} disabled={!company.email}
+                      title={company.email ? `Send email to ${company.email}` : 'No email on file'} className="shrink-0 mb-0.5">
+                      <Send className="h-4 w-4"/>
+                    </Button>
                   </div>
-
-                  {/* Phone */}
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <div className="flex gap-2">
-                      <Phone className="h-4 w-4 mt-3 text-muted-foreground"/>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={company.phone || ''}
-                        onChange={(e) => updateField('phone', e.target.value)}
-                        disabled={!editing}
-                        placeholder="+1 (555) 123-4567"
-/>
-                    </div>
+                  <InlineText alwaysEdit={isNew} type="tel" label="Phone" value={company.phone} onSave={(v) => patchInline({ phone: v })} placeholder="+1 (555) 123-4567" />
+                  <InlineText alwaysEdit={isNew} type="url" label="Website" value={company.website} onSave={(v) => patchInline({ website: v })} placeholder="https://company.com" />
+                  <InlineText alwaysEdit={isNew} label="Employee Count" value={company.employee_count} onSave={(v) => patchInline({ employee_count: v })} placeholder="e.g. 1-10, 50, 500+" copy={false} />
+                  <InlineText alwaysEdit={isNew} label="Annual Revenue" value={company.annual_revenue} onSave={(v) => patchInline({ annual_revenue: v })} placeholder="e.g. $1M - $10M" copy={false} />
+                  <div className="md:col-span-2">
+                    <InlineText alwaysEdit={isNew} multiline label="Description" value={company.description} onSave={(v) => patchInline({ description: v })} placeholder="Brief description of the company…" copy={false} />
                   </div>
-
-                  {/* Website */}
-                  <div className="space-y-2">
-                    <Label htmlFor="website">Website</Label>
-                    <div className="flex gap-2">
-                      <Globe className="h-4 w-4 mt-3 text-muted-foreground"/>
-                      <Input
-                        id="website"
-                        type="url"
-                        value={company.website || ''}
-                        onChange={(e) => updateField('website', e.target.value)}
-                        disabled={!editing}
-                        placeholder="https://company.com"
-/>
-                    </div>
-                  </div>
-
-                  {/* Employee Count */}
-                  <div className="space-y-2">
-                    <Label htmlFor="employee_count">Employee Count</Label>
-                    <Input
-                      id="employee_count"
-                      type="text"
-                      value={company.employee_count || ''}
-                      onChange={(e) => updateField('employee_count', e.target.value)}
-                      disabled={!editing}
-                      placeholder="e.g., 50, 1-10, 100-500, 500+"
-/>
-                  </div>
-
-                  {/* Annual Revenue */}
-                  <div className="space-y-2">
-                    <Label htmlFor="annual_revenue">Annual Revenue</Label>
-                    <Input
-                      id="annual_revenue"
-                      value={company.annual_revenue || ''}
-                      onChange={(e) => updateField('annual_revenue', e.target.value)}
-                      disabled={!editing}
-                      placeholder="e.g., $1M - $10M"
-/>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={company.description || ''}
-                    onChange={(e) => updateField('description', e.target.value)}
-                    disabled={!editing}
-                    placeholder="Brief description of the company..."
-                    rows={3}
-/>
                 </div>
               </CardContent>
             </Card>
@@ -736,43 +621,18 @@ export const CompanyDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Country code */}
-                  <div className="space-y-2">
-                    <Label htmlFor="country_code">Country Code</Label>
-                    <Input
-                      id="country_code"
-                      value={company.country_code || ''}
-                      onChange={(e) => updateField('country_code', e.target.value.toUpperCase().slice(0, 2))}
-                      disabled={!editing}
-                      placeholder="EL, DE, FR…"
-                      maxLength={2}
-/>
-                  </div>
-
-                  {/* VAT number */}
-                  <div className="space-y-2">
-                    <Label htmlFor="vat_number">VAT Number</Label>
-                    <Input
-                      id="vat_number"
-                      value={company.vat_number || ''}
-                      onChange={(e) => updateField('vat_number', e.target.value)}
-                      disabled={!editing}
-                      placeholder="123456789"
-/>
-                  </div>
-
-                  {/* Tax office */}
-                  <div className="space-y-2">
-                    <Label htmlFor="tax_office">Tax Office</Label>
-                    <Input
-                      id="tax_office"
-                      value={company.tax_office || ''}
-                      onChange={(e) => updateField('tax_office', e.target.value)}
-                      disabled={!editing}
-                      placeholder="Optional"
-/>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
+                  <InlineSelect
+                    alwaysEdit={isNew}
+                    label="VAT Country"
+                    value={company.country_code ?? undefined}
+                    placeholder="Not set"
+                    options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, label: <span className="flex items-center gap-2"><span className="font-mono text-[10px] w-7">{o.code}</span>{o.name}{o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}</span> }))}
+                    displayValue={company.country_code ? <span className="font-mono">{company.country_code}</span> : undefined}
+                    onSave={(v) => patchInline({ country_code: v })}
+                  />
+                  <InlineText alwaysEdit={isNew} label="VAT Number" value={company.vat_number} onSave={(v) => patchInline({ vat_number: v })} placeholder="123456789" />
+                  <InlineText alwaysEdit={isNew} label="Tax Office" value={company.tax_office} onSave={(v) => patchInline({ tax_office: v })} placeholder="Optional" />
                 </div>
 
                 {/* Validation status + action */}
@@ -852,73 +712,21 @@ export const CompanyDetailPage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Address</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Address */}
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="address">Street Address</Label>
-                    <Input
-                      id="address"
-                      value={company.address || ''}
-                      onChange={(e) => updateField('address', e.target.value)}
-                      disabled={!editing}
-                      placeholder="123 Main Street"
-/>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                  <div className="md:col-span-2">
+                    <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                   </div>
-
-                  {/* City */}
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={company.city || ''}
-                      onChange={(e) => updateField('city', e.target.value)}
-                      disabled={!editing}
-                      placeholder="San Francisco"
-/>
-                  </div>
-
-                  {/* State */}
-                  <div className="space-y-2">
-                    <Label htmlFor="state">State/Province</Label>
-                    <Input
-                      id="state"
-                      value={company.state || ''}
-                      onChange={(e) => updateField('state', e.target.value)}
-                      disabled={!editing}
-                      placeholder="CA"
-/>
-                  </div>
-
-                  {/* Postal Code */}
-                  <div className="space-y-2">
-                    <Label htmlFor="postal_code">Postal Code</Label>
-                    <Input
-                      id="postal_code"
-                      value={company.postal_code || ''}
-                      onChange={(e) => updateField('postal_code', e.target.value)}
-                      disabled={!editing}
-                      placeholder="94102"
-/>
-                  </div>
-
-                  {/* Country */}
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      value={company.country || ''}
-                      onChange={(e) => updateField('country', e.target.value)}
-                      disabled={!editing}
-                      placeholder="United States"
-/>
-                  </div>
+                  <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
+                  <InlineText alwaysEdit={isNew} label="State / Province" value={company.state} onSave={(v) => patchInline({ state: v })} placeholder="CA" />
+                  <InlineText alwaysEdit={isNew} label="Postal Code" value={company.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="94102" />
+                  <InlineText alwaysEdit={isNew} label="Country" value={company.country} onSave={(v) => patchInline({ country: v })} placeholder="United States" />
                 </div>
               </CardContent>
             </Card>
 
             {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
-            <AddressUnitsManager companyId={isNew ? undefined : id} readOnly={!editing} />
+            <AddressUnitsManager companyId={isNew ? undefined : id} />
 
             {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
             <Card>
@@ -928,76 +736,23 @@ export const CompanyDetailPage: React.FC = () => {
                   Pricing
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="user_level_key">Pricing level</Label>
-                  <Select
-                    value={company.user_level_key ?? '__default__'}
-                    onValueChange={(v) => updateField('user_level_key', v === '__default__' ? null : v)}
-                    disabled={!editing}
-                  >
-                    <SelectTrigger id="user_level_key"><SelectValue placeholder="Standard" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__default__">Standard</SelectItem>
-                      {pricingLevels.map((l) => <SelectItem key={l.level_key} value={l.level_key}>{l.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    The tier this customer buys at — the level's discount applies off your retail price on quotes (ex-VAT).
-                    Configure levels in Finance → Settings → Pricing.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="discount_percent">Customer discount % (override)</Label>
-                    <Input
-                      id="discount_percent"
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      max={100}
-                      value={company.discount_percent ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        updateField('discount_percent', v === '' ? null : Number(v));
-                      }}
-                      disabled={!editing}
-                      placeholder="e.g. 50"
-/>
-                    <p className="text-xs text-muted-foreground">
-                      A fixed discount for this customer that <strong>overrides</strong> their pricing level. Leave empty to use the level's discount.
-                    </p>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                  <InlineSelect
+                    alwaysEdit={isNew}
+                    label="Pricing level"
+                    value={company.user_level_key ?? undefined}
+                    unsetValue="__default__"
+                    placeholder="Standard"
+                    options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))}
+                    onSave={(v) => savePricing({ user_level_key: v })}
+                    hint="Tier this customer buys at — discount applies off retail on quotes."
+                  />
+                  <InlineText alwaysEdit={isNew} type="number" label="Customer discount % (override)" value={company.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 50" copy={false} hint="Overrides the level's discount. Empty = use the level." />
+                  <InlineText alwaysEdit={isNew} type="number" label="Credit limit" value={company.credit_limit ?? undefined} onSave={(v) => patchInline({ credit_limit: v })} placeholder="e.g. 10000" copy={false} hint="Max outstanding receivable; finance flags when exceeded." />
+                  <div className="md:col-span-2">
+                    <InlineText alwaysEdit={isNew} multiline label="Discount notes" value={company.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 50% per 2025 agreement." copy={false} />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="credit_limit">Credit limit</Label>
-                    <Input
-                      id="credit_limit"
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      value={company.credit_limit ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        updateField('credit_limit', v === '' ? null : Number(v));
-                      }}
-                      disabled={!editing}
-                      placeholder="e.g. 10000"
-/>
-                    <p className="text-xs text-muted-foreground">
-                      Max outstanding receivable. Finance flags this customer when their open balance exceeds it. Leave empty for no limit.
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="discount_notes">Discount notes</Label>
-                  <Textarea
-                    id="discount_notes"
-                    value={company.discount_notes || ''}
-                    onChange={(e) => updateField('discount_notes', e.target.value)}
-                    disabled={!editing}
-                    placeholder="e.g. Long-term partner — 50% per 2025 agreement, valid until renewal."
-                    rows={2}
-/>
                 </div>
               </CardContent>
             </Card>
@@ -1014,36 +769,33 @@ export const CompanyDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact_group">Segment</Label>
-                    <Select
-                      value={company.contact_group || 'none'}
-                      onValueChange={(v) => updateField('contact_group', v === 'none' ? null : v)}
-                      disabled={!editing}
-                    >
-                      <SelectTrigger id="contact_group"><SelectValue placeholder="Unsegmented"/></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Unsegmented</SelectItem>
-                        <SelectItem value="b2b">B2B</SelectItem>
-                        <SelectItem value="retail">Retail</SelectItem>
-                        <SelectItem value="wholesale">Wholesale</SelectItem>
-                        <SelectItem value="public_sector">Public sector</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Groups this party for filtering and statement batches.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vat_exemption_reason">Default VAT-exemption category</Label>
-                    <Input
-                      id="vat_exemption_reason"
-                      value={company.vat_exemption_reason || ''}
-                      onChange={(e) => updateField('vat_exemption_reason', e.target.value)}
-                      disabled={!editing}
-                      placeholder="myDATA category 1–31 (for 0% lines)"
-/>
-                    <p className="text-xs text-muted-foreground">Pre-fills the exemption category on 0%-VAT invoice lines for this customer.</p>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                  <InlineSelect
+                    alwaysEdit={isNew}
+                    label="Segment"
+                    value={company.contact_group ?? undefined}
+                    unsetValue="none"
+                    placeholder="Unsegmented"
+                    options={[
+                      { value: 'b2b', label: 'B2B' },
+                      { value: 'retail', label: 'Retail' },
+                      { value: 'wholesale', label: 'Wholesale' },
+                      { value: 'public_sector', label: 'Public sector' },
+                    ]}
+                    onSave={(v) => patchInline({ contact_group: v })}
+                    hint="Groups this party for filtering and statement batches."
+                  />
+                  <InlineSelect
+                    alwaysEdit={isNew}
+                    label="Default VAT-exemption category"
+                    value={company.vat_exemption_reason ?? undefined}
+                    unsetValue="__none"
+                    placeholder="None"
+                    options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))}
+                    displayValue={company.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{company.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === company.vat_exemption_reason)?.label}</span> : undefined}
+                    onSave={(v) => patchInline({ vat_exemption_reason: v })}
+                    hint="Pre-fills the myDATA exemption category on 0%-VAT lines."
+                  />
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -1058,19 +810,22 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
 
                 {/* Separate billing identity */}
-                <div className="rounded-md border border-border/60 p-3 space-y-3">
+                <div className="rounded-md border border-border/60 p-3 space-y-2">
                   <p className="text-xs text-muted-foreground">
                     <span className="text-foreground font-medium">Separate billing identity</span> — fill only when invoices must be issued to a different legal entity than above (different ΑΦΜ / name / address). Leave blank to invoice the party as-is.
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1"><Label htmlFor="billing_name">Billing name</Label><Input id="billing_name" value={company.billing_name || ''} onChange={(e) => updateField('billing_name', e.target.value)} disabled={!editing} placeholder="Legal entity name"/></div>
-                    <div className="space-y-1"><Label htmlFor="billing_vat">Billing VAT (ΑΦΜ)</Label><Input id="billing_vat" value={company.billing_vat || ''} onChange={(e) => updateField('billing_vat', e.target.value)} disabled={!editing}/></div>
-                    <div className="space-y-1"><Label htmlFor="billing_tax_office">Tax office (ΔΟΥ)</Label><Input id="billing_tax_office" value={company.billing_tax_office || ''} onChange={(e) => updateField('billing_tax_office', e.target.value)} disabled={!editing}/></div>
-                    <div className="space-y-1"><Label htmlFor="billing_country_code">Country code</Label><Input id="billing_country_code" value={company.billing_country_code || ''} onChange={(e) => updateField('billing_country_code', e.target.value.toUpperCase().slice(0, 2))} disabled={!editing} maxLength={2} placeholder="EL"/></div>
-                    <div className="space-y-1"><Label htmlFor="billing_street">Street</Label><Input id="billing_street" value={company.billing_street || ''} onChange={(e) => updateField('billing_street', e.target.value)} disabled={!editing}/></div>
-                    <div className="space-y-1"><Label htmlFor="billing_street_number">Number</Label><Input id="billing_street_number" value={company.billing_street_number || ''} onChange={(e) => updateField('billing_street_number', e.target.value)} disabled={!editing}/></div>
-                    <div className="space-y-1"><Label htmlFor="billing_postal_code">Postal code</Label><Input id="billing_postal_code" value={company.billing_postal_code || ''} onChange={(e) => updateField('billing_postal_code', e.target.value)} disabled={!editing}/></div>
-                    <div className="space-y-1"><Label htmlFor="billing_city">City</Label><Input id="billing_city" value={company.billing_city || ''} onChange={(e) => updateField('billing_city', e.target.value)} disabled={!editing}/></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    <InlineText alwaysEdit={isNew} label="Billing name" value={company.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
+                    <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={company.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
+                    <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={company.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} />
+                    <InlineSelect alwaysEdit={isNew} label="VAT country" value={company.billing_country_code ?? undefined} placeholder="Not set"
+                      options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))}
+                      displayValue={company.billing_country_code ? <span className="font-mono">{company.billing_country_code}</span> : undefined}
+                      onSave={(v) => patchInline({ billing_country_code: v })} />
+                    <InlineText alwaysEdit={isNew} label="Street" value={company.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
+                    <InlineText alwaysEdit={isNew} label="Number" value={company.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
+                    <InlineText alwaysEdit={isNew} label="Postal code" value={company.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
+                    <InlineText alwaysEdit={isNew} label="City" value={company.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
                   </div>
                 </div>
               </CardContent>
@@ -1238,43 +993,11 @@ export const CompanyDetailPage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Social Media & Web Presence</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  {/* LinkedIn */}
-                  <div className="space-y-2">
-                    <Label htmlFor="linkedin">LinkedIn</Label>
-                    <Input
-                      id="linkedin"
-                      value={company.linkedin || ''}
-                      onChange={(e) => updateField('linkedin', e.target.value)}
-                      disabled={!editing}
-                      placeholder="https://linkedin.com/company/..."
-/>
-                  </div>
-
-                  {/* Twitter */}
-                  <div className="space-y-2">
-                    <Label htmlFor="twitter">Twitter/X</Label>
-                    <Input
-                      id="twitter"
-                      value={company.twitter || ''}
-                      onChange={(e) => updateField('twitter', e.target.value)}
-                      disabled={!editing}
-                      placeholder="https://twitter.com/..."
-/>
-                  </div>
-
-                  {/* Facebook */}
-                  <div className="space-y-2">
-                    <Label htmlFor="facebook">Facebook</Label>
-                    <Input
-                      id="facebook"
-                      value={company.facebook || ''}
-                      onChange={(e) => updateField('facebook', e.target.value)}
-                      disabled={!editing}
-                      placeholder="https://facebook.com/..."
-/>
-                  </div>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                  <InlineText alwaysEdit={isNew} type="url" label="LinkedIn" value={company.linkedin} onSave={(v) => patchInline({ linkedin: v })} placeholder="https://linkedin.com/company/…" />
+                  <InlineText alwaysEdit={isNew} type="url" label="Twitter / X" value={company.twitter} onSave={(v) => patchInline({ twitter: v })} placeholder="https://twitter.com/…" />
+                  <InlineText alwaysEdit={isNew} type="url" label="Facebook" value={company.facebook} onSave={(v) => patchInline({ facebook: v })} placeholder="https://facebook.com/…" />
                 </div>
               </CardContent>
             </Card>
@@ -1286,21 +1009,11 @@ export const CompanyDetailPage: React.FC = () => {
             <CrmNotesTimeline targetKind="company" targetId={company.id || null}/>
           </TabsContent>
 
-          {/* SEO Tab — DataForSEO Domain Rank + persistent monitoring */}
-          <TabsContent value="seo" className="space-y-4">
-            <CompanySEOPanel
-              companyId={company.id}
-              companyName={company.name}
-              website={company.website || null}
-              countryCode={(company as any).country_code || null}
-/>
-          </TabsContent>
-
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
             {company.id ? (
               <>
-                <CustomerAccountOverview companyId={company.id} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
+                <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
                 <CustomerFinanceRulesCard companyId={company.id} />
               </>
             ) : (

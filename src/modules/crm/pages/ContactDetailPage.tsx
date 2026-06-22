@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent, Tag, Send, Wallet } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent, Tag, Send, Wallet } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerAccountOverview,
@@ -25,16 +25,7 @@ import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDr
 import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
-import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
 import { Switch } from '@/components/core/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/core/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +40,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
+import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
+import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
@@ -100,6 +94,9 @@ interface Contact {
   vat_number?: string | null;
   country_code?: string | null;
   tax_office?: string | null;
+  // items 6/7/8 — inherit billing/pricing from the primary company unless overridden
+  override_company_billing?: boolean | null;
+  override_company_pricing?: boolean | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -108,6 +105,37 @@ interface Contact {
   linked_by?: string;
   companies?: any[];
 }
+
+/** A read-only label/value row used to render values inherited from the business. */
+const InheritedRow: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
+  <div className="flex items-center justify-between gap-4 text-sm">
+    <span className="text-muted-foreground">{label}</span>
+    <span className="font-medium text-right">{value === '' || value === null || value === undefined ? '—' : value}</span>
+  </div>
+);
+
+/**
+ * Per-section "Different from business" switch (items 6/7/8). When OFF the section
+ * inherits the primary company's values (shown read-only); when ON the contact's own
+ * fields are editable and take priority. Only rendered when the contact has a company.
+ */
+const DifferentFromBusinessToggle: React.FC<{
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  companyName?: string | null;
+}> = ({ checked, onChange, companyName }) => (
+  <div className="flex items-center justify-between gap-4 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+    <div className="space-y-0.5">
+      <Label className="cursor-pointer">Different from business</Label>
+      <p className="text-xs text-muted-foreground">
+        {checked
+          ? "Using this contact's own details."
+          : `Inheriting from ${companyName || 'the business'}. Turn on to set different values.`}
+      </p>
+    </div>
+    <Switch checked={checked} onCheckedChange={onChange} />
+  </div>
+);
 
 /**
  * Contact Detail Page
@@ -123,7 +151,6 @@ export const ContactDetailPage: React.FC = () => {
   const isNew = id === 'new';
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(isNew); // Start in editing mode for new contacts
   const [contact, setContact] = useState<Contact | null>(isNew ? {
     id: '',
     name: '',
@@ -160,18 +187,17 @@ export const ContactDetailPage: React.FC = () => {
     created_at: new Date().toISOString(),
   } : null);
   const [linkedUser, setLinkedUser] = useState<any>(null);
+  // items 6/7/8 — the contact's primary company (full row), used to display the
+  // inherited Pricing / Invoicing / Tax & VAT values when overrides are off.
+  const [primaryCompany, setPrimaryCompany] = useState<any>(null);
   const [linking, setLinking] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFullName, setInviteFullName] = useState('');
   const [inviting, setInviting] = useState(false);
-  const [showAddCompanyDialog, setShowAddCompanyDialog] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
-  const [companyRole, setCompanyRole] = useState<string>('');
-  const [isPrimaryContact, setIsPrimaryContact] = useState(false);
-  const [companyNotes, setCompanyNotes] = useState<string>('');
-  const [attachingCompany, setAttachingCompany] = useState(false);
+  // item 5 — company chosen while creating a brand-new contact, attached right after create.
+  const [pendingCompanyId, setPendingCompanyId] = useState<string>('');
 
   useEffect(() => {
     if (id && !isNew) {
@@ -187,6 +213,19 @@ export const ContactDetailPage: React.FC = () => {
       setLinkedUser(null);
     }
   }, [contact?.user_id]);
+
+  // Resolve the contact's primary company (is_primary, else first attached) so the
+  // Pricing / Invoicing / Tax & VAT cards can show inherited values when overrides are off.
+  useEffect(() => {
+    const companies = contact?.companies ?? [];
+    const primary = companies.find((c: any) => c.is_primary) ?? companies[0] ?? null;
+    if (!primary?.company_id) { setPrimaryCompany(null); return; }
+    let cancelled = false;
+    companiesAPI.getCompany(primary.company_id)
+      .then((res: any) => { if (!cancelled) setPrimaryCompany(res?.data ?? res ?? null); })
+      .catch(() => { if (!cancelled) setPrimaryCompany(null); });
+    return () => { cancelled = true; };
+  }, [contact?.companies]);
 
   const loadContact = async () => {
     if (!id) return;
@@ -206,83 +245,64 @@ export const ContactDetailPage: React.FC = () => {
     }
   };
 
+  // Create-new only. Existing contacts self-save per field (view-first inline edit).
   const handleSave = async () => {
     if (!contact) return;
-
-    // Validate required fields
     if (!contact.name || contact.name.trim() === '') {
-      toast({
-        title: 'Validation Error',
-        description: 'Contact name is required',
-        variant: 'destructive',
-      });
+      toast({ title: 'Validation Error', description: 'Contact name is required', variant: 'destructive' });
       return;
     }
-
     try {
       setSaving(true);
-
-      if (isNew) {
-        // Create new contact
-        const response = await contactsAPI.createContact(contact);
-        toast({
-          title: 'Success',
-          description: 'Contact created successfully',
-        });
-        // Navigate to the new contact's page
-        navigate(`/admin/crm/contacts/${response.data.id}`, { replace: true });
-      } else {
-        // #227 — route customer discount/level through the approval RPC (sales → pending,
-        // others → applied); strip them from the generic update so the handler never
-        // applies them directly (bypassing approval).
-        const { user_level_key, discount_percent, ...rest } = contact as any;
-        await contactsAPI.updateContact(id!, rest);
-        let pricingPending = false;
-        try {
-          const res = await financeService.proposeOrApplyCustomerPricing({
-            subjectType: 'contact', subjectId: id!,
-            userLevelKey: contact.user_level_key ?? null,
-            discountPercent: contact.discount_percent ?? null,
-          });
-          pricingPending = res.status === 'pending';
-          if (pricingPending) {
-            // Fan out to every finance approver (owner/admin) — one event per recipient.
-            const approvers = await financeService.listWorkspaceApproverIds(activeWorkspaceId!).catch(() => []);
-            for (const uid of approvers) {
-              flowEventService.emit('pricing_change_requested', {
-                workspace_id: activeWorkspaceId, request_id: res.request_id, user_id: uid,
-                subject_type: 'contact', subject_id: id!,
-                title: 'Discount change needs approval',
-                body: 'A sales team member proposed a customer discount/level change.',
-              });
-            }
-          }
-        } catch (e: any) {
-          toast({ title: 'Pricing change failed', description: e?.message, variant: 'destructive' });
-        }
-        toast({
-          title: pricingPending ? 'Saved — discount change sent for approval' : 'Success',
-          description: pricingPending ? undefined : 'Contact updated successfully',
-        });
-        setEditing(false);
-        await loadContact();
+      const response = await contactsAPI.createContact(contact);
+      // item 5 — attach the company picked during creation, now that we have an id.
+      if (pendingCompanyId) {
+        await companiesAPI.attachContact(pendingCompanyId, response.data.id, undefined, true, '').catch(() => {});
       }
+      toast({ title: 'Success', description: 'Contact created successfully' });
+      navigate(`/admin/crm/contacts/${response.data.id}`, { replace: true });
     } catch (error) {
-      console.error('Error saving contact:', error);
-      toast({
-        title: 'Error',
-        description: isNew ? 'Failed to create contact' : 'Failed to save contact',
-        variant: 'destructive',
-      });
+      console.error('Error creating contact:', error);
+      toast({ title: 'Error', description: 'Failed to create contact', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
   };
 
-  const updateField = (field: keyof Contact, value: any) => {
+  /**
+   * #227 — pricing level/discount must NOT be patched directly: route through the
+   * approval RPC (sales → pending approval, others → applied immediately). Optimistic
+   * local update; on a pending verdict, fan out a notify event to finance approvers.
+   */
+  const savePricing = async (updates: { user_level_key?: string | null; discount_percent?: number | null }) => {
     if (!contact) return;
-    setContact({ ...contact, [field]: value });
+    const next = { ...contact, ...updates };
+    setContact(next);
+    if (isNew || !id) return; // create flow persists everything via handleSave
+    try {
+      const res = await financeService.proposeOrApplyCustomerPricing({
+        subjectType: 'contact', subjectId: id,
+        userLevelKey: next.user_level_key ?? null,
+        discountPercent: next.discount_percent ?? null,
+      });
+      if (res.status === 'pending') {
+        const approvers = await financeService.listWorkspaceApproverIds(activeWorkspaceId!).catch(() => []);
+        for (const uid of approvers) {
+          flowEventService.emit('pricing_change_requested', {
+            workspace_id: activeWorkspaceId, request_id: res.request_id, user_id: uid,
+            subject_type: 'contact', subject_id: id,
+            title: 'Discount change needs approval',
+            body: 'A sales team member proposed a customer discount/level change.',
+          });
+        }
+        toast({ title: 'Discount change sent for approval' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Pricing change failed', description: e?.message, variant: 'destructive' });
+      await loadContact();
+    }
   };
+
 
   // #227 — load this workspace's pricing levels for the customer-level dropdown.
   useEffect(() => {
@@ -399,40 +419,23 @@ export const ContactDetailPage: React.FC = () => {
     }
   };
 
-  // Company attachment handlers
-  const handleAttachCompany = async () => {
-    if (!id || !selectedCompanyId) return;
+  // item 5 — attach a company straight from the Lead Information picker (no dialog).
+  // New contacts: stash the choice and attach it right after the contact is created.
+  const attachCompanyById = async (companyId: string) => {
+    if (!companyId) return;
+    if (isNew || !id) { setPendingCompanyId(companyId); return; }
+    if ((contact?.companies ?? []).some((c: any) => c.company_id === companyId)) return;
     try {
-      setAttachingCompany(true);
-      await companiesAPI.attachContact(
-        selectedCompanyId,
-        id,
-        companyRole,
-        isPrimaryContact,
-        companyNotes,
-      );
-      toast({
-        title: 'Success',
-        description: 'Company attached to contact successfully',
-      });
-      setShowAddCompanyDialog(false);
-      setSelectedCompanyId('');
-      setCompanyRole('');
-      setIsPrimaryContact(false);
-      setCompanyNotes('');
+      const isFirst = (contact?.companies ?? []).length === 0;
+      await companiesAPI.attachContact(companyId, id, undefined, isFirst, '');
       await loadContact();
     } catch (error: any) {
-      console.error('Error attaching company:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to attach company to contact',
-        variant: 'destructive',
-      });
-    } finally {
-      setAttachingCompany(false);
+      toast({ title: 'Error', description: error.message || 'Failed to attach company', variant: 'destructive' });
     }
   };
 
+  // (legacy multi-field attach dialog removed in item 5 — Lead Information now
+  // attaches a company inline via attachCompanyById.)
   const handleDetachCompany = async (relationshipId: string) => {
     if (!confirm('Are you sure you want to remove this company from the contact?')) return;
     try {
@@ -484,6 +487,14 @@ export const ContactDetailPage: React.FC = () => {
     );
   }
 
+  // items 6/7/8 — inheritance state. When the contact has a primary company and the
+  // matching override is off, the section inherits the company's values.
+  const hasCompany = !!primaryCompany;
+  const inheritBilling = hasCompany && !contact.override_company_billing;
+  const inheritPricing = hasCompany && !contact.override_company_pricing;
+  const levelLabel = (key?: string | null) =>
+    (key ? pricingLevels.find((l) => l.level_key === key)?.label ?? key : 'Standard');
+
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
@@ -499,31 +510,17 @@ export const ContactDetailPage: React.FC = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
           </Button>
-          <div className="flex gap-2">
-            {editing ? (
-              <>
-                <Button variant="outline" onClick={() => {
-                  if (isNew) {
-                    navigate('/admin/crm');
-                  } else {
-                    setEditing(false);
-                    loadContact(); // Reload to discard changes
-                  }
-                }}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? 'Saving...' : (isNew ? 'Create Contact' : 'Save Changes')}
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => setEditing(true)}>
-                <Edit2 className="h-4 w-4 mr-2" />
-                Edit Contact
+          {/* View-first: existing contacts save per field inline. Only the create
+              flow needs an explicit Create/Cancel. */}
+          {isNew && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate('/admin/crm')}>Cancel</Button>
+              <Button onClick={handleSave} disabled={saving}>
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : 'Create Contact'}
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -532,10 +529,6 @@ export const ContactDetailPage: React.FC = () => {
             <TabsTrigger value="overview">
               <User className="h-4 w-4 mr-2" />
               Overview
-            </TabsTrigger>
-            <TabsTrigger value="companies">
-              <Building2 className="h-4 w-4 mr-2" />
-              Companies
             </TabsTrigger>
             <TabsTrigger value="notes">
               <FileText className="h-4 w-4 mr-2" />
@@ -570,89 +563,24 @@ export const ContactDetailPage: React.FC = () => {
                     Contact Information
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Full Name *</Label>
-                    <Input
-                      id="name"
-                      value={contact.name}
-                      onChange={(e) => updateField('name', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <div className="relative flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="email"
-                          type="email"
-                          value={contact.email || ''}
-                          onChange={(e) => updateField('email', e.target.value)}
-                          disabled={!editing}
-                          className="mt-1 pl-10"
-                        />
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    <div className="md:col-span-2">
+                      <InlineText alwaysEdit={isNew} label="Full Name *" value={contact.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Jane Smith" copy={false} />
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <InlineText alwaysEdit={isNew} type="email" label="Email" value={contact.email} onSave={(v) => patchInline({ email: v })} placeholder="jane@example.com" />
                       </div>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        onClick={() => setShowEmailDialog(true)}
-                        disabled={!contact.email}
-                        title={contact.email ? `Send email to ${contact.email}` : 'No email on file'}
-                        className="mt-1 shrink-0"
-                      >
+                      <Button type="button" size="icon" variant="outline" onClick={() => setShowEmailDialog(true)} disabled={!contact.email}
+                        title={contact.email ? `Send email to ${contact.email}` : 'No email on file'} className="shrink-0 mb-0.5">
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="phone"
-                        value={contact.phone || ''}
-                        onChange={(e) => updateField('phone', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1 pl-10"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="mobile">Mobile</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="mobile"
-                        value={contact.mobile || ''}
-                        onChange={(e) => updateField('mobile', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1 pl-10"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="position">Position/Title</Label>
-                    <Input
-                      id="position"
-                      value={contact.position || ''}
-                      onChange={(e) => updateField('position', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="department">Department</Label>
-                    <Input
-                      id="department"
-                      value={contact.department || ''}
-                      onChange={(e) => updateField('department', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                    />
+                    <InlineText alwaysEdit={isNew} type="tel" label="Phone" value={contact.phone} onSave={(v) => patchInline({ phone: v })} placeholder="+44 7445 264362" />
+                    <InlineText alwaysEdit={isNew} type="tel" label="Mobile" value={contact.mobile} onSave={(v) => patchInline({ mobile: v })} placeholder="+44 7445 264362" />
+                    <InlineText alwaysEdit={isNew} label="Position / Title" value={contact.position} onSave={(v) => patchInline({ position: v })} placeholder="e.g. Procurement Manager" copy={false} />
+                    <InlineText alwaysEdit={isNew} label="Department" value={contact.department} onSave={(v) => patchInline({ department: v })} placeholder="e.g. Operations" copy={false} />
                   </div>
                 </CardContent>
               </Card>
@@ -666,44 +594,47 @@ export const ContactDetailPage: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* item 5 — attach a company right here (replaces the separate Companies tab). */}
                   <div>
-                    <Label htmlFor="lead_status">Lead Status</Label>
-                    <Input
-                      id="lead_status"
-                      value={contact.lead_status || ''}
-                      onChange={(e) => updateField('lead_status', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                      placeholder="e.g., New, Qualified, Contacted"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lead_source">Lead Source</Label>
-                    <Input
-                      id="lead_source"
-                      value={contact.lead_source || ''}
-                      onChange={(e) => updateField('lead_source', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                      placeholder="e.g., Website, Referral, Trade Show"
-                    />
-                  </div>
-                  <div>
-                    <Label>Created</Label>
-                    <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      {new Date(contact.created_at).toLocaleString()}
+                    <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Company</Label>
+                    <div className="mt-1.5 space-y-2">
+                      {(contact.companies ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {(contact.companies ?? []).map((c: any) => (
+                            <Badge key={c.relationship_id} variant="secondary" className="gap-1.5">
+                              <button type="button" onClick={() => navigate(`/admin/crm/companies/${c.company_id}`)} className="hover:underline">
+                                {c.company_name}
+                              </button>
+                              {c.is_primary && <span className="text-[9px] uppercase opacity-70">primary</span>}
+                              <button type="button" onClick={() => handleDetachCompany(c.relationship_id)} aria-label="Remove company" className="opacity-70 hover:opacity-100">
+                                <Unlink className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      <CompanySearchDropdown
+                        onSelect={attachCompanyById}
+                        excludeCompanyIds={(contact.companies ?? []).map((c: any) => c.company_id)}
+                        placeholder="Search & attach a company…"
+                        selectedCompanyId={isNew ? (pendingCompanyId || null) : null}
+                      />
                     </div>
                   </div>
-                  {contact.updated_at && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    <InlineText alwaysEdit={isNew} label="Lead Status" value={contact.lead_status} onSave={(v) => patchInline({ lead_status: v })} placeholder="e.g. New, Qualified, Contacted" copy={false} />
+                    <InlineText alwaysEdit={isNew} label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="e.g. Website, Referral, Trade Show" copy={false} />
                     <div>
-                      <Label>Last Updated</Label>
-                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        {new Date(contact.updated_at).toLocaleString()}
-                      </div>
+                      <div className="text-xs font-medium text-muted-foreground">Created</div>
+                      <div className="flex items-center gap-2 mt-0.5 text-sm text-muted-foreground"><Calendar className="h-3.5 w-3.5" />{new Date(contact.created_at).toLocaleDateString()}</div>
                     </div>
-                  )}
+                    {contact.updated_at && (
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground">Last Updated</div>
+                        <div className="flex items-center gap-2 mt-0.5 text-sm text-muted-foreground"><Calendar className="h-3.5 w-3.5" />{new Date(contact.updated_at).toLocaleDateString()}</div>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -717,67 +648,18 @@ export const ContactDetailPage: React.FC = () => {
                     Address
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <Label htmlFor="address" className="text-sm">Street Address</Label>
-                    <Input
-                      id="address"
-                      value={contact.address || ''}
-                      onChange={(e) => updateField('address', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                      placeholder="123 Main Street"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="city" className="text-sm">City</Label>
-                      <Input
-                        id="city"
-                        value={contact.city || ''}
-                        onChange={(e) => updateField('city', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1"
-                      />
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    <div className="md:col-span-2">
+                      <InlineText alwaysEdit={isNew} label="Street Address" value={contact.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                     </div>
-                    <div>
-                      <Label htmlFor="postal_code" className="text-sm">Postal Code</Label>
-                      <Input
-                        id="postal_code"
-                        value={contact.postal_code || ''}
-                        onChange={(e) => updateField('postal_code', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="state" className="text-sm">State/Province</Label>
-                      <Input
-                        id="state"
-                        value={contact.state || ''}
-                        onChange={(e) => updateField('state', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="country" className="text-sm">Country</Label>
-                      <Input
-                        id="country"
-                        value={contact.country || ''}
-                        onChange={(e) => updateField('country', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1"
-                      />
-                    </div>
+                    <InlineText alwaysEdit={isNew} label="City" value={contact.city} onSave={(v) => patchInline({ city: v })} placeholder="London" />
+                    <InlineText alwaysEdit={isNew} label="Postal Code" value={contact.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="N21 1QP" />
+                    <InlineText alwaysEdit={isNew} label="State / Province" value={contact.state} onSave={(v) => patchInline({ state: v })} placeholder="Greater London" />
+                    <InlineText alwaysEdit={isNew} label="Country" value={contact.country} onSave={(v) => patchInline({ country: v })} placeholder="United Kingdom" />
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
-              <AddressUnitsManager contactId={isNew ? undefined : id} readOnly={!editing} />
 
               {/* Link to User Account Card - Compact Design */}
               <Card>
@@ -886,76 +768,66 @@ export const ContactDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="user_level_key">Pricing level</Label>
-                  <Select
-                    value={contact.user_level_key ?? '__default__'}
-                    onValueChange={(v) => updateField('user_level_key', v === '__default__' ? null : v)}
-                    disabled={!editing}
-                  >
-                    <SelectTrigger id="user_level_key"><SelectValue placeholder="Standard" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__default__">Standard</SelectItem>
-                      {pricingLevels.map((l) => <SelectItem key={l.level_key} value={l.level_key}>{l.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    The tier this customer buys at — the level's discount applies off your retail price on quotes (ex-VAT).
-                    Configure levels in Finance → Settings → Pricing.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="discount_percent">Customer discount % (override)</Label>
-                    <Input
-                      id="discount_percent"
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      max={100}
-                      value={contact.discount_percent ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        updateField('discount_percent', v === '' ? null : Number(v));
-                      }}
-                      disabled={!editing}
-                      placeholder="e.g. 30"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Applied automatically by the AI price lookup when this contact is the quote customer. Leave empty for no customer discount.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="credit_limit">Credit limit</Label>
-                    <Input
-                      id="credit_limit"
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      value={contact.credit_limit ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        updateField('credit_limit', v === '' ? null : Number(v));
-                      }}
-                      disabled={!editing}
-                      placeholder="e.g. 5000"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Max outstanding receivable. Finance flags this customer when their open balance exceeds it. Leave empty for no limit.
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="discount_notes">Discount notes</Label>
-                  <Textarea
-                    id="discount_notes"
-                    value={contact.discount_notes || ''}
-                    onChange={(e) => updateField('discount_notes', e.target.value)}
-                    disabled={!editing}
-                    placeholder="e.g. Long-term partner — 30% per 2025 agreement, valid until renewal."
-                    rows={2}
+                {hasCompany && (
+                  <DifferentFromBusinessToggle
+                    checked={!!contact.override_company_pricing}
+                    onChange={(v) => patchInline({ override_company_pricing: v })}
+                    companyName={primaryCompany?.name}
                   />
-                </div>
+                )}
+                {inheritPricing ? (
+                  <div className="space-y-2 rounded-md border border-border/60 p-3">
+                    <InheritedRow label="Pricing level" value={levelLabel(primaryCompany?.user_level_key)} />
+                    <InheritedRow label="Customer discount %" value={primaryCompany?.discount_percent != null ? `${primaryCompany.discount_percent}%` : '—'} />
+                    {primaryCompany?.discount_notes && <InheritedRow label="Discount notes" value={primaryCompany.discount_notes} />}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    {/* Pricing level + discount route through the approval RPC (savePricing), not patchInline. */}
+                    <InlineSelect
+                      alwaysEdit={isNew}
+                      label="Pricing level"
+                      value={contact.user_level_key ?? undefined}
+                      unsetValue="__default__"
+                      placeholder="Standard"
+                      options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))}
+                      onSave={(v) => savePricing({ user_level_key: v })}
+                      hint="Tier this customer buys at — discount applies off retail on quotes."
+                    />
+                    <InlineText
+                      alwaysEdit={isNew}
+                      type="number"
+                      label="Customer discount % (override)"
+                      value={contact.discount_percent ?? undefined}
+                      onSave={(v) => savePricing({ discount_percent: v })}
+                      placeholder="e.g. 30"
+                      copy={false}
+                      hint="Applied automatically by the AI price lookup. Empty = none."
+                    />
+                    <div className="md:col-span-2">
+                      <InlineText
+                        alwaysEdit={isNew}
+                        multiline
+                        label="Discount notes"
+                        value={contact.discount_notes}
+                        onSave={(v) => patchInline({ discount_notes: v })}
+                        placeholder="e.g. Long-term partner — 30% per 2025 agreement."
+                        copy={false}
+                      />
+                    </div>
+                  </div>
+                )}
+                {/* Credit limit is a contact-specific risk control — never inherited. */}
+                <InlineText
+                  alwaysEdit={isNew}
+                  type="number"
+                  label="Credit limit"
+                  value={contact.credit_limit ?? undefined}
+                  onSave={(v) => patchInline({ credit_limit: v })}
+                  placeholder="e.g. 5000"
+                  copy={false}
+                  hint="Max outstanding receivable; finance flags this customer when exceeded."
+                />
               </CardContent>
             </Card>
 
@@ -970,36 +842,40 @@ export const ContactDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact_group">Segment</Label>
-                    <Select
-                      value={contact.contact_group || 'none'}
-                      onValueChange={(v) => updateField('contact_group', v === 'none' ? null : v)}
-                      disabled={!editing}
-                    >
-                      <SelectTrigger id="contact_group"><SelectValue placeholder="Unsegmented" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Unsegmented</SelectItem>
-                        <SelectItem value="b2b">B2B</SelectItem>
-                        <SelectItem value="retail">Retail</SelectItem>
-                        <SelectItem value="wholesale">Wholesale</SelectItem>
-                        <SelectItem value="public_sector">Public sector</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Groups this party for filtering and statement batches.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vat_exemption_reason">Default VAT-exemption category</Label>
-                    <Input
-                      id="vat_exemption_reason"
-                      value={contact.vat_exemption_reason || ''}
-                      onChange={(e) => updateField('vat_exemption_reason', e.target.value)}
-                      disabled={!editing}
-                      placeholder="myDATA category 1–31 (for 0% lines)"
-                    />
-                    <p className="text-xs text-muted-foreground">Pre-fills the exemption category on 0%-VAT invoice lines for this customer.</p>
-                  </div>
+                {hasCompany && (
+                  <DifferentFromBusinessToggle
+                    checked={!!contact.override_company_billing}
+                    onChange={(v) => patchInline({ override_company_billing: v })}
+                    companyName={primaryCompany?.name}
+                  />
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                  <InlineSelect
+                    alwaysEdit={isNew}
+                    label="Segment"
+                    value={contact.contact_group ?? undefined}
+                    unsetValue="none"
+                    placeholder="Unsegmented"
+                    options={[
+                      { value: 'b2b', label: 'B2B' },
+                      { value: 'retail', label: 'Retail' },
+                      { value: 'wholesale', label: 'Wholesale' },
+                      { value: 'public_sector', label: 'Public sector' },
+                    ]}
+                    onSave={(v) => patchInline({ contact_group: v })}
+                    hint="Groups this party for filtering and statement batches."
+                  />
+                  <InlineSelect
+                    alwaysEdit={isNew}
+                    label="Default VAT-exemption category"
+                    value={contact.vat_exemption_reason ?? undefined}
+                    unsetValue="__none"
+                    placeholder="None"
+                    options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))}
+                    displayValue={contact.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{contact.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === contact.vat_exemption_reason)?.label}</span> : undefined}
+                    onSave={(v) => patchInline({ vat_exemption_reason: v })}
+                    hint="Pre-fills the myDATA exemption category on 0%-VAT lines."
+                  />
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -1012,21 +888,36 @@ export const ContactDetailPage: React.FC = () => {
                     onCheckedChange={(v) => patchInline({ include_in_myf: v })}
                   />
                 </div>
-                <div className="rounded-md border border-border/60 p-3 space-y-3">
+                {inheritBilling ? (
+                  <div className="rounded-md border border-border/60 p-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      <span className="text-foreground font-medium">Billing identity inherited from {primaryCompany?.name || 'the business'}</span> — invoices to this contact are issued under the company's identity.
+                    </p>
+                    <InheritedRow label="Name" value={primaryCompany?.billing_name || primaryCompany?.name} />
+                    <InheritedRow label="VAT (ΑΦΜ)" value={primaryCompany?.billing_vat || primaryCompany?.vat_number} />
+                    <InheritedRow label="Tax office (ΔΟΥ)" value={primaryCompany?.billing_tax_office || primaryCompany?.tax_office} />
+                    <InheritedRow label="VAT country" value={primaryCompany?.billing_country_code || primaryCompany?.country_code} />
+                  </div>
+                ) : (
+                <div className="rounded-md border border-border/60 p-3 space-y-2">
                   <p className="text-xs text-muted-foreground">
                     <span className="text-foreground font-medium">Separate billing identity</span> — fill only when invoices must be issued to a different legal entity than this contact (different ΑΦΜ / name / address). Leave blank to invoice the contact as-is.
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1"><Label htmlFor="billing_name">Billing name</Label><Input id="billing_name" value={contact.billing_name || ''} onChange={(e) => updateField('billing_name', e.target.value)} disabled={!editing} placeholder="Legal entity name" /></div>
-                    <div className="space-y-1"><Label htmlFor="billing_vat">Billing VAT (ΑΦΜ)</Label><Input id="billing_vat" value={contact.billing_vat || ''} onChange={(e) => updateField('billing_vat', e.target.value)} disabled={!editing} /></div>
-                    <div className="space-y-1"><Label htmlFor="billing_tax_office">Tax office (ΔΟΥ)</Label><Input id="billing_tax_office" value={contact.billing_tax_office || ''} onChange={(e) => updateField('billing_tax_office', e.target.value)} disabled={!editing} /></div>
-                    <div className="space-y-1"><Label htmlFor="billing_country_code">Country code</Label><Input id="billing_country_code" value={contact.billing_country_code || ''} onChange={(e) => updateField('billing_country_code', e.target.value.toUpperCase().slice(0, 2))} disabled={!editing} maxLength={2} placeholder="EL" /></div>
-                    <div className="space-y-1"><Label htmlFor="billing_street">Street</Label><Input id="billing_street" value={contact.billing_street || ''} onChange={(e) => updateField('billing_street', e.target.value)} disabled={!editing} /></div>
-                    <div className="space-y-1"><Label htmlFor="billing_street_number">Number</Label><Input id="billing_street_number" value={contact.billing_street_number || ''} onChange={(e) => updateField('billing_street_number', e.target.value)} disabled={!editing} /></div>
-                    <div className="space-y-1"><Label htmlFor="billing_postal_code">Postal code</Label><Input id="billing_postal_code" value={contact.billing_postal_code || ''} onChange={(e) => updateField('billing_postal_code', e.target.value)} disabled={!editing} /></div>
-                    <div className="space-y-1"><Label htmlFor="billing_city">City</Label><Input id="billing_city" value={contact.billing_city || ''} onChange={(e) => updateField('billing_city', e.target.value)} disabled={!editing} /></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                    <InlineText alwaysEdit={isNew} label="Billing name" value={contact.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
+                    <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={contact.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
+                    <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={contact.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} placeholder="e.g. Tax Office Chalandriou" />
+                    <InlineSelect alwaysEdit={isNew} label="VAT country" value={contact.billing_country_code ?? undefined} placeholder="Not set"
+                      options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))}
+                      displayValue={contact.billing_country_code ? <span className="font-mono">{contact.billing_country_code}</span> : undefined}
+                      onSave={(v) => patchInline({ billing_country_code: v })} />
+                    <InlineText alwaysEdit={isNew} label="Street" value={contact.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
+                    <InlineText alwaysEdit={isNew} label="Number" value={contact.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
+                    <InlineText alwaysEdit={isNew} label="Postal code" value={contact.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
+                    <InlineText alwaysEdit={isNew} label="City" value={contact.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
                   </div>
                 </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1040,6 +931,10 @@ export const ContactDetailPage: React.FC = () => {
               taxOffice={contact.tax_office ?? null}
               attachedCompanies={contact.companies ?? []}
               onPatch={(updates) => patchInline(updates as Partial<Contact>)}
+              inheriting={inheritBilling}
+              overrideBilling={!!contact.override_company_billing}
+              onToggleOverride={hasCompany ? (v) => patchInline({ override_company_billing: v }) : undefined}
+              primaryCompany={primaryCompany}
             />
 
             {/* Role — who this contact is to the workspace. Drives how the
@@ -1110,103 +1005,6 @@ export const ContactDetailPage: React.FC = () => {
             {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
           </TabsContent>
 
-          {/* Companies Tab */}
-          <TabsContent value="companies" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    Attached Companies
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Companies associated with this contact
-                  </p>
-                </div>
-                <Button onClick={() => setShowAddCompanyDialog(true)} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Company
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {!contact.companies || contact.companies.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Building2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No companies attached to this contact yet</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-4"
-                      onClick={() => setShowAddCompanyDialog(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add First Company
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Company Name</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Industry</TableHead>
-                        <TableHead>Website</TableHead>
-                        <TableHead>Primary</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {contact.companies.map((company: any) => (
-                        <TableRow key={company.relationship_id}>
-                          <TableCell className="font-medium">
-                            <button
-                              onClick={() => navigate(`/admin/crm/companies/${company.company_id}`)}
-                              className="text-primary hover:underline"
-                            >
-                              {company.company_name}
-                            </button>
-                          </TableCell>
-                          <TableCell>{company.role || '-'}</TableCell>
-                          <TableCell>{company.company_industry || '-'}</TableCell>
-                          <TableCell>
-                            {company.company_website ? (
-                              <a
-                                href={company.company_website}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                {company.company_website}
-                              </a>
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {company.is_primary && (
-                              <Badge variant="secondary">Primary</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDetachCompany(company.relationship_id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Notes & Activity Tab — timeline of separate note entries
               (replaced the single-textarea blob in 2026-05-25). */}
           <TabsContent value="notes" className="space-y-4">
@@ -1217,7 +1015,7 @@ export const ContactDetailPage: React.FC = () => {
           <TabsContent value="account" className="space-y-4">
             {contact.id ? (
               <>
-                <CustomerAccountOverview contactId={contact.id} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
+                <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
                 <CustomerFinanceRulesCard contactId={contact.id} />
               </>
             ) : (
@@ -1296,86 +1094,6 @@ export const ContactDetailPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Company Dialog */}
-      <Dialog open={showAddCompanyDialog} onOpenChange={setShowAddCompanyDialog}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Attach Company to Contact</DialogTitle>
-            <DialogDescription>
-              Link this contact to a company and specify their role
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Company Search */}
-            <div className="space-y-2">
-              <Label>Company *</Label>
-              <CompanySearchDropdown
-                onSelect={setSelectedCompanyId}
-                excludeCompanyIds={contact?.companies?.map((c: any) => c.company_id) || []}
-                placeholder="Search companies..."
-                selectedCompanyId={selectedCompanyId || null}
-              />
-            </div>
-
-            {/* Role */}
-            <div className="space-y-2">
-              <Label htmlFor="company-role">Role at Company</Label>
-              <Input
-                id="company-role"
-                value={companyRole}
-                onChange={(e) => setCompanyRole(e.target.value)}
-                placeholder="e.g., CEO, Sales Manager, Developer"
-              />
-            </div>
-
-            {/* Primary Contact */}
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="is-primary"
-                checked={isPrimaryContact}
-                onChange={(e) => setIsPrimaryContact(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <Label htmlFor="is-primary" className="cursor-pointer">
-                Mark as primary contact for this company
-              </Label>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="company-notes">Notes</Label>
-              <Textarea
-                id="company-notes"
-                value={companyNotes}
-                onChange={(e) => setCompanyNotes(e.target.value)}
-                placeholder="Additional notes about this relationship..."
-                rows={3}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowAddCompanyDialog(false);
-                setSelectedCompanyId('');
-                setCompanyRole('');
-                setIsPrimaryContact(false);
-                setCompanyNotes('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAttachCompany}
-              disabled={!selectedCompanyId || attachingCompany}
-            >
-              {attachingCompany ? 'Attaching...' : 'Attach Company'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

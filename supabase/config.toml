@@ -13,6 +13,9 @@ max_rows = 10000
 [functions.inbox-api]
 verify_jwt = false
 
+[functions.dashboard-insights]
+verify_jwt = false
+
 [functions.mivaa-gateway]
 verify_jwt = false
 

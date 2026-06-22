@@ -6,6 +6,7 @@
 // override (they are business-activity specific and become a per-workspace config later).
 
 import type { FiscalInvoiceInput, FiscalLine, FiscalParty } from './types.ts';
+import { resolveContactBillingSource } from '../crm/party-inheritance.ts';
 
 export interface FiscalOverrides {
   invoiceType?: string;
@@ -144,7 +145,9 @@ export async function buildInvoiceInputFromDb(
     if (c) counterpart = partyFromCrm(c);
   } else if (inv.customer_contact_id) {
     const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).single();
-    if (c) counterpart = partyFromCrm(c);
+    // Items 6/7/8 — a contact attached to a company is invoiced under the company's
+    // billing/VAT identity unless it explicitly overrides (resolveContactBillingSource).
+    if (c) counterpart = partyFromCrm(await resolveContactBillingSource(supabase, c));
   }
   counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
 
@@ -352,7 +355,7 @@ export async function buildCreditNoteInputFromDb(
     if (c) counterpart = partyFromCrm(c);
   } else if (inv.customer_contact_id) {
     const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).single();
-    if (c) counterpart = partyFromCrm(c);
+    if (c) counterpart = partyFromCrm(await resolveContactBillingSource(supabase, c));
   }
   // Credit note inherits the corrected invoice's chosen sub-unit address.
   counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
@@ -457,7 +460,7 @@ export async function buildDeliveryNoteInputFromDb(
     if (c) counterpart = partyFromCrm(c);
   } else if (dn.customer_contact_id) {
     const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', dn.customer_contact_id).single();
-    if (c) counterpart = partyFromCrm(c);
+    if (c) counterpart = partyFromCrm(await resolveContactBillingSource(supabase, c));
   }
 
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => ({

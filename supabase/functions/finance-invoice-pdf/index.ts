@@ -9,7 +9,7 @@
 // explicitly asked for a per-invoice GR/EN choice. A Unicode font is embedded so Greek
 // glyphs (and Greek customer names/addresses, regardless of language) render correctly.
 import { createClient } from '@supabase/supabase-js';
-import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -297,6 +297,17 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     return my;
   };
 
+  // Sidebar (Modern): vertical accent wordmark in the left page margin. Drawn rotated 90°
+  // so it reads bottom-to-top; glyphs sit within the [0, M] gutter, clear of the body (x ≥ M).
+  if (spec.headerStyle === 'sidebar' && issuerName) {
+    const wmSize = 15;
+    const wmW = bold.widthOfTextAtSize(issuerName, wmSize);
+    page.drawText(issuerName, {
+      x: 24, y: Math.max(M, (A4.h - wmW) / 2), size: wmSize, font: bold,
+      color: colors.accent, rotate: degrees(90),
+    });
+  }
+
   if (spec.headerStyle === 'band') {
     const bandH = 70;
     page.drawRectangle({ x: 0, y: A4.h - bandH, width: A4.w, height: bandH, color: colors.headerBg });
@@ -450,6 +461,13 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     textR(L.total, right - 110, y + 1, 10, bold, WHITE);
     textR(money(grand), right, y + 1, 11, bold, WHITE);
     y -= 20;
+  } else if (spec.totalsBoxStyle === 'accent-text') {
+    // Modern: accent rule + accent-colored amount-due text (no filled box).
+    page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: colors.accent });
+    y -= 4;
+    textR(L.total, right - 110, y, 10, bold, colors.accent);
+    textR(money(grand), right, y, 11, bold, colors.accent);
+    y -= 16;
   } else {
     page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: LINE });
     y -= 4;
@@ -493,10 +511,12 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   }
   if (payBits.length || accountLines.length) {
     if (y < M + 110) newPage();
+    // Sidebar (Modern) prints bank details in the accent color, like the design reference.
+    const bankColor = spec.headerStyle === 'sidebar' ? colors.accent : MUTED;
     for (const pb of payBits) { text(pb, M, y, 8.5, font, MUTED); y -= 11; }
     accountLines.forEach((line, i) => {
       if (y < M + 60) newPage();
-      text(i === 0 ? `${L.bank}: ${line}` : line, M, y, 8.5, font, MUTED); y -= 11;
+      text(i === 0 ? `${L.bank}: ${line}` : line, M, y, 8.5, font, bankColor); y -= 11;
     });
     y -= 4;
   }

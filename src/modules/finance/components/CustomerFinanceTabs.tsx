@@ -16,10 +16,13 @@ import {
   type Invoice,
   type PaymentWithAllocation,
   type CustomerTopProductRow,
+  type ManualEntry,
+  type ManualEntryDirection,
 } from '@/modules/finance/services/financeService';
 import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { ManualEntryDialog } from '@/modules/finance/components/ManualEntryDialog';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -155,7 +158,7 @@ export const PartyAccountSummary: React.FC<{
  * (customer + supplier net position) + open orders / last payment meta + the customer's top
  * products to push + email-statement + an optional "View ledger in Finance" cross-link.
  */
-export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, isSupplier, ledgerHref }) => {
+export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, customerName, isSupplier, ledgerHref }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [loading, setLoading] = useState(true);
@@ -166,6 +169,9 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [topProducts, setTopProducts] = useState<CustomerTopProductRow[]>([]);
   const [aging, setAging] = useState<{ not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null>(null);
   const [emailing, setEmailing] = useState(false);
+  // Item 3 — un-invoiced receivables/payables recorded against this party.
+  const [entries, setEntries] = useState<ManualEntry[]>([]);
+  const [entryDialog, setEntryDialog] = useState<{ open: boolean; direction: ManualEntryDirection }>({ open: false, direction: 'receivable' });
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
 
@@ -199,6 +205,10 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         const buckets = await financeService.getCustomerAgingBuckets({ workspaceId: activeWorkspaceId, companyId, contactId });
         const b = buckets[0];
         setAging(b ? { not_due: Number(b.not_due), due_0_30: Number(b.due_0_30), due_31_90: Number(b.due_31_90), due_90_plus: Number(b.due_90_plus) } : null);
+
+        // Un-invoiced receivables/payables for this party (item 3).
+        const me = await financeService.listManualEntries({ workspaceId: activeWorkspaceId, companyId, contactId, includeSettled: true }).catch(() => [] as ManualEntry[]);
+        setEntries(me);
       }
     } catch (e) {
       console.error('account overview load failed', e);
@@ -231,7 +241,13 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-semibold text-primary">Account overview</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
+            <Plus className="h-3.5 w-3.5 mr-2" /> Add receivable
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
+            <Plus className="h-3.5 w-3.5 mr-2" /> Add payable
+          </Button>
           {ledgerHref && (
             <Link to={ledgerHref}><Button size="sm" variant="ghost"><FileText className="h-3.5 w-3.5 mr-2" /> View ledger in Finance</Button></Link>
           )}
@@ -288,6 +304,71 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
           </table>
         </CardContent>
       </Card>
+
+      {/* Item 3 — un-invoiced receivables / payables recorded against this party. */}
+      <Card>
+        <CardHeader className="border-b border-border/60 px-5 py-3">
+          <CardTitle className="text-sm flex items-center gap-2"><Wallet className="h-4 w-4" /> Receivables &amp; payables (un-invoiced)</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {entries.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+              No manual receivables or payables. Use “Add receivable / payable” above to record money owed without an invoice.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-xs text-muted-foreground">
+                <tr className="border-b border-border/60">
+                  <th className="px-4 py-2 text-left">Description</th>
+                  <th className="px-4 py-2 text-left">Type</th>
+                  <th className="px-4 py-2 text-left">Method</th>
+                  <th className="px-4 py-2 text-right">Amount</th>
+                  <th className="px-4 py-2 text-right">Due</th>
+                  <th className="px-4 py-2 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((e) => (
+                  <tr key={e.id} className="border-b border-border/30 hover:bg-muted/30">
+                    <td className="px-4 py-2">
+                      <div className="font-medium">{e.description}</div>
+                      {e.finance_doc_requested && (
+                        <Badge variant="outline" className="mt-0.5 text-[10px]">
+                          {e.finance_doc_status === 'issued' ? `${e.finance_doc_kind} issued` : `${e.finance_doc_kind} requested`}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      <Badge variant={e.direction === 'receivable' ? 'default' : 'secondary'} className="text-[10px] capitalize">{e.direction}</Badge>
+                    </td>
+                    <td className="px-4 py-2 capitalize text-muted-foreground">{e.settlement_method ? e.settlement_method.replace('_', ' ') : '—'}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{formatMoney(e.amount, e.currency)}</td>
+                    <td className="px-4 py-2 text-right text-muted-foreground">{e.due_at ? new Date(e.due_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-2 text-right capitalize text-muted-foreground">{e.status.replace('_', ' ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+
+      {activeWorkspaceId && (
+        <ManualEntryDialog
+          workspaceId={activeWorkspaceId}
+          direction={entryDialog.direction}
+          open={entryDialog.open}
+          onOpenChange={(v) => setEntryDialog((s) => ({ ...s, open: v }))}
+          onSaved={load}
+          lockedParty={
+            companyId
+              ? { party_type: 'company', party_id: companyId, display_name: customerName ?? 'This company' }
+              : contactId
+                ? { party_type: 'contact', party_id: contactId, display_name: customerName ?? 'This contact' }
+                : undefined
+          }
+        />
+      )}
     </div>
   );
 };

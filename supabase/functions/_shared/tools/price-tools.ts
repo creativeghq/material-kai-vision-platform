@@ -5,6 +5,8 @@
  * matches so the agent can compose a reasoning chain (list price × discount rules).
  */
 
+import { resolveContactPricingSource } from '../crm/party-inheritance.ts';
+
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
@@ -55,16 +57,20 @@ async function loadCustomerDiscount(
 
   const { data } = await supabase
     .from('crm_contacts')
-    .select('id, name, discount_percent, discount_notes')
+    .select('id, name, discount_percent, discount_notes, override_company_pricing')
     .eq('id', customer_contact_id!)
     .maybeSingle();
   if (!data) return null;
+  // Items 6/7/8 — when the contact inherits pricing (override off), the standing
+  // discount comes from its primary company. resolveContactPricingSource returns the
+  // company row (or the contact itself when overriding / unattached).
+  const source = await resolveContactPricingSource(supabase, data);
   return {
     kind: 'contact',
     id: data.id,
     name: data.name,
-    discount_percent: data.discount_percent ?? null,
-    discount_notes: data.discount_notes ?? null,
+    discount_percent: source.discount_percent ?? null,
+    discount_notes: source.discount_notes ?? null,
   };
 }
 

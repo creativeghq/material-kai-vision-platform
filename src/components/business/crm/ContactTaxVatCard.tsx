@@ -4,52 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
+import { Switch } from '@/components/core/ui/switch';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
-
-/** ISO-3166 alpha-2 codes for VAT purposes. Greece uses 'EL' (not 'GR') in
- * the VIES system; we follow that convention so what the user types here can
- * be used directly against VIES / ΑΑΔΕ. The list covers EU + EEA + UK + CH +
- * the handful of non-EU countries we see in the platform. "Other" sits at the
- * end for manual entry of anything missing. */
-const VAT_COUNTRY_OPTIONS: Array<{ code: string; name: string; eu: boolean }> = [
-  { code: 'EL', name: 'Greece',          eu: true  },
-  { code: 'AT', name: 'Austria',         eu: true  },
-  { code: 'BE', name: 'Belgium',         eu: true  },
-  { code: 'BG', name: 'Bulgaria',        eu: true  },
-  { code: 'HR', name: 'Croatia',         eu: true  },
-  { code: 'CY', name: 'Cyprus',          eu: true  },
-  { code: 'CZ', name: 'Czech Republic',  eu: true  },
-  { code: 'DK', name: 'Denmark',         eu: true  },
-  { code: 'EE', name: 'Estonia',         eu: true  },
-  { code: 'FI', name: 'Finland',         eu: true  },
-  { code: 'FR', name: 'France',          eu: true  },
-  { code: 'DE', name: 'Germany',         eu: true  },
-  { code: 'HU', name: 'Hungary',         eu: true  },
-  { code: 'IE', name: 'Ireland',         eu: true  },
-  { code: 'IT', name: 'Italy',           eu: true  },
-  { code: 'LV', name: 'Latvia',          eu: true  },
-  { code: 'LT', name: 'Lithuania',       eu: true  },
-  { code: 'LU', name: 'Luxembourg',      eu: true  },
-  { code: 'MT', name: 'Malta',           eu: true  },
-  { code: 'NL', name: 'Netherlands',     eu: true  },
-  { code: 'PL', name: 'Poland',          eu: true  },
-  { code: 'PT', name: 'Portugal',        eu: true  },
-  { code: 'RO', name: 'Romania',         eu: true  },
-  { code: 'SK', name: 'Slovakia',        eu: true  },
-  { code: 'SI', name: 'Slovenia',        eu: true  },
-  { code: 'ES', name: 'Spain',           eu: true  },
-  { code: 'SE', name: 'Sweden',          eu: true  },
-  { code: 'GB', name: 'United Kingdom',  eu: false },
-  { code: 'CH', name: 'Switzerland',     eu: false },
-  { code: 'NO', name: 'Norway',          eu: false },
-  { code: 'IS', name: 'Iceland',         eu: false },
-  { code: 'US', name: 'United States',   eu: false },
-  { code: 'CA', name: 'Canada',          eu: false },
-  { code: 'AU', name: 'Australia',       eu: false },
-  { code: 'JP', name: 'Japan',           eu: false },
-];
+import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 
 interface AttachedCompany {
   company_id?: string | null;
@@ -67,10 +26,19 @@ interface ContactTaxVatCardProps {
       decide whether to show the "business VAT takes priority" banner. */
   attachedCompanies?: AttachedCompany[];
   onPatch: (updates: { vat_number?: string | null; country_code?: string | null; tax_office?: string | null }) => void;
+  /** items 6/7/8 — when true, this contact inherits the company's VAT identity
+      (shown read-only). When false, the contact's own VAT fields are editable. */
+  inheriting?: boolean;
+  overrideBilling?: boolean;
+  /** Toggle handler for "Different from business"; absent when no primary company. */
+  onToggleOverride?: (v: boolean) => void;
+  /** Full primary-company row used to render the inherited VAT identity. */
+  primaryCompany?: { name?: string | null; vat_number?: string | null; country_code?: string | null; tax_office?: string | null } | null;
 }
 
 export const ContactTaxVatCard: React.FC<ContactTaxVatCardProps> = ({
   vatNumber, countryCode, taxOffice, attachedCompanies = [], onPatch,
+  inheriting = false, overrideBilling = false, onToggleOverride, primaryCompany,
 }) => {
   // Surface only companies that have an actual VAT to compare against.
   const companiesWithVat = attachedCompanies.filter((c) => !!c?.vat_number);
@@ -135,57 +103,88 @@ export const ContactTaxVatCard: React.FC<ContactTaxVatCardProps> = ({
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="vat_country">Country</Label>
-            <Select
-              value={countryCode || '__unset'}
-              onValueChange={handleCountry}
-            >
-              <SelectTrigger id="vat_country">
-                <SelectValue placeholder="Not set" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__unset">Not set</SelectItem>
-                {VAT_COUNTRY_OPTIONS.map((o) => (
-                  <SelectItem key={o.code} value={o.code}>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] w-7">{o.code}</span>
-                      <span>{o.name}</span>
-                      {o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {onToggleOverride && (
+          <div className="flex items-center justify-between gap-4 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+            <div className="space-y-0.5">
+              <Label className="cursor-pointer">Different from business</Label>
+              <p className="text-xs text-muted-foreground">
+                {overrideBilling
+                  ? "Using this contact's own VAT identity."
+                  : `Inheriting VAT identity from ${primaryBusiness?.company_name || 'the business'}. Turn on to set a different one.`}
+              </p>
+            </div>
+            <Switch checked={overrideBilling} onCheckedChange={onToggleOverride} />
           </div>
-          <div className="space-y-1.5 md:col-span-2">
-            <Label htmlFor="vat_number">VAT number</Label>
-            <Input
-              id="vat_number"
-              value={localVat}
-              onChange={(e) => setLocalVat(e.target.value)}
-              onFocus={() => { vatFocused.current = true; }}
-              onBlur={() => { vatFocused.current = false; handleVatBlur(); }}
-              placeholder="e.g. 123456789"
-            />
-            <p className="text-[10px] text-muted-foreground">
-              Digits only or country-prefixed (e.g. <span className="font-mono">EL123456789</span>). Saved on blur.
-            </p>
-          </div>
-        </div>
+        )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="tax_office">Tax office</Label>
-          <Input
-            id="tax_office"
-            value={localTax}
-            onChange={(e) => setLocalTax(e.target.value)}
-            onFocus={() => { taxFocused.current = true; }}
-            onBlur={() => { taxFocused.current = false; handleTaxBlur(); }}
-            placeholder="Local tax authority (e.g. Tax Office Chalandriou for GR)"
-          />
-        </div>
+        {inheriting ? (
+          <div className="space-y-2 rounded-md border border-border/60 p-3">
+            <div className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-muted-foreground">VAT</span>
+              <span className="font-mono font-medium">
+                {(primaryCompany?.country_code ?? '').toUpperCase()}{primaryCompany?.vat_number || '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-muted-foreground">Tax office</span>
+              <span className="font-medium text-right">{primaryCompany?.tax_office || '—'}</span>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="vat_country">Country</Label>
+                <Select
+                  value={countryCode || '__unset'}
+                  onValueChange={handleCountry}
+                >
+                  <SelectTrigger id="vat_country">
+                    <SelectValue placeholder="Not set" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__unset">Not set</SelectItem>
+                    {VAT_COUNTRY_OPTIONS.map((o) => (
+                      <SelectItem key={o.code} value={o.code}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] w-7">{o.code}</span>
+                          <span>{o.name}</span>
+                          {o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="vat_number">VAT number</Label>
+                <Input
+                  id="vat_number"
+                  value={localVat}
+                  onChange={(e) => setLocalVat(e.target.value)}
+                  onFocus={() => { vatFocused.current = true; }}
+                  onBlur={() => { vatFocused.current = false; handleVatBlur(); }}
+                  placeholder="e.g. 123456789"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Digits only or country-prefixed (e.g. <span className="font-mono">EL123456789</span>). Saved on blur.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tax_office">Tax office</Label>
+              <Input
+                id="tax_office"
+                value={localTax}
+                onChange={(e) => setLocalTax(e.target.value)}
+                onFocus={() => { taxFocused.current = true; }}
+                onBlur={() => { taxFocused.current = false; handleTaxBlur(); }}
+                placeholder="Local tax authority (e.g. Tax Office Chalandriou for GR)"
+              />
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

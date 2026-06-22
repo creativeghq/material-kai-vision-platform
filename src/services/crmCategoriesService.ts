@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type CrmCategoryKind = 'professional_type' | 'role' | 'manual';
+export type CrmCategoryKind = 'professional_type' | 'role' | 'manual' | 'industry';
 export type CrmCategoryMemberKind = 'platform_user' | 'crm_contact' | 'crm_company';
 
 export interface CrmCategory {
@@ -76,6 +76,9 @@ class CrmCategoriesService {
     description?: string;
     color_hex?: string;
     icon?: string;
+    /** Operator-managed kinds only ('manual' default, or 'industry'). The auto
+     * kinds (professional_type / role) are owned by the resync RPC. */
+    kind?: Extract<CrmCategoryKind, 'manual' | 'industry'>;
   }): Promise<CrmCategory> {
     const { data: { user } } = await supabase.auth.getUser();
     const slug = (input.slug || input.name).toLowerCase().trim()
@@ -86,7 +89,7 @@ class CrmCategoriesService {
         name: input.name,
         slug,
         description: input.description ?? null,
-        kind: 'manual',
+        kind: input.kind ?? 'manual',
         source_value: null,
         color_hex: input.color_hex ?? null,
         icon: input.icon ?? null,
@@ -286,6 +289,52 @@ class CrmCategoriesService {
     const wantIds = new Set(manualCategoryIds);
     const toAdd = [...wantIds].filter((id) => !existingIds.has(id));
     const toRemove = (existing || []).filter((r: any) => !wantIds.has(r.category_id));
+    if (toAdd.length > 0) {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
+        category_id: cid,
+        member_kind: 'crm_company' as CrmCategoryMemberKind,
+        crm_company_id: companyId,
+        source: 'manual',
+        added_by: user?.id ?? null,
+      })));
+    }
+    if (toRemove.length > 0) {
+      await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+    }
+  }
+
+  /** List categories of a given kind (e.g. 'industry') for a scoped picker. */
+  async listByKind(kind: CrmCategoryKind): Promise<CrmCategory[]> {
+    const { data, error } = await supabase
+      .from('crm_categories')
+      .select('id, slug, name, description, kind, source_value, color_hex, icon, is_active, created_at, updated_at')
+      .eq('kind', kind)
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return (data || []) as CrmCategory[];
+  }
+
+  /**
+   * Reconcile a company's manual memberships **within a bounded set of categories**
+   * (`scopeIds`) to exactly `selectedIds`. Memberships outside the scope (e.g. other
+   * manual lists) are left untouched — unlike `setMembershipsForCompany`, which
+   * replaces ALL manual memberships. Used by the per-kind pickers (industry) so they
+   * don't clobber unrelated category assignments.
+   */
+  async setCompanyMembershipsWithinScope(companyId: string, scopeIds: string[], selectedIds: string[]): Promise<void> {
+    const scope = new Set(scopeIds);
+    const want = new Set(selectedIds.filter((id) => scope.has(id)));
+    const { data: existing } = await supabase
+      .from('crm_category_members')
+      .select('id, category_id, source')
+      .eq('crm_company_id', companyId)
+      .eq('source', 'manual')
+      .in('category_id', scopeIds.length ? scopeIds : ['00000000-0000-0000-0000-000000000000']);
+    const existingIds = new Set((existing || []).map((r: any) => r.category_id));
+    const toAdd = [...want].filter((id) => !existingIds.has(id));
+    const toRemove = (existing || []).filter((r: any) => !want.has(r.category_id));
     if (toAdd.length > 0) {
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({

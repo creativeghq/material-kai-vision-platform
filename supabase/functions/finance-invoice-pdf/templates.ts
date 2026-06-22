@@ -2,9 +2,9 @@
 // same ids, layout flags, and default colors — so the PDF matches the HTML preview.
 import { rgb, type RGB } from 'pdf-lib';
 
-export type HeaderStyle = 'split' | 'band' | 'stacked' | 'minimal';
+export type HeaderStyle = 'split' | 'band' | 'stacked' | 'minimal' | 'sidebar';
 export type TitleStyle = 'right' | 'left-xl' | 'on-band' | 'center';
-export type TotalsBoxStyle = 'plain' | 'boxed' | 'accent';
+export type TotalsBoxStyle = 'plain' | 'boxed' | 'accent' | 'accent-text';
 
 export interface InvoiceColorsHex {
   accent: string; headerBg: string; headerText: string; tableHeaderBg: string;
@@ -27,12 +27,8 @@ export const TEMPLATES: Record<string, TemplateSpec> = {
     defaultColors: { accent: '#1f1f1f', headerBg: '#111111', headerText: '#ffffff', tableHeaderBg: '#efeae6', text: '#1c1c1c', muted: '#6b6b6b', line: '#dcdcdc' },
   },
   modern: {
-    id: 'modern', headerStyle: 'split', titleStyle: 'left-xl', tableHeaderFill: true, totalsBoxStyle: 'accent',
-    defaultColors: { accent: '#2563eb', headerBg: '#f3f4f6', headerText: '#111827', tableHeaderBg: '#f3f4f6', text: '#111827', muted: '#6b7280', line: '#e5e7eb' },
-  },
-  'accent-header': {
-    id: 'accent-header', headerStyle: 'band', titleStyle: 'on-band', tableHeaderFill: true, totalsBoxStyle: 'boxed',
-    defaultColors: { accent: '#b08d57', headerBg: '#2f3a4a', headerText: '#ffffff', tableHeaderBg: '#ece7df', text: '#222222', muted: '#6b6b6b', line: '#d8d2c8' },
+    id: 'modern', headerStyle: 'sidebar', titleStyle: 'right', tableHeaderFill: false, totalsBoxStyle: 'accent-text',
+    defaultColors: { accent: '#4f46e5', headerBg: '#ffffff', headerText: '#111827', tableHeaderBg: '#f3f4f6', text: '#1f2433', muted: '#6b7280', line: '#e5e7eb' },
   },
   minimal: {
     id: 'minimal', headerStyle: 'minimal', titleStyle: 'left-xl', tableHeaderFill: false, totalsBoxStyle: 'plain',

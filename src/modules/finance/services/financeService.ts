@@ -299,6 +299,10 @@ export interface ManualEntry {
   issued_at: string;
   due_at: string | null;
   notes: string | null;
+  settlement_method: 'bank_transfer' | 'cash' | 'card' | 'check' | 'other' | null;
+  finance_doc_requested: boolean | null;
+  finance_doc_kind: 'receipt' | 'invoice' | null;
+  finance_doc_status: 'requested' | 'issued' | 'declined' | null;
   created_at: string;
 }
 
@@ -672,6 +676,10 @@ const _financeServiceCore = {
     dueAt?: string | null;
     issuedAt?: string | null;
     notes?: string | null;
+    // item 3 — settlement method + optional request for finance to issue a document
+    settlementMethod?: 'bank_transfer' | 'cash' | 'card' | 'check' | 'other' | null;
+    financeDocRequested?: boolean;
+    financeDocKind?: 'receipt' | 'invoice' | null;
   }): Promise<ManualEntry> {
     if (!Number.isFinite(input.amount) || input.amount <= 0) {
       throw new Error('Amount must be greater than 0');
@@ -693,6 +701,10 @@ const _financeServiceCore = {
         due_at: input.dueAt ?? null,
         issued_at: input.issuedAt ?? new Date().toISOString(),
         notes: input.notes ?? null,
+        settlement_method: input.settlementMethod ?? null,
+        finance_doc_requested: input.financeDocRequested ?? false,
+        finance_doc_kind: input.financeDocRequested ? (input.financeDocKind ?? null) : null,
+        finance_doc_status: input.financeDocRequested ? 'requested' : null,
       })
       .select('*')
       .single();

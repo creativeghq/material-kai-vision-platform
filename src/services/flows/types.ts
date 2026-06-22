@@ -70,7 +70,9 @@ export type TriggerType =
   | 'expense_card_requested'
   // #227 — pricing-pyramid discount-approval workflow
   | 'pricing_change_requested'
-  | 'pricing_change_decided';
+  | 'pricing_change_decided'
+  // Account receivable/payable: finance asked to issue a receipt/invoice
+  | 'finance_document_requested';
 
 export interface ManualTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
@@ -82,6 +84,7 @@ export interface ExpenseCardReviewedTriggerConfig {}
 export interface ExpenseCardRequestedTriggerConfig {}
 export interface PricingChangeRequestedTriggerConfig {}
 export interface PricingChangeDecidedTriggerConfig {}
+export interface FinanceDocumentRequestedTriggerConfig {}
 export interface ReviewSubmittedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
@@ -249,6 +252,7 @@ export type TriggerConfigMap = {
   expense_card_requested: ExpenseCardRequestedTriggerConfig;
   pricing_change_requested: PricingChangeRequestedTriggerConfig;
   pricing_change_decided: PricingChangeDecidedTriggerConfig;
+  finance_document_requested: FinanceDocumentRequestedTriggerConfig;
 };
 
 // =====================================================

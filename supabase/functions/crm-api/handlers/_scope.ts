@@ -51,7 +51,11 @@ export async function getCrmScope(
       .eq('status', 'active'),
   ]);
 
-  const workspaceIds = (mems ?? []).map((m: { workspace_id: string }) => m.workspace_id);
+  // filter(Boolean): a NULL/empty workspace_id would poison any `.in('workspace_id', …)`
+  // query downstream (Postgres rejects '' as a uuid → 22P02 "invalid input syntax").
+  const workspaceIds = (mems ?? [])
+    .map((m: { workspace_id: string }) => m.workspace_id)
+    .filter(Boolean);
 
   const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
   if (globalRole && ['admin', 'super_admin'].includes(globalRole)) {

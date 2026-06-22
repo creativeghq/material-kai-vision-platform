@@ -63,6 +63,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'inbox.thread_assigned': UserPlus,
   marketplace_want_match: Package,
   expense_card_submitted: ClipboardCheck,
+  finance_document_requested: ClipboardCheck,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,
   pricing_change_requested: ClipboardCheck,

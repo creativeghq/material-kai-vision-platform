@@ -34,6 +34,9 @@ export const CustomerFinanceRulesCard: React.FC<Target> = ({ companyId, contactI
   const [terms, setTerms] = useState<string>('');
   const [team, setTeam] = useState<string[]>([]);
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([]);
+  // Display name for ANY user id (sales-eligible members ∪ already-assigned team),
+  // so an assigned owner who is no longer sales-eligible still shows a name, not a raw id.
+  const [nameById, setNameById] = useState<Map<string, string>>(new Map());
   const [defaults, setDefaults] = useState<{ credit_limit: number | null; min_order_value: number | null; payment_terms_days: number | null } | null>(null);
 
   const load = useCallback(async () => {
@@ -47,20 +50,24 @@ export const CustomerFinanceRulesCard: React.FC<Target> = ({ companyId, contactI
       setCreditLimit(row?.credit_limit != null ? String(row.credit_limit) : '');
       setMinOrder(row?.min_order_value != null ? String(row.min_order_value) : '');
       setTerms(row?.payment_terms_days != null ? String(row.payment_terms_days) : '');
-      setTeam(Array.isArray(row?.responsible_sales_user_ids) ? row.responsible_sales_user_ids : []);
+      const teamIds: string[] = Array.isArray(row?.responsible_sales_user_ids) ? row.responsible_sales_user_ids : [];
+      setTeam(teamIds);
       if (defs) setDefaults({ credit_limit: defs.credit_limit, min_order_value: defs.min_order_value, payment_terms_days: defs.payment_terms_days });
 
       // Sales-eligible members of the workspace → names from user_profiles.
       const { data: members } = await (supabase as any)
         .from('workspace_members').select('user_id, role').eq('workspace_id', activeWorkspaceId).in('role', SALES_ROLES);
-      const ids = (members ?? []).map((m: any) => m.user_id);
-      if (ids.length) {
-        const { data: profs } = await (supabase as any).from('user_profiles').select('user_id, full_name, email').in('user_id', ids);
-        const byId = new Map((profs ?? []).map((p: any) => [p.user_id, p.full_name || p.email || p.user_id.slice(0, 8)]));
-        setSalesUsers(ids.map((id: string) => ({ user_id: id, name: byId.get(id) ?? id.slice(0, 8) })));
-      } else {
-        setSalesUsers([]);
+      const memberIds: string[] = (members ?? []).map((m: any) => m.user_id);
+      // Resolve names for sales-eligible members AND already-assigned team members
+      // (the latter may no longer be sales-eligible but must still render a name).
+      const allIds = [...new Set([...memberIds, ...teamIds])];
+      const byId = new Map<string, string>();
+      if (allIds.length) {
+        const { data: profs } = await (supabase as any).from('user_profiles').select('user_id, full_name, email').in('user_id', allIds);
+        for (const p of (profs ?? []) as any[]) byId.set(p.user_id, p.full_name || p.email || 'Unknown member');
       }
+      setNameById(byId);
+      setSalesUsers(memberIds.map((id: string) => ({ user_id: id, name: byId.get(id) ?? 'Unknown member' })));
     } catch (err: any) {
       toast({ title: 'Failed to load rules', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -91,8 +98,8 @@ export const CustomerFinanceRulesCard: React.FC<Target> = ({ companyId, contactI
     v == null ? 'no default' : money ? formatMoney(v) : `${v} days`;
 
   const selectedNames = useMemo(
-    () => team.map((id) => salesUsers.find((u) => u.user_id === id)?.name ?? id.slice(0, 8)),
-    [team, salesUsers],
+    () => team.map((id) => nameById.get(id) ?? 'Unknown member'),
+    [team, nameById],
   );
 
   if (loading) return <Card><CardContent className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></CardContent></Card>;

@@ -38,6 +38,13 @@ const COMPANY_WRITABLE_COLUMNS = [
   'business_start_date', 'aade_data', 'aade_data_at',
 ] as const;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Guard a path/body id before it reaches Postgres so a malformed value returns a
+ * clean 400 instead of a raw "invalid input syntax for type uuid" 22P02. */
+function isUuid(v: unknown): v is string {
+  return typeof v === 'string' && UUID_RE.test(v);
+}
+
 function pickCompanyFields(body: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const col of COMPANY_WRITABLE_COLUMNS) {
@@ -319,17 +326,31 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const body = await req.json();
       const { contact_id, role, is_primary, notes } = body;
 
-      if (!(await companyInScope(companyId, scope))) {
+      // Validate ids up front so a malformed value returns a clear 400 rather than a
+      // raw Postgres "invalid input syntax for type uuid" surfaced as an opaque error.
+      if (!isUuid(companyId)) {
         return new Response(
-          JSON.stringify({ error: 'Company not found' }),
-          { status: 404, headers: corsHeaders },
+          JSON.stringify({ error: 'Invalid company id' }),
+          { status: 400, headers: corsHeaders },
         );
       }
-
       if (!contact_id) {
         return new Response(
           JSON.stringify({ error: 'contact_id is required' }),
           { status: 400, headers: corsHeaders },
+        );
+      }
+      if (!isUuid(contact_id)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid contact id' }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
+      if (!(await companyInScope(companyId, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Company not found' }),
+          { status: 404, headers: corsHeaders },
         );
       }
 

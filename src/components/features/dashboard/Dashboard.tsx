@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 
 import { HeroSection } from './HeroSection';
 import { LatestWidgets } from './LatestWidgets';
+import { MyOverview } from './MyOverview';
+import { DashboardAiInsights } from './DashboardAiInsights';
 import { RecommendedForYou } from '@/components/features/recommendations';
 
 export const Dashboard: React.FC = () => {
@@ -16,30 +18,21 @@ export const Dashboard: React.FC = () => {
           <HeroSection onNavigate={navigate} />
         </div>
 
-        {/* AI Insights panel */}
-        <div className="col-span-12 lg:col-span-4 rounded-xl border border-white/8 bg-card p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-xl font-semibold mb-2">AI Insights</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              JARVIS is continuously learning from new catalogs and materials added to the platform.
-              Ask it anything about specs, suppliers, or design.
-            </p>
-          </div>
-          <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-            <span className="text-xs font-medium text-primary uppercase tracking-wider">Pro Tip</span>
-            <p className="text-sm mt-1">Use the Agent Hub to compare technical specs across different manufacturers.</p>
-          </div>
-        </div>
+        {/* AI Insights panel — real, generated per workspace, cached 15 days */}
+        <DashboardAiInsights />
       </div>
 
-      {/* Latest content widgets */}
-      <LatestWidgets />
+      {/* Personal quick overview — finance, projects, tasks, inbox */}
+      <MyOverview />
 
-      {/* Personalized Recommendations */}
+      {/* Personalized Recommendations — before the platform-generated areas */}
       <div>
         <h2 className="text-xl font-light tracking-tight mb-4">Recommended for You</h2>
         <RecommendedForYou limit={20} algorithm="user_user" />
       </div>
+
+      {/* Latest content across the platform (generated areas) */}
+      <LatestWidgets />
     </div>
   );
 };

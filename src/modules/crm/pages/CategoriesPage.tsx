@@ -13,6 +13,9 @@ import { getErrorMessage } from '@/core/errors/utils';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
   crmCategoriesService,
@@ -26,13 +29,18 @@ const KIND_LABELS: Record<CrmCategoryKind, string> = {
   professional_type: 'Professional type',
   role: 'Role',
   manual: 'Custom',
+  industry: 'Industry',
 };
 
 const KIND_VARIANTS: Record<CrmCategoryKind, 'default' | 'secondary' | 'outline'> = {
   professional_type: 'secondary',
   role: 'outline',
   manual: 'default',
+  industry: 'secondary',
 };
+
+/** Kinds an operator may create directly (the auto kinds are owned by resync). */
+const AUTO_KINDS: CrmCategoryKind[] = ['professional_type', 'role'];
 
 export const CategoriesPanel: React.FC = () => {
   const { toast } = useToast();
@@ -46,6 +54,7 @@ export const CategoriesPanel: React.FC = () => {
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
   const [createColor, setCreateColor] = useState('#22c55e');
+  const [createKind, setCreateKind] = useState<'manual' | 'industry'>('manual');
 
   const [editing, setEditing] = useState<CrmCategorySummary | null>(null);
   const [editName, setEditName] = useState('');
@@ -75,7 +84,7 @@ export const CategoriesPanel: React.FC = () => {
   }, [categories, search]);
 
   const grouped = useMemo(() => {
-    const out = { professional_type: [] as CrmCategorySummary[], role: [] as CrmCategorySummary[], manual: [] as CrmCategorySummary[] };
+    const out = { professional_type: [] as CrmCategorySummary[], role: [] as CrmCategorySummary[], manual: [] as CrmCategorySummary[], industry: [] as CrmCategorySummary[] };
     for (const c of filtered) out[c.kind].push(c);
     return out;
   }, [filtered]);
@@ -108,10 +117,11 @@ export const CategoriesPanel: React.FC = () => {
         name: createName.trim(),
         description: createDescription.trim() || undefined,
         color_hex: createColor || undefined,
+        kind: createKind,
       });
       toast({ title: 'Category created' });
       setShowCreate(false);
-      setCreateName(''); setCreateDescription(''); setCreateColor('#22c55e');
+      setCreateName(''); setCreateDescription(''); setCreateColor('#22c55e'); setCreateKind('manual');
       load();
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
@@ -145,7 +155,7 @@ export const CategoriesPanel: React.FC = () => {
   };
 
   const handleDelete = async (c: CrmCategorySummary) => {
-    const autoNote = c.kind !== 'manual'
+    const autoNote = AUTO_KINDS.includes(c.kind)
       ? ` This is auto-built from ${c.kind === 'role' ? 'a role' : 'a professional type'}, so it will reappear on the next "Resync auto".`
       : '';
     if (!window.confirm(`Delete "${c.name}"? Members are removed but the underlying users / contacts stay.${autoNote}`)) return;
@@ -198,7 +208,7 @@ export const CategoriesPanel: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {(['manual', 'professional_type', 'role'] as CrmCategoryKind[]).map((kind) => {
+            {(['industry', 'manual', 'professional_type', 'role'] as CrmCategoryKind[]).map((kind) => {
               const list = grouped[kind];
               if (list.length === 0) return null;
               return (
@@ -208,7 +218,7 @@ export const CategoriesPanel: React.FC = () => {
                       {KIND_LABELS[kind]}
                     </h2>
                     <Badge variant={KIND_VARIANTS[kind]} className="text-[10px] py-0">{list.length}</Badge>
-                    {kind !== 'manual' && (
+                    {AUTO_KINDS.includes(kind) && (
                       <span className="text-xs text-muted-foreground">— synced from {kind === 'professional_type' ? 'user_profiles.professional_type' : 'roles.name'}</span>
                     )}
                   </div>
@@ -259,8 +269,23 @@ export const CategoriesPanel: React.FC = () => {
           <DialogHeader><DialogTitle>New CRM Category</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
+              <Label>Type</Label>
+              <Select value={createKind} onValueChange={(v) => setCreateKind(v as 'manual' | 'industry')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Custom list</SelectItem>
+                  <SelectItem value="industry">Industry</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {createKind === 'industry'
+                  ? 'Industries are the taxonomy you assign to companies (multi-select on the company page).'
+                  : 'A free-form list you assign people / companies to.'}
+              </p>
+            </div>
+            <div className="space-y-1">
               <Label>Name *</Label>
-              <Input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="e.g. Newsletter VIPs" />
+              <Input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder={createKind === 'industry' ? 'e.g. Hospitality, Retail, Architecture' : 'e.g. Newsletter VIPs'} />
             </div>
             <div className="space-y-1">
               <Label>Description</Label>
@@ -309,7 +334,7 @@ export const CategoriesPanel: React.FC = () => {
                 <input id="active" type="checkbox" checked={editActive} onChange={(e) => setEditActive(e.target.checked)} />
                 <Label htmlFor="active" className="cursor-pointer">Active</Label>
               </div>
-              {editing.kind !== 'manual' && (
+              {AUTO_KINDS.includes(editing.kind) && (
                 <p className="text-xs text-muted-foreground">
                   Auto-built from {editing.kind === 'professional_type' ? 'professional type' : 'role'} "{editing.source_value}". You can rename, recolour, toggle Active, and add/remove members freely — auto members just re-sync on "Resync auto". (Only the slug/kind stay fixed so the sync keeps matching.)
                 </p>

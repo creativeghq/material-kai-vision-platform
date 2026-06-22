@@ -5,6 +5,10 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/core/ui/select';
+import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -523,13 +527,27 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                     placeholder="Greece"
                   />
                 </FormField>
-                <FormField label="Country code">
-                  <Input
-                    value={businessForm.country_code}
-                    onChange={(e) => setBusinessForm({ ...businessForm, country_code: e.target.value.toUpperCase() })}
-                    placeholder="GR"
-                    maxLength={2}
-                  />
+                <FormField label="VAT country">
+                  <Select
+                    value={businessForm.country_code || '__unset'}
+                    onValueChange={(v) => setBusinessForm({ ...businessForm, country_code: v === '__unset' ? '' : v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Not set" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__unset">Not set</SelectItem>
+                      {VAT_COUNTRY_OPTIONS.map((o) => (
+                        <SelectItem key={o.code} value={o.code}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] w-7">{o.code}</span>
+                            <span>{o.name}</span>
+                            {o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </FormField>
               </div>
             )}
