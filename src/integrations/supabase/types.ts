@@ -3979,7 +3979,7 @@ export type Database = {
           country: string | null
           country_code: string | null
           created_at: string | null
-          created_by: string
+          created_by: string | null
           credit_limit: number | null
           department: string | null
           discount_notes: string | null
@@ -4043,7 +4043,7 @@ export type Database = {
           country?: string | null
           country_code?: string | null
           created_at?: string | null
-          created_by: string
+          created_by?: string | null
           credit_limit?: number | null
           department?: string | null
           discount_notes?: string | null
@@ -4107,7 +4107,7 @@ export type Database = {
           country?: string | null
           country_code?: string | null
           created_at?: string | null
-          created_by?: string
+          created_by?: string | null
           credit_limit?: number | null
           department?: string | null
           discount_notes?: string | null
@@ -14974,7 +14974,7 @@ export type Database = {
           assignee_id: string | null
           completed_at: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           description: string | null
           due_date: string | null
           id: string
@@ -14991,7 +14991,7 @@ export type Database = {
           assignee_id?: string | null
           completed_at?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
@@ -15008,7 +15008,7 @@ export type Database = {
           assignee_id?: string | null
           completed_at?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           description?: string | null
           due_date?: string | null
           id?: string

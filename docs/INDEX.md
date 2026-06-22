@@ -489,6 +489,18 @@ Complete documentation for Material Kai Vision Platform.
 - 7 personas × 15 capabilities matrix; `usePermissions`/`CapabilityGuard`
 - Module entitlements (#212); workspace tenancy, hierarchy & guard RPCs
 
+**[trip-expense-cards.md](trip-expense-cards.md)** - Trip/expense cards & customer AR aging ✨ NEW (2026-06)
+- Expense cards with per-line finance approval + reimbursement→planned_payment; receipts via `trip-expense-ops`; KAI tools
+- `vw_customer_aging_buckets` (not_due / 0–30 / 31–90 / 90+) across the finance Parties views
+
+**[surplus-marketplace.md](surplus-marketplace.md)** - 0%-commission last-stock marketplace (#219) ✨ NEW (2026-06)
+- Cross-tenant `marketplace_listings` browse under Discover (first read-across-workspaces RLS surface)
+- Buyer inquiry bridged into the seller's Inbox; want-list alerts; warehouse-sourced listings + expiry cron
+
+**[purchase-items-doors-windows.md](purchase-items-doors-windows.md)** - Project purchase items (doors/windows) ✨ NEW (2026-06)
+- `project_purchase_items` + `generate-purchase-sheet-pdf` (schedule / per-item spec sheets with door-swing & window glyphs)
+- Quote-referenced (not PO); frontend/agent wiring still pending
+
 ---
 
 ### 🔌 API Reference
