@@ -587,21 +587,26 @@ export function formatAddressLine(a: {
 }
 
 export const addressUnitsAPI = {
-  /** List the sub-units of a company OR contact (pass exactly one id). */
+  /**
+   * List the sub-units of a company OR contact (pass exactly one id).
+   * Read goes through the supabase client (table RLS = is_workspace_member), NOT the
+   * crm-api edge function: that function gates address-units to admin/factory, which is
+   * correct for writes but too strict for this read — the sub-unit picker is mounted in
+   * the project/quote client flows used by non-admin workspace members, where the strict
+   * gate produced a benign-but-noisy "Access denied" and hid the picker. RLS keeps it
+   * tenant-safe; writes (create/update/remove) stay on the admin-gated edge function.
+   */
   async list(parent: { companyId?: string; contactId?: string }): Promise<AddressUnit[]> {
-    const token = await getAuthToken();
-    const params = new URLSearchParams();
-    if (parent.companyId) params.set('company_id', parent.companyId);
-    if (parent.contactId) params.set('contact_id', parent.contactId);
+    let query = (supabase as any).from('crm_address_units').select('*');
+    if (parent.companyId) query = query.eq('company_id', parent.companyId);
+    else if (parent.contactId) query = query.eq('contact_id', parent.contactId);
+    else return [];
 
-    const response = await fetch(`${getApiBase()}/crm-api/address-units?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || 'Failed to fetch address units');
-    }
-    return (await response.json()).data ?? [];
+    const { data, error } = await query
+      .order('is_default', { ascending: false })
+      .order('branch_number', { ascending: true, nullsFirst: false });
+    if (error) throw new Error(error.message || 'Failed to fetch address units');
+    return (data ?? []) as AddressUnit[];
   },
 
   async create(
