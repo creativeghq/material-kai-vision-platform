@@ -459,6 +459,23 @@ Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
     }
     if (!workspaceId) return json({ error: 'no workspace' }, 400);
 
+    // Tenant boundary: this handler runs under the service role (RLS bypassed) and the
+    // allowedRoles gate only proves the caller is a finance/owner user SOMEWHERE — not that
+    // they belong to the requested workspace. Without this, a finance user in tenant A could
+    // pass body.workspace_id=<tenant B> + recipients_override=[attacker] and exfiltrate tenant
+    // B's AR/AP aging + cash-flow forecast + monthly P&L to an arbitrary address. Require an
+    // active membership of the resolved workspace (internal 'secret' callers bypass).
+    if (auth.level !== 'secret') {
+      const { data: mem } = await supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('user_id', auth.userId)
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (!mem) return json({ error: 'Not authorized for this workspace' }, 403);
+    }
+
     const { data: settings } = await supabase
       .from('finance_settings')
       .select('*')

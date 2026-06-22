@@ -334,7 +334,7 @@ Deno.serve(withApiLogging('generate-pbr-maps', async (req) => {
       return jsonResponse({ success: false, error: 'user_id required for internal calls' }, 400);
     }
     userId = rawBody.user_id;
-    return await handleRequest(supabase, rawBody, userId);
+    return await handleRequest(supabase, rawBody, userId, true);
   }
 
   // User JWT validation
@@ -352,13 +352,14 @@ Deno.serve(withApiLogging('generate-pbr-maps', async (req) => {
     return jsonResponse({ success: false, error: 'Invalid JSON body' }, 400);
   }
 
-  return await handleRequest(supabase, body, userId);
+  return await handleRequest(supabase, body, userId, false);
 }));
 
 async function handleRequest(
   supabase: ReturnType<typeof createClient>,
   body: PbrRequest,
   userId: string,
+  isService: boolean,
 ): Promise<Response> {
   const { product_id, source_image_url, generate_tileable = true } = body;
 
@@ -368,6 +369,32 @@ async function handleRequest(
   }
   if (!source_image_url) {
     return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
+  }
+
+  // ── Tenant boundary ──────────────────────────────────────────────────────
+  // The service-role client below reads + OVERWRITES products.metadata.pbr_maps by id (RLS
+  // bypassed). A user-JWT caller must belong to the product's workspace, else any
+  // authenticated user could read another tenant's product metadata and corrupt its PBR maps
+  // (and write images under generation-images/pbr-maps/{product_id}/). Internal service-role
+  // calls (isService) are dispatched server-to-server and already trusted.
+  if (!isService) {
+    const { data: prod } = await supabase
+      .from('products')
+      .select('workspace_id')
+      .eq('id', product_id)
+      .maybeSingle();
+    if (!prod) {
+      return jsonResponse({ success: false, error: 'Product not found' }, 404);
+    }
+    const { data: mem } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('user_id', userId)
+      .eq('workspace_id', (prod as any).workspace_id)
+      .maybeSingle();
+    if (!mem) {
+      return jsonResponse({ success: false, error: 'Not authorized for this product' }, 403);
+    }
   }
 
   // ── Pre-flight: REPLICATE_API_TOKEN must be configured ───────────────────
