@@ -704,9 +704,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           <DialogTitle>New invoice</DialogTitle>
         </DialogHeader>
 
-        {/* ───────────── Single editable document (Oxygen-style) ───────────── */}
-        <div className="flex-1 min-h-0 overflow-y-auto bg-muted/20">
-          <div className="mx-auto max-w-5xl space-y-5 rounded-lg border border-border/50 bg-background px-6 py-6 my-6 shadow-sm">
+        {/* ───────── Editable form (left) + live styled-template preview (right) ───────── */}
+        <div className="flex-1 min-h-0 flex">
+          <div className="flex-1 min-w-0 overflow-y-auto bg-muted/20">
+          <div className="mx-auto max-w-3xl space-y-5 rounded-lg border border-border/50 bg-background px-6 py-6 my-6 shadow-sm">
             {/* Document type quick-pick (segmented control) — mirrors Oxygen's top tabs */}
             <div className="flex flex-wrap gap-2">
               {([['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']] as const)
@@ -1156,7 +1157,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               Issue now (assigns the legal number + date)
             </label>
           </div>
+          </div>
 
+          {/* Live preview — same renderer + active workspace template/colors as the real PDF. */}
+          <div className="hidden lg:flex w-[620px] xl:w-[680px] shrink-0 flex-col border-l border-border/60 bg-muted/40">
+            <div className="flex items-center justify-between px-4 h-10 shrink-0 border-b border-border/60 bg-background/60">
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">Live preview</span>
+              <Button size="sm" variant="ghost" className="h-7 rounded-full gap-1.5 text-xs" onClick={() => setShowPreview(true)}>
+                <Eye className="h-3.5 w-3.5" /> Full size
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto p-5 no-card-hover">
+              <div style={{ zoom: 0.72 }}><InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} /></div>
+            </div>
+          </div>
         </div>
 
         <DialogFooter className="border-t border-border/60 px-5 py-3 shrink-0">
