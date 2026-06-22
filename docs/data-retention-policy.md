@@ -50,6 +50,7 @@ Cleanup is performed by two mechanisms:
 |---|---|---|---|
 | `job-cleanup-weekly` | `0 3 * * 0` (Sun 03:00 UTC) | Edge function | Full multi-table cleanup pass via `job-cleanup-cron` edge function |
 | `system-logs-daily-cleanup` | `0 2 * * *` (daily 02:00 UTC) | Direct SQL | `DELETE FROM system_logs WHERE created_at < NOW() - INTERVAL '30 days'` — handles bulk purge without edge function overhead |
+| `purge-orphan-agent-projects` | `30 3 */2 * *` (every 2 days, 03:30 UTC) | Direct SQL | `DELETE FROM agent_projects WHERE workspace_id IS NULL` — removes unreachable orphan Agent Fabric projects (NULL workspace can never satisfy the `is_workspace_admin(workspace_id)` RLS). CASCADEs to that project's secrets/deployments/snapshots. Same purge runs in `reset-platform` STEP 1.6. |
 
 ---
 
