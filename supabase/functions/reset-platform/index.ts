@@ -269,7 +269,7 @@ const TABLES_TO_CLEAR = [
   'trending_searches',             // Trending terms
   'unmatched_term_frequency',      // Unknown term frequency
   'query_intelligence',            // Derived query intelligence
-  'query_understanding_cache',     // Cached NL→query parses (hallucination risk)
+  // NOTE: query_understanding_cache (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'duplicate_detection_cache',     // Cached duplicate detection
   'product_similarity_cache',      // Cached product similarity
 
@@ -292,7 +292,7 @@ const TABLES_TO_CLEAR = [
   'processing_queue',              // Generic processing queue
   'processing_metrics',            // Processing metrics
   'pipeline_strategy_metrics',     // Chunking-strategy / Phase-3 distribution metrics
-  'paddleocr_metrics',             // Per-attempt PaddleOCR structural-pass telemetry
+  // NOTE: paddleocr_metrics (bigint PK, not uuid) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'batch_jobs',                    // Batch jobs
   'embedding_stability_metrics',   // Embedding drift metrics
   'product_prices',                // Product price rows (child of products, CASCADE)
@@ -315,7 +315,7 @@ const TABLES_TO_CLEAR = [
   'pdf_processing_results',        // PDF processing results
   'pdf_integration_health_results',// PDF integration health
   'validation_results',            // Validation results
-  'review_summaries',              // Derived review summaries
+  // NOTE: review_summaries (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'document_images',               // Extracted images from PDFs
   'document_chunks',               // Semantic text chunks
   'products',                      // Extracted products
@@ -346,7 +346,9 @@ const TABLES_TO_CLEAR = [
   'api_usage_logs',                // API usage logs
   'mivaa_api_usage_logs',          // MIVAA API usage logs
   'webhook_calls',                 // Webhook call history
-  'system_logs',                   // Platform-wide system/audit log (derived, unbounded)
+  // NOTE: system_logs is NOT here — at ~1M+ rows a PostgREST delete-all hits the
+  // statement timeout. It (plus the id-less metric/cache tables + all vecs.*
+  // collections) is TRUNCATEd via the reset_truncate_heavy() RPC in STEP 3.
   'ai_pricing_update_logs',        // AI pricing auto-update audit log
   'email_events',                  // Email open/click/bounce events (child of email_logs)
   'email_analytics',               // Email engagement analytics (derived)
@@ -757,63 +759,34 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
 
     const totalStorageDeleted = results.storage.reduce((sum: number, r: any) => sum + (r.deleted || 0), 0);
 
-    // STEP 3: Clear VECS collections (vector embeddings)
-    console.log('\n🗑️  STEP 3: Clear VECS collections');
-    results.vecs = [];
-
-    // VECS collections to clear — every image embedding collection.
-    // Missing even one causes the AI to retrieve ghost images after reset.
-    const vecsCollections = [
-      'image_slig_embeddings',          // Primary visual embeddings (SigLIP2, 768D)
-      'image_color_embeddings',         // Color-focused SLIG (768D)
-      'image_texture_embeddings',       // Texture pattern SLIG (768D)
-      'image_style_embeddings',         // Design style Voyage (1024D)
-      'image_material_embeddings',      // Material type Voyage (1024D)
-      'image_understanding_embeddings', // Voyage AI understanding embeddings from Claude Opus vision_analysis (1024D)
-    ];
-    for (const collection of vecsCollections) {
-      try {
-        console.log(`   Clearing vecs.${collection}...`);
-
-        // Query VECS table directly (schema: vecs)
-        const { count, error: countError } = await supabase
-          .schema('vecs')
-          .from(collection)
-          .select('*', { count: 'exact', head: true });
-
-        if (countError) {
-          console.log(`   ⚠️ Could not count vecs.${collection}: ${countError.message}`);
-          results.vecs.push({ collection, deleted: 0, error: countError.message });
-          continue;
-        }
-
-        if (!count || count === 0) {
-          console.log(`   ✅ vecs.${collection} is already empty`);
-          results.vecs.push({ collection, deleted: 0 });
-          continue;
-        }
-
-        // Delete all rows from VECS collection
-        const { error: deleteError } = await supabase
-          .schema('vecs')
-          .from(collection)
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-
-        if (deleteError) {
-          console.error(`   ❌ Failed to clear vecs.${collection}:`, deleteError);
-          results.vecs.push({ collection, deleted: 0, error: deleteError.message });
-        } else {
-          console.log(`   ✅ Deleted ${count} rows from vecs.${collection}`);
-          results.vecs.push({ collection, deleted: count });
-        }
-      } catch (error: any) {
-        console.error(`   ❌ Error clearing vecs.${collection}:`, error);
-        results.vecs.push({ collection, deleted: 0, error: error.message });
+    // STEP 3: TRUNCATE high-volume / id-less tables + ALL VECS collections via RPC.
+    // None of these can go through the PostgREST delete-all path:
+    //   • system_logs is ~1M+ rows → DELETE hits the statement timeout
+    //   • paddleocr_metrics (bigint PK) / query_understanding_cache / review_summaries
+    //     have non-uuid or absent `id` columns → the .neq('id', zero-uuid) predicate errors
+    //   • DELETE is NOT granted to the PostgREST role on the vecs schema, so the old
+    //     per-collection delete silently no-op'd → ghost embeddings survived every reset
+    // reset_truncate_heavy() is SECURITY DEFINER and TRUNCATEs all of them reliably
+    // (fixed allow-list, no dynamic input). This is the single source of truth for
+    // clearing every image embedding collection — missing one leaves ghost images.
+    console.log('\n🗑️  STEP 3: TRUNCATE VECS + high-volume/id-less tables (RPC)');
+    results.truncated = { tables: [] };
+    try {
+      const { data: trunc, error: truncErr } = await supabase.rpc('reset_truncate_heavy');
+      if (truncErr) {
+        console.error('   ❌ reset_truncate_heavy failed:', truncErr);
+        results.truncated = { tables: [], error: truncErr.message };
+      } else {
+        const tables: string[] = (trunc && (trunc as any).truncated) || [];
+        console.log(`   ✅ Truncated ${tables.length} relations: ${tables.join(', ')}`);
+        results.truncated = { tables };
       }
+    } catch (error: any) {
+      console.error('   ❌ reset_truncate_heavy error:', error);
+      results.truncated = { tables: [], error: error.message };
     }
 
-    const totalVecsDeleted = results.vecs.reduce((sum: number, r: any) => sum + (r.deleted || 0), 0);
+    const totalVecsDeleted = (results.truncated.tables || []).filter((t: string) => t.startsWith('vecs.')).length;
 
     // STEP 4: Trim prompt_history to keep only the 5 most recent rows per prompt_id.
     // prompt_history is the audit trail of admin edits to prompts — we keep a
@@ -870,12 +843,13 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
 
     const successfulTables = results.tables.filter((r: any) => !r.error).length;
     const failedTables = results.tables.filter((r: any) => r.error).length;
-    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows across ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} errors), KB docs cleaned: ${results.knowledge_base.deleted}, Storage: ${totalStorageDeleted} files, VECS: ${totalVecsDeleted} embeddings, prompt_history trimmed: ${results.prompt_history.deleted}, server /tmp: ${results.server_tmp.ok ? 'cleaned' : 'skipped/failed'}`);
+    const truncatedCount = (results.truncated?.tables || []).length;
+    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows across ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} errors), KB docs cleaned: ${results.knowledge_base.deleted}, Storage: ${totalStorageDeleted} files, Truncated: ${truncatedCount} relations (incl. ${totalVecsDeleted} VECS), prompt_history trimmed: ${results.prompt_history.deleted}, server /tmp: ${results.server_tmp.ok ? 'cleaned' : 'skipped/failed'}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        summary: `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), cleaned ${results.knowledge_base.deleted} unprotected KB docs, ${totalStorageDeleted} files from storage, ${totalVecsDeleted} embeddings from VECS, trimmed ${results.prompt_history.deleted} prompt_history rows, and ${results.server_tmp.ok ? 'cleaned' : 'failed to clean'} MIVAA /tmp`,
+        summary: `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), cleaned ${results.knowledge_base.deleted} unprotected KB docs, ${totalStorageDeleted} files from storage, truncated ${truncatedCount} heavy/id-less relations (incl. ${totalVecsDeleted} VECS collections), trimmed ${results.prompt_history.deleted} prompt_history rows, and ${results.server_tmp.ok ? 'cleaned' : 'failed to clean'} MIVAA /tmp`,
         results,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
