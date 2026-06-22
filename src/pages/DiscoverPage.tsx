@@ -3,7 +3,7 @@ import {
   Search, Users, MapPin, Globe, Building2, Package,
   Layers, X, Package2, ExternalLink, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -416,6 +416,7 @@ export const DiscoverPage: React.FC = () => {
 
   // Products / Factories
   const [products, setProducts] = useState<RawProduct[]>([]);
+  const [searchParams] = useSearchParams();
   const [productSearch, setProductSearch] = useState('');
   const [productCat, setProductCat] = useState('all');
   const [factorySearch, setFactorySearch] = useState('');
@@ -485,6 +486,16 @@ export const DiscoverPage: React.FC = () => {
   function openProduct(p: RawProduct) {
     setModalProduct(toProduct(p));
   }
+
+  // Deep-link: /discover?product=<id> (e.g. from a Brand page) opens that
+  // product's detail modal once the catalog has loaded.
+  useEffect(() => {
+    const pid = searchParams.get('product');
+    if (!pid || products.length === 0) return;
+    const raw = products.find((p) => p.id === pid);
+    if (raw) openProduct(raw);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, products]);
 
   // Derived factories
   const factories = useMemo<Factory[]>(() => {

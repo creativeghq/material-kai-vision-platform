@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Package, FileText, ArrowLeft, Star, ChevronRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Package, FileText, ArrowLeft, Star, ChevronRight, BookOpen, Layers } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { SeoHead } from '@/components/seo/SeoHead';
 import { ProductTeaser } from '@/components/features/knowledge/ProductTeaser';
+import { mdComponents } from '@/components/features/knowledge/markdownComponents';
 
 interface BrandDoc {
   id: string;
@@ -20,7 +23,8 @@ interface BrandProduct { id: string; name: string; image_url: string | null; }
 interface BrandData {
   brand: string;
   slug: string;
-  overview: { title: string; slug: string | null; summary: string | null } | null;
+  hero_image: string | null;
+  overview: { title: string; slug: string | null; summary: string | null; content: string | null } | null;
   docs: BrandDoc[];
   products: BrandProduct[];
 }
@@ -42,6 +46,11 @@ function collectionOf(title: string): string {
   return m ? m[1] : 'General';
 }
 
+/** Drop a single leading `# Heading` so the page keeps one h1 (the brand name). */
+function stripLeadingH1(md: string): string {
+  return md.replace(/^\s*#\s+.+(\r?\n)+/, '');
+}
+
 const DocCard: React.FC<{ doc: BrandDoc; compact?: boolean }> = ({ doc, compact }) => (
   <Link
     to={`/knowledge-base/${doc.slug || doc.id}`}
@@ -51,6 +60,12 @@ const DocCard: React.FC<{ doc: BrandDoc; compact?: boolean }> = ({ doc, compact 
     {!compact && doc.summary && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{doc.summary}</p>}
     {doc.category_name && <p className="text-[10px] text-muted-foreground mt-2">{doc.category_name}</p>}
   </Link>
+);
+
+const Stat: React.FC<{ icon: React.ReactNode; value: number; label: string }> = ({ icon, value, label }) => (
+  <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+    {icon} <span className="font-medium text-foreground">{value}</span> {label}
+  </span>
 );
 
 export const BrandKnowledgePage: React.FC = () => {
@@ -85,8 +100,8 @@ export const BrandKnowledgePage: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-4 text-center">
         <SeoHead title="Brand not found" noIndex canonicalPath={`/brand/${slug}`} />
-        <p className="text-lg font-light">No brand knowledge found for “{slug}”.</p>
-        <Button className="rounded-full" onClick={() => navigate('/knowledge-base')}>Browse the knowledge base</Button>
+        <p className="text-lg font-light">No brand page found for “{slug}”.</p>
+        <Button className="rounded-full" onClick={() => navigate('/brands')}>Browse all brands</Button>
       </div>
     );
   }
@@ -97,19 +112,29 @@ export const BrandKnowledgePage: React.FC = () => {
   const groups: Record<string, BrandDoc[]> = {};
   rest.forEach((d) => { const c = collectionOf(d.title); (groups[c] ||= []).push(d); });
   const groupNames = Object.keys(groups).sort();
+  const collectionCount = groupNames.filter((g) => g !== 'General').length;
+  const aboutBody = data.overview?.content ? stripLeadingH1(data.overview.content) : '';
   const signupHref = '/auth?mode=signup&redirect=/discover';
+  const openProduct = (id: string) => navigate(user ? `/discover?product=${id}` : signupHref);
 
   return (
     <div className="min-h-screen bg-background">
       <SeoHead
-        title={`${data.brand} — Brand Knowledge`}
+        title={`${data.brand} — Brand`}
         description={data.overview?.summary || `Documentation, certifications and products from ${data.brand}.`}
         canonicalPath={`/brand/${data.slug}`}
+        image={data.hero_image || undefined}
       />
 
       {/* Hero */}
-      <header className="bg-gradient-to-b from-primary/10 to-background border-b">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+      <header className="border-b">
+        {data.hero_image && (
+          <div className="h-44 md:h-60 w-full overflow-hidden bg-muted">
+            <img src={data.hero_image} alt={data.brand} className="w-full h-full object-cover"
+              onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }} />
+          </div>
+        )}
+        <div className="max-w-5xl mx-auto px-6 py-8">
           <button
             onClick={() => navigate('/brands')}
             className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-4"
@@ -117,21 +142,31 @@ export const BrandKnowledgePage: React.FC = () => {
             <ArrowLeft className="h-4 w-4" /> All brands
           </button>
           <h1 className="text-3xl font-medium tracking-tight">{data.brand}</h1>
-          <p className="mt-2 text-muted-foreground max-w-2xl">
-            {data.overview?.summary || `Documentation, certifications and products from ${data.brand}.`}
-          </p>
-          {data.overview?.slug && (
-            <Link
-              to={`/knowledge-base/${data.overview.slug}`}
-              className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:underline"
-            >
-              Read about {data.brand} <ChevronRight className="h-4 w-4" />
-            </Link>
+          {data.overview?.summary && (
+            <p className="mt-2 text-muted-foreground max-w-2xl">{data.overview.summary}</p>
           )}
+          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Stat icon={<Package className="h-4 w-4" />} value={data.products?.length || 0} label="products" />
+            {collectionCount > 0 && <Stat icon={<Layers className="h-4 w-4" />} value={collectionCount} label="collections" />}
+            <Stat icon={<BookOpen className="h-4 w-4" />} value={docs.length} label="articles" />
+          </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-10 space-y-12">
+        {/* About — real brand copy from the backend */}
+        {aboutBody && (
+          <section>
+            <h2 className="text-xl font-medium mb-3 flex items-center gap-2">About {data.brand}</h2>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{aboutBody}</ReactMarkdown>
+            {data.overview?.slug && (
+              <Link to={`/knowledge-base/${data.overview.slug}`} className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline">
+                Read the full article <ChevronRight className="h-4 w-4" />
+              </Link>
+            )}
+          </section>
+        )}
+
         {/* Featured docs */}
         {featured.length > 0 && (
           <section>
@@ -144,7 +179,7 @@ export const BrandKnowledgePage: React.FC = () => {
           </section>
         )}
 
-        {/* Products (lead-gen) */}
+        {/* Products — image cards that open the internal product page */}
         {data.products?.length > 0 && (
           <section>
             <div className="flex items-end justify-between mb-4">
@@ -157,21 +192,21 @@ export const BrandKnowledgePage: React.FC = () => {
                 </Button>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {data.products.map((p) => (
                 <ProductTeaser
                   key={p.id}
                   name={p.name}
                   imageUrl={p.image_url}
                   cta={user ? 'View product →' : 'Sign up to view →'}
-                  onClick={() => navigate(user ? `/discover?product=${p.id}` : signupHref)}
+                  onClick={() => openProduct(p.id)}
                 />
               ))}
             </div>
           </section>
         )}
 
-        {/* All documentation grouped by collection */}
+        {/* Documentation grouped by collection — links into the internal KB articles */}
         {groupNames.length > 0 && (
           <section>
             <h2 className="text-xl font-medium mb-4 flex items-center gap-2">
@@ -190,14 +225,7 @@ export const BrandKnowledgePage: React.FC = () => {
           </section>
         )}
 
-        {/* Fallback when the brand has no KB documentation yet */}
-        {featured.length === 0 && groupNames.length === 0 && (
-          <section className="rounded-2xl border bg-muted/30 p-6 text-center">
-            <p className="text-sm text-muted-foreground">Documentation for {data.brand} is being added.</p>
-          </section>
-        )}
-
-        {/* Synthesized lead-gen section — always present, the catalog funnel */}
+        {/* Synthesized lead-gen / catalog funnel */}
         <section className="rounded-2xl border bg-primary/5 p-6 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1">
             <p className="font-medium">Interested in {data.brand}?</p>
