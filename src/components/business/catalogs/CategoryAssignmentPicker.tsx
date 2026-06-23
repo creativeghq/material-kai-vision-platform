@@ -13,7 +13,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Tags } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { crmCategoriesService, type CrmCategorySummary, type CrmCategoryKind } from '@/services/crmCategoriesService';
 import { getErrorMessage } from '@/core/errors/utils';
@@ -100,7 +99,12 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
     } finally { setSaving(false); }
   };
 
-  const anyCategories = categories.some((c) => c.kind === 'manual' || c.kind === 'professional_type' || c.kind === 'role');
+  // On a platform user, professional_type / role are derived from the account
+  // (role is set at signup/admin) — not assignable here, so users only get the
+  // Custom lists. Contacts & companies can be tagged with all three.
+  const hasAssignable = target.kind === 'user'
+    ? categories.some((c) => c.kind === 'manual')
+    : categories.some((c) => c.kind === 'manual' || c.kind === 'professional_type' || c.kind === 'role');
 
   return (
     <Card className={className}>
@@ -115,7 +119,7 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
           <div className="flex items-center gap-2 py-3 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
-        ) : !anyCategories ? (
+        ) : !hasAssignable ? (
           <div className="text-xs text-muted-foreground">
             No categories yet.{' '}
             <a href="/admin/crm?tab=categories" className="text-primary hover:underline">Create some →</a>
@@ -124,52 +128,35 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
           GROUPS.map(({ key, label }) => {
             const list = grouped[key] ?? [];
             if (list.length === 0) return null;
-            const readOnly = target.kind === 'user' && key !== 'manual';
-            const activeReadOnly = readOnly ? list.filter((c) => memberOf.has(c.id)) : [];
+            // Users don't get professional_type / role here — those come from the
+            // account (role set at signup) and have their own dropdowns on the page.
+            if (key !== 'manual' && target.kind === 'user') return null;
             return (
               <div key={key} className="space-y-2">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  {label}{readOnly && ' (auto-synced)'}
-                </div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {readOnly ? (
-                    activeReadOnly.length === 0
-                      ? <span className="text-xs text-muted-foreground">— none</span>
-                      : activeReadOnly.map((c) => (
-                          <Badge key={c.id} variant="secondary" className="text-xs">
-                            {c.color_hex && <span className="w-2 h-2 rounded-full mr-1.5" style={{ background: c.color_hex }} />}
-                            {c.name}
-                          </Badge>
-                        ))
-                  ) : (
-                    list.map((c) => {
-                      const active = memberOf.has(c.id);
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => toggle(c.id)}
-                          disabled={saving}
-                          className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 transition border ${
-                            active ? 'bg-primary text-primary-foreground border-primary'
-                                   : 'border-border hover:border-primary/50'
-                          }`}
-                        >
-                          {c.color_hex && <span className="w-2 h-2 rounded-full" style={{ background: c.color_hex }} />}
-                          {c.name}
-                        </button>
-                      );
-                    })
-                  )}
+                  {list.map((c) => {
+                    const active = memberOf.has(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => toggle(c.id)}
+                        disabled={saving}
+                        className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 transition border ${
+                          active ? 'bg-primary text-primary-foreground border-primary'
+                                 : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {c.color_hex && <span className="w-2 h-2 rounded-full" style={{ background: c.color_hex }} />}
+                        {c.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
           })
-        )}
-        {!loading && target.kind === 'user' && (grouped.professional_type?.length > 0 || grouped.role?.length > 0) && (
-          <p className="text-[10px] text-muted-foreground">
-            Professional type / role are synced from the user's profile — edit the source field then run "Resync auto" on the Categories page.
-          </p>
         )}
       </CardContent>
     </Card>
