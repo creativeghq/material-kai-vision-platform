@@ -131,7 +131,13 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
               </div>
             </div>
 
-            {(grouped.professional_type.length > 0 || grouped.role.length > 0) && (
+            {/* Auto-synced categories are platform-user-only — the resync RPC
+             * only ever assigns member_kind='platform_user' from
+             * user_profiles.professional_type / roles.name. Contacts and
+             * companies can never be auto-synced, so this block is hidden for
+             * them (it would always read "— none"). They categorize via the
+             * Custom lists above + the Industry picker. */}
+            {target.kind === 'user' && (grouped.professional_type.length > 0 || grouped.role.length > 0) && (
               <div className="space-y-2 pt-2 border-t">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">
                   Auto-synced (read-only)
@@ -148,7 +154,7 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  Synced from {target.kind === 'user' ? 'user_profiles.professional_type / role' : 'underlying record'}. Edit the source field then run "Resync auto" on the Categories page.
+                  Synced from user_profiles.professional_type / role. Edit the source field then run "Resync auto" on the Categories page.
                 </p>
               </div>
             )}
