@@ -42,13 +42,17 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
   const [memberOf, setMemberOf] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
+  // Depend on the primitive kind/id, NOT the `target` object — the parent passes a
+  // fresh object literal every render, which otherwise re-fires the load on every
+  // re-render (the visible "refresh each visit" flicker).
   const refreshMemberships = useCallback(async () => {
     const ids =
       target.kind === 'user'    ? await crmCategoriesService.listMembershipsForUser(target.id) :
       target.kind === 'contact' ? await crmCategoriesService.listMembershipsForContact(target.id) :
                                   await crmCategoriesService.listMembershipsForCompany(target.id);
     setMemberOf(new Set(ids));
-  }, [target]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.kind, target.id]);
 
   const loadAll = useCallback(async () => {
     try {
