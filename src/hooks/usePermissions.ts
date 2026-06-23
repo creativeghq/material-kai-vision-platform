@@ -47,10 +47,16 @@ export function usePermissions(): PermissionsApi {
     const persona = resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole });
     const can = (capability: Capability) => personaCan(persona, capability);
 
-    // Finer axes are now derived from the resolved persona (which the account role
+    // Finer axes are derived from the resolved persona (which the account role
     // drives), so a Supplier/Architect/Finance/Sales account role grants the right
     // gates even without a workspace-tree node. operator stays root-only.
-    const isAccountant = persona === 'accountant';
+    //
+    // `isAccountant` = the INVITED EXTERNAL accountant (workspace role) — a RESTRICT
+    // flag (#202: no expense approval / no settings). The internal `finance` account
+    // role also resolves to the accountant persona (Finance surface) but is NOT
+    // isAccountant, so it keeps approval rights (server: is_workspace_finance_manager
+    // already allows finance + owner/admin).
+    const isAccountant = workspaceRole === 'accountant';
     const isSalesRep = persona === 'sales';
     const isBusinessNode = persona === 'operator' || persona === 'dealer' || persona === 'architect';
     // Manages THIS node: a workspace owner/admin, or any business-tier persona.
@@ -68,7 +74,9 @@ export function usePermissions(): PermissionsApi {
       isSalesRep,
       isWorkspaceManager,
       canSupplyProducts,
-      canOperateFinance: isWorkspaceManager || isAccountant,
+      // Day-to-day finance ops: managers + anyone on the Finance surface (finance role
+      // or invited accountant).
+      canOperateFinance: isWorkspaceManager || persona === 'accountant',
       canManageNetwork: isBusinessNode,
     };
   }, [isPlatformOperator, rank, workspaceRole, accountRole, loading]);
