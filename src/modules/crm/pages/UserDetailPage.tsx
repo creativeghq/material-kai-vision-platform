@@ -31,7 +31,6 @@ import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { usersAPI, contactsAPI } from '@/services/crm.service';
 import { supabase } from '@/integrations/supabase/client';
-import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { AdminRoleUpgradeRequestsPanel } from '@/modules/crm/components/AdminRoleUpgradeRequestsPanel';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { crmCategoriesService } from '@/services/crmCategoriesService';
@@ -730,8 +729,6 @@ export const UserDetailPage: React.FC = () => {
               </CardContent>
             </Card>
             </div>
-
-            <CategoryAssignmentPicker target={{ kind: 'user', id: user.user_id }} />
 
             {/* Role Upgrade Requests — applications for dealer/factory promotion */}
             <AdminRoleUpgradeRequestsPanel
