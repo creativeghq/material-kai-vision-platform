@@ -527,9 +527,10 @@ export const ContactDetailPage: React.FC = () => {
           {/* Overview Tab — CRM two-column layout: a compact info column on the
               left, the commercial detail on the right. */}
           <TabsContent value="overview" className="space-y-6">
-            {/* When a business is attached there's no commercial column, so drop the
-                sidebar split and go single-column (avoids a blank right pane). */}
-            <div className={`grid grid-cols-1 gap-6 items-start ${hasCompany ? '' : 'lg:grid-cols-[360px_1fr]'}`}>
+            {/* Categories on top, then a sidebar of contact info on the left and the
+                Activity feed (+ commercial when there's no business) as the main column. */}
+            {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
+            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
               {/* LEFT — identity & quick info */}
               <div className="space-y-4 lg:sticky lg:top-4">
               {/* Contact Information Card */}
@@ -541,7 +542,7 @@ export const ContactDetailPage: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${hasCompany ? 'md:grid-cols-2' : ''}`}>
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                     <div>
                       <InlineText alwaysEdit={isNew} label="Full Name *" value={contact.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Jane Smith" copy={false} />
                     </div>
@@ -647,7 +648,7 @@ export const ContactDetailPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${hasCompany ? 'md:grid-cols-2' : ''}`}>
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                     <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => { patchInline({ lead_status: v }); if (v) logActivity('lead_status_changed', `Lead status set to "${v}"`); }} placeholder="Not set" />
                     <LeadFieldSelect alwaysEdit={isNew} kind="lead_source" label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="Not set" />
                     <div>
@@ -673,7 +674,7 @@ export const ContactDetailPage: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${hasCompany ? 'md:grid-cols-2' : ''}`}>
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                     <div>
                       <InlineText alwaysEdit={isNew} label="Street Address" value={contact.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                     </div>
@@ -721,10 +722,10 @@ export const ContactDetailPage: React.FC = () => {
               </Card>
               </div>
 
-              {/* RIGHT — commercial detail. Only rendered for a contact WITHOUT a
-                  business (an attached contact is billed under the company). */}
-              {!hasCompany && (
+              {/* RIGHT — main column: commercial (only when no business) + Activity feed. */}
               <div className="space-y-4">
+            {!hasCompany && (
+              <>
             {/* commercial info (Pricing + Invoicing & VAT) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
@@ -863,14 +864,12 @@ export const ContactDetailPage: React.FC = () => {
               taxOffice={contact.tax_office ?? null}
               onPatch={(updates) => patchInline(updates as Partial<Contact>)}
             />
-              </div>
-              )}
-            </div>
-
-            {/* CRM Categories, then the unified Activity feed (notes live here too —
-                added via the "Add note" button, no separate Notes tab). */}
-            {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
+              </>
+            )}
+            {/* Unified Activity feed (notes live here too — "Add note" button). */}
             {contact.id && <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} />}
+              </div>
+            </div>
           </TabsContent>
 
 
