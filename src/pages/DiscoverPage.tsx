@@ -429,6 +429,8 @@ export const DiscoverPage: React.FC = () => {
   const [productFactory, setProductFactory] = useState('all');
   const [productSurplusOnly, setProductSurplusOnly] = useState(false);
   const [productSort, setProductSort] = useState<'name' | 'factory'>('name');
+  // Controlled so a deep-link (?tab=products&factory=…) can open the right tab.
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'profiles');
 
   // Modals
   const [selectedFactory, setSelectedFactory] = useState<Factory | null>(null);
@@ -504,6 +506,15 @@ export const DiscoverPage: React.FC = () => {
     if (raw) openProduct(raw);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, products]);
+
+  // Deep-link: /discover?tab=products&factory=<name> (from a CRM supplier's factory
+  // link or a factory page) opens the Products tab pre-filtered to that maker.
+  useEffect(() => {
+    const f = searchParams.get('factory');
+    if (f) setProductFactory(f);
+    const t = searchParams.get('tab');
+    if (t) setActiveTab(t);
+  }, [searchParams]);
 
   // Derived factories
   const factories = useMemo<Factory[]>(() => {
@@ -606,7 +617,7 @@ export const DiscoverPage: React.FC = () => {
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
-        <Tabs defaultValue="profiles">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="profiles" className="flex items-center gap-2">
               <Users className="h-4 w-4" /> Profiles

@@ -34,3 +34,18 @@ export function professionalTypeLabel(value?: string | null): string {
   if (!value) return '';
   return PROFESSIONAL_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
+
+/** Friendly display labels for the account roles (the roles table `name`). */
+export const ROLE_LABELS: Record<string, string> = {
+  user: 'User',
+  dealer: 'Dealer',
+  factory: 'Factory',
+  finance: 'Finance',
+  admin: 'Operator / Admin',
+  super_admin: 'Super Admin',
+};
+
+export function roleLabel(name?: string | null): string {
+  if (!name) return '';
+  return ROLE_LABELS[name] ?? (name.charAt(0).toUpperCase() + name.slice(1));
+}

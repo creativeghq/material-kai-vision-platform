@@ -33,6 +33,7 @@ import { usersAPI, contactsAPI } from '@/services/crm.service';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminRoleUpgradeRequestsPanel } from '@/modules/crm/components/AdminRoleUpgradeRequestsPanel';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
+import { roleLabel } from '@/modules/crm/crmConstants';
 import { crmCategoriesService } from '@/services/crmCategoriesService';
 
 interface UserProfile {
@@ -642,7 +643,7 @@ export const UserDetailPage: React.FC = () => {
                         <SelectTrigger id="user-role" className="mt-1">
                           <SelectValue placeholder="Select role...">
                             {user.role_id && roles.length > 0
-                              ? roles.find(r => r.id === user.role_id)?.name || 'Select role...'
+                              ? roleLabel(roles.find(r => r.id === user.role_id)?.name) || 'Select role...'
                               : 'Select role...'}
                           </SelectValue>
                         </SelectTrigger>
@@ -651,14 +652,15 @@ export const UserDetailPage: React.FC = () => {
                             <SelectItem key={role.id} value={role.id}>
                               <div className="flex items-center gap-2">
                                 <Shield className="h-4 w-4" />
-                                {role.name} (Level {role.level})
+                                {roleLabel(role.name)}
                               </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Role determines platform permissions and access levels.
+                        Role determines platform permissions and access levels. See the access
+                        matrix in docs/role-access-matrix.md.
                       </p>
                     </div>
                     <div>

@@ -1,6 +1,8 @@
 import React from 'react';
-import { Building2, Loader2, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Building2, Loader2, TrendingUp, Package, ExternalLink } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Button } from '@/components/core/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -40,6 +42,17 @@ export default function FactoryAnalyticsPage() {
         subtitle={isAdmin ? 'Full platform + factory analytics view' : 'Your factory performance and market trends'}
       />
       <div className="px-3 sm:px-6 py-4 sm:py-8">
+        {factoryClaimedName && (
+          <div className="mb-4 flex justify-end">
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/discover?tab=products&factory=${encodeURIComponent(factoryClaimedName)}`}>
+                <Package className="h-3.5 w-3.5 mr-1.5" />
+                Products
+                <ExternalLink className="h-3 w-3 ml-1.5 opacity-60" />
+              </Link>
+            </Button>
+          </div>
+        )}
         <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             {isFactory && (

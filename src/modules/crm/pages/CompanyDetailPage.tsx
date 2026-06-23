@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
 import {
   CustomerFinanceSummary,
@@ -29,6 +29,7 @@ import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDr
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
 import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
+import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
@@ -83,6 +84,7 @@ interface Company {
   prices_vat_inclusive?: boolean | null; // #227 — gross display for this customer
   is_supplier?: boolean | null;
   is_customer?: boolean | null;
+  factory_names?: string[] | null; // supplier↔factory pin (ingested metadata.factory_name values)
   // #207 — commercial depth
   contact_group?: string | null;
   include_in_myf?: boolean | null;
@@ -129,10 +131,14 @@ interface Company {
 export const CompanyDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
+  // The role-first Add Company modal hands off a prefill (chosen role + any VIES/ΑΑΔΕ lookup)
+  // via router state so the create form opens pre-populated for review before saving.
+  const prefill = (location.state as { prefill?: Partial<Company> } | null)?.prefill;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viesBusy, setViesBusy] = useState(false);
@@ -160,8 +166,10 @@ export const CompanyDetailPage: React.FC = () => {
     credit_limit: null,
     is_supplier: false,
     is_customer: false,
+    factory_names: [],
     created_at: new Date().toISOString(),
     contacts: [],
+    ...prefill,
   } : null);
   const [showAddContactDialog, setShowAddContactDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -475,6 +483,15 @@ export const CompanyDetailPage: React.FC = () => {
     );
   }
 
+  // Role gating: a pure supplier (is_supplier && !is_customer) hides the whole
+  // commercial schema (pricing, discounts, invoicing, customer finance tabs) — we
+  // buy from them, we don't sell to them. Customers (or both, or legacy rows with
+  // neither flag) keep the full commercial profile. Supplier features (Products tab,
+  // factory link) show whenever is_supplier is set.
+  const isPureSupplier = !!company.is_supplier && !company.is_customer;
+  const showCommercial = !isPureSupplier;
+  const showSupplierFeatures = !!company.is_supplier;
+
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
@@ -521,22 +538,26 @@ export const CompanyDetailPage: React.FC = () => {
               <FileText className="h-4 w-4 mr-2"/>
               Notes
             </TabsTrigger>
-            <TabsTrigger value="account">
-              <Wallet className="h-4 w-4 mr-2"/>
-              Account
-            </TabsTrigger>
-            <TabsTrigger value="quotes">
-              <ScrollText className="h-4 w-4 mr-2"/>
-              Quotes
-            </TabsTrigger>
-            <TabsTrigger value="invoices">
-              <Receipt className="h-4 w-4 mr-2"/>
-              Invoices
-            </TabsTrigger>
-            <TabsTrigger value="payments">
-              <CreditCard className="h-4 w-4 mr-2"/>
-              Payments
-            </TabsTrigger>
+            {showCommercial && (
+              <>
+                <TabsTrigger value="account">
+                  <Wallet className="h-4 w-4 mr-2"/>
+                  Account
+                </TabsTrigger>
+                <TabsTrigger value="quotes">
+                  <ScrollText className="h-4 w-4 mr-2"/>
+                  Quotes
+                </TabsTrigger>
+                <TabsTrigger value="invoices">
+                  <Receipt className="h-4 w-4 mr-2"/>
+                  Invoices
+                </TabsTrigger>
+                <TabsTrigger value="payments">
+                  <CreditCard className="h-4 w-4 mr-2"/>
+                  Payments
+                </TabsTrigger>
+              </>
+            )}
             {company.is_supplier && (
               <TabsTrigger value="products">
                 <Package className="h-4 w-4 mr-2"/>
@@ -578,17 +599,20 @@ export const CompanyDetailPage: React.FC = () => {
             </Card>
             )}
 
-            {/* CRM two-column layout: company identity on the left, all detail on the right. */}
-            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
+            {/* CRM detail uses a compact 360px identity rail beside the detail column.
+                The create form instead gets a centered, full-width layout — a data-entry
+                form does not belong in a 360px sidebar (that was the source of the
+                overlapping-fields break: viewport md: breakpoints firing inside a 360px box). */}
+            <div className={isNew ? 'grid grid-cols-1 gap-6 max-w-3xl mx-auto' : 'grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start'}>
               {/* LEFT — company identity */}
-              <div className="space-y-4 lg:sticky lg:top-4">
+              <div className={isNew ? 'space-y-4' : 'space-y-4 lg:sticky lg:top-4'}>
             <Card>
               <CardHeader>
                 <CardTitle>Company Information</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 gap-x-6 gap-y-2">
-                  <div className="md:col-span-2">
+                <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${isNew ? 'sm:grid-cols-2' : ''}`}>
+                  <div className={isNew ? 'sm:col-span-2' : ''}>
                     <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
                   </div>
                   <div>
@@ -612,12 +636,14 @@ export const CompanyDetailPage: React.FC = () => {
                   <InlineText alwaysEdit={isNew} type="url" label="Website" value={company.website} onSave={(v) => patchInline({ website: v })} placeholder="https://company.com" />
                   <InlineText alwaysEdit={isNew} label="Employee Count" value={company.employee_count} onSave={(v) => patchInline({ employee_count: v })} placeholder="e.g. 1-10, 50, 500+" copy={false} />
                   <InlineText alwaysEdit={isNew} label="Annual Revenue" value={company.annual_revenue} onSave={(v) => patchInline({ annual_revenue: v })} placeholder="e.g. $1M - $10M" copy={false} />
-                  <div className="md:col-span-2">
+                  <div className={isNew ? 'sm:col-span-2' : ''}>
                     <InlineText alwaysEdit={isNew} multiline label="Description" value={company.description} onSave={(v) => patchInline({ description: v })} placeholder="Brief description of the company…" copy={false} />
                   </div>
-                  {/* item 5 — Role moved in here as a minimal inline switch row.
-                      Supplier still controls whether the Products tab appears. */}
-                  <div className="md:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 mt-1 border-t">
+                  {/* Role — the role is chosen up-front in the Add Company modal, so on the
+                      create form we don't show the switches. On an existing record they stay,
+                      so a supplier can also be flagged a customer later (or vice-versa). */}
+                  {!isNew && (
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 mt-1 border-t">
                     <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5"/>Role</span>
                     <label htmlFor="is_supplier" className="flex items-center gap-2 text-sm cursor-pointer">
                       <Switch id="is_supplier" checked={!!company.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v })} />
@@ -628,6 +654,7 @@ export const CompanyDetailPage: React.FC = () => {
                       Customer
                     </label>
                   </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -638,7 +665,7 @@ export const CompanyDetailPage: React.FC = () => {
                 <CardTitle>Address</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 gap-x-6 gap-y-2">
+                <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${isNew ? 'sm:grid-cols-2' : ''}`}>
                   <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                   <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
                   <InlineText alwaysEdit={isNew} label="State / Province" value={company.state} onSave={(v) => patchInline({ state: v })} placeholder="CA" />
@@ -647,6 +674,15 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Supplier↔factory pin — the relation to the ingested catalog. Suppliers only. */}
+            {showSupplierFeatures && (
+              <FactoryLinkCard
+                value={company.factory_names ?? []}
+                supplierName={company.name}
+                onChange={(names) => patchInline({ factory_names: names })}
+              />
+            )}
 
             {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
             <AddressUnitsManager companyId={isNew ? undefined : id} />
@@ -752,7 +788,8 @@ export const CompanyDetailPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Pricing + Invoicing & VAT sit side by side — no full-row areas. */}
+            {/* Pricing + Invoicing & VAT — customer commercial schema; hidden for a pure supplier. */}
+            {showCommercial && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
             <Card>
@@ -857,6 +894,7 @@ export const CompanyDetailPage: React.FC = () => {
               </CardContent>
             </Card>
             </div>
+            )}
               </div>
             </div>
 
@@ -867,7 +905,7 @@ export const CompanyDetailPage: React.FC = () => {
               supplier. Read-only view for now. */}
           {company.is_supplier && (
             <TabsContent value="products" className="space-y-4">
-              <SupplierProductsTab supplierName={company.name}/>
+              <SupplierProductsTab supplierName={company.name} factoryNames={company.factory_names ?? []}/>
             </TabsContent>
           )}
 
@@ -996,6 +1034,9 @@ export const CompanyDetailPage: React.FC = () => {
             <CrmNotesTimeline targetKind="company" targetId={company.id || null}/>
           </TabsContent>
 
+          {/* Customer-only commercial tabs — hidden for a pure supplier. */}
+          {showCommercial && (
+            <>
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
             {company.id ? (
@@ -1025,6 +1066,8 @@ export const CompanyDetailPage: React.FC = () => {
             {company.id && <CustomerFinanceSummary companyId={company.id}/>}
             <CustomerPaymentsTab companyId={company.id} customerName={company.name}/>
           </TabsContent>
+            </>
+          )}
         </Tabs>
       </div>
 

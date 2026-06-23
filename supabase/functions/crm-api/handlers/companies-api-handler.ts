@@ -21,6 +21,7 @@ const COMPANY_WRITABLE_COLUMNS = [
   'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'notes',
   'linkedin', 'twitter', 'facebook', 'description',
   'is_supplier', 'is_customer', 'discount_percent', 'discount_notes', 'credit_limit',
+  'factory_names', // supplier↔factory pin (ingested metadata.factory_name values)
   'user_level_key', // #227 — pricing level
   'prices_vat_inclusive', // #227 — show this customer gross (VAT-incl) prices
 

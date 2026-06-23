@@ -20,6 +20,12 @@ interface SupplierProductsTabProps {
   supplierName: string;
   /** Optional list of aliases (e.g. trading names, legal names) to also match */
   aliases?: string[];
+  /**
+   * Explicitly pinned factory/manufacturer names (crm_companies.factory_names). When
+   * non-empty these are authoritative — we match the catalog by them and ignore the
+   * fuzzy supplier-name match. Empty falls back to matching on supplierName + aliases.
+   */
+  factoryNames?: string[];
 }
 
 interface ProductRow {
@@ -47,14 +53,20 @@ interface ProductRow {
 export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
   supplierName,
   aliases = [],
+  factoryNames = [],
 }) => {
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
+  const pinned = factoryNames.filter((s) => (s ?? '').trim());
+  const isPinned = pinned.length > 0;
+
   const candidateNames = React.useMemo(() => {
-    const all = [supplierName, ...aliases].map((s) => (s ?? '').trim()).filter(Boolean);
+    // Explicit pin wins; otherwise fall back to the supplier name + aliases.
+    const source = isPinned ? pinned : [supplierName, ...aliases];
+    const all = source.map((s) => (s ?? '').trim()).filter(Boolean);
     // Dedupe case-insensitively
     const seen = new Set<string>();
     const out: string[] = [];
@@ -63,7 +75,8 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
       if (!seen.has(key)) { seen.add(key); out.push(s); }
     }
     return out;
-  }, [supplierName, aliases]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierName, aliases.join('|'), pinned.join('|')]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,8 +152,9 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
             Products from this supplier
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Matched by maker name on product metadata (no FK link yet — rename the
-            supplier or fix the product metadata if a row is missing).
+            {isPinned
+              ? 'Matched by the factory name(s) pinned on this supplier (Linked factory / manufacturer).'
+              : 'Matched by maker name on product metadata — pin a factory under “Linked factory / manufacturer” for an exact link.'}
           </p>
         </div>
         <div className="flex items-center gap-2">

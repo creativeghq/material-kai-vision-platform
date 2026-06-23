@@ -29,10 +29,11 @@ import { usersAPI, contactsAPI, companiesAPI } from '@/services/crm.service';
 import { crmCategoriesService, type CrmCategorySummary } from '@/services/crmCategoriesService';
 import { CategoriesPanel } from './CategoriesPage';
 import { CrmFilters, type FilterDef } from '../components/CrmFilters';
+import { AddCompanyModal } from '../components/AddCompanyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
 import {
   ANY, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS, CLIENT_SUPPLIER_OPTIONS,
-  professionalTypeLabel, type Option,
+  professionalTypeLabel, roleLabel, type Option,
 } from '../crmConstants';
 
 const TAB_VALUES = ['users', 'contacts', 'companies', 'categories'] as const;
@@ -114,6 +115,7 @@ export const CRMManagement: React.FC = () => {
   const [selUsers, setSelUsers] = useState<Set<string>>(new Set());
   const [selContacts, setSelContacts] = useState<Set<string>>(new Set());
   const [selCompanies, setSelCompanies] = useState<Set<string>>(new Set());
+  const [showAddCompany, setShowAddCompany] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
 
   // Add-user modal
@@ -199,7 +201,7 @@ export const CRMManagement: React.FC = () => {
   }, [companyF.category]);
 
   // ── option lists ──────────────────────────────────────────────────────────
-  const roleOptions: Option[] = useMemo(() => roles.map((r) => ({ value: r.id, label: r.name })), [roles]);
+  const roleOptions: Option[] = useMemo(() => roles.map((r) => ({ value: r.id, label: roleLabel(r.name) })), [roles]);
   const categoryOptions: Option[] = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
   const companyNameOptions: Option[] = useMemo(() =>
     [...new Set(companies.map((c) => c.name).filter(Boolean))].sort().map((n) => ({ value: n as string, label: n as string })),
@@ -377,6 +379,7 @@ export const CRMManagement: React.FC = () => {
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader title="CRM Management" description="Manage users and customer contacts" badge="Admin" />
+      <AddCompanyModal open={showAddCompany} onOpenChange={setShowAddCompany} />
 
       <div className="p-3 sm:p-6 space-y-6">
         <div className="flex justify-end">
@@ -452,9 +455,9 @@ export const CRMManagement: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             <Select value={user.role_id || ''} onValueChange={(v) => handleRoleChange(user.user_id, v)}>
-                              <SelectTrigger className="h-8 w-[140px] capitalize"><SelectValue placeholder="No role" /></SelectTrigger>
+                              <SelectTrigger className="h-8 w-[150px]"><SelectValue placeholder="No role" /></SelectTrigger>
                               <SelectContent>
-                                {roles.map((r) => <SelectItem key={r.id} value={r.id} className="capitalize">{r.name}</SelectItem>)}
+                                {roles.map((r) => <SelectItem key={r.id} value={r.id}>{roleLabel(r.name)}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </TableCell>
@@ -554,7 +557,7 @@ export const CRMManagement: React.FC = () => {
               <CardContent className="space-y-3">
                 <CrmFilters
                   search={searchTerm} onSearch={setSearchTerm} searchPlaceholder="Search companies…"
-                  filters={companyFilters} onAdd={() => navigate('/admin/crm/companies/new')} addLabel="Add Company"
+                  filters={companyFilters} onAdd={() => setShowAddCompany(true)} addLabel="Add Company"
                 />
                 {selCompanies.size > 0 && (
                   <CrmBulkBar
