@@ -573,8 +573,8 @@ export const ContactDetailPage: React.FC = () => {
                       <div className="flex-1">
                         <InlineText alwaysEdit={isNew} type="email" label="Email" value={contact.email} onSave={(v) => patchInline({ email: v })} placeholder="jane@example.com" />
                       </div>
-                      <Button type="button" size="icon" variant="outline" onClick={() => setShowEmailDialog(true)} disabled={!contact.email}
-                        title={contact.email ? `Send email to ${contact.email}` : 'No email on file'} className="shrink-0 mb-0.5">
+                      <Button type="button" size="icon" variant="ghost" onClick={() => setShowEmailDialog(true)} disabled={!contact.email}
+                        title={contact.email ? `Send email to ${contact.email}` : 'No email on file'} className="shrink-0 mb-0.5 text-muted-foreground hover:bg-transparent hover:text-foreground">
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>

@@ -626,80 +626,71 @@ export const UserDetailPage: React.FC = () => {
                       {new Date(user.created_at).toLocaleString()}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* item 6 — Role & Permissions and the Linked CRM Contact stack in the
-                  right column so the contact sits directly under the role card. */}
-              <div className="space-y-6">
-              {/* Role & Permissions Card — Role + Professional type are
-                  admin classifications, both inline-editable (no "Edit" mode
-                  required). Professional type drives the auto-synced CRM
-                  category for this user. */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Shield className="h-4 w-4" />
-                    Role & Permissions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="user-role">Role</Label>
-                    <Select
-                      value={user.role_id || ''}
-                      onValueChange={(v) => patchInlineUser({ role_id: v })}
-                    >
-                      <SelectTrigger id="user-role" className="mt-1">
-                        <SelectValue placeholder="Select role...">
-                          {user.role_id && roles.length > 0
-                            ? roles.find(r => r.id === user.role_id)?.name || 'Select role...'
-                            : 'Select role...'}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map((role) => (
-                          <SelectItem key={role.id} value={role.id}>
-                            <div className="flex items-center gap-2">
-                              <Shield className="h-4 w-4" />
-                              {role.name} (Level {role.level})
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Role determines platform permissions and access levels.
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t">
-                    <Label htmlFor="user-prof-type">Professional Type (Category)</Label>
-                    <Select
-                      value={user.professional_type ?? '__unset'}
-                      onValueChange={(v) =>
-                        patchInlineUser({ professional_type: v === '__unset' ? null : v })
-                      }
-                    >
-                      <SelectTrigger id="user-prof-type" className="mt-1">
-                        <SelectValue placeholder="Not set" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__unset">Not set</SelectItem>
-                        {Object.entries(PROFESSIONAL_TYPE_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Drives the auto-synced CRM category. Re-syncs the user's category
-                      membership immediately on change.
-                    </p>
+                  {/* Role & classification moved in here (mirrors the business page,
+                      where Role lives inside Company Information). Both inline-editable;
+                      Professional type drives the auto-synced CRM category. */}
+                  <div className="pt-4 border-t space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Shield className="h-3.5 w-3.5" /> Role &amp; classification
+                    </div>
+                    <div>
+                      <Label htmlFor="user-role">Role</Label>
+                      <Select
+                        value={user.role_id || ''}
+                        onValueChange={(v) => patchInlineUser({ role_id: v })}
+                      >
+                        <SelectTrigger id="user-role" className="mt-1">
+                          <SelectValue placeholder="Select role...">
+                            {user.role_id && roles.length > 0
+                              ? roles.find(r => r.id === user.role_id)?.name || 'Select role...'
+                              : 'Select role...'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((role) => (
+                            <SelectItem key={role.id} value={role.id}>
+                              <div className="flex items-center gap-2">
+                                <Shield className="h-4 w-4" />
+                                {role.name} (Level {role.level})
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Role determines platform permissions and access levels.
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="user-prof-type">Professional Type (Category)</Label>
+                      <Select
+                        value={user.professional_type ?? '__unset'}
+                        onValueChange={(v) =>
+                          patchInlineUser({ professional_type: v === '__unset' ? null : v })
+                        }
+                      >
+                        <SelectTrigger id="user-prof-type" className="mt-1">
+                          <SelectValue placeholder="Not set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__unset">Not set</SelectItem>
+                          {Object.entries(PROFESSIONAL_TYPE_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Drives the auto-synced CRM category. Re-syncs the user's category
+                        membership immediately on change.
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-            {/* item 6 — Linked CRM Contact now sits directly under Role & Permissions. */}
+            {/* Linked CRM Contact (right column). Role + Professional type now live
+                inside the User Information card on the left (mirrors the business page). */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -738,7 +729,6 @@ export const UserDetailPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-              </div>
             </div>
 
             <CategoryAssignmentPicker target={{ kind: 'user', id: user.user_id }} />

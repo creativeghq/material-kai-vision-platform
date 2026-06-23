@@ -602,8 +602,8 @@ export const CompanyDetailPage: React.FC = () => {
                     <div className="flex-1">
                       <InlineText alwaysEdit={isNew} type="email" label="Email" value={company.email} onSave={(v) => patchInline({ email: v })} placeholder="contact@company.com" />
                     </div>
-                    <Button type="button" size="icon" variant="outline" onClick={() => setShowEmailDialog(true)} disabled={!company.email}
-                      title={company.email ? `Send email to ${company.email}` : 'No email on file'} className="shrink-0 mb-0.5">
+                    <Button type="button" size="icon" variant="ghost" onClick={() => setShowEmailDialog(true)} disabled={!company.email}
+                      title={company.email ? `Send email to ${company.email}` : 'No email on file'} className="shrink-0 mb-0.5 text-muted-foreground hover:bg-transparent hover:text-foreground">
                       <Send className="h-4 w-4"/>
                     </Button>
                   </div>
