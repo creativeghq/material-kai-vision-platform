@@ -239,9 +239,9 @@ export async function handleContacts(req: Request): Promise<Response> {
       }
 
       const {
-        name, email, phone, mobile, company, position, title,
+        name, email, phone, mobile, company, position, title, department,
         linkedin, twitter, facebook, address, city, state, postal_code, country,
-        status, lead_source, contact_type, vat_number, country_code, tax_office,
+        status, lead_source, lead_status, contact_type, vat_number, country_code, tax_office,
         first_name, last_name, profession, is_client, is_supplier, date_of_birth,
         discount_pct, discount_percent, discount_notes, credit_limit,
         user_level_key, // #227 — pricing level
@@ -259,6 +259,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       if (company !== undefined) updates.company = company;
       if (position !== undefined) updates.position = position;
       if (title !== undefined) updates.title = title;
+      if (department !== undefined) updates.department = department;
       if (linkedin !== undefined) updates.linkedin = linkedin;
       if (twitter !== undefined) updates.twitter = twitter;
       if (facebook !== undefined) updates.facebook = facebook;
@@ -269,6 +270,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       if (country !== undefined) updates.country = country;
       if (status !== undefined) updates.status = status;
       if (lead_source !== undefined) updates.lead_source = lead_source;
+      if (lead_status !== undefined) updates.lead_status = lead_status;
       if (contact_type !== undefined) updates.contact_type = contact_type;
       if (vat_number !== undefined) updates.vat_number = vat_number;
       if (country_code !== undefined) updates.country_code = country_code;

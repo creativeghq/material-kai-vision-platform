@@ -1,19 +1,21 @@
 /**
- * CategoryAssignmentPicker — embeddable component that lets an admin pick
- * which CRM categories a user / contact / company belongs to. Drops into the
- * CRM detail pages without the full Categories admin page.
+ * CategoryAssignmentPicker — embeddable component that lets an admin pick which
+ * CRM categories a user / contact / company belongs to. Drops into the CRM
+ * detail pages without the full Categories admin page.
  *
- * Wires through crmCategoriesService.setMembershipsFor*. Auto-synced
- * categories (kind != 'manual') are visible but disabled — those are managed
- * by the resync RPC, not by hand.
+ * Shows ALL category kinds (Custom + Professional type + Role) as assignable
+ * tags on contacts and companies. For platform USERS the professional_type /
+ * role categories are auto-synced from user_profiles.professional_type / role,
+ * so there they stay read-only (managed by the resync RPC); only Custom is
+ * hand-toggled. Industry + the lead vocabularies have their own dedicated
+ * pickers, so they're not duplicated here.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Tags } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
-import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { crmCategoriesService, type CrmCategorySummary } from '@/services/crmCategoriesService';
+import { crmCategoriesService, type CrmCategorySummary, type CrmCategoryKind } from '@/services/crmCategoriesService';
 import { getErrorMessage } from '@/core/errors/utils';
 
 type Target =
@@ -26,6 +28,14 @@ interface Props {
   className?: string;
 }
 
+/** Kinds rendered here, in order. Industry + lead_status/lead_source are excluded —
+ * they have dedicated UIs (IndustrySelect + the Lead dropdowns). */
+const GROUPS: Array<{ key: Extract<CrmCategoryKind, 'manual' | 'professional_type' | 'role'>; label: string }> = [
+  { key: 'manual', label: 'Custom' },
+  { key: 'professional_type', label: 'Professional type' },
+  { key: 'role', label: 'Role' },
+];
+
 export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className }) => {
   const { toast } = useToast();
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
@@ -33,63 +43,64 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
   const [memberOf, setMemberOf] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
+  const refreshMemberships = useCallback(async () => {
+    const ids =
+      target.kind === 'user'    ? await crmCategoriesService.listMembershipsForUser(target.id) :
+      target.kind === 'contact' ? await crmCategoriesService.listMembershipsForContact(target.id) :
+                                  await crmCategoriesService.listMembershipsForCompany(target.id);
+    setMemberOf(new Set(ids));
+  }, [target]);
+
   const loadAll = useCallback(async () => {
     try {
       setLoading(true);
       const list = await crmCategoriesService.list();
       setCategories(list.filter((c) => c.is_active));
-      const ids =
-        target.kind === 'user'    ? await crmCategoriesService.listMembershipsForUser(target.id) :
-        target.kind === 'contact' ? await crmCategoriesService.listMembershipsForContact(target.id) :
-                                    await crmCategoriesService.listMembershipsForCompany(target.id);
-      setMemberOf(new Set(ids));
+      await refreshMemberships();
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [target, toast]);
+  }, [refreshMemberships, toast]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  const grouped = useMemo(() => {
+    const out: Record<string, CrmCategorySummary[]> = { manual: [], professional_type: [], role: [] };
+    for (const c of categories) out[c.kind]?.push(c);
+    return out;
+  }, [categories]);
+
   const toggle = async (categoryId: string) => {
-    // Auto-synced categories are read-only here — managed by the resync RPC.
-    // Only manual categories can be toggled by the admin.
     const cat = categories.find((c) => c.id === categoryId);
-    if (!cat || cat.kind !== 'manual') return;
+    if (!cat) return;
+    // On platform users, professional_type / role are auto-synced → read-only here.
+    if (target.kind === 'user' && cat.kind !== 'manual') return;
 
     const next = new Set(memberOf);
-    if (next.has(categoryId)) next.delete(categoryId);
-    else next.add(categoryId);
+    if (next.has(categoryId)) next.delete(categoryId); else next.add(categoryId);
     setMemberOf(next);
     setSaving(true);
     try {
-      const manualIds = categories.filter((c) => c.kind === 'manual').map((c) => c.id);
-      const wantManualMemberships = manualIds.filter((id) => next.has(id));
       if (target.kind === 'user') {
-        await crmCategoriesService.setMembershipsForUser(target.id, wantManualMemberships);
+        // Only manual memberships are hand-managed for users; auto rows stay put.
+        const manualIds = categories.filter((c) => c.kind === 'manual').map((c) => c.id);
+        await crmCategoriesService.setMembershipsForUser(target.id, manualIds.filter((id) => next.has(id)));
       } else if (target.kind === 'contact') {
-        await crmCategoriesService.setMembershipsForContact(target.id, wantManualMemberships);
+        // Contacts/companies have no auto memberships — every assignment is manual,
+        // so any kind can be freely toggled. Persist the full selection.
+        await crmCategoriesService.setMembershipsForContact(target.id, [...next]);
       } else {
-        await crmCategoriesService.setMembershipsForCompany(target.id, wantManualMemberships);
+        await crmCategoriesService.setMembershipsForCompany(target.id, [...next]);
       }
     } catch (err) {
       toast({ title: 'Save failed', description: getErrorMessage(err), variant: 'destructive' });
-      const ids =
-        target.kind === 'user'    ? await crmCategoriesService.listMembershipsForUser(target.id) :
-        target.kind === 'contact' ? await crmCategoriesService.listMembershipsForContact(target.id) :
-                                    await crmCategoriesService.listMembershipsForCompany(target.id);
-      setMemberOf(new Set(ids));
+      await refreshMemberships();
     } finally { setSaving(false); }
   };
 
-  const grouped = useMemo(() => {
-    const out = { manual: [] as CrmCategorySummary[], professional_type: [] as CrmCategorySummary[], role: [] as CrmCategorySummary[] };
-    // Only these three kinds are rendered here; other kinds (industry, lead_status,
-    // lead_source — pick-one vocabularies, not memberships) are intentionally skipped.
-    for (const c of categories) out[c.kind as keyof typeof out]?.push(c);
-    return out;
-  }, [categories]);
+  const anyCategories = categories.some((c) => c.kind === 'manual' || c.kind === 'professional_type' || c.kind === 'role');
 
   return (
     <Card className={className}>
@@ -99,69 +110,66 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
         </CardTitle>
         {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         {loading ? (
           <div className="flex items-center gap-2 py-3 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
+        ) : !anyCategories ? (
+          <div className="text-xs text-muted-foreground">
+            No categories yet.{' '}
+            <a href="/admin/crm?tab=categories" className="text-primary hover:underline">Create some →</a>
+          </div>
         ) : (
-          <>
-            <div className="space-y-2">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Custom</div>
-              <div className="flex flex-wrap gap-1.5">
-                {grouped.manual.length === 0 ? (
-                  <div className="text-xs text-muted-foreground">
-                    No custom categories yet.{' '}
-                    <a href="/admin/crm?tab=categories" className="text-primary hover:underline">Create some →</a>
-                  </div>
-                ) : grouped.manual.map((c) => {
-                  const active = memberOf.has(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => toggle(c.id)}
-                      disabled={saving}
-                      className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 transition border ${
-                        active ? 'bg-primary text-primary-foreground border-primary' :
-                        'border-border hover:border-primary/50'
-                      }`}
-                    >
-                      {c.color_hex && <span className="w-2 h-2 rounded-full" style={{ background: c.color_hex }} />}
-                      {c.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Auto-synced categories are platform-user-only — the resync RPC
-             * only ever assigns member_kind='platform_user' from
-             * user_profiles.professional_type / roles.name. Contacts and
-             * companies can never be auto-synced, so this block is hidden for
-             * them (it would always read "— none"). They categorize via the
-             * Custom lists above + the Industry picker. */}
-            {target.kind === 'user' && (grouped.professional_type.length > 0 || grouped.role.length > 0) && (
-              <div className="space-y-2 pt-2 border-t">
+          GROUPS.map(({ key, label }) => {
+            const list = grouped[key] ?? [];
+            if (list.length === 0) return null;
+            const readOnly = target.kind === 'user' && key !== 'manual';
+            const activeReadOnly = readOnly ? list.filter((c) => memberOf.has(c.id)) : [];
+            return (
+              <div key={key} className="space-y-2">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Auto-synced (read-only)
+                  {label}{readOnly && ' (auto-synced)'}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {[...grouped.professional_type, ...grouped.role].filter((c) => memberOf.has(c.id)).map((c) => (
-                    <Badge key={c.id} variant="secondary" className="text-xs">
-                      {c.color_hex && <span className="w-2 h-2 rounded-full mr-1.5" style={{ background: c.color_hex }} />}
-                      {c.name}
-                    </Badge>
-                  ))}
-                  {[...grouped.professional_type, ...grouped.role].filter((c) => memberOf.has(c.id)).length === 0 && (
-                    <span className="text-xs text-muted-foreground">— none</span>
+                  {readOnly ? (
+                    activeReadOnly.length === 0
+                      ? <span className="text-xs text-muted-foreground">— none</span>
+                      : activeReadOnly.map((c) => (
+                          <Badge key={c.id} variant="secondary" className="text-xs">
+                            {c.color_hex && <span className="w-2 h-2 rounded-full mr-1.5" style={{ background: c.color_hex }} />}
+                            {c.name}
+                          </Badge>
+                        ))
+                  ) : (
+                    list.map((c) => {
+                      const active = memberOf.has(c.id);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => toggle(c.id)}
+                          disabled={saving}
+                          className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 transition border ${
+                            active ? 'bg-primary text-primary-foreground border-primary'
+                                   : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          {c.color_hex && <span className="w-2 h-2 rounded-full" style={{ background: c.color_hex }} />}
+                          {c.name}
+                        </button>
+                      );
+                    })
                   )}
                 </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Synced from user_profiles.professional_type / role. Edit the source field then run "Resync auto" on the Categories page.
-                </p>
               </div>
-            )}
-          </>
+            );
+          })
+        )}
+        {!loading && target.kind === 'user' && (grouped.professional_type?.length > 0 || grouped.role?.length > 0) && (
+          <p className="text-[10px] text-muted-foreground">
+            Professional type / role are synced from the user's profile — edit the source field then run "Resync auto" on the Categories page.
+          </p>
         )}
       </CardContent>
     </Card>
