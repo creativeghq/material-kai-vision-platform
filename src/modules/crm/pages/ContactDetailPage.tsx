@@ -167,6 +167,7 @@ export const ContactDetailPage: React.FC = () => {
   const [inviting, setInviting] = useState(false);
   // item 5 — company chosen while creating a brand-new contact, attached right after create.
   const [pendingCompanyId, setPendingCompanyId] = useState<string>('');
+  const [creatingBusiness, setCreatingBusiness] = useState(false);
   // Bump to force the Activity timeline to reload after we log a new activity.
   const [activityRefresh, setActivityRefresh] = useState(0);
   const bumpActivity = () => setActivityRefresh((n) => n + 1);
@@ -413,6 +414,41 @@ export const ContactDetailPage: React.FC = () => {
     }
   };
 
+  // Solopreneur → business: create a company prefilled from this contact and attach
+  // it as primary. The reassign-financials trigger then rolls the contact's existing
+  // quotes/invoices up to the new business automatically.
+  const createBusinessFromContact = async () => {
+    if (!id || isNew || !contact) return;
+    setCreatingBusiness(true);
+    try {
+      const res = await companiesAPI.createCompany({
+        name: contact.billing_name || contact.company || contact.name,
+        email: contact.email ?? null,
+        phone: contact.phone ?? null,
+        vat_number: contact.vat_number ?? null,
+        country_code: contact.country_code ?? null,
+        tax_office: contact.tax_office ?? null,
+        address: contact.address ?? null,
+        city: contact.city ?? null,
+        state: contact.state ?? null,
+        postal_code: contact.postal_code ?? null,
+        country: contact.country ?? null,
+        is_customer: !!contact.is_client,
+        is_supplier: !!contact.is_supplier,
+      });
+      const companyId = res?.data?.id ?? res?.id;
+      if (!companyId) throw new Error('Company was not created');
+      await companiesAPI.attachContact(companyId, id, undefined, true, '');
+      await loadContact();
+      logActivity('company_attached', 'Business created from contact', undefined, { company_id: companyId });
+      toast({ title: 'Business created', description: 'The contact is now attached; their quotes & invoices moved to the business.' });
+    } catch (error: any) {
+      toast({ title: 'Could not create business', description: error?.message, variant: 'destructive' });
+    } finally {
+      setCreatingBusiness(false);
+    }
+  };
+
   // (legacy multi-field attach dialog removed in item 5 — Lead Information now
   // attaches a company inline via attachCompanyById.)
   const handleDetachCompany = async (relationshipId: string) => {
@@ -654,12 +690,26 @@ export const ContactDetailPage: React.FC = () => {
                           ))}
                         </div>
                       ) : (
-                        <CompanySearchDropdown
-                          onSelect={attachCompanyById}
-                          excludeCompanyIds={(contact.companies ?? []).map((c: any) => c.company_id)}
-                          placeholder="Search & attach a company…"
-                          selectedCompanyId={isNew ? (pendingCompanyId || null) : null}
-                        />
+                        <>
+                          <CompanySearchDropdown
+                            onSelect={attachCompanyById}
+                            excludeCompanyIds={(contact.companies ?? []).map((c: any) => c.company_id)}
+                            placeholder="Search & attach a company…"
+                            selectedCompanyId={isNew ? (pendingCompanyId || null) : null}
+                          />
+                          {/* Solopreneur opening a business: spin up a company from this
+                              contact's details + move their existing quotes/invoices to it. */}
+                          {!isNew && (
+                            <button
+                              type="button"
+                              onClick={createBusinessFromContact}
+                              disabled={creatingBusiness}
+                              className="text-xs text-primary hover:underline disabled:opacity-50"
+                            >
+                              {creatingBusiness ? 'Creating business…' : '+ Open a business from this contact'}
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
