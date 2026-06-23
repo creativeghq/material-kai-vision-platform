@@ -14,6 +14,9 @@ import {
 } from '@/components/core/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/core/ui/select';
+import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Label } from '@/components/core/ui/label';
@@ -327,6 +330,21 @@ export const CRMManagement: React.FC = () => {
     } catch (error: any) { toast({ title: 'Error', description: error.message || 'Failed to create user', variant: 'destructive' }); }
     finally { setCreatingUser(false); }
   };
+  // Assign a platform user's account role inline from the Users tab (this is the
+  // home for role/permission management — not the per-user CRM detail entry).
+  const handleRoleChange = async (userId: string, roleId: string) => {
+    const prevUsers = users;
+    const nextRole = roles.find((r) => r.id === roleId);
+    setUsers((list) => list.map((u) => (u.user_id === userId ? { ...u, role_id: roleId, roles: nextRole } : u)));
+    try {
+      await usersAPI.updateUser(userId, { role_id: roleId });
+      toast({ title: 'Role updated', description: nextRole ? `Set to ${nextRole.name}` : undefined });
+    } catch (error: any) {
+      setUsers(prevUsers);
+      toast({ title: 'Failed to update role', description: error?.message, variant: 'destructive' });
+    }
+  };
+
   const handleResetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth?reset=true` });
@@ -432,7 +450,14 @@ export const CRMManagement: React.FC = () => {
                               <Mail className="h-4 w-4 text-muted-foreground" />{user.email}<ExternalLink className="h-3 w-3" />
                             </button>
                           </TableCell>
-                          <TableCell><Badge variant="outline">{user.roles?.name || 'No role'}</Badge></TableCell>
+                          <TableCell>
+                            <Select value={user.role_id || ''} onValueChange={(v) => handleRoleChange(user.user_id, v)}>
+                              <SelectTrigger className="h-8 w-[140px] capitalize"><SelectValue placeholder="No role" /></SelectTrigger>
+                              <SelectContent>
+                                {roles.map((r) => <SelectItem key={r.id} value={r.id} className="capitalize">{r.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{professionalTypeLabel(user.professional_type) || '-'}</TableCell>
                           <TableCell><Badge variant="secondary">{user.subscription_tier}</Badge></TableCell>
                           <TableCell><div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-muted-foreground" />{user.credits || 0}</div></TableCell>
