@@ -559,7 +559,7 @@ export const ContactDetailPage: React.FC = () => {
                     <InlineText alwaysEdit={isNew} type="tel" label="Mobile" value={contact.mobile} onSave={(v) => patchInline({ mobile: v })} placeholder="+44 7445 264362" />
                     <InlineText alwaysEdit={isNew} label="Position / Title" value={contact.position} onSave={(v) => patchInline({ position: v })} placeholder="e.g. Procurement Manager" copy={false} />
                     <InlineText alwaysEdit={isNew} label="Department" value={contact.department} onSave={(v) => patchInline({ department: v })} placeholder="e.g. Operations" copy={false} />
-                    <InlineText alwaysEdit={isNew} type="date" label="Birthday" value={contact.date_of_birth} onSave={(v) => patchInline({ date_of_birth: v })} placeholder="" copy={false} hint="Used for birthday greetings." />
+                    <InlineText alwaysEdit={isNew} type="date" label="Birthday" value={contact.date_of_birth} onSave={(v) => patchInline({ date_of_birth: v })} placeholder="" copy={false} />
                   </div>
 
                   {/* Role — only for contacts NOT attached to a business. A person who
