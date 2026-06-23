@@ -27,12 +27,13 @@ interface Props {
   className?: string;
 }
 
-/** Kinds rendered here, in order. Industry + lead_status/lead_source are excluded —
- * they have dedicated UIs (IndustrySelect + the Lead dropdowns). */
-const GROUPS: Array<{ key: Extract<CrmCategoryKind, 'manual' | 'professional_type' | 'role'>; label: string }> = [
+/** Kinds rendered here, in order. 'role' is intentionally excluded — role
+ * categories are auto-synced from the account `roles` table (a platform-user
+ * permission concept), so they don't belong on a contact/company. Industry +
+ * lead_status/lead_source are excluded too (they have dedicated UIs). */
+const GROUPS: Array<{ key: Extract<CrmCategoryKind, 'manual' | 'professional_type'>; label: string }> = [
   { key: 'manual', label: 'Custom' },
   { key: 'professional_type', label: 'Professional type' },
-  { key: 'role', label: 'Role' },
 ];
 
 export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className }) => {
@@ -108,7 +109,7 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
   // Custom lists. Contacts & companies can be tagged with all three.
   const hasAssignable = target.kind === 'user'
     ? categories.some((c) => c.kind === 'manual')
-    : categories.some((c) => c.kind === 'manual' || c.kind === 'professional_type' || c.kind === 'role');
+    : categories.some((c) => c.kind === 'manual' || c.kind === 'professional_type');
 
   return (
     <Card className={className}>
