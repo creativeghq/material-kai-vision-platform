@@ -501,7 +501,8 @@ export const ContactDetailPage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+          <TabsList className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="overview">
               <User className="h-4 w-4 mr-2" />
               Overview
@@ -514,15 +515,28 @@ export const ContactDetailPage: React.FC = () => {
               <ScrollText className="h-4 w-4 mr-2" />
               Quotes
             </TabsTrigger>
-            <TabsTrigger value="invoices">
-              <Receipt className="h-4 w-4 mr-2" />
-              Invoices
-            </TabsTrigger>
-            <TabsTrigger value="payments">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Payments
-            </TabsTrigger>
+            {/* Invoices + Payments are billed against the business when one is
+                attached — hidden here, managed on the company. */}
+            {!hasCompany && (
+              <>
+                <TabsTrigger value="invoices">
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Invoices
+                </TabsTrigger>
+                <TabsTrigger value="payments">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Payments
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
+          {hasCompany && primaryCompany?.id && (
+            <Button variant="outline" size="sm" className="gap-1.5"
+              onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}>
+              <Building2 className="h-4 w-4" /> Check Company: {primaryCompany.name}
+            </Button>
+          )}
+          </div>
 
           {/* Overview Tab — CRM two-column layout: a compact info column on the
               left, the commercial detail on the right. */}
