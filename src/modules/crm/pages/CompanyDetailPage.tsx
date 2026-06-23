@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerAccountOverview,
@@ -639,16 +639,9 @@ export const CompanyDetailPage: React.FC = () => {
                   <div className={isNew ? 'sm:col-span-2' : ''}>
                     <InlineText alwaysEdit={isNew} multiline label="Description" value={company.description} onSave={(v) => patchInline({ description: v })} placeholder="Brief description of the company…" copy={false} />
                   </div>
-                  {/* Role — chosen at creation (Add Company / import / open-from-contact);
-                      shown read-only here, no after-the-fact switcher. */}
-                  {!isNew && (
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-3 mt-1 border-t">
-                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5"/>Role</span>
-                    {company.is_supplier && <Badge variant="secondary">Supplier</Badge>}
-                    {company.is_customer && <Badge variant="secondary">Customer</Badge>}
-                    {!company.is_supplier && !company.is_customer && <span className="text-sm text-muted-foreground">—</span>}
-                  </div>
-                  )}
+                  {/* Customer vs supplier is fixed at creation (Add Company / import /
+                      open-from-contact) — no role control on the company page. The flags
+                      still drive the Products tab + customer/supplier lists. */}
                 </div>
               </CardContent>
             </Card>
