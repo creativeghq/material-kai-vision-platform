@@ -11,12 +11,11 @@ code as of this writing — where the model is *not* enforced, it says so explic
 ## 1. The two "role" concepts
 
 ### a) Account role — `roles` table (`user_profiles.role_id`)
-A global, per-user value. Levels: `user`(1) · `dealer`(2) · `factory`(3) · `finance`(4) · `admin`(5) · `super_admin`(6).
+A global, per-user value — **the access tier**. Set: `user`(1) · `sales`(2) · `supplier`(3) · `architect`(4) · `finance`(5) · `admin`(6). (Dealer+Factory merged into **supplier**; Super Admin merged into **admin**, 2026-06.)
 
-What it **actually** gates:
-- `admin` / `super_admin` (and `owner` of the **root** workspace) ⇒ **Platform Operator** — full `/admin/*` access.
-- `admin` specifically ⇒ passes the `is_admin_user()` RLS check on admin-governed tables.
-- **`dealer` and `factory` as *global* account roles are essentially vestigial** — the frontend does not branch on them (the `FACTORY_OR_ADMIN_ROLES` constant is unused). Dealer/architect behaviour comes from **workspace ownership + marketplace rank**, not this column. The `dealer`↔`factory` values are still used by the role-upgrade-request approval flow.
+This is now the **primary driver of the persona** (see §2) — `resolvePersona()` maps the account role to a persona, falling back to the workspace-derived persona only for `user`/unset. So setting the Role under **Admin → CRM → Users** is what actually grants a user's capabilities.
+
+Reserved-tier rule: **`admin` is granted operator (see-all) ONLY via root-workspace ownership** (`isPlatformOperator`), never by the account role alone — a tenant can't self-escalate to platform operator. `is_admin_user()` RLS still keys on the `admin` role name.
 
 Managed in **Admin → CRM → Users** (inline Role dropdown).
 
@@ -29,17 +28,18 @@ Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 
 ## 2. Personas (the real access tiers)
 
-| Persona | Who | How it's resolved |
+| Persona | Account role that grants it | Notes |
 |---|---|---|
-| **operator** | Platform team | `owner`/`admin`/`super_admin` (account role) of the **root** workspace → `isPlatformOperator` |
-| **dealer** | Supplier node owner | workspace `owner`/`admin` + rank `dealer` (or root-rank, non-operator) |
-| **architect** | Architect node owner | workspace `owner`/`admin` + rank `architect` |
-| **staff** | Business team member | workspace `member` |
-| **accountant** | Invited external accountant | workspace role `accountant` |
-| **sales** | Invited sales rep | workspace role `sales` |
-| **end_user** | Project client / referral | workspace role `client` |
+| **operator** | (root-workspace ownership only) | `admin` of the **root** workspace. NOT granted by account role alone. |
+| **dealer** (= Supplier tier) | `supplier` (or legacy `dealer`/`factory`) | Full business node + downstream. |
+| **architect** | `architect` | Sells to end clients; own downstream. |
+| **accountant** (Finance surface) | `finance` | Finance module; the `finance` role keeps **expense-approval** rights (it is NOT the restricted external accountant). |
+| **sales** | `sales` | Sales portal + own customers. |
+| **staff** / **end_user** | `user` / unset → workspace fallback | Team member / project client, resolved from the workspace role. |
 
-Resolution order is in `resolvePersona()` — `client` → `accountant` → `sales` → owner/admin(by rank) → `staff`.
+Resolution (`resolvePersona()`): `isPlatformOperator` → operator; else **account role** maps the tenant tier; else the legacy workspace-derived persona (`client`→end_user, `accountant`→accountant, `sales`→sales, owner/admin by rank, member→staff).
+
+The **invited external accountant** (workspace role `accountant`, #202) still resolves to the accountant persona but is flagged `isAccountant` to *restrict* it (no expense approval / no settings) — distinct from the internal `finance` account role.
 
 ---
 
@@ -93,10 +93,10 @@ Notes:
 
 ---
 
-## 6. Known gaps / not-enforced (be honest)
-- The **global role *hierarchy* is not a ladder** — there's no "level ≥ N grants X". Access is `auth` + persona-capability + platform-operator + edge `allowedRoles`.
-- **Global `dealer`/`factory` account roles** don't drive frontend access (dealer/architect behaviour is workspace-rank based). They're effectively labels + inputs to the upgrade-request flow.
-- **`is_admin_user()` matches `admin` only, not `super_admin`** — a `super_admin` who isn't also a workspace member can miss some RLS-gated reads. Workspace membership + `owner`/`admin` cover the normal operator case.
+## 6. Known gaps / notes (be honest)
+- The role set is not a numeric *ladder* — `level` is informational. Access = persona-capability + operator(root) + edge `allowedRoles`.
+- **Account role drives the persona for the frontend** (2026-06 rewire). The marketplace **#227 pyramid still keys on the workspace tree** (a supplier/architect *node* with parent/rank/commission). So the Role grants the *surface*; the workspace node provides the *downstream data* (`/network` shows only the caller's own subtree via `get_manageable_workspaces`). A user tagged `supplier` with no workspace node sees the surface but an empty network until a node exists.
+- `super_admin` was merged into `admin`; leftover `'super_admin'` strings in edge `allowedRoles` are harmless dead entries.
 - Agent **sub-agent orchestration** is documented as admin/owner-only, but tool-list filtering by role at injection time should be re-verified.
 
 ---
