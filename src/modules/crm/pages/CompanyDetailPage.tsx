@@ -639,20 +639,14 @@ export const CompanyDetailPage: React.FC = () => {
                   <div className={isNew ? 'sm:col-span-2' : ''}>
                     <InlineText alwaysEdit={isNew} multiline label="Description" value={company.description} onSave={(v) => patchInline({ description: v })} placeholder="Brief description of the company…" copy={false} />
                   </div>
-                  {/* Role — the role is chosen up-front in the Add Company modal, so on the
-                      create form we don't show the switches. On an existing record they stay,
-                      so a supplier can also be flagged a customer later (or vice-versa). */}
+                  {/* Role — chosen at creation (Add Company / import / open-from-contact);
+                      shown read-only here, no after-the-fact switcher. */}
                   {!isNew && (
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 mt-1 border-t">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-3 mt-1 border-t">
                     <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5"/>Role</span>
-                    <label htmlFor="is_supplier" className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Switch id="is_supplier" checked={!!company.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v })} />
-                      Supplier
-                    </label>
-                    <label htmlFor="is_customer" className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Switch id="is_customer" checked={!!company.is_customer} onCheckedChange={(v) => patchInline({ is_customer: v })} />
-                      Customer
-                    </label>
+                    {company.is_supplier && <Badge variant="secondary">Supplier</Badge>}
+                    {company.is_customer && <Badge variant="secondary">Customer</Badge>}
+                    {!company.is_supplier && !company.is_customer && <span className="text-sm text-muted-foreground">—</span>}
                   </div>
                   )}
                 </div>
