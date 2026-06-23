@@ -507,18 +507,19 @@ export const ContactDetailPage: React.FC = () => {
               <User className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="account">
-              <Wallet className="h-4 w-4 mr-2" />
-              Account
-            </TabsTrigger>
-            <TabsTrigger value="quotes">
-              <ScrollText className="h-4 w-4 mr-2" />
-              Quotes
-            </TabsTrigger>
-            {/* Invoices + Payments are billed against the business when one is
-                attached — hidden here, managed on the company. */}
+            {/* When the contact belongs to a business, every financial surface
+                (account, quotes, invoices, payments) lives on the company — use the
+                "Check Company" link. Standalone contacts keep them here. */}
             {!hasCompany && (
               <>
+                <TabsTrigger value="account">
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Account
+                </TabsTrigger>
+                <TabsTrigger value="quotes">
+                  <ScrollText className="h-4 w-4 mr-2" />
+                  Quotes
+                </TabsTrigger>
                 <TabsTrigger value="invoices">
                   <Receipt className="h-4 w-4 mr-2" />
                   Invoices
