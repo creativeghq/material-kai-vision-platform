@@ -755,6 +755,8 @@ export const CompanyDetailPage: React.FC = () => {
             <AddressUnitsManager companyId={isNew ? undefined : id} />
             </div>
 
+            {/* Pricing + Invoicing & VAT sit side by side — no full-row areas. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
             <Card>
               <CardHeader>
@@ -857,6 +859,7 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+            </div>
 
           </TabsContent>
 
