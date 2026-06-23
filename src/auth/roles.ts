@@ -11,11 +11,16 @@
 
 export const ROLES = {
   ADMIN: 'admin',
-  SUPER_ADMIN: 'super_admin',
+  SUPER_ADMIN: 'super_admin', // legacy — merged into ADMIN (2026-06); kept for old data
   OWNER: 'owner',
+  SUPPLIER: 'supplier',
+  ARCHITECT: 'architect',
+  FINANCE: 'finance',
+  SALES: 'sales',
+  USER: 'user',
+  // legacy account roles, merged into SUPPLIER (2026-06); kept so old rows resolve
   FACTORY: 'factory',
   DEALER: 'dealer',
-  USER: 'user',
 } as const;
 
 export type Role = typeof ROLES[keyof typeof ROLES];
