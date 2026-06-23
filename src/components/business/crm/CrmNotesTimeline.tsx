@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -111,6 +112,11 @@ export const CrmNotesTimeline: React.FC<CrmNotesTimelineProps> = ({ targetKind, 
         created_by: user.id,
       });
       if (error) throw error;
+      // Mirror into the activity feed (fire-and-forget).
+      crmActivitiesService.log(
+        { kind: targetKind, id: targetId },
+        { activity_type: 'note_added', title: 'Note added', description: body.length > 140 ? `${body.slice(0, 140)}…` : body },
+      );
       setDraft('');
       setShowAdd(false);
       await load();

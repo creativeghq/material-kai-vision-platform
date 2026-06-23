@@ -27,6 +27,8 @@ interface SendEmailDialogProps {
   toName?: string | null;
   /** Free-form context shown in the dialog header (e.g. "Granitifiandre Spa"). */
   recipientLabel?: string | null;
+  /** Called after a successful send (used to log a CRM activity). */
+  onSent?: (info: { subject: string }) => void;
 }
 
 interface EmailTemplateRow {
@@ -48,7 +50,7 @@ interface EmailTemplateRow {
  *  - "Custom" — write subject + body once, send as a one-off transactional email.
  */
 export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
-  open, onClose, toEmail, toName, recipientLabel,
+  open, onClose, toEmail, toName, recipientLabel, onSent,
 }) => {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<EmailTemplateRow[]>([]);
@@ -141,6 +143,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         title: 'Email sent',
         description: `Delivered to ${toEmail} · message ${result.messageId.slice(0, 12)}…`,
       });
+      onSent?.({ subject: selectedTemplate.subject_template || selectedTemplate.name });
       onClose();
     } catch (err: any) {
       toast({ title: 'Send failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
@@ -171,6 +174,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         title: 'Email sent',
         description: `Delivered to ${toEmail} · message ${result.messageId.slice(0, 12)}…`,
       });
+      onSent?.({ subject: customSubject.trim() });
       onClose();
     } catch (err: any) {
       toast({ title: 'Send failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });

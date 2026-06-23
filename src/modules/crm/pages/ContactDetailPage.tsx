@@ -23,6 +23,8 @@ import { CategoryAssignmentPicker } from '@/components/business/catalogs/Categor
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
 import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
+import { CrmActivityTimeline } from '@/components/business/crm/CrmActivityTimeline';
+import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
@@ -166,6 +168,15 @@ export const ContactDetailPage: React.FC = () => {
   const [inviting, setInviting] = useState(false);
   // item 5 — company chosen while creating a brand-new contact, attached right after create.
   const [pendingCompanyId, setPendingCompanyId] = useState<string>('');
+  // Bump to force the Activity timeline to reload after we log a new activity.
+  const [activityRefresh, setActivityRefresh] = useState(0);
+  const bumpActivity = () => setActivityRefresh((n) => n + 1);
+  const logActivity = (activity_type: string, title: string, description?: string, metadata?: Record<string, unknown>) => {
+    if (!id || isNew) return;
+    crmActivitiesService
+      .log({ kind: 'contact', id }, { activity_type, title, description, metadata })
+      .then(bumpActivity);
+  };
 
   useEffect(() => {
     if (id && !isNew) {
@@ -397,6 +408,7 @@ export const ContactDetailPage: React.FC = () => {
       const isFirst = (contact?.companies ?? []).length === 0;
       await companiesAPI.attachContact(companyId, id, undefined, isFirst, '');
       await loadContact();
+      logActivity('company_attached', 'Company attached', undefined, { company_id: companyId });
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to attach company', variant: 'destructive' });
     }
@@ -419,6 +431,7 @@ export const ContactDetailPage: React.FC = () => {
         description: 'Company removed from contact successfully',
       });
       await loadContact();
+      logActivity('company_detached', 'Company removed', companyRelationship.company_name ?? undefined, { company_id: companyRelationship.company_id });
     } catch (error: any) {
       console.error('Error removing company:', error);
       toast({
@@ -493,10 +506,6 @@ export const ContactDetailPage: React.FC = () => {
             <TabsTrigger value="overview">
               <User className="h-4 w-4 mr-2" />
               Overview
-            </TabsTrigger>
-            <TabsTrigger value="notes">
-              <FileText className="h-4 w-4 mr-2" />
-              Notes & Activity
             </TabsTrigger>
             <TabsTrigger value="account">
               <Wallet className="h-4 w-4 mr-2" />
@@ -638,7 +647,7 @@ export const ContactDetailPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-x-6 gap-y-2">
-                    <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => patchInline({ lead_status: v })} placeholder="Not set" />
+                    <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => { patchInline({ lead_status: v }); if (v) logActivity('lead_status_changed', `Lead status set to "${v}"`); }} placeholder="Not set" />
                     <LeadFieldSelect alwaysEdit={isNew} kind="lead_source" label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="Not set" />
                     <div>
                       <div className="text-xs font-medium text-muted-foreground">Created</div>
@@ -856,16 +865,17 @@ export const ContactDetailPage: React.FC = () => {
               </>
             )}
 
-            {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
               </div>
+            </div>
+
+            {/* CRM Categories on top, then Notes + Activity inline (no separate tab). */}
+            {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <CrmNotesTimeline targetKind="contact" targetId={contact.id || null} />
+              {contact.id && <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} />}
             </div>
           </TabsContent>
 
-          {/* Notes & Activity Tab — timeline of separate note entries
-              (replaced the single-textarea blob in 2026-05-25). */}
-          <TabsContent value="notes" className="space-y-4">
-            <CrmNotesTimeline targetKind="contact" targetId={contact.id || null} />
-          </TabsContent>
 
           {/* Account overview Tab */}
           <TabsContent value="account" className="space-y-4">
@@ -906,6 +916,7 @@ export const ContactDetailPage: React.FC = () => {
         toEmail={contact.email || ''}
         toName={contact.name || null}
         recipientLabel={contact.name || 'Contact'}
+        onSent={({ subject }) => logActivity('email_sent', `Email sent to ${contact.email}`, subject)}
       />
 
       {/* Invite User Dialog */}
