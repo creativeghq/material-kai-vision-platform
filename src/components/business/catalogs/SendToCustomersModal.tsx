@@ -155,13 +155,13 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
                   <div className="flex items-center gap-2 py-4 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Loading categories…</div>
                 ) : (
                   <div className="space-y-3">
-                    {(['manual', 'professional_type', 'role'] as const).map((kind) => {
+                    {(['manual', 'professional_type'] as const).map((kind) => {
                       const list = grouped[kind];
                       if (list.length === 0) return null;
                       return (
                         <div key={kind} className="space-y-1">
                           <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                            {kind === 'manual' ? 'Custom' : kind === 'professional_type' ? 'Professional type' : 'Role'}
+                            {kind === 'manual' ? 'Custom' : 'Professional type'}
                           </div>
                           <div className="flex flex-wrap gap-1.5">
                             {list.map((c) => {

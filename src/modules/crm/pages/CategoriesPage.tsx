@@ -44,7 +44,7 @@ const KIND_VARIANTS: Record<CrmCategoryKind, 'default' | 'secondary' | 'outline'
 };
 
 /** Kinds an operator may create directly (the auto kinds are owned by resync). */
-const AUTO_KINDS: CrmCategoryKind[] = ['professional_type', 'role'];
+const AUTO_KINDS: CrmCategoryKind[] = ['professional_type'];
 
 /** Pick-one attribute vocabularies — stored as a string on the contact, not as
  * a membership list. They have no members, so the card opens Edit (not the
@@ -185,7 +185,7 @@ export const CategoriesPanel: React.FC = () => {
         <div className="text-sm text-muted-foreground max-w-2xl space-y-1">
           <p>Group platform users + CRM contacts + companies into lists — used by "Send to Customers" and other outreach. Every category here is fully editable: rename, recolour, toggle active, add/remove members, or delete.</p>
           <p className="text-xs">
-            <b className="text-foreground">Role</b> &amp; <b className="text-foreground">Professional type</b> categories are <i>auto-built</i> from each role / professional type and keep their members in sync — but you can still add anyone to them manually on top. <b className="text-foreground">Custom</b> lists are entirely yours. The same person can sit in a role list, a professional-type list, and custom lists at once.
+            <b className="text-foreground">Professional type</b> categories are <i>auto-built</i> from each user's professional type and keep their members in sync — but you can still add anyone to them manually on top. <b className="text-foreground">Custom</b> lists are entirely yours. (Account role — Operator/Dealer/Factory — is a user permission, managed in the Users tab, not a CRM category.)
           </p>
         </div>
         <div className="flex gap-2">
@@ -219,7 +219,7 @@ export const CategoriesPanel: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {(['lead_status', 'lead_source', 'industry', 'manual', 'professional_type', 'role'] as CrmCategoryKind[]).map((kind) => {
+            {(['lead_status', 'lead_source', 'industry', 'manual', 'professional_type'] as CrmCategoryKind[]).map((kind) => {
               const list = grouped[kind];
               if (list.length === 0) return null;
               return (
