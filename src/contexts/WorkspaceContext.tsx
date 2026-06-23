@@ -60,6 +60,9 @@ interface WorkspaceContextType {
   isRootWorkspace: boolean;
   /** Platform-operator = owner/admin of the ROOT workspace (independent of active selection). */
   isPlatformOperator: boolean;
+  /** The user's global account role name (roles.name): user|sales|supplier|architect|finance|admin.
+   *  This is the access TIER set under Admin → CRM → Users; it drives the persona. */
+  accountRole: string | null;
   /** Switch the active workspace; rejects ids the user isn't a member of. */
   switchWorkspace: (workspaceId: string) => void;
   /** Re-fetch memberships (after creating a child workspace, role change, etc.). */
@@ -109,11 +112,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState<WorkspaceMembership[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+  const [accountRole, setAccountRole] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) {
       setMemberships([]);
       setActiveWorkspaceId(null);
+      setAccountRole(null);
       setLoading(false);
       return;
     }
@@ -153,6 +158,22 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const rows = (data ?? []).map(mapMembership).filter(Boolean) as WorkspaceMembership[];
     setMemberships(rows);
+
+    // Account role (the access tier set under Users) — roles has no FK from
+    // user_profiles, so resolve the name in a second cheap lookup.
+    try {
+      const { data: prof } = await supabase
+        .from('user_profiles').select('role_id').eq('user_id', user.id).maybeSingle();
+      if (prof?.role_id) {
+        const { data: r } = await supabase
+          .from('roles').select('name').eq('id', prof.role_id).maybeSingle();
+        setAccountRole((r as { name?: string } | null)?.name ?? null);
+      } else {
+        setAccountRole(null);
+      }
+    } catch {
+      setAccountRole(null);
+    }
 
     // Resolve the active workspace: persisted choice (if still valid) → root → first.
     let next: string | null = null;
@@ -212,6 +233,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     rank: rankOf(activeWorkspace),
     isRootWorkspace: !!activeWorkspace?.isRoot,
     isPlatformOperator,
+    accountRole,
     switchWorkspace,
     refresh: load,
   };

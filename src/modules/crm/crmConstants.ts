@@ -38,11 +38,15 @@ export function professionalTypeLabel(value?: string | null): string {
 /** Friendly display labels for the account roles (the roles table `name`). */
 export const ROLE_LABELS: Record<string, string> = {
   user: 'User',
-  dealer: 'Dealer',
-  factory: 'Factory',
+  sales: 'Sales',
+  supplier: 'Supplier',
+  architect: 'Architect',
   finance: 'Finance',
-  admin: 'Operator / Admin',
-  super_admin: 'Super Admin',
+  admin: 'Admin',
+  // legacy aliases (rows removed from roles; keep labels resolvable for old data)
+  dealer: 'Supplier',
+  factory: 'Supplier',
+  super_admin: 'Admin',
 };
 
 export function roleLabel(name?: string | null): string {

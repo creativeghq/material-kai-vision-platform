@@ -77,11 +77,31 @@ export interface PersonaInputs {
   isPlatformOperator: boolean;
   rank: 'operator' | 'dealer' | 'architect' | null;
   workspaceRole: string | null; // owner | admin | member | client
+  /** Global account role (roles.name) — the access TIER set under Users. Primary driver. */
+  accountRole?: string | null;
 }
 
-/** Resolve the single persona from the (already-reconciled) workspace signals. */
-export function resolvePersona({ isPlatformOperator, rank, workspaceRole }: PersonaInputs): Persona {
+/**
+ * Resolve the single persona. The account role (set under Users) is the primary tier;
+ * `operator` is granted ONLY by root-workspace ownership (never by account role) so a
+ * tenant can never become a platform operator. Account role falls back to the legacy
+ * workspace-derived persona for plain `user`/unset (no regression for existing users).
+ */
+export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole }: PersonaInputs): Persona {
   if (isPlatformOperator) return 'operator';
+
+  // Account role drives the tenant tiers. 'admin'/'super_admin' here do NOT grant
+  // operator (multi-tenancy) — only root-workspace ownership above does.
+  switch (accountRole) {
+    case 'supplier':
+    case 'dealer':   // legacy alias
+    case 'factory':  // legacy alias → supplier tier
+      return 'dealer';
+    case 'architect': return 'architect';
+    case 'sales': return 'sales';
+    case 'finance': return 'accountant';
+  }
+
   const role = workspaceRole ?? '';
   if (role === 'client') return 'end_user';
   if (role === 'accountant') return 'accountant';

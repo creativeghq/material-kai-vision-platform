@@ -41,15 +41,21 @@ export interface PermissionsApi {
 }
 
 export function usePermissions(): PermissionsApi {
-  const { isPlatformOperator, rank, workspaceRole, loading } = useWorkspace();
+  const { isPlatformOperator, rank, workspaceRole, accountRole, loading } = useWorkspace();
 
   return useMemo(() => {
-    const persona = resolvePersona({ isPlatformOperator, rank, workspaceRole });
+    const persona = resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole });
     const can = (capability: Capability) => personaCan(persona, capability);
 
-    const isWorkspaceManager = !!workspaceRole && ADMIN_ROLES.includes(workspaceRole);
-    const canSupplyProducts = rank === 'operator' || rank === 'dealer';
-    const isAccountant = workspaceRole === 'accountant';
+    // Finer axes are now derived from the resolved persona (which the account role
+    // drives), so a Supplier/Architect/Finance/Sales account role grants the right
+    // gates even without a workspace-tree node. operator stays root-only.
+    const isAccountant = persona === 'accountant';
+    const isSalesRep = persona === 'sales';
+    const isBusinessNode = persona === 'operator' || persona === 'dealer' || persona === 'architect';
+    // Manages THIS node: a workspace owner/admin, or any business-tier persona.
+    const isWorkspaceManager = (!!workspaceRole && ADMIN_ROLES.includes(workspaceRole)) || isBusinessNode;
+    const canSupplyProducts = persona === 'operator' || persona === 'dealer';
 
     return {
       loading,
@@ -59,11 +65,11 @@ export function usePermissions(): PermissionsApi {
       isOperator: persona === 'operator',
       isEndUser: persona === 'end_user',
       isAccountant,
-      isSalesRep: workspaceRole === 'sales',
+      isSalesRep,
       isWorkspaceManager,
       canSupplyProducts,
       canOperateFinance: isWorkspaceManager || isAccountant,
-      canManageNetwork: isWorkspaceManager && canSupplyProducts,
+      canManageNetwork: isBusinessNode,
     };
-  }, [isPlatformOperator, rank, workspaceRole, loading]);
+  }, [isPlatformOperator, rank, workspaceRole, accountRole, loading]);
 }
