@@ -902,7 +902,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           <SelectContent>
             <SelectItem value="platform" className="text-xs">All Platform</SelectItem>
             <SelectItem value="factory" className="text-xs">
-              {factoryName ? `My Factory — ${factoryName}` : 'My Factory'}
+              {factoryName ? `My Business — ${factoryName}` : 'My Business'}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -995,7 +995,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       {viewScope === 'factory' && factoryKpis && (
         <>
           <SectionHeader
-            title="Your Factory Position"
+            title="Your Position"
             desc="How your performance benchmarks against the full platform — funnel comparison and buyer composition"
             icon={Building2}
           />
@@ -1006,7 +1006,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                 <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><TrendingUp className="h-4 w-4" /> Your Funnel vs Platform</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs font-semibold text-primary mb-2">Your Factory</p>
+                    <p className="text-xs font-semibold text-primary mb-2">Your Brand</p>
                     <div className="space-y-2">
                       {factoryEngagementFunnel.map((stage, i) => {
                         const maxCount = factoryEngagementFunnel[0]?.count || 1;

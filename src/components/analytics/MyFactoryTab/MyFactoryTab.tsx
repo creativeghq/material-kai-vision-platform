@@ -468,7 +468,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Radar */}
         <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Activity className="h-4 w-4" /> Factory Performance Overview</h3>
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Activity className="h-4 w-4" /> Supplier Performance Overview</h3>
           <div>
             <ResponsiveContainer width="100%" height={280}>
               <RadarChart data={radarData}>
@@ -688,13 +688,13 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 
 
       {/* ──── Factory Visibility & Demand ──────────────────── */}
       <SectionHeader
-        title="Factory Visibility & Demand"
-        desc="How buyers find your factory — brand searches, category preferences, and material interest signals"
+        title="Supplier Visibility & Demand"
+        desc="How buyers find your business — brand searches, category preferences, and material interest signals"
         icon={Globe}
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Factory Name Searches (12w)" value={factorySearchCount} icon={Search} color="text-blue-600" />
+        <KpiCard label="Brand Name Searches (12w)" value={factorySearchCount} icon={Search} color="text-blue-600" />
         <KpiCard label="Materials Used in 3D" value={vrIn3dCount} icon={Eye} color="text-violet-600" />
         <KpiCard label="New Followers (12w)" value={followerTrend.reduce((s, f) => s + f.follows, 0)} icon={Users} color="text-green-600" />
         <KpiCard label="Catalog Products" value={productIds.length} icon={Package} />
@@ -703,11 +703,11 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Factory name searches */}
         <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Search className="h-4 w-4" /> Searches Mentioning Your Factory (12w)</h3>
+          <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><Search className="h-4 w-4" /> Searches Mentioning Your Brand (12w)</h3>
           <div>
             <p className="text-xs text-muted-foreground mb-3">Buyer search queries containing "{factoryName}"</p>
             {factorySearches.length === 0 ? (
-              <EmptyState message="No factory-name searches recorded in this period" />
+              <EmptyState message="No brand-name searches recorded in this period" />
             ) : (
               <AnalyticsTable<{ term: string; count: number }>
                 maxH={280}
