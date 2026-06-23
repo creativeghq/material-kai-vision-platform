@@ -57,13 +57,12 @@ async function loadCustomerDiscount(
 
   const { data } = await supabase
     .from('crm_contacts')
-    .select('id, name, discount_percent, discount_notes, override_company_pricing')
+    .select('id, name, discount_percent, discount_notes')
     .eq('id', customer_contact_id!)
     .maybeSingle();
   if (!data) return null;
-  // Items 6/7/8 — when the contact inherits pricing (override off), the standing
-  // discount comes from its primary company. resolveContactPricingSource returns the
-  // company row (or the contact itself when overriding / unattached).
+  // A contact attached to a business uses that company's pricing; an unattached
+  // contact uses its own. resolveContactPricingSource returns the right row.
   const source = await resolveContactPricingSource(supabase, data);
   return {
     kind: 'contact',

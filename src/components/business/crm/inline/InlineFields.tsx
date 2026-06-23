@@ -75,7 +75,7 @@ interface InlineTextProps {
   label?: string;
   placeholder?: string;
   hint?: string;
-  type?: 'text' | 'email' | 'tel' | 'url' | 'number';
+  type?: 'text' | 'email' | 'tel' | 'url' | 'number' | 'date';
   multiline?: boolean;
   copy?: boolean;
   emptyText?: string;

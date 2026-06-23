@@ -71,7 +71,7 @@ export async function handleContacts(req: Request): Promise<Response> {
     // POST /api/contacts - Create contact
     if (method === 'POST' && path.length === 0) {
       const body = await req.json();
-      const { name, email, phone, company, notes } = body;
+      const { name, email, phone, company, notes, date_of_birth } = body;
       // #227 — persist customer-pricing fields on create too (parity with companies; the PATCH
       // path already handled them, so a contact created with these set used to lose them).
       const { user_level_key, prices_vat_inclusive, discount_percent } = body;
@@ -115,6 +115,7 @@ export async function handleContacts(req: Request): Promise<Response> {
           ...(user_level_key !== undefined ? { user_level_key } : {}),
           ...(prices_vat_inclusive !== undefined ? { prices_vat_inclusive } : {}),
           ...(discount_percent !== undefined ? { discount_percent } : {}),
+          ...(date_of_birth !== undefined ? { date_of_birth } : {}),
           workspace_id: targetWs,
           created_by: userId || 'system',
         })
@@ -241,7 +242,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         name, email, phone, mobile, company, position, title,
         linkedin, twitter, facebook, address, city, state, postal_code, country,
         status, lead_source, contact_type, vat_number, country_code, tax_office,
-        first_name, last_name, profession, is_client, is_supplier,
+        first_name, last_name, profession, is_client, is_supplier, date_of_birth,
         discount_pct, discount_percent, discount_notes, credit_limit,
         user_level_key, // #227 — pricing level
         prices_vat_inclusive, // #227 — show this customer gross (VAT-incl) prices
@@ -249,8 +250,6 @@ export async function handleContacts(req: Request): Promise<Response> {
         contact_group, include_in_myf, vat_exemption_reason,
         billing_name, billing_vat, billing_tax_office, billing_street,
         billing_street_number, billing_postal_code, billing_city, billing_country_code,
-        // company-inheritance overrides (items 6/7/8 + role)
-        override_company_billing, override_company_pricing, override_company_role,
       } = body;
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (name !== undefined) updates.name = name;
@@ -279,6 +278,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       if (profession !== undefined) updates.profession = profession;
       if (is_client !== undefined) updates.is_client = is_client;
       if (is_supplier !== undefined) updates.is_supplier = is_supplier;
+      if (date_of_birth !== undefined) updates.date_of_birth = date_of_birth;
       // Column is discount_percent; accept both the canonical name and the legacy
       // discount_pct alias (older callers) — the prior code wrote a non-existent column.
       if (discount_percent !== undefined) updates.discount_percent = discount_percent;
@@ -299,9 +299,6 @@ export async function handleContacts(req: Request): Promise<Response> {
       if (billing_postal_code !== undefined) updates.billing_postal_code = billing_postal_code;
       if (billing_city !== undefined) updates.billing_city = billing_city;
       if (billing_country_code !== undefined) updates.billing_country_code = billing_country_code;
-      if (override_company_billing !== undefined) updates.override_company_billing = override_company_billing;
-      if (override_company_pricing !== undefined) updates.override_company_pricing = override_company_pricing;
-      if (override_company_role !== undefined) updates.override_company_role = override_company_role;
 
       const { data, error } = await supabase
         .from('crm_contacts')

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, ClipboardList, Receipt, CreditCard, ScrollText, Percent, Tag, Send, Wallet } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, CreditCard, ScrollText, Percent, Tag, Send, Wallet, X } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerAccountOverview,
@@ -95,10 +95,7 @@ interface Contact {
   vat_number?: string | null;
   country_code?: string | null;
   tax_office?: string | null;
-  // items 6/7/8 — inherit billing/pricing/role from the primary company unless overridden
-  override_company_billing?: boolean | null;
-  override_company_pricing?: boolean | null;
-  override_company_role?: boolean | null;
+  date_of_birth?: string | null; // birthday — for greetings / birthday messages
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -107,37 +104,6 @@ interface Contact {
   linked_by?: string;
   companies?: any[];
 }
-
-/** A read-only label/value row used to render values inherited from the business. */
-const InheritedRow: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
-  <div className="flex items-center justify-between gap-4 text-sm">
-    <span className="text-muted-foreground">{label}</span>
-    <span className="font-medium text-right">{value === '' || value === null || value === undefined ? '—' : value}</span>
-  </div>
-);
-
-/**
- * Per-section "Different from business" switch (items 6/7/8). When OFF the section
- * inherits the primary company's values (shown read-only); when ON the contact's own
- * fields are editable and take priority. Only rendered when the contact has a company.
- */
-const DifferentFromBusinessToggle: React.FC<{
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  companyName?: string | null;
-}> = ({ checked, onChange, companyName }) => (
-  <div className="flex items-center justify-between gap-4 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-    <div className="space-y-0.5">
-      <Label className="cursor-pointer">Different from business</Label>
-      <p className="text-xs text-muted-foreground">
-        {checked
-          ? "Using this contact's own details."
-          : `Inheriting from ${companyName || 'the business'}. Turn on to set different values.`}
-      </p>
-    </div>
-    <Switch checked={checked} onCheckedChange={onChange} />
-  </div>
-);
 
 /**
  * Contact Detail Page
@@ -489,14 +455,9 @@ export const ContactDetailPage: React.FC = () => {
     );
   }
 
-  // items 6/7/8 — inheritance state. When the contact has a primary company and the
-  // matching override is off, the section inherits the company's values.
+  // A contact attached to a business has no separate commercial identity — the
+  // business owns pricing / VAT / tax, so those sections are hidden when attached.
   const hasCompany = !!primaryCompany;
-  const inheritBilling = hasCompany && !contact.override_company_billing;
-  const inheritPricing = hasCompany && !contact.override_company_pricing;
-  const inheritRole = hasCompany && !contact.override_company_role;
-  const levelLabel = (key?: string | null) =>
-    (key ? pricingLevels.find((l) => l.level_key === key)?.label ?? key : 'Standard');
 
   return (
     <div className="min-h-screen">
@@ -555,9 +516,12 @@ export const ContactDetailPage: React.FC = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Overview Tab */}
+          {/* Overview Tab — CRM two-column layout: a compact info column on the
+              left, the commercial detail on the right. */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
+              {/* LEFT — identity & quick info */}
+              <div className="space-y-4 lg:sticky lg:top-4">
               {/* Contact Information Card */}
               <Card>
                 <CardHeader>
@@ -584,82 +548,52 @@ export const ContactDetailPage: React.FC = () => {
                     <InlineText alwaysEdit={isNew} type="tel" label="Mobile" value={contact.mobile} onSave={(v) => patchInline({ mobile: v })} placeholder="+44 7445 264362" />
                     <InlineText alwaysEdit={isNew} label="Position / Title" value={contact.position} onSave={(v) => patchInline({ position: v })} placeholder="e.g. Procurement Manager" copy={false} />
                     <InlineText alwaysEdit={isNew} label="Department" value={contact.department} onSave={(v) => patchInline({ department: v })} placeholder="e.g. Operations" copy={false} />
+                    <InlineText alwaysEdit={isNew} type="date" label="Birthday" value={contact.date_of_birth} onSave={(v) => patchInline({ date_of_birth: v })} placeholder="" copy={false} hint="Used for birthday greetings." />
                   </div>
 
-                  {/* Role — who this contact is to the workspace. Lives here (mirrors the
-                      company page, where Role sits inside Company Information). When a
-                      business is attached the role is inherited from it unless overridden;
-                      sole-trader / freelancer contacts with no company set it themselves. */}
+                  {/* Role — only for contacts NOT attached to a business. A person who
+                      belongs to a company has no separate role/billing identity; the
+                      business owns it, so the whole section is hidden when attached. */}
+                  {!hasCompany && (
                   <div className="pt-4 border-t space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                       <Tag className="h-3.5 w-3.5" /> Role
                     </div>
-                    {hasCompany && (
-                      <DifferentFromBusinessToggle
-                        checked={!!contact.override_company_role}
-                        onChange={(v) => patchInline({ override_company_role: v })}
-                        companyName={primaryCompany?.name}
-                      />
-                    )}
-                    {inheritRole ? (
-                      <div className="space-y-2 rounded-md border border-border/60 p-3">
-                        <InheritedRow label="Supplier" value={primaryCompany?.is_supplier ? 'Yes' : 'No'} />
-                        <InheritedRow label="Customer" value={primaryCompany?.is_customer ? 'Yes' : 'No'} />
-                        <InheritedRow label="Billing type" value="Company (B2B)" />
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="is_supplier" className="cursor-pointer">This is a supplier</Label>
+                        <p className="text-xs text-muted-foreground">Freelancer / sole trader who supplies directly.</p>
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="space-y-1">
-                            <Label htmlFor="is_supplier" className="cursor-pointer">This is a supplier</Label>
-                            <p className="text-xs text-muted-foreground">
-                              Use for freelancers / sole traders who supply directly. If they belong to a business,
-                              mark the company as supplier instead — products live on the business.
-                            </p>
-                          </div>
-                          <Switch
-                            id="is_supplier"
-                            checked={!!contact.is_supplier}
-                            onCheckedChange={(v) => patchInline({ is_supplier: v })}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="space-y-1">
-                            <Label htmlFor="is_client" className="cursor-pointer">This is a customer</Label>
-                            <p className="text-xs text-muted-foreground">
-                              Means we sell to them — quotes / invoices / statements get raised against this contact.
-                            </p>
-                          </div>
-                          <Switch
-                            id="is_client"
-                            checked={!!contact.is_client}
-                            onCheckedChange={(v) => patchInline({ is_client: v })}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-4 pt-2 border-t">
-                          <div className="space-y-1">
-                            <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
-                            <p className="text-xs text-muted-foreground">
-                              Drives B2C vs B2B billing — used by quote VAT logic.
-                            </p>
-                          </div>
-                          <Select
-                            value={contact.contact_type ?? '__unset'}
-                            onValueChange={(v) => patchInline({ contact_type: v === '__unset' ? null : v })}
-                          >
-                            <SelectTrigger id="contact_type" className="w-44">
-                              <SelectValue placeholder="Not set" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__unset">Not set</SelectItem>
-                              <SelectItem value="private">Private (B2C)</SelectItem>
-                              <SelectItem value="company">Company (B2B)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </>
-                    )}
+                      <Switch id="is_supplier" checked={!!contact.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v })} />
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="is_client" className="cursor-pointer">This is a customer</Label>
+                        <p className="text-xs text-muted-foreground">We sell to them — quotes / invoices raised against this contact.</p>
+                      </div>
+                      <Switch id="is_client" checked={!!contact.is_client} onCheckedChange={(v) => patchInline({ is_client: v })} />
+                    </div>
+                    <div className="flex items-center justify-between gap-4 pt-2 border-t">
+                      <div className="space-y-1">
+                        <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
+                        <p className="text-xs text-muted-foreground">Drives B2C vs B2B VAT logic.</p>
+                      </div>
+                      <Select
+                        value={contact.contact_type ?? '__unset'}
+                        onValueChange={(v) => patchInline({ contact_type: v === '__unset' ? null : v })}
+                      >
+                        <SelectTrigger id="contact_type" className="w-44">
+                          <SelectValue placeholder="Not set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__unset">Not set</SelectItem>
+                          <SelectItem value="private">Private (B2C)</SelectItem>
+                          <SelectItem value="company">Company (B2B)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -676,27 +610,31 @@ export const ContactDetailPage: React.FC = () => {
                   <div>
                     <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Company</Label>
                     <div className="mt-1.5 space-y-2">
-                      {(contact.companies ?? []).length > 0 && (
+                      {/* Once a company is attached, hide the search and show it with an
+                          X to remove. Removing it brings the search back (no point showing
+                          a search bar when the slot is already filled). */}
+                      {(contact.companies ?? []).length > 0 ? (
                         <div className="flex flex-wrap gap-1.5">
                           {(contact.companies ?? []).map((c: any) => (
-                            <Badge key={c.relationship_id} variant="secondary" className="gap-1.5">
+                            <Badge key={c.relationship_id} variant="secondary" className="gap-1.5 py-1 pl-2.5 pr-1.5">
                               <button type="button" onClick={() => navigate(`/admin/crm/companies/${c.company_id}`)} className="hover:underline">
                                 {c.company_name}
                               </button>
                               {c.is_primary && <span className="text-[9px] uppercase opacity-70">primary</span>}
-                              <button type="button" onClick={() => handleDetachCompany(c.relationship_id)} aria-label="Remove company" className="opacity-70 hover:opacity-100">
-                                <Unlink className="h-3 w-3" />
+                              <button type="button" onClick={() => handleDetachCompany(c.relationship_id)} aria-label="Remove company" className="rounded-full p-0.5 opacity-70 hover:bg-muted hover:opacity-100">
+                                <X className="h-3 w-3" />
                               </button>
                             </Badge>
                           ))}
                         </div>
+                      ) : (
+                        <CompanySearchDropdown
+                          onSelect={attachCompanyById}
+                          excludeCompanyIds={(contact.companies ?? []).map((c: any) => c.company_id)}
+                          placeholder="Search & attach a company…"
+                          selectedCompanyId={isNew ? (pendingCompanyId || null) : null}
+                        />
                       )}
-                      <CompanySearchDropdown
-                        onSelect={attachCompanyById}
-                        excludeCompanyIds={(contact.companies ?? []).map((c: any) => c.company_id)}
-                        placeholder="Search & attach a company…"
-                        selectedCompanyId={isNew ? (pendingCompanyId || null) : null}
-                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
@@ -715,10 +653,8 @@ export const ContactDetailPage: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
 
-            {/* Address Card */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Address Card */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -747,98 +683,51 @@ export const ContactDetailPage: React.FC = () => {
                     Linked User Account
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent>
                   {linkedUser ? (
-                    <>
-                      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-sm font-medium truncate">{linkedUser.email}</span>
-                        </div>
-                        {linkedUser.user_profiles?.subscription_tier && (
-                          <Badge variant="outline" className="capitalize text-xs flex-shrink-0">
-                            {linkedUser.user_profiles.subscription_tier}
-                          </Badge>
-                        )}
+                    <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium truncate">{linkedUser.email}</span>
                       </div>
-                      {linkedUser.user_profiles?.full_name && (
-                        <p className="text-sm text-muted-foreground px-3">
-                          {linkedUser.user_profiles.full_name}
-                        </p>
-                      )}
-                      {contact.linked_at && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground px-3">
-                          <Calendar className="h-3 w-3" />
-                          Linked {new Date(contact.linked_at).toLocaleDateString()}
-                        </div>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/admin/quote-requests?user=${contact.user_id}`)}
-                        className="w-full"
-                      >
-                        <ClipboardList className="h-3 w-3 mr-2" />
-                        Create Quote
+                      <Button variant="ghost" size="icon" onClick={handleUnlinkUser} disabled={linking}
+                        title="Unlink user" className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-transparent hover:text-foreground">
+                        <Unlink className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleUnlinkUser}
-                        disabled={linking}
-                        className="w-full text-muted-foreground"
-                      >
-                        <Unlink className="h-3 w-3 mr-2" />
-                        {linking ? 'Unlinking...' : 'Unlink User'}
-                      </Button>
-                    </>
+                    </div>
                   ) : (
-                    <>
-                      <p className="text-sm text-muted-foreground">
-                        Link to a user account or create a new one to assign quotes and track activity.
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={openInviteDialog}
-                        className="w-full"
-                        disabled={!contact.email && !isNew}
-                      >
-                        <UserPlus className="h-3 w-3 mr-2" />
-                        Create &amp; Invite User
+                    <div className="space-y-2">
+                      <Button size="sm" onClick={openInviteDialog} className="w-full" disabled={!contact.email && !isNew}>
+                        <UserPlus className="h-3.5 w-3.5 mr-2" /> Create &amp; invite user
                       </Button>
-                      {!contact.email && (
-                        <p className="text-xs text-muted-foreground text-center">
-                          Add an email to the contact first
-                        </p>
-                      )}
-                      <div className="relative flex items-center gap-2">
-                        <div className="flex-1 border-t border-border" />
-                        <span className="text-xs text-muted-foreground">or link existing</span>
-                        <div className="flex-1 border-t border-border" />
-                      </div>
-                      <div>
-                        <Label className="text-sm">Search User</Label>
-                        <div className="mt-1.5">
-                          <UserSearchDropdown
-                            onSelect={handleLinkUser}
-                            placeholder="Search by email..."
-                            selectedUserId={null}
-                          />
-                        </div>
-                      </div>
-                      {linking && (
-                        <p className="text-sm text-muted-foreground text-center">
-                          Linking...
-                        </p>
-                      )}
-                    </>
+                      <UserSearchDropdown
+                        onSelect={handleLinkUser}
+                        placeholder="…or link an existing user"
+                        selectedUserId={null}
+                      />
+                    </div>
                   )}
                 </CardContent>
               </Card>
-            </div>
+              </div>
 
-            {/* item 7 — remaining cards organised into two-column rows. Row 1 groups the
-                commercial info (Pricing + Invoicing & VAT). */}
+              {/* RIGHT — commercial detail */}
+              <div className="space-y-4">
+            {hasCompany ? (
+              <Card>
+                <CardContent className="p-4 text-sm text-muted-foreground flex items-start gap-2">
+                  <Building2 className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>
+                    Pricing, VAT &amp; tax for this contact are managed on{' '}
+                    <button type="button" onClick={() => primaryCompany?.id && navigate(`/admin/crm/companies/${primaryCompany.id}`)} className="text-foreground font-medium hover:underline">
+                      {primaryCompany?.name || 'the business'}
+                    </button>. The contact is billed under the business identity.
+                  </span>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+            {/* commercial info (Pricing + Invoicing & VAT) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
             <Card>
@@ -849,20 +738,6 @@ export const ContactDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {hasCompany && (
-                  <DifferentFromBusinessToggle
-                    checked={!!contact.override_company_pricing}
-                    onChange={(v) => patchInline({ override_company_pricing: v })}
-                    companyName={primaryCompany?.name}
-                  />
-                )}
-                {inheritPricing ? (
-                  <div className="space-y-2 rounded-md border border-border/60 p-3">
-                    <InheritedRow label="Pricing level" value={levelLabel(primaryCompany?.user_level_key)} />
-                    <InheritedRow label="Customer discount %" value={primaryCompany?.discount_percent != null ? `${primaryCompany.discount_percent}%` : '—'} />
-                    {primaryCompany?.discount_notes && <InheritedRow label="Discount notes" value={primaryCompany.discount_notes} />}
-                  </div>
-                ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                     {/* Pricing level + discount route through the approval RPC (savePricing), not patchInline. */}
                     <InlineSelect
@@ -897,8 +772,7 @@ export const ContactDetailPage: React.FC = () => {
                       />
                     </div>
                   </div>
-                )}
-                {/* Credit limit is a contact-specific risk control — never inherited. */}
+                {/* Credit limit — contact-specific risk control. */}
                 <InlineText
                   alwaysEdit={isNew}
                   type="number"
@@ -923,13 +797,6 @@ export const ContactDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {hasCompany && (
-                  <DifferentFromBusinessToggle
-                    checked={!!contact.override_company_billing}
-                    onChange={(v) => patchInline({ override_company_billing: v })}
-                    companyName={primaryCompany?.name}
-                  />
-                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                   <InlineSelect
                     alwaysEdit={isNew}
@@ -969,17 +836,6 @@ export const ContactDetailPage: React.FC = () => {
                     onCheckedChange={(v) => patchInline({ include_in_myf: v })}
                   />
                 </div>
-                {inheritBilling ? (
-                  <div className="rounded-md border border-border/60 p-3 space-y-2">
-                    <p className="text-xs text-muted-foreground">
-                      <span className="text-foreground font-medium">Billing identity inherited from {primaryCompany?.name || 'the business'}</span> — invoices to this contact are issued under the company's identity.
-                    </p>
-                    <InheritedRow label="Name" value={primaryCompany?.billing_name || primaryCompany?.name} />
-                    <InheritedRow label="VAT (ΑΦΜ)" value={primaryCompany?.billing_vat || primaryCompany?.vat_number} />
-                    <InheritedRow label="Tax office (ΔΟΥ)" value={primaryCompany?.billing_tax_office || primaryCompany?.tax_office} />
-                    <InheritedRow label="VAT country" value={primaryCompany?.billing_country_code || primaryCompany?.country_code} />
-                  </div>
-                ) : (
                 <div className="rounded-md border border-border/60 p-3 space-y-2">
                   <p className="text-xs text-muted-foreground">
                     <span className="text-foreground font-medium">Separate billing identity</span> — fill only when invoices must be issued to a different legal entity than this contact (different ΑΦΜ / name / address). Leave blank to invoice the contact as-is.
@@ -998,29 +854,23 @@ export const ContactDetailPage: React.FC = () => {
                     <InlineText alwaysEdit={isNew} label="City" value={contact.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
                   </div>
                 </div>
-                )}
               </CardContent>
             </Card>
             </div>
 
-            {/* Tax & VAT — admin-managed billing details. If the contact is
-                attached to a Company (B2B), the company's VAT takes priority
-                for invoicing — this VAT is the contact's personal one (used
-                for B2C / sole-trader / self-employed invoicing). Role now lives
-                inside Contact Information above. */}
+            {/* Tax & VAT — the contact's own identity (B2C / sole trader). */}
             <ContactTaxVatCard
               vatNumber={contact.vat_number ?? null}
               countryCode={contact.country_code ?? null}
               taxOffice={contact.tax_office ?? null}
-              attachedCompanies={contact.companies ?? []}
               onPatch={(updates) => patchInline(updates as Partial<Contact>)}
-              inheriting={inheritBilling}
-              overrideBilling={!!contact.override_company_billing}
-              onToggleOverride={hasCompany ? (v) => patchInline({ override_company_billing: v }) : undefined}
-              primaryCompany={primaryCompany}
             />
+              </>
+            )}
 
             {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
+              </div>
+            </div>
           </TabsContent>
 
           {/* Notes & Activity Tab — timeline of separate note entries

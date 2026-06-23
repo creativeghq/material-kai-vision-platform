@@ -578,9 +578,10 @@ export const CompanyDetailPage: React.FC = () => {
             </Card>
             )}
 
-            {/* items 2 & 5 — Company Information (with a minimal Role row) sits next to
-                Tax & VAT in a two-column layout. */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            {/* CRM two-column layout: company identity on the left, all detail on the right. */}
+            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
+              {/* LEFT — company identity */}
+              <div className="space-y-4 lg:sticky lg:top-4">
             <Card>
               <CardHeader>
                 <CardTitle>Company Information</CardTitle>
@@ -630,7 +631,10 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+              </div>
 
+              {/* RIGHT — detail */}
+              <div className="space-y-4">
             {/* Tax & VAT Card — EU VAT validation via VIES (used before invoicing) */}
             <Card>
               <CardHeader>
@@ -725,13 +729,11 @@ export const CompanyDetailPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-            </div>
 
-            {/* item 1 — CRM Categories moved up here, right under the business
-                information instead of at the very bottom of the tab. */}
+            {/* CRM Categories */}
             {company.id && <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>}
 
-            {/* item 3 — Address + Sub Units side by side. */}
+            {/* Address + Sub Units side by side. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             {/* Address Card */}
             <Card>
@@ -859,6 +861,8 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+            </div>
+              </div>
             </div>
 
           </TabsContent>
