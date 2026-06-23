@@ -25,6 +25,37 @@ async function contactInScope(contactId: string, scope: CrmScope): Promise<boole
   return !!data;
 }
 
+/** Columns a client may write on a CRM contact. Used by BOTH create and update so
+ * a field added on the frontend can never silently no-op (the bug that hid
+ * lead_status / department). System columns are intentionally excluded. */
+const CONTACT_WRITABLE_COLUMNS = [
+  'name', 'email', 'phone', 'mobile', 'company', 'position', 'department',
+  'first_name', 'last_name', 'profession',
+  'linkedin', 'twitter', 'facebook', 'website',
+  'address', 'city', 'state', 'postal_code', 'country', 'street', 'street_number',
+  'status', 'lead_source', 'lead_status', 'contact_type',
+  'is_client', 'is_supplier',
+  'vat_number', 'country_code', 'tax_office', 'date_of_birth',
+  'discount_percent', 'discount_notes', 'credit_limit', 'user_level_key', 'prices_vat_inclusive',
+  'contact_group', 'include_in_myf', 'vat_exemption_reason',
+  'billing_name', 'billing_vat', 'billing_tax_office', 'billing_street',
+  'billing_street_number', 'billing_postal_code', 'billing_city', 'billing_country_code',
+  'industry', 'employee_count', 'annual_revenue', 'min_order_value', 'payment_terms_days',
+  'finance_statement_opt_out', 'responsible_sales_user_ids', 'tags',
+] as const;
+
+function pickContactFields(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const col of CONTACT_WRITABLE_COLUMNS) {
+    if (body[col] !== undefined) out[col] = body[col];
+  }
+  // Legacy alias: some callers send discount_pct for discount_percent.
+  if (out.discount_percent === undefined && body.discount_pct !== undefined) {
+    out.discount_percent = body.discount_pct;
+  }
+  return out;
+}
+
 /**
  * CRM Contacts API
  * Handles CRM contact management: create, list, update, delete
@@ -71,10 +102,7 @@ export async function handleContacts(req: Request): Promise<Response> {
     // POST /api/contacts - Create contact
     if (method === 'POST' && path.length === 0) {
       const body = await req.json();
-      const { name, email, phone, company, notes, date_of_birth } = body;
-      // #227 — persist customer-pricing fields on create too (parity with companies; the PATCH
-      // path already handled them, so a contact created with these set used to lose them).
-      const { user_level_key, prices_vat_inclusive, discount_percent } = body;
+      const name = body.name as string | undefined;
 
       if (!name) {
         return new Response(
@@ -107,15 +135,8 @@ export async function handleContacts(req: Request): Promise<Response> {
       const { data, error } = await supabase
         .from('crm_contacts')
         .insert({
+          ...pickContactFields(body),
           name,
-          email,
-          phone,
-          company,
-          notes,
-          ...(user_level_key !== undefined ? { user_level_key } : {}),
-          ...(prices_vat_inclusive !== undefined ? { prices_vat_inclusive } : {}),
-          ...(discount_percent !== undefined ? { discount_percent } : {}),
-          ...(date_of_birth !== undefined ? { date_of_birth } : {}),
           workspace_id: targetWs,
           created_by: userId || 'system',
         })
@@ -238,69 +259,10 @@ export async function handleContacts(req: Request): Promise<Response> {
         );
       }
 
-      const {
-        name, email, phone, mobile, company, position, title, department,
-        linkedin, twitter, facebook, address, city, state, postal_code, country,
-        status, lead_source, lead_status, contact_type, vat_number, country_code, tax_office,
-        first_name, last_name, profession, is_client, is_supplier, date_of_birth,
-        discount_pct, discount_percent, discount_notes, credit_limit,
-        user_level_key, // #227 — pricing level
-        prices_vat_inclusive, // #227 — show this customer gross (VAT-incl) prices
-        // #207 — commercial depth
-        contact_group, include_in_myf, vat_exemption_reason,
-        billing_name, billing_vat, billing_tax_office, billing_street,
-        billing_street_number, billing_postal_code, billing_city, billing_country_code,
-      } = body;
-      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (name !== undefined) updates.name = name;
-      if (email !== undefined) updates.email = email;
-      if (phone !== undefined) updates.phone = phone;
-      if (mobile !== undefined) updates.mobile = mobile;
-      if (company !== undefined) updates.company = company;
-      if (position !== undefined) updates.position = position;
-      if (title !== undefined) updates.title = title;
-      if (department !== undefined) updates.department = department;
-      if (linkedin !== undefined) updates.linkedin = linkedin;
-      if (twitter !== undefined) updates.twitter = twitter;
-      if (facebook !== undefined) updates.facebook = facebook;
-      if (address !== undefined) updates.address = address;
-      if (city !== undefined) updates.city = city;
-      if (state !== undefined) updates.state = state;
-      if (postal_code !== undefined) updates.postal_code = postal_code;
-      if (country !== undefined) updates.country = country;
-      if (status !== undefined) updates.status = status;
-      if (lead_source !== undefined) updates.lead_source = lead_source;
-      if (lead_status !== undefined) updates.lead_status = lead_status;
-      if (contact_type !== undefined) updates.contact_type = contact_type;
-      if (vat_number !== undefined) updates.vat_number = vat_number;
-      if (country_code !== undefined) updates.country_code = country_code;
-      if (tax_office !== undefined) updates.tax_office = tax_office;
-      if (first_name !== undefined) updates.first_name = first_name;
-      if (last_name !== undefined) updates.last_name = last_name;
-      if (profession !== undefined) updates.profession = profession;
-      if (is_client !== undefined) updates.is_client = is_client;
-      if (is_supplier !== undefined) updates.is_supplier = is_supplier;
-      if (date_of_birth !== undefined) updates.date_of_birth = date_of_birth;
-      // Column is discount_percent; accept both the canonical name and the legacy
-      // discount_pct alias (older callers) — the prior code wrote a non-existent column.
-      if (discount_percent !== undefined) updates.discount_percent = discount_percent;
-      else if (discount_pct !== undefined) updates.discount_percent = discount_pct;
-      if (discount_notes !== undefined) updates.discount_notes = discount_notes;
-      if (credit_limit !== undefined) updates.credit_limit = credit_limit;
-      if (user_level_key !== undefined) updates.user_level_key = user_level_key;
-      if (prices_vat_inclusive !== undefined) updates.prices_vat_inclusive = prices_vat_inclusive;
-      // #207 — commercial depth
-      if (contact_group !== undefined) updates.contact_group = contact_group;
-      if (include_in_myf !== undefined) updates.include_in_myf = include_in_myf;
-      if (vat_exemption_reason !== undefined) updates.vat_exemption_reason = vat_exemption_reason;
-      if (billing_name !== undefined) updates.billing_name = billing_name;
-      if (billing_vat !== undefined) updates.billing_vat = billing_vat;
-      if (billing_tax_office !== undefined) updates.billing_tax_office = billing_tax_office;
-      if (billing_street !== undefined) updates.billing_street = billing_street;
-      if (billing_street_number !== undefined) updates.billing_street_number = billing_street_number;
-      if (billing_postal_code !== undefined) updates.billing_postal_code = billing_postal_code;
-      if (billing_city !== undefined) updates.billing_city = billing_city;
-      if (billing_country_code !== undefined) updates.billing_country_code = billing_country_code;
+      const updates: Record<string, unknown> = {
+        ...pickContactFields(body),
+        updated_at: new Date().toISOString(),
+      };
 
       const { data, error } = await supabase
         .from('crm_contacts')
