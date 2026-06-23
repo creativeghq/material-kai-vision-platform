@@ -249,8 +249,8 @@ export async function handleContacts(req: Request): Promise<Response> {
         contact_group, include_in_myf, vat_exemption_reason,
         billing_name, billing_vat, billing_tax_office, billing_street,
         billing_street_number, billing_postal_code, billing_city, billing_country_code,
-        // company-inheritance overrides (items 6/7/8)
-        override_company_billing, override_company_pricing,
+        // company-inheritance overrides (items 6/7/8 + role)
+        override_company_billing, override_company_pricing, override_company_role,
       } = body;
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (name !== undefined) updates.name = name;
@@ -301,6 +301,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       if (billing_country_code !== undefined) updates.billing_country_code = billing_country_code;
       if (override_company_billing !== undefined) updates.override_company_billing = override_company_billing;
       if (override_company_pricing !== undefined) updates.override_company_pricing = override_company_pricing;
+      if (override_company_role !== undefined) updates.override_company_role = override_company_role;
 
       const { data, error } = await supabase
         .from('crm_contacts')

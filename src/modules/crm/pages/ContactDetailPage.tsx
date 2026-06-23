@@ -95,9 +95,10 @@ interface Contact {
   vat_number?: string | null;
   country_code?: string | null;
   tax_office?: string | null;
-  // items 6/7/8 — inherit billing/pricing from the primary company unless overridden
+  // items 6/7/8 — inherit billing/pricing/role from the primary company unless overridden
   override_company_billing?: boolean | null;
   override_company_pricing?: boolean | null;
+  override_company_role?: boolean | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -493,6 +494,7 @@ export const ContactDetailPage: React.FC = () => {
   const hasCompany = !!primaryCompany;
   const inheritBilling = hasCompany && !contact.override_company_billing;
   const inheritPricing = hasCompany && !contact.override_company_pricing;
+  const inheritRole = hasCompany && !contact.override_company_role;
   const levelLabel = (key?: string | null) =>
     (key ? pricingLevels.find((l) => l.level_key === key)?.label ?? key : 'Standard');
 
@@ -564,7 +566,7 @@ export const ContactDetailPage: React.FC = () => {
                     Contact Information
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                     <div className="md:col-span-2">
                       <InlineText alwaysEdit={isNew} label="Full Name *" value={contact.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Jane Smith" copy={false} />
@@ -582,6 +584,81 @@ export const ContactDetailPage: React.FC = () => {
                     <InlineText alwaysEdit={isNew} type="tel" label="Mobile" value={contact.mobile} onSave={(v) => patchInline({ mobile: v })} placeholder="+44 7445 264362" />
                     <InlineText alwaysEdit={isNew} label="Position / Title" value={contact.position} onSave={(v) => patchInline({ position: v })} placeholder="e.g. Procurement Manager" copy={false} />
                     <InlineText alwaysEdit={isNew} label="Department" value={contact.department} onSave={(v) => patchInline({ department: v })} placeholder="e.g. Operations" copy={false} />
+                  </div>
+
+                  {/* Role — who this contact is to the workspace. Lives here (mirrors the
+                      company page, where Role sits inside Company Information). When a
+                      business is attached the role is inherited from it unless overridden;
+                      sole-trader / freelancer contacts with no company set it themselves. */}
+                  <div className="pt-4 border-t space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Tag className="h-3.5 w-3.5" /> Role
+                    </div>
+                    {hasCompany && (
+                      <DifferentFromBusinessToggle
+                        checked={!!contact.override_company_role}
+                        onChange={(v) => patchInline({ override_company_role: v })}
+                        companyName={primaryCompany?.name}
+                      />
+                    )}
+                    {inheritRole ? (
+                      <div className="space-y-2 rounded-md border border-border/60 p-3">
+                        <InheritedRow label="Supplier" value={primaryCompany?.is_supplier ? 'Yes' : 'No'} />
+                        <InheritedRow label="Customer" value={primaryCompany?.is_customer ? 'Yes' : 'No'} />
+                        <InheritedRow label="Billing type" value="Company (B2B)" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="is_supplier" className="cursor-pointer">This is a supplier</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Use for freelancers / sole traders who supply directly. If they belong to a business,
+                              mark the company as supplier instead — products live on the business.
+                            </p>
+                          </div>
+                          <Switch
+                            id="is_supplier"
+                            checked={!!contact.is_supplier}
+                            onCheckedChange={(v) => patchInline({ is_supplier: v })}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="is_client" className="cursor-pointer">This is a customer</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Means we sell to them — quotes / invoices / statements get raised against this contact.
+                            </p>
+                          </div>
+                          <Switch
+                            id="is_client"
+                            checked={!!contact.is_client}
+                            onCheckedChange={(v) => patchInline({ is_client: v })}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-4 pt-2 border-t">
+                          <div className="space-y-1">
+                            <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Drives B2C vs B2B billing — used by quote VAT logic.
+                            </p>
+                          </div>
+                          <Select
+                            value={contact.contact_type ?? '__unset'}
+                            onValueChange={(v) => patchInline({ contact_type: v === '__unset' ? null : v })}
+                          >
+                            <SelectTrigger id="contact_type" className="w-44">
+                              <SelectValue placeholder="Not set" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__unset">Not set</SelectItem>
+                              <SelectItem value="private">Private (B2C)</SelectItem>
+                              <SelectItem value="company">Company (B2B)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -926,12 +1003,11 @@ export const ContactDetailPage: React.FC = () => {
             </Card>
             </div>
 
-            {/* item 7 — Row 2 groups the tax identity (Tax & VAT + Role). */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Tax & VAT — admin-managed billing details. If the contact is
                 attached to a Company (B2B), the company's VAT takes priority
                 for invoicing — this VAT is the contact's personal one (used
-                for B2C / sole-trader / self-employed invoicing). */}
+                for B2C / sole-trader / self-employed invoicing). Role now lives
+                inside Contact Information above. */}
             <ContactTaxVatCard
               vatNumber={contact.vat_number ?? null}
               countryCode={contact.country_code ?? null}
@@ -943,72 +1019,6 @@ export const ContactDetailPage: React.FC = () => {
               onToggleOverride={hasCompany ? (v) => patchInline({ override_company_billing: v }) : undefined}
               primaryCompany={primaryCompany}
             />
-
-            {/* Role — who this contact is to the workspace. Drives how the
-                finance Parties view classifies them. Note: contacts are people,
-                not businesses — products live on the company (see "Companies"
-                tab → open the company → Products). is_supplier is kept here
-                for sole-trader / freelancer contacts who supply directly
-                without a CRM company. */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Tag className="h-4 w-4" />
-                  Role
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="is_supplier" className="cursor-pointer">This is a supplier</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Use for freelancers / sole traders who supply directly. If they belong to a business,
-                      mark the company as supplier instead — products live on the business.
-                    </p>
-                  </div>
-                  <Switch
-                    id="is_supplier"
-                    checked={!!contact.is_supplier}
-                    onCheckedChange={(v) => patchInline({ is_supplier: v })}
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="is_client" className="cursor-pointer">This is a customer</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Means we sell to them — quotes / invoices / statements get raised against this contact.
-                    </p>
-                  </div>
-                  <Switch
-                    id="is_client"
-                    checked={!!contact.is_client}
-                    onCheckedChange={(v) => patchInline({ is_client: v })}
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-4 pt-2 border-t">
-                  <div className="space-y-1">
-                    <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Drives B2C vs B2B billing — used by quote VAT logic.
-                    </p>
-                  </div>
-                  <Select
-                    value={contact.contact_type ?? '__unset'}
-                    onValueChange={(v) => patchInline({ contact_type: v === '__unset' ? null : v })}
-                  >
-                    <SelectTrigger id="contact_type" className="w-44">
-                      <SelectValue placeholder="Not set" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__unset">Not set</SelectItem>
-                      <SelectItem value="private">Private (B2C)</SelectItem>
-                      <SelectItem value="company">Company (B2B)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-            </div>
 
             {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
           </TabsContent>
