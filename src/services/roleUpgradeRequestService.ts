@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type RoleUpgradeRequestedRole = 'dealer' | 'factory';
+export type RoleUpgradeRequestedRole = 'supplier' | 'architect';
 export type RoleUpgradeStatus = 'pending' | 'approved' | 'rejected';
 
 export interface RoleUpgradeRequest {
@@ -46,7 +46,7 @@ function rowToRequest(row: RawRow): RoleUpgradeRequest {
     id: row.id,
     user_id: row.user_id,
     requested_role_id: row.requested_role_id,
-    requested_role_name: (row.roles?.name as RoleUpgradeRequestedRole) ?? 'dealer',
+    requested_role_name: (row.roles?.name as RoleUpgradeRequestedRole) ?? 'supplier',
     justification: row.justification,
     status: row.status,
     admin_note: row.admin_note,

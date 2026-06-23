@@ -1,10 +1,10 @@
 /**
  * role-upgrade-requests
  *
- * Single edge function for the dealer/factory promotion workflow:
+ * Single edge function for the supplier/architect promotion workflow:
  *
  *   POST /submit   (any authed user)
- *     body: { requested_role: 'dealer' | 'factory', justification?: string }
+ *     body: { requested_role: 'supplier' | 'architect', justification?: string }
  *     - Validates the caller is a Business entity (entity_type='business' + business_id set).
  *     - Resolves requested_role → role_id.
  *     - Inserts a role_upgrade_requests row (partial unique index prevents duplicates).
@@ -118,7 +118,7 @@ async function validateVatLive(countryCode: string | null, vatNumber: string | n
   }
 }
 
-type AllowedRole = 'dealer' | 'factory';
+type AllowedRole = 'supplier' | 'architect';
 
 interface SubmitBody {
   requested_role: AllowedRole;
@@ -199,8 +199,8 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
 
     if (action === 'submit') {
       const body = rawBody as SubmitBody & { action: string };
-      if (!body.requested_role || !['dealer', 'factory'].includes(body.requested_role)) {
-        return jsonResponse({ error: 'requested_role must be "dealer" or "factory"' }, 400);
+      if (!body.requested_role || !['supplier', 'architect'].includes(body.requested_role)) {
+        return jsonResponse({ error: 'requested_role must be "supplier" or "architect"' }, 400);
       }
 
       // Business-entity gate

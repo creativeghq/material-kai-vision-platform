@@ -81,7 +81,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       // Include workspace owner + super_admin so the primary business persona can manage
       // their own CRM contacts (was ['admin','factory'], which locked owners out). Tenant
       // isolation stays enforced by the workspace scope below.
-      allowedRoles: ['admin', 'super_admin', 'owner', 'factory'],
+      allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'sales'],
     });
 
     // authenticate() already grants success for secret-key (level='secret') access and

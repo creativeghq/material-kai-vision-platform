@@ -93,7 +93,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // role 'user') and platform super_admin must be allowed — matches finance/messaging/
       // email/agent handlers. The earlier ['admin','factory'] locked owners out of their
       // own CRM (list AND write). Tenant isolation is still enforced by getCrmScope below.
-      allowedRoles: ['admin', 'super_admin', 'owner', 'factory'],
+      allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'sales'],
     });
 
     // authenticate() already grants success for secret-key (level='secret') access and

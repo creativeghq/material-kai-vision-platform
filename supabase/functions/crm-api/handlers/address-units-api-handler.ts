@@ -76,7 +76,7 @@ export async function handleAddressUnits(req: Request): Promise<Response> {
     // Owner + super_admin included so the primary business persona can manage a party's
     // address sub-units (was ['admin','factory']). Reads now also go via table RLS on the
     // client; this gate still covers writes. Tenant isolation enforced by the scope below.
-    const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner', 'factory'] });
+    const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner', 'supplier', 'architect', 'sales'] });
     if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),

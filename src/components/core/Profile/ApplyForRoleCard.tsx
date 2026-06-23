@@ -60,7 +60,7 @@ export const ApplyForRoleCard: React.FC = () => {
   };
 
   // Hide the card entirely once the user IS a dealer or factory (or higher) — they don't need to apply.
-  if (currentRoleName === 'dealer' || currentRoleName === 'factory' || currentRoleName === 'admin' || currentRoleName === 'super_admin' || currentRoleName === 'owner') {
+  if (currentRoleName === 'supplier' || currentRoleName === 'architect' || currentRoleName === 'admin' || currentRoleName === 'super_admin' || currentRoleName === 'owner') {
     return null;
   }
 
@@ -134,23 +134,23 @@ export const ApplyForRoleCard: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <RoleApplyTile
-              role="dealer"
-              icon={<Briefcase className="h-5 w-5" />}
-              title="Apply as Dealer"
-              description="Manage orders + customer contacts + limited inventory access."
-              pending={pendingForRole('dealer')}
-              rejected={lastRejected('dealer')}
-              onApply={() => openDialog('dealer')}
+              role="supplier"
+              icon={<Factory className="h-5 w-5" />}
+              title="Apply as Supplier"
+              description="Supply catalog, manage materials + inventory, full CRM, and your downstream architects and clients."
+              pending={pendingForRole('supplier')}
+              rejected={lastRejected('supplier')}
+              onApply={() => openDialog('supplier')}
               disabled={!!pendingRequest}
             />
             <RoleApplyTile
-              role="factory"
-              icon={<Factory className="h-5 w-5" />}
-              title="Apply as Factory"
-              description="Create + manage materials, inventory, production reports, full CRM."
-              pending={pendingForRole('factory')}
-              rejected={lastRejected('factory')}
-              onApply={() => openDialog('factory')}
+              role="architect"
+              icon={<Briefcase className="h-5 w-5" />}
+              title="Apply as Architect"
+              description="Sell to your end clients with margin; quotes, projects, moodboards and CRM."
+              pending={pendingForRole('architect')}
+              rejected={lastRejected('architect')}
+              onApply={() => openDialog('architect')}
               disabled={!!pendingRequest}
             />
           </div>
@@ -160,7 +160,7 @@ export const ApplyForRoleCard: React.FC = () => {
       <Dialog open={!!dialogRole} onOpenChange={(open) => !open && setDialogRole(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Apply for {dialogRole === 'factory' ? 'Factory' : 'Dealer'} role</DialogTitle>
+            <DialogTitle>Apply for {dialogRole === 'architect' ? 'Architect' : 'Supplier'} role</DialogTitle>
             <DialogDescription>
               Tell the admin team a bit about your business and why you want to be a {dialogRole}. They will review and reply by email.
             </DialogDescription>
