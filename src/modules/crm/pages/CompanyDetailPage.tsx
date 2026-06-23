@@ -587,7 +587,7 @@ export const CompanyDetailPage: React.FC = () => {
                 <CardTitle>Company Information</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                   <div className="md:col-span-2">
                     <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
                   </div>
@@ -631,6 +631,28 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Address Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Address</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-x-6 gap-y-2">
+                  <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
+                  <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
+                  <InlineText alwaysEdit={isNew} label="State / Province" value={company.state} onSave={(v) => patchInline({ state: v })} placeholder="CA" />
+                  <InlineText alwaysEdit={isNew} label="Postal Code" value={company.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="94102" />
+                  <InlineText alwaysEdit={isNew} label="Country" value={company.country} onSave={(v) => patchInline({ country: v })} placeholder="United States" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
+            <AddressUnitsManager companyId={isNew ? undefined : id} />
+
+            {/* CRM Categories */}
+            {company.id && <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>}
               </div>
 
               {/* RIGHT — detail */}
@@ -729,33 +751,6 @@ export const CompanyDetailPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* CRM Categories */}
-            {company.id && <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>}
-
-            {/* Address + Sub Units side by side. */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            {/* Address Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Address</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                  <div className="md:col-span-2">
-                    <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
-                  </div>
-                  <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
-                  <InlineText alwaysEdit={isNew} label="State / Province" value={company.state} onSave={(v) => patchInline({ state: v })} placeholder="CA" />
-                  <InlineText alwaysEdit={isNew} label="Postal Code" value={company.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="94102" />
-                  <InlineText alwaysEdit={isNew} label="Country" value={company.country} onSave={(v) => patchInline({ country: v })} placeholder="United States" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
-            <AddressUnitsManager companyId={isNew ? undefined : id} />
-            </div>
 
             {/* Pricing + Invoicing & VAT sit side by side — no full-row areas. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">

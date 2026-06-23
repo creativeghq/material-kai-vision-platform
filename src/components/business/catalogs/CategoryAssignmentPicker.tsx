@@ -110,7 +110,10 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Custom</div>
               <div className="flex flex-wrap gap-1.5">
                 {grouped.manual.length === 0 ? (
-                  <div className="text-xs text-muted-foreground">No custom categories yet. Add some at /admin/crm?tab=categories.</div>
+                  <div className="text-xs text-muted-foreground">
+                    No custom categories yet.{' '}
+                    <a href="/admin/crm?tab=categories" className="text-primary hover:underline">Create some →</a>
+                  </div>
                 ) : grouped.manual.map((c) => {
                   const active = memberOf.has(c.id);
                   return (

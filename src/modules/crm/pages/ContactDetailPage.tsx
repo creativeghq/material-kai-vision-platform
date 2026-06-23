@@ -531,8 +531,8 @@ export const ContactDetailPage: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    <div className="md:col-span-2">
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-2">
+                    <div>
                       <InlineText alwaysEdit={isNew} label="Full Name *" value={contact.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Jane Smith" copy={false} />
                     </div>
                     <div className="flex items-end gap-2">
@@ -637,7 +637,7 @@ export const ContactDetailPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                     <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => patchInline({ lead_status: v })} placeholder="Not set" />
                     <LeadFieldSelect alwaysEdit={isNew} kind="lead_source" label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="Not set" />
                     <div>
@@ -663,8 +663,8 @@ export const ContactDetailPage: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    <div className="md:col-span-2">
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-2">
+                    <div>
                       <InlineText alwaysEdit={isNew} label="Street Address" value={contact.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                     </div>
                     <InlineText alwaysEdit={isNew} label="City" value={contact.city} onSave={(v) => patchInline({ city: v })} placeholder="London" />
@@ -713,19 +713,7 @@ export const ContactDetailPage: React.FC = () => {
 
               {/* RIGHT — commercial detail */}
               <div className="space-y-4">
-            {hasCompany ? (
-              <Card>
-                <CardContent className="p-4 text-sm text-muted-foreground flex items-start gap-2">
-                  <Building2 className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>
-                    Pricing, VAT &amp; tax for this contact are managed on{' '}
-                    <button type="button" onClick={() => primaryCompany?.id && navigate(`/admin/crm/companies/${primaryCompany.id}`)} className="text-foreground font-medium hover:underline">
-                      {primaryCompany?.name || 'the business'}
-                    </button>. The contact is billed under the business identity.
-                  </span>
-                </CardContent>
-              </Card>
-            ) : (
+            {!hasCompany && (
               <>
             {/* commercial info (Pricing + Invoicing & VAT) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
