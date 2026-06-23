@@ -62,7 +62,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Network is reached from the workspace switcher ("Manage network"), not the top nav.
   {
     id: 'factory-analytics',
-    label: 'Factory Analytics',
+    label: 'Supplier Analytics',
     path: '/factory-analytics',
     icon: BarChart3,
     requireRole: 'factory',

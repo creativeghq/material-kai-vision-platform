@@ -1197,6 +1197,28 @@ async function executeAgent(
   // Bind tools based on agent configuration with RBAC gating
   const tools: any[] = [];
   const isAdmin = userRole === 'admin' || userRole === 'owner';
+  // Full set of tool IDs THIS agent is permitted to use (pre-toolkit-filter).
+  // Used to clamp in-run toolkit loads to the agent's own capabilities so the
+  // agent can't pull a cluster it doesn't own (e.g. catalogs on interior-designer).
+  const agentFullToolIds = new Set<string>(AGENT_CONFIGS[agentId]?.tools || []);
+
+  // Idempotent merge into the LIVE `tools` array — skips a tool whose name is
+  // already bound, so registerTools can be re-run for in-run toolkit loads
+  // without duplicating instances.
+  const mergeTools = (incoming: any[]) => {
+    for (const t of incoming) {
+      if (t && !tools.some((x: any) => x?.name === t.name)) tools.push(t);
+    }
+  };
+
+  // Build tool instances for a given set of tool IDs. Called at startup with
+  // the full resolved set, and again by the in-run loader (load_toolkit) when
+  // the agent pulls a new toolkit mid-conversation. The body shadows
+  // `config`/`tools` so the entire existing registration logic below is reused
+  // verbatim; the returned array is merged into the live `tools` by the caller.
+  async function registerTools(requestedIds: Set<string>): Promise<any[]> {
+    const config = { tools: [...requestedIds] };
+    const tools: any[] = [];
 
   // Lazy-load ALL tool modules at request time (not boot time).
   // Each module does top-level await for @langchain/core + zod.
@@ -1361,18 +1383,9 @@ async function executeAgent(
   const createPublishCatalogTool = catalogMod?.createPublishCatalogTool;
 
   // --- Toolkit meta-tool: load_toolkit ---
-  // Always-on. Lets the agent dynamically request a toolkit cluster when the
-  // user's request needs tools that aren't currently bound. Two-turn pattern
-  // (load on turn N, use on turn N+1) — the chunk handler on the frontend
-  // updates the user's active toolkit set so the next turn binds the new tools.
-  if (config.tools.includes('load_toolkit')) {
-    try {
-      const { createLoadToolkitTool } = await import('../_shared/tools/toolkit-tools.ts');
-      tools.push(createLoadToolkitTool(isAdmin, onChunk));
-    } catch (loadToolkitErr) {
-      console.warn('⚠️ Could not register load_toolkit tool:', loadToolkitErr);
-    }
-  }
+  // Registered ONCE on the LIVE tool list (outside registerTools) so its in-run
+  // loader appends to the real array, which agentNode re-binds every iteration.
+  // See the applyToolkitInRun + createLoadToolkitTool wiring after registerTools.
 
   // --- Core tools (all users) ---
 
@@ -1768,6 +1781,49 @@ async function executeAgent(
   if (config.tools.includes('estimate_cost')) {
     tools.push(createCostEstimationTool(workspaceId));
   }
+
+    return tools;
+  } // ── end registerTools ──────────────────────────────────────────────────
+
+  // In-run toolkit loader. Invoked by the load_toolkit meta-tool when the agent
+  // needs a cluster that isn't bound yet. Clamps to (toolkit ∩ this agent's
+  // permitted tools), re-runs registerTools, and merges the new instances into
+  // the LIVE `tools` array — which agentNode re-binds every iteration, so the
+  // agent can call the freshly-loaded tool in the SAME turn (no re-send).
+  const applyToolkitInRun = async (
+    toolkitId: string,
+  ): Promise<{ success: boolean; tool_ids?: string[]; toolkit_name?: string; error?: string }> => {
+    const def = (SERVER_TOOLKITS as Record<string, { tool_ids: string[] }>)[toolkitId];
+    if (!def) return { success: false, error: `Unknown toolkit "${toolkitId}".` };
+    // Only bind tools this agent is actually allowed to use.
+    const allowedIds = def.tool_ids.filter((t) => agentFullToolIds.has(t));
+    if (allowedIds.length === 0) {
+      return {
+        success: false,
+        error: `The "${toolkitId}" toolkit isn't available to this agent. Tell the user to switch to the KAI agent to use it.`,
+      };
+    }
+    mergeTools(await registerTools(new Set(allowedIds)));
+    // RBAC (admin-only) gating happens inside registerTools, so a tool may be
+    // requested-but-not-bound for a non-admin — report only what's actually live.
+    const present = allowedIds.filter((id) => tools.some((t: any) => t?.name === id));
+    if (present.length === 0) {
+      return { success: false, error: `Could not load "${toolkitId}" (admin-only or unavailable for your role).` };
+    }
+    return { success: true, tool_ids: present, toolkit_name: toolkitId };
+  };
+
+  // Register load_toolkit ONCE on the live tool list, wired to the in-run loader.
+  try {
+    const { createLoadToolkitTool } = await import('../_shared/tools/toolkit-tools.ts');
+    const loadableToolkitIds = Object.keys(SERVER_TOOLKITS).filter((id) => id !== 'core');
+    tools.push(createLoadToolkitTool(isAdmin, onChunk, applyToolkitInRun, loadableToolkitIds));
+  } catch (loadToolkitErr) {
+    console.warn('⚠️ Could not register load_toolkit tool:', loadToolkitErr);
+  }
+
+  // Startup registration — build the initially-selected toolset on the live list.
+  mergeTools(await registerTools(new Set(config.tools)));
 
   // ─── Direct tool execution (deterministic run — no LLM) ──────────────────
   // When the frontend fires a toolkit quick-start that carries a `run`

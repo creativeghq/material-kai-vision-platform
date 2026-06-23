@@ -143,7 +143,7 @@ const CreateWorkspaceDialog: React.FC<{
               <Select value={type} onValueChange={(v: any) => setType(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="dealer">Dealer / Supplier (can add own products)</SelectItem>
+                  <SelectItem value="dealer">Supplier (can add own products)</SelectItem>
                   <SelectItem value="architect">Architect (catalog only)</SelectItem>
                 </SelectContent>
               </Select>

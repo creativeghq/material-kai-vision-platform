@@ -539,6 +539,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     label: string;
     toolkitId: string;
   } | null>(null);
+  // Toolkit IDs to force-include in the NEXT send's selected_toolkits, regardless
+  // of whether the activeToolkits state update has committed yet. Set by quick-start
+  // launchers (via ensureAgentAndToolkit) so a seeded prompt always sends with its
+  // toolkit bound — closes the setState-vs-setTimeout race. Consumed once by
+  // handleSendMessage. (The server-side in-run loader is the backstop if missed.)
+  const pendingToolkitsRef = useRef<string[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -600,6 +606,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (!owners.includes(selectedAgent)) {
       setSelectedAgent(owners[0]);
     }
+    // Force-include this toolkit in the next send regardless of whether the
+    // activeToolkits state update below has committed by send time.
+    if (!toolkit.alwaysOn && !pendingToolkitsRef.current.includes(toolkit.id)) {
+      pendingToolkitsRef.current.push(toolkit.id);
+    }
     if (!toolkit.alwaysOn && !activeToolkits.includes(toolkit.id)) {
       // setActiveToolkits inline (avoids the not-yet-declared dep on updateActiveToolkits)
       const merged = new Set<string>([...activeToolkits, toolkit.id, ...ALWAYS_ON_TOOLKIT_IDS]);
@@ -643,6 +654,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const handleQuickStart = useCallback((qs: ToolkitQuickStart, tk: ToolkitDefinition, agentId?: string) => {
     const target = agentId || (getToolkitOwnerAgents(tk)[0] ?? selectedAgent);
     if (target && target !== selectedAgent) setSelectedAgent(target);
+
+    // Guarantee the toolkit is bound on the seeded send (switch agent + queue
+    // the toolkit into the next request) — closes the "tools not loaded" race.
+    ensureAgentAndToolkit(tk);
 
     if (qs.form?.length) {
       setToolkitFormState({ quickStart: qs, toolkit: tk });
@@ -690,7 +705,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // attached photo via the verified generate-interior-gemini image-edit path.
     setInput(qs.prompt);
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
-  }, [selectedAgent, fireDirectRun, attachedImages, messages]);
+  }, [selectedAgent, fireDirectRun, attachedImages, messages, ensureAgentAndToolkit]);
 
   // Toolkit setter — writes to local state, persists to localStorage (browser
   // default for new chats), and saves to the current conversation's row when
@@ -1624,6 +1639,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // LLM turn — the same stream pipeline below renders the same result cards.
     const directRun = pendingDirectRunRef.current;
     pendingDirectRunRef.current = null;
+    // Toolkits queued by a quick-start launcher for this send (race-proof).
+    const pendingToolkits = pendingToolkitsRef.current;
+    pendingToolkitsRef.current = [];
 
     if (!directRun && !input.trim() && attachedImages.length === 0) {
       return;
@@ -1786,9 +1804,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // favor of the visual toolkit picker + load_toolkit meta-tool.
           // For a direct run we also force-include the owning toolkit so the server
           // binds the target tool even if the user hasn't pre-enabled that cluster.
-          selected_toolkits: directRun
-            ? Array.from(new Set([...(activeToolkits || []), directRun.toolkitId]))
-            : activeToolkits,
+          // `pendingToolkits` does the same for seeded-prompt quick-starts (race-proof).
+          selected_toolkits: Array.from(new Set([
+            ...(activeToolkits || []),
+            ...pendingToolkits,
+            ...(directRun ? [directRun.toolkitId] : []),
+          ])),
           // Deterministic single-tool run — skips the LLM. RBAC still enforced
           // server-side (admin-only tools never bind for non-admins).
           ...(directRun
@@ -2466,16 +2487,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   });
                 }
               } else if (chunk.type === 'toolkit_loaded') {
-                // The agent called load_toolkit mid-conversation — auto-add
-                // the requested toolkit to the user's active set so the next
-                // turn binds those tools. Persisted to localStorage.
+                // The agent called load_toolkit mid-conversation. The tools are
+                // ALREADY live for this turn (loaded in-run server-side) — there
+                // is no re-send. We only persist the toolkit onto the user's
+                // active set so future turns bind it up-front without a reload.
                 const newToolkitId = chunk.toolkit_id as string;
                 if (newToolkitId && !activeToolkits.includes(newToolkitId)) {
                   updateActiveToolkits([...activeToolkits, newToolkitId]);
-                  toast({
-                    title: `${chunk.toolkit_name || newToolkitId} toolkit loaded`,
-                    description: `${chunk.tool_ids?.length || 0} tools now available — re-send your request to use them.`,
-                  });
                 }
               } else if (chunk.type === 'workflow_plan') {
                 // Boot the tracker. Chunk shape: { run_id, definition_id, title?, subtitle?, metadata?, step_overrides? }

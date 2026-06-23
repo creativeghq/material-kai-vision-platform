@@ -26,7 +26,7 @@ export default function FactoryAnalyticsPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-2">
           <Building2 className="h-10 w-10 text-muted-foreground mx-auto" />
-          <p className="text-muted-foreground">Access restricted to verified factories and admins.</p>
+          <p className="text-muted-foreground">Access restricted to verified suppliers and admins.</p>
         </div>
       </div>
     );
@@ -38,8 +38,8 @@ export default function FactoryAnalyticsPage() {
     <div>
       <PageHeader
         icon={Building2}
-        title="Factory Analytics"
-        subtitle={isAdmin ? 'Full platform + factory analytics view' : 'Your factory performance and market trends'}
+        title="Supplier Analytics"
+        subtitle={isAdmin ? 'Full platform + supplier analytics view' : 'Your supplier performance and market trends'}
       />
       <div className="px-3 sm:px-6 py-4 sm:py-8">
         {factoryClaimedName && (
@@ -57,7 +57,7 @@ export default function FactoryAnalyticsPage() {
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             {isFactory && (
               <TabsTrigger value="my-factory" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />My Factory
+                <Building2 className="h-4 w-4" />My Business
               </TabsTrigger>
             )}
             <TabsTrigger value="market-trends" className="flex items-center gap-2">
