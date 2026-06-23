@@ -22,7 +22,6 @@ import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
-import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
 import { CrmActivityTimeline } from '@/components/business/crm/CrmActivityTimeline';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
@@ -868,12 +867,10 @@ export const ContactDetailPage: React.FC = () => {
               )}
             </div>
 
-            {/* CRM Categories on top, then Notes + Activity inline (no separate tab). */}
+            {/* CRM Categories, then the unified Activity feed (notes live here too —
+                added via the "Add note" button, no separate Notes tab). */}
             {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-              <CrmNotesTimeline targetKind="contact" targetId={contact.id || null} />
-              {contact.id && <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} />}
-            </div>
+            {contact.id && <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} />}
           </TabsContent>
 
 
