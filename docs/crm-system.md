@@ -6,9 +6,16 @@ Customer Relationship Management — contacts, companies, and user account manag
 
 ## Overview
 
-The CRM provides workspace admins with a unified view of contacts, companies, and platform users. It integrates with the messaging system (SMS/email campaigns) and quotes system.
+The CRM provides workspace admins with a unified view of contacts, companies, and platform users. It integrates with the messaging system (SMS/email campaigns), the quotes system, and the [Finance / Orders](orders-system.md) layer.
 
 **Admin Route:** `/admin/crm`
+
+### Finance / Orders integration
+- **Company page tabs:** **Account** (balance + ledger) and **Orders** (the company's orders; quotes/invoices/payments are now viewed *inside* each order, not as separate tabs). The net figure is labelled **"Account balance (they owe us / we owe them / settled)"**.
+- **Business-contact rollup:** a quote/invoice for a contact who belongs to a business is attributed to the **company** (quotes enforce an at-most-one-party constraint, so the contact is dropped on a quote; invoices keep both with company precedence). Linking a contact to a company re-points their existing contact-level quotes/invoices to it.
+- **Parties (Finance):** contacts that belong to a business are **hidden** from the Customers & Suppliers list — the business represents them.
+- **Contacts list:** the company column shows the **attached business** (via the `crm_company_contacts` junction), not only the legacy free-text field.
+- **Company role:** Customer / Supplier are **editable checkboxes** (a company can be both); set at creation, adjustable on the company page.
 
 **Edge Function:** `crm-api` — a single router with resource handlers (the former separate `crm-*-api` functions were consolidated):
 - `companies` — Company records, contact associations

@@ -17,6 +17,7 @@ The Quotes System is a comprehensive quote management platform that allows users
 ✅ **Upsells/Extras** - Admin-managed upsell items with customer acceptance tracking
 ✅ **Project Timeline** - Track project progress through predefined timeline steps
 ✅ **Quote Acceptance** - Customer quote acceptance with validation workflow
+✅ **Accepted → Order + Pre-invoice** - Accepting a quote auto-creates a sales [Order](orders-system.md) (from the quote items) and a draft **pre-invoice**, via the `generate_order_from_quote` trigger (any acceptance path; idempotent)
 ✅ **Admin Management** - Comprehensive admin interface for quote management
 
 ## Database Schema

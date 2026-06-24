@@ -5,12 +5,13 @@
 
 The finance module is the platform's multi-tenant accounting and e-invoicing layer for Greek businesses. It issues legally-compliant documents to **AADE/myDATA** through the **Novus** provider connector, tracks AR/AP, and produces the reports a Greek business needs for VAT filing and bookkeeping. It replaced a removed legacy third-party ERP connector (see [§10](#10-removed-the-legacy-erp-connector)).
 
-Related docs: [POS / Retail](pos-retail-system.md) · [Online Storefront](online-storefront.md) · [Capabilities & Tenancy](capabilities-and-tenancy.md) · [Warehouse & Billing](warehouse-and-billing.md) · [Finance API reference](api/finance-api.md) · [myAADE module](../src/modules/myaade/README.md).
+Related docs: [Orders](orders-system.md) · [POS / Retail](pos-retail-system.md) · [Online Storefront](online-storefront.md) · [Capabilities & Tenancy](capabilities-and-tenancy.md) · [Warehouse & Billing](warehouse-and-billing.md) · [Finance API reference](api/finance-api.md) · [myAADE module](../src/modules/myaade/README.md).
 
 ---
 
 ## 1. What the module covers
 
+- **Orders** ([orders-system.md](orders-system.md)) — sales & purchase orders are the commercial hub that quotes, invoices, payments/receipts, dispatch, products and **profit** attach to. An accepted quote auto-creates an order + a draft **pre-invoice**; a POS sale auto-creates a fulfilled/paid order. Orders are the first **Documents** tab and replace the per-doc tabs on the CRM company page.
 - **Outbound documents** — sales invoices (`1.x`), service invoices (`2.x`), retail receipts (`11.x`, see [POS](pos-retail-system.md)), delivery/dispatch notes (`9.3`), and customer credit notes (`5.1`/`5.2`). All submitted to AADE/myDATA via the Novus connector.
 - **Inbound documents** — pulls bills that suppliers transmitted to AADE citing this workspace's VAT (`RequestDocs`) into `inbound_documents`; convert to `supplier_bills` and/or receive into warehouse stock.
 - **AP side** — supplier bills, supplier credit notes, planned payments, payment allocation.

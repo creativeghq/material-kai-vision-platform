@@ -18,6 +18,8 @@ The POS is deliberately minimal: no customer record required, software-tracked c
 
 A receipt cannot be issued until a shift is open (`PosPage.issue()` blocks with "Open a shift first").
 
+Every POS sale also becomes a [sales **Order**](orders-system.md): `finalizeSale` calls `generate_order_from_invoice(invoice_id, mark_delivered=true)`, creating a fulfilled/paid/delivered order from the receipt + its items (best-effort, idempotent).
+
 ---
 
 ## 2. Cloud vPOS shifts
