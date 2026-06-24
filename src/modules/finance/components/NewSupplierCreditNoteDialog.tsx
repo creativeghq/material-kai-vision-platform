@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, VAT_CATEGORIES, type SupplierBill } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { useSessionDraft } from '@/hooks/useSessionDraft';
 
 type Supplier = { type: 'company' | 'contact'; id: string; label: string };
 interface Line { id: string; description: string; qty: string; unitPrice: string; vatCode: string; }
@@ -51,15 +52,33 @@ export const NewSupplierCreditNoteDialog: React.FC<{
   const [markPaid, setMarkPaid] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
+  const clearDraft = useSessionDraft(
+    `fin-supplier-credit-note:${workspaceId}:${supplierBillId ?? 'standalone'}`,
+    open,
+    { billId, categoryId, supplier, issueDate, lines, reason, externalMark, markPaid },
+    (d) => {
+      setBillId(d?.billId ?? (supplierBillId ?? ''));
+      setCategoryId(d?.categoryId ?? '');
+      setSupplier(d?.supplier ?? null);
+      setSupSearch('');
+      setIssueDate(d?.issueDate ?? new Date().toISOString().slice(0, 10));
+      setLines(d?.lines ?? [newLine()]);
+      setReason(d?.reason ?? '');
+      setExternalMark(d?.externalMark ?? '');
+      setMarkPaid(d?.markPaid ?? false);
+    },
+  );
+
+  // Load the supplier-bill + category lists when the dialog opens (billId itself is
+  // restored above, so the loader no longer overrides it).
   useEffect(() => {
     if (!open) return;
-    setReason(''); setExternalMark(''); setMarkPaid(false); setLines([newLine()]); setSupplier(null); setSupSearch(''); setCategoryId('');
-    setIssueDate(new Date().toISOString().slice(0, 10));
     financeService.listSupplierBills({ workspaceId, status: ['received', 'partially_paid', 'paid', 'overdue', 'disputed'] })
-      .then((rows) => { setBills(rows); setBillId(supplierBillId ?? ''); })
+      .then(setBills)
       .catch(() => setBills([]));
     financeCategoriesService.list(workspaceId).then((c) => setCategories(c.filter((x) => x.kind === 'expense' || x.kind === 'both'))).catch(() => setCategories([]));
-  }, [open, workspaceId, supplierBillId]);
+  }, [open, workspaceId]);
 
   // supplier search (standalone mode — only when no bill linked)
   useEffect(() => {
@@ -131,6 +150,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
         lines: computed.payloadLines,
       });
       toast({ title: 'Supplier credit note recorded', description: billId ? 'Payable reduced.' : 'Standalone note recorded.' });
+      clearDraft();
       onCreated(); onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -250,7 +270,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={() => { clearDraft(); onOpenChange(false); }} disabled={busy}>Cancel</Button>
           <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Record · {formatMoney(computed.total, currency)}</Button>
         </DialogFooter>
       </DialogContent>

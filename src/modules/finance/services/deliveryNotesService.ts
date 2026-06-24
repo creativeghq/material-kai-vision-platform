@@ -4,6 +4,7 @@
  * transmitted to myDATA as a 9.3 movement document via `submitFiscal()`.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 
 export interface DeliveryNote {
   id: string;
@@ -170,7 +171,7 @@ export const deliveryNotesService = {
     const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
       body: { delivery_note_id: id, submit_fiscal: true },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     if (data && data.ok === false) throw new Error(data.error || 'myDATA transmission failed');
     return data;
   },

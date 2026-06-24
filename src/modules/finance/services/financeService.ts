@@ -10,6 +10,7 @@
 //   - The cost-snapshot rule from PR-A is honored end-to-end
 
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 import { flowEventService } from '@/services/flows/flowEventService';
 
 // ─── Finance flow events (fire-and-forget) ───────────────────────────────────
@@ -599,7 +600,7 @@ const _financeServiceCore = {
         issue_now: opts.issueNow === true,
       },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data as { invoice_id: string; invoice: Invoice | null };
   },
 
@@ -1324,7 +1325,7 @@ const _financeServiceCore = {
     const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
       body: { credit_note_id: creditNoteId, submit_fiscal: true },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data;
   },
 
@@ -2144,7 +2145,7 @@ const _financeServiceV2 = {
         cancel_url: opts.cancelUrl,
       },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     if ((data as any)?.error) throw new Error((data as any).error);
     return data as any;
   },
@@ -2167,7 +2168,7 @@ const _financeServiceV2 = {
         cancel_url: opts.cancelUrl,
       },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data as any;
   },
 
@@ -2186,7 +2187,7 @@ const _financeServiceV2 = {
     const { data, error } = await supabase.functions.invoke('finance-digest-aggregate', {
       body: { mode: 'now', workspace_id: opts.workspaceId, recipients_override: opts.recipientsOverride },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data as any;
   },
 
@@ -2222,7 +2223,7 @@ const _financeServiceV2 = {
         cancel_url: opts.cancelUrl,
       },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data as any;
   },
 };

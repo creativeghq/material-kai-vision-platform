@@ -21,6 +21,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import { SEOResearchCard } from '@/components/features/ai/SEOResearchCard';
 import { SEOGenericCard } from '@/components/features/ai/SEOGenericCard';
 import { listResearchRuns, persistResearchRun, type SeoResearchRun } from '@/services/seoToolkitApi';
@@ -134,7 +135,7 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
             },
           },
         });
-        if (inv.error) throw new Error(inv.error.message || 'edge fn failed');
+        if (inv.error) throw new Error(await edgeErrorMessage(inv.error, 'edge fn failed'));
         await persistResearchRun({
           kind: 'keyword_research',
           subject: targetKeyword,

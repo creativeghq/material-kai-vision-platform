@@ -13,6 +13,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 import {
   Table,
   TableBody,
@@ -212,7 +213,7 @@ export const PushNotificationsTab: React.FC = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) throw await edgeError(error);
 
       toast({
         title: 'Test Notification Sent',

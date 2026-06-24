@@ -9,6 +9,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, MessageSquare, Pencil, Tag, History, Info } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -107,7 +108,11 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
   const sendEmail = async () => {
     try {
       const { data, error } = await financeService.sendInvoiceEmail(invoiceId);
-      if (error || data?.ok === false) { toast({ title: 'Email not sent', description: data?.error ?? error?.message, variant: 'destructive' }); return; }
+      if (error || data?.ok === false) {
+        const description = data?.error ?? (error ? await edgeErrorMessage(error) : 'Email not sent');
+        toast({ title: 'Email not sent', description, variant: 'destructive' });
+        return;
+      }
       toast({ title: 'Email sent', description: `To ${data?.sent_to}` });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });

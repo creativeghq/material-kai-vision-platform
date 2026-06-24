@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 import type { MessagingCampaignRecipient, MessagingCampaignStats, MessagingChannelType } from './types';
 
 export interface MessagingCampaign {
@@ -212,7 +213,7 @@ class MessagingCampaignService {
       },
     });
 
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data;
   }
 

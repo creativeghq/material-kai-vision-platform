@@ -58,6 +58,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import { XMLProductPreviewModal } from './XMLProductPreviewModal';
 
 interface DetectedField {
@@ -377,7 +378,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         },
       );
 
-      if (functionError) throw new Error(functionError.message);
+      if (functionError) throw new Error(await edgeErrorMessage(functionError, 'Failed to generate preview'));
       if (!data?.success) throw new Error(data?.error || 'Failed to generate preview');
 
       setPreviewProduct(data.preview_product);
@@ -438,7 +439,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         },
       );
 
-      if (functionError) throw new Error(functionError.message);
+      if (functionError) throw new Error(await edgeErrorMessage(functionError, 'Import failed'));
       if (!data?.success) throw new Error(data?.error || 'Import failed');
 
       const jobId = data.job_id || data.data_import_job_id;

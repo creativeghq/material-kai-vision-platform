@@ -9,6 +9,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { edgeError } from '@/utils/edgeError';
 
 interface ModelPricing {
   id: string;
@@ -204,7 +205,7 @@ export const AIModelPricingTab: React.FC = () => {
         body: { force_update: forceAll },
       });
 
-      if (error) throw error;
+      if (error) throw await edgeError(error);
 
       const result = data;
       if (result.success) {

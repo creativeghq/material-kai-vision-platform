@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import type {
   MessagingChannel,
   MessagingTemplate,
@@ -37,8 +38,7 @@ export class MessagingService {
 
       if (error) {
         console.error('Edge function error:', error);
-        const errorMessage = error.message || 'Failed to send message';
-        throw new Error(errorMessage);
+        throw new Error(await edgeErrorMessage(error, 'Failed to send message'));
       }
 
       if (!data || !data.messageId) {
@@ -73,7 +73,7 @@ export class MessagingService {
 
       if (error) {
         console.error('Edge function error:', error);
-        throw new Error(error.message || 'Failed to send bulk messages');
+        throw new Error(await edgeErrorMessage(error, 'Failed to send bulk messages'));
       }
 
       return data;
@@ -391,7 +391,7 @@ export class MessagingService {
     const { data, error } = await supabase.functions.invoke('messaging-api', {
       body: { action: 'connect-whatsapp', ...options },
     });
-    if (error) throw new Error(error.message || 'Failed to connect WhatsApp');
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to connect WhatsApp'));
     if (data?.error) throw new Error(data.error);
     return data;
   }

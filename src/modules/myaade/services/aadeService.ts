@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 
 export interface AadeBasicRec {
   afm: string | null;
@@ -69,7 +70,7 @@ export const aadeService = {
         workspace_id: args.workspaceId,
       },
     });
-    if (error) return { error: error.message };
+    if (error) return { error: await edgeErrorMessage(error) };
     if (data?.error) return data as AadeLookupError;
     return data as AadeLookupResult;
   },

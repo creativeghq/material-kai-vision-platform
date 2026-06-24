@@ -38,6 +38,7 @@ import { Separator } from '@/components/core/ui/separator';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { edgeError } from '@/utils/edgeError';
 import { supabase } from '@/integrations/supabase/client';
 
 type LookupMode = 'ai' | 'quick';
@@ -216,7 +217,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
           },
         },
       });
-      if (error) throw error;
+      if (error) throw await edgeError(error);
 
       // The gateway forwards the MIVAA response as-is under data.data (or directly).
       const payload = (data?.data ?? data) as any;

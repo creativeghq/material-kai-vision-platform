@@ -7,6 +7,7 @@ import { Label } from '@/components/core/ui/label';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 import { useShowPrices } from '@/hooks/useShowPrices';
 
 interface PublicMeta {
@@ -70,7 +71,7 @@ export const PublicCatalogPage: React.FC = () => {
 
   const callAccess = useCallback(async (body: any) => {
     const { data, error } = await supabase.functions.invoke('catalog-access', { body });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data;
   }, []);
 

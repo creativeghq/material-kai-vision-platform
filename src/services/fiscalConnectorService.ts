@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 
 // Client for the fiscal connector abstraction (e-Invoicing).
 // Master-key model: the Novus key is configured ONCE on the root (operator)
@@ -79,7 +80,7 @@ export const fiscalConnectorService = {
     const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
       body: { fiscal_status: { workspace_id: workspaceId } },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data;
   },
 
@@ -145,7 +146,7 @@ export const fiscalConnectorService = {
         pos_payment: opts?.posPayment,
       },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data;
   },
 
@@ -157,7 +158,7 @@ export const fiscalConnectorService = {
     const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
       body: { pos_complete: input },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data;
   },
 };

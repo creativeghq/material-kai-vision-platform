@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { validateVatViaVies } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
+import { useSessionDraft } from '@/hooks/useSessionDraft';
 
 type Role = 'customer' | 'supplier';
 
@@ -84,6 +85,23 @@ export const AddCompanyModal: React.FC<{
   // Prefill accumulated from a VAT lookup (carried into the create form).
   const [prefill, setPrefill] = useState<Record<string, any>>({});
   const [verified, setVerified] = useState<null | { name: string | null; address: string | null; source: 'aade' | 'vies' }>(null);
+
+  // Draft persistence — a half-filled "add company" survives navigating away +
+  // reopening; cleared once you continue to the create form.
+  const clearDraft = useSessionDraft(
+    'crm-add-company',
+    open,
+    { step, role, name, countryCode, vatNumber, prefill, verified },
+    (d) => {
+      setStep(d?.step ?? 'role');
+      setRole(d?.role ?? null);
+      setName(d?.name ?? '');
+      setCountryCode(d?.countryCode ?? 'EL');
+      setVatNumber(d?.vatNumber ?? '');
+      setPrefill(d?.prefill ?? {});
+      setVerified(d?.verified ?? null);
+    },
+  );
 
   const reset = () => {
     setStep('role'); setRole(null); setName(''); setCountryCode('EL'); setVatNumber('');
@@ -175,6 +193,7 @@ export const AddCompanyModal: React.FC<{
       is_customer: role === 'customer',
     };
     onOpenChange(false);
+    clearDraft();
     reset();
     navigate('/admin/crm/companies/new', { state: { prefill: finalPrefill } });
   };

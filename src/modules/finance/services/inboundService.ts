@@ -4,6 +4,7 @@
  * client reads what's been pulled and turns a doc into a supplier bill / warehouse intake.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 
 export interface InboundDocLine {
   line_number: number | null;
@@ -52,7 +53,7 @@ export const inboundService = {
   /** Manually trigger the myDATA RequestDocs pull (finance-manager). */
   async syncNow(): Promise<any> {
     const { data, error } = await supabase.functions.invoke('finance-inbound-sync', { body: {} });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data;
   },
 

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 
 export interface PDFGenerationResult {
   success: boolean;
@@ -25,7 +26,7 @@ class QuotePDFService {
     });
 
     if (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: await edgeErrorMessage(error) };
     }
 
     return data as PDFGenerationResult;

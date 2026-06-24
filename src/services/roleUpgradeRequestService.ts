@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 
 export type RoleUpgradeRequestedRole = 'supplier' | 'architect';
 export type RoleUpgradeStatus = 'pending' | 'approved' | 'rejected';
@@ -69,7 +70,7 @@ export async function submitRoleUpgradeRequest(args: {
   const { data, error } = await supabase.functions.invoke('role-upgrade-requests', {
     body: { action: 'submit', requested_role: args.requestedRole, justification: args.justification ?? '' },
   });
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: await edgeErrorMessage(error) };
   if (data?.success) return { success: true, request_id: data.request_id };
   return { success: false, error: data?.error || 'submit_failed', message: data?.message };
 }

@@ -47,6 +47,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError, edgeErrorMessage } from '@/utils/edgeError';
 import {
   KbFilterModal,
   EMPTY_KB_FILTERS,
@@ -406,7 +407,11 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         body: { doc_id: doc.id },
       });
       if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || 'Unknown error');
+        throw new Error(
+          error
+            ? await edgeErrorMessage(error, data?.error || 'Unknown error')
+            : data?.error || 'Unknown error',
+        );
       }
       await loadDocuments();
       toast({ title: 'Embedding generated', description: `${data.dimensions}D vector saved successfully.` });
@@ -447,7 +452,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
       const { data, error } = await supabase.functions.invoke('kb-embedding-backfill', {
         body: { workspace_id: workspaceId, limit: 25 },
       });
-      if (error) throw error;
+      if (error) throw await edgeError(error);
       toast({
         title: 'Embedding backfill ran',
         description: `Embedded ${data?.succeeded ?? 0} doc(s)${data?.failed ? `, ${data.failed} failed` : ''}. ${data?.remaining ?? 0} remaining (the drain cron handles the rest).`,

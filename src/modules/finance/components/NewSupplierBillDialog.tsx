@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService } from '@/modules/finance/services/financeService';
+import { useSessionDraft } from '@/hooks/useSessionDraft';
 
 interface Supplier {
   type: 'contact' | 'company';
@@ -48,18 +49,23 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
   const [dueAt, setDueAt] = useState<string>('');
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    if (!open) return;
-    setSupplier(null);
-    setSupplierSearch('');
-    setSupplierBillNumber('');
-    setCurrency('EUR');
-    setSubtotalNet('0');
-    setVatAmount('0');
-    setIssuedAt(new Date().toISOString().slice(0, 10));
-    setDueAt('');
-    setNotes('');
-  }, [open]);
+  // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
+  const clearDraft = useSessionDraft(
+    `fin-supplier-bill:${workspaceId}`,
+    open,
+    { supplier, supplierBillNumber, currency, subtotalNet, vatAmount, issuedAt, dueAt, notes },
+    (d) => {
+      setSupplier(d?.supplier ?? null);
+      setSupplierSearch('');
+      setSupplierBillNumber(d?.supplierBillNumber ?? '');
+      setCurrency(d?.currency ?? 'EUR');
+      setSubtotalNet(d?.subtotalNet ?? '0');
+      setVatAmount(d?.vatAmount ?? '0');
+      setIssuedAt(d?.issuedAt ?? new Date().toISOString().slice(0, 10));
+      setDueAt(d?.dueAt ?? '');
+      setNotes(d?.notes ?? '');
+    },
+  );
 
   // Search across is_supplier=true rows only
   useEffect(() => {
@@ -132,6 +138,7 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
         notes: notes || undefined,
       });
       toast({ title: 'Supplier bill recorded' });
+      clearDraft();
       onCreated();
     } catch (err: any) {
       toast({ title: 'Failed', description: err.message ?? 'Error', variant: 'destructive' });
@@ -243,7 +250,7 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={() => { clearDraft(); onOpenChange(false); }} disabled={busy}>Cancel</Button>
           <Button onClick={handleSave} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Record bill'}
           </Button>

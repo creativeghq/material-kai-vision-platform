@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 
 // Types
 export interface EmailDomain {
@@ -149,7 +150,7 @@ export class EmailService {
       body: { action: 'add-domain', domain },
     });
 
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data;
   }
 
@@ -161,7 +162,7 @@ export class EmailService {
       body: { action: 'mark-domain-verified', domain },
     });
 
-    if (error) throw error;
+    if (error) throw await edgeError(error);
   }
 
   /**
@@ -172,7 +173,7 @@ export class EmailService {
       body: { action: 'sync-domains' },
     });
 
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     if (!data?.success) throw new Error(data?.error || 'Failed to sync domains');
     return data;
   }

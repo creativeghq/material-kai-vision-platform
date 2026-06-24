@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 import { useToast } from '@/hooks/use-toast';
 import ScheduleImportModal from './ScheduleImportModal';
 import { XMLImportJobCard, XMLImportJob } from './XMLImportJobCard';
@@ -199,7 +200,7 @@ const ImportHistoryTab: React.FC = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) throw await edgeError(error);
 
       if (!data.success) {
         throw new Error(data.error || 'Re-run failed');

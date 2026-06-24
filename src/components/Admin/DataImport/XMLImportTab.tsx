@@ -20,6 +20,7 @@ import {
 } from '@/components/core/ui/select';
 import { Label } from '@/components/core/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import XMLFieldMappingModal from './XMLFieldMappingModal';
 import { logger } from '@/services/logger.service';
 
@@ -181,7 +182,7 @@ const XMLImportTab: React.FC = () => {
       );
 
       if (functionError) {
-        throw new Error(functionError.message);
+        throw new Error(await edgeErrorMessage(functionError, 'Failed to detect fields'));
       }
 
       if (!data.success) {

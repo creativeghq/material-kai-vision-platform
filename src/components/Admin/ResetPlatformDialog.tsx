@@ -14,6 +14,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 
 interface ResetPlatformDialogProps {
   trigger?: React.ReactNode;
@@ -43,7 +44,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
         body: { confirm: true },
       });
 
-      if (error) throw error;
+      if (error) throw await edgeError(error);
 
       toast({
         title: 'Platform Reset Complete',

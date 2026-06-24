@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Loader2, RefreshCw, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -88,7 +89,7 @@ export function StorageAuditPanel() {
           body: { dry_run: dryRun, source: 'admin' },
         },
       );
-      if (error) throw error;
+      if (error) throw await edgeError(error);
       const resp = data as CleanupResponse | null;
       if (!resp?.success) throw new Error(resp?.error ?? 'Cleanup failed');
       setLastRun(resp.stats ?? null);

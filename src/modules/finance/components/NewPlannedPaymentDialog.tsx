@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   financeService, type PlannedPaymentCategory, type PlannedPaymentDirection,
 } from '@/modules/finance/services/financeService';
+import { useSessionDraft } from '@/hooks/useSessionDraft';
 
 interface Party { type: 'company' | 'contact'; id: string; label: string }
 
@@ -55,19 +56,24 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
   const [partySearch, setPartySearch] = useState('');
   const [partyOptions, setPartyOptions] = useState<Party[]>([]);
 
-  useEffect(() => {
-    if (!open) return;
-    setDirection(defaultDirection);
-    setTitle('');
-    setAmount('0');
-    setCurrency('EUR');
-    setScheduledFor(new Date().toISOString().slice(0, 10));
-    setCategory(defaultDirection === 'in' ? 'expected_receipt' : 'supplier_bill');
-    setReminderAt('');
-    setNotes('');
-    setParty(null);
-    setPartySearch('');
-  }, [open, defaultDirection]);
+  // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
+  const clearDraft = useSessionDraft(
+    `fin-planned-payment:${workspaceId}:${defaultDirection}`,
+    open,
+    { direction, title, amount, currency, scheduledFor, category, reminderAt, notes, party },
+    (d) => {
+      setDirection(d?.direction ?? defaultDirection);
+      setTitle(d?.title ?? '');
+      setAmount(d?.amount ?? '0');
+      setCurrency(d?.currency ?? 'EUR');
+      setScheduledFor(d?.scheduledFor ?? new Date().toISOString().slice(0, 10));
+      setCategory(d?.category ?? (defaultDirection === 'in' ? 'expected_receipt' : 'supplier_bill'));
+      setReminderAt(d?.reminderAt ?? '');
+      setNotes(d?.notes ?? '');
+      setParty(d?.party ?? null);
+      setPartySearch('');
+    },
+  );
 
   // Search across CRM
   useEffect(() => {
@@ -121,6 +127,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
         reminderAt: reminderAt || null,
       });
       toast({ title: 'Planned payment added' });
+      clearDraft();
       onCreated();
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
@@ -224,7 +231,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={() => { clearDraft(); onOpenChange(false); }} disabled={busy}>Cancel</Button>
           <Button onClick={handleSave} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Schedule'}
           </Button>

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 
 export interface PlatformSecretView {
   key: string;
@@ -68,7 +69,7 @@ class PlatformSecretsService {
   private async invoke<T = Record<string, unknown>>(body: Record<string, unknown>): Promise<T> {
     const { data, error } = await supabase.functions.invoke('platform-secrets-admin', { body });
     if (error) {
-      const msg = (data as { error?: string } | null)?.error ?? error.message;
+      const msg = (data as { error?: string } | null)?.error ?? await edgeErrorMessage(error);
       throw new Error(msg);
     }
     if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);

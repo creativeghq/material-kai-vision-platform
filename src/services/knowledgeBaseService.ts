@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError, edgeErrorMessage } from '@/utils/edgeError';
 
 /** A single authored FAQ entry, rendered at the bottom of an article and
  *  emitted as schema.org FAQPage structured data. Stored on metadata.faq. */
@@ -111,7 +112,7 @@ export async function parseSupplierCostListDoc(
   const { data, error } = await supabase.functions.invoke('parse-supplier-cost-list', {
     body: { kb_doc_id: kbDocId, dry_run: options.dryRun === true },
   });
-  if (error) throw error;
+  if (error) throw await edgeError(error);
   return data as ParseSupplierCostListResult;
 }
 
@@ -164,7 +165,7 @@ export class KnowledgeBaseService {
     });
 
     if (error) {
-      throw new Error(error.message || 'Gateway request failed');
+      throw new Error(await edgeErrorMessage(error, 'Gateway request failed'));
     }
 
     if (!data.success) {

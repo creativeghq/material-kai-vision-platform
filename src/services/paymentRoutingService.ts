@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 
 export interface PaymentConfig {
   payout_mode: 'platform' | 'connect';
@@ -21,7 +22,7 @@ export const paymentRoutingService = {
     const { data, error } = await supabase.functions.invoke('stripe-connect', {
       body: { action: 'onboard', workspace_id: workspaceId, return_url: returnUrl },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data as { url: string };
   },
 
@@ -29,7 +30,7 @@ export const paymentRoutingService = {
     const { data, error } = await supabase.functions.invoke('stripe-connect', {
       body: { action: 'status', workspace_id: workspaceId },
     });
-    if (error) throw error;
+    if (error) throw await edgeError(error);
     return data as any;
   },
 };
