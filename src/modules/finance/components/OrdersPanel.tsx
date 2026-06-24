@@ -168,14 +168,31 @@ const NewOrderModal: React.FC<{
   // Per-line product lookup — the Description field IS a catalog search.
   const [activeLine, setActiveLine] = useState<number | null>(null);
   const [lineProdOpts, setLineProdOpts] = useState<Array<{ id: string; name: string }>>([]);
+  const [project, setProject] = useState<{ id: string; name: string } | null>(null);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [projectOpts, setProjectOpts] = useState<Array<{ id: string; name: string }>>([]);
+  const [currency, setCurrency] = useState('EUR');
 
   const isSales = preset.orderType === 'sales';
 
   useEffect(() => {
     if (!open) return;
     setParty(null); setPartySearch(''); setPartyOpts([]); setActiveLine(null); setLineProdOpts([]);
+    setProject(null); setProjectSearch(''); setProjectOpts([]); setCurrency('EUR');
     setItems([blankLine()]);
   }, [open]);
+
+  // Project search (optional link — workspace-scoped).
+  useEffect(() => {
+    if (!open) return;
+    const term = projectSearch.trim();
+    if (term.length < 2) { setProjectOpts([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await supabase.from('projects').select('id, name').eq('workspace_id', workspaceId).ilike('name', `%${term}%`).limit(8);
+      setProjectOpts((data ?? []) as Array<{ id: string; name: string }>);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [projectSearch, open, workspaceId]);
 
   // CRM party search — by name, VAT, or email (companies + contacts).
   useEffect(() => {
@@ -244,6 +261,8 @@ const NewOrderModal: React.FC<{
         workspaceId,
         orderType: preset.orderType,
         status: preset.preOrder ? 'draft' : 'confirmed',
+        currency,
+        projectId: project?.id ?? null,
         customerCompanyId: isSales ? coId : null,
         customerContactId: isSales ? ctId : null,
         supplierCompanyId: !isSales ? coId : null,
@@ -294,6 +313,41 @@ const NewOrderModal: React.FC<{
                 )}
               </div>
             )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Project (optional)</Label>
+              {project ? (
+                <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
+                  <span className="text-sm">{project.name}</span>
+                  <Button size="sm" variant="ghost" onClick={() => setProject(null)}>Change</Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input className="pl-7" placeholder="Link a project…" value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
+                  {projectOpts.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
+                      {projectOpts.map((o) => (
+                        <button key={o.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setProject(o); setProjectSearch(''); setProjectOpts([]); }}>{o.name}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label>Currency</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="GBP">GBP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-1">
