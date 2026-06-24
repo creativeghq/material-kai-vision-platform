@@ -468,7 +468,7 @@ const FinancePage: React.FC = () => {
               )}
             </div>
 
-            <BucketCards buckets={arBuckets} active={arBucket} onPick={setArBucket} noun="invoice(s)" />
+            <BucketCards buckets={arBuckets} active={arBucket} onPick={setArBucket} noun="receivable(s)" />
             <AgingFilterBar
               query={arQuery} setQuery={setArQuery} cat={arCat} setCat={setArCat}
               bucket={arBucket} setBucket={setArBucket} categories={incomeCats}
