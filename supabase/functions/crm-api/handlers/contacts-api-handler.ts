@@ -166,7 +166,18 @@ export async function handleContacts(req: Request): Promise<Response> {
 
       let listQuery = supabase
         .from('crm_contacts')
-        .select('*')
+        .select(`
+          *,
+          crm_company_contacts(
+            id,
+            company_id,
+            is_primary,
+            crm_companies(
+              id,
+              name
+            )
+          )
+        `)
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
       if (!scope.isGlobalOperator) {
@@ -181,8 +192,27 @@ export async function handleContacts(req: Request): Promise<Response> {
         );
       }
 
+      // Flatten each contact's company attachments into a `companies` array (same
+      // shape as the single-contact GET) so the list can show the attached business
+      // instead of only the legacy free-text `company` column.
+      const rows = (data ?? []).map((row) => {
+        const attachments = (row as { crm_company_contacts?: Array<{
+          id: string; company_id: string; is_primary: boolean;
+          crm_companies?: { id: string; name: string } | null;
+        }> }).crm_company_contacts ?? [];
+        const companies = attachments.map((a) => ({
+          relationship_id: a.id,
+          company_id: a.company_id,
+          company_name: a.crm_companies?.name ?? null,
+          is_primary: a.is_primary,
+        }));
+        delete (row as { crm_company_contacts?: unknown }).crm_company_contacts;
+        (row as { companies?: unknown }).companies = companies;
+        return row;
+      });
+
       return new Response(
-        JSON.stringify({ data, count: data?.length || 0 }),
+        JSON.stringify({ data: rows, count: rows.length }),
         { status: 200, headers: corsHeaders },
       );
     }

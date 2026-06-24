@@ -58,6 +58,8 @@ interface Contact {
   email?: string;
   phone?: string;
   company?: string;
+  /** Attached businesses via the crm_company_contacts junction (flattened by the API). */
+  companies?: Array<{ company_id: string; company_name: string | null; is_primary?: boolean }>;
   profession?: string;
   status?: string;
   is_client?: boolean;
@@ -220,11 +222,19 @@ export const CRMManagement: React.FC = () => {
     (userF.profession === ANY || u.professional_type === userF.profession),
   ), [users, q, userF]);
 
+  // The attached business: prefer the primary junction company, then any junction
+  // company, falling back to the legacy free-text `company` field.
+  const contactCompanyName = (c: Contact): string => {
+    const list = c.companies ?? [];
+    const primary = list.find((x) => x.is_primary) ?? list[0];
+    return primary?.company_name ?? c.company ?? '';
+  };
+
   const filteredContacts = useMemo(() => contacts.filter((c) =>
-    (c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.company?.toLowerCase().includes(q)) &&
+    (c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || contactCompanyName(c).toLowerCase().includes(q)) &&
     (contactF.profession === ANY || c.profession === contactF.profession) &&
     (contactF.status === ANY || c.status === contactF.status) &&
-    (contactF.company === ANY || c.company === contactF.company) &&
+    (contactF.company === ANY || contactCompanyName(c) === contactF.company) &&
     (contactF.clientSupplier === ANY ||
       (contactF.clientSupplier === 'client' && c.is_client) ||
       (contactF.clientSupplier === 'supplier' && c.is_supplier) ||
@@ -533,7 +543,7 @@ export const CRMManagement: React.FC = () => {
                           </TableCell>
                           <TableCell>{contact.email ? <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">{contact.email}</a> : '-'}</TableCell>
                           <TableCell>{contact.phone ? <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">{contact.phone}</a> : '-'}</TableCell>
-                          <TableCell>{contact.company || '-'}</TableCell>
+                          <TableCell>{contactCompanyName(contact) || '-'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{professionalTypeLabel(contact.profession) || contact.profession || '-'}</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" onClick={() => handleDeleteContact(contact.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>

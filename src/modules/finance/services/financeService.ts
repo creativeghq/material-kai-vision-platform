@@ -2108,7 +2108,18 @@ const _financeServiceV2 = {
         lang: input.lang,
       },
     });
-    if (error) throw error;
+    if (error) {
+      // supabase-js wraps any non-2xx as a FunctionsHttpError whose message is the
+      // generic "Edge Function returned a non-2xx status code" — the real reason
+      // (e.g. "Statement sending is disabled in finance settings.") lives in the
+      // response body. Surface it so callers show a truthful toast instead.
+      let message = error.message;
+      try {
+        const body = await (error as any)?.context?.json?.();
+        if (body?.error) message = body.error;
+      } catch { /* body not JSON — keep the generic message */ }
+      return { ok: false, email_sent_to: null, pdf_url: null, lines: 0, total_outstanding: 0, error: message };
+    }
     return data as any;
   },
 
