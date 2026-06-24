@@ -27,6 +27,7 @@ import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -621,19 +622,17 @@ export const ContactDetailPage: React.FC = () => {
                     <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                       <Tag className="h-3.5 w-3.5" /> Role
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <Label htmlFor="is_supplier" className="cursor-pointer">This is a supplier</Label>
-                        <p className="text-xs text-muted-foreground">Freelancer / sole trader who supplies directly.</p>
-                      </div>
-                      <Switch id="is_supplier" checked={!!contact.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v })} />
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <Label htmlFor="is_client" className="cursor-pointer">This is a customer</Label>
-                        <p className="text-xs text-muted-foreground">We sell to them — quotes / invoices raised against this contact.</p>
-                      </div>
-                      <Switch id="is_client" checked={!!contact.is_client} onCheckedChange={(v) => patchInline({ is_client: v })} />
+                    {/* Customer / Supplier — checkboxes (a sole trader can be both),
+                        matching the company page. */}
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                      <label htmlFor="is_client" className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox id="is_client" checked={!!contact.is_client} onCheckedChange={(v) => patchInline({ is_client: v === true })} />
+                        Customer
+                      </label>
+                      <label htmlFor="is_supplier" className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox id="is_supplier" checked={!!contact.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v === true })} />
+                        Supplier
+                      </label>
                     </div>
                     <div className="flex items-center justify-between gap-4 pt-2 border-t">
                       <div className="space-y-1">
