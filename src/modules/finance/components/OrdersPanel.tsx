@@ -23,6 +23,7 @@ const STATUS_TONE: Record<OrderStatus, string> = {
 type Party = { type: 'company' | 'contact'; id: string; name: string; vat?: string | null; sub?: string | null };
 const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct ?? 0;
 const DEFAULT_VAT_CODE = '1'; // 24%
+const vatCodeOf = (pct?: number | null) => VAT_CATEGORIES.find((v) => v.pct === (pct ?? 0))?.code ?? DEFAULT_VAT_CODE;
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
 export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; projectId?: string }> = ({ workspaceId, companyId, projectId }) => {
@@ -415,6 +416,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [saving, setSaving] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payAmt, setPayAmt] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editItems, setEditItems] = useState<Line[]>([]);
 
   const load = async (id: string) => {
     try {
@@ -471,6 +474,31 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     } finally { setSaving(false); }
   };
 
+  // #3 — edit the order's line items (only while it has no invoice yet).
+  const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled' && (fin?.invoices.length ?? 0) === 0;
+  const startEdit = () => {
+    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), vat_code: vatCodeOf(it.vat_percent) })));
+    setEditing(true);
+  };
+  const setEditItem = (i: number, patch: Partial<Line>) => setEditItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
+  const saveItems = async () => {
+    if (!order) return;
+    const clean = editItems.filter((l) => l.description.trim() && (Number(l.quantity) || 0) > 0);
+    if (clean.length === 0) { toast({ title: 'Add at least one product', variant: 'destructive' }); return; }
+    setSaving(true);
+    try {
+      await ordersService.updateItems(order.id, order.workspace_id, clean.map((l) => ({
+        product_id: l.product_id ?? null, description: l.description, quantity: Number(l.quantity) || 0,
+        unit_price: Number(l.unit_price) || 0, vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
+      })));
+      setEditing(false);
+      await load(order.id); onChanged();
+      toast({ title: 'Order updated' });
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   // #2 — raise a draft invoice from this (manual/quote-less) sales order, then open it to issue.
   const createInvoice = async () => {
     if (!order) return;
@@ -501,20 +529,47 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               <span className="ml-auto font-semibold">{formatMoney(Number(order.total), order.currency)}</span>
             </div>
 
-            <div className="rounded-md border border-border/60">
-              <div className="grid grid-cols-[1fr_60px_90px_90px_90px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
-                <span>Item</span><span className="text-right">Qty</span><span className="text-right">Delivered</span><span className="text-right">Unit</span><span className="text-right">Total</span>
-              </div>
-              {items.map((it) => (
-                <div key={it.id} className="grid grid-cols-[1fr_60px_90px_90px_90px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm">
-                  <span>{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
-                  <span className="text-right tabular-nums">{it.quantity}</span>
-                  <span className="text-right tabular-nums text-muted-foreground">{it.quantity_delivered}</span>
-                  <span className="text-right tabular-nums">{formatMoney(Number(it.unit_price), order.currency)}</span>
-                  <span className="text-right tabular-nums">{formatMoney(Number(it.line_total), order.currency)}</span>
+            {!editing ? (
+              <div className="rounded-md border border-border/60">
+                <div className="grid grid-cols-[1fr_60px_90px_90px_90px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+                  <span>Item</span><span className="text-right">Qty</span><span className="text-right">Delivered</span><span className="text-right">Unit</span><span className="text-right">Total</span>
                 </div>
-              ))}
-            </div>
+                {items.map((it) => (
+                  <div key={it.id} className="grid grid-cols-[1fr_60px_90px_90px_90px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm">
+                    <span>{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
+                    <span className="text-right tabular-nums">{it.quantity}</span>
+                    <span className="text-right tabular-nums text-muted-foreground">{it.quantity_delivered}</span>
+                    <span className="text-right tabular-nums">{formatMoney(Number(it.unit_price), order.currency)}</span>
+                    <span className="text-right tabular-nums">{formatMoney(Number(it.line_total), order.currency)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-md border border-border/60">
+                <div className="grid grid-cols-[1fr_56px_84px_92px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                  <span>Product</span><span className="text-right">Qty</span><span className="text-right">Unit</span><span className="text-right">VAT</span><span />
+                </div>
+                {editItems.map((l, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_56px_84px_92px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
+                    <Input className="h-8 text-sm" value={l.description} onChange={(e) => setEditItem(i, { description: e.target.value, product_id: null })} placeholder="Product…" />
+                    <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.quantity} onChange={(e) => setEditItem(i, { quantity: Number(e.target.value) })} />
+                    <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.unit_price} onChange={(e) => setEditItem(i, { unit_price: Number(e.target.value) })} />
+                    <Select value={l.vat_code} onValueChange={(v) => setEditItem(i, { vat_code: v })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => setEditItems((ls) => ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls)}><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between px-2 py-1.5 border-t border-border/40">
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditItems((ls) => [...ls, blankLine()])}><Plus className="h-3.5 w-3.5 mr-1" /> New Product</Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                    <Button size="sm" onClick={saveItems} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save items'}</Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
               <Label className="text-xs text-muted-foreground">Status</Label>
@@ -526,6 +581,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               </Select>
               {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
                 <Button size="sm" variant="outline" onClick={() => changeStatus('fulfilled')} disabled={saving}>Mark completed</Button>
+              )}
+              {editable && !editing && (
+                <Button size="sm" variant="outline" onClick={startEdit} disabled={saving}>Edit items</Button>
               )}
               {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
                 <Button size="sm" variant="outline" onClick={createInvoice} disabled={saving}>

@@ -41,6 +41,8 @@ export interface OrderItem {
   description: string;
   quantity: number;
   unit_price: number;
+  vat_percent?: number | null;
+  vat_category?: number | null;
   net_value: number;
   vat_amount: number;
   line_total: number;
@@ -199,6 +201,32 @@ export const ordersService = {
 
   async setStatus(id: string, status: OrderStatus): Promise<void> {
     const { error } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Replace an order's line items and recompute its totals (draft/un-invoiced orders). */
+  async updateItems(orderId: string, workspaceId: string, items: NewOrderItem[]): Promise<void> {
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const lines = items.map((it) => {
+      const net = r2((it.quantity || 0) * (it.unit_price || 0));
+      const pct = it.vat_percent ?? 0;
+      return { it, net, vat: r2(net * pct / 100), pct };
+    });
+    const subtotal = r2(lines.reduce((a, l) => a + l.net, 0));
+    const vatTotal = r2(lines.reduce((a, l) => a + l.vat, 0));
+    await supabase.from('order_items').delete().eq('order_id', orderId);
+    if (lines.length) {
+      const { error: itErr } = await supabase.from('order_items').insert(lines.map((l, i) => ({
+        order_id: orderId, workspace_id: workspaceId, product_id: l.it.product_id ?? null,
+        description: l.it.description, quantity: l.it.quantity, unit_price: l.it.unit_price,
+        vat_percent: l.pct, vat_category: l.it.vat_category ?? null,
+        net_value: l.net, vat_amount: l.vat, line_total: l.net, update_warehouse: l.it.update_warehouse ?? true, sort_order: i,
+      })));
+      if (itErr) throw itErr;
+    }
+    const { error } = await supabase.from('orders')
+      .update({ subtotal_net: subtotal, vat_amount: vatTotal, total: r2(subtotal + vatTotal), updated_at: new Date().toISOString() })
+      .eq('id', orderId);
     if (error) throw error;
   },
 };
