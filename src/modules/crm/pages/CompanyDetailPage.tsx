@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, ShoppingCart } from 'lucide-react';
 import {
-  CustomerFinanceSummary,
   CustomerAccountOverview,
-  CustomerQuotesTab,
-  CustomerInvoicesTab,
-  CustomerPaymentsTab,
 } from '@/modules/finance/components/CustomerFinanceTabs';
+import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -546,17 +543,11 @@ export const CompanyDetailPage: React.FC = () => {
                   <Wallet className="h-4 w-4 mr-2"/>
                   Account
                 </TabsTrigger>
-                <TabsTrigger value="quotes">
-                  <ScrollText className="h-4 w-4 mr-2"/>
-                  Quotes
-                </TabsTrigger>
-                <TabsTrigger value="invoices">
-                  <Receipt className="h-4 w-4 mr-2"/>
-                  Invoices
-                </TabsTrigger>
-                <TabsTrigger value="payments">
-                  <CreditCard className="h-4 w-4 mr-2"/>
-                  Payments
+                {/* Quotes / Invoices / Payments are now per-ORDER — they live inside each
+                    order (Orders tab → open an order). The Account tab keeps the balance + ledger. */}
+                <TabsTrigger value="orders">
+                  <ShoppingCart className="h-4 w-4 mr-2"/>
+                  Orders
                 </TabsTrigger>
               </>
             )}
@@ -609,7 +600,7 @@ export const CompanyDetailPage: React.FC = () => {
               {/* LEFT — company identity */}
               <div className={isNew ? 'space-y-4' : 'space-y-3 lg:sticky lg:top-4'}>
             <CollapsibleCard title="Company Information" icon={Building2} defaultOpen>
-                <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${isNew ? 'sm:grid-cols-2' : ''}`}>
+                <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                   <div className={isNew ? 'sm:col-span-2' : ''}>
                     <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
                   </div>
@@ -1044,22 +1035,13 @@ export const CompanyDetailPage: React.FC = () => {
             )}
           </TabsContent>
 
-          {/* Quotes Tab */}
-          <TabsContent value="quotes" className="space-y-4">
-            {company.id && <CustomerFinanceSummary companyId={company.id}/>}
-            <CustomerQuotesTab companyId={company.id} customerName={company.name}/>
-          </TabsContent>
-
-          {/* Invoices Tab */}
-          <TabsContent value="invoices" className="space-y-4">
-            {company.id && <CustomerFinanceSummary companyId={company.id}/>}
-            <CustomerInvoicesTab companyId={company.id} customerName={company.name}/>
-          </TabsContent>
-
-          {/* Payments Tab */}
-          <TabsContent value="payments" className="space-y-4">
-            {company.id && <CustomerFinanceSummary companyId={company.id}/>}
-            <CustomerPaymentsTab companyId={company.id} customerName={company.name}/>
+          {/* Orders Tab — quotes/invoices/payments now live per-order (open an order). */}
+          <TabsContent value="orders" className="space-y-4">
+            {company.id ? (
+              <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
+            ) : (
+              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its orders.</CardContent></Card>
+            )}
           </TabsContent>
             </>
           )}

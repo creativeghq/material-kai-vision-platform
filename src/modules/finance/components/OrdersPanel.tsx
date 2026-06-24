@@ -22,7 +22,7 @@ const STATUS_TONE: Record<OrderStatus, string> = {
 type Party = { type: 'company' | 'contact'; id: string; name: string };
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
-export const OrdersPanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
+export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string }> = ({ workspaceId, companyId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,14 +37,14 @@ export const OrdersPanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     if (!workspaceId) return;
     try {
       setLoading(true);
-      setRows(await ordersService.list({ workspaceId, orderType: typeF === 'all' ? undefined : typeF, status: statusF === 'all' ? undefined : statusF }));
+      setRows(await ordersService.list({ workspaceId, companyId, orderType: typeF === 'all' ? undefined : typeF, status: statusF === 'all' ? undefined : statusF }));
     } catch (err: any) {
       toast({ title: 'Failed to load orders', description: err?.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, typeF, statusF]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, typeF, statusF]);
 
   const filtered = useMemo(() => {
     const t = search.trim().toLowerCase();
@@ -313,15 +313,16 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [fin, setFin] = useState<Awaited<ReturnType<typeof ordersService.getOrderFinance>> | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); return; }
     void (async () => {
       try {
         setLoading(true);
-        const res = await ordersService.get(orderId);
-        setOrder(res.order); setItems(res.items);
+        const [res, finance] = await Promise.all([ordersService.get(orderId), ordersService.getOrderFinance(orderId)]);
+        setOrder(res.order); setItems(res.items); setFin(finance);
       } catch (err: any) {
         toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
       } finally { setLoading(false); }
@@ -384,8 +385,52 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               )}
             </div>
 
+            {/* Profit: what we received (customer payments) − what we paid suppliers (linked payments out). */}
+            {fin && (
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-md border border-border/60 p-2">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Received</div>
+                  <div className="text-sm font-semibold text-emerald-500">{formatMoney(fin.received, order.currency)}</div>
+                </div>
+                <div className="rounded-md border border-border/60 p-2">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Paid to suppliers</div>
+                  <div className="text-sm font-semibold text-red-400">{formatMoney(fin.paid_out, order.currency)}</div>
+                </div>
+                <div className="rounded-md border border-border/60 p-2">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Profit</div>
+                  <div className={`text-sm font-semibold ${fin.profit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.profit, order.currency)}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Attached invoices */}
+            {fin && fin.invoices.length > 0 && (
+              <div className="rounded-md border border-border/60">
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Invoices</div>
+                {fin.invoices.map((iv) => (
+                  <div key={iv.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                    <span className="font-mono text-xs">{iv.internal_number ?? iv.id.slice(0, 8)} · {iv.status}</span>
+                    <span className="tabular-nums">{formatMoney(Number(iv.total), iv.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(iv.amount_due), iv.currency)}</span></span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Attached payments */}
+            {fin && fin.payments.length > 0 && (
+              <div className="rounded-md border border-border/60">
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments</div>
+                {fin.payments.map((p) => (
+                  <div key={p.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                    <span className="text-xs text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'In' : 'Out'} · {p.method ?? '—'}</span>
+                    <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <p className="text-[11px] text-muted-foreground">
-              Invoices, payments, dispatch &amp; profit attach to this order — coming next. Source quote / pre-invoice already link via the order.
+              Dispatch (delivery note → stock) attaches here next. Source quote / pre-invoice already link via the order.
             </p>
           </div>
         )}
