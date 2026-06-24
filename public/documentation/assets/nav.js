@@ -51,6 +51,7 @@
           { file: "finance-rp-followups.html", title: "Follow-ups" },
         ]},
         { file: "finance-documents.html", title: "Documents", children: [
+          { file: "finance-doc-orders.html", title: "Orders" },
           { file: "finance-doc-invoices.html", title: "Invoices" },
           { file: "finance-doc-receipts.html", title: "Receipts" },
           { file: "finance-doc-credit-notes.html", title: "Credit notes" },

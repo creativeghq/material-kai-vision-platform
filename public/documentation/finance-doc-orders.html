@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance: Orders | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-documents.html">Documents</a> / Orders</div>
+  <h1>Documents · Orders</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">An <strong>Order</strong> is the spine of a deal. Instead of tracking a quote, an invoice, payments and a delivery as separate, disconnected documents, an order ties them together: <em>invoices, payments, dispatch and profit all hang off the one order</em>. Open an order and you see, in one place, what was sold, what's been invoiced, what's been paid, what's left to deliver, and what you actually made on it. This page explains what orders are, the two kinds, their statuses, and how to create and work one.</p>
+
+  <div class="callout"><p><strong>Where:</strong> top navigation → <strong>Finance</strong> → the <strong>Orders</strong> tab (the first tab in the Documents area). A company's own orders also appear on its <a href="crm-companies.html">CRM record</a> under the <strong>Orders</strong> tab.</p></div>
+
+  <h2>Sales orders vs purchase orders</h2>
+  <p>Every order is one of two <strong>types</strong>, chosen when you create it:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Type</th><th>What it is</th><th>Party</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Sales</strong></td><td>Something you're selling to a customer.</td><td>A customer (company / contact).</td></tr>
+      <tr><td><strong>Purchase</strong></td><td>Something you're buying from a supplier.</td><td>A supplier (company / contact).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The two statuses on every order</h2>
+  <p>An order carries a <strong>fulfilment status</strong> (how far along delivery is) and a <strong>payment status</strong> (how much has been paid) — kept separate because a deal can be paid but not yet delivered, or delivered but not yet paid.</p>
+  <h3>Fulfilment status</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Pre-order</strong></td><td>Drafted, not yet confirmed — still editable.</td></tr>
+      <tr><td><strong>Confirmed</strong></td><td>Agreed and committed.</td></tr>
+      <tr><td><strong>Partially delivered</strong></td><td>Some lines (or quantities) have shipped, not all.</td></tr>
+      <tr><td><strong>Completed</strong></td><td>Fully delivered.</td></tr>
+      <tr><td><strong>Cancelled</strong></td><td>Called off.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Payment status</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Unpaid</strong></td><td>Nothing paid yet.</td></tr>
+      <tr><td><strong>Partially paid</strong></td><td>Some payment received/made.</td></tr>
+      <tr><td><strong>Paid</strong></td><td>Settled in full.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>What's on the screen</h2>
+  <ul class="feat">
+    <li><strong>Type filter</strong> — All / Sales / Purchase.</li>
+    <li><strong>Status filter</strong> — All statuses, or one of the fulfilment statuses above.</li>
+    <li><strong>Search</strong> — by party (customer/supplier) or order number (<em>“Party or number”</em>).</li>
+    <li><strong>The list</strong> — columns for <strong>Order</strong> (number), <strong>Type</strong>, <strong>Party</strong>, <strong>Status</strong>, <strong>Payment</strong>, <strong>Total</strong> and <strong>Created</strong>.</li>
+    <li><strong>New</strong> — create an order.</li>
+  </ul>
+
+  <h2>How to create an order — step by step</h2>
+  <ol>
+    <li>Click <strong>New</strong>.</li>
+    <li>Choose the <strong>type</strong> — <strong>Sales</strong> (to a customer) or <strong>Purchase</strong> (from a supplier) — and whether it starts as a <strong>Pre-order</strong>.</li>
+    <li>Pick the <strong>party</strong> (the customer or supplier). Optionally link a <strong>project</strong> and the <strong>source quote</strong> it came from.</li>
+    <li>Add <strong>line items</strong> — either pick a <strong>catalogue product by name</strong>, or add an ad-hoc line (description, quantity, unit price). Each line shows its net, VAT and line total.</li>
+    <li>Save. The order appears in the list with its number and a <strong>Pre-order / Unpaid</strong> starting state.</li>
+  </ol>
+  <div class="callout"><p><strong>Catalogue line vs ad-hoc line.</strong> A line added from the catalogue can <strong>move warehouse stock</strong> when the order is delivered; an ad-hoc (typed-in) line stays off-warehouse. This matters for the dispatch/warehouse flow below.</p></div>
+
+  <h2>Working an order — invoices, payments &amp; profit</h2>
+  <p>Open an order to see everything that hangs off it. This is the point of orders: the money and the documents are consolidated on one screen.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>On the order</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Invoices</strong></td><td>Every invoice raised against this order, with its status and amount still due.</td></tr>
+      <tr><td><strong>Payments</strong></td><td>Payments linked to the order — money <em>in</em> (from a customer) and <em>out</em> (to a supplier).</td></tr>
+      <tr><td><strong>Received</strong></td><td>Total customer payments received on the order.</td></tr>
+      <tr><td><strong>Paid to suppliers</strong></td><td>Total payments made out on the order.</td></tr>
+      <tr><td><strong>Profit</strong></td><td><strong>Received − Paid to suppliers</strong> — what you actually made, shown green (positive) or red (negative).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Dispatch is invoice-driven</h2>
+  <p>An order's <strong>Dispatch board</strong> button takes you to the dispatch queue. The flow is deliberate: <strong>once the order's invoice is paid and flagged for shipping, the order appears on the <a href="finance-op-dispatch.html">Dispatch board</a></strong>, which cuts the delivery note and moves warehouse stock — for <em>catalogue lines only</em> (ad-hoc lines stay off-warehouse). So you don't ship straight from the order; you raise and settle the invoice, and dispatch picks it up from there.</p>
+
+  <h2>POS sales become orders automatically</h2>
+  <p>You don't have to create an order by hand for counter sales. <strong>Every <a href="pos.html">POS</a> checkout automatically creates a sales order</strong> in a <strong>Completed, Paid, Delivered</strong> state — so even till sales show up in the orders list and roll into the customer's account and your profit figures, with no extra step.</p>
+
+  <h2>Orders on a customer's account</h2>
+  <p>A company in <a href="crm-companies.html">CRM</a> is treated as an <strong>Account</strong>: its detail page has an <strong>Account</strong> tab (the running balance + ledger) and an <strong>Orders</strong> tab (all of that company's orders). Quotes, invoices and payments now live <em>per order</em>, so the Account tab is the money summary and each order is where the documents sit. (The customer's running balance is shown as the <strong>Account balance</strong>.)</p>
+
+  <h2>What it affects</h2>
+  <ul class="feat">
+    <li>Invoices (<a href="finance-doc-invoices.html">Invoices</a>) and <a href="finance-rp-payments.html">payments</a> link to an order, which is how Received / Paid / Profit are computed.</li>
+    <li>Paid, ship-flagged invoices flow to the <a href="finance-op-dispatch.html">Dispatch board</a> → delivery note + <a href="finance-op-warehouse.html">warehouse</a> movement (catalogue lines).</li>
+    <li><a href="pos.html">POS</a> sales auto-create completed orders.</li>
+    <li>Each order rolls up to the customer's <strong>Account</strong> in <a href="crm-companies.html">CRM</a>.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
