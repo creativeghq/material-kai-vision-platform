@@ -16,26 +16,54 @@ import { resolveSecret, type ResolvedSecret } from '../secrets.ts';
 const WSSE_NS = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd';
 const PASSWORD_TYPE = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText';
 
+/** Where a resolved ΑΑΔΕ credential value came from. 'workspace' = the per-tenant row. */
+export type AadeCredSource = ResolvedSecret['source'] | 'workspace';
+
 export interface AadeCredentials {
   username: string;
   password: string;
   /** Empty string when not configured. ΑΑΔΕ accepts that as "unknown caller". */
   afmCalledBy: string;
   sources: {
-    username: ResolvedSecret['source'];
-    password: ResolvedSecret['source'];
-    afm_called_by: ResolvedSecret['source'];
+    username: AadeCredSource;
+    password: AadeCredSource;
+    afm_called_by: AadeCredSource;
   };
 }
 
 export type SupabaseLike = { from: (t: string) => unknown };
 
-/**
- * Pull ΑΑΔΕ credentials following the platform-wide env-first → DB-fallback policy.
- * Throws nothing — the caller checks `username` / `password` for empty strings
- * and decides how to respond (typically a 503 with `aade_not_configured`).
- */
-export async function resolveAadeCredentials(supabase: SupabaseLike): Promise<AadeCredentials> {
+/** Read the per-workspace Special Access Codes row (service-role; bypasses RLS). */
+async function readWorkspaceAadeRow(
+  supabase: SupabaseLike,
+  workspaceId: string,
+): Promise<{ username: string; password: string; afm_called_by: string } | null> {
+  // deno-lint-ignore no-explicit-any
+  const { data } = await (supabase as any)
+    .from('workspace_aade_credentials')
+    .select('username, password, afm_called_by, enabled')
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (!data || data.enabled === false) return null;
+  const username = (data.username ?? '').trim();
+  const password = (data.password ?? '').trim();
+  if (!username || !password) return null;
+  return { username, password, afm_called_by: (data.afm_called_by ?? '').trim() };
+}
+
+/** Is this workspace the operator's root workspace (the only one allowed the env fallback)? */
+async function isRootWorkspace(supabase: SupabaseLike, workspaceId: string): Promise<boolean> {
+  // deno-lint-ignore no-explicit-any
+  const { data } = await (supabase as any)
+    .from('workspaces')
+    .select('is_root')
+    .eq('id', workspaceId)
+    .maybeSingle();
+  return !!data?.is_root;
+}
+
+/** Pull ΑΑΔΕ Special Access Codes from env / platform_secrets (the operator's own default). */
+async function resolveOperatorAadeCredentials(supabase: SupabaseLike): Promise<AadeCredentials> {
   // deno-lint-ignore no-explicit-any
   const [usernameSecret, passwordSecret, afmCalledBySecret] = await Promise.all([
     resolveSecret(supabase as any, 'AADE_USERNAME'),
@@ -51,6 +79,53 @@ export async function resolveAadeCredentials(supabase: SupabaseLike): Promise<Aa
       password: passwordSecret.source,
       afm_called_by: afmCalledBySecret.source,
     },
+  };
+}
+
+/**
+ * Resolve the ΑΑΔΕ Special Access Codes for a lookup, per-workspace.
+ *
+ * Policy:
+ *   1. The workspace's own `workspace_aade_credentials` row wins (sources='workspace').
+ *   2. If it has no usable row AND it is the operator's ROOT workspace, fall back to
+ *      env / platform_secrets (AADE_USERNAME / AADE_PASSWORD / AADE_AFM_CALLED_BY).
+ *   3. Any other workspace with no row gets empty creds → the caller returns
+ *      `aade_not_configured`. Tenants NEVER use the operator's master credentials.
+ *
+ * When `workspaceId` is omitted the resolver returns empty creds (missing) — every
+ * call site is expected to pass the active workspace id.
+ *
+ * Throws nothing — the caller checks `username` / `password` for empty strings.
+ */
+export async function resolveAadeCredentials(
+  supabase: SupabaseLike,
+  workspaceId?: string | null,
+): Promise<AadeCredentials> {
+  if (workspaceId) {
+    const row = await readWorkspaceAadeRow(supabase, workspaceId);
+    if (row) {
+      return {
+        username: row.username,
+        password: row.password,
+        afmCalledBy: row.afm_called_by,
+        sources: {
+          username: 'workspace',
+          password: 'workspace',
+          afm_called_by: row.afm_called_by ? 'workspace' : 'missing',
+        },
+      };
+    }
+    // No per-workspace row: only the operator's root workspace may use the env default.
+    if (await isRootWorkspace(supabase, workspaceId)) {
+      return resolveOperatorAadeCredentials(supabase);
+    }
+  }
+  // Non-root workspace with no row, or no workspace context → not configured.
+  return {
+    username: '',
+    password: '',
+    afmCalledBy: '',
+    sources: { username: 'missing', password: 'missing', afm_called_by: 'missing' },
   };
 }
 

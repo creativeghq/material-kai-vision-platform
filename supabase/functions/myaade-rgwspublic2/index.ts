@@ -151,7 +151,9 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     }
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
-    const creds = await resolveAadeCredentials(admin);
+    // Per-workspace Special Access Codes — only the operator's root workspace falls back
+    // to the env / platform_secrets default; every tenant uses its own codes.
+    const creds = await resolveAadeCredentials(admin, body.workspace_id ?? null);
 
     // Best-effort internal audit. AADE notifies the looked-up ΑΦΜ's TAXISnet inbox on every
     // live ('aade') call — this is OUR record of who/when/why/which VAT. Never blocks the response.
@@ -174,7 +176,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     if (!creds.username || !creds.password) {
       return jsonResponse({
         error: 'aade_not_configured',
-        message: 'ΑΑΔΕ web-service credentials not set. Configure AADE_USERNAME and AADE_PASSWORD at /admin/modules/myaade.',
+        message: 'ΑΑΔΕ Special Access Codes are not set for this workspace. Enter your TAXISnet username + password under Finance → Settings (myAADE credentials).',
         secret_sources: { username: creds.sources.username, password: creds.sources.password },
       }, 503);
     }

@@ -40,7 +40,7 @@ Every successful lookup writes an audit entry to the looked-up ΑΦΜ's TAXISnet
 
 Every `myaade-*` function shares [`supabase/functions/_shared/aade/soap.ts`](../../../supabase/functions/_shared/aade/soap.ts):
 
-- `resolveAadeCredentials(supabase)` — pulls `AADE_USERNAME` / `AADE_PASSWORD` / `AADE_AFM_CALLED_BY` via the platform-wide env-first → DB-fallback policy, returns `{ username, password, afmCalledBy, sources }`.
+- `resolveAadeCredentials(supabase, workspaceId)` — **per-workspace** (2026-06-24). Reads the workspace's own `workspace_aade_credentials` row first (`sources='workspace'`); only the operator's **root** workspace falls back to env / `platform_secrets` `AADE_USERNAME`/`AADE_PASSWORD`/`AADE_AFM_CALLED_BY`. Any other workspace with no row returns empty creds → caller responds `aade_not_configured`. Returns `{ username, password, afmCalledBy, sources }`. Every call site must pass the active `workspace_id`.
 - `buildSoapEnvelope(creds, bodyXml)` — wraps any operation-specific `<Body>` in the standard SOAP 1.2 envelope + WS-Security UsernameToken header.
 - `postSoap(endpoint, envelope, timeoutMs?)` — POSTs with the correct content-type (`application/soap+xml`) and a 20s default timeout, returns `{ ok, xml, httpStatus, err }`.
 - `pickTag(xml, tagName)` / `pickAllTagBlocks(xml, tagName)` — namespace-agnostic XML extraction with NULL/--- sentinel handling.

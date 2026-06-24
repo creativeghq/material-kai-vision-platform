@@ -24,6 +24,7 @@ import { PendingDiscountApprovalsCard } from '@/modules/finance/components/Pendi
 import { ServicesCard } from '@/modules/finance/components/ServicesCard';
 import { TeamInviteCard } from '@/modules/finance/components/TeamInviteCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
+import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { CategoriesCard } from '@/modules/finance/components/CategoriesCard';
 import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
@@ -195,8 +196,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
       </TabsList>
 
       <div className="w-full min-w-0 space-y-4">
-        <TabsContent value="identity" className="mt-0">
+        <TabsContent value="identity" className="mt-0 space-y-4">
           <BusinessIdentityCard workspaceId={workspaceId} />
+          <AadeCredentialsCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-0 space-y-4">

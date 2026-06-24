@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
-import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { aadeService, type AadeLookupResult } from '../services/aadeService';
+import { AadeCredentialsCard } from '../components/AadeCredentialsCard';
 
 // "Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ" — the separate credentials you create specifically for
 // software access to ΑΑΔΕ web services. The app redirects through TAXISnet login.
@@ -19,6 +20,7 @@ const FAQ_PDF_URL = 'https://www.aade.gr/sites/default/files/2018-07/eidikoi_kwd
 
 const MyAadeModulePage: React.FC = () => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [afm, setAfm] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AadeLookupResult | null>(null);
@@ -33,7 +35,7 @@ const MyAadeModulePage: React.FC = () => {
     setLoading(true);
     setResult(null);
     setErrMsg(null);
-    const res = await aadeService.lookup({ afm: clean });
+    const res = await aadeService.lookup({ afm: clean, workspaceId: activeWorkspaceId ?? undefined });
     setLoading(false);
     if ('error' in res && res.error) {
       setErrMsg(res.message || res.error);
@@ -64,12 +66,8 @@ const MyAadeModulePage: React.FC = () => {
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
-        {/* Credentials */}
-        <SecretsManagerCard
-          scope={{ mode: 'module', moduleSlug: 'myaade' }}
-          title="AADE TAXISnet credentials"
-          description="Platform-wide TAXISnet account used to query the RgWsPublic2 SOAP service. Environment variables take priority."
-        />
+        {/* Per-workspace credentials */}
+        {activeWorkspaceId && <AadeCredentialsCard workspaceId={activeWorkspaceId} />}
 
         {/* Registration hint */}
         <Card>
@@ -90,7 +88,7 @@ const MyAadeModulePage: React.FC = () => {
                 Inside the app, create a new username + password pair and authorize it for the <strong>RgWsPublic2</strong> service (business details by VAT number).
               </li>
               <li>
-                Paste the new pair above as <code>AADE_USERNAME</code> + <code>AADE_PASSWORD</code>. (Optional: also set <code>AADE_AFM_CALLED_BY</code> to the platform's own company VAT number so the lookup audit trail names it.)
+                Paste the new pair into the <strong>credentials card above</strong>. (Optional: also set your own company VAT as the caller VAT so the lookup audit trail names it.)
               </li>
               <li>
                 Click <strong>Look up</strong> below with any 9-digit VAT number to confirm the credentials work end-to-end.

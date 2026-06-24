@@ -10,6 +10,7 @@ import {
 } from '@/components/core/ui/select';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { validateVatViaVies, type ViesValidationResult } from '@/services/viesService';
@@ -56,6 +57,7 @@ interface BusinessSectionProps {
 
 export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChanged }) => {
   const { user } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -191,7 +193,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
       return;
     }
     setAadeChecking(true);
-    const res = await aadeService.lookup({ afm: rawAfm, companyId: businessId ?? undefined });
+    const res = await aadeService.lookup({ afm: rawAfm, companyId: businessId ?? undefined, workspaceId: activeWorkspaceId ?? undefined });
     setAadeChecking(false);
 
     if ('error' in res && res.error) {

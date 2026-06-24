@@ -324,6 +324,7 @@ export const CompanyDetailPage: React.FC = () => {
         afm: rawAfm,
         companyId: isNew ? undefined : id,
         reason: 'crm_enrichment',
+        workspaceId: activeWorkspaceId ?? undefined,
       });
       if ('error' in res && res.error) {
         toast({ title: 'AADE lookup failed', description: (res.message || res.error), variant: 'destructive' });

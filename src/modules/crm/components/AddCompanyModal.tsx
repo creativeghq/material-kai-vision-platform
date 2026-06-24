@@ -16,6 +16,7 @@ import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { validateVatViaVies } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 type Role = 'customer' | 'supplier';
 
@@ -76,6 +77,7 @@ export const AddCompanyModal: React.FC<{
 }> = ({ open, onOpenChange }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [step, setStep] = useState<'role' | 'details'>('role');
   const [role, setRole] = useState<Role | null>(null);
   const [name, setName] = useState('');
@@ -125,7 +127,7 @@ export const AddCompanyModal: React.FC<{
       // Greek ΑΦΜ → ΑΑΔΕ (richer: ΔΟΥ, ΚΑΔ, legal form, structured address). reason='crm_enrichment'
       // is legitimate — we only research a business we are about to onboard as a counterparty.
       if (cc === 'EL' && afm.length === 9) {
-        const res = await aadeService.lookup({ afm, reason: 'crm_enrichment' });
+        const res = await aadeService.lookup({ afm, reason: 'crm_enrichment', workspaceId: activeWorkspaceId ?? undefined });
         if ('error' in res && res.error) {
           toast({ title: 'ΑΑΔΕ lookup failed', description: res.message || res.error, variant: 'destructive' });
           return;

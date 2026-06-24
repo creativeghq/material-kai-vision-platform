@@ -74,4 +74,37 @@ export const aadeService = {
     if (data?.error) return data as AadeLookupError;
     return data as AadeLookupResult;
   },
+
+  /** Per-workspace ΑΑΔΕ Special Access Codes STATUS (finance-manager only). Never returns the
+   *  password to the browser — only whether one is set (`has_password`). */
+  async getCreds(workspaceId: string): Promise<{ username: string | null; afm_called_by: string | null; enabled: boolean; has_password: boolean } | null> {
+    const { data, error } = await supabase.rpc('get_aade_creds_status', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return null;
+    return {
+      username: row.username ?? null,
+      afm_called_by: row.afm_called_by ?? null,
+      enabled: row.enabled ?? true,
+      has_password: !!row.has_password,
+    };
+  },
+
+  /** Save this workspace's Special Access Codes. The password is only written when a new value
+   *  is provided — saving with a blank password preserves the stored one (the masked form never
+   *  wipes a stored secret). */
+  async saveCreds(workspaceId: string, input: { username: string; password?: string; afmCalledBy?: string | null; enabled: boolean }): Promise<void> {
+    const payload: Record<string, any> = {
+      workspace_id: workspaceId,
+      username: input.username || null,
+      afm_called_by: input.afmCalledBy || null,
+      enabled: input.enabled,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.password && input.password.trim()) {
+      payload.password = input.password.trim();
+    }
+    const { error } = await supabase.from('workspace_aade_credentials').upsert(payload, { onConflict: 'workspace_id' });
+    if (error) throw error;
+  },
 };
