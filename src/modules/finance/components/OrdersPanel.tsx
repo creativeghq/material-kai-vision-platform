@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -359,19 +359,24 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [items, setItems] = useState<OrderItem[]>([]);
   const [fin, setFin] = useState<Awaited<ReturnType<typeof ordersService.getOrderFinance>> | null>(null);
   const [saving, setSaving] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [payAmt, setPayAmt] = useState('');
+
+  const load = async (id: string) => {
+    try {
+      setLoading(true);
+      const [res, finance] = await Promise.all([ordersService.get(id), ordersService.getOrderFinance(id)]);
+      setOrder(res.order); setItems(res.items); setFin(finance);
+    } catch (err: any) {
+      toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
+    } finally { setLoading(false); }
+  };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); return; }
-    void (async () => {
-      try {
-        setLoading(true);
-        const [res, finance] = await Promise.all([ordersService.get(orderId), ordersService.getOrderFinance(orderId)]);
-        setOrder(res.order); setItems(res.items); setFin(finance);
-      } catch (err: any) {
-        toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
-      } finally { setLoading(false); }
-    })();
-  }, [orderId, toast]);
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); return; }
+    void load(orderId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
 
   const changeStatus = async (status: OrderStatus) => {
     if (!order) return;
@@ -381,6 +386,32 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       setOrder({ ...order, status });
       onChanged();
       toast({ title: `Marked ${ORDER_STATUS_LABEL[status]}` });
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  // Record a payment ON the order — money in (sales) / out (purchase). The payment trigger
+  // recomputes payment_status; getOrderFinance refreshes Received/Profit.
+  const recordPay = async () => {
+    if (!order) return;
+    const amt = parseFloat(payAmt);
+    if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('payments').insert({
+        workspace_id: order.workspace_id,
+        direction: order.order_type === 'sales' ? 'in' : 'out',
+        amount: amt,
+        currency: order.currency,
+        order_id: order.id,
+        paid_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      setPayOpen(false); setPayAmt('');
+      await load(order.id);
+      onChanged();
+      toast({ title: order.order_type === 'sales' ? 'Payment received' : 'Payment recorded' });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
@@ -427,12 +458,27 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
                 <Button size="sm" variant="outline" onClick={() => changeStatus('fulfilled')} disabled={saving}>Mark completed</Button>
               )}
+              {order.payment_status !== 'paid' && (
+                <Button size="sm" variant="outline" onClick={() => { setPayOpen((v) => !v); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
+                  <Banknote className="h-3.5 w-3.5 mr-1" /> Record payment
+                </Button>
+              )}
               {order.order_type === 'sales' && (
                 <Button size="sm" variant="outline" onClick={() => navigate('/finance?tab=doc_dispatch')}>
                   <Truck className="h-3.5 w-3.5 mr-1" /> Dispatch board
                 </Button>
               )}
             </div>
+
+            {payOpen && (
+              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                <span className="text-xs text-muted-foreground">{order.order_type === 'sales' ? 'Money received' : 'Money paid out'}</span>
+                <Input className="h-8 w-32 text-right text-sm" type="number" step="0.01" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
+                <span className="text-xs text-muted-foreground">{order.currency}</span>
+                <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save payment'}</Button>
+                <Button size="sm" variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>
+              </div>
+            )}
 
             {/* Profit: what we received (customer payments) − what we paid suppliers (linked payments out). */}
             {fin && (
