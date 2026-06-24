@@ -58,6 +58,8 @@ export interface NewOrderItem {
   description: string;
   quantity: number;
   unit_price: number;
+  vat_percent?: number;       // per-line VAT %
+  vat_category?: number;      // myDATA VAT category code (1=24%, …)
   update_warehouse?: boolean;
 }
 
@@ -120,7 +122,16 @@ export const ordersService = {
     notes?: string | null;
     items: NewOrderItem[];
   }): Promise<string> {
-    const subtotal = input.items.reduce((a, it) => a + it.quantity * it.unit_price, 0);
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const lines = input.items.map((it) => {
+      const net = r2((it.quantity || 0) * (it.unit_price || 0));
+      const pct = it.vat_percent ?? 0;
+      const vat = r2(net * pct / 100);
+      return { it, net, vat, pct };
+    });
+    const subtotal = r2(lines.reduce((a, l) => a + l.net, 0));
+    const vatTotal = r2(lines.reduce((a, l) => a + l.vat, 0));
+    const total = r2(subtotal + vatTotal);
     const { data: order, error } = await supabase
       .from('orders')
       .insert({
@@ -134,26 +145,28 @@ export const ordersService = {
         project_id: input.projectId ?? null,
         currency: input.currency ?? 'EUR',
         subtotal_net: subtotal,
-        vat_amount: 0,
-        total: subtotal,
+        vat_amount: vatTotal,
+        total,
         notes: input.notes ?? null,
       })
       .select('id')
       .single();
     if (error) throw error;
     const orderId = order.id as string;
-    if (input.items.length) {
-      const itemRows = input.items.map((it, i) => ({
+    if (lines.length) {
+      const itemRows = lines.map((l, i) => ({
         order_id: orderId,
         workspace_id: input.workspaceId,
-        product_id: it.product_id ?? null,
-        description: it.description,
-        quantity: it.quantity,
-        unit_price: it.unit_price,
-        net_value: it.quantity * it.unit_price,
-        vat_amount: 0,
-        line_total: it.quantity * it.unit_price,
-        update_warehouse: it.update_warehouse ?? true,
+        product_id: l.it.product_id ?? null,
+        description: l.it.description,
+        quantity: l.it.quantity,
+        unit_price: l.it.unit_price,
+        vat_percent: l.pct,
+        vat_category: l.it.vat_category ?? null,
+        net_value: l.net,
+        vat_amount: l.vat,
+        line_total: l.net,      // net per line (gross sits on the order total)
+        update_warehouse: l.it.update_warehouse ?? true,
         sort_order: i,
       }));
       const { error: itErr } = await supabase.from('order_items').insert(itemRows);

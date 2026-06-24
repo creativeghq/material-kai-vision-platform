@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { formatMoney } from '@/modules/finance/services/financeService';
+import { formatMoney, financeService, VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderListRow, type OrderItem, type Order, type NewOrderItem,
@@ -20,7 +20,9 @@ const STATUS_TONE: Record<OrderStatus, string> = {
   draft: 'secondary', confirmed: 'outline', partially_fulfilled: 'outline', fulfilled: 'default', cancelled: 'destructive',
 };
 
-type Party = { type: 'company' | 'contact'; id: string; name: string };
+type Party = { type: 'company' | 'contact'; id: string; name: string; vat?: string | null; sub?: string | null };
+const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct ?? 0;
+const DEFAULT_VAT_CODE = '1'; // 24%
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
 export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string }> = ({ workspaceId, companyId }) => {
@@ -147,6 +149,9 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string }> 
 
 // ---------------------------------------------------------------------------
 
+type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; vat_code: string };
+const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, vat_code: DEFAULT_VAT_CODE });
+
 const NewOrderModal: React.FC<{
   workspaceId: string;
   open: boolean;
@@ -159,19 +164,20 @@ const NewOrderModal: React.FC<{
   const [party, setParty] = useState<Party | null>(null);
   const [partySearch, setPartySearch] = useState('');
   const [partyOpts, setPartyOpts] = useState<Party[]>([]);
-  const [items, setItems] = useState<NewOrderItem[]>([{ description: '', quantity: 1, unit_price: 0 }]);
-  const [prodSearch, setProdSearch] = useState('');
-  const [prodOpts, setProdOpts] = useState<Array<{ id: string; name: string }>>([]);
+  const [items, setItems] = useState<Line[]>([blankLine()]);
+  // Per-line product lookup — the Description field IS a catalog search.
+  const [activeLine, setActiveLine] = useState<number | null>(null);
+  const [lineProdOpts, setLineProdOpts] = useState<Array<{ id: string; name: string }>>([]);
 
   const isSales = preset.orderType === 'sales';
 
   useEffect(() => {
     if (!open) return;
-    setParty(null); setPartySearch(''); setPartyOpts([]); setProdSearch(''); setProdOpts([]);
-    setItems([{ description: '', quantity: 1, unit_price: 0 }]);
+    setParty(null); setPartySearch(''); setPartyOpts([]); setActiveLine(null); setLineProdOpts([]);
+    setItems([blankLine()]);
   }, [open]);
 
-  // CRM party search (any company/contact).
+  // CRM party search — by name, VAT, or email (companies + contacts).
   useEffect(() => {
     if (!open) return;
     const term = partySearch.trim();
@@ -179,49 +185,77 @@ const NewOrderModal: React.FC<{
     const like = `%${term}%`;
     const t = setTimeout(async () => {
       const [c, p] = await Promise.all([
-        supabase.from('crm_companies').select('id, name').ilike('name', like).limit(8),
-        supabase.from('crm_contacts').select('id, name').ilike('name', like).limit(8),
+        supabase.from('crm_companies').select('id, name, vat_number, email')
+          .or(`name.ilike.${like},vat_number.ilike.${like},email.ilike.${like}`).limit(8),
+        supabase.from('crm_contacts').select('id, name, vat_number, email')
+          .or(`name.ilike.${like},vat_number.ilike.${like},email.ilike.${like}`).limit(8),
       ]);
       const opts: Party[] = [];
-      for (const r of c.data ?? []) opts.push({ type: 'company', id: (r as any).id, name: `${(r as any).name} (company)` });
-      for (const r of p.data ?? []) opts.push({ type: 'contact', id: (r as any).id, name: (r as any).name });
+      for (const r of (c.data ?? []) as any[]) opts.push({ type: 'company', id: r.id, name: r.name, vat: r.vat_number, sub: [r.vat_number ? `VAT ${r.vat_number}` : null, r.email, 'Company'].filter(Boolean).join(' · ') });
+      for (const r of (p.data ?? []) as any[]) opts.push({ type: 'contact', id: r.id, name: r.name, vat: r.vat_number, sub: [r.vat_number ? `VAT ${r.vat_number}` : null, r.email, 'Contact'].filter(Boolean).join(' · ') });
       setPartyOpts(opts);
     }, 200);
     return () => clearTimeout(t);
   }, [partySearch, open]);
 
-  // Catalog product search → adds a line.
+  // Per-line product lookup — typing in a line's Description searches the catalog.
   useEffect(() => {
-    if (!open) return;
-    const term = prodSearch.trim();
-    if (term.length < 2) { setProdOpts([]); return; }
+    if (!open || activeLine === null) return;
+    const term = (items[activeLine]?.description ?? '').trim();
+    if (term.length < 2) { setLineProdOpts([]); return; }
     const t = setTimeout(async () => {
       const { data } = await supabase.from('products').select('id, name').ilike('name', `%${term}%`).limit(8);
-      setProdOpts((data ?? []) as Array<{ id: string; name: string }>);
+      setLineProdOpts((data ?? []) as Array<{ id: string; name: string }>);
     }, 200);
     return () => clearTimeout(t);
-  }, [prodSearch, open]);
+  }, [activeLine, items, open]);
 
-  const setItem = (i: number, patch: Partial<NewOrderItem>) => setItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
-  const addLine = (l?: NewOrderItem) => setItems((ls) => [...ls, l ?? { description: '', quantity: 1, unit_price: 0 }]);
+  const setItem = (i: number, patch: Partial<Line>) => setItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
+  const addLine = () => setItems((ls) => [...ls, blankLine()]);
   const removeLine = (i: number) => setItems((ls) => ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls);
+  const pickProduct = (i: number, p: { id: string; name: string }) => {
+    setItem(i, { product_id: p.id, description: p.name });
+    setActiveLine(null); setLineProdOpts([]);
+  };
 
-  const total = items.reduce((a, it) => a + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0);
+  const calc = items.map((l) => {
+    const net = (Number(l.quantity) || 0) * (Number(l.unit_price) || 0);
+    const vat = net * pctOf(l.vat_code) / 100;
+    return { net, vat, gross: net + vat };
+  });
+  const netTotal = calc.reduce((a, c) => a + c.net, 0);
+  const vatTotal = calc.reduce((a, c) => a + c.vat, 0);
+  const grossTotal = netTotal + vatTotal;
 
   const save = async () => {
+    if (!party) { toast({ title: isSales ? 'Pick a customer' : 'Pick a supplier', variant: 'destructive' }); return; }
     const clean = items.filter((it) => it.description.trim() && (Number(it.quantity) || 0) > 0);
-    if (clean.length === 0) { toast({ title: 'Add at least one line', variant: 'destructive' }); return; }
+    if (clean.length === 0) { toast({ title: 'Add at least one product', variant: 'destructive' }); return; }
     setBusy(true);
     try {
+      // A contact who belongs to a business is attributed to the BUSINESS (same as quotes/invoices).
+      let coId: string | null = party.type === 'company' ? party.id : null;
+      let ctId: string | null = party.type === 'contact' ? party.id : null;
+      if (ctId) {
+        const rolled = await financeService.resolvePrimaryCompanyId(ctId).catch(() => null);
+        if (rolled) { coId = rolled; ctId = null; }
+      }
       await ordersService.create({
         workspaceId,
         orderType: preset.orderType,
         status: preset.preOrder ? 'draft' : 'confirmed',
-        customerCompanyId: isSales && party?.type === 'company' ? party.id : null,
-        customerContactId: isSales && party?.type === 'contact' ? party.id : null,
-        supplierCompanyId: !isSales && party?.type === 'company' ? party.id : null,
-        supplierContactId: !isSales && party?.type === 'contact' ? party.id : null,
-        items: clean.map((it) => ({ ...it, quantity: Number(it.quantity) || 0, unit_price: Number(it.unit_price) || 0 })),
+        customerCompanyId: isSales ? coId : null,
+        customerContactId: isSales ? ctId : null,
+        supplierCompanyId: !isSales ? coId : null,
+        supplierContactId: !isSales ? ctId : null,
+        items: clean.map((it) => ({
+          product_id: it.product_id ?? null,
+          description: it.description,
+          quantity: Number(it.quantity) || 0,
+          unit_price: Number(it.unit_price) || 0,
+          vat_percent: pctOf(it.vat_code),
+          vat_category: parseInt(it.vat_code, 10) || undefined,
+        })),
       });
       toast({ title: preset.preOrder ? 'Pre-order created' : 'Order created' });
       onCreated();
@@ -238,20 +272,23 @@ const NewOrderModal: React.FC<{
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label>{isSales ? 'Customer' : 'Supplier'}</Label>
+            <Label>{isSales ? 'Customer *' : 'Supplier *'}</Label>
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
-                <span className="text-sm">{party.name}</span>
+                <span className="text-sm">{party.name}{party.sub ? <span className="text-xs text-muted-foreground"> · {party.sub}</span> : null}</span>
                 <Button size="sm" variant="ghost" onClick={() => setParty(null)}>Change</Button>
               </div>
             ) : (
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input className="pl-7" placeholder={`Search ${isSales ? 'customers' : 'suppliers'} by name…`} value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
+                <Input className="pl-7" placeholder={`Search ${isSales ? 'customers' : 'suppliers'} by name, VAT or email…`} value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
                 {partyOpts.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
                     {partyOpts.map((o) => (
-                      <button key={`${o.type}:${o.id}`} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setParty(o); setPartySearch(''); setPartyOpts([]); }}>{o.name}</button>
+                      <button key={`${o.type}:${o.id}`} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setParty(o); setPartySearch(''); setPartyOpts([]); }}>
+                        <div>{o.name}</div>
+                        {o.sub && <div className="text-[10px] text-muted-foreground">{o.sub}</div>}
+                      </button>
                     ))}
                   </div>
                 )}
@@ -262,41 +299,46 @@ const NewOrderModal: React.FC<{
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label>Items</Label>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => addLine()}><Plus className="h-3.5 w-3.5 mr-1" /> Ad-hoc line</Button>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New Product</Button>
             </div>
             <div className="rounded-md border border-border/60">
-              <div className="grid grid-cols-[1fr_70px_96px_96px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
-                <span>Description</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">Line total</span><span />
+              <div className="grid grid-cols-[1fr_56px_84px_92px_84px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                <span>Product</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">VAT</span><span className="text-right">Line total</span><span />
               </div>
               {items.map((l, i) => (
-                <div key={i} className="grid grid-cols-[1fr_70px_96px_96px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
-                  <Input className="h-8 text-sm" value={l.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="Product / description" />
+                <div key={i} className="grid grid-cols-[1fr_56px_84px_92px_84px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
+                  <div className="relative">
+                    <Input className="h-8 text-sm" value={l.description}
+                      onChange={(e) => { setItem(i, { description: e.target.value, product_id: null }); setActiveLine(i); }}
+                      onFocus={() => setActiveLine(i)}
+                      placeholder="Search a product or type a new one…" />
+                    {activeLine === i && lineProdOpts.length > 0 && (
+                      <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
+                        {lineProdOpts.map((p) => (
+                          <button key={p.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => pickProduct(i, p)}>{p.name}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} />
                   <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.unit_price} onChange={(e) => setItem(i, { unit_price: Number(e.target.value) })} />
-                  <span className="text-right text-sm tabular-nums">{formatMoney((Number(l.quantity) || 0) * (Number(l.unit_price) || 0))}</span>
+                  <Select value={l.vat_code} onValueChange={(v) => setItem(i, { vat_code: v })}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <span className="text-right text-sm tabular-nums">{formatMoney(calc[i]?.gross ?? 0)}</span>
                   <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => removeLine(i)}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               ))}
             </div>
-            {/* Catalog add */}
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-7 h-8 text-sm" placeholder="…or add a catalog product by name" value={prodSearch} onChange={(e) => setProdSearch(e.target.value)} />
-              {prodOpts.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
-                  {prodOpts.map((o) => (
-                    <button key={o.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                      onClick={() => { addLine({ product_id: o.id, description: o.name, quantity: 1, unit_price: 0 }); setProdSearch(''); setProdOpts([]); }}>
-                      {o.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground">Ad-hoc lines are not linked to the warehouse. Catalog products link to it (delivery moves stock).</p>
+            <p className="text-[11px] text-muted-foreground">Type to search the catalog and pick a product (links to the warehouse — delivery moves stock), or type a new product name (off-warehouse).</p>
           </div>
 
-          <div className="flex justify-end text-sm font-semibold">Total {formatMoney(total)}</div>
+          <div className="flex justify-end gap-4 text-sm">
+            <span className="text-muted-foreground">Net {formatMoney(netTotal)}</span>
+            <span className="text-muted-foreground">VAT {formatMoney(vatTotal)}</span>
+            <span className="font-semibold">Total {formatMoney(grossTotal)}</span>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
