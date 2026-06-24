@@ -25,7 +25,7 @@ const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct
 const DEFAULT_VAT_CODE = '1'; // 24%
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
-export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string }> = ({ workspaceId, companyId }) => {
+export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; projectId?: string }> = ({ workspaceId, companyId, projectId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,14 +40,14 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string }> 
     if (!workspaceId) return;
     try {
       setLoading(true);
-      setRows(await ordersService.list({ workspaceId, companyId, orderType: typeF === 'all' ? undefined : typeF, status: statusF === 'all' ? undefined : statusF }));
+      setRows(await ordersService.list({ workspaceId, companyId, projectId, orderType: typeF === 'all' ? undefined : typeF, status: statusF === 'all' ? undefined : statusF }));
     } catch (err: any) {
       toast({ title: 'Failed to load orders', description: err?.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, typeF, statusF]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, projectId, typeF, statusF]);
 
   const filtered = useMemo(() => {
     const t = search.trim().toLowerCase();

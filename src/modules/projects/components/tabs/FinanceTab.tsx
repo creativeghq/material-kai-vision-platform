@@ -17,6 +17,8 @@ import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import {
   projectsService,
   type ProjectFinanceRow,
@@ -34,6 +36,7 @@ export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const { activeWorkspaceId } = useWorkspace();
   const [summary, setSummary] = useState<ProjectFinanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [picker, setPicker] = useState<'receivable' | 'payable' | null>(null);
@@ -136,6 +139,9 @@ export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {
         rows={summary.receivables} total={t.receivable_total} due={t.receivable_due} kind="receivable" />
       <Section title="Payables" icon={<ArrowUpRight className="h-4 w-4 text-amber-400" />}
         rows={summary.payables} total={t.payable_total} due={t.payable_due} kind="payable" />
+
+      {/* This project's orders (sales & purchase). */}
+      <OrdersPanel workspaceId={activeWorkspaceId ?? ''} projectId={projectId} />
 
       {picker && (
         <AttachDialog

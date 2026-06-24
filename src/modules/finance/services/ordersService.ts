@@ -70,6 +70,7 @@ export const ordersService = {
     status?: OrderStatus;
     companyId?: string;
     contactId?: string;
+    projectId?: string;
   }): Promise<OrderListRow[]> {
     let q = supabase
       .from('orders')
@@ -79,6 +80,7 @@ export const ordersService = {
       .limit(500);
     if (opts.orderType) q = q.eq('order_type', opts.orderType);
     if (opts.status) q = q.eq('status', opts.status);
+    if (opts.projectId) q = q.eq('project_id', opts.projectId);
     if (opts.companyId) q = q.or(`customer_company_id.eq.${opts.companyId},supplier_company_id.eq.${opts.companyId}`);
     if (opts.contactId) q = q.or(`customer_contact_id.eq.${opts.contactId},supplier_contact_id.eq.${opts.contactId}`);
     const { data, error } = await q;
