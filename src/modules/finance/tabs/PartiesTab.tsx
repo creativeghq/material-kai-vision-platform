@@ -17,8 +17,9 @@ import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanc
 import { ExternalLink } from 'lucide-react';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
-  invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment',
+  invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
   supplier_bill: 'Supplier bill', supplier_credit_note: 'Supplier credit note',
+  manual_receivable: 'Receivable (un-invoiced)', manual_payable: 'Payable (un-invoiced)',
 };
 
 interface Props { workspaceId: string; statementsEnabled: boolean; autoOpenParty?: string | null; financeBase?: string }
@@ -514,7 +515,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                             <tr key={idx} className="border-b border-border/30">
                               <td className="px-3 py-1.5">{r.entry_date ? new Date(r.entry_date).toLocaleDateString() : '—'}</td>
                               <td className="px-3 py-1.5">{LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
-                              <td className="px-3 py-1.5 font-mono text-xs">{r.doc_number ?? '—'}</td>
+                              <td className="px-3 py-1.5 font-mono">{r.doc_number ?? '—'}</td>
                               <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.debit) ? m(Number(r.debit)) : ''}</td>
                               <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.credit) ? m(Number(r.credit)) : ''}</td>
                               <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{m(r.progrDebit)}</td>

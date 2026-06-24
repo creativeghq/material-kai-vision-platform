@@ -9,7 +9,7 @@
  * Settle it later from "Record payment" or the row's Settle action — that runs
  * through the same payment-allocation machinery as invoices.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -20,7 +20,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { financeService, type ManualEntryDirection, type PartyRow } from '@/modules/finance/services/financeService';
+import { financeService, type ManualEntryDirection } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
@@ -49,14 +49,17 @@ export const ManualEntryDialog: React.FC<{
   const { toast } = useToast();
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [partyKey, setPartyKey] = useState<string>(''); // `${party_type}:${party_id}`
+  // Searchable counterparty — any CRM company/contact, not limited to a flagged role.
+  type Picked = { party_type: 'company' | 'contact'; party_id: string; display_name: string };
+  const [pickedParty, setPickedParty] = useState<Picked | null>(null);
+  const [partySearch, setPartySearch] = useState('');
+  const [partyOptions, setPartyOptions] = useState<Picked[]>([]);
   const [categoryId, setCategoryId] = useState('');
   const [issuedAt, setIssuedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [dueAt, setDueAt] = useState('');
   const [notes, setNotes] = useState('');
   const [method, setMethod] = useState<SettlementMethod | ''>('');
   const [requestDoc, setRequestDoc] = useState(false);
-  const [parties, setParties] = useState<PartyRow[]>([]);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -69,42 +72,58 @@ export const ManualEntryDialog: React.FC<{
   const clearDraft = useSessionDraft(
     `fin-manual-entry:${workspaceId}:${direction}:${lockedParty?.party_id ?? 'none'}`,
     open,
-    { description, amount, partyKey, categoryId, issuedAt, dueAt, notes, method, requestDoc },
+    { description, amount, pickedParty, categoryId, issuedAt, dueAt, notes, method, requestDoc },
     (d) => {
       setDescription(d?.description ?? ''); setAmount(d?.amount ?? '');
-      setPartyKey(d?.partyKey ?? (lockedParty ? `${lockedParty.party_type}:${lockedParty.party_id}` : ''));
+      setPickedParty(d?.pickedParty ?? (lockedParty ? { party_type: lockedParty.party_type, party_id: lockedParty.party_id, display_name: lockedParty.display_name } : null));
+      setPartySearch('');
       setCategoryId(d?.categoryId ?? '');
       setIssuedAt(d?.issuedAt ?? new Date().toISOString().slice(0, 10)); setDueAt(d?.dueAt ?? ''); setNotes(d?.notes ?? '');
       setMethod(d?.method ?? ''); setRequestDoc(d?.requestDoc ?? false);
     },
   );
 
-  // Load the party + category lists when the dialog opens.
+  // Load category list when the dialog opens.
   useEffect(() => {
     if (!open) return;
-    (async () => {
-      const [pp, cats] = await Promise.all([
-        // Skip the party list entirely when the counterparty is already locked by the caller.
-        lockedParty ? Promise.resolve([] as PartyRow[]) : financeService.listParties({ workspaceId, role: isReceivable ? 'customer' : 'supplier' }).catch(() => []),
-        financeCategoriesService.list(workspaceId).catch(() => []),
-      ]);
-      setParties(pp);
-      setCategories(cats);
-    })();
-  }, [open, workspaceId, isReceivable, lockedParty]);
+    financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+  }, [open, workspaceId]);
 
-  const selectedParty = useMemo(
-    () => parties.find((p) => `${p.party_type}:${p.party_id}` === partyKey) ?? null,
-    [parties, partyKey],
-  );
+  // Search CRM for the counterparty by name (any company/contact, so the business is
+  // always findable even when it isn't flagged as a customer/supplier yet).
+  useEffect(() => {
+    if (!open || lockedParty) return;
+    const term = partySearch.trim();
+    if (term.length < 2) { setPartyOptions([]); return; }
+    const like = `%${term}%`;
+    const t = setTimeout(async () => {
+      const [companies, contacts] = await Promise.all([
+        supabase.from('crm_companies').select('id, name').ilike('name', like).limit(8),
+        supabase.from('crm_contacts').select('id, name, first_name, last_name, email')
+          .or(`name.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`).limit(8),
+      ]);
+      const opts: Picked[] = [];
+      for (const c of companies.data ?? []) {
+        const cc = c as { id: string; name?: string };
+        opts.push({ party_type: 'company', party_id: cc.id, display_name: `${cc.name ?? cc.id} (company)` });
+      }
+      for (const c of contacts.data ?? []) {
+        const cc = c as { id: string; name?: string; first_name?: string; last_name?: string; email?: string };
+        opts.push({ party_type: 'contact', party_id: cc.id, display_name: cc.name || [cc.first_name, cc.last_name].filter(Boolean).join(' ') || cc.email || cc.id });
+      }
+      setPartyOptions(opts);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [partySearch, open, lockedParty]);
 
   const save = async () => {
     const amt = parseFloat(amount);
     if (!description.trim()) { toast({ title: 'Add a description', variant: 'destructive' }); return; }
     if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
-    let companyId = lockedParty?.party_type === 'company' ? lockedParty.party_id : (selectedParty?.party_type === 'company' ? selectedParty.party_id : null);
-    let contactId = lockedParty?.party_type === 'contact' ? lockedParty.party_id : (selectedParty?.party_type === 'contact' ? selectedParty.party_id : null);
-    let partyName = lockedParty?.display_name ?? selectedParty?.display_name ?? null;
+    const eff = lockedParty ?? pickedParty;
+    let companyId = eff?.party_type === 'company' ? eff.party_id : null;
+    let contactId = eff?.party_type === 'contact' ? eff.party_id : null;
+    let partyName = eff?.display_name ?? null;
     // Business rollup: a person attached to a company is billed under the BUSINESS,
     // not the person — same rule as invoices. Search by person, attribute to business.
     if (contactId && !companyId) {
@@ -184,27 +203,43 @@ export const ManualEntryDialog: React.FC<{
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <>
               <div className="space-y-1">
                 <Label>Amount</Label>
                 <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>{isReceivable ? 'Customer' : 'Supplier'} (optional)</Label>
-                <Select value={partyKey} onValueChange={setPartyKey}>
-                  <SelectTrigger><SelectValue placeholder="None — unassigned" /></SelectTrigger>
-                  <SelectContent>
-                    {parties.length === 0
-                      ? <div className="px-2 py-1 text-xs text-muted-foreground">No {isReceivable ? 'customers' : 'suppliers'} in CRM</div>
-                      : parties.map((p) => (
-                        <SelectItem key={`${p.party_type}:${p.party_id}`} value={`${p.party_type}:${p.party_id}`}>
-                          {p.display_name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                {pickedParty ? (
+                  <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
+                    <span className="text-sm">{pickedParty.display_name}</span>
+                    <Button size="sm" variant="ghost" onClick={() => setPickedParty(null)}>Change</Button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Input
+                      placeholder={`Search ${isReceivable ? 'customers' : 'suppliers'} by name…`}
+                      value={partySearch}
+                      onChange={(e) => setPartySearch(e.target.value)}
+                    />
+                    {partyOptions.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
+                        {partyOptions.map((o) => (
+                          <button
+                            key={`${o.party_type}:${o.party_id}`}
+                            type="button"
+                            className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                            onClick={() => { setPickedParty(o); setPartySearch(''); setPartyOptions([]); }}
+                          >
+                            {o.display_name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
+            </>
           )}
 
           <div className="space-y-1">
