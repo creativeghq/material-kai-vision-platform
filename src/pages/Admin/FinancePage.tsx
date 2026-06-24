@@ -119,6 +119,7 @@ const FinancePage: React.FC = () => {
   const [pnl, setPnl] = useState<PnlRow[]>([]);
   const [cashFlow, setCashFlow] = useState<CashFlowRow[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+  const [cashPosition, setCashPosition] = useState(0); // money in bank = Σ payments in − out
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newBillOpen, setNewBillOpen] = useState(false);
@@ -178,6 +179,9 @@ const FinancePage: React.FC = () => {
       setPnl(pnlRows);
       setCashFlow(cashRows);
       setRecentInvoices(invoices);
+      // Cash in bank — actual money in/out across all payments (not planned).
+      const { data: pays } = await supabase.from('payments').select('direction, amount').eq('workspace_id', wsId);
+      setCashPosition((pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'in' ? Number(p.amount) : -Number(p.amount)), 0));
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load finance data');
       toast({ title: 'Load failed', description: err?.message, variant: 'destructive' });
@@ -328,7 +332,14 @@ const FinancePage: React.FC = () => {
           {/* ─────────── DASHBOARD ─────────── */}
           <TabsContent value="dashboard" className="space-y-6">
             {/* KPI strip */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <KpiCard
+                icon={BanknoteIcon}
+                label="Cash in bank"
+                value={formatMoney(cashPosition)}
+                accent={cashPosition < 0 ? 'destructive' : 'default'}
+                subtext="Payments in − out"
+              />
               <KpiCard
                 icon={ArrowDownCircle}
                 label="AR outstanding"
