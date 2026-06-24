@@ -80,6 +80,9 @@ verify_jwt = false
 [functions.finance-pay-invoice]
 verify_jwt = false
 
+[functions.finance-customer-documents]
+verify_jwt = false
+
 # Public online storefront (anonymous catalog browse + cart checkout → draft order + pay token)
 [functions.finance-storefront]
 verify_jwt = false

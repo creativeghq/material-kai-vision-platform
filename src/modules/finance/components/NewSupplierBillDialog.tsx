@@ -110,11 +110,19 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
     }
     try {
       setBusy(true);
+      // Business rollup: a supplier contact attached to a supplier company is
+      // billed under the BUSINESS, not the person — same rule as customer docs.
+      let supCompanyId = supplier.type === 'company' ? supplier.id : undefined;
+      let supContactId = supplier.type === 'contact' ? supplier.id : undefined;
+      if (supContactId && !supCompanyId) {
+        const rolled = await financeService.resolvePrimaryCompanyId(supContactId).catch(() => null);
+        if (rolled) { supCompanyId = rolled; supContactId = undefined; }
+      }
       await financeService.createSupplierBill({
         workspaceId,
         supplierBillNumber: supplierBillNumber || undefined,
-        supplierCompanyId: supplier.type === 'company' ? supplier.id : undefined,
-        supplierContactId: supplier.type === 'contact' ? supplier.id : undefined,
+        supplierCompanyId: supCompanyId,
+        supplierContactId: supContactId,
         currency,
         subtotalNet: Number((parseFloat(subtotalNet) || 0).toFixed(2)),
         vatAmount: Number((parseFloat(vatAmount) || 0).toFixed(2)),

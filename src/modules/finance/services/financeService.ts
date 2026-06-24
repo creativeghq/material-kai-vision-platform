@@ -10,6 +10,64 @@
 //   - The cost-snapshot rule from PR-A is honored end-to-end
 
 import { supabase } from '@/integrations/supabase/client';
+import { flowEventService } from '@/services/flows/flowEventService';
+
+// ─── Finance flow events (fire-and-forget) ───────────────────────────────────
+// Emitted when a document is issued or a payment is received, so seeded
+// system-default flows can notify the workspace + email the customer. Never
+// throws — a flow failure must not break issuance/payment recording.
+
+/** Resolve a party's display name + email + linked app user (for bell + email). */
+async function resolvePartyContactInfo(
+  companyId: string | null | undefined,
+  contactId: string | null | undefined,
+): Promise<{ name: string | null; email: string | null; userId: string | null }> {
+  try {
+    if (companyId) {
+      const { data } = await supabase.from('crm_companies').select('name, email').eq('id', companyId).maybeSingle();
+      return { name: (data?.name as string) ?? null, email: (data?.email as string) ?? null, userId: null };
+    }
+    if (contactId) {
+      const { data } = await supabase.from('crm_contacts').select('name, first_name, last_name, email, user_id').eq('id', contactId).maybeSingle();
+      const name = (data?.name as string) || [data?.first_name, data?.last_name].filter(Boolean).join(' ') || null;
+      return { name, email: (data?.email as string) ?? null, userId: (data?.user_id as string) ?? null };
+    }
+  } catch { /* non-fatal */ }
+  return { name: null, email: null, userId: null };
+}
+
+/** Emit invoice_issued / receipt_issued for a freshly-issued document. */
+async function emitDocumentIssuedEvent(invoiceId: string): Promise<void> {
+  try {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('id, internal_number, legal_number, document_type, total, currency, customer_company_id, customer_contact_id, workspace_id')
+      .eq('id', invoiceId)
+      .maybeSingle();
+    if (!inv) return;
+    const isReceipt = String((inv as any).document_type ?? '').startsWith('11');
+    const party = await resolvePartyContactInfo((inv as any).customer_company_id, (inv as any).customer_contact_id);
+    const num = (inv as any).legal_number ?? (inv as any).internal_number ?? '';
+    const amount = `${Number((inv as any).total ?? 0).toFixed(2)} ${(inv as any).currency ?? 'EUR'}`;
+    const docWord = isReceipt ? 'Receipt' : 'Invoice';
+    flowEventService.emit(isReceipt ? 'receipt_issued' : 'invoice_issued', {
+      type: isReceipt ? 'receipt_issued' : 'invoice_issued',
+      // Bell recipient — only linked customers have a user_id; the flow skips an empty one.
+      user_id: party.userId ?? undefined,
+      customer_email: party.email ?? undefined,
+      customer_name: party.name ?? undefined,
+      invoice_id: (inv as any).id,
+      document_number: num,
+      document_type: (inv as any).document_type ?? undefined,
+      amount,
+      currency: (inv as any).currency ?? 'EUR',
+      workspace_id: (inv as any).workspace_id,
+      title: `${docWord} ${num} issued`,
+      body: `${docWord} ${num} for ${amount}${party.name ? ` to ${party.name}` : ''} has been issued.`,
+      action_url: `/finance/invoices/${(inv as any).id}`,
+    });
+  } catch { /* flow emit is best-effort */ }
+}
 
 // =============================================================================
 // Types
@@ -395,6 +453,14 @@ const _financeServiceCore = {
     return { pdf_url: data?.pdf_url ?? null };
   },
 
+  /** Payment receipt (απόδειξη είσπραξης) PDF for a recorded payment. */
+  async generatePaymentReceiptPdf(paymentId: string, regenerate = false): Promise<{ pdf_url: string | null; pdf_storage_path: string | null; receipt_number: string | null }> {
+    const { data, error } = await supabase.functions.invoke('finance-invoice-pdf', { body: { payment_id: paymentId, regenerate } });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.error || 'Receipt generation failed');
+    return { pdf_url: data?.pdf_url ?? null, pdf_storage_path: data?.pdf_storage_path ?? null, receipt_number: data?.receipt_number ?? null };
+  },
+
   /** #204 "Send SMS" — text the invoice number + total (+ QR) to the customer via messaging-api. */
   async sendInvoiceSms(invoiceId: string): Promise<{ ok: boolean; sent_to?: string; error?: string }> {
     const { data: inv } = await supabase
@@ -540,6 +606,8 @@ const _financeServiceCore = {
   async markInvoiceIssued(invoiceId: string): Promise<void> {
     const { error } = await supabase.rpc('mark_invoice_issued', { p_invoice_id: invoiceId });
     if (error) throw error;
+    // Notify the workspace + email the customer via the seeded flow (fire-and-forget).
+    void emitDocumentIssuedEvent(invoiceId);
   },
 
   async updateInvoice(invoiceId: string, patch: Partial<Invoice>): Promise<Invoice> {
@@ -634,6 +702,36 @@ const _financeServiceCore = {
       p_category_id: input.categoryId ?? null,
     });
     if (error) throw error;
+    // Payment received → notify + email the customer via the seeded flow (fire-and-forget).
+    // Only for inbound money (a customer paying us); outbound is us paying a supplier.
+    if (input.direction === 'in') {
+      const paymentId = data as string;
+      void (async () => {
+        try {
+          const party = await resolvePartyContactInfo(input.counterpartyCompanyId, input.counterpartyContactId);
+          const amount = `${Number(input.amount).toFixed(2)} ${input.currency ?? 'EUR'}`;
+          // Generate the payment receipt (απόδειξη είσπραξης) so the customer email can link it.
+          let receiptUrl: string | null = null;
+          try { receiptUrl = (await financeService.generatePaymentReceiptPdf(paymentId)).pdf_url; } catch { /* receipt optional */ }
+          const receiptLine = receiptUrl ? `<p><a href="${receiptUrl}">Download your receipt</a></p>` : '';
+          flowEventService.emit('payment_received', {
+            type: 'payment_received',
+            user_id: party.userId ?? undefined,
+            customer_email: party.email ?? undefined,
+            customer_name: party.name ?? undefined,
+            payment_id: paymentId,
+            amount,
+            currency: input.currency ?? 'EUR',
+            workspace_id: input.workspaceId,
+            receipt_url: receiptUrl ?? undefined,
+            receipt_line: receiptLine,
+            title: `Payment received — ${amount}`,
+            body: `A payment of ${amount}${party.name ? ` from ${party.name}` : ''} has been recorded.`,
+            action_url: '/finance?tab=parties',
+          });
+        } catch { /* best-effort */ }
+      })();
+    }
     return data as string;
   },
 
@@ -1710,6 +1808,28 @@ const _financeServiceV2 = {
   },
 
   // -------- Parties --------
+
+  /**
+   * Business rollup: a person (CRM contact) can be attached to a company via
+   * crm_company_contacts (is_primary marks the main one). When a contact is
+   * chosen as the billing party on ANY document (invoice / receipt / receivable
+   * / payable …), the document must be issued to that BUSINESS, not the person.
+   * Returns the contact's primary company_id, or null when the contact is a
+   * standalone individual. Prefers is_primary, then the oldest link.
+   */
+  async resolvePrimaryCompanyId(contactId: string): Promise<string | null> {
+    if (!contactId) return null;
+    const { data, error } = await supabase
+      .from('crm_company_contacts')
+      .select('company_id, is_primary, created_at')
+      .eq('contact_id', contactId)
+      .order('is_primary', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) return null;
+    return (data?.company_id as string | undefined) ?? null;
+  },
 
   async listParties(opts: {
     workspaceId: string;

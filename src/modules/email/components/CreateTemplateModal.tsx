@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -146,16 +147,14 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
           {/* Category */}
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
-            <select
-              id="category"
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="transactional">Transactional</option>
-              <option value="marketing">Marketing</option>
-              <option value="notification">Notification</option>
-            </select>
+            <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+              <SelectTrigger id="category"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="transactional">Transactional</SelectItem>
+                <SelectItem value="marketing">Marketing</SelectItem>
+                <SelectItem value="notification">Notification</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="p-4 rounded-lg border bg-muted/50">

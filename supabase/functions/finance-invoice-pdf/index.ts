@@ -52,6 +52,8 @@ const LABELS: Record<Lang, Record<string, string>> = {
     mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για επαλήθευση στο myDATA',
     movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
     vehicle: 'Όχημα', purpose: 'Σκοπός', notes: 'Σημειώσεις', page: 'Σελίδα', of: 'από',
+    paymentReceipt: 'ΑΠΟΔΕΙΞΗ ΕΙΣΠΡΑΞΗΣ', received: 'Εισπράχθηκε', method: 'Τρόπος πληρωμής',
+    appliedTo: 'Εξόφληση', reference: 'Αναφορά', thankYou: 'Ευχαριστούμε για την πληρωμή σας.',
   },
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
@@ -70,7 +72,13 @@ const LABELS: Record<Lang, Record<string, string>> = {
     mark: 'MARK', uid: 'UID', verify: 'Scan to verify on myDATA',
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading place', deliveryPlace: 'Delivery place',
     vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
+    paymentReceipt: 'PAYMENT RECEIPT', received: 'Received', method: 'Payment method',
+    appliedTo: 'Applied to', reference: 'Reference', thankYou: 'Thank you for your payment.',
   },
+};
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  bank_transfer: 'Bank transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
 };
 
 function docTitle(documentType: string | null, L: Record<string, string>): string {
@@ -108,7 +116,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let kind: 'invoice' | 'credit_note' | 'delivery_note' = 'invoice';
+  let kind: 'invoice' | 'credit_note' | 'delivery_note' | 'payment_receipt' = 'invoice';
   let docId = '';
   let regenerate = false;
   try {
@@ -116,15 +124,16 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     regenerate = !!body.regenerate;
     if (body.credit_note_id) { kind = 'credit_note'; docId = body.credit_note_id; }
     else if (body.delivery_note_id) { kind = 'delivery_note'; docId = body.delivery_note_id; }
+    else if (body.payment_id) { kind = 'payment_receipt'; docId = body.payment_id; }
     else if (body.invoice_id) { kind = 'invoice'; docId = body.invoice_id; }
-    else return json({ error: 'invoice_id, credit_note_id or delivery_note_id is required' }, 400);
+    else return json({ error: 'invoice_id, credit_note_id, delivery_note_id or payment_id is required' }, 400);
   } catch {
     return json({ error: 'invalid body' }, 400);
   }
 
-  const TABLE = kind === 'credit_note' ? 'credit_notes' : kind === 'delivery_note' ? 'delivery_notes' : 'invoices';
-  const OUT = kind === 'credit_note' ? 'credit-note-output' : kind === 'delivery_note' ? 'delivery-note-output' : 'invoice-output';
-  const PREFIX = kind === 'credit_note' ? 'cn' : kind === 'delivery_note' ? 'dn' : 'inv';
+  const TABLE = kind === 'credit_note' ? 'credit_notes' : kind === 'delivery_note' ? 'delivery_notes' : kind === 'payment_receipt' ? 'payments' : 'invoices';
+  const OUT = kind === 'credit_note' ? 'credit-note-output' : kind === 'delivery_note' ? 'delivery-note-output' : kind === 'payment_receipt' ? 'payment-receipt-output' : 'invoice-output';
+  const PREFIX = kind === 'credit_note' ? 'cn' : kind === 'delivery_note' ? 'dn' : kind === 'payment_receipt' ? 'pr' : 'inv';
 
   const { data: row } = await supabase.from(TABLE).select('*').eq('id', docId).maybeSingle();
   if (!row) return json({ error: `${kind} not found` }, 404);
@@ -140,6 +149,45 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
 
   try {
     await supabase.from(TABLE).update({ pdf_generation_status: 'generating' }).eq('id', docId);
+
+    // ── Payment receipt (απόδειξη είσπραξης) — its own clean acknowledgment layout,
+    //    not a VAT invoice. Settles inbound money against one or more invoices. ──
+    if (kind === 'payment_receipt') {
+      const receiptNumber = (row as any).receipt_number || `PR-${String(docId).slice(0, 8).toUpperCase()}`;
+      const [{ data: fsP }, { data: allocs }] = await Promise.all([
+        supabase.from('finance_settings').select('*').eq('workspace_id', row.workspace_id).maybeSingle(),
+        supabase.from('payment_allocations')
+          .select('amount, invoice:invoices(internal_number, legal_number), supplier_bill:supplier_bills(supplier_bill_number)')
+          .eq('payment_id', docId),
+      ]);
+      let custP: any = null;
+      if (row.counterparty_company_id) {
+        const { data } = await supabase.from('crm_companies').select('*').eq('id', row.counterparty_company_id).maybeSingle();
+        custP = data;
+      } else if (row.counterparty_contact_id) {
+        const { data } = await supabase.from('crm_contacts').select('*').eq('id', row.counterparty_contact_id).maybeSingle();
+        custP = data;
+      }
+      let logoP: Uint8Array | null = null;
+      if (fsP?.business_logo_path) {
+        try {
+          const { data: lf } = await supabase.storage.from('generation-images').download(fsP.business_logo_path);
+          if (lf) logoP = new Uint8Array(await lf.arrayBuffer());
+        } catch { /* logo optional */ }
+      }
+      const langP: Lang = fsP?.default_doc_language === 'el' ? 'el' : 'en';
+      const bytes = await buildPaymentReceiptPdf({
+        payment: row, allocations: allocs ?? [], fs: fsP, customer: custP, lang: langP, logo: logoP, receiptNumber,
+      });
+      const pPath = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
+      const { error: upPErr } = await supabase.storage.from('pdf-documents').upload(pPath, bytes, { upsert: true, contentType: 'application/pdf' });
+      if (upPErr) throw upPErr;
+      await supabase.from(TABLE).update({
+        receipt_number: receiptNumber, pdf_storage_path: pPath, pdf_generation_status: 'completed', pdf_generated_at: new Date().toISOString(),
+      }).eq('id', docId);
+      const { data: signedP } = await supabase.storage.from('pdf-documents').createSignedUrl(pPath, 60 * 60 * 24 * 7);
+      return json({ ok: true, pdf_url: signedP?.signedUrl, pdf_storage_path: pPath, receipt_number: receiptNumber });
+    }
 
     // Normalize each document kind into the shape buildPdf expects.
     let inv: any = row;
@@ -567,6 +615,95 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
       x: A4.w / 2 - 30, y: 24, size: 7, font, color: MUTED,
     });
   });
+
+  return await pdf.save();
+}
+
+// Payment receipt (απόδειξη είσπραξης) — a clean money-received acknowledgment.
+// Deliberately NOT the VAT invoice layout: issuer header, a big "Received" amount,
+// method/date/reference, the invoice(s) it settles, and a thank-you line.
+async function buildPaymentReceiptPdf(d: {
+  payment: any; allocations: any[]; fs: any; customer: any; lang: Lang; logo?: Uint8Array | null; receiptNumber: string;
+}): Promise<Uint8Array> {
+  const { payment, allocations, fs, customer, lang, logo, receiptNumber } = d;
+  const L = LABELS[lang];
+  const currency = payment.currency ?? 'EUR';
+  const money = (n: any) => fmtMoney(n, currency, lang);
+  const INK = rgb(0.1, 0.1, 0.12), MUTED = rgb(0.45, 0.45, 0.5), LINE = rgb(0.8, 0.8, 0.83);
+
+  const fonts = await loadFonts();
+  const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  const font = await pdf.embedFont(fonts.regular, { subset: true });
+  const bold = await pdf.embedFont(fonts.bold, { subset: true });
+  const page = pdf.addPage([A4.w, A4.h]);
+  const right = A4.w - M;
+  let y = A4.h - M;
+  const text = (s: any, x: number, yy: number, size: number, f: PDFFont = font, color = INK) =>
+    page.drawText(String(s ?? ''), { x, y: yy, size, font: f, color });
+  const textR = (s: any, xRight: number, yy: number, size: number, f: PDFFont = font, color = INK) => {
+    const str = String(s ?? '');
+    page.drawText(str, { x: xRight - f.widthOfTextAtSize(str, size), y: yy, size, font: f, color });
+  };
+
+  // Header: logo + issuer (left), title + number/date (right).
+  if (logo) {
+    try {
+      const img = await (async () => { try { return await pdf.embedPng(logo); } catch { return await pdf.embedJpg(logo); } })();
+      const s = Math.min(120 / img.width, 46 / img.height);
+      page.drawImage(img, { x: M, y: y - img.height * s, width: img.width * s, height: img.height * s });
+      y -= img.height * s + 8;
+    } catch { /* logo optional */ }
+  }
+  text(fs?.business_name || '', M, y - 12, 15, bold, INK);
+  let iy = y - 28;
+  for (const l of [
+    [fs?.business_address, fs?.business_street_number].filter(Boolean).join(' '),
+    [fs?.business_postal_code, fs?.business_city].filter(Boolean).join(' '),
+    fs?.business_vat ? `${L.vatNo}: ${fs.business_vat}` : '',
+    [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
+  ].filter(Boolean) as string[]) { text(l, M, iy, 8.5, font, MUTED); iy -= 11; }
+
+  textR(L.paymentReceipt, right, y - 2, 18, bold, INK);
+  textR(`${L.number}: ${receiptNumber}`, right, y - 22, 9, font, MUTED);
+  textR(`${L.date}: ${payment.paid_at ? new Date(payment.paid_at).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') : ''}`, right, y - 34, 9, font, MUTED);
+
+  y = iy - 14;
+  page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.7, color: LINE });
+  y -= 18;
+
+  // Customer block.
+  text(L.customer, M, y, 9, bold, MUTED); y -= 13;
+  const custName = customer ? (customer.name || [customer.first_name, customer.last_name].filter(Boolean).join(' ')) : '—';
+  text(custName, M, y, 11, bold); y -= 13;
+  for (const l of (customer ? [
+    [customer.street ?? customer.address, customer.street_number].filter(Boolean).join(' '),
+    [customer.postal_code, customer.city].filter(Boolean).join(' '),
+    customer.vat_number ? `${L.vatNo}: ${customer.vat_number}` : '',
+  ].filter(Boolean) : []) as string[]) { text(l, M, y, 8.5, font, MUTED); y -= 11; }
+  y -= 10;
+
+  // Big "Received" amount box.
+  page.drawRectangle({ x: M, y: y - 38, width: right - M, height: 44, borderColor: LINE, borderWidth: 1 });
+  text(L.received, M + 12, y - 12, 9, bold, MUTED);
+  textR(money(payment.amount), right - 12, y - 26, 20, bold, INK);
+  const methodLabel = payment.method ? (PAYMENT_METHOD_LABELS[String(payment.method)] ?? String(payment.method)) : '';
+  text([methodLabel ? `${L.method}: ${methodLabel}` : '', payment.reference ? `${L.reference}: ${payment.reference}` : ''].filter(Boolean).join('   ·   '), M + 12, y - 30, 8.5, font, MUTED);
+  y -= 56;
+
+  // Applied-to list (invoices/bills this payment settled).
+  const lines = (allocations ?? []).map((a: any) => {
+    const docNo = a.invoice?.legal_number || a.invoice?.internal_number || a.supplier_bill?.supplier_bill_number || '';
+    return docNo ? `${docNo} — ${money(a.amount)}` : money(a.amount);
+  });
+  if (lines.length) {
+    text(L.appliedTo, M, y, 9, bold, MUTED); y -= 13;
+    for (const l of lines) { text(l, M + 4, y, 9, font, INK); y -= 12; }
+    y -= 6;
+  }
+
+  if (payment.notes) { text(`${L.notes}: ${payment.notes}`, M, y, 8.5, font, MUTED); y -= 14; }
+  text(L.thankYou, M, y, 9, font, MUTED);
 
   return await pdf.save();
 }

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -390,31 +391,29 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
               {form.embedFfe && (
                 <div className="space-y-1.5">
                   <Label>FF&E source quote</Label>
-                  <select
-                    value={form.quoteId}
-                    onChange={(e) => setForm({ ...form, quoteId: e.target.value })}
-                    className="w-full rounded-md bg-background border border-border px-3 py-2 text-sm"
-                  >
-                    <option value="">— none —</option>
-                    {quotes.map((q) => (
-                      <option key={q.id} value={q.id}>{q.name || q.quote_number || q.id.slice(0, 8)}</option>
-                    ))}
-                  </select>
+                  <Select value={form.quoteId || '__none__'} onValueChange={(v) => setForm({ ...form, quoteId: v === '__none__' ? '' : v })}>
+                    <SelectTrigger><SelectValue placeholder="— none —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— none —</SelectItem>
+                      {quotes.map((q) => (
+                        <SelectItem key={q.id} value={q.id}>{q.name || q.quote_number || q.id.slice(0, 8)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
               {form.embedVr && (
                 <div className="space-y-1.5">
                   <Label>3D world</Label>
-                  <select
-                    value={form.vrWorldId}
-                    onChange={(e) => setForm({ ...form, vrWorldId: e.target.value })}
-                    className="w-full rounded-md bg-background border border-border px-3 py-2 text-sm"
-                  >
-                    <option value="">— none —</option>
-                    {vrWorlds.map((w) => (
-                      <option key={w.id} value={w.id}>{w.display_name || w.id.slice(0, 8)}</option>
-                    ))}
-                  </select>
+                  <Select value={form.vrWorldId || '__none__'} onValueChange={(v) => setForm({ ...form, vrWorldId: v === '__none__' ? '' : v })}>
+                    <SelectTrigger><SelectValue placeholder="— none —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— none —</SelectItem>
+                      {vrWorlds.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>{w.display_name || w.id.slice(0, 8)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
             </div>

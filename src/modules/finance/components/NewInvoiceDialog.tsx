@@ -31,7 +31,15 @@ import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 
-interface Customer { type: 'contact' | 'company'; id: string; label: string; }
+interface Customer {
+  type: 'contact' | 'company';
+  id: string;
+  label: string;
+  /** Where this option came from — surfaced as a tag in the picker. */
+  source?: 'business' | 'person';
+  /** Secondary line (email / website / VAT) to disambiguate same-named parties. */
+  sub?: string;
+}
 
 interface LineItem {
   description: string;
@@ -307,13 +315,36 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const term = customerSearch.trim();
     if (term.length < 2) { setCustomerOptions([]); return; }
     const t = setTimeout(async () => {
+      // Search across more than just the name — a short-name you remember might be
+      // the email, the website domain, or the VAT number. Match all of them on both
+      // people and businesses, and tag each result so it's clear which is which.
+      const like = `%${term}%`;
       const [contacts, companies] = await Promise.all([
-        supabase.from('crm_contacts').select('id, name, first_name, last_name, email').or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`).limit(6),
-        supabase.from('crm_companies').select('id, name').ilike('name', `%${term}%`).limit(6),
+        supabase.from('crm_contacts')
+          .select('id, name, first_name, last_name, email, website, vat_number')
+          .or(`name.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},website.ilike.${like},vat_number.ilike.${like}`)
+          .limit(8),
+        supabase.from('crm_companies')
+          .select('id, name, email, website, vat_number')
+          .or(`name.ilike.${like},email.ilike.${like},website.ilike.${like},vat_number.ilike.${like}`)
+          .limit(8),
       ]);
       const opts: Customer[] = [];
-      for (const c of contacts.data ?? []) opts.push({ type: 'contact', id: c.id, label: c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || c.id });
-      for (const c of companies.data ?? []) opts.push({ type: 'company', id: c.id, label: `${c.name} (company)` });
+      // Businesses first — they're the preferred billing target.
+      for (const c of companies.data ?? []) {
+        opts.push({
+          type: 'company', id: c.id, source: 'business',
+          label: c.name || c.email || c.id,
+          sub: [c.vat_number ? `VAT ${c.vat_number}` : null, c.email, c.website].filter(Boolean).join(' · ') || undefined,
+        });
+      }
+      for (const c of contacts.data ?? []) {
+        opts.push({
+          type: 'contact', id: c.id, source: 'person',
+          label: c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || c.id,
+          sub: [c.vat_number ? `VAT ${c.vat_number}` : null, c.email, c.website].filter(Boolean).join(' · ') || undefined,
+        });
+      }
       setCustomerOptions(opts);
     }, 200);
     return () => clearTimeout(t);
@@ -448,6 +479,30 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
   };
 
+  // Pick a billing party from the search results. Business rollup: if the chosen
+  // party is a PERSON attached to a company, the invoice is issued to the
+  // BUSINESS (its details load), even though the operator searched by person.
+  const pickCustomer = async (o: Customer) => {
+    setCustomerSearch(''); setCustomerOptions([]);
+    if (o.type === 'contact') {
+      try {
+        const companyId = await financeService.resolvePrimaryCompanyId(o.id);
+        if (companyId) {
+          const { data: comp } = await supabase.from('crm_companies').select('id, name').eq('id', companyId).maybeSingle();
+          if (comp) {
+            setCustomer({ type: 'company', id: comp.id, label: comp.name as string, source: 'business' });
+            toast({
+              title: 'Billed to the business',
+              description: `${o.label} is linked to ${comp.name} — the invoice is issued to the business, not the person.`,
+            });
+            return;
+          }
+        }
+      } catch { /* fall back to billing the person directly */ }
+    }
+    setCustomer(o);
+  };
+
   // ── Totals (per-line VAT via category when set, else global rate) ──
   // Net for one line, honoring the VAT-inclusive toggle (price already contains VAT).
   const lineNetOf = (l: LineItem) => {
@@ -501,6 +556,28 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }
     return { inactiveVat, unvalidatedVat, overCreditLimit, creditLimit, projected, blocks, warns, hardBlocked: blocks.length > 0 };
   }, [customerAddr, buyerOutstanding, totals.total, riskRules, currency]);
+
+  // Fiscal class of the (already rolled-up) buyer. Greek myDATA: businesses get
+  // invoices (1.x/2.x); a private individual with no VAT gets a retail receipt
+  // (11.x). AADE REJECTS an invoice issued to a VAT-less party, so steering the
+  // consumer to a receipt is correctness, not just UX. A contact is treated as a
+  // business when it carries a VAT number or contact_type='company' (the
+  // person→company rollup has already converted linked contacts to companies).
+  const buyerIsConsumer = useMemo(() => {
+    if (!customer) return false;
+    if (customer.type === 'company') return false;
+    if (!customerAddr) return false; // contact row not loaded yet — don't restrict prematurely
+    const a = customerAddr as any;
+    const hasVat = !!(a?.vat_number && String(a.vat_number).trim());
+    if (hasVat || a?.contact_type === 'company') return false;
+    return true;
+  }, [customer, customerAddr]);
+
+  // A consumer can only be issued retail receipts (11.x) or movement docs (9.x).
+  // Steer the doc type to a retail receipt the moment the buyer resolves to a consumer.
+  useEffect(() => {
+    if (buyerIsConsumer && !documentType.startsWith('11')) setDocumentType('11.1');
+  }, [buyerIsConsumer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply the configured default withholding for the active doc type once the doc-type
   // defaults have loaded (covers the common case where the operator never changes the
@@ -792,9 +869,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input className="pl-8" placeholder="Search contacts or companies…" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
                   {customerOptions.length > 0 && (
-                    <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
+                    <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md max-h-72 overflow-y-auto">
                       {customerOptions.map((o) => (
-                        <button key={`${o.type}-${o.id}`} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setCustomer(o); setCustomerSearch(''); setCustomerOptions([]); }}>{o.label}</button>
+                        <button key={`${o.type}-${o.id}`} type="button" className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted" onClick={() => pickCustomer(o)}>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm">{o.label}</span>
+                            {o.sub && <span className="block truncate text-[11px] text-muted-foreground">{o.sub}</span>}
+                          </span>
+                          <Badge variant="outline" className={`shrink-0 text-[10px] ${o.source === 'business' ? 'border-primary/50 text-primary' : 'border-border text-muted-foreground'}`}>
+                            {o.source === 'business' ? 'Business' : 'Person'}
+                          </Badge>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -806,9 +891,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <Label className="text-xs uppercase tracking-wide text-muted-foreground col-span-2">Invoice details</Label>
               <div className="space-y-1.5 col-span-2">
                 <Label className="text-xs">Document type</Label>
-                {/* One control: common types as chips + the long myDATA tail in a "More types" dropdown. */}
+                {/* One control: common types as chips + the long myDATA tail in a "More types" dropdown.
+                    For a private individual (no VAT) only retail receipts (11.x) + movement docs (9.x)
+                    are offered — AADE rejects an invoice (1.x/2.x) issued to a VAT-less buyer. */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {([['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']] as const)
+                  {((buyerIsConsumer
+                      ? [['11.1', 'Receipt'], ['9.3', 'Delivery note']]
+                      : [['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']]) as ReadonlyArray<readonly [string, string]>)
                     .filter(([code]) => !docTypes.length || docTypes.some((t) => t.code === code))
                     .map(([code, label]) => (
                       <button
@@ -820,18 +909,30 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         {label}
                       </button>
                     ))}
-                  <Select value={COMMON_DOC_CODES.includes(documentType) ? '' : documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
-                    <SelectTrigger className="h-9 w-auto gap-1 rounded-full px-3.5 text-sm font-medium"><SelectValue placeholder="More types…" /></SelectTrigger>
-                    <SelectContent>
-                      {groupDocTypes(docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }]).map((g) => (
-                        <React.Fragment key={g.family}>
-                          <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">{g.label}</div>
-                          {g.items.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}
-                        </React.Fragment>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {(() => {
+                    // Restrict the long tail to receipts + movement docs for consumers.
+                    const tail = (docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }])
+                      .filter((t) => !buyerIsConsumer || t.code.startsWith('11') || t.code.startsWith('9'));
+                    return (
+                      <Select value={COMMON_DOC_CODES.includes(documentType) ? '' : documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
+                        <SelectTrigger className="h-9 w-auto gap-1 rounded-full px-3.5 text-sm font-medium"><SelectValue placeholder="More types…" /></SelectTrigger>
+                        <SelectContent>
+                          {groupDocTypes(tail).map((g) => (
+                            <React.Fragment key={g.family}>
+                              <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">{g.label}</div>
+                              {g.items.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}
+                            </React.Fragment>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    );
+                  })()}
                 </div>
+                {buyerIsConsumer && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Private individual (no VAT) — issued as a retail receipt. Invoices require a business VAT number.
+                  </p>
+                )}
                 <p className="text-[11px] text-muted-foreground">
                   {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'No series — auto-numbered (set series in Settings → Documents)'}
                 </p>

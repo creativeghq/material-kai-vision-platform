@@ -72,7 +72,11 @@ export type TriggerType =
   | 'pricing_change_requested'
   | 'pricing_change_decided'
   // Account receivable/payable: finance asked to issue a receipt/invoice
-  | 'finance_document_requested';
+  | 'finance_document_requested'
+  // Finance documents: a tax invoice / retail receipt was issued, or a payment was received
+  | 'invoice_issued'
+  | 'receipt_issued'
+  | 'payment_received';
 
 export interface ManualTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
@@ -85,6 +89,9 @@ export interface ExpenseCardRequestedTriggerConfig {}
 export interface PricingChangeRequestedTriggerConfig {}
 export interface PricingChangeDecidedTriggerConfig {}
 export interface FinanceDocumentRequestedTriggerConfig {}
+export interface InvoiceIssuedTriggerConfig {}
+export interface ReceiptIssuedTriggerConfig {}
+export interface PaymentReceivedTriggerConfig {}
 export interface ReviewSubmittedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
@@ -253,6 +260,9 @@ export type TriggerConfigMap = {
   pricing_change_requested: PricingChangeRequestedTriggerConfig;
   pricing_change_decided: PricingChangeDecidedTriggerConfig;
   finance_document_requested: FinanceDocumentRequestedTriggerConfig;
+  invoice_issued: InvoiceIssuedTriggerConfig;
+  receipt_issued: ReceiptIssuedTriggerConfig;
+  payment_received: PaymentReceivedTriggerConfig;
 };
 
 // =====================================================

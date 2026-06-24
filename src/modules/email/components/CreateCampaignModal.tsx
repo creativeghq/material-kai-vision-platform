@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, Calendar, Search, UserPlus, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -422,20 +423,14 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           {/* Template Selection */}
           <div className="space-y-2">
             <Label htmlFor="template">Email Template *</Label>
-            <select
-              id="template"
-              className="w-full px-3 py-2 border rounded-md"
-              value={formData.template_id}
-              onChange={(e) => setFormData({ ...formData, template_id: e.target.value })}
-              required
-            >
-              <option value="">Select a template</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
+            <Select value={formData.template_id || undefined} onValueChange={(v) => setFormData({ ...formData, template_id: v })}>
+              <SelectTrigger id="template"><SelectValue placeholder="Select a template" /></SelectTrigger>
+              <SelectContent>
+                {templates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Subject Line */}

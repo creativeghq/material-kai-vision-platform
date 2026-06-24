@@ -105,11 +105,18 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
     }
     try {
       setBusy(true);
+      // Business rollup: a person attached to a company is attributed to the BUSINESS.
+      let cpCompanyId = party?.type === 'company' ? party.id : null;
+      let cpContactId = party?.type === 'contact' ? party.id : null;
+      if (cpContactId && !cpCompanyId) {
+        const rolled = await financeService.resolvePrimaryCompanyId(cpContactId).catch(() => null);
+        if (rolled) { cpCompanyId = rolled; cpContactId = null; }
+      }
       await financeService.createPlannedPayment({
         workspaceId, direction, title: title.trim(), amount: parsedAmount, currency,
         scheduledFor, category,
-        counterpartyCompanyId: party?.type === 'company' ? party.id : null,
-        counterpartyContactId: party?.type === 'contact' ? party.id : null,
+        counterpartyCompanyId: cpCompanyId,
+        counterpartyContactId: cpContactId,
         notes: notes || undefined,
         reminderAt: reminderAt || null,
       });

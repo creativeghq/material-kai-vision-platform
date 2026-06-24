@@ -57,6 +57,16 @@ interface QuoteSeller {
   email: string | null;
 }
 
+interface IssuedDocument {
+  kind: 'invoice' | 'receipt';
+  number: string;
+  status: string;
+  total: number | null;
+  currency: string;
+  issued_at: string | null;
+  pdf_url: string | null;
+}
+
 const money = (v: number | null | undefined, currency: string) =>
   v == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v);
 
@@ -66,6 +76,7 @@ export default function PublicQuotePage() {
   const [quote, setQuote] = useState<PublicQuote | null>(null);
   const [seller, setSeller] = useState<QuoteSeller | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [issuedDoc, setIssuedDoc] = useState<IssuedDocument | null>(null);
   const [notFound, setNotFound] = useState(false);
 
   // Stable per-visit session id so repeated downloads from the same visit
@@ -86,6 +97,7 @@ export default function PublicQuotePage() {
         setQuote(data?.quote ?? null);
         setSeller(data?.seller ?? null);
         setPdfUrl(data?.pdf_url ?? null);
+        setIssuedDoc(data?.issued_document ?? null);
         setNotFound(!!data?.not_found || !data?.quote);
       } catch {
         if (!cancelled) setNotFound(true);
@@ -184,6 +196,30 @@ export default function PublicQuotePage() {
             {quote.client_name && <span>Prepared for {quote.client_name}</span>}
             {quote.created_at && <span>Created {new Date(quote.created_at).toLocaleDateString()}</span>}
             {quote.expires_at && <span>Valid until {new Date(quote.expires_at).toLocaleDateString()}</span>}
+          </div>
+        )}
+
+        {/* Issued-document indicator: the quote has been turned into a real invoice/receipt. */}
+        {issuedDoc && (
+          <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 flex-wrap">
+            <FileText className="h-4 w-4 text-emerald-400 shrink-0" />
+            <div className="text-sm">
+              <span className="font-medium">
+                {issuedDoc.kind === 'receipt' ? 'Receipt' : 'Invoice'} {issuedDoc.number} issued
+              </span>
+              {issuedDoc.total != null && (
+                <span className="text-muted-foreground"> · {money(issuedDoc.total, issuedDoc.currency)}</span>
+              )}
+              {issuedDoc.issued_at && (
+                <span className="text-muted-foreground"> · {new Date(issuedDoc.issued_at).toLocaleDateString()}</span>
+              )}
+            </div>
+            {issuedDoc.pdf_url && (
+              <Button size="sm" variant="outline" className="gap-2 rounded-full ml-auto" onClick={() => window.open(issuedDoc.pdf_url!, '_blank')}>
+                <Download className="h-4 w-4" />
+                {issuedDoc.kind === 'receipt' ? 'Download receipt' : 'Download invoice'}
+              </Button>
+            )}
           </div>
         )}
 

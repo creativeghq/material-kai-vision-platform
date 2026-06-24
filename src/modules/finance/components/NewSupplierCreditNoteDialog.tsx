@@ -108,10 +108,20 @@ export const NewSupplierCreditNoteDialog: React.FC<{
     if (computed.payloadLines.length === 0) { toast({ title: 'Add at least one line', description: 'Each line needs a description and a price.', variant: 'destructive' }); return; }
     setBusy(true);
     try {
+      // Business rollup: a standalone supplier credit note keyed to a PERSON who is
+      // attached to a company is attributed to the BUSINESS, not the person.
+      let effSupplier = billId ? null : supplier;
+      if (effSupplier && effSupplier.type === 'contact') {
+        const rolled = await financeService.resolvePrimaryCompanyId(effSupplier.id).catch(() => null);
+        if (rolled) {
+          const { data: comp } = await supabase.from('crm_companies').select('id, name').eq('id', rolled).maybeSingle();
+          if (comp) effSupplier = { type: 'company', id: comp.id as string, label: (comp.name as string) ?? effSupplier.label };
+        }
+      }
       await financeService.issueSupplierCreditNote({
         workspaceId,
         supplierBillId: billId || null,
-        supplier: billId ? null : supplier,
+        supplier: effSupplier,
         currency,
         issuedAt: new Date(issueDate).toISOString(),
         categoryId: categoryId || null,

@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { financeService, type ManualEntryDirection, type PartyRow } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { flowEventService } from '@/services/flows/flowEventService';
@@ -89,9 +90,22 @@ export const ManualEntryDialog: React.FC<{
     const amt = parseFloat(amount);
     if (!description.trim()) { toast({ title: 'Add a description', variant: 'destructive' }); return; }
     if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
-    const companyId = lockedParty?.party_type === 'company' ? lockedParty.party_id : (selectedParty?.party_type === 'company' ? selectedParty.party_id : null);
-    const contactId = lockedParty?.party_type === 'contact' ? lockedParty.party_id : (selectedParty?.party_type === 'contact' ? selectedParty.party_id : null);
-    const partyName = lockedParty?.display_name ?? selectedParty?.display_name ?? null;
+    let companyId = lockedParty?.party_type === 'company' ? lockedParty.party_id : (selectedParty?.party_type === 'company' ? selectedParty.party_id : null);
+    let contactId = lockedParty?.party_type === 'contact' ? lockedParty.party_id : (selectedParty?.party_type === 'contact' ? selectedParty.party_id : null);
+    let partyName = lockedParty?.display_name ?? selectedParty?.display_name ?? null;
+    // Business rollup: a person attached to a company is billed under the BUSINESS,
+    // not the person — same rule as invoices. Search by person, attribute to business.
+    if (contactId && !companyId) {
+      try {
+        const rolledCompanyId = await financeService.resolvePrimaryCompanyId(contactId);
+        if (rolledCompanyId) {
+          const { data: comp } = await supabase.from('crm_companies').select('name').eq('id', rolledCompanyId).maybeSingle();
+          companyId = rolledCompanyId;
+          contactId = null;
+          partyName = (comp?.name as string | undefined) ?? partyName;
+        }
+      } catch { /* keep the person attribution on lookup failure */ }
+    }
     setBusy(true);
     try {
       const entry = await financeService.createManualEntry({

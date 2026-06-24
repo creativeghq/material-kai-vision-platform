@@ -14,6 +14,7 @@ import {
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -278,17 +279,14 @@ const IdealoPage: React.FC = () => {
               <div className="flex items-end gap-2">
                 <div>
                   <Label htmlFor="country" className="mb-1">Country</Label>
-                  <select
-                    id="country"
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    disabled={searching || !moduleEnabled}
-                    className="h-9 px-3 rounded-md border border-white/10 bg-white/5 text-sm"
-                  >
-                    {SUPPORTED_LOCALES.map((loc) => (
-                      <option key={loc.code} value={loc.code}>{loc.code}</option>
-                    ))}
-                  </select>
+                  <Select value={country} onValueChange={setCountry} disabled={searching || !moduleEnabled}>
+                    <SelectTrigger id="country" className="w-28"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_LOCALES.map((loc) => (
+                        <SelectItem key={loc.code} value={loc.code}>{loc.code}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button
                   onClick={runSearch}

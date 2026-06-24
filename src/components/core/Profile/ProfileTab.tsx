@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -1648,25 +1649,23 @@ function TimeRangeEditor({
       <div className="space-y-2">
         {ranges.map((range, i) => (
           <div key={i} className="flex items-center gap-2 bg-muted/40 rounded-lg p-2">
-            <select
-              value={range.start}
-              onChange={(e) => updateRange(i, 'start', e.target.value)}
-              className="flex-1 min-w-0 rounded-md border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {TIME_OPTIONS.map((t) => (
-                <option key={t} value={t}>{fmtTime(t)}</option>
-              ))}
-            </select>
+            <Select value={range.start} onValueChange={(v) => updateRange(i, 'start', v)}>
+              <SelectTrigger className="flex-1 min-w-0"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {TIME_OPTIONS.map((t) => (
+                  <SelectItem key={t} value={t}>{fmtTime(t)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <span className="text-xs text-muted-foreground shrink-0">to</span>
-            <select
-              value={range.end}
-              onChange={(e) => updateRange(i, 'end', e.target.value)}
-              className="flex-1 min-w-0 rounded-md border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {TIME_OPTIONS.filter((t) => t > range.start).map((t) => (
-                <option key={t} value={t}>{fmtTime(t)}</option>
-              ))}
-            </select>
+            <Select value={range.end} onValueChange={(v) => updateRange(i, 'end', v)}>
+              <SelectTrigger className="flex-1 min-w-0"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {TIME_OPTIONS.filter((t) => t > range.start).map((t) => (
+                  <SelectItem key={t} value={t}>{fmtTime(t)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <button
               type="button"
               onClick={() => removeRange(i)}

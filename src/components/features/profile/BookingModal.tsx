@@ -4,6 +4,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
@@ -130,16 +131,15 @@ export const BookingModal: React.FC<{
           {services.length > 0 && (
             <div className="space-y-1.5">
               <Label>Service (optional)</Label>
-              <select
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
-              >
-                <option value="">— Select a service —</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+              <Select value={serviceId || '__none__'} onValueChange={(v) => setServiceId(v === '__none__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="— Select a service —" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Select a service —</SelectItem>
+                  {services.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

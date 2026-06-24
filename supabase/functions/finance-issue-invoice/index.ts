@@ -5,6 +5,7 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
 import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
 //
@@ -111,7 +112,7 @@ function json(body: any, status = 200): Response {
 async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string[]> {
   const { data: inv } = await supabase
     .from('invoices')
-    .select('workspace_id, customer_company_id, customer_contact_id, total')
+    .select('workspace_id, customer_company_id, customer_contact_id, total, document_type')
     .eq('id', invoiceId)
     .single();
   if (!inv) return [];
@@ -142,7 +143,17 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     .maybeSingle();
   if (!buyer) return blocks;
 
-  const hasVat = !!buyer.vat_number;
+  const hasVat = !!(buyer.vat_number && String(buyer.vat_number).trim());
+
+  // myDATA correctness backstop: an invoice (τιμολόγιο, doc family 1.x/2.x) REQUIRES a
+  // buyer VAT/ΑΦΜ — AADE rejects it for a VAT-less party. A private individual must be
+  // issued a retail receipt (11.x). Block here (with a clear message) rather than let the
+  // transmission fail downstream. The client dialog gates this too, but the gate is bypassable.
+  const docFamily = String(inv.document_type ?? '').split('.')[0];
+  if ((docFamily === '1' || docFamily === '2') && !hasVat) {
+    blocks.push('an invoice (τιμολόγιο) requires a buyer VAT number — issue a retail receipt (11.x) for a private individual');
+  }
+
   if (isCompany && hasVat) {
     if (rules.block_inactive && buyer.vat_validated === false) blocks.push('the buyer ΑΦΜ is inactive / not recognised');
     if (rules.block_unvalidated && (buyer.vat_validated === null || buyer.vat_validated === undefined)) blocks.push('the buyer VAT has never been validated');
@@ -163,6 +174,75 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     }
   }
   return blocks;
+}
+
+/**
+ * Quote→invoice auto-correct: the invoices.document_type column defaults to '1.1'
+ * and issue_invoice_from_quote does NOT set it, so a quote for a VAT-less private
+ * individual would produce an invoice (τιμολόγιο) that AADE rejects. Flip it to a
+ * retail receipt (11.1) here — only on the quote path, where the doc type was the
+ * unchosen default (ad-hoc invoices are gated in the dialog + by buyerRiskBlocks).
+ */
+async function autoReceiptForConsumerQuote(supabase: any, invoiceId: string): Promise<void> {
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('document_type, customer_company_id, customer_contact_id')
+    .eq('id', invoiceId)
+    .maybeSingle();
+  if (!inv) return;
+  const fam = String(inv.document_type ?? '').split('.')[0];
+  if (fam !== '1' && fam !== '2') return; // only invoice families require a VAT buyer
+  const isCompany = !!inv.customer_company_id;
+  const buyerId = inv.customer_company_id ?? inv.customer_contact_id;
+  if (!buyerId) return;
+  const { data: buyer } = await supabase
+    .from(isCompany ? 'crm_companies' : 'crm_contacts')
+    .select('vat_number')
+    .eq('id', buyerId)
+    .maybeSingle();
+  const hasVat = !!(buyer?.vat_number && String(buyer.vat_number).trim());
+  if (!hasVat) {
+    await supabase.from('invoices').update({ document_type: '11.1' }).eq('id', invoiceId);
+  }
+}
+
+/** Emit invoice_issued / receipt_issued so seeded flows notify + email the customer. */
+async function emitDocumentIssued(supabase: any, invoiceId: string): Promise<void> {
+  try {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('id, internal_number, legal_number, document_type, total, currency, customer_company_id, customer_contact_id, workspace_id')
+      .eq('id', invoiceId)
+      .maybeSingle();
+    if (!inv) return;
+    const isReceipt = String(inv.document_type ?? '').startsWith('11');
+    let name: string | null = null, email: string | null = null, userId: string | null = null;
+    if (inv.customer_company_id) {
+      const { data: c } = await supabase.from('crm_companies').select('name, email').eq('id', inv.customer_company_id).maybeSingle();
+      name = c?.name ?? null; email = c?.email ?? null;
+    } else if (inv.customer_contact_id) {
+      const { data: c } = await supabase.from('crm_contacts').select('name, first_name, last_name, email, user_id').eq('id', inv.customer_contact_id).maybeSingle();
+      name = c?.name || [c?.first_name, c?.last_name].filter(Boolean).join(' ') || null; email = c?.email ?? null; userId = c?.user_id ?? null;
+    }
+    const num = inv.legal_number ?? inv.internal_number ?? '';
+    const amount = `${Number(inv.total ?? 0).toFixed(2)} ${inv.currency ?? 'EUR'}`;
+    const docWord = isReceipt ? 'Receipt' : 'Invoice';
+    await emitFlowEvent(isReceipt ? 'receipt_issued' : 'invoice_issued', {
+      type: isReceipt ? 'receipt_issued' : 'invoice_issued',
+      user_id: userId ?? undefined,
+      customer_email: email ?? undefined,
+      customer_name: name ?? undefined,
+      invoice_id: inv.id,
+      document_number: num,
+      document_type: inv.document_type ?? undefined,
+      amount,
+      currency: inv.currency ?? 'EUR',
+      workspace_id: inv.workspace_id,
+      title: `${docWord} ${num} issued`,
+      body: `${docWord} ${num} for ${amount}${name ? ` to ${name}` : ''} has been issued.`,
+      action_url: `/finance/invoices/${inv.id}`,
+    }).catch(() => {});
+  } catch { /* best-effort */ }
 }
 
 /**
@@ -497,6 +577,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       });
       if (rpcErr) return json({ error: `issue_invoice_from_quote failed: ${rpcErr.message}` }, 500);
       invoiceId = created as string;
+      // VAT-less private individual → retail receipt, never an invoice (AADE would reject).
+      await autoReceiptForConsumerQuote(supabase, invoiceId);
     }
 
     // 1b. Buyer risk-gate — authoritative server-side enforcement. Only gates the act of
@@ -526,6 +608,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           p_invoice_id: invoiceId,
         });
         if (issueErr) return json({ error: `mark_invoice_issued failed: ${issueErr.message}` }, 500);
+        // Notify + email the customer via the seeded flow (fire-and-forget).
+        await emitDocumentIssued(supabase, invoiceId);
       }
     }
 

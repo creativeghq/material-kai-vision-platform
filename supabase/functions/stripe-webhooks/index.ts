@@ -380,6 +380,23 @@ async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent
       metadata: { invoice_id: inv.id, amount, currency, payment_intent_id: paymentIntent.id },
     }).then(() => {});
   }
+
+  // Customer-facing: notify + email the buyer that their payment was received (seeded flow).
+  const cust = (inv.company ?? inv.contact) as { email?: string; name?: string } | null;
+  await emitFlowEvent('payment_received', {
+    type: 'payment_received',
+    customer_email: cust?.email ?? undefined,
+    customer_name: cust?.name ?? undefined,
+    invoice_id: inv.id,
+    payment_id: paymentRow.id,
+    amount: `${amount.toFixed(2)} ${currency}`,
+    currency,
+    workspace_id: inv.workspace_id,
+    receipt_line: '', // receipt PDF is generated from the finance UI (service-role can't mint it here)
+    title: `Payment received — ${amount.toFixed(2)} ${currency}`,
+    body: `We received your payment of ${amount.toFixed(2)} ${currency} for invoice ${inv.internal_number}.`,
+    action_url: `/finance/invoices/${inv.id}`,
+  }).catch(() => {});
 }
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {

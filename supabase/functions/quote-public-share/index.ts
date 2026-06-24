@@ -154,6 +154,37 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     pdf_url = signed?.signedUrl ?? null;
   }
 
+  // Has an invoice / retail receipt been issued from this quote yet? (invoices.quote_id)
+  // Surface it so the customer can grab the final document straight from the shared quote.
+  let issued_document: any = null;
+  {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('id, internal_number, legal_number, document_type, status, total, currency, issued_at, pdf_storage_path')
+      .eq('quote_id', quote.id)
+      .neq('status', 'void')
+      .neq('status', 'draft')
+      .order('issued_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    if (inv) {
+      let doc_pdf_url: string | null = null;
+      if (inv.pdf_storage_path) {
+        const { data: s } = await supabase.storage.from('pdf-documents').createSignedUrl(inv.pdf_storage_path, 60 * 60);
+        doc_pdf_url = s?.signedUrl ?? null;
+      }
+      issued_document = {
+        kind: String(inv.document_type ?? '').startsWith('11') ? 'receipt' : 'invoice',
+        number: inv.legal_number ?? inv.internal_number ?? '',
+        status: inv.status,
+        total: inv.total != null ? Number(inv.total) : null,
+        currency: inv.currency ?? 'EUR',
+        issued_at: inv.issued_at,
+        pdf_url: doc_pdf_url,
+      };
+    }
+  }
+
   return jsonResponse({
     quote: {
       id: quote.id,
@@ -175,6 +206,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     },
     seller,
     pdf_url,
+    issued_document,
     not_found: false,
   });
 }));
