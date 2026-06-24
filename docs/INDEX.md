@@ -473,6 +473,11 @@ Complete documentation for Material Kai Vision Platform.
 - Reports: VAT (ΦΠΑ), myDATA reconciliation, ledgers (καρτέλα), accounting export (γέφυρες)
 - Replaced a removed legacy ERP connector
 
+**[orders-system.md](orders-system.md)** - Orders (sales & purchase hub) ✨ NEW (2026-06)
+- Sales/purchase orders tie quotes, invoices, payments/receipts, dispatch, products & profit together
+- Accepted quote → order + draft pre-invoice; POS sale → order; payment_status + profit per order
+- First Finance → Documents tab; replaces the per-doc tabs on the CRM company page
+
 **[pos-retail-system.md](pos-retail-system.md)** - POS / retail ✨ NEW (2026-06)
 - vPOS shifts + cash drawer + X/Z reports; Law 5155 card/IRIS signature flow; EFT-POS registry; thermal receipt
 
