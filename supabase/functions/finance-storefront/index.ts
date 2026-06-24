@@ -143,6 +143,23 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       const totalNet = round2(totalGross / (1 + vatRate / 100));
       const totalVat = round2(totalGross - totalNet);
 
+      // Guest checkout carries only name+email. The invoices_customer_xor CHECK requires
+      // exactly one of customer_company_id / customer_contact_id, so find-or-create a CRM
+      // contact by email in this workspace and link it (otherwise every order 500s).
+      const custEmail = String(customer.email).trim();
+      let contactId: string;
+      const { data: existingContacts } = await supabase.from('crm_contacts')
+        .select('id').eq('workspace_id', ws.id).ilike('email', custEmail).limit(1);
+      if (existingContacts && existingContacts.length > 0) {
+        contactId = (existingContacts[0] as any).id;
+      } else {
+        const { data: newContact, error: cErr } = await supabase.from('crm_contacts')
+          .insert({ workspace_id: ws.id, name: String(customer.name).slice(0, 200), email: custEmail })
+          .select('id').single();
+        if (cErr || !newContact) return json({ error: `could not create customer: ${cErr?.message ?? 'no row returned'}` }, 500);
+        contactId = (newContact as any).id;
+      }
+
       // Draft number (no legal-counter advance — abandoned carts can't gap the series).
       const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: ws.id });
       if (numErr) return json({ error: `numbering failed: ${numErr.message}` }, 500);
@@ -150,6 +167,7 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       const payToken = crypto.randomUUID().replace(/-/g, '');
       const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
         workspace_id: ws.id,
+        customer_contact_id: contactId,
         internal_number: draftNumber as string,
         status: 'draft',
         document_type: '11.1',

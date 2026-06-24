@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { QuoteData, QuoteItemData, ClientData, TemplateConfig } from './types.ts';
+import { HttpError } from '../_shared/api-logger.ts';
 
 /**
  * Fetch complete quote data including items with product details
@@ -56,7 +57,7 @@ export async function fetchQuoteData(
   }
 
   if (!items || items.length === 0) {
-    throw new Error('Cannot generate PDF: quote has no items.');
+    throw new HttpError(400, 'Cannot generate PDF: quote has no items.');
   }
 
   // Validate all items have prices
@@ -64,7 +65,8 @@ export async function fetchQuoteData(
     (item: any) => item.unit_price === null || item.unit_price === undefined
   );
   if (unpricedItems.length > 0) {
-    throw new Error(
+    throw new HttpError(
+      400,
       `Cannot generate PDF: ${unpricedItems.length} item(s) are missing prices. Set all item prices first.`
     );
   }

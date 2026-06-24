@@ -252,7 +252,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           .select()
           .single();
 
-        if (logError) throw new Error(`Failed to create email log: ${logError.message}`);
+        // Guard BOTH the error and a null row: a successful insert whose RETURNING
+        // row is hidden by RLS yields logData=null with no error. Without this guard
+        // the code would send the email and then 500 on `logData.id` (reading 'id'
+        // of null) — emailing the recipient but reporting failure to the caller.
+        if (logError || !logData) {
+          throw new HttpError(500, `Failed to create email log: ${logError?.message ?? 'insert returned no row (check email_logs RLS)'}`);
+        }
 
         // Send via Resend
         const tags = Object.entries(body.tags || {}).map(([name, value]) => ({ name, value }));
@@ -316,7 +322,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           .insert({
             domain,
             verification_status: 'pending',
-            created_by: user.id,
+            created_by: user?.id ?? null,
           })
           .select()
           .single();
@@ -488,7 +494,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
               .insert({
                 domain: rd.name,
                 verification_status: verificationStatus,
-                created_by: user.id,
+                created_by: user?.id ?? null,
               });
             added++;
           }

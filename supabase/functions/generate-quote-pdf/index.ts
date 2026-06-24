@@ -227,12 +227,15 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
         .eq('id', quoteId);
     }
 
+    // Honor HttpError status (e.g. 400 for "quote has no items" / unpriced items) so
+    // genuine client errors aren't reported as 500s / Sentry noise.
+    const status = (error as any)?.status && Number.isInteger((error as any).status) ? (error as any).status : 500;
     return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : 'PDF generation failed',
       },
-      500
+      status
     );
   }
 }));

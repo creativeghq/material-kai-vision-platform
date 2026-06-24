@@ -271,7 +271,8 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           setSelectedDoc(doc as KBDocument);
           setSelectedCatId((doc as any).category_id || null);
           window.scrollTo({ top: 0 });
-          supabase.rpc('increment_kb_doc_view', { doc_id: doc.id }).catch(() => {});
+          // PostgREST builder is a thenable but has no .catch(); use then(onOk, onErr).
+          void supabase.rpc('increment_kb_doc_view', { doc_id: doc.id }).then(() => {}, () => {});
         } else {
           setSelectedDoc(null);
           setNotFound(true);
