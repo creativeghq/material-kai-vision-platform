@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerAccountOverview,
@@ -33,6 +33,7 @@ import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -639,9 +640,21 @@ export const CompanyDetailPage: React.FC = () => {
                   <div className={isNew ? 'sm:col-span-2' : ''}>
                     <InlineText alwaysEdit={isNew} multiline label="Description" value={company.description} onSave={(v) => patchInline({ description: v })} placeholder="Brief description of the company…" copy={false} />
                   </div>
-                  {/* Customer vs supplier is fixed at creation (Add Company / import /
-                      open-from-contact) — no role control on the company page. The flags
-                      still drive the Products tab + customer/supplier lists. */}
+                  {/* Role — a company can be a Customer, a Supplier, or BOTH (e.g. a
+                      supplier you also need to invoice for returns / credit notes).
+                      Editable anytime after onboarding; drives the Products tab +
+                      customer/supplier lists + finance party type. */}
+                  <div className="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 mt-1 border-t">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5"/>Role</span>
+                    <label htmlFor="role_is_customer" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox id="role_is_customer" checked={!!company.is_customer} onCheckedChange={(v) => patchInline({ is_customer: v === true })} />
+                      Customer
+                    </label>
+                    <label htmlFor="role_is_supplier" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox id="role_is_supplier" checked={!!company.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v === true })} />
+                      Supplier
+                    </label>
+                  </div>
                 </div>
               </CardContent>
             </Card>
