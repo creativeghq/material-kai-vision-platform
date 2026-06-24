@@ -437,6 +437,8 @@ const PosPage: React.FC = () => {
         .select('fiscal_mark, fiscal_uid, fiscal_qr_url').eq('id', invoiceId).maybeSingle();
       if (inv) { finalMark = inv.fiscal_mark ?? mark; uid = inv.fiscal_uid ?? null; qrUrl = inv.fiscal_qr_url ?? null; }
     } catch { /* non-fatal — fall back to the passed mark */ }
+    // Every POS sale becomes a (completed, paid, delivered) sales order — best-effort.
+    try { await supabase.rpc('generate_order_from_invoice', { p_invoice_id: invoiceId, p_mark_delivered: true }); } catch { /* non-fatal */ }
     setResult({ ...snapshot, invoiceId, mark: finalMark, uid, qrUrl, method: paidMethod, issuedAt: new Date().toLocaleString() });
     resetSale();
     toast({ title: 'Receipt issued', description: finalMark ? `MARK ${finalMark}` : 'Saved (myDATA pending)' });
