@@ -540,15 +540,11 @@ export const CompanyDetailPage: React.FC = () => {
             </TabsTrigger>
             {showCommercial && (
               <>
+                {/* One tab: the Account = balance/ledger + the Orders that drive it.
+                    Quotes / Invoices / Payments live per-order (open an order). */}
                 <TabsTrigger value="account">
                   <Wallet className="h-4 w-4 mr-2"/>
                   Account
-                </TabsTrigger>
-                {/* Quotes / Invoices / Payments are now per-ORDER — they live inside each
-                    order (Orders tab → open an order). The Account tab keeps the balance + ledger. */}
-                <TabsTrigger value="orders">
-                  <ShoppingCart className="h-4 w-4 mr-2"/>
-                  Orders
                 </TabsTrigger>
               </>
             )}
@@ -1024,24 +1020,17 @@ export const CompanyDetailPage: React.FC = () => {
           {/* Customer-only commercial tabs — hidden for a pure supplier. */}
           {showCommercial && (
             <>
-          {/* Account overview Tab */}
+          {/* Account = the balance/ledger + the Orders that drive it (one combined tab).
+              Quotes / invoices / payments are viewed per-order (open an order). */}
           <TabsContent value="account" className="space-y-4">
             {company.id ? (
               <>
                 <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
                 <CustomerFinanceRulesCard companyId={company.id} />
+                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
               </>
             ) : (
-              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its account overview.</CardContent></Card>
-            )}
-          </TabsContent>
-
-          {/* Orders Tab — quotes/invoices/payments now live per-order (open an order). */}
-          <TabsContent value="orders" className="space-y-4">
-            {company.id ? (
-              <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
-            ) : (
-              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its orders.</CardContent></Card>
+              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its account &amp; orders.</CardContent></Card>
             )}
           </TabsContent>
             </>
