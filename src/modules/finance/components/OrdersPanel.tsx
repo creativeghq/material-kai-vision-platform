@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, ShoppingCart, Trash2, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -310,6 +311,7 @@ const NewOrderModal: React.FC<{
 
 const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClose: () => void; onChanged: () => void }> = ({ orderId, open, onClose, onChanged }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -383,6 +385,11 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
                 <Button size="sm" variant="outline" onClick={() => changeStatus('fulfilled')} disabled={saving}>Mark completed</Button>
               )}
+              {order.order_type === 'sales' && (
+                <Button size="sm" variant="outline" onClick={() => navigate('/finance?tab=doc_dispatch')}>
+                  <Truck className="h-3.5 w-3.5 mr-1" /> Dispatch board
+                </Button>
+              )}
             </div>
 
             {/* Profit: what we received (customer payments) − what we paid suppliers (linked payments out). */}
@@ -430,7 +437,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             )}
 
             <p className="text-[11px] text-muted-foreground">
-              Dispatch (delivery note → stock) attaches here next. Source quote / pre-invoice already link via the order.
+              Dispatch is invoice-driven: once this order's invoice is paid &amp; flagged for shipping it shows on the
+              Dispatch board, which cuts the delivery note and moves warehouse stock (catalog lines only — ad-hoc lines stay off-warehouse).
             </p>
           </div>
         )}
