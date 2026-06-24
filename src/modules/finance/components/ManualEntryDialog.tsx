@@ -63,13 +63,23 @@ export const ManualEntryDialog: React.FC<{
   // receivable → finance issues a receipt to the customer; payable → an invoice is expected.
   const docKind: 'receipt' | 'invoice' = isReceivable ? 'receipt' : 'invoice';
 
+  // Draft persistence — a half-filled entry survives navigating away and reopening
+  // (sessionStorage: kept across screen changes within the tab, gone when the tab
+  // closes; cleared explicitly on Save / Cancel). Keyed per workspace + direction +
+  // locked party so two different entries never collide.
+  const draftKey = `fin-manual-entry:${workspaceId}:${direction}:${lockedParty?.party_id ?? 'none'}`;
+  const clearDraft = () => { try { sessionStorage.removeItem(draftKey); } catch { /* ignore */ } };
+
   useEffect(() => {
     if (!open) return;
-    setDescription(''); setAmount('');
-    setPartyKey(lockedParty ? `${lockedParty.party_type}:${lockedParty.party_id}` : '');
-    setCategoryId('');
-    setIssuedAt(new Date().toISOString().slice(0, 10)); setDueAt(''); setNotes('');
-    setMethod(''); setRequestDoc(false);
+    // Restore a saved draft if one exists, else start blank.
+    let d: Record<string, any> | null = null;
+    try { const raw = sessionStorage.getItem(draftKey); if (raw) d = JSON.parse(raw); } catch { /* ignore */ }
+    setDescription(d?.description ?? ''); setAmount(d?.amount ?? '');
+    setPartyKey(d?.partyKey ?? (lockedParty ? `${lockedParty.party_type}:${lockedParty.party_id}` : ''));
+    setCategoryId(d?.categoryId ?? '');
+    setIssuedAt(d?.issuedAt ?? new Date().toISOString().slice(0, 10)); setDueAt(d?.dueAt ?? ''); setNotes(d?.notes ?? '');
+    setMethod(d?.method ?? ''); setRequestDoc(d?.requestDoc ?? false);
     (async () => {
       const [pp, cats] = await Promise.all([
         // Skip the party list entirely when the counterparty is already locked by the caller.
@@ -79,7 +89,16 @@ export const ManualEntryDialog: React.FC<{
       setParties(pp);
       setCategories(cats);
     })();
-  }, [open, workspaceId, isReceivable, lockedParty]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, workspaceId, isReceivable, lockedParty, draftKey]);
+
+  // Persist the in-progress entry on every change while the dialog is open.
+  useEffect(() => {
+    if (!open) return;
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify({ description, amount, partyKey, categoryId, issuedAt, dueAt, notes, method, requestDoc }));
+    } catch { /* ignore */ }
+  }, [open, draftKey, description, amount, partyKey, categoryId, issuedAt, dueAt, notes, method, requestDoc]);
 
   const selectedParty = useMemo(
     () => parties.find((p) => `${p.party_type}:${p.party_id}` === partyKey) ?? null,
@@ -137,6 +156,7 @@ export const ManualEntryDialog: React.FC<{
         });
       }
       toast({ title: isReceivable ? 'Receivable added' : 'Payable added' });
+      clearDraft();
       onSaved(); onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -249,7 +269,7 @@ export const ManualEntryDialog: React.FC<{
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={() => { clearDraft(); onOpenChange(false); }} disabled={busy}>Cancel</Button>
           <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Save</Button>
         </DialogFooter>
       </DialogContent>
