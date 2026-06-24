@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerAccountOverview,
@@ -25,6 +25,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { validateVatViaVies } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
+import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
 import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
@@ -606,12 +607,8 @@ export const CompanyDetailPage: React.FC = () => {
                 overlapping-fields break: viewport md: breakpoints firing inside a 360px box). */}
             <div className={isNew ? 'grid grid-cols-1 gap-6 max-w-3xl mx-auto' : 'grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start'}>
               {/* LEFT — company identity */}
-              <div className={isNew ? 'space-y-4' : 'space-y-4 lg:sticky lg:top-4'}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Company Information</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div className={isNew ? 'space-y-4' : 'space-y-3 lg:sticky lg:top-4'}>
+            <CollapsibleCard title="Company Information" icon={Building2} defaultOpen>
                 <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${isNew ? 'sm:grid-cols-2' : ''}`}>
                   <div className={isNew ? 'sm:col-span-2' : ''}>
                     <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
@@ -656,15 +653,10 @@ export const CompanyDetailPage: React.FC = () => {
                     </label>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </CollapsibleCard>
 
-            {/* Address Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Address</CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Address */}
+            <CollapsibleCard title="Address" icon={MapPin} defaultOpen={isNew}>
                 <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${isNew ? 'sm:grid-cols-2' : ''}`}>
                   <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                   <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
@@ -672,8 +664,14 @@ export const CompanyDetailPage: React.FC = () => {
                   <InlineText alwaysEdit={isNew} label="Postal Code" value={company.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="94102" />
                   <InlineText alwaysEdit={isNew} label="Country" value={company.country} onSave={(v) => patchInline({ country: v })} placeholder="United States" />
                 </div>
-              </CardContent>
-            </Card>
+            </CollapsibleCard>
+
+            {/* CRM Categories — moved here, below the Address */}
+            {company.id && (
+              <CollapsibleCard title="CRM Categories" icon={Tags}>
+                <CategoryAssignmentPicker bare target={{ kind: 'company', id: company.id }}/>
+              </CollapsibleCard>
+            )}
 
             {/* Supplier↔factory pin — the relation to the ingested catalog. Suppliers only. */}
             {showSupplierFeatures && (
@@ -686,9 +684,6 @@ export const CompanyDetailPage: React.FC = () => {
 
             {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
             <AddressUnitsManager companyId={isNew ? undefined : id} />
-
-            {/* CRM Categories */}
-            {company.id && <CategoryAssignmentPicker target={{ kind: 'company', id: company.id }}/>}
               </div>
 
               {/* RIGHT — detail */}

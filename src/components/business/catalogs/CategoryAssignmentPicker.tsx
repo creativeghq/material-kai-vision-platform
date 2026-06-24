@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Tags } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { crmCategoriesService, type CrmCategorySummary, type CrmCategoryKind } from '@/services/crmCategoriesService';
 import { getErrorMessage } from '@/core/errors/utils';
@@ -25,6 +26,8 @@ type Target =
 interface Props {
   target: Target;
   className?: string;
+  /** Render just the body (no Card chrome) for embedding in a CollapsibleCard. */
+  bare?: boolean;
 }
 
 /** Kinds rendered here, in order. 'role' is intentionally excluded — role
@@ -36,7 +39,7 @@ const GROUPS: Array<{ key: Extract<CrmCategoryKind, 'manual' | 'professional_typ
   { key: 'professional_type', label: 'Professional type' },
 ];
 
-export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className }) => {
+export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, bare = false }) => {
   const { toast } = useToast();
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,15 +114,8 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
     ? categories.some((c) => c.kind === 'manual')
     : categories.some((c) => c.kind === 'manual' || c.kind === 'professional_type');
 
-  return (
-    <Card className={className}>
-      <CardHeader className="flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Tags className="h-4 w-4" /> CRM Categories
-        </CardTitle>
-        {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const body = (
+    <>
         {loading ? (
           <div className="flex items-center gap-2 py-3 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
@@ -163,7 +159,20 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className })
             );
           })
         )}
-      </CardContent>
+    </>
+  );
+
+  if (bare) return <div className={cn('space-y-4', className)}>{body}</div>;
+
+  return (
+    <Card className={className}>
+      <CardHeader className="flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Tags className="h-4 w-4" /> CRM Categories
+        </CardTitle>
+        {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+      </CardHeader>
+      <CardContent className="space-y-4">{body}</CardContent>
     </Card>
   );
 };

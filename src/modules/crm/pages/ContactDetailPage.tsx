@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, CreditCard, ScrollText, Percent, Tag, Send, Wallet, X } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, CreditCard, ScrollText, Percent, Tag, Tags, Send, Wallet, X } from 'lucide-react';
 import {
   CustomerFinanceSummary,
   CustomerAccountOverview,
@@ -23,6 +23,7 @@ import { CategoryAssignmentPicker } from '@/components/business/catalogs/Categor
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
 import { CrmActivityTimeline } from '@/components/business/crm/CrmActivityTimeline';
+import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
@@ -579,21 +580,13 @@ export const ContactDetailPage: React.FC = () => {
           {/* Overview Tab — CRM two-column layout: a compact info column on the
               left, the commercial detail on the right. */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Categories on top, then a sidebar of contact info on the left and the
-                Activity feed (+ commercial when there's no business) as the main column. */}
-            {contact.id && <CategoryAssignmentPicker target={{ kind: 'contact', id: contact.id }} />}
+            {/* Sidebar of independently collapsible info cards on the left; the Activity
+                feed (+ commercial when there's no business) is the main column. */}
             <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
-              {/* LEFT — identity & quick info */}
-              <div className="space-y-4 lg:sticky lg:top-4">
-              {/* Contact Information Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <User className="h-4 w-4" />
-                    Contact Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              {/* LEFT — identity & quick info (collapsible cards) */}
+              <div className="space-y-3 lg:sticky lg:top-4">
+              {/* Contact Information — open by default */}
+              <CollapsibleCard title="Contact Information" icon={User} defaultOpen contentClassName="space-y-4">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                     <div>
                       <InlineText alwaysEdit={isNew} label="Full Name *" value={contact.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Jane Smith" copy={false} />
@@ -655,18 +648,10 @@ export const ContactDetailPage: React.FC = () => {
                     </div>
                   </div>
                   )}
-                </CardContent>
-              </Card>
+              </CollapsibleCard>
 
-              {/* Lead Information Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <FileText className="h-4 w-4" />
-                    Lead Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              {/* Lead Information */}
+              <CollapsibleCard title="Lead Information" icon={FileText} defaultOpen={isNew} contentClassName="space-y-4">
                   {/* item 5 — attach a company right here (replaces the separate Companies tab). */}
                   <div>
                     <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Company</Label>
@@ -726,18 +711,10 @@ export const ContactDetailPage: React.FC = () => {
                       </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+              </CollapsibleCard>
 
-              {/* Address Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <MapPin className="h-4 w-4" />
-                    Address
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+              {/* Address */}
+              <CollapsibleCard title="Address" icon={MapPin} defaultOpen={isNew}>
                   <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                     <div>
                       <InlineText alwaysEdit={isNew} label="Street Address" value={contact.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
@@ -747,18 +724,17 @@ export const ContactDetailPage: React.FC = () => {
                     <InlineText alwaysEdit={isNew} label="State / Province" value={contact.state} onSave={(v) => patchInline({ state: v })} placeholder="Greater London" />
                     <InlineText alwaysEdit={isNew} label="Country" value={contact.country} onSave={(v) => patchInline({ country: v })} placeholder="United Kingdom" />
                   </div>
-                </CardContent>
-              </Card>
+              </CollapsibleCard>
 
-              {/* Link to User Account Card - Compact Design */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <LinkIcon className="h-4 w-4" />
-                    Linked User Account
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+              {/* CRM Categories — moved here, below the Address */}
+              {contact.id && (
+                <CollapsibleCard title="CRM Categories" icon={Tags}>
+                  <CategoryAssignmentPicker bare target={{ kind: 'contact', id: contact.id }} />
+                </CollapsibleCard>
+              )}
+
+              {/* Linked User Account */}
+              <CollapsibleCard title="Linked User Account" icon={LinkIcon} defaultOpen={isNew}>
                   {linkedUser ? (
                     <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -782,8 +758,7 @@ export const ContactDetailPage: React.FC = () => {
                       />
                     </div>
                   )}
-                </CardContent>
-              </Card>
+              </CollapsibleCard>
               </div>
 
               {/* RIGHT — main column: commercial (only when no business) + Activity feed. */}

@@ -15,6 +15,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -571,15 +572,8 @@ export const UserDetailPage: React.FC = () => {
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* User Information Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <User className="h-4 w-4" />
-                    User Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              {/* User Information — open by default */}
+              <CollapsibleCard title="User Information" icon={User} defaultOpen contentClassName="space-y-4">
                   <div>
                     <Label>Email</Label>
                     <div className="flex items-center gap-2 mt-1 p-2 bg-muted/30 rounded-lg">
@@ -687,19 +681,11 @@ export const UserDetailPage: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+              </CollapsibleCard>
 
-            {/* Linked CRM Contact (right column). Role + Professional type now live
-                inside the User Information card on the left (mirrors the business page). */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Building2 className="h-4 w-4" />
-                  Linked CRM Contact
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Linked CRM Contact — Role + Professional type live inside the User
+                Information card on the left (mirrors the business page). */}
+            <CollapsibleCard title="Linked CRM Contact" icon={Building2}>
                 {linkedContact ? (
                   <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                     <div>
@@ -728,8 +714,7 @@ export const UserDetailPage: React.FC = () => {
                     </p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+            </CollapsibleCard>
             </div>
 
             {/* Role Upgrade Requests — applications for dealer/factory promotion */}
