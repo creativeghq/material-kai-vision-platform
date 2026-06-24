@@ -787,28 +787,29 @@ class ProjectsService {
     const contactId = project?.client_contact_id ?? null;
     const companyId = project?.client_company_id ?? null;
 
+    // Voided docs are deletions — never offer them as attachable to a project.
     const invQ = (supabase as any)
       .from('invoices')
       .select('id, internal_number, total, amount_due, status, currency, issued_at, due_at')
-      .is('project_id', null);
+      .is('project_id', null).neq('status', 'void');
     if (companyId) invQ.eq('customer_company_id', companyId);
     else if (contactId) invQ.eq('customer_contact_id', contactId);
 
     const meRecvQ = (supabase as any)
       .from('finance_manual_entries')
       .select('id, description, amount, amount_due, status, currency, issued_at, due_at, direction')
-      .is('project_id', null).eq('direction', 'receivable');
+      .is('project_id', null).eq('direction', 'receivable').neq('status', 'void');
     if (companyId) meRecvQ.eq('counterparty_company_id', companyId);
     else if (contactId) meRecvQ.eq('counterparty_contact_id', contactId);
 
     const billQ = (supabase as any)
       .from('supplier_bills')
       .select('id, supplier_bill_number, total, amount_due, status, currency, issued_at, due_at')
-      .is('project_id', null);
+      .is('project_id', null).neq('status', 'void');
     const mePayQ = (supabase as any)
       .from('finance_manual_entries')
       .select('id, description, amount, amount_due, status, currency, issued_at, due_at, direction')
-      .is('project_id', null).eq('direction', 'payable');
+      .is('project_id', null).eq('direction', 'payable').neq('status', 'void');
 
     const [inv, meRecv, bills, mePay] = await Promise.all([invQ, meRecvQ, billQ, mePayQ]);
     if (inv.error) throw inv.error;

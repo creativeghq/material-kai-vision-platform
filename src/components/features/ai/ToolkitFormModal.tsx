@@ -11,6 +11,7 @@
  * single component powers every toolkit.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { ImagePlus, X } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -29,6 +30,12 @@ import {
 export type ToolkitFormModalState = {
   quickStart: ToolkitQuickStart;
   toolkit: ToolkitDefinition;
+  /**
+   * Per-field seed values applied over the field defaults when the modal opens.
+   * Used to pre-fill an `image` field with a photo the user already attached, so
+   * an interior quick-start launched from the composer doesn't ask for it twice.
+   */
+  prefill?: Record<string, string>;
 } | null;
 
 interface Props {
@@ -44,6 +51,20 @@ interface Props {
   onRunTool?: (args: {
     toolName: string;
     toolInput: Record<string, unknown>;
+    toolkit: ToolkitDefinition;
+    quickStart: ToolkitQuickStart;
+  }) => void;
+  /**
+   * Called for quick-starts that carry a `generation` descriptor (interior image
+   * flows). The parent attaches the captured photo(s), forces the generation
+   * pipeline (`mode`) or opens a guided builder (`opensModal`), and auto-sends
+   * the rendered prompt. Falls back to onSubmit when the parent doesn't provide it.
+   */
+  onGenerate?: (args: {
+    images: string[];
+    mode?: string;
+    opensModal?: 'virtual-staging' | 'gemini-edit';
+    renderedPrompt: string;
     toolkit: ToolkitDefinition;
     quickStart: ToolkitQuickStart;
   }) => void;
@@ -70,17 +91,18 @@ const COMMON_MARKETS = [
   'Australia', 'Canada', 'globally',
 ];
 
-export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool }: Props) {
+export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool, onGenerate }: Props) {
   const open = !!state;
   const [values, setValues] = useState<Record<string, string>>({});
 
   const fields = state?.quickStart.form ?? [];
+  const imageFieldKeys = useMemo(() => fields.filter((f) => f.kind === 'image').map((f) => f.key), [fields]);
 
   // Reset to per-field defaults whenever a new quick-start opens.
   useEffect(() => {
     if (!state) return;
     const init: Record<string, string> = {};
-    for (const f of state.quickStart.form ?? []) init[f.key] = f.default ?? '';
+    for (const f of state.quickStart.form ?? []) init[f.key] = state.prefill?.[f.key] ?? f.default ?? '';
     setValues(init);
   }, [state]);
 
@@ -97,6 +119,29 @@ export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool }: Props)
 
   const handleSubmit = () => {
     if (missingRequired.length > 0) return;
+    // Image-generation handoff (interior flows): split the captured photo(s) from
+    // the text fields, render the prompt from text only (image data URLs must
+    // never leak into the prompt), and let the parent attach + send / open the
+    // guided builder.
+    if (state.quickStart.generation && onGenerate) {
+      const gen = state.quickStart.generation;
+      const images = (gen.imageKeys ?? imageFieldKeys)
+        .map((k) => (values[k] ?? '').trim())
+        .filter(Boolean);
+      const textValues: Record<string, string> = { ...values };
+      for (const k of imageFieldKeys) delete textValues[k];
+      const template = state.quickStart.promptTemplate || state.quickStart.prompt;
+      onGenerate({
+        images,
+        mode: gen.mode,
+        opensModal: gen.opensModal,
+        renderedPrompt: renderPromptTemplate(template, textValues),
+        toolkit: state.toolkit,
+        quickStart: state.quickStart,
+      });
+      onClose();
+      return;
+    }
     // Deterministic run: map collected values → structured tool args and fire a
     // direct tool invocation (no LLM). Falls back to prompt-injection if the
     // parent didn't provide onRunTool.
@@ -138,7 +183,7 @@ export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool }: Props)
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={missingRequired.length > 0}>
-            Run
+            {state.quickStart.generation ? 'Generate' : 'Run'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -152,6 +197,41 @@ const FieldInput: React.FC<{
   onChange: (v: string) => void;
 }> = ({ field, value, onChange }) => {
   switch (field.kind) {
+    case 'image':
+      return (
+        <div className="mt-1">
+          {value ? (
+            <div className="relative inline-block">
+              <img src={value} alt={field.label} className="max-h-40 rounded-md border border-border object-contain" />
+              <button
+                type="button"
+                onClick={() => onChange('')}
+                className="absolute -right-2 -top-2 rounded-full bg-background border border-border p-1 text-muted-foreground shadow hover:text-destructive"
+                aria-label="Remove image"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground transition-colors hover:bg-muted/50">
+              <ImagePlus className="h-5 w-5" />
+              <span>{field.placeholder || 'Click to upload a photo'}</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => onChange(typeof reader.result === 'string' ? reader.result : '');
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+          )}
+        </div>
+      );
     case 'textarea':
     case 'tags':
       return (

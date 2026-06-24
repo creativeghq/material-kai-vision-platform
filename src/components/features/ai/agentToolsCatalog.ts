@@ -828,7 +828,7 @@ export function findTool(toolId: string): AgentToolEntry | undefined {
  * One field in a quick-start's collect-then-send form. Rendered generically by
  * ToolkitFormModal. The `key` is referenced from `promptTemplate` as `{{key}}`.
  */
-export type ToolkitFormFieldKind = 'text' | 'textarea' | 'number' | 'select' | 'country' | 'country_code' | 'tags';
+export type ToolkitFormFieldKind = 'text' | 'textarea' | 'number' | 'select' | 'country' | 'country_code' | 'tags' | 'image';
 
 export interface ToolkitFormFieldOption {
   value: string;
@@ -883,6 +883,30 @@ export interface ToolkitQuickStartRun {
   coerce?: Record<string, 'number' | 'csv' | 'lines'>;
 }
 
+/**
+ * Image-generation handoff descriptor for a toolkit quick-start (interior flows).
+ */
+export interface ToolkitQuickStartGeneration {
+  /**
+   * Form `image`-field keys whose captured photos become the sent message's
+   * attached images, in order (e.g. ['photo'] or ['inspiration','room']).
+   */
+  imageKeys: string[];
+  /**
+   * Generation pipeline to force as `selectedGenerationMode` on the send:
+   * 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render'. Omit to let
+   * the interior agent route from the rendered prompt (used by re-light → the
+   * lighting tool, and VR world → the VR tool).
+   */
+  mode?: string;
+  /**
+   * Instead of auto-sending, seed the captured photo into a guided builder and
+   * open it (the staging wizard collects style/furniture; the gemini-edit canvas
+   * collects edit categories). The photo is attached first either way.
+   */
+  opensModal?: 'virtual-staging' | 'gemini-edit';
+}
+
 export interface ToolkitQuickStart {
   /** Short button label, 1–4 words. */
   label: string;
@@ -911,6 +935,18 @@ export interface ToolkitQuickStart {
    * the collected form values instead of sending a prompt. See ToolkitQuickStartRun.
    */
   run?: ToolkitQuickStartRun;
+  /**
+   * Image-generation handoff for the interior-design flows. When present, the
+   * `form` (which MUST include the `image` field(s) named in `imageKeys`) is the
+   * step-by-step capture surface; on submit the captured photo(s) become the
+   * message's attached images, the generation pipeline is forced via `mode`, the
+   * `promptTemplate` is rendered from the remaining text fields, and ONE complete
+   * generation message is auto-sent. Mirrors `run`, but for the image pipelines
+   * (image-edit / redesign / floor-plan-render / virtual-staging / re-light / VR)
+   * instead of a deterministic tool call. This replaces the old `opensModal` +
+   * bare-prompt path that dead-ended when no photo was attached yet.
+   */
+  generation?: ToolkitQuickStartGeneration;
   /**
    * When set, clicking this quick-start opens an interactive design modal in
    * AgentHub (a guided canvas) instead of just sending a prompt. The host maps
@@ -1156,15 +1192,48 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'generate_3d', 'apply_lighting_preset', 'generate_vr_world',
     ],
     quick_starts: [
+      // Every image-required interior flow captures its inputs (photo first, then
+      // the creative choices) step-by-step in ToolkitFormModal, then auto-sends
+      // ONE complete generation message — the same collect-then-send rail the
+      // other toolkits use, never a bare prompt that asks for the photo in chat.
       {
         label: 'Test on a room',
         description: 'Apply a material from the catalog onto a photo of your room',
         icon: 'ImageIcon',
-        opensModal: 'gemini-edit',
         imageRequired: true,
-        prompt: 'I will attach a photo of my room — apply the selected material/finish onto a surface (floor or wall) and show me the result, keeping everything else in place.',
+        prompt: 'Apply the chosen material/finish onto the chosen surface in my room photo, keeping everything else in place.',
+        promptTemplate: 'Apply {{material}} onto the {{surface}} in this room photo. Keep the layout, furniture, lighting and everything else exactly in place — change only the {{surface}} finish. {{notes}}',
+        generation: { imageKeys: ['photo'], mode: 'image-edit' },
+        form: [
+          { key: 'photo', label: 'Your room photo', kind: 'image', required: true, help: 'Upload a photo of the room you want to restyle.' },
+          { key: 'material', label: 'Material / finish to apply', kind: 'text', required: true, placeholder: 'e.g. warm oak herringbone, Carrara marble, matte charcoal microcement' },
+          { key: 'surface', label: 'Apply to', kind: 'select', default: 'floor', options: [
+            { value: 'floor', label: 'Floor' },
+            { value: 'wall', label: 'Wall' },
+            { value: 'feature wall', label: 'Feature wall' },
+            { value: 'ceiling', label: 'Ceiling' },
+            { value: 'countertop', label: 'Countertop' },
+          ] },
+          { key: 'notes', label: 'Anything to preserve or emphasize? (optional)', kind: 'textarea', placeholder: 'e.g. keep the rug and the pendant light' },
+        ],
       },
       {
+        // Targeted edit — captures the photo, then opens the gemini-edit builder
+        // (categories: change floor / walls / lighting / objects / region edit).
+        label: 'Edit a photo',
+        description: 'Make a targeted change to a room photo — floor, walls, lighting, objects',
+        icon: 'Pencil',
+        imageRequired: true,
+        prompt: 'Make a targeted edit to this room photo.',
+        promptTemplate: 'Make a targeted edit to this room photo.',
+        generation: { imageKeys: ['photo'], opensModal: 'gemini-edit' },
+        form: [
+          { key: 'photo', label: 'Room photo', kind: 'image', required: true, help: 'Upload the photo you want to edit.' },
+        ],
+      },
+      {
+        // From-scratch design needs no photo and already opens a guided multi-step
+        // modal — left on its own rail.
         label: 'Design a room',
         description: 'Generate a room from scratch — pick room, style, and details',
         icon: 'Sparkles',
@@ -1175,38 +1244,79 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Stage a room',
         description: 'Furnish an empty room photo with furniture and decor',
         icon: 'LayoutTemplate',
-        opensModal: 'virtual-staging',
         imageRequired: true,
-        prompt: 'I will attach an empty room photo — stage it with furniture and decor.',
+        prompt: 'Stage this empty room with furniture and decor.',
+        promptTemplate: 'Stage this empty room photo with furniture and decor.',
+        // Photo captured here, then the staging wizard collects style + furniture.
+        generation: { imageKeys: ['photo'], opensModal: 'virtual-staging' },
+        form: [
+          { key: 'photo', label: 'Empty room photo', kind: 'image', required: true, help: 'Upload a photo of the empty room to furnish.' },
+        ],
       },
       {
         label: 'Redesign from a photo',
         description: 'Change the style, materials, or finishes on an existing room photo',
         icon: 'Sparkles',
-        opensModal: 'gemini-edit',
         imageRequired: true,
-        prompt: 'I will attach a room photo — redesign its style, materials, and finishes while keeping the layout.',
+        prompt: 'Redesign this room while keeping the layout.',
+        promptTemplate: 'Redesign this room in a {{style}} style — update the materials and finishes while keeping the exact layout and architecture. {{notes}}',
+        generation: { imageKeys: ['photo'], mode: 'redesign' },
+        form: [
+          { key: 'photo', label: 'Room photo', kind: 'image', required: true },
+          { key: 'style', label: 'Target style', kind: 'text', required: true, placeholder: 'e.g. warm minimal, Mediterranean, Scandinavian' },
+          { key: 'notes', label: 'Notes (optional)', kind: 'textarea', placeholder: 'e.g. keep the flooring, warmer tones, more plants' },
+        ],
       },
       {
         label: 'Re-light a room',
         description: 'Re-render an attached room photo under a different lighting mood',
         icon: 'Sparkles',
         imageRequired: true,
-        prompt: 'I will attach a room photo — re-render it under "Golden Hour" lighting.',
+        prompt: 'Re-light this room.',
+        promptTemplate: 'Re-render this room photo under "{{preset}}" lighting, keeping the layout, materials and finishes unchanged.',
+        // No forced mode — the interior agent routes to the lighting tool.
+        generation: { imageKeys: ['photo'] },
+        form: [
+          { key: 'photo', label: 'Room photo', kind: 'image', required: true },
+          { key: 'preset', label: 'Lighting mood', kind: 'select', default: 'Golden Hour', options: [
+            { value: 'Natural Daylight', label: 'Natural Daylight' },
+            { value: 'Golden Hour', label: 'Golden Hour' },
+            { value: 'Overcast', label: 'Overcast' },
+            { value: 'Showroom Spots', label: 'Showroom Spots' },
+            { value: 'Warm Evening', label: 'Warm Evening' },
+            { value: 'Night', label: 'Night' },
+          ] },
+        ],
       },
       {
         label: 'Floor plan → 3D',
         description: 'Turn an attached 2D floor plan into a photorealistic 3D interior',
         icon: 'LayoutTemplate',
         imageRequired: true,
-        prompt: 'I will attach a 2D floor plan — render it as a photorealistic 3D interior view.',
+        prompt: 'Render this floor plan as a photorealistic 3D interior.',
+        promptTemplate: 'Render this 2D floor plan as a photorealistic eye-level perspective interior showing how the rooms look from inside, with realistic materials and natural lighting. {{notes}}',
+        generation: { imageKeys: ['plan'], mode: 'floor-plan-render' },
+        form: [
+          { key: 'plan', label: '2D floor plan', kind: 'image', required: true, help: 'Upload a top-down 2D floor-plan image.' },
+          { key: 'notes', label: 'Style / notes (optional)', kind: 'textarea', placeholder: 'e.g. warm minimal, oak floors, large windows' },
+        ],
       },
       {
         label: 'VR world',
         description: 'Build an explorable Gaussian Splat world from a room image',
         icon: 'Globe',
         imageRequired: true,
-        prompt: 'I will attach a room image — turn it into an explorable VR world (draft model).',
+        prompt: 'Build a VR world from this room image.',
+        promptTemplate: 'Turn this room image into an explorable VR world using the {{quality}} model.',
+        // No forced mode — the interior agent routes to the VR tool.
+        generation: { imageKeys: ['photo'] },
+        form: [
+          { key: 'photo', label: 'Room image', kind: 'image', required: true },
+          { key: 'quality', label: 'Quality', kind: 'select', default: 'draft', options: [
+            { value: 'draft', label: 'Draft — fast preview (18 credits)' },
+            { value: 'high-quality', label: 'High quality (190 credits)' },
+          ] },
+        ],
       },
     ],
   },

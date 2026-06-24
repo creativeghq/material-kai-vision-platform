@@ -640,6 +640,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return true;
   }, []);
 
+  // The best room photo currently in play: a composer attachment first, else the
+  // most recent generated/attached image in the conversation. Used to pre-fill the
+  // capture form when an interior flow is launched from a composer chip.
+  const latestAvailableImage = useCallback((): string | null => {
+    if (attachedImages[0]) return attachedImages[0];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.geminiImageData?.image_url) return m.geminiImageData.image_url;
+      if (m.virtualStagingData?.image_url) return m.virtualStagingData.image_url;
+      if (m.designData?.images?.[0]) return m.designData.images[0];
+      if (m.images?.[0]) return m.images[0];
+    }
+    return null;
+  }, [attachedImages, messages]);
+
   /**
    * Single dispatcher for a toolkit quick-start. This is THE launch path now
    * that the separate ✨ prompts surface is gone — the toolkit picker calls it.
@@ -660,7 +675,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     ensureAgentAndToolkit(tk);
 
     if (qs.form?.length) {
-      setToolkitFormState({ quickStart: qs, toolkit: tk });
+      // Pre-fill the image field with a photo already in play (composer
+      // attachment or the latest generated image) so launching from a chip
+      // doesn't re-ask for the photo the user already provided.
+      let prefill: Record<string, string> | undefined;
+      const imgKey = qs.generation?.imageKeys?.[0];
+      if (imgKey) {
+        const img = latestAvailableImage();
+        if (img) prefill = { [imgKey]: img };
+      }
+      setToolkitFormState({ quickStart: qs, toolkit: tk, prefill });
       return;
     }
     if (qs.run && fireDirectRun(qs, tk)) return;
@@ -705,7 +729,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // attached photo via the verified generate-interior-gemini image-edit path.
     setInput(qs.prompt);
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
-  }, [selectedAgent, fireDirectRun, attachedImages, messages, ensureAgentAndToolkit]);
+  }, [selectedAgent, fireDirectRun, attachedImages, messages, ensureAgentAndToolkit, latestAvailableImage]);
+
+  // Launch an Interior Design quick-start by label from the composer chip row, so
+  // those chips run the SAME guided capture-then-send flow as the toolkit picker
+  // (photo-first → inputs → generate) instead of setting a mode + canned prompt.
+  const launchInteriorQuickStart = useCallback((label: string) => {
+    const tk = TOOLKITS.find((t) => t.id === 'generation');
+    const qs = tk?.quick_starts?.find((q) => q.label === label);
+    if (tk && qs) handleQuickStart(qs, tk);
+  }, [handleQuickStart]);
 
   // Toolkit setter — writes to local state, persists to localStorage (browser
   // default for new chats), and saves to the current conversation's row when
@@ -3501,6 +3534,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   if (qs.run && fireDirectRun(qs, tkParam)) {
                     return;
                   }
+                  // Guided-modal quick-starts (e.g. Design a room → new-design)
+                  // route through the shared dispatcher so the modal opens here too.
+                  if (qs.opensModal) {
+                    handleQuickStart(qs, tkParam);
+                    return;
+                  }
                   if (qs.workflow_id) {
                     bootWorkflowLocally(qs.workflow_id);
                   } else {
@@ -3550,6 +3589,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     return;
                   }
                   if (qs.run && fireDirectRun(qs, tk)) {
+                    return;
+                  }
+                  // Guided-modal quick-starts (e.g. Design a room → new-design)
+                  // route through the shared dispatcher so the modal opens here too.
+                  if (qs.opensModal) {
+                    handleQuickStart(qs, tk);
                     return;
                   }
                   if (qs.workflow_id) {
@@ -4557,11 +4602,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     Design a Room
                   </button>
 
-                  {/* Floor Plan → 3D Render */}
+                  {/* Floor Plan → 3D Render — guided capture (photo-first) */}
                   <button
-                    onClick={() => { setSelectedGenerationMode('floor-plan-render'); setInput('Render this floor plan as a photorealistic eye-level perspective interior showing how the rooms look from inside, with realistic materials and natural lighting.'); }}
+                    onClick={() => launchInteriorQuickStart('Floor plan → 3D')}
                     className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'floor-plan-render' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'}`}
-                    title="Convert uploaded floor plan to a photorealistic eye-level interior perspective"
+                    title="Convert a floor plan to a photorealistic eye-level interior perspective"
                   >
                     <LayoutTemplate className="w-3 h-3" />
                     Floor Plan → 3D Render
@@ -4588,11 +4633,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           'Photorealistic professional render. No partial replacements, no hybrid shapes, no remnants of the original. Every element is either fully replaced by Image 1 or (if Image 1 has no equivalent) rendered in the closest matching style to Image 1.',
                         );
                       } else {
-                        setSelectedGenerationMode('redesign');
-                        setInput(
-                          'Redesign this room with a high-end contemporary style. Keep all fixtures and architectural elements in their exact positions — sink, vanity, toilet, shower, doors, windows, niches, mirrors, towel rails. Nothing moves.\n\n' +
-                          'Update all visual surfaces: floor material and pattern, wall tiles/finishes, ceiling finish, fixture aesthetics, hardware metal finish, and lighting. Make it look professionally designed and photorealistic.',
-                        );
+                        // Single-image redesign → guided capture (photo-first + target style).
+                        launchInteriorQuickStart('Redesign from a photo');
                       }
                     }}
                     className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${(selectedGenerationMode === 'redesign' || selectedGenerationMode === 'copy-style') ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700'}`}
@@ -4602,16 +4644,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     {attachedImages.length >= 2 ? 'Copy Style' : 'Redesign Room'}
                   </button>
 
-                  {/* Edit Image — Gemini targeted edit (opens structured modal) */}
+                  {/* Edit Image — guided capture (photo-first), then the targeted-edit builder */}
                   <button
-                    onClick={() => {
-                      setSelectedGenerationMode('image-edit');
-                      // Find room context from the most recent generation in conversation
-                      const lastGen = [...messages].reverse().find(m => m.generation_job?.room_type);
-                      setGeminiEditRoomType(lastGen?.generation_job?.room_type || null);
-                      setGeminiEditStyle(lastGen?.generation_job?.style || null);
-                      setShowGeminiEditModal(true);
-                    }}
+                    onClick={() => launchInteriorQuickStart('Edit a photo')}
                     className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
                     title="Make targeted changes — change floor, lighting, plants, style, and more"
                   >
@@ -4619,13 +4654,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     Edit Image
                   </button>
 
-                  {/* Virtual Staging — stage uploaded room image with AI furniture */}
+                  {/* Virtual Staging — guided capture (photo-first), then the staging wizard */}
                   <button
-                    onClick={() => {
-                      if (attachedImages.length > 0) {
-                        setVirtualStagingImageUrl(attachedImages[0]);
-                      }
-                    }}
+                    onClick={() => launchInteriorQuickStart('Stage a room')}
                     className="flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700"
                     title="Virtually stage this room with AI-generated furniture (20 credits)"
                   >
@@ -5237,6 +5268,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           pendingDirectRunRef.current = { toolName, toolInput, label: quickStart.label, toolkitId: toolkit.id };
           setToolkitFormState(null);
           setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+        }}
+        onGenerate={({ images, mode, opensModal, renderedPrompt }) => {
+          // Interior image flow: the form already captured the photo(s) + creative
+          // inputs. Attach the photo(s), then either open a guided builder seeded
+          // with it (staging wizard / gemini-edit canvas) or force the generation
+          // pipeline + auto-send the rendered prompt as ONE complete message.
+          setToolkitFormState(null);
+          if (images.length > 0) setAttachedImages(images);
+          if (opensModal === 'virtual-staging') {
+            if (images[0]) setVirtualStagingImageUrl(images[0]);
+            return;
+          }
+          if (opensModal === 'gemini-edit') {
+            setGeminiEditRoomType(null);
+            setGeminiEditStyle(null);
+            setShowGeminiEditModal(true);
+            return;
+          }
+          if (mode) setSelectedGenerationMode(mode);
+          setInput(renderedPrompt);
+          // Let setState commit (attached images + mode) before the send reads them.
+          setTimeout(() => { void handleSendMessageRef.current?.(); }, 100);
         }}
       />
 

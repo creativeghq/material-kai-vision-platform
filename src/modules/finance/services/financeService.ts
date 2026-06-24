@@ -755,7 +755,11 @@ const _financeServiceCore = {
       .eq('workspace_id', opts.workspaceId)
       .order('issued_at', { ascending: false });
     if (opts.direction) q = q.eq('direction', opts.direction);
-    if (!opts.includeSettled) q = q.in('status', ['open', 'partially_paid']);
+    // A voided entry is a deletion — it must never surface in any list or total,
+    // even when settled entries are requested. `includeSettled` only widens the
+    // set to also include fully-`paid` entries; it never includes `void`.
+    if (opts.includeSettled) q = q.neq('status', 'void');
+    else q = q.in('status', ['open', 'partially_paid']);
     if (opts.companyId) q = q.eq('counterparty_company_id', opts.companyId);
     if (opts.contactId) q = q.eq('counterparty_contact_id', opts.contactId);
     const { data, error } = await q;
@@ -811,11 +815,16 @@ const _financeServiceCore = {
     return data as ManualEntry;
   },
 
-  /** Soft-delete: mark void so it drops out of aging + party rollups (history kept). */
-  async voidManualEntry(id: string): Promise<void> {
+  /**
+   * Hard-delete a manual receivable/payable. When the user removes an entry it is
+   * gone — no "void" rows kept around. Any payment allocations cascade out
+   * (payment_allocations.manual_entry_id FK is ON DELETE CASCADE), returning the
+   * allocated amount to unallocated credit on the payment.
+   */
+  async deleteManualEntry(id: string): Promise<void> {
     const { error } = await supabase
       .from('finance_manual_entries')
-      .update({ status: 'void' })
+      .delete()
       .eq('id', id);
     if (error) throw error;
   },
