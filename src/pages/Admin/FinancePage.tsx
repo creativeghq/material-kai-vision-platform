@@ -61,11 +61,13 @@ import type { FinanceSettings } from '@/modules/finance/services/financeService'
 import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
-import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck } from 'lucide-react';
+import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
+import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 
 const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'doc_orders', type: 'orders', label: 'Orders', icon: ShoppingCart },
   { value: 'doc_invoices', type: 'invoices', label: 'Invoices', icon: FileText },
   { value: 'doc_receipts', type: 'receipts', label: 'Receipts', icon: Receipt },
   { value: 'doc_credit_notes', type: 'credit_notes', label: 'Credit notes', icon: FileMinus },
@@ -136,10 +138,11 @@ const FinancePage: React.FC = () => {
 
   const openManualEntry = (dir: 'receivable' | 'payable') => { setManualEntryDir(dir); setManualEntryOpen(true); };
   const openSettle = (preset: RecordPaymentPreset) => { setSettlePreset(preset); setSettleOpen(true); };
-  const voidManual = async (id: string) => {
+  const removeManual = async (id: string) => {
+    if (!window.confirm('Delete this entry permanently? This cannot be undone.')) return;
     try {
-      await financeService.voidManualEntry(id);
-      toast({ title: 'Entry removed' });
+      await financeService.deleteManualEntry(id);
+      toast({ title: 'Entry deleted' });
       if (workspaceId) void loadAll(workspaceId);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -531,7 +534,7 @@ const FinancePage: React.FC = () => {
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openSettle({ direction: 'received', targetType: 'manual_entry', targetId: r.id })}>
                                   <BanknoteIcon className="h-3.5 w-3.5 mr-1" /> Settle
                                 </Button>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Remove" onClick={() => voidManual(r.id)}>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Delete" onClick={() => removeManual(r.id)}>
                                   <Ban className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
@@ -622,7 +625,7 @@ const FinancePage: React.FC = () => {
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openSettle({ direction: 'paid_out', targetType: 'manual_entry', targetId: r.id })}>
                                   <BanknoteIcon className="h-3.5 w-3.5 mr-1" /> Settle
                                 </Button>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Remove" onClick={() => voidManual(r.id)}>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Delete" onClick={() => removeManual(r.id)}>
                                   <Ban className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
@@ -645,7 +648,7 @@ const FinancePage: React.FC = () => {
           {/* ─────────── DOCUMENTS (folded in) ─────────── */}
           {DOC_TABS.map((d) => (
             <TabsContent key={d.value} value={d.value} className="space-y-4">
-              <DocumentsView embeddedType={d.type} />
+              {d.type === 'orders' ? <OrdersPanel workspaceId={workspaceId} /> : <DocumentsView embeddedType={d.type} />}
             </TabsContent>
           ))}
 

@@ -84,7 +84,7 @@ export const PartyAccountSummary: React.FC<{
   meta?: Array<{ label: string; value: React.ReactNode }>;
 }> = ({ customer, supplier, aging, meta }) => {
   const net = (customer?.outstanding ?? 0) - (supplier?.outstanding ?? 0);
-  const netLabel = net > 0 ? 'They owe us (net)' : net < 0 ? 'We owe them (net)' : 'Settled up';
+  const netLabel = net > 0 ? 'Account balance (they owe us)' : net < 0 ? 'Account balance (we owe them)' : 'Account balance (settled)';
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
   const netRing = net > 0 ? 'ring-1 ring-emerald-500/25' : net < 0 ? 'ring-1 ring-destructive/30' : '';
 
