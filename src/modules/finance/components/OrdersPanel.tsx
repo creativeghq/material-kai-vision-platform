@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -417,6 +417,21 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     } finally { setSaving(false); }
   };
 
+  // #2 — raise a draft invoice from this (manual/quote-less) sales order, then open it to issue.
+  const createInvoice = async () => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.rpc('generate_invoice_from_order', { p_order: order.id });
+      if (error) throw error;
+      await load(order.id); onChanged();
+      toast({ title: 'Draft invoice created', description: 'Review it, then issue & transmit to myDATA.' });
+      if (data) navigate(`/finance/invoices/${data}`);
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -457,6 +472,11 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               </Select>
               {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
                 <Button size="sm" variant="outline" onClick={() => changeStatus('fulfilled')} disabled={saving}>Mark completed</Button>
+              )}
+              {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
+                <Button size="sm" variant="outline" onClick={createInvoice} disabled={saving}>
+                  <FileText className="h-3.5 w-3.5 mr-1" /> Create invoice
+                </Button>
               )}
               {order.payment_status !== 'paid' && (
                 <Button size="sm" variant="outline" onClick={() => { setPayOpen((v) => !v); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
