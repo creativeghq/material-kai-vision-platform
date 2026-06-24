@@ -181,13 +181,15 @@ export const ordersService = {
 
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
+    supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
     payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null }>;
     received: number;
     paid_out: number;
     profit: number;
   }> {
-    const [inv, pay] = await Promise.all([
+    const [inv, bills, pay] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
+      supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('payments').select('id, direction, amount, currency, paid_at, method').eq('order_id', orderId).order('paid_at', { ascending: false }),
     ]);
     const payments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null }>;
@@ -195,6 +197,7 @@ export const ordersService = {
     const paid_out = payments.filter((p) => p.direction === 'out').reduce((a, p) => a + Number(p.amount), 0);
     return {
       invoices: (inv.data ?? []) as Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
+      supplierBills: (bills.data ?? []) as Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
       payments, received, paid_out, profit: received - paid_out,
     };
   },

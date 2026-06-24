@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -514,6 +514,30 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     } finally { setSaving(false); }
   };
 
+  // #5 — purchase order: record the supplier bill + receive goods into the warehouse.
+  const recordBill = async () => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc('generate_supplier_bill_from_order', { p_order: order.id });
+      if (error) throw error;
+      await load(order.id); onChanged();
+      toast({ title: 'Supplier bill recorded' });
+    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setSaving(false); }
+  };
+  const receiveWarehouse = async () => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.rpc('receive_order_into_warehouse', { p_order: order.id });
+      if (error) throw error;
+      await load(order.id); onChanged();
+      toast({ title: 'Received', description: `${data ?? 0} warehouse line(s) updated` });
+    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setSaving(false); }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -590,6 +614,16 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <FileText className="h-3.5 w-3.5 mr-1" /> Create invoice
                 </Button>
               )}
+              {order.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) === 0 && (
+                <Button size="sm" variant="outline" onClick={recordBill} disabled={saving}>
+                  <Receipt className="h-3.5 w-3.5 mr-1" /> Record supplier bill
+                </Button>
+              )}
+              {order.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled' && (
+                <Button size="sm" variant="outline" onClick={receiveWarehouse} disabled={saving}>
+                  <PackageCheck className="h-3.5 w-3.5 mr-1" /> Receive into warehouse
+                </Button>
+              )}
               {order.payment_status !== 'paid' && (
                 <Button size="sm" variant="outline" onClick={() => { setPayOpen((v) => !v); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
                   <Banknote className="h-3.5 w-3.5 mr-1" /> Record payment
@@ -638,6 +672,19 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <div key={iv.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                     <span className="font-mono text-xs">{iv.internal_number ?? iv.id.slice(0, 8)} · {iv.status}</span>
                     <span className="tabular-nums">{formatMoney(Number(iv.total), iv.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(iv.amount_due), iv.currency)}</span></span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Attached supplier bills (purchase orders) */}
+            {fin && fin.supplierBills.length > 0 && (
+              <div className="rounded-md border border-border/60">
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Supplier bills</div>
+                {fin.supplierBills.map((b) => (
+                  <div key={b.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                    <span className="font-mono text-xs">{b.supplier_bill_number ?? b.id.slice(0, 8)} · {b.status}</span>
+                    <span className="tabular-nums">{formatMoney(Number(b.total), b.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(b.amount_due), b.currency)}</span></span>
                   </div>
                 ))}
               </div>

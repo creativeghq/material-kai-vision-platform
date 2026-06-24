@@ -5,6 +5,7 @@ import {
   CustomerAccountOverview,
 } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
+import { PlannedPaymentsCard } from '@/modules/finance/components/PlannedPaymentsCard';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -1027,6 +1028,7 @@ export const CompanyDetailPage: React.FC = () => {
               <>
                 <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
                 <CustomerFinanceRulesCard companyId={company.id} />
+                <PlannedPaymentsCard workspaceId={activeWorkspaceId ?? ''} companyId={company.id} isSupplier={!!company.is_supplier} />
                 <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
               </>
             ) : (
