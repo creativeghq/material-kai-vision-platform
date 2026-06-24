@@ -53,6 +53,12 @@ const BACKOFF_MS = Number(process.env.SMOKE_BACKOFF_MS || 5000);
  * restart, a cold start, a momentary network hiccup — doesn't page you. Only a SUSTAINED
  * failure (still failing after all attempts) is reported as FAIL.
  */
+// Thrown from inside a check fn to record a SKIP (not a FAIL) — e.g. the data
+// needed to exercise the check doesn't exist yet (empty catalog). A skip never
+// fails the run and is not retried.
+class SkipCheck extends Error {}
+function skipIf(cond, msg) { if (cond) throw new SkipCheck(msg); }
+
 async function check(name, requiredEnv, fn) {
   const missing = requiredEnv.filter((k) => !process.env[k] && !DEFAULTED[k]);
   if (missing.length) {
@@ -68,6 +74,10 @@ async function check(name, requiredEnv, fn) {
       results.push({ name, status: 'PASS', detail: note, ms: Date.now() - started });
       return;
     } catch (err) {
+      if (err instanceof SkipCheck) {
+        results.push({ name, status: 'SKIP', detail: err.message, ms: Date.now() - started });
+        return;
+      }
       lastErr = err;
       if (attempt < RETRIES) await sleep(BACKOFF_MS);
     }
@@ -111,6 +121,9 @@ await check('db.products.sample', ['DB_KEY'], async () => {
     headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}` },
   });
   assert(res.ok, `GET products → ${res.status}`);
+  // An empty catalog (fresh/reset workspace) means there's nothing to sample — that's
+  // a data state, not a regression, so SKIP rather than FAIL the deploy gate.
+  skipIf(Array.isArray(json) && json.length === 0, 'products table empty — no row to sample');
   assert(Array.isArray(json) && json.length === 1 && json[0].id, 'no product row returned');
   sampleProductId = json[0].id;
   return sampleProductId;
@@ -118,7 +131,7 @@ await check('db.products.sample', ['DB_KEY'], async () => {
 
 for (const rpc of ['find_similar_products', 'find_complementary_products']) {
   await check(`db.rpc.${rpc}`, ['DB_KEY'], async () => {
-    assert(sampleProductId, 'no sample product id (db.products.sample failed)');
+    skipIf(!sampleProductId, 'no sample product (empty catalog) — cannot exercise RPC');
     const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/${rpc}`, {
       method: 'POST',
       headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
