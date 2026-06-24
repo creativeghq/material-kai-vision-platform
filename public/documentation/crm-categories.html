@@ -32,9 +32,8 @@
   <table>
     <thead><tr><th>Control</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td><strong>New Category</strong></td><td>Create a new category — name it and set its type / role.</td></tr>
-      <tr><td><strong>Edit</strong></td><td>Modify an existing category (for example rename it or change its type / role).</td></tr>
-      <tr><td><strong>Resync auto</strong></td><td>Refreshes the auto-derived (role-linked) categories so their memberships reflect the current set of users.</td></tr>
+      <tr><td><strong>New Category</strong></td><td>Create a new category — name it and set its type.</td></tr>
+      <tr><td><strong>Edit</strong></td><td>Modify an existing category (for example rename it or change its type).</td></tr>
       <tr><td><strong>Search categories</strong></td><td>Filters the list so you can find a category quickly.</td></tr>
     </tbody>
   </table>
@@ -45,23 +44,15 @@
     <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Categories</strong> tab.</li>
     <li>Click <strong>New Category</strong>.</li>
     <li><strong>Name</strong> the category (for example, <em>Architects in Athens</em>).</li>
-    <li>Set its <strong>type / role</strong>.</li>
+    <li>Set its <strong>type</strong>.</li>
     <li><strong>Save.</strong></li>
     <li><strong>Assign the category</strong> on a contact or company — open the record's detail page and apply the label there. (A category you've just created starts empty; it fills up as you assign it.)</li>
   </ol>
   <p><strong>What it affects elsewhere:</strong> once a category exists and has members, it becomes a selectable audience for the <strong>Send to Customers</strong> action on catalogs and for other email outreach, and a filter for grouping your contacts and companies.</p>
 
-  <h2>What Edit and Resync auto do</h2>
-  <p><strong>Edit</strong> is for the categories you create and curate by hand — use it to rename a category or change its type / role as your segmentation evolves. The members of a hand-curated category are the records you've assigned the label to on their detail pages.</p>
-  <p><strong>Resync auto</strong> is for the auto-derived, role-linked categories (below). Because their membership comes from user roles rather than manual assignment, you don't add people to them by hand — you press <strong>Resync auto</strong> to refresh them so they reflect the current set of dealer and factory users.</p>
-
-  <h2>Role-linked categories (auto-populated)</h2>
-  <p><strong>What they are —</strong> two special categories that are derived automatically from user roles rather than assigned by hand. <strong>Why they matter —</strong> they keep your dealer and factory audiences correct without manual upkeep — membership simply follows the role you set on the <a href="crm.html">Users</a> tab.</p>
-  <ul class="feat">
-    <li><strong>Dealer Accounts</strong> — users who hold the <em>dealer</em> role.</li>
-    <li><strong>Factory Accounts</strong> — users who hold the <em>factory</em> role.</li>
-  </ul>
-  <p>Because their membership comes from roles, you don't add people to these by hand. When you change who holds the dealer or factory role on the Users tab, press <strong>Resync auto</strong> so these categories reflect the current set of dealer and factory users.</p>
+  <h2>What Edit does</h2>
+  <p><strong>Edit</strong> is for the categories you create and curate by hand — use it to rename a category or change its type as your segmentation evolves. The members of a hand-curated category are the records you've assigned the label to on their detail pages.</p>
+  <div class="callout"><p><strong>Changed in 2026-06:</strong> categories no longer carry a <em>role</em>, and the old auto-populated <em>Dealer Accounts</em> / <em>Factory Accounts</em> role-linked categories were <strong>retired</strong> when roles were consolidated (dealer/factory → <strong>Supplier</strong>). Access is now driven by a user's account <a href="crm-users.html">Role</a>, not by category membership. Categories are purely the audiences <em>you</em> curate for outreach and filtering.</p></div>
 
   <h2>Seeded example categories</h2>
   <p>MaterialsHub ships with a set of starter categories you can use straight away or adapt — so you're not segmenting from a blank slate:</p>

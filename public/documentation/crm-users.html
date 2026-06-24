@@ -38,15 +38,30 @@
     <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
     <tbody>
       <tr><td><strong>Email</strong></td><td>The user's login email address — this is also what the search box matches on.</td></tr>
-      <tr><td><strong>Role</strong></td><td>The user's role — admin, user, dealer, factory, and so on. The role is the gate on what the person can see and do across the platform.</td></tr>
+      <tr><td><strong>Role</strong></td><td>The user's <strong>account role</strong> — this is the <em>access tier</em> (see the box below). Editable <strong>inline</strong> from this column.</td></tr>
+      <tr><td><strong>Type</strong></td><td>The account/professional type of the user.</td></tr>
       <tr><td><strong>Subscription</strong></td><td>The user's subscription tier (free, pro, …).</td></tr>
       <tr><td><strong>Credits</strong></td><td>The user's current credit balance — what the account has left to spend.</td></tr>
       <tr><td><strong>Status</strong></td><td>The account status (e.g. active).</td></tr>
-      <tr><td><strong>Created</strong></td><td>When the user was added.</td></tr>
       <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the user.</td></tr>
     </tbody>
   </table>
   </div>
+
+  <h2>The account role = the access tier</h2>
+  <p>A user's <strong>account role</strong> is now the single thing that decides what they can do across the platform. Set it here (the Role column is an inline dropdown). There are six tiers:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Role</th><th>What it grants</th></tr></thead>
+    <tbody>
+      <tr><td><strong>User</strong></td><td>A standard team member — the baseline; access falls back to their workspace membership.</td></tr>
+      <tr><td><strong>Sales</strong></td><td>The <a href="sales.html">Sales portal</a> and their own customers (no finance back-office).</td></tr>
+      <tr><td><strong>Supplier</strong></td><td>The full supplier business node and its downstream (this replaces the old <em>dealer</em> and <em>factory</em> roles — both now map to Supplier).</td></tr>
+      <tr><td><strong>Architect</strong></td><td>Sells to end clients with their own downstream.</td></tr>
+      <tr><td><strong>Finance</strong></td><td>The full <a href="finance.html">Finance</a> module, including expense approval.</td></tr>
+      <tr><td><strong>Admin</strong></td><td>Workspace administration (replaces the old <em>super admin</em>). Platform-operator “see everything” is reserved and not granted by this role alone.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><p><strong>Filters.</strong> The toolbar has <strong>Any role</strong>, <strong>Any status</strong>, <strong>Any plan</strong> and <strong>Any type</strong> dropdowns to narrow the list, plus the email search box.</p></div>
 
   <h2>How to search</h2>
   <p>Type into the <strong>Search users by email…</strong> box at the top of the tab to filter the table down to matching users. It's the fastest way to jump to one person in a long list — search on their login email.</p>
@@ -66,12 +81,12 @@
   <h2>What this affects elsewhere</h2>
   <p>This tab decides <strong>who can log in</strong> and, through each user's role, <strong>what they can see and do platform-wide</strong>:</p>
   <ul class="feat">
-    <li><strong>Roles gate access.</strong> The role you set here controls which top-nav areas a person can reach across the whole platform — CRM, Finance, Sales, dealer/factory portals, and so on. For the full role-to-access mapping, see <a href="getting-started.html">Getting Started → Roles &amp; access</a>.</li>
-    <li><strong>Roles feed the role-linked categories.</strong> The two auto-populated CRM categories — <strong>Dealer Accounts</strong> and <strong>Factory Accounts</strong> — are populated straight from the <em>dealer</em> and <em>factory</em> roles you assign on this tab.</li>
+    <li><strong>Role is the access tier.</strong> The role you set here is the primary driver of what a person can reach platform-wide — CRM, Finance, Sales, supplier/architect surfaces, and so on (per the six tiers above). It's changed inline, and takes effect for that user.</li>
     <li><strong>Invites land here.</strong> When you invite a colleague via <a href="finance-settings-team.html">Finance → Settings → Team</a>, they sign up with the role baked into the link and then appear in this Users list, where their role and subscription are managed.</li>
   </ul>
+  <div class="callout"><p><strong>Changed in 2026-06:</strong> roles were consolidated — <em>dealer</em> and <em>factory</em> merged into <strong>Supplier</strong>, and <em>super admin</em> into <strong>Admin</strong> — and the old auto-populated “Dealer/Factory Accounts” role categories were retired. Old records still display with the new label.</p></div>
 
-  <div class="callout tip"><p><strong>Worked example — onboarding a new dealer.</strong> You've sent a dealer an invite link from <a href="finance-settings-team.html">Team</a>; once they sign up they show up here in the <strong>Users</strong> tab. Use the email <strong>Search</strong> to find them, confirm their <strong>Status</strong> is active, and set their <strong>Role</strong> to <em>dealer</em>. From that point they fall automatically into the <strong>Dealer Accounts</strong> category, and their role grants them the dealer portal — no further manual list-keeping needed.</p></div>
+  <div class="callout tip"><p><strong>Worked example — onboarding a supplier.</strong> You've sent an invite link from <a href="finance-settings-team.html">Team</a>; once they sign up they appear here in the <strong>Users</strong> tab. Use the email <strong>Search</strong> to find them, confirm their <strong>Status</strong> is active, and set their <strong>Role</strong> to <em>Supplier</em> from the inline dropdown — that grants their supplier business node immediately, no further list-keeping needed.</p></div>
 
   <div class="callout"><p>Users are one of the four CRM tabs — for the people and organisations you do business with, see <a href="crm.html">CRM</a> (Contacts, Companies and Categories). To invite a new person into the workspace, use <a href="finance-settings-team.html">Finance → Settings → Team</a>; for what each role can do, see <a href="getting-started.html">Getting Started → Roles &amp; access</a>.</p></div>
 </main>

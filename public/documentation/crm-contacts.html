@@ -30,12 +30,20 @@
       <tr><td><strong>Name</strong></td><td>The person's name.</td></tr>
       <tr><td><strong>Email</strong></td><td>Primary email address.</td></tr>
       <tr><td><strong>Phone</strong></td><td>Phone number.</td></tr>
-      <tr><td><strong>Company</strong></td><td>The company the contact is linked to.</td></tr>
-      <tr><td><strong>Created</strong></td><td>When the contact was added.</td></tr>
+      <tr><td><strong>Company</strong></td><td>The business the contact is attached to (shown by name — it links through to that company's <a href="crm-companies.html">Account</a>).</td></tr>
+      <tr><td><strong>Type</strong></td><td>The contact type. There's a <strong>Type</strong> filter (plus filters for status, company, kind and category) above the list.</td></tr>
       <tr><td><strong>Actions</strong></td><td>Per-row actions to manage the contact.</td></tr>
     </tbody>
   </table>
   </div>
+
+  <h2>The contact detail page — Activity, notes &amp; attached business</h2>
+  <p><strong>What it is —</strong> opening a contact shows a <strong>two-column</strong> layout (with collapsible sidebar sections) where the main column is a unified <strong>Activity</strong> feed.</p>
+  <ul class="feat">
+    <li><strong>Activity feed + inline notes.</strong> The contact's quotes, invoices and notes appear together in one time-ordered feed, and you add a <strong>note inline</strong> right there — there's no separate Notes tab anymore.</li>
+    <li><strong>Role &amp; Birthday on the contact.</strong> The customer/supplier <strong>Role</strong> sits in Contact Information (and is inherited from an attached business), and there's a <strong>Birthday</strong> field.</li>
+    <li><strong>Attached to a business → financials roll up.</strong> When a contact is attached to a company, their financial tabs (invoices/payments/balance) are <strong>hidden</strong> in favour of a <strong>“Check Company”</strong> link, and quotes/orders roll up to the business <a href="crm-companies.html">Account</a> — so one customer's money lives in one place, not split between the person and their company. A solopreneur contact can be promoted to a business when they grow.</li>
+  </ul>
 
   <h2>How to add a contact</h2>
   <p>The New Contact form is organised into groups. Required fields are marked with <strong>*</strong>. The quick path is short; the field-by-field walkthrough below explains every group.</p>
@@ -77,8 +85,8 @@
   <table>
     <thead><tr><th>Field</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td><strong>Lead Status</strong></td><td>Where the contact sits in your pipeline.</td></tr>
-      <tr><td><strong>Lead Source</strong></td><td>How the contact came to you.</td></tr>
+      <tr><td><strong>Lead Status</strong></td><td>Where the contact sits in your pipeline. A <strong>managed dropdown</strong> (no free text) so everyone uses the same stages.</td></tr>
+      <tr><td><strong>Lead Source</strong></td><td>How the contact came to you. Also a <strong>managed dropdown</strong>, so your source list stays clean and reportable.</td></tr>
       <tr><td><strong>Created</strong></td><td>Set automatically when the record is saved.</td></tr>
     </tbody>
   </table>
