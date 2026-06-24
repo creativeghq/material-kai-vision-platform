@@ -571,7 +571,7 @@ export const ContactDetailPage: React.FC = () => {
           {hasCompany && primaryCompany?.id && (
             <Button variant="outline" size="sm" className="gap-1.5"
               onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}>
-              <Building2 className="h-4 w-4" /> Check Company: {primaryCompany.name}
+              <Building2 className="h-4 w-4" /> {primaryCompany.name}
             </Button>
           )}
           </div>
