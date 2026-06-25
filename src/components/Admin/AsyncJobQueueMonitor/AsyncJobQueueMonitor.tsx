@@ -19,6 +19,7 @@ import { logger } from '@/services/logger.service';
 import { TempFileCleanupModal } from '../TempFileCleanupModal';
 import { JobCheckpointTimeline } from '../JobCheckpointTimeline';
 import { DocumentHealthPanel } from './DocumentHealthPanel';
+import { EmbeddingBackfillCard } from './EmbeddingBackfillCard';
 import {
   RefreshCw,
   AlertTriangle,
@@ -1488,6 +1489,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Embedding coverage — backfill-agent health at a glance */}
+        <EmbeddingBackfillCard />
 
         {/* Overview Metrics - Compact Design */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
