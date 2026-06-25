@@ -281,19 +281,27 @@ export const UserDetailPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     setError(null);
-
-    // Load roles and user in parallel
+    // Roles + the user gate the first paint; the linked contact loads on its own
+    // (separate effect) so a slow second round-trip never holds the whole page on
+    // the "Loading…" screen.
     try {
-      const [rolesResult] = await Promise.all([
-        loadRoles(),
-        loadUser(),
-      ]);
+      await Promise.all([loadRoles(), loadUser()]);
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  // Linked CRM contact loads independently — never blocks the main page paint.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    contactsAPI.getContactByUserId(id)
+      .then((r) => { if (!cancelled) setLinkedContact(r?.data ?? null); })
+      .catch(() => { if (!cancelled) setLinkedContact(null); });
+    return () => { cancelled = true; };
+  }, [id]);
 
   const loadRoles = async () => {
     try {
@@ -318,8 +326,6 @@ export const UserDetailPage: React.FC = () => {
       // Handle both response.data and direct response formats
       const userData = response.data || response;
 
-      console.log('User data loaded:', userData); // Debug log
-
       if (!userData) {
         setError('User not found');
         return;
@@ -332,17 +338,6 @@ export const UserDetailPage: React.FC = () => {
       setSubscriptionTier(userData.subscription_tier || 'free');
       setStatus(userData.status || 'active');
       setCredits(userData.credits || 0);
-
-      // Try to load linked contact
-      try {
-        const contactResponse = await contactsAPI.getContactByUserId(id);
-        if (contactResponse.data) {
-          setLinkedContact(contactResponse.data);
-        }
-      } catch {
-        // No linked contact found, that's okay
-        setLinkedContact(null);
-      }
     } catch (err: any) {
       console.error('Error loading user:', err);
       setError(err.message || 'Failed to load user details');
