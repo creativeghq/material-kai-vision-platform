@@ -315,8 +315,10 @@ export const ordersService = {
     workspaceId: string; productId: string; orderType: OrderType;
     companyId?: string | null; contactId?: string | null;
   }): Promise<LinePricing> {
-    const { data: prod } = await supabase.from('products').select('cost, measurement_unit_code').eq('id', opts.productId).maybeSingle();
-    const unit = (prod?.measurement_unit_code as string | null) ?? null;
+    const { data: prod } = await supabase.from('products').select('cost').eq('id', opts.productId).maybeSingle();
+    // NB: products.measurement_unit_code is the integer myDATA code, NOT our text unit label
+    // (item/m²/…), so we don't seed the line's unit from it — the user picks it.
+    const unit: string | null = null;
     const cost = prod?.cost != null ? Number(prod.cost) : null;
     if (opts.orderType === 'purchase') {
       return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit };
