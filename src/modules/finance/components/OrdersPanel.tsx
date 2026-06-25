@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -8,6 +8,9 @@ import { Badge } from '@/components/core/ui/badge';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney, financeService, VAT_CATEGORIES, type ManualEntry, type ManualEntryDirection } from '@/modules/finance/services/financeService';
@@ -35,9 +38,13 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
   const [statusF, setStatusF] = useState<'all' | OrderStatus>('all');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  // What the New-order dropdown chose: sales/purchase + whether it's a draft (pre-order).
+  const [createPreset, setCreatePreset] = useState<{ orderType: OrderType; draft: boolean }>({ orderType: 'sales', draft: false });
   const [openId, setOpenId] = useState<string | null>(null);
   // Inside a CRM party (company/contact) the list is already scoped — hide the filter cluster.
   const embedded = !!(companyId || contactId);
+
+  const openCreate = (orderType: OrderType, draft: boolean) => { setCreatePreset({ orderType, draft }); setCreateOpen(true); };
 
   const load = async () => {
     if (!workspaceId) return;
@@ -99,9 +106,19 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
               </div>
             </>
           )}
-          {/* One entry point. Sell-vs-buy and draft-vs-confirm are choices inside the modal,
-              not separate buttons (a "pre-order" is just an order saved as a draft). */}
-          <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" /> New order</Button>
+          {/* One entry point, one dropdown — the order kind is an explicit choice in the menu
+              (a "pre-order" is just a sales order saved as a draft). */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-1" /> New order <ChevronDown className="h-4 w-4 ml-1" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => openCreate('sales', false)}>Sales order</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openCreate('purchase', false)}>Purchase order</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openCreate('sales', true)}>Pre-order (draft)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -146,6 +163,7 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
         workspaceId={workspaceId}
         lockedCompanyId={companyId}
         lockedContactId={contactId}
+        preset={createPreset}
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={() => { setCreateOpen(false); void load(); }}
@@ -165,14 +183,15 @@ const NewOrderModal: React.FC<{
   /** When the modal is opened from inside a CRM party, that party is pre-selected and locked. */
   lockedCompanyId?: string;
   lockedContactId?: string;
+  /** Chosen from the New-order dropdown: sell vs buy + draft (pre-order) vs confirmed. */
+  preset: { orderType: OrderType; draft: boolean };
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated: () => void;
-}> = ({ workspaceId, lockedCompanyId, lockedContactId, open, onOpenChange, onCreated }) => {
+}> = ({ workspaceId, lockedCompanyId, lockedContactId, preset, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
-  // Direction is chosen in-modal: a sales order (we sell) vs a purchase order (we buy).
-  const [orderType, setOrderType] = useState<OrderType>('sales');
+  const orderType = preset.orderType;
   const [party, setParty] = useState<Party | null>(null);
   const [partySearch, setPartySearch] = useState('');
   const [partyOpts, setPartyOpts] = useState<Party[]>([]);
@@ -189,7 +208,6 @@ const NewOrderModal: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    setOrderType('sales');
     setParty(null); setPartySearch(''); setPartyOpts([]); setActiveLine(null); setLineProdOpts([]);
     setProject(null); setProjectSearch(''); setProjectOpts([]); setCurrency('EUR');
     setItems([blankLine()]);
@@ -317,13 +335,8 @@ const NewOrderModal: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>New order</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{preset.draft ? 'New pre-order' : isSales ? 'New sales order' : 'New purchase order'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          {/* Direction — sell to a customer (sales order) or buy from a supplier (purchase order). */}
-          <div className="flex gap-2">
-            <Button type="button" size="sm" variant={isSales ? 'default' : 'outline'} className="flex-1" onClick={() => setOrderType('sales')}>Sell to customer</Button>
-            <Button type="button" size="sm" variant={!isSales ? 'default' : 'outline'} className="flex-1" onClick={() => setOrderType('purchase')}>Buy from supplier</Button>
-          </div>
           <div className="space-y-1">
             <Label>{isSales ? 'Customer *' : 'Supplier *'}</Label>
             {party ? (
@@ -431,9 +444,10 @@ const NewOrderModal: React.FC<{
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          {/* Pre-order = save as a draft; Create = a confirmed, live order. */}
-          <Button variant="secondary" onClick={() => save('draft')} disabled={busy}>Save as pre-order</Button>
-          <Button onClick={() => save('confirmed')} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Create order</Button>
+          {/* The kind was chosen in the New-order dropdown: draft → pre-order, else a live order. */}
+          <Button onClick={() => save(preset.draft ? 'draft' : 'confirmed')} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} {preset.draft ? 'Save pre-order' : 'Create order'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -656,6 +670,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               </div>
             )}
 
+            {/* Status is the one always-visible control; every other action lives in one
+                Actions menu so the order view stays clean instead of a row of buttons. */}
             <div className="flex flex-wrap items-center gap-2">
               <Label className="text-xs text-muted-foreground">Status</Label>
               <Select value={order.status} onValueChange={(v: any) => changeStatus(v)}>
@@ -664,37 +680,64 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => <SelectItem key={s} value={s}>{ORDER_STATUS_LABEL[s]}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
-                <Button size="sm" variant="outline" onClick={() => changeStatus('fulfilled')} disabled={saving}>Mark completed</Button>
-              )}
-              {editable && !editing && (
-                <Button size="sm" variant="outline" onClick={startEdit} disabled={saving}>Edit items</Button>
-              )}
-              {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
-                <Button size="sm" variant="outline" onClick={createInvoice} disabled={saving}>
-                  <FileText className="h-3.5 w-3.5 mr-1" /> Create invoice
-                </Button>
-              )}
-              {order.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) === 0 && (
-                <Button size="sm" variant="outline" onClick={recordBill} disabled={saving}>
-                  <Receipt className="h-3.5 w-3.5 mr-1" /> Record supplier bill
-                </Button>
-              )}
-              {order.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled' && (
-                <Button size="sm" variant="outline" onClick={receiveWarehouse} disabled={saving}>
-                  <PackageCheck className="h-3.5 w-3.5 mr-1" /> Receive into warehouse
-                </Button>
-              )}
-              {order.payment_status !== 'paid' && (
-                <Button size="sm" variant="outline" onClick={() => { setPayOpen((v) => !v); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
-                  <Banknote className="h-3.5 w-3.5 mr-1" /> Record payment
-                </Button>
-              )}
-              {order.order_type === 'sales' && (
-                <Button size="sm" variant="outline" onClick={() => navigate('/finance?tab=doc_dispatch')}>
-                  <Truck className="h-3.5 w-3.5 mr-1" /> Dispatch board
-                </Button>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={saving}>
+                    <MoreHorizontal className="h-3.5 w-3.5 mr-1" /> Actions <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {order.payment_status !== 'paid' && (
+                    <DropdownMenuItem onClick={() => { setPayOpen(true); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
+                      <Banknote className="h-3.5 w-3.5 mr-2" /> Record payment
+                    </DropdownMenuItem>
+                  )}
+                  {party && (
+                    <DropdownMenuItem onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
+                      <Plus className="h-3.5 w-3.5 mr-2" /> Add receivable
+                    </DropdownMenuItem>
+                  )}
+                  {party && (
+                    <DropdownMenuItem onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
+                      <Plus className="h-3.5 w-3.5 mr-2" /> Add payable
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
+                    <DropdownMenuItem onClick={createInvoice}>
+                      <FileText className="h-3.5 w-3.5 mr-2" /> Create invoice
+                    </DropdownMenuItem>
+                  )}
+                  {order.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) === 0 && (
+                    <DropdownMenuItem onClick={recordBill}>
+                      <Receipt className="h-3.5 w-3.5 mr-2" /> Record supplier bill
+                    </DropdownMenuItem>
+                  )}
+                  {order.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled' && (
+                    <DropdownMenuItem onClick={receiveWarehouse}>
+                      <PackageCheck className="h-3.5 w-3.5 mr-2" /> Receive into warehouse
+                    </DropdownMenuItem>
+                  )}
+                  {editable && !editing && (
+                    <DropdownMenuItem onClick={startEdit}>
+                      <Pencil className="h-3.5 w-3.5 mr-2" /> Edit items
+                    </DropdownMenuItem>
+                  )}
+                  {order.order_type === 'sales' && (
+                    <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
+                      <Truck className="h-3.5 w-3.5 mr-2" /> Dispatch board
+                    </DropdownMenuItem>
+                  )}
+                  {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => changeStatus('fulfilled')}>
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark completed
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {payOpen && (
@@ -767,19 +810,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             {/* Receivables & payables on THIS order — money owed on/by it that isn't a formal
                 invoice/bill (deposits, advances, fees). Added per-order, not at party level. */}
             <div className="rounded-md border border-border/60">
-              <div className="flex items-center justify-between border-b border-border/60 px-3 py-1.5">
-                <span className="text-[11px] font-medium text-muted-foreground">Receivables &amp; payables</span>
-                <div className="flex items-center gap-1">
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={!party} onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Receivable
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={!party} onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Payable
-                  </Button>
-                </div>
-              </div>
+              <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Receivables &amp; payables</div>
               {entries.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-muted-foreground">None yet. Add a receivable (they owe us) or payable (we owe) tied to this order.</p>
+                <p className="px-3 py-2 text-xs text-muted-foreground">None yet. Use <span className="font-medium">Actions → Add receivable / payable</span> to record money owed on this order.</p>
               ) : (
                 entries.map((e) => (
                   <div key={e.id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
