@@ -108,6 +108,7 @@ const ProjectAcceptInvitePage = lazy(() => import('./modules/projects/pages/Acce
 const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
 const PayInvoicePage = lazy(() => import('./pages/PayInvoicePage'));
 const TripExpensesPage = lazy(() => import('./pages/TripExpensesPage'));
+const ClientPortalPage = lazy(() => import('./pages/ClientPortalPage'));
 const PublicStorefrontPage = lazy(() => import('./pages/PublicStorefrontPage'));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 const PlansPage = lazy(() => import('./pages/Admin/PlansPage'));
@@ -242,6 +243,18 @@ const App = () => (
                           </Layout>
                         </EntitlementGuard>
                       </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* Client Portal — customer self-serve account (orders, invoices, receipts, balance).
+                    Any authenticated user; non-customers just see the empty state. */}
+                <Route
+                  path="/portal"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <ClientPortalPage />
+                      </Layout>
                     </AuthGuard>
                   }
                 />

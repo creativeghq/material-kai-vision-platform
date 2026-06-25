@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -25,12 +25,14 @@ import { ServicesCard } from '@/modules/finance/components/ServicesCard';
 import { TeamInviteCard } from '@/modules/finance/components/TeamInviteCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
+import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 import { CategoriesCard } from '@/modules/finance/components/CategoriesCard';
 import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
 import { StorefrontCard } from '@/modules/finance/components/StorefrontCard';
 import { MembersCard } from '@/modules/finance/components/MembersCard';
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
+import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -44,6 +46,7 @@ const SETTINGS_SECTIONS = [
   { value: 'services', label: 'Services', icon: Wrench },
   { value: 'team', label: 'Team', icon: Users },
   { value: 'storefront', label: 'Online Store', icon: Store },
+  { value: 'banks', label: 'Bank accounts', icon: Landmark },
   { value: 'statements', label: 'Statement PDF', icon: ImageIcon },
   { value: 'digest', label: 'Finance Digest', icon: Mail },
   { value: 'payments', label: 'Payments', icon: CreditCard },
@@ -199,6 +202,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         <TabsContent value="identity" className="mt-0 space-y-4">
           <BusinessIdentityCard workspaceId={workspaceId} />
           <AadeCredentialsCard workspaceId={workspaceId} />
+          <WorkspaceEmailConfigCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-0 space-y-4">
@@ -236,6 +240,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="storefront" className="mt-0">
           <StorefrontCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        <TabsContent value="banks" className="mt-0">
+          <BankAccountsCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="payments" className="mt-0">

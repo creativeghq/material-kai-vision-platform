@@ -443,7 +443,7 @@ async function sendOneStatement(
     </div>`;
 
   const { data: dispatch, error: dispatchErr } = await supabase.functions.invoke('email-api', {
-    body: { action: 'send', to: targetEmail, subject, html, emailType: 'transactional', tags: { feature: 'finance_statement', party_type: partyType, party_id: party.party_id } },
+    body: { action: 'send', to: targetEmail, subject, html, emailType: 'transactional', tags: { feature: 'finance_statement', party_type: partyType, party_id: party.party_id }, workspace_id: party.workspace_id },
   });
   if (dispatchErr || !(dispatch as any)?.success) {
     return { ok: false, email_sent_to: null, pdf_url: pdfUrl, rows: ledger.rows.length, closing_balance: closing, error: dispatchErr?.message ?? (dispatch as any)?.error ?? 'email send failed' };

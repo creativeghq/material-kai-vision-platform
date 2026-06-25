@@ -96,7 +96,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
     </div>`;
 
   const { data: dispatch, error: dispatchErr } = await supabase.functions.invoke('email-api', {
-    body: { action: 'send', to: email, subject, html, emailType: 'transactional', tags: { feature: 'invoice_email', invoice_id }, attachments },
+    body: { action: 'send', to: email, subject, html, emailType: 'transactional', tags: { feature: 'invoice_email', invoice_id }, attachments, workspace_id: inv.workspace_id },
   });
   if (dispatchErr || !(dispatch as any)?.success) {
     return json({ ok: false, error: dispatchErr?.message ?? 'email send failed' }, 502);

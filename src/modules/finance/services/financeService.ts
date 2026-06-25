@@ -152,6 +152,43 @@ export interface Payment {
   created_at: string;
 }
 
+export type BankAccountKind = 'bank' | 'cash' | 'card' | 'online' | 'other';
+
+export interface BankAccount {
+  id: string;
+  workspace_id: string;
+  name: string;
+  kind: BankAccountKind;
+  currency: string;
+  iban: string | null;
+  account_ref: string | null;
+  opening_balance: number;
+  is_default: boolean;
+  is_active: boolean;
+  sort_order: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BankAccountBalance {
+  bank_account_id: string;
+  workspace_id: string;
+  name: string;
+  kind: BankAccountKind;
+  currency: string;
+  iban: string | null;
+  account_ref: string | null;
+  is_active: boolean;
+  is_default: boolean;
+  sort_order: number;
+  opening_balance: number;
+  total_in: number;
+  total_out: number;
+  current_balance: number;
+  payment_count: number;
+}
+
 export interface PaymentAllocation {
   id: string;
   payment_id: string;
@@ -671,6 +708,8 @@ const _financeServiceCore = {
     fxRateToBase?: number;
     /** Optional finance category. */
     categoryId?: string | null;
+    /** Which bank/cash account the money moved through (in → deposited to / out → paid from). */
+    bankAccountId?: string | null;
     /**
      * Allocations may sum to LESS than the payment (remainder = customer credit) but not
      * more. `amount` is the value applied to the target in the TARGET's currency; for a
@@ -701,6 +740,7 @@ const _financeServiceCore = {
         fx_rate: a.fx_rate ?? 1,
       })),
       p_category_id: input.categoryId ?? null,
+      p_bank_account_id: input.bankAccountId ?? null,
     });
     if (error) throw error;
     // Payment received → notify + email the customer via the seeded flow (fire-and-forget).
@@ -1103,6 +1143,74 @@ const _financeServiceCore = {
   async deletePayment(paymentId: string): Promise<void> {
     // Allocations cascade automatically; status-keeper trigger fires on each delete.
     const { error } = await supabase.from('payments').delete().eq('id', paymentId);
+    if (error) throw error;
+  },
+
+  // -------- Bank / cash accounts (where money sits) --------
+
+  /** Active (and optionally inactive) bank/cash accounts for a workspace. */
+  async listBankAccounts(workspaceId: string, opts: { includeInactive?: boolean } = {}): Promise<BankAccount[]> {
+    let q = supabase.from('finance_bank_accounts').select('*').eq('workspace_id', workspaceId)
+      .order('sort_order', { ascending: true }).order('created_at', { ascending: true });
+    if (!opts.includeInactive) q = q.eq('is_active', true);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as BankAccount[];
+  },
+
+  /** Per-account running balances (opening + Σ in − Σ out). */
+  async getBankAccountBalances(workspaceId: string): Promise<BankAccountBalance[]> {
+    const { data, error } = await supabase.from('vw_bank_account_balances').select('*')
+      .eq('workspace_id', workspaceId).order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as BankAccountBalance[];
+  },
+
+  async createBankAccount(input: {
+    workspaceId: string; name: string; kind?: BankAccountKind; currency?: string;
+    iban?: string | null; accountRef?: string | null; openingBalance?: number;
+    isDefault?: boolean; notes?: string | null;
+  }): Promise<BankAccount> {
+    if (!input.name?.trim()) throw new Error('Account name is required');
+    // First account in a workspace becomes the default automatically.
+    const existing = await this.listBankAccounts(input.workspaceId, { includeInactive: true });
+    const makeDefault = input.isDefault ?? existing.length === 0;
+    if (makeDefault && existing.some((a) => a.is_default)) {
+      await supabase.from('finance_bank_accounts').update({ is_default: false }).eq('workspace_id', input.workspaceId);
+    }
+    const { data, error } = await supabase.from('finance_bank_accounts').insert({
+      workspace_id: input.workspaceId,
+      name: input.name.trim(),
+      kind: input.kind ?? 'bank',
+      currency: input.currency ?? 'EUR',
+      iban: input.iban ?? null,
+      account_ref: input.accountRef ?? null,
+      opening_balance: input.openingBalance ?? 0,
+      is_default: makeDefault,
+      sort_order: existing.length,
+    }).select('*').single();
+    if (error) throw error;
+    return data as BankAccount;
+  },
+
+  async updateBankAccount(id: string, patch: Partial<Pick<BankAccount,
+    'name' | 'kind' | 'currency' | 'iban' | 'account_ref' | 'opening_balance' | 'is_active' | 'sort_order' | 'notes'>>): Promise<void> {
+    const { error } = await supabase.from('finance_bank_accounts')
+      .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Exactly one default account per workspace. */
+  async setDefaultBankAccount(workspaceId: string, accountId: string): Promise<void> {
+    const clear = await supabase.from('finance_bank_accounts').update({ is_default: false }).eq('workspace_id', workspaceId);
+    if (clear.error) throw clear.error;
+    const set = await supabase.from('finance_bank_accounts').update({ is_default: true }).eq('id', accountId);
+    if (set.error) throw set.error;
+  },
+
+  /** Delete an account. Payments keep their history (bank_account_id → NULL via FK). */
+  async deleteBankAccount(id: string): Promise<void> {
+    const { error } = await supabase.from('finance_bank_accounts').delete().eq('id', id);
     if (error) throw error;
   },
 

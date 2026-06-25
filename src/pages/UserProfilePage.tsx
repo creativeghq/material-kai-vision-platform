@@ -37,7 +37,7 @@ export const UserProfilePage: React.FC = () => {
         subtitle="Manage your account, credits, and billing"
       />
 
-      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+      <div className="px-3 sm:px-6 py-4 sm:py-8">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="profile" className="flex items-center gap-2">
@@ -70,7 +70,7 @@ export const UserProfilePage: React.FC = () => {
           </TabsTrigger>
           <TabsTrigger value="documents" className="flex items-center gap-2">
             <ReceiptText className="h-4 w-4" />
-            My Documents
+            My Account
           </TabsTrigger>
           <TabsTrigger value="social-accounts" className="flex items-center gap-2">
             <Share2 className="h-4 w-4" />

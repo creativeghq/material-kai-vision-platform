@@ -228,6 +228,47 @@ export class EmailService {
     if (error) throw error;
     return data;
   }
+
+  /** Per-workspace Resend BYOK config STATUS (finance-manager only). Never returns the API
+   *  key — only whether one is set (`has_api_key`) + the effective platform-controlled cap. */
+  async getWorkspaceConfig(workspaceId: string): Promise<{
+    from_email: string | null;
+    from_name: string | null;
+    enabled: boolean;
+    has_api_key: boolean;
+    effective_daily_limit: number;
+    sent_today: number;
+  } | null> {
+    const { data, error } = await supabase.rpc('get_workspace_email_config_status', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return null;
+    return {
+      from_email: row.from_email ?? null,
+      from_name: row.from_name ?? null,
+      enabled: row.enabled ?? true,
+      has_api_key: !!row.has_api_key,
+      effective_daily_limit: row.effective_daily_limit ?? 0,
+      sent_today: row.sent_today ?? 0,
+    };
+  }
+
+  /** Save this workspace's Resend BYOK config. The API key is only written when a new value is
+   *  provided — a blank key preserves the stored one (the masked form never wipes a secret). */
+  async saveWorkspaceConfig(workspaceId: string, input: { apiKey?: string; fromEmail: string; fromName?: string | null; enabled: boolean }): Promise<void> {
+    const payload: Record<string, any> = {
+      workspace_id: workspaceId,
+      from_email: input.fromEmail || null,
+      from_name: input.fromName || null,
+      enabled: input.enabled,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.apiKey && input.apiKey.trim()) {
+      payload.resend_api_key = input.apiKey.trim();
+    }
+    const { error } = await supabase.from('workspace_email_config').upsert(payload, { onConflict: 'workspace_id' });
+    if (error) throw error;
+  }
 }
 
 // Export singleton instance

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Menu, LogOut, Wrench, Eye, EyeOff } from 'lucide-react';
+import { User, Menu, LogOut, Wrench, Eye, EyeOff, LayoutDashboard } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useShowPrices } from '@/hooks/useShowPrices';
 
@@ -88,6 +88,10 @@ export const Sidebar: React.FC = () => {
         <DropdownMenuItem onClick={() => navigate('/profile')} className="py-3">
           <User className="mr-3 h-4 w-4" />
           <span className="text-sm">My Profile</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate('/portal')} className="py-3">
+          <LayoutDashboard className="mr-3 h-4 w-4" />
+          <span className="text-sm">Client Portal</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate('/tools')} className="py-3">
           <Wrench className="mr-3 h-4 w-4" />

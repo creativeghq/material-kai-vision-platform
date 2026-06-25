@@ -13,6 +13,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
+import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
 
 const resendApiKey = () => Deno.env.get('RESEND_API_KEY') || '';
 
@@ -32,9 +33,12 @@ interface SendEmailRequest {
   emailType?: 'transactional' | 'marketing' | 'notification';
   /** Resend attachments — base64 content (no data: prefix). */
   attachments?: Array<{ filename: string; content: string }>;
+  /** When set, the send uses this workspace's BYOK Resend key + sender (workspace_email_config)
+   *  and counts against its platform-controlled daily cap. Omit for platform/system sends. */
+  workspace_id?: string;
 }
 
-async function sendViaResend(payload: {
+async function sendViaResend(apiKey: string, payload: {
   from: string;
   to: string[];
   subject: string;
@@ -46,13 +50,12 @@ async function sendViaResend(payload: {
   tags?: Array<{ name: string; value: string }>;
   attachments?: Array<{ filename: string; content: string }>;
 }): Promise<string> {
-  const apiKey = () => Deno.env.get('RESEND_API_KEY') || '';
-  if (!apiKey()) throw new Error('RESEND_API_KEY is not configured');
+  if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey()}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
@@ -109,22 +112,42 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           }
         }
 
-        // Pre-flight: require Resend API key. Without this, sendViaResend()
+        const body: SendEmailRequest = requestBody;
+
+        // Resolve the Resend key + sender: the workspace's own BYOK config wins when set,
+        // otherwise the platform key + global email_settings sender.
+        const sender = await resolveWorkspaceEmailSender(supabaseClient, body.workspace_id);
+
+        // Pre-flight: require a Resend API key. Without this, sendViaResend()
         // throws deep inside the send pipeline and surfaces as an opaque 500.
         // Returning 503 with code='provider_not_configured' lets the frontend
         // surface a meaningful "ask your admin to set this" message.
-        if (!resendApiKey()) {
+        if (!sender.apiKey) {
           return notConfiguredResponse(
             {
               provider: 'Resend',
-              envVarHint: 'Set RESEND_API_KEY on the host, or paste it',
-              settingsPath: '/admin/modules/email/settings → Keys',
+              envVarHint: 'Set RESEND_API_KEY on the host, paste it',
+              settingsPath: '/admin/modules/email/settings → Keys (or your workspace email settings)',
             },
             corsHeaders,
           );
         }
 
-        const body: SendEmailRequest = requestBody;
+        // Enforce the platform-controlled per-workspace daily send cap (no-op for system sends
+        // that carry no workspace_id).
+        const quota = await checkWorkspaceSendQuota(supabaseClient, body.workspace_id);
+        if (!quota.allowed) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Daily email limit reached for this workspace (${quota.used}/${quota.limit}). Try again tomorrow.`,
+              code: 'workspace_email_quota_exceeded',
+              used: quota.used,
+              limit: quota.limit,
+            }),
+            { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
 
         let htmlBody = body.html;
         let textBody = body.text;
@@ -179,40 +202,18 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           throw new Error('Either html or text body must be provided');
         }
 
-        // Get default sender settings. We deliberately do NOT fall back to a bogus
-        // `noreply@example.com` — that domain is unverified, so Resend rejects it (and
-        // a silent fallback masks a real misconfiguration). If neither the request nor
-        // email_settings supplies a real sender, fail loudly (audit #217 M1).
-        let defaultFromEmail = '';
-        let defaultFromName = 'Material Kai';
-
-        try {
-          const { data: emailSettings, error: settingsError } = await supabaseClient
-            .from('email_settings')
-            .select('setting_key, setting_value')
-            .in('setting_key', ['default_from_email', 'default_from_name']);
-
-          if (settingsError) throw settingsError;
-
-          if (emailSettings) {
-            emailSettings.forEach((setting: { setting_key: string; setting_value: string }) => {
-              if (setting.setting_key === 'default_from_email') defaultFromEmail = setting.setting_value || '';
-              else if (setting.setting_key === 'default_from_name') defaultFromName = setting.setting_value || defaultFromName;
-            });
-          }
-        } catch (error) {
-          // Surface rather than silently sending from an invalid domain.
-          console.error('Error loading email settings:', error);
-        }
-
-        const fromEmail = body.from || defaultFromEmail;
+        // Sender comes from the resolved BYOK/platform config (see resolveWorkspaceEmailSender).
+        // We deliberately do NOT fall back to a bogus `noreply@example.com` — that domain is
+        // unverified, so Resend rejects it (and a silent fallback masks a real misconfiguration).
+        // If neither the request nor the resolved config supplies a real sender, fail loudly.
+        const fromEmail = body.from || sender.fromEmail;
         if (!fromEmail) {
           throw new Error(
-            'No sender address configured. Set `default_from_email` in email_settings, ' +
-            'or pass `from` in the request.',
+            'No sender address configured. Set a workspace sender (workspace_email_config) or ' +
+            '`default_from_email` in email_settings, or pass `from` in the request.',
           );
         }
-        const fromName = body.fromName || defaultFromName;
+        const fromName = body.fromName || sender.fromName;
         const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
         const toAddresses = Array.isArray(body.to) ? body.to : [body.to];
 
@@ -243,6 +244,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             email_type: body.emailType || 'transactional',
             tags: body.tags || {},
             variables: body.variables || {},
+            workspace_id: body.workspace_id ?? null,
             // Server-to-server callers (Flows send_email, send-quote-email, price/
             // mention alerts, …) authenticate with the secret key and carry no user,
             // so auth.user is null. created_by is nullable for exactly these system
@@ -266,7 +268,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           tags.push({ name: 'type', value: body.emailType || 'transactional' });
         }
 
-        const messageId = await sendViaResend({
+        const messageId = await sendViaResend(sender.apiKey, {
           from: fromAddress,
           to: toAddresses,
           subject,

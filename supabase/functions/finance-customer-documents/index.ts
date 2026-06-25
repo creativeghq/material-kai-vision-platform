@@ -30,6 +30,14 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // Optional action: 'overview' (default — summary + orders + documents) or
+  // 'order_detail' (line items for a single owned order).
+  let action = 'overview';
+  let orderId: string | null = null;
+  if (req.method === 'POST') {
+    try { const b = await req.json(); action = b?.action ?? 'overview'; orderId = b?.order_id ?? null; } catch { /* no body */ }
+  }
+
   // 1. The caller's own CRM contacts (the only documents they may see).
   const { data: contacts } = await supabase
     .from('crm_contacts')
@@ -48,6 +56,27 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     .select('company_id')
     .in('contact_id', contactIds);
   const companyIds = [...new Set((links ?? []).map((l: any) => l.company_id).filter(Boolean))];
+
+  // ── action: order_detail — line items for a single order the caller owns ──
+  if (action === 'order_detail') {
+    if (!orderId) return json({ error: 'order_id required' }, 400);
+    const { data: order } = await supabase
+      .from('orders')
+      .select('id, order_number, order_type, status, payment_status, total, subtotal_net, vat_amount, currency, notes, created_at, customer_contact_id, customer_company_id')
+      .eq('id', orderId)
+      .maybeSingle();
+    const owns = order
+      && order.order_type === 'sales'
+      && ((order.customer_contact_id && contactIds.includes(order.customer_contact_id))
+        || (order.customer_company_id && companyIds.includes(order.customer_company_id)));
+    if (!owns) return json({ error: 'Not found' }, 404);
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('id, description, quantity, unit_price, net_value, vat_amount, line_total, quantity_delivered, sort_order')
+      .eq('order_id', orderId)
+      .order('sort_order', { ascending: true });
+    return json({ ok: true, order, items: items ?? [] });
+  }
 
   const sign = async (path: string | null): Promise<string | null> => {
     if (!path) return null;
@@ -117,5 +146,52 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     pdf_url: await sign(r.pdf_storage_path),
   })));
 
-  return json({ ok: true, linked: true, invoices, receipts });
+  // 4. Sales orders placed by the caller (or their business) — status + payment state.
+  const fetchOrders = (col: 'customer_contact_id' | 'customer_company_id', ids: string[]) =>
+    supabase
+      .from('orders')
+      .select('id, order_number, status, payment_status, total, currency, created_at')
+      .in(col, ids)
+      .eq('order_type', 'sales')
+      .order('created_at', { ascending: false })
+      .limit(200);
+  const orderResults = await Promise.all([
+    fetchOrders('customer_contact_id', contactIds),
+    companyIds.length ? fetchOrders('customer_company_id', companyIds) : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const orders = dedupeById(orderResults.flatMap((r: any) => r.data ?? [])).map((o: any) => ({
+    id: o.id,
+    order_number: o.order_number,
+    status: o.status,
+    payment_status: o.payment_status,
+    total: Number(o.total ?? 0),
+    currency: o.currency ?? 'EUR',
+    created_at: o.created_at,
+  }));
+
+  // 5. Account summary — billed / paid / outstanding per currency (derived from the
+  //    issued documents above so the math is internally consistent and never double-counts
+  //    a payment receipt against its invoice). `paid = billed − outstanding`.
+  const byCurrency = new Map<string, { currency: string; billed: number; paid: number; outstanding: number; doc_count: number; order_count: number }>();
+  const bump = (cur: string): { currency: string; billed: number; paid: number; outstanding: number; doc_count: number; order_count: number } => {
+    const k = cur || 'EUR';
+    let cell = byCurrency.get(k);
+    if (!cell) { cell = { currency: k, billed: 0, paid: 0, outstanding: 0, doc_count: 0, order_count: 0 }; byCurrency.set(k, cell); }
+    return cell;
+  };
+  for (const inv of invoices) {
+    const c = bump(inv.currency);
+    c.billed += inv.total;
+    c.outstanding += inv.amount_due;
+    c.doc_count += 1;
+  }
+  for (const o of orders) bump(o.currency).order_count += 1;
+  const summary = Array.from(byCurrency.values()).map((c) => ({
+    ...c,
+    billed: Math.round(c.billed * 100) / 100,
+    outstanding: Math.round(c.outstanding * 100) / 100,
+    paid: Math.round((c.billed - c.outstanding) * 100) / 100,
+  }));
+
+  return json({ ok: true, linked: true, summary, orders, invoices, receipts });
 }));

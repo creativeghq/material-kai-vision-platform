@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Download, FileText, FileCheck, Receipt } from 'lucide-react';
+import { Loader2, Download, FileText, FileCheck, Receipt, Package, Wallet, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -8,6 +8,9 @@ import {
   customerDocumentsService,
   type CustomerInvoiceDoc,
   type CustomerReceiptDoc,
+  type CustomerOrder,
+  type CustomerAccountSummary,
+  type CustomerOrderItem,
 } from '@/services/customerDocumentsService';
 
 const money = (v: number, currency: string) =>
@@ -21,16 +24,34 @@ const STATUS_STYLES: Record<string, string> = {
   issued: 'bg-blue-500/10 text-blue-300',
 };
 
+const ORDER_STATUS_LABEL: Record<CustomerOrder['status'], string> = {
+  draft: 'Pre-order', confirmed: 'Confirmed', partially_fulfilled: 'Partially delivered',
+  fulfilled: 'Completed', cancelled: 'Cancelled',
+};
+const ORDER_STATUS_STYLE: Record<CustomerOrder['status'], string> = {
+  draft: 'text-muted-foreground', confirmed: 'bg-blue-500/10 text-blue-300',
+  partially_fulfilled: 'bg-amber-500/10 text-amber-400', fulfilled: 'bg-emerald-500/10 text-emerald-400',
+  cancelled: 'bg-red-500/10 text-red-400',
+};
+const PAYMENT_LABEL: Record<CustomerOrder['payment_status'], string> = {
+  unpaid: 'Unpaid', partial: 'Partially paid', paid: 'Paid',
+};
+const PAYMENT_STYLE: Record<CustomerOrder['payment_status'], string> = {
+  unpaid: 'text-muted-foreground', partial: 'bg-amber-500/10 text-amber-400', paid: 'bg-emerald-500/10 text-emerald-400',
+};
+
 /**
- * "My documents" — a customer's own invoices, retail receipts, and payment receipts,
- * with signed download links. Data comes from the finance-customer-documents edge
- * function (the invoices table is workspace-member RLS-gated, so customers can't read
- * it directly). Empty/`linked:false` simply means no documents are addressed to this
- * account yet.
+ * Client Portal — the signed-in customer's own account: a spend/outstanding summary,
+ * their sales orders (with drill-in line items), issued invoices / retail receipts,
+ * and payment receipts. Data comes from the finance-customer-documents edge function
+ * (finance tables are workspace-member RLS-gated, so customers can't read them directly).
+ * Empty simply means nothing is addressed to this account yet.
  */
 export const MyDocumentsTab: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<CustomerAccountSummary[]>([]);
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [invoices, setInvoices] = useState<CustomerInvoiceDoc[]>([]);
   const [receipts, setReceipts] = useState<CustomerReceiptDoc[]>([]);
 
@@ -40,9 +61,9 @@ export const MyDocumentsTab: React.FC = () => {
       setLoading(true);
       try {
         const res = await customerDocumentsService.listMyDocuments();
-        if (!cancelled) { setInvoices(res.invoices); setReceipts(res.receipts); }
+        if (!cancelled) { setSummary(res.summary); setOrders(res.orders); setInvoices(res.invoices); setReceipts(res.receipts); }
       } catch (err) {
-        if (!cancelled) toast({ title: 'Could not load your documents', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+        if (!cancelled) toast({ title: 'Could not load your account', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -63,13 +84,14 @@ export const MyDocumentsTab: React.FC = () => {
     );
   }
 
-  if (invoices.length === 0 && receipts.length === 0) {
+  const isEmpty = summary.length === 0 && orders.length === 0 && invoices.length === 0 && receipts.length === 0;
+  if (isEmpty) {
     return (
       <Card className="dashboard-card p-12 text-center space-y-3">
         <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-        <p className="text-sm text-muted-foreground">No documents yet.</p>
+        <p className="text-sm text-muted-foreground">Nothing here yet.</p>
         <p className="text-xs text-muted-foreground">
-          Invoices and receipts issued to you will appear here, ready to download.
+          Your orders, invoices and receipts will appear here as soon as a business issues them to you.
         </p>
       </Card>
     );
@@ -77,6 +99,27 @@ export const MyDocumentsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* ── Account summary (per currency) ── */}
+      {summary.map((s) => (
+        <div key={s.currency} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SummaryCard label="Total spent" value={money(s.paid, s.currency)} icon={Wallet} />
+          <SummaryCard label="Outstanding" value={money(s.outstanding, s.currency)} icon={Wallet} danger={s.outstanding > 0} />
+          <SummaryCard label="Orders" value={String(s.order_count)} icon={Package} />
+          <SummaryCard label="Documents" value={String(s.doc_count)} icon={FileText} />
+        </div>
+      ))}
+
+      {/* ── Orders ── */}
+      {orders.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-base font-semibold">Orders</h3>
+          <div className="space-y-2">
+            {orders.map((o) => <OrderRow key={o.id} order={o} />)}
+          </div>
+        </div>
+      )}
+
+      {/* ── Invoices & receipts ── */}
       {invoices.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-base font-semibold">Invoices &amp; receipts</h3>
@@ -105,6 +148,7 @@ export const MyDocumentsTab: React.FC = () => {
         </div>
       )}
 
+      {/* ── Payment receipts ── */}
       {receipts.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-base font-semibold">Payment receipts</h3>
@@ -127,5 +171,87 @@ export const MyDocumentsTab: React.FC = () => {
         </div>
       )}
     </div>
+  );
+};
+
+const SummaryCard: React.FC<{ label: string; value: string; icon: React.ComponentType<{ className?: string }>; danger?: boolean }> = ({ label, value, icon: Icon, danger }) => (
+  <Card className={`dashboard-card p-3 ${danger ? 'ring-1 ring-destructive/40' : ''}`}>
+    <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Icon className="h-3.5 w-3.5" /> {label}</div>
+    <div className={`mt-1 text-xl font-semibold ${danger ? 'text-destructive' : ''}`}>{value}</div>
+  </Card>
+);
+
+/** A single order row that expands to show its line items on demand. */
+const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<CustomerOrderItem[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && items === null) {
+      setLoading(true);
+      try {
+        const detail = await customerDocumentsService.getOrderDetail(order.id);
+        setItems(detail.items);
+      } catch (err) {
+        toast({ title: 'Could not load order', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+        setOpen(false);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  return (
+    <Card className="dashboard-card overflow-hidden">
+      <button type="button" onClick={toggle} className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/20 transition-colors">
+        {open ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+        <Package className="h-4 w-4 text-primary shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">Order {order.order_number ?? order.id.slice(0, 8)}</div>
+          <div className="text-[11px] text-muted-foreground">{fmtDate(order.created_at)} · {money(order.total, order.currency)}</div>
+        </div>
+        <Badge variant="outline" className={`shrink-0 text-[10px] ${ORDER_STATUS_STYLE[order.status]}`}>{ORDER_STATUS_LABEL[order.status]}</Badge>
+        <Badge variant="outline" className={`shrink-0 text-[10px] ${PAYMENT_STYLE[order.payment_status]}`}>{PAYMENT_LABEL[order.payment_status]}</Badge>
+      </button>
+      {open && (
+        <div className="border-t border-border/50 px-3 py-2">
+          {loading ? (
+            <div className="py-4 flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+          ) : !items || items.length === 0 ? (
+            <p className="py-3 text-center text-xs text-muted-foreground">No line items recorded for this order.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-[10px] uppercase text-muted-foreground">
+                <tr>
+                  <th className="py-1.5 text-left font-medium">Item</th>
+                  <th className="py-1.5 text-right font-medium">Qty</th>
+                  <th className="py-1.5 text-right font-medium">Unit</th>
+                  <th className="py-1.5 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it) => (
+                  <tr key={it.id} className="border-t border-border/30">
+                    <td className="py-1.5 pr-2">
+                      <div className="truncate">{it.description || 'Item'}</div>
+                      {it.quantity_delivered > 0 && it.quantity_delivered < it.quantity && (
+                        <div className="text-[10px] text-amber-400">{it.quantity_delivered} of {it.quantity} delivered</div>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">{it.quantity}</td>
+                    <td className="py-1.5 text-right tabular-nums">{money(it.unit_price, order.currency)}</td>
+                    <td className="py-1.5 text-right tabular-nums font-medium">{money(it.line_total, order.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </Card>
   );
 };

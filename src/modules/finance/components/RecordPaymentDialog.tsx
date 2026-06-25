@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { financeService, type Invoice, type ManualEntry, type PaymentMethod } from '@/modules/finance/services/financeService';
+import { financeService, type Invoice, type ManualEntry, type PaymentMethod, type BankAccount } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
 type Kind = 'received' | 'paid_out' | 'refund';
@@ -58,6 +58,8 @@ export const RecordPaymentDialog: React.FC<{
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [manualEntries, setManualEntries] = useState<ManualEntry[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankAccountId, setBankAccountId] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -70,15 +72,19 @@ export const RecordPaymentDialog: React.FC<{
     setInvoiceId(preset?.direction === 'refund' ? preset.targetId : '');
     setIssueCreditNote(true);
     (async () => {
-      const [cats, invs, manual] = await Promise.all([
+      const [cats, invs, manual, banks] = await Promise.all([
         financeCategoriesService.list(workspaceId).catch(() => []),
         // Include paid invoices too — a refund is usually against an already-settled invoice.
         financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'overdue', 'paid'], limit: 200 }).catch(() => []),
         financeService.listManualEntries({ workspaceId }).catch(() => []),
+        financeService.listBankAccounts(workspaceId).catch(() => [] as BankAccount[]),
       ]);
       setCategories(cats);
       setInvoices(invs);
       setManualEntries(manual);
+      setBankAccounts(banks);
+      // Default to the workspace's default account so cash location is always captured.
+      setBankAccountId(banks.find((b) => b.is_default)?.id ?? '');
     })();
   }, [open, workspaceId, preset]);
 
@@ -180,6 +186,7 @@ export const RecordPaymentDialog: React.FC<{
         counterpartyCompanyId,
         counterpartyContactId,
         allocations,
+        bankAccountId: bankAccountId || null,
       });
       if (creditNoteFiscalError) {
         // Cash-out logged + credit note created, but myDATA transmission failed —
@@ -292,6 +299,22 @@ export const RecordPaymentDialog: React.FC<{
               </p>
             </div>
           )}
+
+          <div className="space-y-1">
+            <Label>{kind === 'received' ? 'Deposit to account' : 'Pay from account'}</Label>
+            <Select value={bankAccountId || 'none'} onValueChange={(v) => setBankAccountId(v === 'none' ? '' : v)}>
+              <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Unassigned (no account)</SelectItem>
+                {bankAccounts.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}{b.currency !== 'EUR' ? ` · ${b.currency}` : ''}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {bankAccounts.length === 0
+              ? <p className="text-[11px] text-muted-foreground">No accounts yet — add bank/cash accounts in Settings → Bank accounts to track where money sits.</p>
+              : <p className="text-[11px] text-muted-foreground">{kind === 'received' ? 'Which account this money lands in.' : 'Which account this money is paid from.'}</p>}
+          </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-1">

@@ -213,6 +213,7 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
               catalog_id: catalog.id,
               send_batch_id: sendBatchId,
             },
+            workspace_id: ownerWsId ?? undefined,
           },
         });
         if (dispatchErr || !dispatch?.success) {

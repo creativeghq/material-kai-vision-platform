@@ -21,6 +21,8 @@ import {
   Banknote as BanknoteIcon,
   Ban,
   Plane,
+  Award,
+  Boxes,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -43,7 +45,17 @@ import {
   type CashFlowRow,
   type Invoice,
   type AgeBucket,
+  type SalesPerCustomerRow,
+  type SalesPerProductRow,
+  type TopOutstandingRow,
+  type BankAccountBalance,
 } from '@/modules/finance/services/financeService';
+import {
+  ordersService,
+  ORDER_STATUS_LABEL,
+  ORDER_PAYMENT_LABEL,
+  type OrderListRow,
+} from '@/modules/finance/services/ordersService';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
@@ -89,6 +101,27 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
+const DASH_PERIOD_LABEL: Record<'this_month' | 'last_month' | 'last_quarter' | 'ytd', string> = {
+  this_month: 'This month', last_month: 'Last month', last_quarter: 'Last 3 months', ytd: 'Year to date',
+};
+
+/** {from,to} ISO dates for a dashboard period selector. */
+function dashRange(p: 'this_month' | 'last_month' | 'last_quarter' | 'ytd'): { from: string; to: string } {
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  if (p === 'last_month') {
+    return { from: fmt(new Date(today.getFullYear(), today.getMonth() - 1, 1)), to: fmt(new Date(today.getFullYear(), today.getMonth(), 0)) };
+  }
+  if (p === 'last_quarter') {
+    const start = new Date(today); start.setMonth(start.getMonth() - 3);
+    return { from: fmt(start), to: fmt(today) };
+  }
+  if (p === 'ytd') {
+    return { from: fmt(new Date(today.getFullYear(), 0, 1)), to: fmt(today) };
+  }
+  return { from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(today) };
+}
+
 const FinancePage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -120,6 +153,16 @@ const FinancePage: React.FC = () => {
   const [cashFlow, setCashFlow] = useState<CashFlowRow[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [cashPosition, setCashPosition] = useState(0); // money in bank = Σ payments in − out
+  const [bankBalances, setBankBalances] = useState<BankAccountBalance[]>([]);
+
+  // Dashboard sales insights (period-scoped — reuse the Reports RPCs at a glance).
+  type DashPeriod = 'this_month' | 'last_month' | 'last_quarter' | 'ytd';
+  const [dashPeriod, setDashPeriod] = useState<DashPeriod>('this_month');
+  const [topCustomers, setTopCustomers] = useState<SalesPerCustomerRow[]>([]);
+  const [topProducts, setTopProducts] = useState<SalesPerProductRow[]>([]);
+  const [topOutstanding, setTopOutstanding] = useState<TopOutstandingRow[]>([]);
+  const [recentOrders, setRecentOrders] = useState<OrderListRow[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newBillOpen, setNewBillOpen] = useState(false);
@@ -159,6 +202,28 @@ const FinancePage: React.FC = () => {
   // No workspace once context settled → stop the spinner so the empty-state renders.
   useEffect(() => { if (!wsLoading && !workspaceId) setLoading(false); }, [wsLoading, workspaceId]);
 
+  // Dashboard insights — re-fetch when the workspace or period changes, independent
+  // of the heavy loadAll() so flipping the period is cheap.
+  useEffect(() => { if (workspaceId) void loadInsights(workspaceId, dashPeriod); }, [workspaceId, dashPeriod]);
+
+  const loadInsights = async (wsId: string, period: DashPeriod) => {
+    try {
+      setInsightsLoading(true);
+      const { from, to } = dashRange(period);
+      const [custs, prods, outstanding, orders] = await Promise.all([
+        financeService.reportSalesPerCustomer(wsId, from, to).catch(() => [] as SalesPerCustomerRow[]),
+        financeService.reportSalesPerProduct(wsId, from, to).catch(() => [] as SalesPerProductRow[]),
+        financeService.reportTopCustomerOutstanding(wsId).catch(() => [] as TopOutstandingRow[]),
+        ordersService.list({ workspaceId: wsId, orderType: 'sales' }).catch(() => [] as OrderListRow[]),
+      ]);
+      setTopCustomers(custs);
+      setTopProducts(prods);
+      setTopOutstanding(outstanding);
+      setRecentOrders(orders);
+    } catch { /* insights are best-effort — the core dashboard still renders */ }
+    finally { setInsightsLoading(false); }
+  };
+
   const loadAll = async (wsId: string) => {
     try {
       setLoading(true);
@@ -182,6 +247,8 @@ const FinancePage: React.FC = () => {
       // Cash in bank — actual money in/out across all payments (not planned).
       const { data: pays } = await supabase.from('payments').select('direction, amount').eq('workspace_id', wsId);
       setCashPosition((pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'in' ? Number(p.amount) : -Number(p.amount)), 0));
+      // Per-account balances (where the money actually sits).
+      setBankBalances(await financeService.getBankAccountBalances(wsId).catch(() => [] as BankAccountBalance[]));
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load finance data');
       toast({ title: 'Load failed', description: err?.message, variant: 'destructive' });
@@ -367,6 +434,12 @@ const FinancePage: React.FC = () => {
               />
             </div>
 
+            {/* Where the money sits — live balance per bank/cash account. */}
+            <BankBalancesCard rows={bankBalances} onManage={() => onTabChange('settings')} />
+
+            {/* Revenue trend + period-over-period growth signal (reuses the 12-mo P&L). */}
+            <RevenueTrendCard rows={pnl} />
+
             {/* Marketplace commission earned (downline catalog sales) — renders only when non-zero */}
             <CommissionSummaryCard />
 
@@ -464,6 +537,32 @@ const FinancePage: React.FC = () => {
                   )}
                 </CardContent>
               </Card>
+            </div>
+
+            {/* ─── Sales insights (period-scoped) — top customers, best sellers, orders ─── */}
+            <div className="flex items-center justify-between gap-2 pt-2">
+              <h3 className="text-sm font-semibold flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Sales insights</h3>
+              <div className="flex items-center gap-2">
+                {insightsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                <Select value={dashPeriod} onValueChange={(v) => setDashPeriod(v as typeof dashPeriod)}>
+                  <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(['this_month', 'last_month', 'last_quarter', 'ytd'] as const).map((p) => (
+                      <SelectItem key={p} value={p}>{DASH_PERIOD_LABEL[p]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <TopCustomersCard rows={topCustomers} onViewAll={() => onTabChange('reports')} />
+              <TopProductsCard rows={topProducts} onViewAll={() => onTabChange('reports')} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <RecentOrdersCard rows={recentOrders} onViewAll={() => onTabChange('doc_orders')} />
+              <TopOutstandingCard rows={topOutstanding} onViewAll={() => onTabChange('ar')} />
             </div>
           </TabsContent>
 
@@ -974,5 +1073,249 @@ const PnlCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => (
     </CardContent>
   </Card>
 );
+
+/** Live balance per bank/cash account — "where do we have what money". */
+const BankBalancesCard: React.FC<{ rows: BankAccountBalance[]; onManage?: () => void }> = ({ rows, onManage }) => {
+  const active = useMemo(() => rows.filter((r) => r.is_active), [rows]);
+  const totalsByCurrency = useMemo(() => active.reduce((acc, r) => {
+    acc[r.currency] = (acc[r.currency] ?? 0) + Number(r.current_balance || 0);
+    return acc;
+  }, {} as Record<string, number>), [active]);
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm flex items-center gap-2"><BanknoteIcon className="h-4 w-4" /> Cash by account</CardTitle>
+        <Button size="sm" variant="ghost" onClick={onManage}>{active.length === 0 ? 'Add accounts' : 'Manage'}</Button>
+      </CardHeader>
+      <CardContent className="p-0">
+        {active.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            No bank or cash accounts yet. Add them in Settings → Bank accounts to track where your money sits, then pick an account whenever you record a payment.
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {active.map((r) => (
+                <div key={r.bank_account_id} className="rounded-md border border-border/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium truncate">{r.name}</span>
+                    {r.is_default && <Badge variant="outline" className="text-[10px]">Default</Badge>}
+                  </div>
+                  <div className={`mt-1 text-lg font-semibold tabular-nums ${Number(r.current_balance) < 0 ? 'text-destructive' : ''}`}>{formatMoney(Number(r.current_balance), r.currency)}</div>
+                  <div className="text-[10px] text-muted-foreground tabular-nums">+{formatMoney(Number(r.total_in), r.currency)} in · −{formatMoney(Number(r.total_out), r.currency)} out</div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-4 border-t border-border/60 px-4 py-2 text-xs">
+              {Object.entries(totalsByCurrency).map(([cur, total]) => (
+                <span key={cur} className="text-muted-foreground">Total {cur}: <span className="font-semibold text-foreground">{formatMoney(total, cur)}</span></span>
+              ))}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+/**
+ * Revenue trend (last 12 months) + period-over-period growth. Reuses the monthly
+ * P&L rows already loaded for the dashboard, so it adds no extra query. Pure CSS
+ * bars — no chart dependency, matching the codebase's build-it-ourselves pattern.
+ */
+const RevenueTrendCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => {
+  const months = useMemo(() => rows.slice(-12), [rows]);
+  const stats = useMemo(() => {
+    if (months.length === 0) return null;
+    const last = months[months.length - 1];
+    const prev = months.length > 1 ? months[months.length - 2] : null;
+    const lastRev = Number(last.revenue_net ?? 0);
+    const prevRev = prev ? Number(prev.revenue_net ?? 0) : null;
+    const momPct = prevRev != null && prevRev > 0 ? ((lastRev - prevRev) / prevRev) * 100 : null;
+    // Same calendar month a year ago (13th-from-last needs 13 rows) — only when present.
+    const yearAgo = months.length >= 13 ? Number(months[months.length - 13].revenue_net ?? 0) : null;
+    const yoyPct = yearAgo != null && yearAgo > 0 ? ((lastRev - yearAgo) / yearAgo) * 100 : null;
+    const max = Math.max(1, ...months.map((m) => Number(m.revenue_net ?? 0)));
+    return { last, lastRev, momPct, yoyPct, max };
+  }, [months]);
+
+  const Delta: React.FC<{ pct: number | null; label: string }> = ({ pct, label }) => {
+    if (pct == null) return null;
+    const up = pct >= 0;
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${up ? 'bg-emerald-500/15 text-emerald-500' : 'bg-destructive/15 text-destructive'}`}>
+        {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}% <span className="text-muted-foreground">{label}</span>
+      </span>
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Revenue trend</CardTitle>
+        {stats && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">{formatMoney(stats.lastRev)}</span>
+            <Delta pct={stats.momPct} label="vs last mo" />
+            <Delta pct={stats.yoyPct} label="vs last yr" />
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="p-5">
+        {!stats ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">No invoices issued yet — nothing to trend.</div>
+        ) : (
+          <div className="flex items-end gap-1.5 h-28">
+            {months.map((m, i) => {
+              const rev = Number(m.revenue_net ?? 0);
+              const isLast = i === months.length - 1;
+              const label = new Date(m.period_month).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+              return (
+                <div key={m.period_month} className="group relative flex flex-1 flex-col items-center justify-end gap-1">
+                  <div
+                    className={`w-full rounded-t ${isLast ? 'bg-primary' : 'bg-primary/35 group-hover:bg-primary/60'} transition-colors`}
+                    style={{ height: `${Math.max(2, (rev / stats.max) * 100)}%` }}
+                    title={`${label}: ${formatMoney(rev)}`}
+                  />
+                  <span className="text-[9px] text-muted-foreground truncate w-full text-center">{label.split(' ')[0]}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// ── Dashboard sales-insight cards ───────────────────────────────────────────
+
+const InsightCard: React.FC<{
+  title: string; icon: React.ComponentType<{ className?: string }>;
+  onViewAll?: () => void; empty: string; isEmpty: boolean; children: React.ReactNode;
+}> = ({ title, icon: Icon, onViewAll, empty, isEmpty, children }) => (
+  <Card>
+    <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
+      <CardTitle className="text-sm flex items-center gap-2"><Icon className="h-4 w-4" /> {title}</CardTitle>
+      {onViewAll && <Button size="sm" variant="ghost" onClick={onViewAll}>View all</Button>}
+    </CardHeader>
+    <CardContent className="p-0">
+      {isEmpty ? <div className="p-6 text-center text-sm text-muted-foreground">{empty}</div> : children}
+    </CardContent>
+  </Card>
+);
+
+/** Highest-revenue customers in the selected period. */
+const TopCustomersCard: React.FC<{ rows: SalesPerCustomerRow[]; onViewAll?: () => void }> = ({ rows, onViewAll }) => {
+  const top = useMemo(() => [...rows].sort((a, b) => Number(b.revenue_net || 0) - Number(a.revenue_net || 0)).slice(0, 6), [rows]);
+  const max = top.length ? Number(top[0].revenue_net || 0) : 0;
+  return (
+    <InsightCard title="Top customers" icon={Award} onViewAll={onViewAll} isEmpty={top.length === 0} empty="No sales in this period yet.">
+      <ul className="divide-y divide-border/40">
+        {top.map((r, i) => (
+          <li key={`${r.party_type}-${r.party_id}`} className="px-4 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-4 text-right">{i + 1}</span>
+                <span className="truncate text-sm font-medium">{r.display_name || '—'}</span>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-sm font-medium">{formatMoney(Number(r.revenue_net || 0))}</div>
+                <div className="text-[10px] text-muted-foreground">{r.invoice_count ?? 0} inv · {formatMoney(Number(r.gross_margin || 0))} margin</div>
+              </div>
+            </div>
+            <div className="mt-1.5 h-1 rounded-full bg-muted">
+              <div className="h-1 rounded-full bg-primary" style={{ width: `${max > 0 ? Math.max(4, (Number(r.revenue_net || 0) / max) * 100) : 0}%` }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </InsightCard>
+  );
+};
+
+/** Best-selling products in the selected period (the "shopping" detail). */
+const TopProductsCard: React.FC<{ rows: SalesPerProductRow[]; onViewAll?: () => void }> = ({ rows, onViewAll }) => {
+  const top = useMemo(() => [...rows].sort((a, b) => Number(b.revenue_net || 0) - Number(a.revenue_net || 0)).slice(0, 6), [rows]);
+  return (
+    <InsightCard title="Best sellers" icon={Boxes} onViewAll={onViewAll} isEmpty={top.length === 0} empty="No products sold in this period yet.">
+      <table className="w-full text-sm">
+        <thead className="text-xs text-muted-foreground">
+          <tr className="border-b border-border/60">
+            <th className="px-4 py-2 text-left">Product</th>
+            <th className="px-4 py-2 text-right">Qty</th>
+            <th className="px-4 py-2 text-right">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          {top.map((r, i) => (
+            <tr key={r.product_id ?? `${r.product_name}-${i}`} className="border-b border-border/30">
+              <td className="px-4 py-2">
+                <div className="truncate text-sm">{r.product_name || '—'}</div>
+                {r.sku && <div className="text-[10px] text-muted-foreground font-mono">{r.sku}</div>}
+              </td>
+              <td className="px-4 py-2 text-right tabular-nums">{Number(r.total_quantity ?? 0)}</td>
+              <td className="px-4 py-2 text-right font-medium tabular-nums">{formatMoney(Number(r.revenue_net || 0))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </InsightCard>
+  );
+};
+
+/** Most recent sales orders with fulfilment + payment status. */
+const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; onViewAll?: () => void }> = ({ rows, onViewAll }) => {
+  const recent = useMemo(() => rows.slice(0, 6), [rows]);
+  const payVariant = (s: string) => (s === 'paid' ? 'default' : s === 'partial' ? 'secondary' : 'outline');
+  return (
+    <InsightCard title="Recent orders" icon={ShoppingCart} onViewAll={onViewAll} isEmpty={recent.length === 0} empty="No sales orders yet.">
+      <ul className="divide-y divide-border/40">
+        {recent.map((o) => (
+          <li key={o.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{o.party_name ?? 'Walk-in'}</div>
+              <div className="text-xs text-muted-foreground">
+                <span className="font-mono">{o.order_number ?? o.id.slice(0, 8)}</span> · {new Date(o.created_at).toLocaleDateString()}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1">
+                  <Badge variant="outline" className="text-[10px]">{ORDER_STATUS_LABEL[o.status]}</Badge>
+                  <Badge variant={payVariant(o.payment_status)} className="text-[10px]">{ORDER_PAYMENT_LABEL[o.payment_status]}</Badge>
+                </div>
+                <div className="text-sm font-medium">{formatMoney(Number(o.total || 0), o.currency)}</div>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </InsightCard>
+  );
+};
+
+/** Customers who owe the most right now (snapshot, not period-scoped). */
+const TopOutstandingCard: React.FC<{ rows: TopOutstandingRow[]; onViewAll?: () => void }> = ({ rows, onViewAll }) => {
+  const top = useMemo(() => [...rows].sort((a, b) => Number(b.outstanding || 0) - Number(a.outstanding || 0)).slice(0, 6), [rows]);
+  return (
+    <InsightCard title="Who owes the most" icon={ArrowDownCircle} onViewAll={onViewAll} isEmpty={top.length === 0} empty="No outstanding balances — all clear.">
+      <ul className="divide-y divide-border/40">
+        {top.map((r) => (
+          <li key={`${r.party_type}-${r.party_id}`} className="flex items-center justify-between gap-3 px-4 py-2.5">
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{r.display_name || '—'}</div>
+              <div className="text-xs text-muted-foreground">
+                {r.open_invoice_count ?? 0} open · {r.max_days_overdue > 0 ? `${r.max_days_overdue}d overdue` : 'on schedule'}
+              </div>
+            </div>
+            <div className={`text-sm font-medium shrink-0 ${r.max_days_overdue > 0 ? 'text-destructive' : ''}`}>{formatMoney(Number(r.outstanding || 0))}</div>
+          </li>
+        ))}
+      </ul>
+    </InsightCard>
+  );
+};
 
 export default FinancePage;

@@ -5,7 +5,6 @@ import {
   CustomerAccountOverview,
 } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
-import { PlannedPaymentsCard } from '@/modules/finance/components/PlannedPaymentsCard';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -1021,15 +1020,25 @@ export const CompanyDetailPage: React.FC = () => {
           {/* Customer-only commercial tabs — hidden for a pure supplier. */}
           {showCommercial && (
             <>
-          {/* Account = the balance/ledger + the Orders that drive it (one combined tab).
-              Quotes / invoices / payments are viewed per-order (open an order). */}
+          {/* Account = the Orders that drive the relationship, with the balance/ledger as a
+              roll-up below them. Orders are the primary entity: a sales/purchase order is
+              where invoices, payments and receivables actually live — opening an order shows
+              its own Received / Invoices / Payments and the "Record payment" action. The
+              account overview, finance rules and expected payments are company-level
+              summaries that sit UNDER the orders, not above them. */}
           <TabsContent value="account" className="space-y-4">
             {company.id ? (
               <>
-                <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
-                <CustomerFinanceRulesCard companyId={company.id} />
-                <PlannedPaymentsCard workspaceId={activeWorkspaceId ?? ''} companyId={company.id} isSupplier={!!company.is_supplier} />
+                {/* 1 — Orders first. Click an order to see its details + per-order receivables
+                       (Received / Invoices / Payments + Record payment all live in the order). */}
                 <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
+                {/* 2 — Company-level roll-up across all orders: net position + AR aging, plus the
+                       SINGLE un-invoiced receivables/payables surface (manual_entries, with due
+                       dates = "receivables over time"). The old "Expected payments" card
+                       (planned_payments) was removed here — it duplicated receivables. */}
+                <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
+                {/* 3 — Secondary settings. */}
+                <CustomerFinanceRulesCard companyId={company.id} />
               </>
             ) : (
               <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its account &amp; orders.</CardContent></Card>
