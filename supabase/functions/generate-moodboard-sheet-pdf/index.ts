@@ -68,6 +68,7 @@ import type {
   TitleBlockData,
 } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { createSheet, refundSheetCredits, type SheetType } from './create-sheet.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -87,9 +88,20 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   let sheetId = '';
+  // When set, a create-mode charge that must be refunded if the render fails.
+  let createRefund: { userId: string; sheet_type: string; creditCost: number } | null = null;
 
   try {
-    const body: SheetPdfRequest = await req.json();
+    const body = await req.json() as SheetPdfRequest & {
+      action?: 'create';
+      moodboard_id?: string;
+      sheet_type?: SheetType;
+      title?: string;
+      initial_data?: Record<string, any>;
+      user_id?: string;
+      auto_enhance?: boolean;
+      auto_render?: boolean;
+    };
 
     // Project-level Client View deck — assembled from sheets across any of the
     // project's moodboards. Same builders, project scope. (Folded in here rather
@@ -98,7 +110,52 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       return await buildClientViewPdf(supabase, auth, body.client_view_id, !!body.regenerate);
     }
 
-    sheetId = body.sheet_id || '';
+    // Sheet CREATE — the single entry the agent tool AND the SheetWizardModal both
+    // call. Does ownership + auto-enhance + credits + insert here (no longer in the
+    // agent tool), then passive types fall through to the render block below (one
+    // renderer); interactive types return for the canvas.
+    if (body.action === 'create') {
+      const userId = auth.userId ?? body.user_id;
+      if (!userId) {
+        return jsonResponse({ success: false, error: 'create requires a user (JWT or user_id)' }, 400);
+      }
+      if (!body.moodboard_id || !body.sheet_type || !body.title) {
+        return jsonResponse({ success: false, error: 'create requires moodboard_id, sheet_type and title' }, 400);
+      }
+      const created = await createSheet(supabase, {
+        userId,
+        moodboard_id: body.moodboard_id,
+        sheet_type: body.sheet_type,
+        title: body.title,
+        initial_data: body.initial_data,
+        auto_enhance: body.auto_enhance,
+        auto_render: body.auto_render,
+      });
+      if (!created.ok) {
+        return jsonResponse(
+          { success: false, error: created.error, ...(created.validation_error ? { validation_error: true } : {}) } as SheetPdfResponse,
+          created.status,
+        );
+      }
+      if (created.interactive && !body.auto_render) {
+        // Hand off to the canvas — the frontend mounts the editor, then calls
+        // generatePdf() once the user finishes.
+        return jsonResponse({
+          success: true,
+          sheet_id: created.sheet_id,
+          sheet_type: created.sheet_type,
+          is_interactive: true,
+          status: 'awaiting_canvas_input',
+          initial_data: created.initial_data,
+          credits_charged: created.credits_charged,
+        } as SheetPdfResponse);
+      }
+      // Passive (or auto_render): render now via the block below; refund on failure.
+      sheetId = created.sheet_id;
+      createRefund = { userId, sheet_type: created.sheet_type, creditCost: created.credits_charged };
+    }
+
+    sheetId = sheetId || body.sheet_id || '';
     if (!sheetId) {
       return jsonResponse({ success: false, error: 'Missing sheet_id or client_view_id' }, 400);
     }
@@ -138,6 +195,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         .from('moodboard_presentation_sheets')
         .update({ status: 'failed', error_message: contentError })
         .eq('id', sheetId);
+      if (createRefund) await refundSheetCredits(supabase, createRefund.userId, createRefund.sheet_type, createRefund.creditCost, contentError);
       return jsonResponse({ success: false, error: contentError }, 422);
     }
 
@@ -322,7 +380,12 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       pdf_storage_path: storagePath,
       page_count: pageCount,
     };
-    return jsonResponse(response);
+    // Echo sheet_id + credits for the create-mode callers (agent tool / wizard).
+    return jsonResponse({
+      ...response,
+      sheet_id: sheetId,
+      ...(createRefund ? { credits_charged: createRefund.creditCost, is_interactive: false } : {}),
+    } as SheetPdfResponse);
   } catch (err) {
     console.error('Sheet PDF generation error:', err);
     if (sheetId) {
@@ -334,6 +397,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         })
         .eq('id', sheetId);
     }
+    if (createRefund) await refundSheetCredits(supabase, createRefund.userId, createRefund.sheet_type, createRefund.creditCost, err instanceof Error ? err.message : 'pdf_failed');
     return jsonResponse(
       { success: false, error: err instanceof Error ? err.message : 'PDF generation failed' },
       500,

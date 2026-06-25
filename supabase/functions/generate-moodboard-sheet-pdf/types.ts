@@ -41,6 +41,14 @@ export interface SheetPdfResponse {
   pdf_storage_path?: string;
   page_count?: number;
   error?: string;
+  // create-mode (action:'create') echoes:
+  sheet_id?: string;
+  sheet_type?: string;
+  is_interactive?: boolean;
+  status?: string;
+  initial_data?: Record<string, any>;
+  credits_charged?: number;
+  validation_error?: boolean;
 }
 
 export interface ProductChip {
