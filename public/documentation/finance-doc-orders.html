@@ -13,7 +13,12 @@
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
   <p class="lead">An <strong>Order</strong> is the spine of a deal. Instead of tracking a quote, an invoice, payments and a delivery as separate, disconnected documents, an order ties them together: <em>invoices, payments, dispatch and profit all hang off the one order</em>. Open an order and you see, in one place, what was sold, what's been invoiced, what's been paid, what's left to deliver, and what you actually made on it. This page explains what orders are, the two kinds, their statuses, and how to create and work one.</p>
 
-  <div class="callout"><p><strong>Where:</strong> top navigation → <strong>Finance</strong> → the <strong>Orders</strong> tab (the first tab in the Documents area). A company's own orders also appear on its <a href="crm-companies.html">CRM record</a> under the <strong>Orders</strong> tab.</p></div>
+  <div class="callout"><p><strong>Where:</strong> top navigation → <strong>Finance</strong> → the <strong>Orders</strong> tab (the first tab in the Documents area). A company's own orders also appear on its <a href="crm-companies.html">CRM record</a> under the <strong>Account</strong> tab.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/orders.png" alt="The Orders list under Finance → Documents, with Type/Status/Search filters and create buttons">
+    <figcaption>Finance → Documents → Orders — filter by Type and Status, search by party or number, and create with <strong>New order</strong>, <strong>Pre-order</strong> or <strong>Purchase order</strong>.</figcaption>
+  </figure>
 
   <h2>Sales orders vs purchase orders</h2>
   <p>Every order is one of two <strong>types</strong>, chosen when you create it:</p>
@@ -54,32 +59,49 @@
     <li><strong>Status filter</strong> — All statuses, or one of the fulfilment statuses above.</li>
     <li><strong>Search</strong> — by party (customer/supplier) or order number (<em>“Party or number”</em>).</li>
     <li><strong>The list</strong> — columns for <strong>Order</strong> (number), <strong>Type</strong>, <strong>Party</strong>, <strong>Status</strong>, <strong>Payment</strong>, <strong>Total</strong> and <strong>Created</strong>.</li>
-    <li><strong>New</strong> — create an order.</li>
+    <li><strong>Create buttons</strong> — <strong>New order</strong> (a sales order), <strong>Pre-order</strong> (a sales order that starts in the Pre-order state), and <strong>Purchase order</strong> (an order to a supplier). Each opens the create modal pre-set to that kind.</li>
   </ul>
 
   <h2>How to create an order — step by step</h2>
   <ol>
-    <li>Click <strong>New</strong>.</li>
-    <li>Choose the <strong>type</strong> — <strong>Sales</strong> (to a customer) or <strong>Purchase</strong> (from a supplier) — and whether it starts as a <strong>Pre-order</strong>.</li>
-    <li>Pick the <strong>party</strong> (the customer or supplier — searchable). Choose the <strong>currency</strong>, and optionally link a <strong>project</strong> and the <strong>source quote</strong> it came from.</li>
-    <li>Add <strong>line items</strong> — either pick a <strong>catalogue product by name</strong> (with its VAT), or add an ad-hoc line (description, quantity, unit price). Each line shows its net, VAT and line total.</li>
-    <li>Save. The order appears in the list with its number and a <strong>Pre-order / Unpaid</strong> starting state.</li>
+    <li>Click <strong>New order</strong> (sales), <strong>Pre-order</strong>, or <strong>Purchase order</strong> — the create modal opens pre-set to that type.</li>
+    <li>Pick the <strong>party</strong> (the <strong>Customer</strong> for a sales order, or the supplier for a purchase order — searchable). Choose the <strong>Currency</strong> (defaults to EUR) and optionally link a <strong>Project</strong>.</li>
+    <li>Add <strong>Items</strong> — type to <strong>search the catalogue</strong> and pick a product (this links the line to the warehouse, so delivery moves stock), or type a <strong>new product name</strong> to add an off-warehouse line. Set <strong>Qty</strong>, <strong>Unit price</strong> and <strong>VAT</strong> per line; the <strong>Net</strong>, <strong>VAT</strong> and <strong>Total</strong> foot at the bottom.</li>
+    <li>Click <strong>Create</strong>. The order appears in the list with its number and a starting state.</li>
   </ol>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/new-order-modal.png" alt="The New sales order modal — Customer, Project, Currency and Items with live Net/VAT/Total">
+    <figcaption>The <strong>New sales order</strong> modal — Customer, optional Project, Currency, and the Items grid (Product · Qty · Unit price · VAT · Line total) with live Net / VAT / Total.</figcaption>
+  </figure>
   <div class="callout"><p><strong>Catalogue line vs ad-hoc line.</strong> A line added from the catalogue can <strong>move warehouse stock</strong> when the order is delivered; an ad-hoc (typed-in) line stays off-warehouse. This matters for the dispatch/warehouse flow below.</p></div>
   <p><strong>Editing line items.</strong> While an order is still a <strong>draft / un-invoiced</strong>, you can edit it freely — change a line's <strong>quantity, price or VAT</strong>, and <strong>add or remove</strong> lines; the totals recompute as you go. Once an invoice has been raised against the order, the lines are locked so the order and its invoice can't drift apart.</p>
 
-  <h2>Working an order — invoices, payments &amp; profit</h2>
-  <p>Open an order to see everything that hangs off it. This is the point of orders: the money and the documents are consolidated on one screen.</p>
+  <h2>Inside an order — the detail view</h2>
+  <p>Click any order in the list to open its <strong>detail view</strong>. This is where an order earns its keep: everything about the deal — what was sold, how much has shipped, what's been invoiced and paid, and what you made — is consolidated on one screen. From top to bottom you get:</p>
+
+  <h3>1. The header</h3>
+  <p>The order's <strong>number</strong>, a <strong>type</strong> badge (sales / purchase), the <strong>fulfilment status</strong> badge, the <strong>payment status</strong>, and the order <strong>total</strong>.</p>
+
+  <h3>2. Line items (with delivery progress)</h3>
+  <p>A table of the order's lines — <strong>Item</strong>, <strong>Qty</strong>, <strong>Delivered</strong>, <strong>Unit</strong> price and line <strong>Total</strong>. The <strong>Delivered</strong> column shows how much of each line has actually shipped (so a part-shipped order shows, line by line, what's still outstanding), and a catalogue-vs-typed line is marked <em>“(off-warehouse)”</em> when it isn't linked to stock. While the order is still a draft / un-invoiced, an <strong>Edit items</strong> button turns this into an editable grid (change qty / price / VAT, add or remove lines).</p>
+
+  <h3>3. The action row</h3>
+  <p>A <strong>Status</strong> dropdown (plus a one-click <strong>Mark completed</strong>) and the context-sensitive buttons — <strong>Create invoice</strong>, <strong>Record supplier bill</strong>, <strong>Receive into warehouse</strong>, <strong>Record payment</strong> and <strong>Dispatch board</strong> — covered in the next section.</p>
+
+  <h3>4. The money grid — Received · Paid · Profit</h3>
+  <p>Three cards summarise the order's economics: <strong>Received</strong> (customer payments in, green), <strong>Paid to suppliers</strong> (payments out, red), and <strong>Profit</strong> (<em>Received − Paid to suppliers</em>, green when positive, red when negative). This is the per-order profit, computed live from the payments linked to the order.</p>
+
+  <h3>5. Attached documents</h3>
+  <p>Below the money grid, the order lists everything financial that hangs off it — each appearing only when present:</p>
   <div class="table-wrap"><table>
-    <thead><tr><th>On the order</th><th>What it shows</th></tr></thead>
+    <thead><tr><th>Section</th><th>What it lists</th></tr></thead>
     <tbody>
-      <tr><td><strong>Invoices</strong></td><td>Every invoice raised against this order, with its status and amount still due.</td></tr>
-      <tr><td><strong>Payments</strong></td><td>Payments linked to the order — money <em>in</em> (from a customer) and <em>out</em> (to a supplier).</td></tr>
-      <tr><td><strong>Received</strong></td><td>Total customer payments received on the order.</td></tr>
-      <tr><td><strong>Paid to suppliers</strong></td><td>Total payments made out on the order.</td></tr>
-      <tr><td><strong>Profit</strong></td><td><strong>Received − Paid to suppliers</strong> — what you actually made, shown green (positive) or red (negative).</td></tr>
+      <tr><td><strong>Invoices</strong></td><td>Every <a href="finance-doc-invoices.html">invoice</a> raised against the order — number, status, total and amount still <em>due</em>.</td></tr>
+      <tr><td><strong>Supplier bills</strong></td><td>(Purchase orders) the supplier bills recorded against the order — number, status, total and amount due.</td></tr>
+      <tr><td><strong>Payments</strong></td><td>Each payment linked to the order — date, direction (<em>In</em> / <em>Out</em>), method and amount (in green/red by direction).</td></tr>
     </tbody>
   </table></div>
+  <p>A footnote on the detail reminds you that <strong>dispatch is invoice-driven</strong> (see below).</p>
 
   <h2>Actions on an order</h2>
   <p>Open an order and the available buttons depend on whether it's a sales or a purchase order:</p>
