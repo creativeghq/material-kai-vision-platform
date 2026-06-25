@@ -1021,9 +1021,9 @@ export const CompanyDetailPage: React.FC = () => {
           {showCommercial && (
             <>
           {/* Account = one flow: the money summary up top (orders, owed, paid, net + AR aging),
-              then the Orders list itself as the working surface. Receivables/payables are NOT a
-              separate section anymore — they're added and viewed PER ORDER (open an order to see
-              its Received / Invoices / Payments + Add receivable / Add payable). */}
+              then the Orders list itself as the working surface. An order tracks real cash only
+              (open an order → Received / money in-out / Invoices / Payments); the per-order
+              "virtual receivable/payable" concept was removed. */}
           <TabsContent value="account" className="space-y-4">
             {company.id ? (
               <>
