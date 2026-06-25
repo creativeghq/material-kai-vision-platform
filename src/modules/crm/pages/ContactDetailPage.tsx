@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, CreditCard, ScrollText, Percent, Tag, Tags, Send, Wallet, X } from 'lucide-react';
-import {
-  CustomerFinanceSummary,
-  CustomerAccountOverview,
-  CustomerQuotesTab,
-  CustomerInvoicesTab,
-  CustomerPaymentsTab,
-} from '@/modules/finance/components/CustomerFinanceTabs';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, X } from 'lucide-react';
+import { CustomerAccountOverview } from '@/modules/finance/components/CustomerFinanceTabs';
+import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -545,28 +540,15 @@ export const ContactDetailPage: React.FC = () => {
               <User className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            {/* When the contact belongs to a business, every financial surface
-                (account, quotes, invoices, payments) lives on the company — use the
-                "Check Company" link. Standalone contacts keep them here. */}
+            {/* When the contact belongs to a business, every financial surface lives on
+                the company — use the "Check Company" link. Standalone contacts get the
+                same single Orders-first Account tab as a company (orders drive invoices /
+                payments / receivables, all viewed by opening an order). */}
             {!hasCompany && (
-              <>
-                <TabsTrigger value="account">
-                  <Wallet className="h-4 w-4 mr-2" />
-                  Account
-                </TabsTrigger>
-                <TabsTrigger value="quotes">
-                  <ScrollText className="h-4 w-4 mr-2" />
-                  Quotes
-                </TabsTrigger>
-                <TabsTrigger value="invoices">
-                  <Receipt className="h-4 w-4 mr-2" />
-                  Invoices
-                </TabsTrigger>
-                <TabsTrigger value="payments">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Payments
-                </TabsTrigger>
-              </>
+              <TabsTrigger value="account">
+                <Wallet className="h-4 w-4 mr-2" />
+                Account
+              </TabsTrigger>
             )}
           </TabsList>
           {hasCompany && primaryCompany?.id && (
@@ -912,34 +894,18 @@ export const ContactDetailPage: React.FC = () => {
           </TabsContent>
 
 
-          {/* Account overview Tab */}
+          {/* Account = Orders-first, with the balance/ledger roll-up below (same model as the
+              company page). Opening an order shows its own invoices / payments / receivables. */}
           <TabsContent value="account" className="space-y-4">
             {contact.id ? (
               <>
+                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} />
                 <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
                 <CustomerFinanceRulesCard contactId={contact.id} />
               </>
             ) : (
-              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to see their account overview.</CardContent></Card>
+              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to see their account &amp; orders.</CardContent></Card>
             )}
-          </TabsContent>
-
-          {/* Quotes Tab */}
-          <TabsContent value="quotes" className="space-y-4">
-            {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
-            <CustomerQuotesTab contactId={contact.id} customerName={contact.name} />
-          </TabsContent>
-
-          {/* Invoices Tab */}
-          <TabsContent value="invoices" className="space-y-4">
-            {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
-            <CustomerInvoicesTab contactId={contact.id} customerName={contact.name} />
-          </TabsContent>
-
-          {/* Payments Tab */}
-          <TabsContent value="payments" className="space-y-4">
-            {contact.id && <CustomerFinanceSummary contactId={contact.id} />}
-            <CustomerPaymentsTab contactId={contact.id} customerName={contact.name} />
           </TabsContent>
         </Tabs>
       </div>

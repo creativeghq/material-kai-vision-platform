@@ -106,6 +106,61 @@ export const ordersService = {
     }));
   },
 
+  /**
+   * Confirmed orders that carry real money owed but are NOT yet an invoice/supplier bill —
+   * i.e. un-invoiced receivables (sales) / payables (purchase). Single source of truth used by
+   * BOTH the CRM party Account tab and the global Finance AR/AP tabs so the two stay identical.
+   *
+   * An order is included when: status is not draft/cancelled, it has no invoice AND no supplier
+   * bill yet, and its outstanding (total − settled payments) is > 0. Once invoiced, the invoice/
+   * bill becomes the AR/AP row and the order drops out here — no double counting.
+   */
+  async listUninvoicedOutstanding(opts: {
+    workspaceId: string;
+    companyId?: string;
+    contactId?: string;
+  }): Promise<Array<{ id: string; order_number: string | null; order_type: OrderType; party_name: string | null; total: number; settled: number; outstanding: number; currency: string; status: OrderStatus; created_at: string }>> {
+    const list = await this.list({ workspaceId: opts.workspaceId, companyId: opts.companyId, contactId: opts.contactId });
+    const live = list.filter((o) => o.status !== 'draft' && o.status !== 'cancelled');
+    if (live.length === 0) return [];
+    const ids = live.map((o) => o.id);
+
+    // Batch the finance lookups (3 queries total, not 3 per order). We only need presence of an
+    // invoice/bill and the settled amount — not the full getOrderFinance payload.
+    const [inv, bills, pays] = await Promise.all([
+      supabase.from('invoices').select('order_id').in('order_id', ids),
+      supabase.from('supplier_bills').select('order_id').in('order_id', ids),
+      supabase.from('payments').select('order_id, direction, amount').in('order_id', ids),
+    ]);
+    const invoiced = new Set<string>((inv.data ?? []).map((r: any) => r.order_id));
+    (bills.data ?? []).forEach((r: any) => invoiced.add(r.order_id));
+    const settledIn = new Map<string, number>();
+    const settledOut = new Map<string, number>();
+    for (const p of (pays.data ?? []) as Array<{ order_id: string; direction: 'in' | 'out'; amount: number }>) {
+      const map = p.direction === 'in' ? settledIn : settledOut;
+      map.set(p.order_id, (map.get(p.order_id) ?? 0) + Number(p.amount));
+    }
+
+    return live
+      .filter((o) => !invoiced.has(o.id))
+      .map((o) => {
+        const settled = (o.order_type === 'sales' ? settledIn : settledOut).get(o.id) ?? 0;
+        return {
+          id: o.id,
+          order_number: o.order_number,
+          order_type: o.order_type,
+          party_name: o.party_name,
+          total: Number(o.total),
+          settled,
+          outstanding: Math.round((Number(o.total) - settled) * 100) / 100,
+          currency: o.currency,
+          status: o.status,
+          created_at: o.created_at,
+        };
+      })
+      .filter((r) => r.outstanding > 0.005);
+  },
+
   async get(id: string): Promise<{ order: Order; items: OrderItem[] }> {
     const { data: order, error } = await supabase.from('orders').select('*').eq('id', id).single();
     if (error) throw error;

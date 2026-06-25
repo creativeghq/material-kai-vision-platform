@@ -343,8 +343,9 @@ export interface AgingRow {
   status: string;
   age_bucket: AgeBucket;
   days_overdue: number;
-  /** 'invoice' = real invoice/supplier bill; 'manual' = un-invoiced receivable/payable. */
-  entry_kind?: 'invoice' | 'manual';
+  /** 'invoice' = real invoice/supplier bill; 'manual' = un-invoiced receivable/payable;
+   *  'order' = a confirmed order not yet invoiced (synthesised client-side, not from the view). */
+  entry_kind?: 'invoice' | 'manual' | 'order';
   /** Free-text label for manual entries (null for invoices/bills). */
   description?: string | null;
   /** Resolved counterparty (supplier/customer) display name, for search + display. */

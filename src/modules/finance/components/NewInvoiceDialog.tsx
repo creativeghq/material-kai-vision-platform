@@ -56,7 +56,13 @@ interface LineItem {
   vat_exemption: string;           // myDATA VAT exemption category (1-31) when 0% VAT
   income_classification_type: string;
   income_classification_category: string;
-  // Per-line Novus taxes (amounts in document currency)
+  // Per-line Novus taxes. Each of fees/stamp/other carries a myDATA category code
+  // plus an amount: for a 'percent' category the amount is auto-computed (net × rate%);
+  // for an 'amount' category the operator types it. Deductions are amount-only (no
+  // myDATA category table).
+  fees_category: string;
+  stamp_duty_category: string;
+  other_taxes_category: string;
   fees: string;
   stamp_duty: string;
   other_taxes: string;
@@ -102,12 +108,31 @@ const MOVE_PURPOSES: [string, string][] = [
   ['5', 'Return'], ['6', 'Movement between premises'], ['7', 'Consignment'],
 ];
 
+/** A myDATA tax-category reference row (withholding / fees / other taxes / stamp duty). */
+type TaxRef = { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' };
+
+/** Resolve a line's tax amount for one bucket: a 'percent' category computes net × rate%,
+ *  an 'amount' category (or an unknown one) uses the operator-entered manual amount. */
+const taxAmountOf = (refs: TaxRef[], code: string, manualAmount: string, lineNet: number): number => {
+  if (!code) return 0;
+  const r = refs.find((x) => x.code === code);
+  if (r && r.rate_kind === 'percent') return lineNet * (Number(r.rate) || 0) / 100;
+  return parseFloat(manualAmount) || 0;
+};
+/** True when the chosen category auto-computes from a percentage (so the amount is read-only). */
+const isPercentCat = (refs: TaxRef[], code: string): boolean => {
+  const r = refs.find((x) => x.code === code);
+  return !!r && r.rate_kind === 'percent';
+};
+const taxOptionLabel = (r: TaxRef): string => `${r.description}${r.rate_kind === 'percent' ? ` — ${r.rate}%` : ' (amount)'}`;
+
 const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   description: '', sku: '', quantity: '1', unit_price: '0', unit_cost: '', discount: '', unit: '',
   measurement_unit_code: g?.measurement_unit_code ?? '', color: '', size: '',
   vat_category: g?.vat_category ?? '', vat_exemption: '',
   income_classification_type: g?.income_classification_type ?? '',
   income_classification_category: g?.income_classification_category ?? '',
+  fees_category: '', stamp_duty_category: '', other_taxes_category: '',
   fees: '', stamp_duty: '', other_taxes: '', deductions: '', line_comments: '',
 });
 
@@ -190,6 +215,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [branchCode, setBranchCode] = useState('0');
   const [docLanguage, setDocLanguage] = useState<'el' | 'en'>('en');
   const [withholdingCode, setWithholdingCode] = useState('');
+  // Manual amount for an 'amount'-kind withholding category (wage/solidarity/termination/etc.),
+  // which has no percentage to auto-compute from.
+  const [withholdingAmount, setWithholdingAmount] = useState('');
   const [paymentMethodCode, setPaymentMethodCode] = useState('3'); // default "On credit"
   const [paymentMethodInfo, setPaymentMethodInfo] = useState('');
   const [vatSuspension, setVatSuspension] = useState(false);
@@ -216,7 +244,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [incTypes, setIncTypes] = useState<{ code: string; description: string }[]>([]);
   const [incCats, setIncCats] = useState<{ code: string; description: string }[]>([]);
   const [units, setUnits] = useState<{ code: string; description: string }[]>([]);
-  const [withholdings, setWithholdings] = useState<{ code: string; description: string; rate: number | null }[]>([]);
+  const [withholdings, setWithholdings] = useState<TaxRef[]>([]);
+  const [feesRefs, setFeesRefs] = useState<TaxRef[]>([]);
+  const [stampRefs, setStampRefs] = useState<TaxRef[]>([]);
+  const [otherTaxRefs, setOtherTaxRefs] = useState<TaxRef[]>([]);
   const [docDefaults, setDocDefaults] = useState<Record<string, { type: string | null; category: string | null; wh: string | null }>>({});
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [branches, setBranches] = useState<FinanceBranch[]>([]);
@@ -265,7 +296,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
     setDocumentType('1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(''); setIssueNow(true);
-    setCategoryId(''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode('');
+    setCategoryId(''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setSendSms(false); setNextNumber(null);
@@ -282,7 +313,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [allTypes, enabled, ic, cat, wh, mu, pm, fs] = await Promise.all([
+      const [allTypes, enabled, ic, cat, wh, mu, pm, feesR, stampR, otherR, fs] = await Promise.all([
         invoicingSetupService.listReference('invoice_type'),
         invoicingSetupService.getDocTypeSettings(workspaceId),
         invoicingSetupService.listReference('income_classification_type'),
@@ -290,9 +321,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         invoicingSetupService.listReference('withholding_tax'),
         invoicingSetupService.listReference('measurement_unit'),
         invoicingSetupService.listReference('payment_method'),
+        invoicingSetupService.listReference('fees'),
+        invoicingSetupService.listReference('stamp_duty'),
+        invoicingSetupService.listReference('other_taxes'),
         supabase.from('finance_settings').select('*').eq('workspace_id', workspaceId).maybeSingle(),
       ]);
-      setWithholdings(wh.map((w) => ({ code: w.code, description: w.description, rate: w.rate })));
+      const toTaxRef = (r: { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' }): TaxRef => ({ code: r.code, description: r.description, rate: r.rate, rate_kind: r.rate_kind });
+      setWithholdings(wh.map(toTaxRef));
+      setFeesRefs(feesR.map(toTaxRef));
+      setStampRefs(stampR.map(toTaxRef));
+      setOtherTaxRefs(otherR.map(toTaxRef));
       setUnits(mu.map((u) => ({ code: u.code, description: u.description })));
       setPaymentMethods(pm.map((p) => ({ code: p.code, description: p.description })));
       setIssuer(fs.data ?? null);
@@ -517,8 +555,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const lineNet = lineNetOf(l);
       const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
       net += lineNet; vat += lineNet * (pct / 100);
-      fees += parseFloat(l.fees) || 0; stamp += parseFloat(l.stamp_duty) || 0;
-      other += parseFloat(l.other_taxes) || 0; deduct += parseFloat(l.deductions) || 0;
+      // fees / stamp / other are category-driven: a 'percent' category computes net × rate%,
+      // an 'amount' category uses the typed amount.
+      fees += taxAmountOf(feesRefs, l.fees_category, l.fees, lineNet);
+      stamp += taxAmountOf(stampRefs, l.stamp_duty_category, l.stamp_duty, lineNet);
+      other += taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, lineNet);
+      deduct += parseFloat(l.deductions) || 0;
     }
     // #227 — paid-upfront (cash) discount: scale net + vat proportionally (preserves per-line VAT rates).
     const cashFactor = paidUpfront ? (1 - cashPct / 100) : 1;
@@ -526,11 +568,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     net = net * cashFactor;
     vat = vat * cashFactor;
     const digital = parseFloat(digitalFee) || 0;
+    // Document-level withholding: a 'percent' category withholds net × rate%; an 'amount'
+    // category uses the manually-entered withholding amount.
     const wh = withholdings.find((w) => w.code === withholdingCode);
-    const withheld = wh?.rate ? net * (Number(wh.rate) / 100) : 0;
+    const withheld = !wh ? 0 : wh.rate_kind === 'percent' ? net * (Number(wh.rate) || 0) / 100 : (parseFloat(withholdingAmount) || 0);
     const total = net + vat + fees + stamp + other + digital - withheld - deduct;
     return { net, vat, fees, stamp, other, deduct, digital, withheld, cashDiscount, total };
-  }, [lines, vatRate, withholdingCode, withholdings, pricesIncludeVat, digitalFee, paidUpfront, cashPct]);
+  }, [lines, vatRate, withholdingCode, withholdingAmount, withholdings, feesRefs, stampRefs, otherTaxRefs, pricesIncludeVat, digitalFee, paidUpfront, cashPct]);
 
   // Buyer risk evaluation against the workspace rules. `vat_validated===false` means ΑΑΔΕ flagged
   // the ΑΦΜ inactive (or VIES rejected it); `null` means it was never checked. Credit limit lives
@@ -579,13 +623,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (buyerIsConsumer && !documentType.startsWith('11')) setDocumentType('11.1');
   }, [buyerIsConsumer]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Withholding tax is a service-invoice concept (myDATA doc family 2.x — Παροχή
+  // Υπηρεσιών). It is only offered/applied on service invoices; switching to a
+  // goods/other document clears any chosen code so a hidden withholding can never
+  // ride along on a non-service invoice.
+  const isServiceDoc = documentType.split('.')[0] === '2';
+
   // Apply the configured default withholding for the active doc type once the doc-type
   // defaults have loaded (covers the common case where the operator never changes the
   // doc-type Select). Preserves an explicit choice via `cur ||`. #207
   useEffect(() => {
+    if (!isServiceDoc) { setWithholdingCode(''); setWithholdingAmount(''); return; }
     const def = docDefaults[documentType];
     if (def?.wh) setWithholdingCode((cur) => cur || def.wh!);
-  }, [documentType, docDefaults]);
+  }, [documentType, docDefaults, isServiceDoc]);
 
   const applyDocDefault = (code: string) => {
     const def = docDefaults[code];
@@ -594,8 +645,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setLines((ls) => ls.map((l) => l.income_classification_type ? l : { ...l, income_classification_type: def.type!, income_classification_category: def.category ?? l.income_classification_category }));
     }
     // Pre-fill the configured default withholding for this doc type (only when the
-    // operator hasn't already chosen one). #207 central withholding defaults.
-    if (def?.wh) setWithholdingCode((cur) => cur || def.wh!);
+    // operator hasn't already chosen one, and only on service docs). #207
+    if (def?.wh && code.split('.')[0] === '2') setWithholdingCode((cur) => cur || def.wh!);
   };
 
   const handleSave = async () => {
@@ -677,7 +728,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       }).select().single();
       if (insErr) throw insErr;
 
-      const itemsPayload = clean.map((l) => {
+      // Distribute the document-level withholding across lines by net share, with the LAST
+      // line taking the rounding remainder so Σ(line withheld) == the summary total exactly
+      // (avoids a sub-cent myDATA cross-check mismatch).
+      const sumNet = clean.reduce((s, l) => s + lineNetOf(l), 0);
+      const totalWithheld = Number(totals.withheld.toFixed(2));
+      let whAllocated = 0;
+      const withheldByLine = clean.map((l, i) => {
+        if (!withholdingCode || sumNet <= 0) return 0;
+        if (i === clean.length - 1) return Number((totalWithheld - whAllocated).toFixed(2));
+        const share = Number(((lineNetOf(l) / sumNet) * totalWithheld).toFixed(2));
+        whAllocated = Number((whAllocated + share).toFixed(2));
+        return share;
+      });
+      const itemsPayload = clean.map((l, li) => {
         const q = parseFloat(l.quantity); const p = parseFloat(l.unit_price);
         const disc = parseFloat(l.discount) || 0;
         const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
@@ -701,8 +765,18 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 : null),
           income_classification_type: l.income_classification_type || null,
           income_classification_category: l.income_classification_category || null,
-          fees_amount: parseFloat(l.fees) || 0, stamp_duty_amount: parseFloat(l.stamp_duty) || 0,
-          other_taxes_amount: parseFloat(l.other_taxes) || 0, deductions_amount: parseFloat(l.deductions) || 0,
+          // myDATA per-line tax categories + amounts (a 'percent' category computes net × rate%).
+          fees_category: l.fees_category ? parseInt(l.fees_category, 10) : null,
+          fees_amount: Number(taxAmountOf(feesRefs, l.fees_category, l.fees, net).toFixed(2)),
+          stamp_duty_category: l.stamp_duty_category ? parseInt(l.stamp_duty_category, 10) : null,
+          stamp_duty_amount: Number(taxAmountOf(stampRefs, l.stamp_duty_category, l.stamp_duty, net).toFixed(2)),
+          other_taxes_category: l.other_taxes_category ? parseInt(l.other_taxes_category, 10) : null,
+          other_taxes_amount: Number(taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, net).toFixed(2)),
+          deductions_amount: parseFloat(l.deductions) || 0,
+          // Document-level withholding distributed by net share, with its category, so the
+          // myDATA envelope carries per-line withheldCategory + withheldAmount (not summary-only).
+          withheld_category: withholdingCode && withheldByLine[li] > 0 ? parseInt(withholdingCode, 10) : null,
+          withheld_amount: withheldByLine[li],
           line_comments: l.line_comments || null,
           product_id: l.product_id || null,
         };
@@ -1162,11 +1236,40 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               {l.advancedOpen ? '− Hide' : '+ Advanced taxes'} (fees · stamp duty · other taxes · deductions)
                             </button>
                             {l.advancedOpen && (
-                              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Fees ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.fees} onChange={(e) => update(idx, { fees: e.target.value })} placeholder="0.00" /></div>
-                                <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Stamp duty ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.stamp_duty} onChange={(e) => update(idx, { stamp_duty: e.target.value })} placeholder="0.00" /></div>
-                                <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Other taxes ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.other_taxes} onChange={(e) => update(idx, { other_taxes: e.target.value })} placeholder="0.00" /></div>
-                                <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Deductions ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.deductions} onChange={(e) => update(idx, { deductions: e.target.value })} placeholder="0.00" /></div>
+                              <div className="mt-2 space-y-2">
+                                {/* Pick a myDATA category per bucket: a "%" category auto-computes the
+                                    amount from the line net; an "amount" category lets you type it. */}
+                                {([
+                                  { key: 'fees', label: 'Fees', refs: feesRefs, cat: l.fees_category, amt: l.fees, setCat: (v: string) => update(idx, { fees_category: v, fees: '' }), setAmt: (v: string) => update(idx, { fees: v }) },
+                                  { key: 'stamp', label: 'Stamp duty', refs: stampRefs, cat: l.stamp_duty_category, amt: l.stamp_duty, setCat: (v: string) => update(idx, { stamp_duty_category: v, stamp_duty: '' }), setAmt: (v: string) => update(idx, { stamp_duty: v }) },
+                                  { key: 'other', label: 'Other taxes', refs: otherTaxRefs, cat: l.other_taxes_category, amt: l.other_taxes, setCat: (v: string) => update(idx, { other_taxes_category: v, other_taxes: '' }), setAmt: (v: string) => update(idx, { other_taxes: v }) },
+                                ] as const).map((b) => {
+                                  const pctCat = isPercentCat(b.refs, b.cat);
+                                  const computed = taxAmountOf(b.refs, b.cat, b.amt, lineNetOf(l));
+                                  return (
+                                    <div key={b.key} className="grid grid-cols-[1fr_7rem] gap-2">
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] text-muted-foreground">{b.label}</Label>
+                                        <Select value={b.cat || 'none'} onValueChange={(v) => b.setCat(v === 'none' ? '' : v)}>
+                                          <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                                          <SelectContent><SelectItem value="none">None</SelectItem>{b.refs.map((r) => <SelectItem key={r.code} value={r.code}>{taxOptionLabel(r)}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label>
+                                        <Input className="h-7 text-xs text-right" type="number" min="0" step="0.01"
+                                          value={pctCat ? computed.toFixed(2) : b.amt}
+                                          readOnly={!b.cat || pctCat}
+                                          onChange={(e) => b.setAmt(e.target.value)}
+                                          placeholder={b.cat ? '0.00' : '—'} />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                <div className="grid grid-cols-[1fr_7rem] gap-2">
+                                  <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Deductions</Label><p className="pt-1.5 text-[10px] text-muted-foreground">Retained amount (no myDATA category).</p></div>
+                                  <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.deductions} onChange={(e) => update(idx, { deductions: e.target.value })} placeholder="0.00" /></div>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1183,13 +1286,24 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {/* Document taxes */}
             <section className="grid grid-cols-2 gap-3">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground col-span-2">Taxes</Label>
-              <div className="space-y-1">
-                <Label className="text-xs">Withholding tax</Label>
-                <Select value={withholdingCode || 'none'} onValueChange={(v) => setWithholdingCode(v === 'none' ? '' : v)}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="none">None</SelectItem>{withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{w.description}{w.rate ? ` — ${w.rate}%` : ''}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              {isServiceDoc ? (
+                <div className="space-y-1">
+                  <Label className="text-xs">Withholding tax</Label>
+                  <Select value={withholdingCode || 'none'} onValueChange={(v) => { setWithholdingCode(v === 'none' ? '' : v); setWithholdingAmount(''); }}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="none">None</SelectItem>{withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{taxOptionLabel(w)}</SelectItem>)}</SelectContent>
+                  </Select>
+                  {/* 'amount'-kind withholding (wage/solidarity/termination/…) has no rate to compute from. */}
+                  {withholdingCode && !isPercentCat(withholdings, withholdingCode) && (
+                    <Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={withholdingAmount} onChange={(e) => setWithholdingAmount(e.target.value)} placeholder={`Withholding amount (${currency})`} />
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Withholding tax</Label>
+                  <p className="text-[11px] text-muted-foreground">Available on service invoices (document type 2.x). Switch the document type to a service invoice to apply a withholding rate.</p>
+                </div>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">Digital transaction fee</Label>
                 <Input className="h-9 text-right" type="number" min="0" step="0.01" value={digitalFee} onChange={(e) => setDigitalFee(e.target.value)} placeholder="0.00" />

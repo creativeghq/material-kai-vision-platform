@@ -237,8 +237,34 @@ const FinancePage: React.FC = () => {
         financeService.listInvoices({ workspaceId: wsId, limit: 25 }),
         financeCategoriesService.list(wsId).catch(() => [] as FinanceCategory[]),
       ]);
-      setAr(arRows);
-      setAp(apRows);
+      // Confirmed orders not yet invoiced are real money owed but aren't AR/AP documents yet.
+      // Synthesize them as rows (same data + filter logic as the CRM party Account tab) so the
+      // global Receivables/Payables tabs show the complete "money owed" picture. Once invoiced,
+      // the invoice/bill takes over and the order drops out — no double counting.
+      let arWithOrders = arRows;
+      let apWithOrders = apRows;
+      try {
+        const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: wsId });
+        const toAgingRow = (o: typeof uninvoiced[number]): AgingRow => ({
+          id: o.id,
+          workspace_id: wsId,
+          total: o.total,
+          amount_paid: o.settled,
+          amount_due: o.outstanding,
+          due_at: null,
+          issued_at: o.created_at,
+          status: o.status,
+          age_bucket: 'no_due_date',
+          days_overdue: 0,
+          entry_kind: 'order',
+          description: `Order ${o.order_number ?? o.id.slice(0, 8)}`,
+          party_name: o.party_name,
+        });
+        arWithOrders = [...arRows, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
+        apWithOrders = [...apRows, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
+      } catch { /* orders overlay is best-effort — invoices/manual rows still render */ }
+      setAr(arWithOrders);
+      setAp(apWithOrders);
       setCategories(cats);
       setFollowUps(queue);
       setPnl(pnlRows);
@@ -611,17 +637,18 @@ const FinancePage: React.FC = () => {
                     )}
                     {arFiltered.map((r) => {
                       const isManual = r.entry_kind === 'manual';
+                      const isOrder = r.entry_kind === 'order';
                       return (
                       <tr
                         key={r.id}
                         className={`border-b border-border/30 hover:bg-muted/30 ${isManual ? '' : 'cursor-pointer'}`}
-                        onClick={isManual ? undefined : () => navigate(`${financeBase}/invoices/${r.id}`)}
+                        onClick={isOrder ? () => onTabChange('doc_orders') : isManual ? undefined : () => navigate(`${financeBase}/invoices/${r.id}`)}
                       >
                         <td className="px-4 py-2">
-                          {isManual ? (
+                          {isManual || isOrder ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.description}</span>
-                              <Badge variant="secondary" className="text-[10px]">Un-invoiced</Badge>
+                              <Badge variant="secondary" className="text-[10px]">{isOrder ? 'Order · not invoiced' : 'Un-invoiced'}</Badge>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.internal_number}</span>
@@ -638,7 +665,11 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right">{r.due_at ?? '—'}</td>
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                          {isManual ? (
+                          {isOrder ? (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onTabChange('doc_orders')}>
+                              <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
+                            </Button>
+                          ) : isManual ? (
                             !isAccountant && (
                               <div className="flex items-center justify-end gap-1">
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openSettle({ direction: 'received', targetType: 'manual_entry', targetId: r.id })}>
@@ -706,13 +737,18 @@ const FinancePage: React.FC = () => {
                     )}
                     {apFiltered.map((r) => {
                       const isManual = r.entry_kind === 'manual';
+                      const isOrder = r.entry_kind === 'order';
                       return (
-                      <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
+                      <tr
+                        key={r.id}
+                        className={`border-b border-border/30 hover:bg-muted/30 ${isOrder ? 'cursor-pointer' : ''}`}
+                        onClick={isOrder ? () => onTabChange('doc_orders') : undefined}
+                      >
                         <td className="px-4 py-2">
-                          {isManual ? (
+                          {isManual || isOrder ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.description}</span>
-                              <Badge variant="secondary" className="text-[10px]">Un-invoiced</Badge>
+                              <Badge variant="secondary" className="text-[10px]">{isOrder ? 'Order · not invoiced' : 'Un-invoiced'}</Badge>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.supplier_bill_number ?? '—'}</span>
@@ -729,8 +765,12 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right">{r.due_at ?? '—'}</td>
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
                         {!isAccountant && (
-                          <td className="px-4 py-2 text-right">
-                            {isManual ? (
+                          <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                            {isOrder ? (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onTabChange('doc_orders')}>
+                                <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
+                              </Button>
+                            ) : isManual ? (
                               <div className="flex items-center justify-end gap-1">
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openSettle({ direction: 'paid_out', targetType: 'manual_entry', targetId: r.id })}>
                                   <BanknoteIcon className="h-3.5 w-3.5 mr-1" /> Settle

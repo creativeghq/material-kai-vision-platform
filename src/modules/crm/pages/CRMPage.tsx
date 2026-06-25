@@ -31,6 +31,7 @@ import { CategoriesPanel } from './CategoriesPage';
 import { CrmFilters, type FilterDef } from '../components/CrmFilters';
 import { AddCompanyModal } from '../components/AddCompanyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
+import { CrmPager } from '@/components/business/crm/CrmPager';
 import {
   ANY, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS, CLIENT_SUPPLIER_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
@@ -95,7 +96,13 @@ export const CRMManagement: React.FC = () => {
     setSearchParams(params, { replace: true });
   };
 
-  const [loading, setLoading] = useState(false);
+  // Per-tab loading flags. A single shared flag caused the Users tab to flash
+  // "No users found" because the faster contacts/companies loaders cleared it
+  // while the slower users edge-function call was still in flight. Init true so
+  // the first paint shows "Loading…" rather than an empty state.
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingContacts, setLoadingContacts] = useState(true);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [users, setUsers] = useState<UserWithAuth[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -103,6 +110,12 @@ export const CRMManagement: React.FC = () => {
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0 });
+
+  // Client-side pagination (20 rows/page) over the already-filtered lists.
+  const PAGE_SIZE = 20;
+  const [usersPage, setUsersPage] = useState(1);
+  const [contactsPage, setContactsPage] = useState(1);
+  const [companiesPage, setCompaniesPage] = useState(1);
 
   // Per-tab filters (ANY = no filter)
   const [userF, setUserF] = useState({ role: ANY, status: ANY, subscription: ANY, profession: ANY });
@@ -142,7 +155,7 @@ export const CRMManagement: React.FC = () => {
 
   const loadUsers = async () => {
     try {
-      setLoading(true);
+      setLoadingUsers(true);
       const response = await usersAPI.listUsers();
       setUsers(response.data || []);
       setUserStats({
@@ -152,29 +165,29 @@ export const CRMManagement: React.FC = () => {
       });
     } catch (error: any) {
       toast({ title: 'Error', description: `Failed to load users: ${error.message}`, variant: 'destructive' });
-    } finally { setLoading(false); }
+    } finally { setLoadingUsers(false); }
   };
 
   const loadContacts = async () => {
     try {
-      setLoading(true);
+      setLoadingContacts(true);
       const { data, error } = await supabase
         .from('crm_contacts').select('*').order('created_at', { ascending: false }).limit(500);
       if (error) throw error;
       setContacts(data || []);
     } catch (error: any) {
       toast({ title: 'Error', description: `Failed to load contacts: ${error.message}`, variant: 'destructive' });
-    } finally { setLoading(false); }
+    } finally { setLoadingContacts(false); }
   };
 
   const loadCompanies = async () => {
     try {
-      setLoading(true);
+      setLoadingCompanies(true);
       const response = await companiesAPI.listCompanies(500, 0);
       setCompanies(response.data || []);
     } catch (error: any) {
       toast({ title: 'Error', description: `Failed to load companies: ${error.message}`, variant: 'destructive' });
-    } finally { setLoading(false); }
+    } finally { setLoadingCompanies(false); }
   };
 
   useEffect(() => {
@@ -253,6 +266,23 @@ export const CRMManagement: React.FC = () => {
     (!companyCatIds || companyCatIds.has(c.id)),
   ), [companies, q, companyF, companyCatIds]);
 
+  // ── pagination ────────────────────────────────────────────────────────────
+  // Reset to page 1 whenever the filtered result set changes (search/filter), so
+  // a narrowed list never strands the user on an out-of-range page.
+  useEffect(() => { setUsersPage(1); }, [q, userF]);
+  useEffect(() => { setContactsPage(1); }, [q, contactF, contactCatIds]);
+  useEffect(() => { setCompaniesPage(1); }, [q, companyF, companyCatIds]);
+
+  const pagedUsers = useMemo(
+    () => filteredUsers.slice((usersPage - 1) * PAGE_SIZE, usersPage * PAGE_SIZE),
+    [filteredUsers, usersPage]);
+  const pagedContacts = useMemo(
+    () => filteredContacts.slice((contactsPage - 1) * PAGE_SIZE, contactsPage * PAGE_SIZE),
+    [filteredContacts, contactsPage]);
+  const pagedCompanies = useMemo(
+    () => filteredCompanies.slice((companiesPage - 1) * PAGE_SIZE, companiesPage * PAGE_SIZE),
+    [filteredCompanies, companiesPage]);
+
   // ── selection helpers ─────────────────────────────────────────────────────
   const allUsersSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selUsers.has(u.user_id));
   const allContactsSelected = filteredContacts.length > 0 && filteredContacts.every((c) => selContacts.has(c.id));
@@ -320,9 +350,9 @@ export const CRMManagement: React.FC = () => {
   };
   const handleDeleteContact = async (contactId: string) => {
     if (!window.confirm('Are you sure you want to delete this contact?')) return;
-    try { setLoading(true); await contactsAPI.deleteContact(contactId); toast({ title: 'Success', description: 'Contact deleted' }); await loadContacts(); }
+    try { setLoadingContacts(true); await contactsAPI.deleteContact(contactId); toast({ title: 'Success', description: 'Contact deleted' }); await loadContacts(); }
     catch (e) { toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to delete contact', variant: 'destructive' }); }
-    finally { setLoading(false); }
+    finally { setLoadingContacts(false); }
   };
   const handleDeleteCompany = async (companyId: string) => {
     if (!confirm('Are you sure you want to delete this company?')) return;
@@ -449,11 +479,11 @@ export const CRMManagement: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loading ? (
+                      {loadingUsers ? (
                         <TableRow><TableCell colSpan={8} className="text-center py-4">Loading...</TableCell></TableRow>
                       ) : filteredUsers.length === 0 ? (
                         <TableRow><TableCell colSpan={8} className="text-center py-4">No users found</TableCell></TableRow>
-                      ) : filteredUsers.map((user) => (
+                      ) : pagedUsers.map((user) => (
                         <TableRow key={user.id} data-state={selUsers.has(user.user_id) ? 'selected' : undefined}>
                           <TableCell>
                             <Checkbox checked={selUsers.has(user.user_id)} onCheckedChange={() => setSelUsers((s) => toggle(s, user.user_id))} aria-label="Select row" />
@@ -486,6 +516,7 @@ export const CRMManagement: React.FC = () => {
                     </TableBody>
                   </Table>
                 </div>
+                <CrmPager page={usersPage} pageSize={PAGE_SIZE} total={filteredUsers.length} onPageChange={setUsersPage} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -527,11 +558,11 @@ export const CRMManagement: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loading ? (
+                      {loadingContacts ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">Loading...</TableCell></TableRow>
                       ) : filteredContacts.length === 0 ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">No contacts found</TableCell></TableRow>
-                      ) : filteredContacts.map((contact) => (
+                      ) : pagedContacts.map((contact) => (
                         <TableRow key={contact.id} data-state={selContacts.has(contact.id) ? 'selected' : undefined}>
                           <TableCell>
                             <Checkbox checked={selContacts.has(contact.id)} onCheckedChange={() => setSelContacts((s) => toggle(s, contact.id))} aria-label="Select row" />
@@ -553,6 +584,7 @@ export const CRMManagement: React.FC = () => {
                     </TableBody>
                   </Table>
                 </div>
+                <CrmPager page={contactsPage} pageSize={PAGE_SIZE} total={filteredContacts.length} onPageChange={setContactsPage} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -594,11 +626,11 @@ export const CRMManagement: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loading ? (
+                      {loadingCompanies ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">Loading...</TableCell></TableRow>
                       ) : filteredCompanies.length === 0 ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">No companies found</TableCell></TableRow>
-                      ) : filteredCompanies.map((company) => (
+                      ) : pagedCompanies.map((company) => (
                         <TableRow key={company.id} data-state={selCompanies.has(company.id) ? 'selected' : undefined}>
                           <TableCell>
                             <Checkbox checked={selCompanies.has(company.id)} onCheckedChange={() => setSelCompanies((s) => toggle(s, company.id))} aria-label="Select row" />
@@ -620,6 +652,7 @@ export const CRMManagement: React.FC = () => {
                     </TableBody>
                   </Table>
                 </div>
+                <CrmPager page={companiesPage} pageSize={PAGE_SIZE} total={filteredCompanies.length} onPageChange={setCompaniesPage} />
               </CardContent>
             </Card>
           </TabsContent>

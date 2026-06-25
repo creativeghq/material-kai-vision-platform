@@ -2,8 +2,8 @@
 // Mounts inside ContactDetailPage / CompanyDetailPage. Each tab is self-contained
 // and lazy-loads its data on first render.
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, FileText, ArrowUpRight, Mail, Wallet, ShoppingBag, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, FileText, Mail, Wallet, ShoppingBag, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -13,62 +13,17 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   financeService,
   formatMoney,
-  type Invoice,
-  type PaymentWithAllocation,
   type CustomerTopProductRow,
   type ManualEntry,
   type ManualEntryDirection,
 } from '@/modules/finance/services/financeService';
-import { quotesService } from '@/modules/quotes/services/QuotesService';
-import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
-import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { ordersService, ORDER_STATUS_LABEL } from '@/modules/finance/services/ordersService';
 import { ManualEntryDialog } from '@/modules/finance/components/ManualEntryDialog';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
 type Target = { contactId?: string; companyId?: string; customerName?: string };
 
-export const CustomerFinanceSummary: React.FC<Target> = ({ contactId, companyId }) => {
-  const [summary, setSummary] = useState<{
-    quoteCount: number;
-    quotedTotal: number;
-    acceptedTotal: number;
-    invoicedTotal: number;
-    paidTotal: number;
-    outstandingTotal: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contactId, companyId]);
-
-  const load = async () => {
-    if (!contactId && !companyId) return;
-    try {
-      setLoading(true);
-      const s = await financeService.getCustomerAccount({ contactId, companyId });
-      setSummary(s);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
-  if (!summary) return null;
-
-  return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-      <Card className="dashboard-card border-0"><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Quotes</div><div className="text-lg font-semibold">{summary.quoteCount}</div></CardContent></Card>
-      <Card className="dashboard-card border-0"><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Quoted</div><div className="text-lg font-semibold">{formatMoney(summary.quotedTotal)}</div></CardContent></Card>
-      <Card className="dashboard-card border-0"><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Accepted</div><div className="text-lg font-semibold">{formatMoney(summary.acceptedTotal)}</div></CardContent></Card>
-      <Card className="dashboard-card border-0"><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Invoiced</div><div className="text-lg font-semibold">{formatMoney(summary.invoicedTotal)}</div></CardContent></Card>
-      <Card className="dashboard-card border-0"><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Paid</div><div className="text-lg font-semibold">{formatMoney(summary.paidTotal)}</div></CardContent></Card>
-      <Card className={`dashboard-card border-0 ${summary.outstandingTotal > 0 ? 'ring-1 ring-destructive/40' : ''}`}><CardContent className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Outstanding</div><div className={`text-lg font-semibold ${summary.outstandingTotal > 0 ? 'text-destructive' : ''}`}>{formatMoney(summary.outstandingTotal)}</div></CardContent></Card>
-    </div>
-  );
-};
 
 /**
  * Shared presentational account summary — the single source of layout for a party's money
@@ -172,6 +127,8 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   // Item 3 — un-invoiced receivables/payables recorded against this party.
   const [entries, setEntries] = useState<ManualEntry[]>([]);
   const [entryDialog, setEntryDialog] = useState<{ open: boolean; direction: ManualEntryDirection }>({ open: false, direction: 'receivable' });
+  // Confirmed orders not yet invoiced are real money owed too — surfaced as rows here.
+  const [orderRows, setOrderRows] = useState<Array<{ id: string; label: string; direction: ManualEntryDirection; outstanding: number; currency: string; statusLabel: string }>>([]);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
 
@@ -209,6 +166,22 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         // Un-invoiced receivables/payables for this party (item 3).
         const me = await financeService.listManualEntries({ workspaceId: activeWorkspaceId, companyId, contactId, includeSettled: true }).catch(() => [] as ManualEntry[]);
         setEntries(me);
+
+        // Confirmed-but-not-yet-invoiced orders are money owed too, but they aren't AR/AP
+        // documents yet (no invoice/bill issued). Surface their outstanding balance here so
+        // "money owed" is complete. Once an order is invoiced, the invoice/bill takes over
+        // and the order drops off (filtered out below) — no double counting.
+        try {
+          const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: activeWorkspaceId, companyId, contactId });
+          setOrderRows(uninvoiced.map((o) => ({
+            id: o.id,
+            label: `Order ${o.order_number ?? o.id.slice(0, 8)}`,
+            direction: (o.order_type === 'sales' ? 'receivable' : 'payable') as ManualEntryDirection,
+            outstanding: o.outstanding,
+            currency: o.currency,
+            statusLabel: ORDER_STATUS_LABEL[o.status],
+          })));
+        } catch { setOrderRows([]); }
       }
     } catch (e) {
       console.error('account overview load failed', e);
@@ -311,9 +284,10 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
           <CardTitle className="text-sm flex items-center gap-2"><Wallet className="h-4 w-4" /> Receivables &amp; payables (un-invoiced)</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {entries.length === 0 ? (
+          {entries.length === 0 && orderRows.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              No manual receivables or payables. Use “Add receivable / payable” above to record money owed without an invoice.
+              No money owed outside of issued invoices. Confirmed orders not yet invoiced, and any manual
+              receivable / payable you add above, appear here.
             </p>
           ) : (
             <table className="w-full text-sm">
@@ -328,6 +302,22 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
                 </tr>
               </thead>
               <tbody>
+                {/* Confirmed, not-yet-invoiced orders — money owed that hasn't become an invoice/bill. */}
+                {orderRows.map((o) => (
+                  <tr key={o.id} className="border-b border-border/30 hover:bg-muted/30">
+                    <td className="px-4 py-2">
+                      <div className="font-medium">{o.label}</div>
+                      <Badge variant="outline" className="mt-0.5 text-[10px]">Order · not yet invoiced</Badge>
+                    </td>
+                    <td className="px-4 py-2">
+                      <Badge variant={o.direction === 'receivable' ? 'default' : 'secondary'} className="text-[10px] capitalize">{o.direction}</Badge>
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">—</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{formatMoney(o.outstanding, o.currency)}</td>
+                    <td className="px-4 py-2 text-right text-muted-foreground">—</td>
+                    <td className="px-4 py-2 text-right text-muted-foreground">{o.statusLabel}</td>
+                  </tr>
+                ))}
                 {entries.map((e) => (
                   <tr key={e.id} className="border-b border-border/30 hover:bg-muted/30">
                     <td className="px-4 py-2">
@@ -373,286 +363,3 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   );
 };
 
-export const CustomerQuotesTab: React.FC<Target> = ({ contactId, companyId, customerName }) => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [rows, setRows] = useState<Array<{
-    id: string; quote_number: string | null; name: string | null; status: string;
-    grand_total: number | null; currency: string | null; created_at: string;
-  }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const enabled = Boolean(contactId || companyId);
-
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId]);
-
-  const load = async () => {
-    if (!enabled) { setLoading(false); return; }
-    let q = supabase
-      .from('quotes')
-      .select('id, quote_number, name, status, grand_total, currency, created_at')
-      .order('created_at', { ascending: false });
-    if (contactId) q = q.eq('customer_contact_id', contactId);
-    if (companyId) q = q.eq('customer_company_id', companyId);
-    const { data } = await q;
-    setRows((data as any[]) ?? []);
-    setLoading(false);
-  };
-
-  const createQuote = async () => {
-    if (!enabled) return;
-    setCreating(true);
-    try {
-      const quote = await quotesService.createQuote({
-        name: customerName ? `Quote for ${customerName}` : undefined,
-        customer_contact_id: contactId ?? null,
-        customer_company_id: companyId ?? null,
-      });
-      navigate(`/quotes/${quote.id}`);
-    } catch (e: any) {
-      toast({ title: 'Could not create quote', description: e?.message, variant: 'destructive' });
-      setCreating(false);
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm">Quotes ({rows.length})</CardTitle>
-        <Button size="sm" className="rounded-full" onClick={createQuote} disabled={!enabled || creating}>
-          {creating ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-2" />}
-          New quote
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead className="text-xs text-muted-foreground">
-            <tr className="border-b border-border/60">
-              <th className="px-4 py-2 text-left">Quote</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-right">Total</th>
-              <th className="px-4 py-2 text-right">Created</th>
-              <th className="px-4 py-2 text-right" />
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
-            ) : !enabled ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">Save this customer first to create a quote.</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center">
-                <div className="text-sm text-muted-foreground mb-3">No quotes for this customer yet.</div>
-                <Button size="sm" variant="outline" className="rounded-full" onClick={createQuote} disabled={creating}>
-                  {creating ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-2" />}
-                  Create the first quote
-                </Button>
-              </td></tr>
-            ) : (
-              rows.map((q) => (
-                <tr key={q.id} className="border-b border-border/30 hover:bg-muted/30">
-                  <td className="px-4 py-2 font-medium">{q.quote_number ?? q.name ?? q.id.slice(0, 8)}</td>
-                  <td className="px-4 py-2"><Badge variant="outline">{q.status}</Badge></td>
-                  <td className="px-4 py-2 text-right">{formatMoney(q.grand_total ?? 0, q.currency ?? 'EUR')}</td>
-                  <td className="px-4 py-2 text-right">{new Date(q.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-2 text-right">
-                    <Link to={`/quotes/${q.id}`}><Button size="sm" variant="ghost"><ArrowUpRight className="h-3 w-3" /></Button></Link>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </CardContent>
-    </Card>
-  );
-};
-
-export const CustomerInvoicesTab: React.FC<Target> = ({ contactId, companyId, customerName }) => {
-  const { activeWorkspaceId } = useWorkspace();
-  const [rows, setRows] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const enabled = Boolean(contactId || companyId);
-
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId]);
-
-  const load = async () => {
-    if (!enabled) { setLoading(false); return; }
-    const invoices = await financeService.listInvoices({
-      customerContactId: contactId,
-      customerCompanyId: companyId,
-    });
-    setRows(invoices);
-    setLoading(false);
-  };
-
-  const initialCustomer = enabled
-    ? { type: (companyId ? 'company' : 'contact') as 'company' | 'contact', id: (companyId ?? contactId)!, label: customerName ?? 'Selected customer' }
-    : null;
-
-  return (
-    <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm">Invoices ({rows.length})</CardTitle>
-        <Button size="sm" className="rounded-full" onClick={() => setDialogOpen(true)} disabled={!enabled || !activeWorkspaceId}>
-          <Plus className="h-3.5 w-3.5 mr-2" />
-          New invoice
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead className="text-xs text-muted-foreground">
-            <tr className="border-b border-border/60">
-              <th className="px-4 py-2 text-left">Number</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-right">Total</th>
-              <th className="px-4 py-2 text-right">Paid</th>
-              <th className="px-4 py-2 text-right">Due</th>
-              <th className="px-4 py-2 text-right">Due date</th>
-              <th className="px-4 py-2 text-right" />
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
-            ) : !enabled ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">Save this customer first to create an invoice.</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-8 text-center">
-                <div className="text-sm text-muted-foreground mb-3">No invoices for this customer yet.</div>
-                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDialogOpen(true)} disabled={!activeWorkspaceId}>
-                  <Plus className="h-3.5 w-3.5 mr-2" />
-                  Create the first invoice
-                </Button>
-              </td></tr>
-            ) : (
-              rows.map((i) => (
-                <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30">
-                  <td className="px-4 py-2 font-mono text-xs">{i.internal_number}</td>
-                  <td className="px-4 py-2">
-                    <Badge variant={i.status === 'overdue' ? 'destructive' : i.status === 'paid' ? 'default' : 'outline'}>{i.status}</Badge>
-                  </td>
-                  <td className="px-4 py-2 text-right">{formatMoney(i.total, i.currency)}</td>
-                  <td className="px-4 py-2 text-right">{formatMoney(i.amount_paid, i.currency)}</td>
-                  <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
-                  <td className="px-4 py-2 text-right">{i.due_at ?? '—'}</td>
-                  <td className="px-4 py-2 text-right">
-                    <Link to={`/finance/invoices/${i.id}`}><Button size="sm" variant="ghost"><ArrowUpRight className="h-3 w-3" /></Button></Link>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </CardContent>
-      {activeWorkspaceId && (
-        <NewInvoiceDialog
-          workspaceId={activeWorkspaceId}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          initialCustomer={initialCustomer}
-          onCreated={() => { setDialogOpen(false); void load(); }}
-        />
-      )}
-    </Card>
-  );
-};
-
-export const CustomerPaymentsTab: React.FC<Target> = ({ contactId, companyId, customerName }) => {
-  const { activeWorkspaceId } = useWorkspace();
-  const [rows, setRows] = useState<PaymentWithAllocation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const enabled = Boolean(contactId || companyId);
-
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId]);
-
-  const load = async () => {
-    if (!enabled) { setLoading(false); return; }
-    const data = await financeService.listPayments({
-      counterpartyContactId: contactId,
-      counterpartyCompanyId: companyId,
-      direction: 'in',
-    });
-    setRows(data);
-    setLoading(false);
-  };
-
-  return (
-    <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm">Payments received ({rows.length})</CardTitle>
-        <Button size="sm" className="rounded-full" onClick={() => setDialogOpen(true)} disabled={!enabled || !activeWorkspaceId}>
-          <Plus className="h-3.5 w-3.5 mr-2" />
-          Record payment
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead className="text-xs text-muted-foreground">
-            <tr className="border-b border-border/60">
-              <th className="px-4 py-2 text-left">Paid on</th>
-              <th className="px-4 py-2 text-left">Method</th>
-              <th className="px-4 py-2 text-left">Reference</th>
-              <th className="px-4 py-2 text-right">Amount</th>
-              <th className="px-4 py-2 text-left">Allocated to</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
-            ) : !enabled ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">Save this customer first to record a payment.</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center">
-                <div className="text-sm text-muted-foreground mb-3">No payments recorded from this customer yet.</div>
-                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDialogOpen(true)} disabled={!activeWorkspaceId}>
-                  <Plus className="h-3.5 w-3.5 mr-2" />
-                  Record a payment
-                </Button>
-              </td></tr>
-            ) : (
-              rows.map((p) => (
-                <tr key={p.id} className="border-b border-border/30">
-                  <td className="px-4 py-2">{new Date(p.paid_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-2">{p.method ?? '—'}</td>
-                  <td className="px-4 py-2">{p.reference ?? '—'}</td>
-                  <td className="px-4 py-2 text-right font-medium">{formatMoney(p.amount, p.currency)}</td>
-                  <td className="px-4 py-2">
-                    {p.allocations.length === 0
-                      ? <span className="text-xs text-muted-foreground">Unallocated</span>
-                      : (
-                        <ul className="text-xs space-y-0.5">
-                          {p.allocations.map((a) => (
-                            <li key={a.id} className="flex items-center gap-2">
-                              {a.invoice_id && (
-                                <Link to={`/finance/invoices/${a.invoice_id}`} className="text-primary hover:underline font-mono">
-                                  invoice {a.invoice_id.slice(0, 8)}
-                                </Link>
-                              )}
-                              <span>{formatMoney(a.amount, p.currency)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )
-                    }
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </CardContent>
-      {activeWorkspaceId && (
-        <RecordPaymentDialog
-          workspaceId={activeWorkspaceId}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          initialCounterparty={{ contactId: contactId ?? null, companyId: companyId ?? null }}
-          onSaved={() => { setDialogOpen(false); void load(); }}
-        />
-      )}
-    </Card>
-  );
-};

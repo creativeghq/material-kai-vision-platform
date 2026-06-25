@@ -795,7 +795,7 @@ export const CompanyDetailPage: React.FC = () => {
                     hint="Tier this customer buys at — discount applies off retail on quotes."
                   />
                   <InlineText alwaysEdit={isNew} type="number" label="Customer discount % (override)" value={company.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 50" copy={false} hint="Overrides the level's discount. Empty = use the level." />
-                  <InlineText alwaysEdit={isNew} type="number" label="Credit limit" value={company.credit_limit ?? undefined} onSave={(v) => patchInline({ credit_limit: v })} placeholder="e.g. 10000" copy={false} hint="Max outstanding receivable; finance flags when exceeded." />
+                  {/* Credit limit lives in Account → Payment Rules (single editor of crm_companies.credit_limit). */}
                   <div className="md:col-span-2">
                     <InlineText alwaysEdit={isNew} multiline label="Discount notes" value={company.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 50% per 2025 agreement." copy={false} />
                   </div>

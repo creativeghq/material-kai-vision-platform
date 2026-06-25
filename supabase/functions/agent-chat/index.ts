@@ -872,6 +872,10 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
+      // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).
+      // supplier_overview carries finance data and is admin/owner-gated at injection time.
+      'product_provenance', 'product_price_history', 'projects_using_product',
+      'products_in_project', 'customer_overview', 'supplier_overview',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -1021,6 +1025,12 @@ async function executeAgent(
     },
     'tech-radar': {
       tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
+    },
+    'knowledge-graph': {
+      tool_ids: [
+        'product_provenance', 'product_price_history', 'projects_using_product',
+        'products_in_project', 'customer_overview', 'supplier_overview',
+      ],
     },
     'presentation-sheets': {
       tool_ids: ['generate_presentation_sheet'],
@@ -1602,6 +1612,22 @@ async function executeAgent(
   }
   if (config.tools.includes('add_task') && createAddTaskTool) {
     tools.push(createAddTaskTool(userId, onChunk));
+  }
+
+  // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).
+  // Self-contained import. supplier_overview is finance data → admin/owner only.
+  if (config.tools.some((t: string) => ['product_provenance', 'product_price_history', 'projects_using_product', 'products_in_project', 'customer_overview', 'supplier_overview'].includes(t))) {
+    try {
+      const graphMod = await import('../_shared/tools/graph-tools.ts');
+      if (config.tools.includes('product_provenance')) tools.push(graphMod.createProductProvenanceTool(workspaceId, onChunk));
+      if (config.tools.includes('product_price_history')) tools.push(graphMod.createProductPriceHistoryTool(workspaceId, onChunk));
+      if (config.tools.includes('projects_using_product')) tools.push(graphMod.createProjectsUsingProductTool(workspaceId, onChunk));
+      if (config.tools.includes('products_in_project')) tools.push(graphMod.createProductsInProjectTool(workspaceId, onChunk));
+      if (config.tools.includes('customer_overview')) tools.push(graphMod.createCustomerOverviewTool(workspaceId, onChunk));
+      if (isAdmin && config.tools.includes('supplier_overview')) tools.push(graphMod.createSupplierOverviewTool(workspaceId, onChunk));
+    } catch (graphErr) {
+      console.warn('⚠️ Could not register knowledge-graph tools:', graphErr);
+    }
   }
 
   // Trip cards / sales expenses (all users; 0 cr — DB-only). Self-contained import.

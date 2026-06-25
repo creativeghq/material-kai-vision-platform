@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatMoney, financeService, VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
-  type OrderType, type OrderStatus, type OrderListRow, type OrderItem, type Order, type NewOrderItem,
+  type OrderType, type OrderStatus, type OrderListRow, type OrderItem, type Order,
 } from '@/modules/finance/services/ordersService';
 
 const STATUS_TONE: Record<OrderStatus, string> = {
@@ -26,7 +26,7 @@ const DEFAULT_VAT_CODE = '1'; // 24%
 const vatCodeOf = (pct?: number | null) => VAT_CATEGORIES.find((v) => v.pct === (pct ?? 0))?.code ?? DEFAULT_VAT_CODE;
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
-export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; projectId?: string }> = ({ workspaceId, companyId, projectId }) => {
+export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; contactId?: string; projectId?: string }> = ({ workspaceId, companyId, contactId, projectId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,29 +34,26 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; pr
   const [statusF, setStatusF] = useState<'all' | OrderStatus>('all');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [createPreset, setCreatePreset] = useState<{ orderType: OrderType; preOrder: boolean }>({ orderType: 'sales', preOrder: false });
   const [openId, setOpenId] = useState<string | null>(null);
 
   const load = async () => {
     if (!workspaceId) return;
     try {
       setLoading(true);
-      setRows(await ordersService.list({ workspaceId, companyId, projectId, orderType: typeF === 'all' ? undefined : typeF, status: statusF === 'all' ? undefined : statusF }));
+      setRows(await ordersService.list({ workspaceId, companyId, contactId, projectId, orderType: typeF === 'all' ? undefined : typeF, status: statusF === 'all' ? undefined : statusF }));
     } catch (err: any) {
       toast({ title: 'Failed to load orders', description: err?.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, projectId, typeF, statusF]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, contactId, projectId, typeF, statusF]);
 
   const filtered = useMemo(() => {
     const t = search.trim().toLowerCase();
     if (!t) return rows;
     return rows.filter((r) => (r.party_name ?? '').toLowerCase().includes(t) || (r.order_number ?? '').toLowerCase().includes(t));
   }, [rows, search]);
-
-  const openCreate = (orderType: OrderType, preOrder: boolean) => { setCreatePreset({ orderType, preOrder }); setCreateOpen(true); };
 
   return (
     <div className="space-y-4">
@@ -93,9 +90,9 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; pr
             <Label className="block text-[10px] text-muted-foreground">Search</Label>
             <Input placeholder="Party or number" value={search} onChange={(e) => setSearch(e.target.value)} className="w-52" />
           </div>
-          <Button variant="outline" onClick={() => openCreate('sales', true)}><Plus className="h-4 w-4 mr-1" /> Pre-order</Button>
-          <Button variant="outline" onClick={() => openCreate('purchase', false)}><Plus className="h-4 w-4 mr-1" /> Purchase order</Button>
-          <Button onClick={() => openCreate('sales', false)}><Plus className="h-4 w-4 mr-1" /> New order</Button>
+          {/* One entry point. Sell-vs-buy and draft-vs-confirm are choices inside the modal,
+              not separate buttons (a "pre-order" is just an order saved as a draft). */}
+          <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" /> New order</Button>
         </div>
       </div>
 
@@ -138,8 +135,9 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; pr
 
       <NewOrderModal
         workspaceId={workspaceId}
+        lockedCompanyId={companyId}
+        lockedContactId={contactId}
         open={createOpen}
-        preset={createPreset}
         onOpenChange={setCreateOpen}
         onCreated={() => { setCreateOpen(false); void load(); }}
       />
@@ -155,13 +153,17 @@ const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, va
 
 const NewOrderModal: React.FC<{
   workspaceId: string;
+  /** When the modal is opened from inside a CRM party, that party is pre-selected and locked. */
+  lockedCompanyId?: string;
+  lockedContactId?: string;
   open: boolean;
-  preset: { orderType: OrderType; preOrder: boolean };
   onOpenChange: (v: boolean) => void;
   onCreated: () => void;
-}> = ({ workspaceId, open, preset, onOpenChange, onCreated }) => {
+}> = ({ workspaceId, lockedCompanyId, lockedContactId, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+  // Direction is chosen in-modal: a sales order (we sell) vs a purchase order (we buy).
+  const [orderType, setOrderType] = useState<OrderType>('sales');
   const [party, setParty] = useState<Party | null>(null);
   const [partySearch, setPartySearch] = useState('');
   const [partyOpts, setPartyOpts] = useState<Party[]>([]);
@@ -174,14 +176,32 @@ const NewOrderModal: React.FC<{
   const [projectOpts, setProjectOpts] = useState<Array<{ id: string; name: string }>>([]);
   const [currency, setCurrency] = useState('EUR');
 
-  const isSales = preset.orderType === 'sales';
+  const isSales = orderType === 'sales';
 
   useEffect(() => {
     if (!open) return;
+    setOrderType('sales');
     setParty(null); setPartySearch(''); setPartyOpts([]); setActiveLine(null); setLineProdOpts([]);
     setProject(null); setProjectSearch(''); setProjectOpts([]); setCurrency('EUR');
     setItems([blankLine()]);
-  }, [open]);
+    // Opened from inside a CRM party → that party IS the order's party (customer for a sales
+    // order, supplier for a purchase order). Pre-select + lock it so the user isn't re-searching.
+    if (lockedCompanyId) {
+      void supabase.from('crm_companies').select('id, name, vat_number, email').eq('id', lockedCompanyId).maybeSingle()
+        .then(({ data }) => {
+          if (!data) return;
+          setParty({ type: 'company', id: data.id, name: data.name, vat: data.vat_number,
+            sub: [data.vat_number ? `VAT ${data.vat_number}` : null, data.email, 'Company'].filter(Boolean).join(' · ') });
+        });
+    } else if (lockedContactId) {
+      void supabase.from('crm_contacts').select('id, name, vat_number, email').eq('id', lockedContactId).maybeSingle()
+        .then(({ data }) => {
+          if (!data) return;
+          setParty({ type: 'contact', id: data.id, name: data.name, vat: data.vat_number,
+            sub: [data.vat_number ? `VAT ${data.vat_number}` : null, data.email, 'Contact'].filter(Boolean).join(' · ') });
+        });
+    }
+  }, [open, lockedCompanyId, lockedContactId]);
 
   // Project search (optional link — workspace-scoped).
   useEffect(() => {
@@ -245,7 +265,8 @@ const NewOrderModal: React.FC<{
   const vatTotal = calc.reduce((a, c) => a + c.vat, 0);
   const grossTotal = netTotal + vatTotal;
 
-  const save = async () => {
+  // status: 'draft' = pre-order (not yet committed); 'confirmed' = a live order.
+  const save = async (status: OrderStatus) => {
     if (!party) { toast({ title: isSales ? 'Pick a customer' : 'Pick a supplier', variant: 'destructive' }); return; }
     const clean = items.filter((it) => it.description.trim() && (Number(it.quantity) || 0) > 0);
     if (clean.length === 0) { toast({ title: 'Add at least one product', variant: 'destructive' }); return; }
@@ -260,8 +281,8 @@ const NewOrderModal: React.FC<{
       }
       await ordersService.create({
         workspaceId,
-        orderType: preset.orderType,
-        status: preset.preOrder ? 'draft' : 'confirmed',
+        orderType,
+        status,
         currency,
         projectId: project?.id ?? null,
         customerCompanyId: isSales ? coId : null,
@@ -277,26 +298,30 @@ const NewOrderModal: React.FC<{
           vat_category: parseInt(it.vat_code, 10) || undefined,
         })),
       });
-      toast({ title: preset.preOrder ? 'Pre-order created' : 'Order created' });
+      toast({ title: status === 'draft' ? 'Pre-order saved' : 'Order created' });
       onCreated();
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setBusy(false); }
   };
 
-  const title = preset.preOrder ? 'New pre-order' : isSales ? 'New sales order' : 'New purchase order';
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New order</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          {/* Direction — sell to a customer (sales order) or buy from a supplier (purchase order). */}
+          <div className="flex gap-2">
+            <Button type="button" size="sm" variant={isSales ? 'default' : 'outline'} className="flex-1" onClick={() => setOrderType('sales')}>Sell to customer</Button>
+            <Button type="button" size="sm" variant={!isSales ? 'default' : 'outline'} className="flex-1" onClick={() => setOrderType('purchase')}>Buy from supplier</Button>
+          </div>
           <div className="space-y-1">
             <Label>{isSales ? 'Customer *' : 'Supplier *'}</Label>
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <span className="text-sm">{party.name}{party.sub ? <span className="text-xs text-muted-foreground"> · {party.sub}</span> : null}</span>
-                <Button size="sm" variant="ghost" onClick={() => setParty(null)}>Change</Button>
+                {/* Locked to this party when created from inside its page — no re-search needed. */}
+                {!lockedCompanyId && !lockedContactId && <Button size="sm" variant="ghost" onClick={() => setParty(null)}>Change</Button>}
               </div>
             ) : (
               <div className="relative">
@@ -397,7 +422,9 @@ const NewOrderModal: React.FC<{
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Create</Button>
+          {/* Pre-order = save as a draft; Create = a confirmed, live order. */}
+          <Button variant="secondary" onClick={() => save('draft')} disabled={busy}>Save as pre-order</Button>
+          <Button onClick={() => save('confirmed')} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Create order</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
