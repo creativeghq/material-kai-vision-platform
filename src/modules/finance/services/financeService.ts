@@ -386,6 +386,8 @@ export interface ManualEntry {
   direction: ManualEntryDirection;
   counterparty_company_id: string | null;
   counterparty_contact_id: string | null;
+  order_id: string | null;
+  project_id: string | null;
   description: string;
   category_id: string | null;
   currency: string;
@@ -789,6 +791,7 @@ const _financeServiceCore = {
     includeSettled?: boolean;
     companyId?: string | null;
     contactId?: string | null;
+    orderId?: string | null;
   }): Promise<ManualEntry[]> {
     let q = supabase
       .from('finance_manual_entries')
@@ -803,6 +806,7 @@ const _financeServiceCore = {
     else q = q.in('status', ['open', 'partially_paid']);
     if (opts.companyId) q = q.eq('counterparty_company_id', opts.companyId);
     if (opts.contactId) q = q.eq('counterparty_contact_id', opts.contactId);
+    if (opts.orderId) q = q.eq('order_id', opts.orderId);
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []) as ManualEntry[];
@@ -816,6 +820,7 @@ const _financeServiceCore = {
     currency?: string;
     counterpartyCompanyId?: string | null;
     counterpartyContactId?: string | null;
+    orderId?: string | null;
     categoryId?: string | null;
     dueAt?: string | null;
     issuedAt?: string | null;
@@ -841,6 +846,7 @@ const _financeServiceCore = {
         currency: input.currency ?? 'EUR',
         counterparty_company_id: input.counterpartyCompanyId ?? null,
         counterparty_contact_id: input.counterpartyContactId ?? null,
+        order_id: input.orderId ?? null,
         category_id: input.categoryId ?? null,
         due_at: input.dueAt ?? null,
         issued_at: input.issuedAt ?? new Date().toISOString(),

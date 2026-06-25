@@ -894,13 +894,13 @@ export const ContactDetailPage: React.FC = () => {
           </TabsContent>
 
 
-          {/* Account = Orders-first, with the balance/ledger roll-up below (same model as the
-              company page). Opening an order shows its own invoices / payments / receivables. */}
+          {/* Account = one flow (same model as the company page): money summary up top, then the
+              Orders list. Receivables/payables are managed PER ORDER — open an order to see them. */}
           <TabsContent value="account" className="space-y-4">
             {contact.id ? (
               <>
-                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} />
                 <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
+                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} />
                 <CustomerFinanceRulesCard contactId={contact.id} />
               </>
             ) : (

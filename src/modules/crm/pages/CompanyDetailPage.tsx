@@ -1020,23 +1020,19 @@ export const CompanyDetailPage: React.FC = () => {
           {/* Customer-only commercial tabs — hidden for a pure supplier. */}
           {showCommercial && (
             <>
-          {/* Account = the Orders that drive the relationship, with the balance/ledger as a
-              roll-up below them. Orders are the primary entity: a sales/purchase order is
-              where invoices, payments and receivables actually live — opening an order shows
-              its own Received / Invoices / Payments and the "Record payment" action. The
-              account overview, finance rules and expected payments are company-level
-              summaries that sit UNDER the orders, not above them. */}
+          {/* Account = one flow: the money summary up top (orders, owed, paid, net + AR aging),
+              then the Orders list itself as the working surface. Receivables/payables are NOT a
+              separate section anymore — they're added and viewed PER ORDER (open an order to see
+              its Received / Invoices / Payments + Add receivable / Add payable). */}
           <TabsContent value="account" className="space-y-4">
             {company.id ? (
               <>
-                {/* 1 — Orders first. Click an order to see its details + per-order receivables
-                       (Received / Invoices / Payments + Record payment all live in the order). */}
-                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
-                {/* 2 — Company-level roll-up across all orders: net position + AR aging, plus the
-                       SINGLE un-invoiced receivables/payables surface (manual_entries, with due
-                       dates = "receivables over time"). The old "Expected payments" card
-                       (planned_payments) was removed here — it duplicated receivables. */}
+                {/* 1 — Money summary up top: orders count + value, owed (invoiced & on orders),
+                       paid, net position, AR aging, plus top items to push. */}
                 <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
+                {/* 2 — The orders themselves. Click an order to manage its receivables/payables,
+                       invoices, payments and dispatch. */}
+                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
                 {/* 3 — Secondary settings. */}
                 <CustomerFinanceRulesCard companyId={company.id} />
               </>

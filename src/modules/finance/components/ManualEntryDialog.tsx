@@ -45,7 +45,9 @@ export const ManualEntryDialog: React.FC<{
   onOpenChange: (v: boolean) => void;
   onSaved: () => void;
   lockedParty?: LockedParty;
-}> = ({ workspaceId, direction, open, onOpenChange, onSaved, lockedParty }) => {
+  /** When set, the entry is attached to this order (per-order receivables/payables). */
+  orderId?: string;
+}> = ({ workspaceId, direction, open, onOpenChange, onSaved, lockedParty, orderId }) => {
   const { toast } = useToast();
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -147,6 +149,7 @@ export const ManualEntryDialog: React.FC<{
         categoryId: categoryId || null,
         counterpartyCompanyId: companyId,
         counterpartyContactId: contactId,
+        orderId: orderId ?? null,
         issuedAt: new Date(issuedAt).toISOString(),
         dueAt: dueAt || null,
         notes: notes || null,

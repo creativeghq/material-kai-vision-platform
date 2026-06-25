@@ -3,22 +3,17 @@
 // and lazy-loads its data on first render.
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, FileText, Mail, Wallet, ShoppingBag, Plus } from 'lucide-react';
+import { Loader2, FileText, Mail, Wallet, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   financeService,
   formatMoney,
   type CustomerTopProductRow,
-  type ManualEntry,
-  type ManualEntryDirection,
 } from '@/modules/finance/services/financeService';
-import { ordersService, ORDER_STATUS_LABEL } from '@/modules/finance/services/ordersService';
-import { ManualEntryDialog } from '@/modules/finance/components/ManualEntryDialog';
+import { ordersService } from '@/modules/finance/services/ordersService';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -36,8 +31,10 @@ export const PartyAccountSummary: React.FC<{
   supplier?: { billed: number; paid: number; outstanding: number; ordered?: number } | null;
   /** Per-customer AR aging breakdown (exclusive buckets, by days past due). */
   aging?: { not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null;
+  /** Orders roll-up (count, total ordered value, amount still owed on un-invoiced orders). */
+  orders?: { count: number; ordered: number; owedUninvoiced: number } | null;
   meta?: Array<{ label: string; value: React.ReactNode }>;
-}> = ({ customer, supplier, aging, meta }) => {
+}> = ({ customer, supplier, aging, orders, meta }) => {
   const net = (customer?.outstanding ?? 0) - (supplier?.outstanding ?? 0);
   const netLabel = net > 0 ? 'Account balance (they owe us)' : net < 0 ? 'Account balance (we owe them)' : 'Account balance (settled)';
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
@@ -67,6 +64,17 @@ export const PartyAccountSummary: React.FC<{
           <div className={`text-2xl font-semibold ${netTone}`}>{formatMoney(Math.abs(net))}</div>
         </CardContent>
       </Card>
+
+      {orders && (
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground">Orders</div>
+          <div className="grid grid-cols-3 gap-3">
+            {cell('Orders', orders.count)}
+            {cell('Ordered', formatMoney(orders.ordered))}
+            {cell('Owed on orders', formatMoney(orders.owedUninvoiced), orders.owedUninvoiced > 0)}
+          </div>
+        </div>
+      )}
 
       {customer && (
         <div className="space-y-1.5">
@@ -113,7 +121,7 @@ export const PartyAccountSummary: React.FC<{
  * (customer + supplier net position) + open orders / last payment meta + the customer's top
  * products to push + email-statement + an optional "View ledger in Finance" cross-link.
  */
-export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, customerName, isSupplier, ledgerHref }) => {
+export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, isSupplier, ledgerHref }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [loading, setLoading] = useState(true);
@@ -124,11 +132,9 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [topProducts, setTopProducts] = useState<CustomerTopProductRow[]>([]);
   const [aging, setAging] = useState<{ not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null>(null);
   const [emailing, setEmailing] = useState(false);
-  // Item 3 — un-invoiced receivables/payables recorded against this party.
-  const [entries, setEntries] = useState<ManualEntry[]>([]);
-  const [entryDialog, setEntryDialog] = useState<{ open: boolean; direction: ManualEntryDirection }>({ open: false, direction: 'receivable' });
-  // Confirmed orders not yet invoiced are real money owed too — surfaced as rows here.
-  const [orderRows, setOrderRows] = useState<Array<{ id: string; label: string; direction: ManualEntryDirection; outstanding: number; currency: string; statusLabel: string }>>([]);
+  // Orders roll-up for the KPI strip. Receivables/payables now live PER ORDER (open an order),
+  // not as a separate party-level section.
+  const [orderStats, setOrderStats] = useState<{ count: number; ordered: number; owedUninvoiced: number } | null>(null);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
 
@@ -150,38 +156,25 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
       setLastPayment(p ? { paid_at: p.paid_at, amount: p.amount, currency: p.currency } : null);
       setTopProducts(topProds);
 
-      // Open orders = quotes still in flight (submitted / quoted) for this customer.
-      let oq = supabase.from('quotes').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'quoted']);
-      if (contactId) oq = oq.eq('customer_contact_id', contactId);
-      if (companyId) oq = oq.eq('customer_company_id', companyId);
-      const { count } = await oq;
-      setOpenOrders(count ?? 0);
-
-      // Per-customer AR aging breakdown (skip for supplier-only views).
+      // Orders roll-up — count, total ordered value, and the still-owed amount on orders that
+      // haven't been invoiced yet. This drives the KPI strip ("Orders" + "Owed on orders").
       if (activeWorkspaceId) {
+        try {
+          const ordersList = await ordersService.list({ workspaceId: activeWorkspaceId, companyId, contactId });
+          const active = ordersList.filter((o) => o.status !== 'cancelled');
+          const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: activeWorkspaceId, companyId, contactId });
+          setOrderStats({
+            count: active.length,
+            ordered: active.reduce((a, o) => a + Number(o.total), 0),
+            owedUninvoiced: uninvoiced.reduce((a, o) => a + o.outstanding, 0),
+          });
+          setOpenOrders(active.filter((o) => o.status !== 'fulfilled').length);
+        } catch { setOrderStats(null); }
+
+        // Per-customer AR aging breakdown (skip for supplier-only views).
         const buckets = await financeService.getCustomerAgingBuckets({ workspaceId: activeWorkspaceId, companyId, contactId });
         const b = buckets[0];
         setAging(b ? { not_due: Number(b.not_due), due_0_30: Number(b.due_0_30), due_31_90: Number(b.due_31_90), due_90_plus: Number(b.due_90_plus) } : null);
-
-        // Un-invoiced receivables/payables for this party (item 3).
-        const me = await financeService.listManualEntries({ workspaceId: activeWorkspaceId, companyId, contactId, includeSettled: true }).catch(() => [] as ManualEntry[]);
-        setEntries(me);
-
-        // Confirmed-but-not-yet-invoiced orders are money owed too, but they aren't AR/AP
-        // documents yet (no invoice/bill issued). Surface their outstanding balance here so
-        // "money owed" is complete. Once an order is invoiced, the invoice/bill takes over
-        // and the order drops off (filtered out below) — no double counting.
-        try {
-          const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: activeWorkspaceId, companyId, contactId });
-          setOrderRows(uninvoiced.map((o) => ({
-            id: o.id,
-            label: `Order ${o.order_number ?? o.id.slice(0, 8)}`,
-            direction: (o.order_type === 'sales' ? 'receivable' : 'payable') as ManualEntryDirection,
-            outstanding: o.outstanding,
-            currency: o.currency,
-            statusLabel: ORDER_STATUS_LABEL[o.status],
-          })));
-        } catch { setOrderRows([]); }
       }
     } catch (e) {
       console.error('account overview load failed', e);
@@ -215,12 +208,6 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-semibold text-primary">Account overview</h3>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" variant="outline" onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
-            <Plus className="h-3.5 w-3.5 mr-2" /> Add receivable
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
-            <Plus className="h-3.5 w-3.5 mr-2" /> Add payable
-          </Button>
           {ledgerHref && (
             <Link to={ledgerHref}><Button size="sm" variant="ghost"><FileText className="h-3.5 w-3.5 mr-2" /> View ledger in Finance</Button></Link>
           )}
@@ -235,6 +222,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         customer={account ? { invoiced: account.invoicedTotal, paid: account.paidTotal, outstanding: account.outstandingTotal } : null}
         supplier={supplierAcct ? { billed: supplierAcct.billedTotal, paid: supplierAcct.paidTotal, outstanding: supplierAcct.outstandingTotal, ordered: supplierAcct.orderedTotal } : null}
         aging={aging}
+        orders={orderStats}
         meta={[
           { label: 'Open orders', value: openOrders },
           { label: 'Last payment', value: lastPayment ? new Date(lastPayment.paid_at).toLocaleDateString() : '—' },
@@ -278,87 +266,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         </CardContent>
       </Card>
 
-      {/* Item 3 — un-invoiced receivables / payables recorded against this party. */}
-      <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm flex items-center gap-2"><Wallet className="h-4 w-4" /> Receivables &amp; payables (un-invoiced)</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {entries.length === 0 && orderRows.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              No money owed outside of issued invoices. Confirmed orders not yet invoiced, and any manual
-              receivable / payable you add above, appear here.
-            </p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-xs text-muted-foreground">
-                <tr className="border-b border-border/60">
-                  <th className="px-4 py-2 text-left">Description</th>
-                  <th className="px-4 py-2 text-left">Type</th>
-                  <th className="px-4 py-2 text-left">Method</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                  <th className="px-4 py-2 text-right">Due</th>
-                  <th className="px-4 py-2 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Confirmed, not-yet-invoiced orders — money owed that hasn't become an invoice/bill. */}
-                {orderRows.map((o) => (
-                  <tr key={o.id} className="border-b border-border/30 hover:bg-muted/30">
-                    <td className="px-4 py-2">
-                      <div className="font-medium">{o.label}</div>
-                      <Badge variant="outline" className="mt-0.5 text-[10px]">Order · not yet invoiced</Badge>
-                    </td>
-                    <td className="px-4 py-2">
-                      <Badge variant={o.direction === 'receivable' ? 'default' : 'secondary'} className="text-[10px] capitalize">{o.direction}</Badge>
-                    </td>
-                    <td className="px-4 py-2 text-muted-foreground">—</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatMoney(o.outstanding, o.currency)}</td>
-                    <td className="px-4 py-2 text-right text-muted-foreground">—</td>
-                    <td className="px-4 py-2 text-right text-muted-foreground">{o.statusLabel}</td>
-                  </tr>
-                ))}
-                {entries.map((e) => (
-                  <tr key={e.id} className="border-b border-border/30 hover:bg-muted/30">
-                    <td className="px-4 py-2">
-                      <div className="font-medium">{e.description}</div>
-                      {e.finance_doc_requested && (
-                        <Badge variant="outline" className="mt-0.5 text-[10px]">
-                          {e.finance_doc_status === 'issued' ? `${e.finance_doc_kind} issued` : `${e.finance_doc_kind} requested`}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      <Badge variant={e.direction === 'receivable' ? 'default' : 'secondary'} className="text-[10px] capitalize">{e.direction}</Badge>
-                    </td>
-                    <td className="px-4 py-2 capitalize text-muted-foreground">{e.settlement_method ? e.settlement_method.replace('_', ' ') : '—'}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatMoney(e.amount, e.currency)}</td>
-                    <td className="px-4 py-2 text-right text-muted-foreground">{e.due_at ? new Date(e.due_at).toLocaleDateString() : '—'}</td>
-                    <td className="px-4 py-2 text-right capitalize text-muted-foreground">{e.status.replace('_', ' ')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
-
-      {activeWorkspaceId && (
-        <ManualEntryDialog
-          workspaceId={activeWorkspaceId}
-          direction={entryDialog.direction}
-          open={entryDialog.open}
-          onOpenChange={(v) => setEntryDialog((s) => ({ ...s, open: v }))}
-          onSaved={load}
-          lockedParty={
-            companyId
-              ? { party_type: 'company', party_id: companyId, display_name: customerName ?? 'This company' }
-              : contactId
-                ? { party_type: 'contact', party_id: contactId, display_name: customerName ?? 'This contact' }
-                : undefined
-          }
-        />
-      )}
+      {/* Receivables & payables are managed PER ORDER now — open an order to add/see them. */}
     </div>
   );
 };

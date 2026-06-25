@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { formatMoney, financeService, VAT_CATEGORIES } from '@/modules/finance/services/financeService';
+import { formatMoney, financeService, VAT_CATEGORIES, type ManualEntry, type ManualEntryDirection } from '@/modules/finance/services/financeService';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderListRow, type OrderItem, type Order,
 } from '@/modules/finance/services/ordersService';
+import { ManualEntryDialog, type LockedParty } from '@/modules/finance/components/ManualEntryDialog';
 
 const STATUS_TONE: Record<OrderStatus, string> = {
   draft: 'secondary', confirmed: 'outline', partially_fulfilled: 'outline', fulfilled: 'default', cancelled: 'destructive',
@@ -35,6 +36,8 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // Inside a CRM party (company/contact) the list is already scoped — hide the filter cluster.
+  const embedded = !!(companyId || contactId);
 
   const load = async () => {
     if (!workspaceId) return;
@@ -63,33 +66,39 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
           <p className="text-xs text-muted-foreground">Sales &amp; purchase orders. Invoices, payments, dispatch and profit all hang off an order.</p>
         </div>
         <div className="flex items-end gap-2 flex-wrap">
-          <div className="space-y-1">
-            <Label className="block text-[10px] text-muted-foreground">Type</Label>
-            <Select value={typeF} onValueChange={(v: any) => setTypeF(v)}>
-              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="sales">Sales</SelectItem>
-                <SelectItem value="purchase">Purchase</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="block text-[10px] text-muted-foreground">Status</Label>
-            <Select value={statusF} onValueChange={(v: any) => setStatusF(v)}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => (
-                  <SelectItem key={s} value={s}>{ORDER_STATUS_LABEL[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="block text-[10px] text-muted-foreground">Search</Label>
-            <Input placeholder="Party or number" value={search} onChange={(e) => setSearch(e.target.value)} className="w-52" />
-          </div>
+          {/* Filters only matter on the global Finance list. Inside a single party the list is
+              short and already scoped — the dropdowns are just noise there. */}
+          {!embedded && (
+            <>
+              <div className="space-y-1">
+                <Label className="block text-[10px] text-muted-foreground">Type</Label>
+                <Select value={typeF} onValueChange={(v: any) => setTypeF(v)}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="sales">Sales</SelectItem>
+                    <SelectItem value="purchase">Purchase</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="block text-[10px] text-muted-foreground">Status</Label>
+                <Select value={statusF} onValueChange={(v: any) => setStatusF(v)}>
+                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => (
+                      <SelectItem key={s} value={s}>{ORDER_STATUS_LABEL[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="block text-[10px] text-muted-foreground">Search</Label>
+                <Input placeholder="Party or number" value={search} onChange={(e) => setSearch(e.target.value)} className="w-52" />
+              </div>
+            </>
+          )}
           {/* One entry point. Sell-vs-buy and draft-vs-confirm are choices inside the modal,
               not separate buttons (a "pre-order" is just an order saved as a draft). */}
           <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" /> New order</Button>
@@ -445,19 +454,44 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [payAmt, setPayAmt] = useState('');
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
+  // Per-order receivables / payables (money owed on this order outside its invoice).
+  const [entries, setEntries] = useState<ManualEntry[]>([]);
+  const [party, setParty] = useState<LockedParty | null>(null);
+  const [entryDialog, setEntryDialog] = useState<{ open: boolean; direction: ManualEntryDirection } | null>(null);
+
+  // Resolve the order's counterparty (customer for sales, supplier for purchase) for the
+  // manual-entry dialog's locked party.
+  const resolveParty = async (o: Order): Promise<LockedParty | null> => {
+    const coId = o.order_type === 'sales' ? o.customer_company_id : o.supplier_company_id;
+    const ctId = o.order_type === 'sales' ? o.customer_contact_id : o.supplier_contact_id;
+    if (coId) {
+      const { data } = await supabase.from('crm_companies').select('name').eq('id', coId).maybeSingle();
+      return { party_type: 'company', party_id: coId, display_name: (data?.name as string) ?? 'Company' };
+    }
+    if (ctId) {
+      const { data } = await supabase.from('crm_contacts').select('name').eq('id', ctId).maybeSingle();
+      return { party_type: 'contact', party_id: ctId, display_name: (data?.name as string) ?? 'Contact' };
+    }
+    return null;
+  };
 
   const load = async (id: string) => {
     try {
       setLoading(true);
-      const [res, finance] = await Promise.all([ordersService.get(id), ordersService.getOrderFinance(id)]);
-      setOrder(res.order); setItems(res.items); setFin(finance);
+      const res = await ordersService.get(id);
+      const [finance, ents, p] = await Promise.all([
+        ordersService.getOrderFinance(id),
+        financeService.listManualEntries({ workspaceId: res.order.workspace_id, orderId: id, includeSettled: true }).catch(() => [] as ManualEntry[]),
+        resolveParty(res.order).catch(() => null),
+      ]);
+      setOrder(res.order); setItems(res.items); setFin(finance); setEntries(ents); setParty(p);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setEntries([]); setParty(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -730,6 +764,38 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               </div>
             )}
 
+            {/* Receivables & payables on THIS order — money owed on/by it that isn't a formal
+                invoice/bill (deposits, advances, fees). Added per-order, not at party level. */}
+            <div className="rounded-md border border-border/60">
+              <div className="flex items-center justify-between border-b border-border/60 px-3 py-1.5">
+                <span className="text-[11px] font-medium text-muted-foreground">Receivables &amp; payables</span>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={!party} onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Receivable
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={!party} onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Payable
+                  </Button>
+                </div>
+              </div>
+              {entries.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-muted-foreground">None yet. Add a receivable (they owe us) or payable (we owe) tied to this order.</p>
+              ) : (
+                entries.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                    <span className="flex items-center gap-2">
+                      <Badge variant={e.direction === 'receivable' ? 'default' : 'secondary'} className="text-[10px] capitalize">{e.direction}</Badge>
+                      <span className="text-xs">{e.description}</span>
+                    </span>
+                    <span className="tabular-nums">
+                      {formatMoney(Number(e.amount), e.currency)}
+                      <span className="ml-1 text-[10px] text-muted-foreground capitalize">{e.status.replace('_', ' ')}</span>
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
             <p className="text-[11px] text-muted-foreground">
               Dispatch is invoice-driven: once this order's invoice is paid &amp; flagged for shipping it shows on the
               Dispatch board, which cuts the delivery note and moves warehouse stock (catalog lines only — ad-hoc lines stay off-warehouse).
@@ -740,6 +806,18 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
           <Button variant="outline" onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
+
+      {order && party && entryDialog && (
+        <ManualEntryDialog
+          workspaceId={order.workspace_id}
+          direction={entryDialog.direction}
+          open={entryDialog.open}
+          onOpenChange={(v) => setEntryDialog((prev) => (prev ? { ...prev, open: v } : prev))}
+          onSaved={() => { setEntryDialog(null); void load(order.id); onChanged(); }}
+          lockedParty={party}
+          orderId={order.id}
+        />
+      )}
     </Dialog>
   );
 };
