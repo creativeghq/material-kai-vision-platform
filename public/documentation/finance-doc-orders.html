@@ -61,11 +61,12 @@
   <ol>
     <li>Click <strong>New</strong>.</li>
     <li>Choose the <strong>type</strong> — <strong>Sales</strong> (to a customer) or <strong>Purchase</strong> (from a supplier) — and whether it starts as a <strong>Pre-order</strong>.</li>
-    <li>Pick the <strong>party</strong> (the customer or supplier). Optionally link a <strong>project</strong> and the <strong>source quote</strong> it came from.</li>
-    <li>Add <strong>line items</strong> — either pick a <strong>catalogue product by name</strong>, or add an ad-hoc line (description, quantity, unit price). Each line shows its net, VAT and line total.</li>
+    <li>Pick the <strong>party</strong> (the customer or supplier — searchable). Choose the <strong>currency</strong>, and optionally link a <strong>project</strong> and the <strong>source quote</strong> it came from.</li>
+    <li>Add <strong>line items</strong> — either pick a <strong>catalogue product by name</strong> (with its VAT), or add an ad-hoc line (description, quantity, unit price). Each line shows its net, VAT and line total.</li>
     <li>Save. The order appears in the list with its number and a <strong>Pre-order / Unpaid</strong> starting state.</li>
   </ol>
   <div class="callout"><p><strong>Catalogue line vs ad-hoc line.</strong> A line added from the catalogue can <strong>move warehouse stock</strong> when the order is delivered; an ad-hoc (typed-in) line stays off-warehouse. This matters for the dispatch/warehouse flow below.</p></div>
+  <p><strong>Editing line items.</strong> While an order is still a <strong>draft / un-invoiced</strong>, you can edit it freely — change a line's <strong>quantity, price or VAT</strong>, and <strong>add or remove</strong> lines; the totals recompute as you go. Once an invoice has been raised against the order, the lines are locked so the order and its invoice can't drift apart.</p>
 
   <h2>Working an order — invoices, payments &amp; profit</h2>
   <p>Open an order to see everything that hangs off it. This is the point of orders: the money and the documents are consolidated on one screen.</p>
@@ -79,6 +80,24 @@
       <tr><td><strong>Profit</strong></td><td><strong>Received − Paid to suppliers</strong> — what you actually made, shown green (positive) or red (negative).</td></tr>
     </tbody>
   </table></div>
+
+  <h2>Actions on an order</h2>
+  <p>Open an order and the available buttons depend on whether it's a sales or a purchase order:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Action</th><th>On</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Create invoice</strong></td><td>Sales order</td><td>Raises an <a href="finance-doc-invoices.html">invoice</a> for the order's lines in one click (even for a manually-created order) and links it back to the order.</td></tr>
+      <tr><td><strong>Record supplier bill</strong></td><td>Purchase order</td><td>Records the supplier's bill against the order (the purchase-side equivalent of an invoice).</td></tr>
+      <tr><td><strong>Receive into warehouse</strong></td><td>Purchase order</td><td>Receives the ordered goods into <a href="finance-op-warehouse.html">Warehouse</a> stock (catalogue lines), so on-hand quantities go up when the delivery arrives.</td></tr>
+      <tr><td><strong>Record payment</strong></td><td>Both</td><td>Logs a payment on the order — money <em>received</em> (sales) or <em>paid out</em> (purchase) — which updates the payment status and the Received / Profit figures.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Orders on a project</h2>
+  <p>Orders can be scoped to a <a href="projects.html">project</a>: pick a project when you create the order, and that order then shows in the project's <strong>Finance</strong> tab — so on a project you see exactly the orders (and their money) that belong to it, not the whole workspace.</p>
+
+  <h2>Customers see their own orders</h2>
+  <p>Each customer can see the orders you've raised for them — with line-item detail, status and any invoices/receipts to download — in their <a href="client-portal.html">Client Portal</a>. You don't send anything extra; issuing the order is enough.</p>
 
   <h2>Dispatch is invoice-driven</h2>
   <p>An order's <strong>Dispatch board</strong> button takes you to the dispatch queue. The flow is deliberate: <strong>once the order's invoice is paid and flagged for shipping, the order appears on the <a href="finance-op-dispatch.html">Dispatch board</a></strong>, which cuts the delivery note and moves warehouse stock — for <em>catalogue lines only</em> (ad-hoc lines stay off-warehouse). So you don't ship straight from the order; you raise and settle the invoice, and dispatch picks it up from there.</p>

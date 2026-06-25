@@ -85,6 +85,7 @@
         ]},
       ]},
       { file: "pos.html", title: "Point of Sale", icon: "🧮" },
+      { file: "client-portal.html", title: "Client Portal", icon: "🪪" },
       { file: "inbox.html", title: "Inbox", icon: "✉️" },
     ]},
     { title: "Network & Tools", items: [

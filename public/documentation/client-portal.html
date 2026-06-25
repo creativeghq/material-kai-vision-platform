@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Client Portal | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Client Portal</div>
+  <h1>Client Portal</h1>
+  <div class="routes"><span class="badge route">/portal</span></div>
+  <p class="lead">The Client Portal is a <strong>self-serve account page for your customers</strong>. A customer who has a login sees, in one branded place, everything a business has issued to them: their orders (with line-item detail), invoices and receipts to download, payment receipts, and a running summary of what they've spent and what's still outstanding. It's the customer-facing flip side of <a href="finance.html">Finance</a> — the same documents you issue, presented back to the person they were issued to.</p>
+
+  <div class="callout"><p><strong>How to open it:</strong> a customer opens <span class="badge route">/portal</span> (it's also the <strong>“My Account”</strong> view inside their <a href="account.html">Profile</a>). Most customers arrive by clicking the link in an <strong>invoice or statement email</strong>, which drops them straight onto their account. Any signed-in user can open it; someone who isn't a customer of any business just sees an empty state.</p></div>
+
+  <h2>What it is &amp; who it's for</h2>
+  <p><strong>What it is —</strong> a read-only account view for the <em>recipient</em> of your documents. <strong>Why it matters —</strong> instead of customers emailing you to ask “what do I owe?” or “can you resend that invoice?”, they self-serve: they see their balance and download any document themselves, day or night. <strong>Who it's for —</strong> your customers. They see only what's addressed to them, never your back-office.</p>
+
+  <div class="callout warn"><p><strong>Privacy:</strong> finance records are protected so customers can't read your books directly — the portal fetches each customer's data through a dedicated, <strong>ownership-scoped</strong> service that returns only the orders and documents addressed to <em>that</em> account. One customer can never see another's.</p></div>
+
+  <h2>What a customer sees</h2>
+  <h3>Account summary</h3>
+  <p>At the top, a set of summary cards (one set per currency they've transacted in):</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Card</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Total spent</strong></td><td>Everything they've paid you.</td></tr>
+      <tr><td><strong>Outstanding</strong></td><td>What they still owe (highlighted when above zero).</td></tr>
+      <tr><td><strong>Orders</strong></td><td>How many orders they have.</td></tr>
+      <tr><td><strong>Documents</strong></td><td>How many invoices/receipts are on file for them.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Orders (with line-item drill-in)</h3>
+  <p>Each <a href="finance-doc-orders.html">order</a> is a row showing its number, date, total, and two badges — its <strong>fulfilment</strong> status (Pre-order / Confirmed / Partially delivered / Completed / Cancelled) and its <strong>payment</strong> status (Unpaid / Partially paid / Paid). Clicking a row <strong>expands it</strong> to reveal the line items (item, quantity, unit price, line total), including a “<em>3 of 10 delivered</em>” note where an order is only partly fulfilled. So a customer can check exactly what they ordered and how much has shipped.</p>
+
+  <h3>Invoices &amp; receipts</h3>
+  <p>Each issued <a href="finance-doc-invoices.html">invoice</a> or retail receipt is listed with its number, issue date, total, a status badge, and any <strong>amount still due</strong>. A <strong>PDF</strong> button downloads the document. This is how a customer re-downloads an invoice without asking you.</p>
+
+  <h3>Payment receipts</h3>
+  <p>Every payment they've made is listed with its date, amount and method, each with a <strong>PDF</strong> to download as proof of payment.</p>
+
+  <h2>Where the data comes from</h2>
+  <p>Everything on the portal is the <em>same</em> data you manage in Finance — orders, invoices, receipts and payments — just filtered to the one account and presented read-only. There's nothing extra to maintain: the moment you issue an order, invoice, receipt or record a payment against a customer, it appears on their portal. The customer's running balance here mirrors the <strong>Account balance</strong> on their <a href="crm-companies.html">CRM record</a>.</p>
+
+  <h2>The empty state</h2>
+  <p>A signed-in user who isn't (yet) a customer of any business sees: <em>“Nothing here yet. Your orders, invoices and receipts will appear here as soon as a business issues them to you.”</em> — so the page is safe to expose to every user; it simply fills in once documents are addressed to them.</p>
+
+  <div class="callout tip"><p><strong>Tip for businesses:</strong> the invoice and statement emails you send already link here, so you don't need to attach PDFs or field “please resend” requests — point customers at their portal and they self-serve. To set the running balance and what's owed, see <a href="finance-doc-orders.html">Orders</a>, <a href="finance-doc-invoices.html">Invoices</a> and <a href="finance-receivables-payables.html">Receivables &amp; Payables</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
