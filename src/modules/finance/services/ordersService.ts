@@ -75,6 +75,7 @@ export interface LinePricing {
   unit_cost: number | null;
   discount_pct: number | null;
   measurement_unit_code: string | null;
+  available: number | null;   // qty on hand across the workspace's warehouses (null = not stocked)
 }
 
 export const ordersService = {
@@ -315,13 +316,16 @@ export const ordersService = {
     workspaceId: string; productId: string; orderType: OrderType;
     companyId?: string | null; contactId?: string | null;
   }): Promise<LinePricing> {
-    const { data: prod } = await supabase.from('products').select('cost').eq('id', opts.productId).maybeSingle();
+    const [{ data: prod }, available] = await Promise.all([
+      supabase.from('products').select('cost').eq('id', opts.productId).maybeSingle(),
+      this.getAvailableStock([opts.productId], opts.workspaceId).then((m) => m.get(opts.productId) ?? null),
+    ]);
     // NB: products.measurement_unit_code is the integer myDATA code, NOT our text unit label
     // (item/m²/…), so we don't seed the line's unit from it — the user picks it.
     const unit: string | null = null;
     const cost = prod?.cost != null ? Number(prod.cost) : null;
     if (opts.orderType === 'purchase') {
-      return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit };
+      return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available };
     }
     try {
       const { data } = await supabase.rpc('get_product_price_for_workspace', {
@@ -333,11 +337,24 @@ export const ordersService = {
         unit_price: r.final_sell != null ? Number(r.final_sell) : (r.retail != null ? Number(r.retail) : null),
         unit_cost: r.cost_basis != null ? Number(r.cost_basis) : cost,
         discount_pct: r.discount_pct != null ? Number(r.discount_pct) : null,
-        measurement_unit_code: unit,
+        measurement_unit_code: unit, available,
       };
     } catch {
-      return { unit_price: null, unit_cost: cost, discount_pct: null, measurement_unit_code: unit };
+      return { unit_price: null, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available };
     }
+  },
+
+  /** Qty on hand per product, summed across the workspace's warehouses. Absent = not stocked. */
+  async getAvailableStock(productIds: string[], workspaceId: string): Promise<Map<string, number>> {
+    const ids = [...new Set(productIds.filter(Boolean))];
+    const out = new Map<string, number>();
+    if (ids.length === 0) return out;
+    const { data } = await supabase.from('warehouse_items').select('product_id, qty_on_hand')
+      .eq('workspace_id', workspaceId).in('product_id', ids);
+    for (const r of (data ?? []) as Array<{ product_id: string; qty_on_hand: number | null }>) {
+      out.set(r.product_id, (out.get(r.product_id) ?? 0) + Number(r.qty_on_hand ?? 0));
+    }
+    return out;
   },
 
   /** Set / clear a product's primary supplier (the manual "+ supplier" on an order line). */

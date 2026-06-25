@@ -189,8 +189,8 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
 
 // ---------------------------------------------------------------------------
 
-type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string };
-const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE });
+type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string; available?: number | null };
+const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE, available: null });
 
 const NewOrderModal: React.FC<{
   workspaceId: string;
@@ -306,7 +306,7 @@ const NewOrderModal: React.FC<{
       });
       setItems((ls) => ls.map((l, idx) => {
         if (idx !== i) return l;
-        const next: Line = { ...l };
+        const next: Line = { ...l, available: pr.available };
         if (pr.unit_cost != null) next.unit_cost = pr.unit_cost;
         if (pr.measurement_unit_code) next.unit_code = pr.measurement_unit_code;
         if (pr.unit_price != null && (!l.unit_price || l.unit_price === 0)) next.unit_price = pr.unit_price;
@@ -448,8 +448,12 @@ const NewOrderModal: React.FC<{
               <div className={`grid ${isSales ? 'grid-cols-[1fr_52px_62px_82px_82px_88px_84px_24px]' : 'grid-cols-[1fr_52px_62px_82px_88px_84px_24px]'} gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[640px]`}>
                 <span>Product</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">{isSales ? 'Unit price' : 'Cost/unit'}</span>{isSales && <span className="text-right">Cost/unit</span>}<span className="text-right">VAT</span><span className="text-right">Line total</span><span />
               </div>
-              {items.map((l, i) => (
-                <div key={i} className={`grid ${isSales ? 'grid-cols-[1fr_52px_62px_82px_82px_88px_84px_24px]' : 'grid-cols-[1fr_52px_62px_82px_88px_84px_24px]'} items-center gap-2 border-t border-border/40 px-2 py-1.5 min-w-[640px]`}>
+              {items.map((l, i) => {
+                // #3 — selling a stocked catalog line for more than we have on hand.
+                const short = isSales && l.product_id && l.available != null && Number(l.quantity) > l.available;
+                return (
+                <React.Fragment key={i}>
+                <div className={`grid ${isSales ? 'grid-cols-[1fr_52px_62px_82px_82px_88px_84px_24px]' : 'grid-cols-[1fr_52px_62px_82px_88px_84px_24px]'} items-center gap-2 border-t border-border/40 px-2 py-1.5 min-w-[640px]`}>
                   <div className="relative">
                     <Input className="h-8 text-sm" value={l.description}
                       onChange={(e) => { setItem(i, { description: e.target.value, product_id: null }); setActiveLine(i); }}
@@ -480,7 +484,14 @@ const NewOrderModal: React.FC<{
                   <span className="text-right text-sm tabular-nums">{formatMoney(calc[i]?.gross ?? 0)}</span>
                   <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => removeLine(i)}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
-              ))}
+                {short && (
+                  <div className="px-2 pb-1.5 -mt-0.5 text-[11px] text-amber-600 flex items-center gap-1 min-w-[640px]">
+                    <PackageCheck className="h-3 w-3" /> Only {l.available} in stock — ordering {Number(l.quantity)}. You can still proceed (back-order); a purchase order restocks it.
+                  </div>
+                )}
+                </React.Fragment>
+                );
+              })}
             </div>
             <p className="text-[11px] text-muted-foreground">{isSales ? 'Pick a catalog product to auto-fill the customer’s price, cost & unit (this customer’s discount is applied). Editable.' : 'A purchase order’s unit price is what we pay the supplier (= our cost). Pick a catalog product to auto-fill it.'} Catalog lines link to the warehouse — delivery moves stock.</p>
           </div>
@@ -739,18 +750,21 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     {order.payment_status !== 'paid' && (
-                      <DropdownMenuItem onClick={() => { setPayOpen(true); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
-                        <Banknote className="h-3.5 w-3.5 mr-2" /> Record payment
+                      <DropdownMenuItem className="items-start" onClick={() => { setPayOpen(true); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
+                        <Banknote className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
+                        <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">Cash actually moved (in/out). Not a document.</span></span>
                       </DropdownMenuItem>
                     )}
                     {party && (
-                      <DropdownMenuItem onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
-                        <Plus className="h-3.5 w-3.5 mr-2" /> Add receivable
+                      <DropdownMenuItem className="items-start" onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
+                        <Plus className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
+                        <span className="flex flex-col"><span>Add receivable</span><span className="text-[10px] text-muted-foreground">Money they owe us — no cash yet.</span></span>
                       </DropdownMenuItem>
                     )}
                     {party && (
-                      <DropdownMenuItem onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
-                        <Plus className="h-3.5 w-3.5 mr-2" /> Add payable
+                      <DropdownMenuItem className="items-start" onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
+                        <Plus className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
+                        <span className="flex flex-col"><span>Add payable</span><span className="text-[10px] text-muted-foreground">Money we owe — no cash yet.</span></span>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
@@ -804,6 +818,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     const gross = Number(it.net_value) + Number(it.vat_amount);
                     const unitLabel = UNIT_OPTIONS.find((u) => u.code === it.measurement_unit_code)?.label ?? (it.measurement_unit_code || '—');
                     const sup = it.product_id ? suppliers.get(it.product_id) : undefined;
+                    const del = Number(it.quantity_delivered); const q = Number(it.quantity);
+                    const delTone = del >= q && q > 0 ? 'text-emerald-600' : del > 0 ? 'text-amber-600' : 'text-muted-foreground';
                     return (
                     <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_48px_78px_44px_88px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[840px]">
                       <span className="min-w-0">
@@ -817,15 +833,19 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                       </span>
                       <span className="text-right tabular-nums">{Number(it.quantity)}</span>
                       <span className="text-muted-foreground text-xs">{unitLabel}</span>
-                      {/* Delivered: edit the qty or use the menu; the order status auto-advances. */}
-                      <div className="flex items-center justify-end gap-1">
-                        <Input key={`${it.id}-${it.quantity_delivered}`} className="h-7 w-12 text-right text-xs px-1" type="number" step="1" min="0" defaultValue={Number(it.quantity_delivered)} disabled={saving}
-                          onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== Number(it.quantity_delivered)) void setLineDelivered(it.id, v); }} />
-                        <span className="text-[10px] text-muted-foreground">/{Number(it.quantity)}</span>
+                      {/* Delivered: inline-editable (reads like text, box on hover/focus) + quick menu.
+                          Tone: green = fully delivered, amber = partial. Status auto-advances. */}
+                      <div className="flex items-center justify-end gap-0.5">
+                        <Input key={`${it.id}-${it.quantity_delivered}`}
+                          className={`h-6 w-9 text-right text-xs px-0.5 tabular-nums border-0 shadow-none bg-transparent rounded hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-1 ${delTone}`}
+                          type="number" step="1" min="0" defaultValue={del} disabled={saving}
+                          onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== del) void setLineDelivered(it.id, v); }} />
+                        <span className="text-[10px] text-muted-foreground">/ {q}</span>
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild><button type="button" className="text-muted-foreground hover:text-foreground"><ChevronDown className="h-3 w-3" /></button></DropdownMenuTrigger>
+                          <DropdownMenuTrigger asChild><button type="button" className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronDown className="h-3 w-3" /></button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, Number(it.quantity))}>Mark fully delivered</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, q)}>Mark fully delivered</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, Math.ceil(q / 2))}>Mark half delivered</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => void setLineDelivered(it.id, 0)}>Mark not delivered</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -886,12 +906,15 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             )}
 
             {payOpen && (
-              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                <span className="text-xs text-muted-foreground">{order.order_type === 'sales' ? 'Money received' : 'Money paid out'}</span>
-                <Input className="h-8 w-32 text-right text-sm" type="number" step="0.01" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
-                <span className="text-xs text-muted-foreground">{order.currency}</span>
-                <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save payment'}</Button>
-                <Button size="sm" variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{order.order_type === 'sales' ? 'Money received' : 'Money paid out'}</span>
+                  <Input className="h-8 w-32 text-right text-sm" type="number" step="0.01" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
+                  <span className="text-xs text-muted-foreground">{order.currency}</span>
+                  <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save payment'}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Records the cash movement only — it doesn't issue a receipt or invoice. Use Actions → {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'} for the document.</p>
               </div>
             )}
 
