@@ -41,6 +41,7 @@ export interface OrderItem {
   description: string;
   quantity: number;
   unit_price: number;
+  unit_cost: number | null;   // snapshot cost/unit (margin before invoicing)
   vat_percent?: number | null;
   vat_category?: number | null;
   net_value: number;
@@ -60,10 +61,14 @@ export interface NewOrderItem {
   description: string;
   quantity: number;
   unit_price: number;
+  unit_cost?: number | null;  // cost/unit snapshot (from catalog or manual)
   vat_percent?: number;       // per-line VAT %
   vat_category?: number;      // myDATA VAT category code (1=24%, …)
   update_warehouse?: boolean;
 }
+
+/** Catalog pricing snapshot used to pre-fill an order line (cost for margin, list for discount). */
+export interface ProductPricing { cost: number | null; list_price: number | null; }
 
 export const ordersService = {
   async list(opts: {
@@ -220,6 +225,7 @@ export const ordersService = {
         description: l.it.description,
         quantity: l.it.quantity,
         unit_price: l.it.unit_price,
+        unit_cost: l.it.unit_cost ?? null,
         vat_percent: l.pct,
         vat_category: l.it.vat_category ?? null,
         net_value: l.net,
@@ -276,7 +282,7 @@ export const ordersService = {
     if (lines.length) {
       const { error: itErr } = await supabase.from('order_items').insert(lines.map((l, i) => ({
         order_id: orderId, workspace_id: workspaceId, product_id: l.it.product_id ?? null,
-        description: l.it.description, quantity: l.it.quantity, unit_price: l.it.unit_price,
+        description: l.it.description, quantity: l.it.quantity, unit_price: l.it.unit_price, unit_cost: l.it.unit_cost ?? null,
         vat_percent: l.pct, vat_category: l.it.vat_category ?? null,
         net_value: l.net, vat_amount: l.vat, line_total: l.net, update_warehouse: l.it.update_warehouse ?? true, sort_order: i,
       })));
@@ -286,5 +292,58 @@ export const ordersService = {
       .update({ subtotal_net: subtotal, vat_amount: vatTotal, total: r2(subtotal + vatTotal), updated_at: new Date().toISOString() })
       .eq('id', orderId);
     if (error) throw error;
+  },
+
+  /**
+   * Catalog pricing snapshot for a product, used to pre-fill an order line:
+   *  - cost: what it costs us (products.cost — the platform's maintained cost).
+   *  - list_price: the catalog list/retail price (product_prices), so the order can show
+   *    the discount the customer is getting vs list.
+   */
+  async getProductPricing(productId: string): Promise<ProductPricing> {
+    const [prod, price] = await Promise.all([
+      supabase.from('products').select('cost').eq('id', productId).maybeSingle(),
+      supabase.from('product_prices').select('list_price').eq('product_id', productId).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    return {
+      cost: prod.data?.cost != null ? Number(prod.data.cost) : null,
+      list_price: price.data?.list_price != null ? Number(price.data.list_price) : null,
+    };
+  },
+
+  /** Batch list-price lookup for a set of products (order detail shows discount-vs-list). */
+  async getListPrices(productIds: string[]): Promise<Map<string, number>> {
+    const ids = [...new Set(productIds.filter(Boolean))];
+    if (ids.length === 0) return new Map();
+    const { data } = await supabase.from('product_prices').select('product_id, list_price, updated_at').in('product_id', ids);
+    const m = new Map<string, number>();
+    for (const r of (data ?? []) as Array<{ product_id: string; list_price: number | null }>) {
+      if (r.list_price != null && !m.has(r.product_id)) m.set(r.product_id, Number(r.list_price));
+    }
+    return m;
+  },
+
+  /**
+   * Set per-line delivered quantities and auto-advance the order's fulfilment status:
+   *   nothing delivered → confirmed · some → partially_fulfilled · all → fulfilled.
+   * (Stays out of 'draft'/'cancelled'.) Warehouse stock movement remains the dispatch flow's job.
+   */
+  async setDelivery(orderId: string, deliveries: Array<{ itemId: string; quantityDelivered: number }>): Promise<OrderStatus> {
+    for (const d of deliveries) {
+      const { error } = await supabase.from('order_items')
+        .update({ quantity_delivered: Math.max(0, d.quantityDelivered) }).eq('id', d.itemId);
+      if (error) throw error;
+    }
+    const { data: items } = await supabase.from('order_items').select('quantity, quantity_delivered').eq('order_id', orderId);
+    const rows = (items ?? []) as Array<{ quantity: number; quantity_delivered: number }>;
+    const totalQty = rows.reduce((a, r) => a + Number(r.quantity), 0);
+    const totalDel = rows.reduce((a, r) => a + Number(r.quantity_delivered), 0);
+    const next: OrderStatus = totalDel <= 0 ? 'confirmed' : totalDel >= totalQty ? 'fulfilled' : 'partially_fulfilled';
+    const { data: cur } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle();
+    // Don't override a draft/cancelled order from delivery edits.
+    if (cur?.status === 'draft' || cur?.status === 'cancelled') return cur.status as OrderStatus;
+    const { error } = await supabase.from('orders').update({ status: next, updated_at: new Date().toISOString() }).eq('id', orderId);
+    if (error) throw error;
+    return next;
   },
 };

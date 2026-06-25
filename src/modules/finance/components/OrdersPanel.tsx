@@ -181,8 +181,8 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
 
 // ---------------------------------------------------------------------------
 
-type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; vat_code: string };
-const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, vat_code: DEFAULT_VAT_CODE });
+type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; vat_code: string };
+const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, vat_code: DEFAULT_VAT_CODE });
 
 const NewOrderModal: React.FC<{
   workspaceId: string;
@@ -284,9 +284,20 @@ const NewOrderModal: React.FC<{
   const setItem = (i: number, patch: Partial<Line>) => setItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const addLine = () => setItems((ls) => [...ls, blankLine()]);
   const removeLine = (i: number) => setItems((ls) => ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls);
-  const pickProduct = (i: number, p: { id: string; name: string }) => {
+  const pickProduct = async (i: number, p: { id: string; name: string }) => {
     setItem(i, { product_id: p.id, description: p.name });
     setActiveLine(null); setLineProdOpts([]);
+    // Pull catalog pricing: snapshot cost (for margin) + pre-fill the unit price from list
+    // when the line is still empty, so the order reflects the catalog out of the box.
+    try {
+      const pricing = await ordersService.getProductPricing(p.id);
+      setItems((ls) => ls.map((l, idx) => {
+        if (idx !== i) return l;
+        const next: Line = { ...l, unit_cost: pricing.cost };
+        if ((!l.unit_price || l.unit_price === 0) && pricing.list_price != null) next.unit_price = pricing.list_price;
+        return next;
+      }));
+    } catch { /* pricing is best-effort — line still works with manual cost/price */ }
   };
 
   const calc = items.map((l) => {
@@ -297,6 +308,11 @@ const NewOrderModal: React.FC<{
   const netTotal = calc.reduce((a, c) => a + c.net, 0);
   const vatTotal = calc.reduce((a, c) => a + c.vat, 0);
   const grossTotal = netTotal + vatTotal;
+  // Margin = revenue − cost across lines that carry a cost. null when no line has cost yet.
+  const anyCost = items.some((l) => l.unit_cost != null);
+  const marginTotal = anyCost
+    ? items.reduce((a, l) => a + ((Number(l.unit_price) || 0) - (Number(l.unit_cost) || 0)) * (Number(l.quantity) || 0), 0)
+    : null;
 
   // status: 'draft' = pre-order (not yet committed); 'confirmed' = a live order.
   const save = async (status: OrderStatus) => {
@@ -327,6 +343,7 @@ const NewOrderModal: React.FC<{
           description: it.description,
           quantity: Number(it.quantity) || 0,
           unit_price: Number(it.unit_price) || 0,
+          unit_cost: it.unit_cost,
           vat_percent: pctOf(it.vat_code),
           vat_category: parseInt(it.vat_code, 10) || undefined,
         })),
@@ -340,7 +357,7 @@ const NewOrderModal: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{preset.draft ? 'New pre-order' : isSales ? 'New sales order' : 'New purchase order'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
@@ -410,11 +427,11 @@ const NewOrderModal: React.FC<{
               <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New Product</Button>
             </div>
             <div className="rounded-md border border-border/60">
-              <div className="grid grid-cols-[1fr_56px_84px_92px_84px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
-                <span>Product</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">VAT</span><span className="text-right">Line total</span><span />
+              <div className="grid grid-cols-[1fr_56px_84px_84px_92px_90px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                <span>Product</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">Cost/unit</span><span className="text-right">VAT</span><span className="text-right">Line total</span><span />
               </div>
               {items.map((l, i) => (
-                <div key={i} className="grid grid-cols-[1fr_56px_84px_92px_84px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
+                <div key={i} className="grid grid-cols-[1fr_56px_84px_84px_92px_90px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
                   <div className="relative">
                     <Input className="h-8 text-sm" value={l.description}
                       onChange={(e) => { setItem(i, { description: e.target.value, product_id: null }); setActiveLine(i); }}
@@ -430,6 +447,7 @@ const NewOrderModal: React.FC<{
                   </div>
                   <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} />
                   <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.unit_price} onChange={(e) => setItem(i, { unit_price: Number(e.target.value) })} />
+                  <Input className="h-8 text-right text-sm" type="number" step="0.01" placeholder="—" value={l.unit_cost ?? ''} onChange={(e) => setItem(i, { unit_cost: e.target.value === '' ? null : Number(e.target.value) })} title="What this costs us — auto-filled from the catalog, editable" />
                   <Select value={l.vat_code} onValueChange={(v) => setItem(i, { vat_code: v })}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
@@ -439,13 +457,14 @@ const NewOrderModal: React.FC<{
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-muted-foreground">Type to search the catalog and pick a product (links to the warehouse — delivery moves stock), or type a new product name (off-warehouse).</p>
+            <p className="text-[11px] text-muted-foreground">Pick a catalog product to auto-fill its price &amp; cost (links to the warehouse — delivery moves stock), or type a new product name (off-warehouse). Cost is editable.</p>
           </div>
 
           <div className="flex justify-end gap-4 text-sm">
             <span className="text-muted-foreground">Net {formatMoney(netTotal)}</span>
             <span className="text-muted-foreground">VAT {formatMoney(vatTotal)}</span>
             <span className="font-semibold">Total {formatMoney(grossTotal)}</span>
+            {marginTotal != null && <span className={marginTotal >= 0 ? 'text-emerald-500' : 'text-destructive'}>Margin {formatMoney(marginTotal)}</span>}
           </div>
         </div>
         <DialogFooter>
@@ -478,6 +497,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [entries, setEntries] = useState<ManualEntry[]>([]);
   const [party, setParty] = useState<LockedParty | null>(null);
   const [entryDialog, setEntryDialog] = useState<{ open: boolean; direction: ManualEntryDirection } | null>(null);
+  // Catalog list prices for the order's products → show the discount vs list per line.
+  const [listPrices, setListPrices] = useState<Map<string, number>>(new Map());
 
   // Resolve the order's counterparty (customer for sales, supplier for purchase) for the
   // manual-entry dialog's locked party.
@@ -499,19 +520,21 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     try {
       setLoading(true);
       const res = await ordersService.get(id);
-      const [finance, ents, p] = await Promise.all([
+      const productIds = res.items.map((it) => it.product_id).filter(Boolean) as string[];
+      const [finance, ents, p, lp] = await Promise.all([
         ordersService.getOrderFinance(id),
         financeService.listManualEntries({ workspaceId: res.order.workspace_id, orderId: id, includeSettled: true }).catch(() => [] as ManualEntry[]),
         resolveParty(res.order).catch(() => null),
+        ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
       ]);
-      setOrder(res.order); setItems(res.items); setFin(finance); setEntries(ents); setParty(p);
+      setOrder(res.order); setItems(res.items); setFin(finance); setEntries(ents); setParty(p); setListPrices(lp);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setEntries([]); setParty(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setEntries([]); setParty(null); setListPrices(new Map()); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -526,6 +549,19 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       toast({ title: `Marked ${ORDER_STATUS_LABEL[status]}` });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  // Set a line's delivered quantity; the order's fulfilment status auto-advances
+  // (none → confirmed, some → partially delivered, all → completed).
+  const setLineDelivered = async (itemId: string, qty: number) => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      await ordersService.setDelivery(order.id, [{ itemId, quantityDelivered: qty }]);
+      await load(order.id); onChanged();
+    } catch (err: any) {
+      toast({ title: 'Failed to update delivery', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -558,7 +594,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   // #3 — edit the order's line items (only while it has no invoice yet).
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled' && (fin?.invoices.length ?? 0) === 0;
   const startEdit = () => {
-    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), vat_code: vatCodeOf(it.vat_percent) })));
+    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, vat_code: vatCodeOf(it.vat_percent) })));
     setEditing(true);
   };
   const setEditItem = (i: number, patch: Partial<Line>) => setEditItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
@@ -570,7 +606,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     try {
       await ordersService.updateItems(order.id, order.workspace_id, clean.map((l) => ({
         product_id: l.product_id ?? null, description: l.description, quantity: Number(l.quantity) || 0,
-        unit_price: Number(l.unit_price) || 0, vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
+        unit_price: Number(l.unit_price) || 0, unit_cost: l.unit_cost, vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
       })));
       setEditing(false);
       await load(order.id); onChanged();
@@ -619,46 +655,154 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     finally { setSaving(false); }
   };
 
+  // Order margin = Σ (unit_price − unit_cost) × qty over lines that carry a cost. null = no cost yet.
+  const anyCost = items.some((it) => it.unit_cost != null);
+  const orderMargin = order && anyCost
+    ? items.reduce((a, it) => a + ((Number(it.unit_price) || 0) - (Number(it.unit_cost) || 0)) * (Number(it.quantity) || 0), 0)
+    : null;
+  // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
+  // myDATA finalises the exact document type at issue; this just labels the action correctly.
+  const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle></DialogHeader>
         {loading || !order ? (
           <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            {/* Status + actions sit ON TOP of the products (then the document + totals below). */}
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="capitalize">{order.order_type}</Badge>
-              <Badge variant={STATUS_TONE[order.status] as any}>{ORDER_STATUS_LABEL[order.status]}</Badge>
-              <span className="text-muted-foreground">{ORDER_PAYMENT_LABEL[order.payment_status]}</span>
-              <span className="ml-auto font-semibold">{formatMoney(Number(order.total), order.currency)}</span>
+              <span className="text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[order.payment_status]}</span>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Status</Label>
+                <Select value={order.status} onValueChange={(v: any) => changeStatus(v)}>
+                  <SelectTrigger className="h-8 w-44 text-xs" disabled={saving}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => <SelectItem key={s} value={s}>{ORDER_STATUS_LABEL[s]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" disabled={saving}>
+                      <MoreHorizontal className="h-3.5 w-3.5 mr-1" /> Actions <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {order.payment_status !== 'paid' && (
+                      <DropdownMenuItem onClick={() => { setPayOpen(true); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
+                        <Banknote className="h-3.5 w-3.5 mr-2" /> Record payment
+                      </DropdownMenuItem>
+                    )}
+                    {party && (
+                      <DropdownMenuItem onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
+                        <Plus className="h-3.5 w-3.5 mr-2" /> Add receivable
+                      </DropdownMenuItem>
+                    )}
+                    {party && (
+                      <DropdownMenuItem onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
+                        <Plus className="h-3.5 w-3.5 mr-2" /> Add payable
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
+                      <DropdownMenuItem onClick={createInvoice}>
+                        <FileText className="h-3.5 w-3.5 mr-2" /> {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}
+                      </DropdownMenuItem>
+                    )}
+                    {order.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) === 0 && (
+                      <DropdownMenuItem onClick={recordBill}>
+                        <Receipt className="h-3.5 w-3.5 mr-2" /> Record supplier bill
+                      </DropdownMenuItem>
+                    )}
+                    {order.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled' && (
+                      <DropdownMenuItem onClick={receiveWarehouse}>
+                        <PackageCheck className="h-3.5 w-3.5 mr-2" /> Receive into warehouse
+                      </DropdownMenuItem>
+                    )}
+                    {editable && !editing && (
+                      <DropdownMenuItem onClick={startEdit}>
+                        <Pencil className="h-3.5 w-3.5 mr-2" /> Edit items
+                      </DropdownMenuItem>
+                    )}
+                    {order.order_type === 'sales' && (
+                      <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
+                        <Truck className="h-3.5 w-3.5 mr-2" /> Dispatch board
+                      </DropdownMenuItem>
+                    )}
+                    {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => changeStatus('fulfilled')}>
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark completed
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
 
             {!editing ? (
-              <div className="rounded-md border border-border/60">
-                <div className="grid grid-cols-[1fr_60px_90px_90px_90px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
-                  <span>Item</span><span className="text-right">Qty</span><span className="text-right">Delivered</span><span className="text-right">Unit</span><span className="text-right">Total</span>
-                </div>
-                {items.map((it) => (
-                  <div key={it.id} className="grid grid-cols-[1fr_60px_90px_90px_90px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm">
-                    <span>{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
-                    <span className="text-right tabular-nums">{it.quantity}</span>
-                    <span className="text-right tabular-nums text-muted-foreground">{it.quantity_delivered}</span>
-                    <span className="text-right tabular-nums">{formatMoney(Number(it.unit_price), order.currency)}</span>
-                    <span className="text-right tabular-nums">{formatMoney(Number(it.line_total), order.currency)}</span>
+              <>
+                <div className="rounded-md border border-border/60 overflow-x-auto">
+                  <div className="grid grid-cols-[1fr_44px_120px_82px_48px_78px_44px_88px_92px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[780px]">
+                    <span>Item</span><span className="text-right">Qty</span><span className="text-right">Delivered</span><span className="text-right">Unit</span><span className="text-right">Disc</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span className="text-right">Net</span><span className="text-right">Total</span>
                   </div>
-                ))}
-              </div>
+                  {items.map((it) => {
+                    const list = it.product_id ? listPrices.get(it.product_id) : undefined;
+                    const disc = list && list > Number(it.unit_price) ? Math.round((1 - Number(it.unit_price) / list) * 100) : null;
+                    const gross = Number(it.net_value) + Number(it.vat_amount);
+                    return (
+                    <div key={it.id} className="grid grid-cols-[1fr_44px_120px_82px_48px_78px_44px_88px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[780px]">
+                      <span>{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
+                      <span className="text-right tabular-nums">{it.quantity}</span>
+                      {/* Delivered: edit the qty or use the menu; the order status auto-advances. */}
+                      <div className="flex items-center justify-end gap-1">
+                        <Input key={`${it.id}-${it.quantity_delivered}`} className="h-7 w-12 text-right text-xs px-1" type="number" step="1" min="0" defaultValue={Number(it.quantity_delivered)} disabled={saving}
+                          onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== Number(it.quantity_delivered)) void setLineDelivered(it.id, v); }} />
+                        <span className="text-[10px] text-muted-foreground">/{it.quantity}</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild><button type="button" className="text-muted-foreground hover:text-foreground"><ChevronDown className="h-3 w-3" /></button></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, Number(it.quantity))}>Mark fully delivered</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, 0)}>Mark not delivered</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <span className="text-right tabular-nums">{formatMoney(Number(it.unit_price), order.currency)}</span>
+                      <span className="text-right tabular-nums text-emerald-600">{disc != null ? `-${disc}%` : '—'}</span>
+                      <span className="text-right tabular-nums text-muted-foreground">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
+                      <span className="text-right tabular-nums text-muted-foreground">{Number(it.vat_percent ?? 0)}%</span>
+                      <span className="text-right tabular-nums">{formatMoney(Number(it.net_value), order.currency)}</span>
+                      <span className="text-right tabular-nums">{formatMoney(gross, order.currency)}</span>
+                    </div>
+                    );
+                  })}
+                </div>
+                {/* Totals — order-document style, below the table. */}
+                <div className="flex flex-col items-end gap-0.5 text-sm">
+                  <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Net (excl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.subtotal_net), order.currency)}</span></div>
+                  <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{formatMoney(Number(order.vat_amount), order.currency)}</span></div>
+                  <div className="flex justify-between gap-8 w-60 font-semibold border-t border-border/60 pt-0.5"><span>Total (incl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.total), order.currency)}</span></div>
+                  {orderMargin != null && (
+                    <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Margin (excl. VAT)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
+                  )}
+                </div>
+              </>
             ) : (
               <div className="rounded-md border border-border/60">
-                <div className="grid grid-cols-[1fr_56px_84px_92px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
-                  <span>Product</span><span className="text-right">Qty</span><span className="text-right">Unit</span><span className="text-right">VAT</span><span />
+                <div className="grid grid-cols-[1fr_56px_84px_84px_92px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                  <span>Product</span><span className="text-right">Qty</span><span className="text-right">Unit</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span />
                 </div>
                 {editItems.map((l, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_56px_84px_92px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
+                  <div key={i} className="grid grid-cols-[1fr_56px_84px_84px_92px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
                     <Input className="h-8 text-sm" value={l.description} onChange={(e) => setEditItem(i, { description: e.target.value, product_id: null })} placeholder="Product…" />
                     <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.quantity} onChange={(e) => setEditItem(i, { quantity: Number(e.target.value) })} />
                     <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.unit_price} onChange={(e) => setEditItem(i, { unit_price: Number(e.target.value) })} />
+                    <Input className="h-8 text-right text-sm" type="number" step="0.01" placeholder="—" value={l.unit_cost ?? ''} onChange={(e) => setEditItem(i, { unit_cost: e.target.value === '' ? null : Number(e.target.value) })} />
                     <Select value={l.vat_code} onValueChange={(v) => setEditItem(i, { vat_code: v })}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
@@ -675,76 +819,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                 </div>
               </div>
             )}
-
-            {/* Status is the one always-visible control; every other action lives in one
-                Actions menu so the order view stays clean instead of a row of buttons. */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Status</Label>
-              <Select value={order.status} onValueChange={(v: any) => changeStatus(v)}>
-                <SelectTrigger className="h-8 w-44 text-xs" disabled={saving}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => <SelectItem key={s} value={s}>{ORDER_STATUS_LABEL[s]}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline" disabled={saving}>
-                    <MoreHorizontal className="h-3.5 w-3.5 mr-1" /> Actions <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  {order.payment_status !== 'paid' && (
-                    <DropdownMenuItem onClick={() => { setPayOpen(true); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
-                      <Banknote className="h-3.5 w-3.5 mr-2" /> Record payment
-                    </DropdownMenuItem>
-                  )}
-                  {party && (
-                    <DropdownMenuItem onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
-                      <Plus className="h-3.5 w-3.5 mr-2" /> Add receivable
-                    </DropdownMenuItem>
-                  )}
-                  {party && (
-                    <DropdownMenuItem onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
-                      <Plus className="h-3.5 w-3.5 mr-2" /> Add payable
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
-                    <DropdownMenuItem onClick={createInvoice}>
-                      <FileText className="h-3.5 w-3.5 mr-2" /> Create invoice
-                    </DropdownMenuItem>
-                  )}
-                  {order.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) === 0 && (
-                    <DropdownMenuItem onClick={recordBill}>
-                      <Receipt className="h-3.5 w-3.5 mr-2" /> Record supplier bill
-                    </DropdownMenuItem>
-                  )}
-                  {order.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled' && (
-                    <DropdownMenuItem onClick={receiveWarehouse}>
-                      <PackageCheck className="h-3.5 w-3.5 mr-2" /> Receive into warehouse
-                    </DropdownMenuItem>
-                  )}
-                  {editable && !editing && (
-                    <DropdownMenuItem onClick={startEdit}>
-                      <Pencil className="h-3.5 w-3.5 mr-2" /> Edit items
-                    </DropdownMenuItem>
-                  )}
-                  {order.order_type === 'sales' && (
-                    <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
-                      <Truck className="h-3.5 w-3.5 mr-2" /> Dispatch board
-                    </DropdownMenuItem>
-                  )}
-                  {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => changeStatus('fulfilled')}>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark completed
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
 
             {payOpen && (
               <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
