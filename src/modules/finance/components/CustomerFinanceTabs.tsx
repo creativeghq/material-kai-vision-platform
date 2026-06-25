@@ -36,7 +36,7 @@ export const PartyAccountSummary: React.FC<{
   meta?: Array<{ label: string; value: React.ReactNode }>;
 }> = ({ customer, supplier, aging, orders, meta }) => {
   const net = (customer?.outstanding ?? 0) - (supplier?.outstanding ?? 0);
-  const netLabel = net > 0 ? 'Account balance (they owe us)' : net < 0 ? 'Account balance (we owe them)' : 'Account balance (settled)';
+  const netDir = net > 0 ? 'they owe us' : net < 0 ? 'we owe them' : 'settled';
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
   const netRing = net > 0 ? 'ring-1 ring-emerald-500/25' : net < 0 ? 'ring-1 ring-destructive/30' : '';
 
@@ -58,13 +58,6 @@ export const PartyAccountSummary: React.FC<{
 
   return (
     <div className="space-y-3">
-      <Card className={`dashboard-card border-0 ${netRing}`}>
-        <CardContent className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground"><Wallet className="h-3.5 w-3.5" /> {netLabel}</div>
-          <div className={`text-2xl font-semibold ${netTone}`}>{formatMoney(Math.abs(net))}</div>
-        </CardContent>
-      </Card>
-
       {orders && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-medium text-muted-foreground">Orders</div>
@@ -106,6 +99,16 @@ export const PartyAccountSummary: React.FC<{
           </div>
         </div>
       )}
+
+      {/* Net balance — the roll-up of the columns above, shown last. */}
+      <Card className={`dashboard-card border-0 ${netRing}`}>
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <Wallet className="h-3.5 w-3.5" /> Balance <span className="normal-case text-[10px]">· {netDir}</span>
+          </div>
+          <div className={`text-2xl font-semibold ${netTone}`}>{formatMoney(Math.abs(net))}</div>
+        </CardContent>
+      </Card>
 
       {meta && meta.length > 0 && (
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">

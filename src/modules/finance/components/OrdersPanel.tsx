@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -112,11 +112,17 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
             <DropdownMenuTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-1" /> New order <ChevronDown className="h-4 w-4 ml-1" /></Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => openCreate('sales', false)}>Sales order</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openCreate('purchase', false)}>Purchase order</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => openCreate('sales', false)}>
+                <ShoppingCart className="h-3.5 w-3.5 mr-2" /> Sales order
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openCreate('purchase', false)}>
+                <Package className="h-3.5 w-3.5 mr-2" /> Purchase order
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openCreate('sales', true)}>Pre-order (draft)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openCreate('sales', true)}>
+                <FileClock className="h-3.5 w-3.5 mr-2" /> Pre-order <span className="ml-1 text-[10px] text-muted-foreground">(draft)</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
