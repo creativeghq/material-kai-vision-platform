@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2 } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -13,12 +13,11 @@ import {
 } from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { formatMoney, financeService, VAT_CATEGORIES, type ManualEntry, type ManualEntryDirection } from '@/modules/finance/services/financeService';
+import { formatMoney, financeService, VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderListRow, type OrderItem, type Order,
 } from '@/modules/finance/services/ordersService';
-import { ManualEntryDialog, type LockedParty } from '@/modules/finance/components/ManualEntryDialog';
 
 const STATUS_TONE: Record<OrderStatus, string> = {
   draft: 'secondary', confirmed: 'outline', partially_fulfilled: 'outline', fulfilled: 'default', cancelled: 'destructive',
@@ -527,54 +526,34 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [saving, setSaving] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payAmt, setPayAmt] = useState('');
+  // The order only deals in REAL cash: money in (a payment received) or money out (a payment sent).
+  const [payDir, setPayDir] = useState<'in' | 'out'>('in');
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
-  // Per-order receivables / payables (money owed on this order outside its invoice).
-  const [entries, setEntries] = useState<ManualEntry[]>([]);
-  const [party, setParty] = useState<LockedParty | null>(null);
-  const [entryDialog, setEntryDialog] = useState<{ open: boolean; direction: ManualEntryDirection } | null>(null);
-  // Catalog list prices for the order's products → show the discount vs list per line.
+  // Catalog list prices for the order's products → summarised as a discount total below.
   const [listPrices, setListPrices] = useState<Map<string, number>>(new Map());
   // Per-product supplier (who we buy/owe) → shown on each catalog line, settable inline.
   const [suppliers, setSuppliers] = useState<Map<string, { id: string; name: string }>>(new Map());
   const [supplierPick, setSupplierPick] = useState<{ productId: string; label: string } | null>(null);
-
-  // Resolve the order's counterparty (customer for sales, supplier for purchase) for the
-  // manual-entry dialog's locked party.
-  const resolveParty = async (o: Order): Promise<LockedParty | null> => {
-    const coId = o.order_type === 'sales' ? o.customer_company_id : o.supplier_company_id;
-    const ctId = o.order_type === 'sales' ? o.customer_contact_id : o.supplier_contact_id;
-    if (coId) {
-      const { data } = await supabase.from('crm_companies').select('name').eq('id', coId).maybeSingle();
-      return { party_type: 'company', party_id: coId, display_name: (data?.name as string) ?? 'Company' };
-    }
-    if (ctId) {
-      const { data } = await supabase.from('crm_contacts').select('name').eq('id', ctId).maybeSingle();
-      return { party_type: 'contact', party_id: ctId, display_name: (data?.name as string) ?? 'Contact' };
-    }
-    return null;
-  };
 
   const load = async (id: string) => {
     try {
       setLoading(true);
       const res = await ordersService.get(id);
       const productIds = res.items.map((it) => it.product_id).filter(Boolean) as string[];
-      const [finance, ents, p, lp, sup] = await Promise.all([
+      const [finance, lp, sup] = await Promise.all([
         ordersService.getOrderFinance(id),
-        financeService.listManualEntries({ workspaceId: res.order.workspace_id, orderId: id, includeSettled: true }).catch(() => [] as ManualEntry[]),
-        resolveParty(res.order).catch(() => null),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
         ordersService.getProductSuppliers(productIds).catch(() => new Map<string, { id: string; name: string }>()),
       ]);
-      setOrder(res.order); setItems(res.items); setFin(finance); setEntries(ents); setParty(p); setListPrices(lp); setSuppliers(sup);
+      setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSuppliers(sup);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setEntries([]); setParty(null); setListPrices(new Map()); setSuppliers(new Map()); setSupplierPick(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setListPrices(new Map()); setSuppliers(new Map()); setSupplierPick(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -617,8 +596,14 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     } finally { setSaving(false); }
   };
 
-  // Record a payment ON the order — money in (sales) / out (purchase). The payment trigger
-  // recomputes payment_status; getOrderFinance refreshes Received/Profit.
+  // Record real cash ON the order: money in (a payment received) or money out (a payment sent).
+  // The payment trigger recomputes payment_status; getOrderFinance refreshes Received/Paid/Profit.
+  const openPay = (dir: 'in' | 'out') => {
+    if (!order) return;
+    setPayDir(dir);
+    setPayAmt(String(Math.max(0, Number(order.total) - (dir === 'in' ? (fin?.received ?? 0) : (fin?.paid_out ?? 0)))));
+    setPayOpen(true);
+  };
   const recordPay = async () => {
     if (!order) return;
     const amt = parseFloat(payAmt);
@@ -627,7 +612,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     try {
       const { error } = await supabase.from('payments').insert({
         workspace_id: order.workspace_id,
-        direction: order.order_type === 'sales' ? 'in' : 'out',
+        direction: payDir,
         amount: amt,
         currency: order.currency,
         order_id: order.id,
@@ -637,7 +622,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       setPayOpen(false); setPayAmt('');
       await load(order.id);
       onChanged();
-      toast({ title: order.order_type === 'sales' ? 'Payment received' : 'Payment recorded' });
+      toast({ title: payDir === 'in' ? 'Money in recorded' : 'Money out recorded' });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
@@ -712,19 +697,23 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
 
   // Order margin = Σ (unit_price − unit_cost) × qty over lines that carry a cost. null = no cost yet.
   const anyCost = items.some((it) => it.unit_cost != null);
-  const grossMargin = order && anyCost
+  const orderMargin = order && anyCost
     ? items.reduce((a, it) => a + ((Number(it.unit_price) || 0) - (Number(it.unit_cost) || 0)) * (Number(it.quantity) || 0), 0)
     : null;
-  // #6b — net the order's own receivables/payables into the margin (extra owed to us +, we owe −).
-  const entriesNet = entries.reduce((a, e) => a + (e.direction === 'receivable' ? Number(e.amount) : -Number(e.amount)), 0);
-  const orderMargin = grossMargin != null ? grossMargin + entriesNet : (entriesNet !== 0 ? entriesNet : null);
+  // Total discount given vs the catalog list price (shown once at the bottom, not per line).
+  const discountTotal = order
+    ? items.reduce((a, it) => {
+        const list = it.product_id ? listPrices.get(it.product_id) : undefined;
+        return list && list > Number(it.unit_price) ? a + (list - Number(it.unit_price)) * Number(it.quantity) : a;
+      }, 0)
+    : 0;
   // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
   // myDATA finalises the exact document type at issue; this just labels the action correctly.
   const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl w-[95vw] max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle></DialogHeader>
         {loading || !order ? (
           <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -749,24 +738,15 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    {order.payment_status !== 'paid' && (
-                      <DropdownMenuItem className="items-start" onClick={() => { setPayOpen(true); setPayAmt(String(Math.max(0, Number(order.total) - (fin?.received ?? 0)))); }}>
-                        <Banknote className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
-                        <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">Cash actually moved (in/out). Not a document.</span></span>
-                      </DropdownMenuItem>
-                    )}
-                    {party && (
-                      <DropdownMenuItem className="items-start" onClick={() => setEntryDialog({ open: true, direction: 'receivable' })}>
-                        <Plus className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
-                        <span className="flex flex-col"><span>Add receivable</span><span className="text-[10px] text-muted-foreground">Money they owe us — no cash yet.</span></span>
-                      </DropdownMenuItem>
-                    )}
-                    {party && (
-                      <DropdownMenuItem className="items-start" onClick={() => setEntryDialog({ open: true, direction: 'payable' })}>
-                        <Plus className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
-                        <span className="flex flex-col"><span>Add payable</span><span className="text-[10px] text-muted-foreground">Money we owe — no cash yet.</span></span>
-                      </DropdownMenuItem>
-                    )}
+                    {/* The order moves REAL cash only: money in (received) / money out (sent). */}
+                    <DropdownMenuItem className="items-start" onClick={() => openPay('in')}>
+                      <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
+                      <span className="flex flex-col"><span>Record money in</span><span className="text-[10px] text-muted-foreground">Cash received from the customer.</span></span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="items-start" onClick={() => openPay('out')}>
+                      <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
+                      <span className="flex flex-col"><span>Record money out</span><span className="text-[10px] text-muted-foreground">Cash paid to the supplier / refunded.</span></span>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
                       <DropdownMenuItem onClick={createInvoice}>
@@ -809,19 +789,17 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
-                  <div className="grid grid-cols-[1fr_44px_52px_120px_82px_48px_78px_44px_88px_92px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[840px]">
-                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right">Price</span><span className="text-right">Disc</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span className="text-right">Net</span><span className="text-right">Total</span>
+                  <div className="grid grid-cols-[1fr_44px_52px_120px_82px_78px_44px_88px_92px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[800px]">
+                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right">Price</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span className="text-right">Net</span><span className="text-right">Total</span>
                   </div>
                   {items.map((it) => {
-                    const list = it.product_id ? listPrices.get(it.product_id) : undefined;
-                    const disc = list && list > Number(it.unit_price) ? Math.round((1 - Number(it.unit_price) / list) * 100) : null;
                     const gross = Number(it.net_value) + Number(it.vat_amount);
                     const unitLabel = UNIT_OPTIONS.find((u) => u.code === it.measurement_unit_code)?.label ?? (it.measurement_unit_code || '—');
                     const sup = it.product_id ? suppliers.get(it.product_id) : undefined;
                     const del = Number(it.quantity_delivered); const q = Number(it.quantity);
                     const delTone = del >= q && q > 0 ? 'text-emerald-600' : del > 0 ? 'text-amber-600' : 'text-muted-foreground';
                     return (
-                    <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_48px_78px_44px_88px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[840px]">
+                    <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_78px_44px_88px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[800px]">
                       <span className="min-w-0">
                         <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
                         {/* #7 — who we buy this from (and therefore owe). Set it inline. */}
@@ -851,7 +829,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                         </DropdownMenu>
                       </div>
                       <span className="text-right tabular-nums">{formatMoney(Number(it.unit_price), order.currency)}</span>
-                      <span className="text-right tabular-nums text-emerald-600">{disc != null ? `-${disc}%` : '—'}</span>
                       <span className="text-right tabular-nums text-muted-foreground">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
                       <span className="text-right tabular-nums text-muted-foreground">{Number(it.vat_percent ?? 0)}%</span>
                       <span className="text-right tabular-nums">{formatMoney(Number(it.net_value), order.currency)}</span>
@@ -860,16 +837,17 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     );
                   })}
                 </div>
-                {/* Totals — order-document style, below the table. */}
+                {/* Totals — order-document style, below the table. Discount is summarised here
+                    (once), not as a per-line column. */}
                 <div className="flex flex-col items-end gap-0.5 text-sm">
+                  {discountTotal > 0 && (
+                    <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Discount (off list)</span><span className="tabular-nums text-emerald-600">−{formatMoney(discountTotal, order.currency)}</span></div>
+                  )}
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Net (excl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.subtotal_net), order.currency)}</span></div>
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{formatMoney(Number(order.vat_amount), order.currency)}</span></div>
                   <div className="flex justify-between gap-8 w-60 font-semibold border-t border-border/60 pt-0.5"><span>Total (incl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.total), order.currency)}</span></div>
-                  {grossMargin != null && entriesNet !== 0 && (
-                    <div className="flex justify-between gap-8 w-60 text-xs"><span className="text-muted-foreground">Gross margin</span><span className="tabular-nums text-muted-foreground">{formatMoney(grossMargin, order.currency)}</span></div>
-                  )}
                   {orderMargin != null && (
-                    <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">{entriesNet !== 0 ? 'Margin (net of order rec./pay.)' : 'Margin (excl. VAT)'}</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
+                    <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Margin (excl. VAT)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
                   )}
                 </div>
               </>
@@ -908,13 +886,15 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             {payOpen && (
               <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{order.order_type === 'sales' ? 'Money received' : 'Money paid out'}</span>
+                  <span className="text-xs font-medium flex items-center gap-1">
+                    {payDir === 'in' ? <><ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500" /> Money in (received)</> : <><ArrowUpRight className="h-3.5 w-3.5 text-red-400" /> Money out (sent)</>}
+                  </span>
                   <Input className="h-8 w-32 text-right text-sm" type="number" step="0.01" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
                   <span className="text-xs text-muted-foreground">{order.currency}</span>
-                  <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save payment'}</Button>
+                  <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}</Button>
                   <Button size="sm" variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Records the cash movement only — it doesn't issue a receipt or invoice. Use Actions → {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'} for the document.</p>
+                <p className="text-[10px] text-muted-foreground">Just the cash movement — it doesn't issue a document. Use Actions → {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'} for the receipt/invoice.</p>
               </div>
             )}
 
@@ -975,31 +955,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               </div>
             )}
 
-            {/* Receivables & payables on THIS order — money owed on/by it that isn't a formal
-                invoice/bill (deposits, advances, fees). Added per-order, not at party level. */}
-            <div className="rounded-md border border-border/60">
-              <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Receivables &amp; payables</div>
-              {entries.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-muted-foreground">None yet. Use <span className="font-medium">Actions → Add receivable / payable</span> to record money owed on this order.</p>
-              ) : (
-                entries.map((e) => (
-                  <div key={e.id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
-                    <span className="flex items-center gap-2">
-                      <Badge variant={e.direction === 'receivable' ? 'default' : 'secondary'} className="text-[10px] capitalize">{e.direction}</Badge>
-                      <span className="text-xs">{e.description}</span>
-                    </span>
-                    <span className="tabular-nums">
-                      {formatMoney(Number(e.amount), e.currency)}
-                      <span className="ml-1 text-[10px] text-muted-foreground capitalize">{e.status.replace('_', ' ')}</span>
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-
             <p className="text-[11px] text-muted-foreground">
-              Marking a catalog line delivered moves warehouse stock (sales out / purchase in) and auto-advances the order status.
-              Ad-hoc (off-warehouse) lines don't touch stock. The Dispatch board remains for invoice-driven delivery notes.
+              Money in / money out above is real cash on this order (a payment received / sent). Marking a catalog
+              line delivered moves warehouse stock (sales out / purchase in) and auto-advances the status. The
+              receipt/invoice is the separate Create document action.
             </p>
           </div>
         )}
@@ -1007,18 +966,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
           <Button variant="outline" onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
-
-      {order && party && entryDialog && (
-        <ManualEntryDialog
-          workspaceId={order.workspace_id}
-          direction={entryDialog.direction}
-          open={entryDialog.open}
-          onOpenChange={(v) => setEntryDialog((prev) => (prev ? { ...prev, open: v } : prev))}
-          onSaved={() => { setEntryDialog(null); void load(order.id); onChanged(); }}
-          lockedParty={party}
-          orderId={order.id}
-        />
-      )}
 
       {supplierPick && (
         <SupplierPickerDialog
