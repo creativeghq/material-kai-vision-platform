@@ -42,6 +42,7 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   unit_cost: number | null;   // snapshot cost/unit (margin before invoicing)
+  measurement_unit_code: string | null;  // unit of measure (item, m2, kg…)
   vat_percent?: number | null;
   vat_category?: number | null;
   net_value: number;
@@ -62,13 +63,19 @@ export interface NewOrderItem {
   quantity: number;
   unit_price: number;
   unit_cost?: number | null;  // cost/unit snapshot (from catalog or manual)
+  measurement_unit_code?: string | null; // unit of measure (item, m2, kg…)
   vat_percent?: number;       // per-line VAT %
   vat_category?: number;      // myDATA VAT category code (1=24%, …)
   update_warehouse?: boolean;
 }
 
-/** Catalog pricing snapshot used to pre-fill an order line (cost for margin, list for discount). */
-export interface ProductPricing { cost: number | null; list_price: number | null; }
+/** Customer-aware pricing for an order line (from the pricing resolver / catalog cost). */
+export interface LinePricing {
+  unit_price: number | null;
+  unit_cost: number | null;
+  discount_pct: number | null;
+  measurement_unit_code: string | null;
+}
 
 export const ordersService = {
   async list(opts: {
@@ -226,6 +233,7 @@ export const ordersService = {
         quantity: l.it.quantity,
         unit_price: l.it.unit_price,
         unit_cost: l.it.unit_cost ?? null,
+        measurement_unit_code: l.it.measurement_unit_code ?? null,
         vat_percent: l.pct,
         vat_category: l.it.vat_category ?? null,
         net_value: l.net,
@@ -283,6 +291,7 @@ export const ordersService = {
       const { error: itErr } = await supabase.from('order_items').insert(lines.map((l, i) => ({
         order_id: orderId, workspace_id: workspaceId, product_id: l.it.product_id ?? null,
         description: l.it.description, quantity: l.it.quantity, unit_price: l.it.unit_price, unit_cost: l.it.unit_cost ?? null,
+        measurement_unit_code: l.it.measurement_unit_code ?? null,
         vat_percent: l.pct, vat_category: l.it.vat_category ?? null,
         net_value: l.net, vat_amount: l.vat, line_total: l.net, update_warehouse: l.it.update_warehouse ?? true, sort_order: i,
       })));
@@ -295,20 +304,62 @@ export const ordersService = {
   },
 
   /**
-   * Catalog pricing snapshot for a product, used to pre-fill an order line:
-   *  - cost: what it costs us (products.cost — the platform's maintained cost).
-   *  - list_price: the catalog list/retail price (product_prices), so the order can show
-   *    the discount the customer is getting vs list.
+   * Customer-aware price for an order line, used to pre-fill it on product pick.
+   *  - Sales: the central resolver `get_product_price_for_workspace` applies the customer's
+   *    pricing level / discount off retail → `final_sell` (unit_price) + `cost_basis` (unit_cost)
+   *    + `discount_pct`. This is the #227 pricing pyramid; the order reflects it out of the box.
+   *  - Purchase: we pay cost, so unit_price = unit_cost = products.cost.
+   * Also returns the product's unit of measure to seed the line's unit.
    */
-  async getProductPricing(productId: string): Promise<ProductPricing> {
-    const [prod, price] = await Promise.all([
-      supabase.from('products').select('cost').eq('id', productId).maybeSingle(),
-      supabase.from('product_prices').select('list_price').eq('product_id', productId).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
-    ]);
-    return {
-      cost: prod.data?.cost != null ? Number(prod.data.cost) : null,
-      list_price: price.data?.list_price != null ? Number(price.data.list_price) : null,
-    };
+  async resolveLinePricing(opts: {
+    workspaceId: string; productId: string; orderType: OrderType;
+    companyId?: string | null; contactId?: string | null;
+  }): Promise<LinePricing> {
+    const { data: prod } = await supabase.from('products').select('cost, measurement_unit_code').eq('id', opts.productId).maybeSingle();
+    const unit = (prod?.measurement_unit_code as string | null) ?? null;
+    const cost = prod?.cost != null ? Number(prod.cost) : null;
+    if (opts.orderType === 'purchase') {
+      return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit };
+    }
+    try {
+      const { data } = await supabase.rpc('get_product_price_for_workspace', {
+        p_workspace_id: opts.workspaceId, p_product_id: opts.productId,
+        p_company_id: opts.companyId ?? null, p_contact_id: opts.contactId ?? null, p_audience: 'seller',
+      });
+      const r = (data ?? {}) as { final_sell?: number; retail?: number; cost_basis?: number; discount_pct?: number };
+      return {
+        unit_price: r.final_sell != null ? Number(r.final_sell) : (r.retail != null ? Number(r.retail) : null),
+        unit_cost: r.cost_basis != null ? Number(r.cost_basis) : cost,
+        discount_pct: r.discount_pct != null ? Number(r.discount_pct) : null,
+        measurement_unit_code: unit,
+      };
+    } catch {
+      return { unit_price: null, unit_cost: cost, discount_pct: null, measurement_unit_code: unit };
+    }
+  },
+
+  /** Set / clear a product's primary supplier (the manual "+ supplier" on an order line). */
+  async setProductSupplier(productId: string, supplierCompanyId: string | null): Promise<void> {
+    const { error } = await supabase.from('products').update({ supplier_company_id: supplierCompanyId }).eq('id', productId);
+    if (error) throw error;
+  },
+
+  /** Resolve the supplier (id + name) for a set of products, for the order detail's per-line badge. */
+  async getProductSuppliers(productIds: string[]): Promise<Map<string, { id: string; name: string }>> {
+    const ids = [...new Set(productIds.filter(Boolean))];
+    const out = new Map<string, { id: string; name: string }>();
+    if (ids.length === 0) return out;
+    const { data: prods } = await supabase.from('products').select('id, supplier_company_id').in('id', ids);
+    const supIds = [...new Set((prods ?? []).map((p: any) => p.supplier_company_id).filter(Boolean))] as string[];
+    if (supIds.length === 0) return out;
+    const { data: comps } = await supabase.from('crm_companies').select('id, name').in('id', supIds);
+    const names = new Map<string, string>((comps ?? []).map((c: any) => [c.id, c.name]));
+    for (const p of (prods ?? []) as Array<{ id: string; supplier_company_id: string | null }>) {
+      if (p.supplier_company_id && names.has(p.supplier_company_id)) {
+        out.set(p.id, { id: p.supplier_company_id, name: names.get(p.supplier_company_id)! });
+      }
+    }
+    return out;
   },
 
   /** Batch list-price lookup for a set of products (order detail shows discount-vs-list). */
@@ -329,21 +380,16 @@ export const ordersService = {
    * (Stays out of 'draft'/'cancelled'.) Warehouse stock movement remains the dispatch flow's job.
    */
   async setDelivery(orderId: string, deliveries: Array<{ itemId: string; quantityDelivered: number }>): Promise<OrderStatus> {
+    let status: OrderStatus = 'confirmed';
     for (const d of deliveries) {
-      const { error } = await supabase.from('order_items')
-        .update({ quantity_delivered: Math.max(0, d.quantityDelivered) }).eq('id', d.itemId);
+      // deliver_order_line moves warehouse stock by the delta (sales out / purchase in) AND
+      // recomputes the order's fulfilment status atomically.
+      const { data, error } = await supabase.rpc('deliver_order_line', {
+        p_order: orderId, p_item: d.itemId, p_qty: Math.max(0, d.quantityDelivered),
+      });
       if (error) throw error;
+      if (data) status = data as OrderStatus;
     }
-    const { data: items } = await supabase.from('order_items').select('quantity, quantity_delivered').eq('order_id', orderId);
-    const rows = (items ?? []) as Array<{ quantity: number; quantity_delivered: number }>;
-    const totalQty = rows.reduce((a, r) => a + Number(r.quantity), 0);
-    const totalDel = rows.reduce((a, r) => a + Number(r.quantity_delivered), 0);
-    const next: OrderStatus = totalDel <= 0 ? 'confirmed' : totalDel >= totalQty ? 'fulfilled' : 'partially_fulfilled';
-    const { data: cur } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle();
-    // Don't override a draft/cancelled order from delivery edits.
-    if (cur?.status === 'draft' || cur?.status === 'cancelled') return cur.status as OrderStatus;
-    const { error } = await supabase.from('orders').update({ status: next, updated_at: new Date().toISOString() }).eq('id', orderId);
-    if (error) throw error;
-    return next;
+    return status;
   },
 };

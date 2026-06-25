@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -28,6 +28,14 @@ type Party = { type: 'company' | 'contact'; id: string; name: string; vat?: stri
 const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct ?? 0;
 const DEFAULT_VAT_CODE = '1'; // 24%
 const vatCodeOf = (pct?: number | null) => VAT_CATEGORIES.find((v) => v.pct === (pct ?? 0))?.code ?? DEFAULT_VAT_CODE;
+
+// Units of measure for a line (sqm, item, …). Stored as a code on the line + carried to the invoice.
+const UNIT_OPTIONS: Array<{ code: string; label: string }> = [
+  { code: 'item', label: 'item' }, { code: 'm2', label: 'm²' }, { code: 'm', label: 'm' },
+  { code: 'kg', label: 'kg' }, { code: 'lt', label: 'lt' }, { code: 'hour', label: 'hour' },
+  { code: 'set', label: 'set' }, { code: 'box', label: 'box' }, { code: 'pallet', label: 'pallet' },
+];
+const DEFAULT_UNIT = 'item';
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
 export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; contactId?: string; projectId?: string }> = ({ workspaceId, companyId, contactId, projectId }) => {
@@ -181,8 +189,8 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
 
 // ---------------------------------------------------------------------------
 
-type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; vat_code: string };
-const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, vat_code: DEFAULT_VAT_CODE });
+type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string };
+const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE });
 
 const NewOrderModal: React.FC<{
   workspaceId: string;
@@ -287,14 +295,21 @@ const NewOrderModal: React.FC<{
   const pickProduct = async (i: number, p: { id: string; name: string }) => {
     setItem(i, { product_id: p.id, description: p.name });
     setActiveLine(null); setLineProdOpts([]);
-    // Pull catalog pricing: snapshot cost (for margin) + pre-fill the unit price from list
-    // when the line is still empty, so the order reflects the catalog out of the box.
+    // Customer-aware pricing: the resolver applies this customer's level/discount off retail
+    // (sales) → unit price + cost + unit; purchase → cost as both. So the order reflects the
+    // catalog and the customer's deal out of the box. All still editable.
     try {
-      const pricing = await ordersService.getProductPricing(p.id);
+      const pr = await ordersService.resolveLinePricing({
+        workspaceId, productId: p.id, orderType,
+        companyId: party?.type === 'company' ? party.id : null,
+        contactId: party?.type === 'contact' ? party.id : null,
+      });
       setItems((ls) => ls.map((l, idx) => {
         if (idx !== i) return l;
-        const next: Line = { ...l, unit_cost: pricing.cost };
-        if ((!l.unit_price || l.unit_price === 0) && pricing.list_price != null) next.unit_price = pricing.list_price;
+        const next: Line = { ...l };
+        if (pr.unit_cost != null) next.unit_cost = pr.unit_cost;
+        if (pr.measurement_unit_code) next.unit_code = pr.measurement_unit_code;
+        if (pr.unit_price != null && (!l.unit_price || l.unit_price === 0)) next.unit_price = pr.unit_price;
         return next;
       }));
     } catch { /* pricing is best-effort — line still works with manual cost/price */ }
@@ -343,7 +358,9 @@ const NewOrderModal: React.FC<{
           description: it.description,
           quantity: Number(it.quantity) || 0,
           unit_price: Number(it.unit_price) || 0,
-          unit_cost: it.unit_cost,
+          // Purchase: what we pay the supplier IS our cost.
+          unit_cost: isSales ? it.unit_cost : (Number(it.unit_price) || 0),
+          measurement_unit_code: it.unit_code,
           vat_percent: pctOf(it.vat_code),
           vat_category: parseInt(it.vat_code, 10) || undefined,
         })),
@@ -426,12 +443,13 @@ const NewOrderModal: React.FC<{
               <Label>Items</Label>
               <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New Product</Button>
             </div>
-            <div className="rounded-md border border-border/60">
-              <div className="grid grid-cols-[1fr_56px_84px_84px_92px_90px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
-                <span>Product</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">Cost/unit</span><span className="text-right">VAT</span><span className="text-right">Line total</span><span />
+            <div className="rounded-md border border-border/60 overflow-x-auto">
+              {/* Sales shows a separate Cost column (for margin); a purchase order's price IS the cost. */}
+              <div className={`grid ${isSales ? 'grid-cols-[1fr_52px_62px_82px_82px_88px_84px_24px]' : 'grid-cols-[1fr_52px_62px_82px_88px_84px_24px]'} gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[640px]`}>
+                <span>Product</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">{isSales ? 'Unit price' : 'Cost/unit'}</span>{isSales && <span className="text-right">Cost/unit</span>}<span className="text-right">VAT</span><span className="text-right">Line total</span><span />
               </div>
               {items.map((l, i) => (
-                <div key={i} className="grid grid-cols-[1fr_56px_84px_84px_92px_90px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
+                <div key={i} className={`grid ${isSales ? 'grid-cols-[1fr_52px_62px_82px_82px_88px_84px_24px]' : 'grid-cols-[1fr_52px_62px_82px_88px_84px_24px]'} items-center gap-2 border-t border-border/40 px-2 py-1.5 min-w-[640px]`}>
                   <div className="relative">
                     <Input className="h-8 text-sm" value={l.description}
                       onChange={(e) => { setItem(i, { description: e.target.value, product_id: null }); setActiveLine(i); }}
@@ -445,11 +463,18 @@ const NewOrderModal: React.FC<{
                       </div>
                     )}
                   </div>
-                  <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} />
-                  <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.unit_price} onChange={(e) => setItem(i, { unit_price: Number(e.target.value) })} />
-                  <Input className="h-8 text-right text-sm" type="number" step="0.01" placeholder="—" value={l.unit_cost ?? ''} onChange={(e) => setItem(i, { unit_cost: e.target.value === '' ? null : Number(e.target.value) })} title="What this costs us — auto-filled from the catalog, editable" />
+                  <Input className="h-8 text-right text-sm px-1" type="number" step="0.01" value={l.quantity} onChange={(e) => setItem(i, { quantity: Number(e.target.value) })} />
+                  <Select value={l.unit_code} onValueChange={(v) => setItem(i, { unit_code: v })}>
+                    <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
+                    <SelectContent>{UNIT_OPTIONS.map((u) => <SelectItem key={u.code} value={u.code}>{u.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  {/* Sales: unit price. Purchase: this IS the cost (mirror into unit_cost on save). */}
+                  <Input className="h-8 text-right text-sm px-1" type="number" step="0.01" value={l.unit_price} onChange={(e) => setItem(i, { unit_price: Number(e.target.value) })} />
+                  {isSales && (
+                    <Input className="h-8 text-right text-sm px-1" type="number" step="0.01" placeholder="—" value={l.unit_cost ?? ''} onChange={(e) => setItem(i, { unit_cost: e.target.value === '' ? null : Number(e.target.value) })} title="What this costs us — auto-filled from the catalog, editable" />
+                  )}
                   <Select value={l.vat_code} onValueChange={(v) => setItem(i, { vat_code: v })}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
                     <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
                   </Select>
                   <span className="text-right text-sm tabular-nums">{formatMoney(calc[i]?.gross ?? 0)}</span>
@@ -457,7 +482,7 @@ const NewOrderModal: React.FC<{
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-muted-foreground">Pick a catalog product to auto-fill its price &amp; cost (links to the warehouse — delivery moves stock), or type a new product name (off-warehouse). Cost is editable.</p>
+            <p className="text-[11px] text-muted-foreground">{isSales ? 'Pick a catalog product to auto-fill the customer’s price, cost & unit (this customer’s discount is applied). Editable.' : 'A purchase order’s unit price is what we pay the supplier (= our cost). Pick a catalog product to auto-fill it.'} Catalog lines link to the warehouse — delivery moves stock.</p>
           </div>
 
           <div className="flex justify-end gap-4 text-sm">
@@ -499,6 +524,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [entryDialog, setEntryDialog] = useState<{ open: boolean; direction: ManualEntryDirection } | null>(null);
   // Catalog list prices for the order's products → show the discount vs list per line.
   const [listPrices, setListPrices] = useState<Map<string, number>>(new Map());
+  // Per-product supplier (who we buy/owe) → shown on each catalog line, settable inline.
+  const [suppliers, setSuppliers] = useState<Map<string, { id: string; name: string }>>(new Map());
+  const [supplierPick, setSupplierPick] = useState<{ productId: string; label: string } | null>(null);
 
   // Resolve the order's counterparty (customer for sales, supplier for purchase) for the
   // manual-entry dialog's locked party.
@@ -521,20 +549,21 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       setLoading(true);
       const res = await ordersService.get(id);
       const productIds = res.items.map((it) => it.product_id).filter(Boolean) as string[];
-      const [finance, ents, p, lp] = await Promise.all([
+      const [finance, ents, p, lp, sup] = await Promise.all([
         ordersService.getOrderFinance(id),
         financeService.listManualEntries({ workspaceId: res.order.workspace_id, orderId: id, includeSettled: true }).catch(() => [] as ManualEntry[]),
         resolveParty(res.order).catch(() => null),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
+        ordersService.getProductSuppliers(productIds).catch(() => new Map<string, { id: string; name: string }>()),
       ]);
-      setOrder(res.order); setItems(res.items); setFin(finance); setEntries(ents); setParty(p); setListPrices(lp);
+      setOrder(res.order); setItems(res.items); setFin(finance); setEntries(ents); setParty(p); setListPrices(lp); setSuppliers(sup);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setEntries([]); setParty(null); setListPrices(new Map()); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setEntries([]); setParty(null); setListPrices(new Map()); setSuppliers(new Map()); setSupplierPick(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -562,6 +591,18 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       await load(order.id); onChanged();
     } catch (err: any) {
       toast({ title: 'Failed to update delivery', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  // #7 — set a product's supplier (who we owe when we restock it).
+  const setProductSupplier = async (productId: string, supplierCompanyId: string | null) => {
+    setSaving(true);
+    try {
+      await ordersService.setProductSupplier(productId, supplierCompanyId);
+      setSupplierPick(null);
+      if (order) await load(order.id);
+    } catch (err: any) {
+      toast({ title: 'Failed to set supplier', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -594,7 +635,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   // #3 — edit the order's line items (only while it has no invoice yet).
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled' && (fin?.invoices.length ?? 0) === 0;
   const startEdit = () => {
-    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, vat_code: vatCodeOf(it.vat_percent) })));
+    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent) })));
     setEditing(true);
   };
   const setEditItem = (i: number, patch: Partial<Line>) => setEditItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
@@ -606,7 +647,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     try {
       await ordersService.updateItems(order.id, order.workspace_id, clean.map((l) => ({
         product_id: l.product_id ?? null, description: l.description, quantity: Number(l.quantity) || 0,
-        unit_price: Number(l.unit_price) || 0, unit_cost: l.unit_cost, vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
+        unit_price: Number(l.unit_price) || 0,
+        unit_cost: order.order_type === 'purchase' ? (Number(l.unit_price) || 0) : l.unit_cost,
+        measurement_unit_code: l.unit_code,
+        vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
       })));
       setEditing(false);
       await load(order.id); onChanged();
@@ -657,9 +701,12 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
 
   // Order margin = Σ (unit_price − unit_cost) × qty over lines that carry a cost. null = no cost yet.
   const anyCost = items.some((it) => it.unit_cost != null);
-  const orderMargin = order && anyCost
+  const grossMargin = order && anyCost
     ? items.reduce((a, it) => a + ((Number(it.unit_price) || 0) - (Number(it.unit_cost) || 0)) * (Number(it.quantity) || 0), 0)
     : null;
+  // #6b — net the order's own receivables/payables into the margin (extra owed to us +, we owe −).
+  const entriesNet = entries.reduce((a, e) => a + (e.direction === 'receivable' ? Number(e.amount) : -Number(e.amount)), 0);
+  const orderMargin = grossMargin != null ? grossMargin + entriesNet : (entriesNet !== 0 ? entriesNet : null);
   // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
   // myDATA finalises the exact document type at issue; this just labels the action correctly.
   const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
@@ -748,22 +795,33 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
-                  <div className="grid grid-cols-[1fr_44px_120px_82px_48px_78px_44px_88px_92px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[780px]">
-                    <span>Item</span><span className="text-right">Qty</span><span className="text-right">Delivered</span><span className="text-right">Unit</span><span className="text-right">Disc</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span className="text-right">Net</span><span className="text-right">Total</span>
+                  <div className="grid grid-cols-[1fr_44px_52px_120px_82px_48px_78px_44px_88px_92px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[840px]">
+                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right">Price</span><span className="text-right">Disc</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span className="text-right">Net</span><span className="text-right">Total</span>
                   </div>
                   {items.map((it) => {
                     const list = it.product_id ? listPrices.get(it.product_id) : undefined;
                     const disc = list && list > Number(it.unit_price) ? Math.round((1 - Number(it.unit_price) / list) * 100) : null;
                     const gross = Number(it.net_value) + Number(it.vat_amount);
+                    const unitLabel = UNIT_OPTIONS.find((u) => u.code === it.measurement_unit_code)?.label ?? (it.measurement_unit_code || '—');
+                    const sup = it.product_id ? suppliers.get(it.product_id) : undefined;
                     return (
-                    <div key={it.id} className="grid grid-cols-[1fr_44px_120px_82px_48px_78px_44px_88px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[780px]">
-                      <span>{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
-                      <span className="text-right tabular-nums">{it.quantity}</span>
+                    <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_48px_78px_44px_88px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[840px]">
+                      <span className="min-w-0">
+                        <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
+                        {/* #7 — who we buy this from (and therefore owe). Set it inline. */}
+                        {it.product_id && (
+                          <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ productId: it.product_id!, label: it.description })}>
+                            {sup ? <><Building2 className="h-2.5 w-2.5" /> {sup.name}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
+                          </button>
+                        )}
+                      </span>
+                      <span className="text-right tabular-nums">{Number(it.quantity)}</span>
+                      <span className="text-muted-foreground text-xs">{unitLabel}</span>
                       {/* Delivered: edit the qty or use the menu; the order status auto-advances. */}
                       <div className="flex items-center justify-end gap-1">
                         <Input key={`${it.id}-${it.quantity_delivered}`} className="h-7 w-12 text-right text-xs px-1" type="number" step="1" min="0" defaultValue={Number(it.quantity_delivered)} disabled={saving}
                           onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== Number(it.quantity_delivered)) void setLineDelivered(it.id, v); }} />
-                        <span className="text-[10px] text-muted-foreground">/{it.quantity}</span>
+                        <span className="text-[10px] text-muted-foreground">/{Number(it.quantity)}</span>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><button type="button" className="text-muted-foreground hover:text-foreground"><ChevronDown className="h-3 w-3" /></button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -787,24 +845,31 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Net (excl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.subtotal_net), order.currency)}</span></div>
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{formatMoney(Number(order.vat_amount), order.currency)}</span></div>
                   <div className="flex justify-between gap-8 w-60 font-semibold border-t border-border/60 pt-0.5"><span>Total (incl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.total), order.currency)}</span></div>
+                  {grossMargin != null && entriesNet !== 0 && (
+                    <div className="flex justify-between gap-8 w-60 text-xs"><span className="text-muted-foreground">Gross margin</span><span className="tabular-nums text-muted-foreground">{formatMoney(grossMargin, order.currency)}</span></div>
+                  )}
                   {orderMargin != null && (
-                    <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Margin (excl. VAT)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
+                    <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">{entriesNet !== 0 ? 'Margin (net of order rec./pay.)' : 'Margin (excl. VAT)'}</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
                   )}
                 </div>
               </>
             ) : (
               <div className="rounded-md border border-border/60">
-                <div className="grid grid-cols-[1fr_56px_84px_84px_92px_28px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
-                  <span>Product</span><span className="text-right">Qty</span><span className="text-right">Unit</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span />
+                <div className="grid grid-cols-[1fr_52px_60px_80px_80px_84px_24px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                  <span>Product</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Price</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span />
                 </div>
                 {editItems.map((l, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_56px_84px_84px_92px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
+                  <div key={i} className="grid grid-cols-[1fr_52px_60px_80px_80px_84px_24px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
                     <Input className="h-8 text-sm" value={l.description} onChange={(e) => setEditItem(i, { description: e.target.value, product_id: null })} placeholder="Product…" />
-                    <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.quantity} onChange={(e) => setEditItem(i, { quantity: Number(e.target.value) })} />
-                    <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.unit_price} onChange={(e) => setEditItem(i, { unit_price: Number(e.target.value) })} />
-                    <Input className="h-8 text-right text-sm" type="number" step="0.01" placeholder="—" value={l.unit_cost ?? ''} onChange={(e) => setEditItem(i, { unit_cost: e.target.value === '' ? null : Number(e.target.value) })} />
+                    <Input className="h-8 text-right text-sm px-1" type="number" step="0.01" value={l.quantity} onChange={(e) => setEditItem(i, { quantity: Number(e.target.value) })} />
+                    <Select value={l.unit_code} onValueChange={(v) => setEditItem(i, { unit_code: v })}>
+                      <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>{UNIT_OPTIONS.map((u) => <SelectItem key={u.code} value={u.code}>{u.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Input className="h-8 text-right text-sm px-1" type="number" step="0.01" value={l.unit_price} onChange={(e) => setEditItem(i, { unit_price: Number(e.target.value) })} />
+                    <Input className="h-8 text-right text-sm px-1" type="number" step="0.01" placeholder="—" value={l.unit_cost ?? ''} onChange={(e) => setEditItem(i, { unit_cost: e.target.value === '' ? null : Number(e.target.value) })} />
                     <Select value={l.vat_code} onValueChange={(v) => setEditItem(i, { vat_code: v })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
                       <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
                     </Select>
                     <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => setEditItems((ls) => ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls)}><Trash2 className="h-3.5 w-3.5" /></button>
@@ -910,8 +975,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             </div>
 
             <p className="text-[11px] text-muted-foreground">
-              Dispatch is invoice-driven: once this order's invoice is paid &amp; flagged for shipping it shows on the
-              Dispatch board, which cuts the delivery note and moves warehouse stock (catalog lines only — ad-hoc lines stay off-warehouse).
+              Marking a catalog line delivered moves warehouse stock (sales out / purchase in) and auto-advances the order status.
+              Ad-hoc (off-warehouse) lines don't touch stock. The Dispatch board remains for invoice-driven delivery notes.
             </p>
           </div>
         )}
@@ -931,6 +996,61 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
           orderId={order.id}
         />
       )}
+
+      {supplierPick && (
+        <SupplierPickerDialog
+          label={supplierPick.label}
+          currentName={suppliers.get(supplierPick.productId)?.name ?? null}
+          onClose={() => setSupplierPick(null)}
+          onPick={(companyId) => void setProductSupplier(supplierPick.productId, companyId)}
+        />
+      )}
+    </Dialog>
+  );
+};
+
+// Pick (or clear) the supplier we buy a product from — searches CRM companies flagged as suppliers.
+const SupplierPickerDialog: React.FC<{
+  label: string; currentName: string | null;
+  onClose: () => void; onPick: (companyId: string | null) => void;
+}> = ({ label, currentName, onClose, onPick }) => {
+  const [term, setTerm] = useState('');
+  const [opts, setOpts] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    const t = term.trim();
+    if (t.length < 2) { setOpts([]); return; }
+    const h = setTimeout(async () => {
+      const { data } = await supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike('name', `%${t}%`).limit(8);
+      setOpts((data ?? []) as Array<{ id: string; name: string }>);
+    }, 200);
+    return () => clearTimeout(h);
+  }, [term]);
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Supplier for “{label}”</DialogTitle></DialogHeader>
+        <div className="space-y-2">
+          {currentName && (
+            <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
+              <span className="inline-flex items-center gap-2"><Building2 className="h-4 w-4" /> {currentName}</span>
+              <Button size="sm" variant="ghost" onClick={() => onPick(null)}>Clear</Button>
+            </div>
+          )}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-7" placeholder="Search supplier companies…" value={term} onChange={(e) => setTerm(e.target.value)} />
+          </div>
+          {opts.length > 0 && (
+            <div className="rounded-md border border-border/60 divide-y divide-border/40">
+              {opts.map((o) => (
+                <button key={o.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => onPick(o.id)}>{o.name}</button>
+              ))}
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground">Only CRM companies marked as suppliers appear. Set the role on the company if it’s missing.</p>
+        </div>
+        <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button></DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 };
