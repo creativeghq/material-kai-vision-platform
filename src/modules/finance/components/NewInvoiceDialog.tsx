@@ -327,10 +327,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         supabase.from('finance_settings').select('*').eq('workspace_id', workspaceId).maybeSingle(),
       ]);
       const toTaxRef = (r: { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' }): TaxRef => ({ code: r.code, description: r.description, rate: r.rate, rate_kind: r.rate_kind });
-      setWithholdings(wh.map(toTaxRef));
-      setFeesRefs(feesR.map(toTaxRef));
-      setStampRefs(stampR.map(toTaxRef));
-      setOtherTaxRefs(otherR.map(toTaxRef));
+      // Only offer enabled categories — deprecated myDATA codes (e.g. other-taxes 1/2,
+      // which v1.0.9 forbids transmitting) are flagged is_enabled=false in mydata_reference.
+      setWithholdings(wh.filter((r) => r.is_enabled).map(toTaxRef));
+      setFeesRefs(feesR.filter((r) => r.is_enabled).map(toTaxRef));
+      setStampRefs(stampR.filter((r) => r.is_enabled).map(toTaxRef));
+      setOtherTaxRefs(otherR.filter((r) => r.is_enabled).map(toTaxRef));
       setUnits(mu.map((u) => ({ code: u.code, description: u.description })));
       setPaymentMethods(pm.map((p) => ({ code: p.code, description: p.description })));
       setIssuer(fs.data ?? null);
