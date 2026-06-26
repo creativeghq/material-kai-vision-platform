@@ -113,6 +113,8 @@ import { SEOGenericCard, type SEOGenericCardData } from './SEOGenericCard';
 import { VirtualStagingViewer } from './VirtualStagingViewer';
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 import { SheetPreviewCard } from '@/components/features/sheets/SheetPreviewCard';
+import { SheetWizardModal, type SheetWizardResult } from '@/components/features/sheets/SheetWizardModal';
+import type { SheetType } from '@/services/moodboardSheetsService';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 import { WorldViewer } from './WorldViewer';
@@ -313,14 +315,14 @@ interface Message {
   }; // Materials Selection Board result
   sheetCanvasData?: {
     sheet_id: string;
-    sheet_type: 'lighting_plan' | 'annotated_render' | 'elevation_render_pair';
+    sheet_type: SheetType;
     moodboard_id: string;
     initial_data: Record<string, any>;
     title?: string;
   }; // Interactive presentation sheet awaiting canvas input
   sheetPdfData?: {
     sheet_id: string;
-    sheet_type: 'material_board' | 'color_palette' | 'concept_board' | 'lighting_plan' | 'annotated_render' | 'elevation_render_pair' | 'ffe_schedule' | 'full_deck';
+    sheet_type: SheetType;
     title: string;
     pdf_url: string;
     page_count?: number;
@@ -556,6 +558,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [geminiEditRoomType, setGeminiEditRoomType] = useState<string | null>(null);
   const [geminiEditStyle, setGeminiEditStyle] = useState<string | null>(null);
   const [regionEditImageUrl, setRegionEditImageUrl] = useState<string | null>(null);
+  // Guided presentation-sheet wizard (launched from the Sheets toolkit quick-starts).
+  const [sheetWizardOpen, setSheetWizardOpen] = useState(false);
+  const [sheetWizardType, setSheetWizardType] = useState<string | undefined>(undefined);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [editingConvoId, setEditingConvoId] = useState<string | null>(null);
@@ -688,6 +693,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       return;
     }
     if (qs.run && fireDirectRun(qs, tk)) return;
+
+    // Presentation-sheet quick-starts open the guided wizard (the moodboard is
+    // picked inside it). '' = open at the type picker; a slug pre-selects the type.
+    if (qs.opensSheetWizard !== undefined) {
+      setSheetWizardType(qs.opensSheetWizard || undefined);
+      setSheetWizardOpen(true);
+      return;
+    }
 
     if (qs.opensModal === 'new-design') {
       setShowNewDesignModal(true);
@@ -3534,9 +3547,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   if (qs.run && fireDirectRun(qs, tkParam)) {
                     return;
                   }
-                  // Guided-modal quick-starts (e.g. Design a room → new-design)
-                  // route through the shared dispatcher so the modal opens here too.
-                  if (qs.opensModal) {
+                  // Guided-modal quick-starts (e.g. Design a room → new-design,
+                  // Sheets → wizard) route through the shared dispatcher.
+                  if (qs.opensModal || qs.opensSheetWizard !== undefined) {
                     handleQuickStart(qs, tkParam);
                     return;
                   }
@@ -3591,9 +3604,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   if (qs.run && fireDirectRun(qs, tk)) {
                     return;
                   }
-                  // Guided-modal quick-starts (e.g. Design a room → new-design)
-                  // route through the shared dispatcher so the modal opens here too.
-                  if (qs.opensModal) {
+                  // Guided-modal quick-starts (e.g. Design a room → new-design,
+                  // Sheets → wizard) route through the shared dispatcher.
+                  if (qs.opensModal || qs.opensSheetWizard !== undefined) {
                     handleQuickStart(qs, tk);
                     return;
                   }
@@ -5130,6 +5143,65 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       )}
 
       {/* Gemini Edit Modal — 3-step structured image edit */}
+      <SheetWizardModal
+        open={sheetWizardOpen}
+        onClose={() => setSheetWizardOpen(false)}
+        presetType={sheetWizardType as any}
+        onCreated={(res: SheetWizardResult) => {
+          // Mount the same result card the agent flow uses: interactive →
+          // canvas, passive → PDF preview. Persist best-effort if a conversation
+          // is open so it survives a reload.
+          if (res.is_interactive) {
+            const canvasMsg = {
+              id: `msg-sheet-canvas-${Date.now()}`,
+              role: 'assistant' as const,
+              content: 'Sheet ready for editing — use the canvas below to finish it, then click Render PDF.',
+              timestamp: new Date(),
+              agentId: selectedAgent,
+              model: selectedModel,
+              sheetCanvasData: {
+                sheet_id: res.sheet_id,
+                sheet_type: res.sheet_type,
+                moodboard_id: res.moodboard_id,
+                initial_data: res.initial_data || {},
+                title: res.title,
+              },
+            };
+            setMessages((prev) => [...prev, canvasMsg]);
+            if (currentConversationId) {
+              agentChatHistoryService.saveMessage({
+                conversationId: currentConversationId, role: 'assistant', content: canvasMsg.content,
+                metadata: { agentId: selectedAgent, model: selectedModel, sheetCanvasData: canvasMsg.sheetCanvasData },
+              }).catch(() => { /* non-blocking */ });
+            }
+          } else {
+            const pdfMsg = {
+              id: `msg-sheet-pdf-${Date.now()}`,
+              role: 'assistant' as const,
+              content: `${res.title} ready (${res.sheet_type.replace(/_/g, ' ')}).${res.page_count != null ? ` ${res.page_count} page${res.page_count === 1 ? '' : 's'}.` : ''}`,
+              timestamp: new Date(),
+              agentId: selectedAgent,
+              model: selectedModel,
+              sheetPdfData: {
+                sheet_id: res.sheet_id,
+                sheet_type: res.sheet_type,
+                title: res.title,
+                pdf_url: res.pdf_url,
+                page_count: res.page_count,
+                credits_used: res.credits_charged,
+              },
+            };
+            setMessages((prev) => [...prev, pdfMsg]);
+            if (currentConversationId) {
+              agentChatHistoryService.saveMessage({
+                conversationId: currentConversationId, role: 'assistant', content: pdfMsg.content,
+                metadata: { agentId: selectedAgent, model: selectedModel, sheetPdfData: pdfMsg.sheetPdfData },
+              }).catch(() => { /* non-blocking */ });
+            }
+          }
+        }}
+      />
+
       <GeminiEditModal
         isOpen={showGeminiEditModal}
         onClose={() => setShowGeminiEditModal(false)}

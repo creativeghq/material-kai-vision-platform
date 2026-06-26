@@ -958,6 +958,13 @@ export interface ToolkitQuickStart {
    * sending `prompt`, so the quick-start is never inert.
    */
   opensModal?: 'new-design' | 'virtual-staging' | 'gemini-edit';
+  /**
+   * When set, clicking this quick-start opens the guided SheetWizardModal with
+   * this sheet type pre-selected (the moodboard is chosen inside the wizard).
+   * Replaces the old "seed a chat prompt and let the agent ask" flow for
+   * presentation sheets. Value is a sheet_type slug (e.g. 'material_board').
+   */
+  opensSheetWizard?: string;
   /** Hint that this process needs an attached image to do its best work. */
   imageRequired?: boolean;
 }
@@ -1178,9 +1185,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'LayoutTemplate',
     tool_ids: ['generate_presentation_sheet'],
     quick_starts: [
-      { label: 'Material board', description: 'Pick products → A3 PDF', prompt: 'Build me a material board sheet for one of my moodboards. Walk me through picking the moodboard and products.', icon: 'Grid3x3' },
-      { label: 'Color palette', description: 'Auto-extract colors from a moodboard', prompt: 'Generate a color palette sheet for a moodboard — auto-extract from its images.', icon: 'Palette' },
-      { label: 'Full deck', description: 'Multi-page presentation deck', prompt: 'Help me build a multi-page Full Deck for a moodboard. List my recent moodboards so I can pick one.', icon: 'LayoutTemplate' },
+      // Each opens the guided SheetWizardModal (pick moodboard → inputs → generate)
+      // with the type pre-selected. The "New sheet" entry opens it at the type picker.
+      { label: 'New sheet', description: 'Pick any sheet type → guided build', prompt: 'Create a presentation sheet for one of my moodboards.', icon: 'Plus', opensSheetWizard: '' },
+      { label: 'Material board', description: 'Pick products → A3 PDF', prompt: 'Build a material board sheet.', icon: 'Grid3x3', opensSheetWizard: 'material_board' },
+      { label: 'Color palette', description: 'Auto-extract colors from a moodboard', prompt: 'Generate a color palette sheet.', icon: 'Palette', opensSheetWizard: 'color_palette' },
+      { label: 'Full deck', description: 'Multi-page presentation deck', prompt: 'Build a multi-page Full Deck.', icon: 'LayoutTemplate', opensSheetWizard: 'full_deck' },
     ],
   },
   {

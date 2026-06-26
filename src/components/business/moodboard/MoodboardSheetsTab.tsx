@@ -20,6 +20,7 @@ import {
 } from '@/services/moodboardSheetsService';
 import { useToast } from '@/hooks/use-toast';
 import { SheetTypePreviewModal } from '@/components/features/sheets/SheetTypePreviewModal';
+import { SheetWizardModal, type SheetWizardResult } from '@/components/features/sheets/SheetWizardModal';
 
 interface MoodboardSheetsTabProps {
   moodboardId: string;
@@ -56,6 +57,18 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [sharedTokenId, setSharedTokenId] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<SheetType | null>(null);
+  // The guided creation wizard (replaces the seeded-chat handoff).
+  const [wizardType, setWizardType] = useState<SheetType | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  const reloadSheets = async () => {
+    try {
+      const list = await moodboardSheetsService.list(moodboardId);
+      setSheets(list);
+    } catch (err) {
+      toast({ title: 'Could not load tools', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -84,18 +97,26 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
     setPreviewType(sheetType);
   };
 
-  // Step 2 — user clicks "Continue with KAI" in the preview modal. Now we
-  // hand off to the agent with a seeded prompt. AgentHub reads `prompt` and
-  // auto-sends once the user is authenticated.
-  const launchAgentForSheet = (sheetType: SheetType) => {
+  // Step 2 — user clicks "Continue" in the preview modal. Open the guided wizard
+  // (moodboard already known → it skips straight to the type-specific inputs).
+  const launchWizardForSheet = (sheetType: SheetType) => {
     setPreviewType(null);
-    const params = new URLSearchParams();
-    params.set(
-      'prompt',
-      `Create a ${SHEET_TYPE_LABELS[sheetType]} for moodboard ${moodboardId} ("${moodboardTitle}"). ` +
-      `Walk me through the steps to gather the inputs, then call generate_presentation_sheet with sheet_type="${sheetType}".`,
-    );
-    navigate(`/agent-hub?${params.toString()}`);
+    setWizardType(sheetType);
+    setWizardOpen(true);
+  };
+
+  // After a sheet is created: passive types are already rendered (show in list);
+  // interactive types are a draft awaiting canvas input → open the canvas in KAI.
+  const handleSheetCreated = (res: SheetWizardResult) => {
+    void reloadSheets();
+    if (res.is_interactive) {
+      toast({ title: 'Draft created', description: 'Finishing it in the canvas…' });
+      const params = new URLSearchParams();
+      params.set('prompt', `Continue editing sheet ${res.sheet_id} (${SHEET_TYPE_LABELS[res.sheet_type]}, "${res.title}") on moodboard ${moodboardId}.`);
+      navigate(`/agent-hub?${params.toString()}`);
+    } else {
+      toast({ title: 'Sheet ready', description: `${res.title} generated${res.credits_charged ? ` · ${res.credits_charged} cr` : ''}.` });
+    }
   };
 
   const handleDelete = async (sheet: PresentationSheet) => {
@@ -199,7 +220,16 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
         open={previewType !== null}
         sheetType={previewType}
         onCancel={() => setPreviewType(null)}
-        onContinue={launchAgentForSheet}
+        onContinue={launchWizardForSheet}
+      />
+
+      <SheetWizardModal
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        presetMoodboardId={moodboardId}
+        presetMoodboardTitle={moodboardTitle}
+        presetType={wizardType ?? undefined}
+        onCreated={handleSheetCreated}
       />
 
       {/* New Tool launcher */}

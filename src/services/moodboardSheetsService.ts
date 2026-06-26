@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 
 export type SheetType =
   | 'material_board'
@@ -118,6 +119,55 @@ class MoodboardSheetsService {
 
     if (error) throw error;
     return data as PresentationSheet;
+  }
+
+  /**
+   * Create a sheet through the UNIFIED edge path (action:'create') — the same
+   * pipeline the agent tool uses: ownership + auto-enhance + credit debit +
+   * insert, then passive types render immediately and interactive types return
+   * for the canvas. This is what the SheetWizardModal calls, so the wizard and
+   * the agent stay in lockstep (no client-side path that skips credits).
+   */
+  async createSheet(input: {
+    moodboard_id: string;
+    sheet_type: SheetType;
+    title: string;
+    initial_data?: Record<string, any>;
+    auto_enhance?: boolean;
+  }): Promise<{
+    sheet_id: string;
+    sheet_type: SheetType;
+    is_interactive: boolean;
+    status?: string;
+    pdf_url?: string;
+    page_count?: number;
+    credits_charged?: number;
+    initial_data?: Record<string, any>;
+  }> {
+    const { data, error } = await supabase.functions.invoke('generate-moodboard-sheet-pdf', {
+      body: {
+        action: 'create',
+        moodboard_id: input.moodboard_id,
+        sheet_type: input.sheet_type,
+        title: input.title,
+        initial_data: input.initial_data ?? {},
+        auto_enhance: input.auto_enhance,
+      },
+    });
+    // Non-2xx (validation 422 / insufficient-credits 402 / 403) lands in `error`
+    // with the real reason in the body — unwrap it.
+    if (error) throw await edgeError(error, 'Sheet creation failed');
+    if (!data?.success) throw new Error(data?.error || 'Sheet creation failed');
+    return {
+      sheet_id: data.sheet_id,
+      sheet_type: (data.sheet_type ?? input.sheet_type) as SheetType,
+      is_interactive: !!data.is_interactive,
+      status: data.status,
+      pdf_url: data.pdf_url,
+      page_count: data.page_count,
+      credits_charged: data.credits_charged,
+      initial_data: data.initial_data,
+    };
   }
 
   async update(sheetId: string, patch: UpdateSheetData): Promise<PresentationSheet> {
