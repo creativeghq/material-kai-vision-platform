@@ -20,7 +20,7 @@
   <p>Same layout as Receivables — aging buckets on top, then the toolbar, then the list.</p>
   <ul class="feat">
     <li><strong>Aging buckets</strong> — the same five tiles, each with a € total and a bill count: <strong>Current</strong>, <strong>0–30 days</strong>, <strong>31–60 days</strong>, <strong>61–90 days</strong> and <strong>90+ days</strong>. Here they tell you what to <em>pay next</em>, oldest first. Click a bucket to focus the list on just those rows.</li>
-    <li><strong>Toolbar</strong> — <strong>Add payable</strong>, <strong>Supplier credit note</strong> and <strong>New supplier bill</strong> buttons, an <strong>All categories</strong> filter, and a search box ("Search supplier / bill #…").</li>
+    <li><strong>Toolbar</strong> — <strong>Supplier credit note</strong> and <strong>New supplier bill</strong> buttons, an <strong>All categories</strong> filter, and a search box ("Search supplier / bill #…").</li>
     <li><strong>The list</strong> — one row per bill or payable, with the columns described below.</li>
   </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-payables.png" alt="Finance Payables tab"><figcaption>The Payables tab — amounts you owe suppliers, with the five aging buckets and the same search and All-categories filters.</figcaption></figure>
@@ -46,11 +46,12 @@
 
   <h2>How to add a supplier bill</h2>
   <ol>
-    <li>Click <strong>New supplier bill</strong> for a formal supplier invoice, or <strong>Add payable</strong> for an un-invoiced cost like rent or utilities.</li>
+    <li>Click <strong>New supplier bill</strong> for a supplier invoice. (You can also record one straight from a <a href="finance-doc-orders.html">purchase order</a> with <strong>Record supplier bill</strong>.)</li>
     <li>Pick the <strong>supplier</strong> (it must be marked <strong>is_supplier</strong> in <a href="crm-companies.html">CRM</a> to appear), the expense <strong>category</strong>, and enter the <strong>amount</strong> and the <strong>due date</strong>.</li>
     <li>If a supplier has issued you a credit, use <strong>Supplier credit note</strong> instead so it offsets what you owe.</li>
     <li>When you pay it, record the outgoing — the row's <em>Due</em> reduces and it moves toward <em>Current</em>/cleared.</li>
   </ol>
+  <div class="callout"><p><strong>Changed in 2026-06:</strong> the old “Add payable” for an un-invoiced cost has been removed — payables now always trace to a real supplier bill (or a purchase order), so the tab stays in step with your documents. Day-to-day running costs like rent or utilities go in as <a href="finance-doc-expenses.html">Expenses</a>.</p></div>
 
   <h2>How to pay down by age — using the aging buckets</h2>
   <ol>

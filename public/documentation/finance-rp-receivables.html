@@ -20,7 +20,7 @@
   <p>From top to bottom: the aging buckets, then the toolbar, then the list.</p>
   <ul class="feat">
     <li><strong>Aging buckets</strong> — five tiles across the top, each showing a € total and an invoice count: <strong>Current</strong>, <strong>0–30 days</strong>, <strong>31–60 days</strong>, <strong>61–90 days</strong> and <strong>90+ days</strong>. The further right, the more overdue the money — <em>90+ days</em> is your most at-risk debt. Click a bucket to focus the list on just those rows.</li>
-    <li><strong>Toolbar</strong> — <strong>Add receivable</strong> and <strong>New invoice</strong> buttons, an <strong>All categories</strong> filter, and a search box ("Search customer / number…").</li>
+    <li><strong>Toolbar</strong> — a <strong>New invoice</strong> button, an <strong>All categories</strong> filter, and a search box ("Search customer / number…").</li>
     <li><strong>The list</strong> — one row per outstanding item, with the working columns described below.</li>
   </ul>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/finance-receivables.png" alt="Finance Receivables tab"><figcaption>The Receivables tab — outstanding amounts owed to you, with the five aging buckets across the top and search and All-categories filters in the toolbar.</figcaption></figure>
@@ -51,11 +51,13 @@
     <li>When the customer pays and you record it, the row's <em>Due</em> drops and it falls out of the overdue bucket.</li>
   </ol>
 
-  <h2>How to add a receivable or raise an invoice</h2>
+  <h2>Where receivables come from</h2>
+  <p>Receivables are <strong>derived from real documents</strong> — there's no separate “virtual” receivable to keep in step by hand. A row appears here whenever a customer owes money: an issued <a href="finance-doc-invoices.html">invoice</a> with an amount still due, or an <a href="finance-doc-orders.html">order</a> that's been delivered/invoiced and not yet paid. To create one, raise the underlying document:</p>
   <ol>
-    <li>For amounts that aren't on a formal invoice yet — a deposit, an advance, a fee — click <strong>Add receivable</strong> and fill in the customer, amount, category and due date.</li>
     <li>To raise a brand-new invoice directly from here, use <strong>New invoice</strong> on the toolbar.</li>
+    <li>Or raise it from the deal: <strong>Create invoice</strong> on an <a href="finance-doc-orders.html">order</a>, or <strong>Issue invoice</strong> on an accepted <a href="quotes-build.html">quote</a>.</li>
   </ol>
+  <div class="callout"><p><strong>Changed in 2026-06:</strong> the old “Add receivable” for an un-invoiced amount has been removed — receivables now always trace to a real invoice or order, so the tab can't drift out of sync with your documents.</p></div>
   <div class="callout"><p><strong>Invoicing an accepted quote:</strong> to turn an <strong>accepted quote</strong> into an invoice, use <strong>Issue invoice</strong> on the quote page — that's what creates the invoice that then appears here. The Receivables tab is where the invoice <em>lands</em>, not where you raise it from a quote.</p></div>
 
   <div class="callout tip"><p><strong>Worked example — building this week's collections list.</strong> Open <strong>Receivables</strong> → click the <strong>90+ days</strong> bucket to see only the oldest debt → use the <strong>search box</strong> or <strong>All categories</strong> filter to group the calls you want to make → open each row to reach its source document and act. As each customer pays, the row's <em>Due</em> falls and it drops out of the 90+ bucket, so next week's list is shorter.</p></div>
