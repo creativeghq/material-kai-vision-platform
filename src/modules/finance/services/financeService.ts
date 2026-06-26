@@ -377,33 +377,6 @@ export interface CustomerAgingBuckets {
   max_days_overdue: number;
 }
 
-export type ManualEntryDirection = 'receivable' | 'payable';
-export type ManualEntryStatus = 'open' | 'partially_paid' | 'paid' | 'void';
-
-export interface ManualEntry {
-  id: string;
-  workspace_id: string;
-  direction: ManualEntryDirection;
-  counterparty_company_id: string | null;
-  counterparty_contact_id: string | null;
-  order_id: string | null;
-  project_id: string | null;
-  description: string;
-  category_id: string | null;
-  currency: string;
-  amount: number;
-  amount_paid: number;
-  amount_due: number;
-  status: ManualEntryStatus;
-  issued_at: string;
-  due_at: string | null;
-  notes: string | null;
-  settlement_method: 'bank_transfer' | 'cash' | 'card' | 'check' | 'other' | null;
-  finance_doc_requested: boolean | null;
-  finance_doc_kind: 'receipt' | 'invoice' | null;
-  finance_doc_status: 'requested' | 'issued' | 'declined' | null;
-  created_at: string;
-}
 
 export interface FollowUpRow {
   id: string;
@@ -720,7 +693,7 @@ const _financeServiceCore = {
      * (payment→target). When omitted they default to `amount` / 1 (same-currency).
      */
     allocations: Array<{
-      target_id: string; target_type: 'invoice' | 'supplier_bill' | 'manual_entry';
+      target_id: string; target_type: 'invoice' | 'supplier_bill';
       amount: number; amount_doc?: number; fx_rate?: number;
     }>;
   }): Promise<string> {
@@ -780,101 +753,6 @@ const _financeServiceCore = {
   },
 
   // -------- Manual (un-invoiced) receivables / payables --------
-
-  /**
-   * List un-invoiced receivables/payables. By default only open + partially-paid
-   * are returned (the ones still owing); pass includeSettled to also pull paid/void.
-   */
-  async listManualEntries(opts: {
-    workspaceId: string;
-    direction?: ManualEntryDirection;
-    includeSettled?: boolean;
-    companyId?: string | null;
-    contactId?: string | null;
-    orderId?: string | null;
-  }): Promise<ManualEntry[]> {
-    let q = supabase
-      .from('finance_manual_entries')
-      .select('*')
-      .eq('workspace_id', opts.workspaceId)
-      .order('issued_at', { ascending: false });
-    if (opts.direction) q = q.eq('direction', opts.direction);
-    // A voided entry is a deletion — it must never surface in any list or total,
-    // even when settled entries are requested. `includeSettled` only widens the
-    // set to also include fully-`paid` entries; it never includes `void`.
-    if (opts.includeSettled) q = q.neq('status', 'void');
-    else q = q.in('status', ['open', 'partially_paid']);
-    if (opts.companyId) q = q.eq('counterparty_company_id', opts.companyId);
-    if (opts.contactId) q = q.eq('counterparty_contact_id', opts.contactId);
-    if (opts.orderId) q = q.eq('order_id', opts.orderId);
-    const { data, error } = await q;
-    if (error) throw error;
-    return (data ?? []) as ManualEntry[];
-  },
-
-  async createManualEntry(input: {
-    workspaceId: string;
-    direction: ManualEntryDirection;
-    description: string;
-    amount: number;
-    currency?: string;
-    counterpartyCompanyId?: string | null;
-    counterpartyContactId?: string | null;
-    orderId?: string | null;
-    categoryId?: string | null;
-    dueAt?: string | null;
-    issuedAt?: string | null;
-    notes?: string | null;
-    // item 3 — settlement method + optional request for finance to issue a document
-    settlementMethod?: 'bank_transfer' | 'cash' | 'card' | 'check' | 'other' | null;
-    financeDocRequested?: boolean;
-    financeDocKind?: 'receipt' | 'invoice' | null;
-  }): Promise<ManualEntry> {
-    if (!Number.isFinite(input.amount) || input.amount <= 0) {
-      throw new Error('Amount must be greater than 0');
-    }
-    if (!input.description?.trim()) {
-      throw new Error('Description is required');
-    }
-    const { data, error } = await supabase
-      .from('finance_manual_entries')
-      .insert({
-        workspace_id: input.workspaceId,
-        direction: input.direction,
-        description: input.description,
-        amount: input.amount,
-        currency: input.currency ?? 'EUR',
-        counterparty_company_id: input.counterpartyCompanyId ?? null,
-        counterparty_contact_id: input.counterpartyContactId ?? null,
-        order_id: input.orderId ?? null,
-        category_id: input.categoryId ?? null,
-        due_at: input.dueAt ?? null,
-        issued_at: input.issuedAt ?? new Date().toISOString(),
-        notes: input.notes ?? null,
-        settlement_method: input.settlementMethod ?? null,
-        finance_doc_requested: input.financeDocRequested ?? false,
-        finance_doc_kind: input.financeDocRequested ? (input.financeDocKind ?? null) : null,
-        finance_doc_status: input.financeDocRequested ? 'requested' : null,
-      })
-      .select('*')
-      .single();
-    if (error) throw error;
-    return data as ManualEntry;
-  },
-
-  /**
-   * Hard-delete a manual receivable/payable. When the user removes an entry it is
-   * gone — no "void" rows kept around. Any payment allocations cascade out
-   * (payment_allocations.manual_entry_id FK is ON DELETE CASCADE), returning the
-   * allocated amount to unallocated credit on the payment.
-   */
-  async deleteManualEntry(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('finance_manual_entries')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-  },
 
   // -------- Pricing rules (#176 markup overrides) --------
 

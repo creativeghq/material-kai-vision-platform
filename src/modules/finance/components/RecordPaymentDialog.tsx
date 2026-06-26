@@ -1,13 +1,11 @@
 /**
  * Standalone "Record payment" (receipt / payment / refund).
- *  - Received: money in from a customer — optionally "for" an open invoice OR an
- *    un-invoiced receivable → marks it (partly) settled.
- *  - Paid out: money out to a supplier — optionally against an un-invoiced payable.
+ *  - Received: money in from a customer — optionally "for" an open invoice → marks it (partly) settled.
+ *  - Paid out: money out to a supplier (unallocated cash-out / on-account).
  *  - Refund/Return: money out to a customer (e.g. against a credit note).
  * Carries a finance category + method + back-datable date.
  *
- * Pass `preset` to deep-link the dialog to a specific target (the Settle action
- * on a Receivables/Payables row).
+ * Pass `preset` to deep-link the dialog to a specific invoice (e.g. the Settle action on a row).
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -19,17 +17,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { financeService, type Invoice, type ManualEntry, type PaymentMethod, type BankAccount } from '@/modules/finance/services/financeService';
+import { financeService, type Invoice, type PaymentMethod, type BankAccount } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
 type Kind = 'received' | 'paid_out' | 'refund';
-type TargetType = 'invoice' | 'manual_entry';
 const METHODS: PaymentMethod[] = ['cash', 'card', 'bank_transfer', 'check', 'other'];
 
-/** Deep-link the dialog straight to one target (Settle action on an aging row). */
+/** Deep-link the dialog straight to one invoice (Settle / refund action on a row). */
 export interface RecordPaymentPreset {
   direction: Kind;
-  targetType: TargetType;
+  targetType: 'invoice';
   targetId: string;
 }
 
@@ -51,13 +48,12 @@ export const RecordPaymentDialog: React.FC<{
   const [categoryId, setCategoryId] = useState<string>('');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
-  // Settle target as `${type}:${id}` ('' = unallocated). Refund still uses an invoice only.
-  const [targetKey, setTargetKey] = useState<string>('');
-  const [invoiceId, setInvoiceId] = useState<string>(''); // refund target only
+  // Settle target invoice id ('' = unallocated). Refund uses its own invoice picker below.
+  const [invoiceId, setInvoiceId] = useState<string>(''); // refund target
+  const [targetInvoiceId, setTargetInvoiceId] = useState<string>(''); // received allocation target
   const [issueCreditNote, setIssueCreditNote] = useState(true);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [manualEntries, setManualEntries] = useState<ManualEntry[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [busy, setBusy] = useState(false);
@@ -68,53 +64,37 @@ export const RecordPaymentDialog: React.FC<{
     setKind(initialKind);
     setAmount(''); setMethod('cash'); setPaidAt(new Date().toISOString().slice(0, 10));
     setCategoryId(''); setReference(''); setNotes('');
-    setTargetKey(preset && preset.direction !== 'refund' ? `${preset.targetType}:${preset.targetId}` : '');
+    setTargetInvoiceId(preset && preset.direction === 'received' ? preset.targetId : '');
     setInvoiceId(preset?.direction === 'refund' ? preset.targetId : '');
     setIssueCreditNote(true);
     (async () => {
-      const [cats, invs, manual, banks] = await Promise.all([
+      const [cats, invs, banks] = await Promise.all([
         financeCategoriesService.list(workspaceId).catch(() => []),
         // Include paid invoices too — a refund is usually against an already-settled invoice.
         financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'overdue', 'paid'], limit: 200 }).catch(() => []),
-        financeService.listManualEntries({ workspaceId }).catch(() => []),
         financeService.listBankAccounts(workspaceId).catch(() => [] as BankAccount[]),
       ]);
       setCategories(cats);
       setInvoices(invs);
-      setManualEntries(manual);
       setBankAccounts(banks);
       // Default to the workspace's default account so cash location is always captured.
       setBankAccountId(banks.find((b) => b.is_default)?.id ?? '');
     })();
   }, [open, workspaceId, preset]);
 
-  // Received → open invoices + open receivables. Refund → any issued invoice (usually paid).
+  // Received → open invoices. Refund → any issued invoice (usually paid).
   const pickableInvoices = useMemo(
     () => (kind === 'refund' ? invoices : invoices.filter((i) => Number(i.amount_due) > 0)),
     [invoices, kind],
   );
-  const receivables = useMemo(() => manualEntries.filter((m) => m.direction === 'receivable' && Number(m.amount_due) > 0), [manualEntries]);
-  const payables = useMemo(() => manualEntries.filter((m) => m.direction === 'payable' && Number(m.amount_due) > 0), [manualEntries]);
-
   const selectedInvoice = useMemo(() => invoices.find((i) => i.id === invoiceId), [invoices, invoiceId]);
-  const selectedTarget = useMemo(() => {
-    if (!targetKey) return null;
-    const [type, id] = targetKey.split(':');
-    if (type === 'invoice') return { type: 'invoice' as const, inv: invoices.find((i) => i.id === id) ?? null, man: null };
-    return { type: 'manual_entry' as const, inv: null, man: manualEntries.find((m) => m.id === id) ?? null };
-  }, [targetKey, invoices, manualEntries]);
+  const selectedTarget = useMemo(() => invoices.find((i) => i.id === targetInvoiceId) ?? null, [invoices, targetInvoiceId]);
 
-  const pickTarget = (key: string) => {
-    setTargetKey(key);
+  const pickTarget = (id: string) => {
+    setTargetInvoiceId(id);
     if (amount) return;
-    const [type, id] = key.split(':');
-    if (type === 'invoice') {
-      const inv = invoices.find((i) => i.id === id);
-      if (inv) setAmount(String(inv.amount_due));
-    } else {
-      const man = manualEntries.find((m) => m.id === id);
-      if (man) setAmount(String(man.amount_due));
-    }
+    const inv = invoices.find((i) => i.id === id);
+    if (inv) setAmount(String(inv.amount_due));
   };
 
   const pickRefundInvoice = (id: string) => {
@@ -150,21 +130,17 @@ export const RecordPaymentDialog: React.FC<{
 
       const direction = kind === 'received' ? 'in' : 'out';
 
-      // Build the allocation + resolve the counterparty from the chosen target.
-      let allocations: Array<{ target_id: string; target_type: TargetType; amount: number }> = [];
+      // Build the allocation + resolve the counterparty from the chosen invoice.
+      let allocations: Array<{ target_id: string; target_type: 'invoice'; amount: number }> = [];
       let counterpartyCompanyId: string | null = null;
       let counterpartyContactId: string | null = null;
       if (kind === 'refund') {
         counterpartyCompanyId = selectedInvoice?.customer_company_id ?? null;
         counterpartyContactId = selectedInvoice?.customer_contact_id ?? null;
-      } else if (selectedTarget?.type === 'invoice' && selectedTarget.inv) {
-        allocations = [{ target_id: selectedTarget.inv.id, target_type: 'invoice', amount: amt }];
-        counterpartyCompanyId = selectedTarget.inv.customer_company_id ?? null;
-        counterpartyContactId = selectedTarget.inv.customer_contact_id ?? null;
-      } else if (selectedTarget?.type === 'manual_entry' && selectedTarget.man) {
-        allocations = [{ target_id: selectedTarget.man.id, target_type: 'manual_entry', amount: amt }];
-        counterpartyCompanyId = selectedTarget.man.counterparty_company_id ?? null;
-        counterpartyContactId = selectedTarget.man.counterparty_contact_id ?? null;
+      } else if (kind === 'received' && selectedTarget) {
+        allocations = [{ target_id: selectedTarget.id, target_type: 'invoice', amount: amt }];
+        counterpartyCompanyId = selectedTarget.customer_company_id ?? null;
+        counterpartyContactId = selectedTarget.customer_contact_id ?? null;
       }
 
       // No target chosen (unallocated / on-account) → tie it to the party the
@@ -216,7 +192,7 @@ export const RecordPaymentDialog: React.FC<{
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <Label>Type</Label>
-              <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetKey(''); setInvoiceId(''); }}>
+              <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="received">Received (from customer)</SelectItem>
@@ -234,46 +210,22 @@ export const RecordPaymentDialog: React.FC<{
           {kind === 'received' && (
             <div className="space-y-1">
               <Label>For (optional)</Label>
-              <Select value={targetKey} onValueChange={pickTarget}>
+              <Select value={targetInvoiceId} onValueChange={pickTarget}>
                 <SelectTrigger><SelectValue placeholder="None — unallocated credit" /></SelectTrigger>
                 <SelectContent>
-                  {pickableInvoices.length === 0 && receivables.length === 0 && (
-                    <div className="px-2 py-1 text-xs text-muted-foreground">No open invoices or receivables</div>
-                  )}
-                  {pickableInvoices.length > 0 && (
-                    <SelectGroupLabel>Invoices</SelectGroupLabel>
-                  )}
-                  {pickableInvoices.map((i) => (
-                    <SelectItem key={i.id} value={`invoice:${i.id}`}>{i.internal_number} — due {Number(i.amount_due).toFixed(2)}</SelectItem>
-                  ))}
-                  {receivables.length > 0 && (
-                    <SelectGroupLabel>Un-invoiced receivables</SelectGroupLabel>
-                  )}
-                  {receivables.map((m) => (
-                    <SelectItem key={m.id} value={`manual_entry:${m.id}`}>{m.description} — due {Number(m.amount_due).toFixed(2)}</SelectItem>
-                  ))}
+                  {pickableInvoices.length === 0
+                    ? <div className="px-2 py-1 text-xs text-muted-foreground">No open invoices</div>
+                    : pickableInvoices.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>{i.internal_number} — due {Number(i.amount_due).toFixed(2)}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
-              {selectedTarget?.type === 'invoice' && selectedTarget.inv && <p className="text-[11px] text-muted-foreground">Settling this invoice will mark it paid when fully covered.</p>}
-              {selectedTarget?.type === 'manual_entry' && selectedTarget.man && <p className="text-[11px] text-muted-foreground">Settling this receivable reduces what the customer owes.</p>}
+              {selectedTarget && <p className="text-[11px] text-muted-foreground">Settling this invoice will mark it paid when fully covered.</p>}
             </div>
           )}
 
           {kind === 'paid_out' && (
-            <div className="space-y-1">
-              <Label>For (optional)</Label>
-              <Select value={targetKey} onValueChange={pickTarget}>
-                <SelectTrigger><SelectValue placeholder="None — unallocated cash-out" /></SelectTrigger>
-                <SelectContent>
-                  {payables.length === 0
-                    ? <div className="px-2 py-1 text-xs text-muted-foreground">No open payables</div>
-                    : payables.map((m) => (
-                      <SelectItem key={m.id} value={`manual_entry:${m.id}`}>{m.description} — due {Number(m.amount_due).toFixed(2)}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              {selectedTarget?.type === 'manual_entry' && selectedTarget.man && <p className="text-[11px] text-muted-foreground">Settling this payable reduces what we owe the supplier.</p>}
-            </div>
+            <p className="text-[11px] text-muted-foreground">Records cash out (on-account). To settle a specific supplier bill, use the Settle action on that bill.</p>
           )}
 
           {kind === 'refund' && (
@@ -359,8 +311,3 @@ export const RecordPaymentDialog: React.FC<{
     </Dialog>
   );
 };
-
-// Small non-selectable label inside a Select dropdown to group options.
-const SelectGroupLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</div>
-);

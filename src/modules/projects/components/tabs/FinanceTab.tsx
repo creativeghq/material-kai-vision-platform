@@ -1,7 +1,6 @@
 /**
- * Project Finance — attach payables (supplier bills + payable manual entries) and
- * receivables (invoices + receivable manual entries) to a project, scoped to the
- * project's client/supplier. Shows AR/AP totals. Attaching just stamps project_id on
+ * Project Finance — attach payables (supplier bills) and receivables (invoices) to a
+ * project, scoped to the project's client/supplier. Shows AR/AP totals. Attaching just stamps project_id on
  * the finance row; detaching clears it (the document itself is untouched).
  *
  * Owner-only + finance.manage. End-customer collaborators never reach this tab.
@@ -9,7 +8,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Wallet, Loader2, Plus, ArrowDownLeft, ArrowUpRight, Link2Off, FileText,
+  Loader2, Plus, ArrowDownLeft, ArrowUpRight, Link2Off, FileText,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -29,7 +28,7 @@ const money = (n: number | null | undefined, c: string | null | undefined) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
 
 const KIND_LABEL: Record<string, string> = {
-  invoice: 'Invoice', manual: 'Manual', supplier_bill: 'Supplier bill',
+  invoice: 'Invoice', supplier_bill: 'Supplier bill',
 };
 
 export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {

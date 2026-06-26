@@ -88,7 +88,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - document_series             ← legal invoice/receipt numbering sequences
 //   - fiscal_connectors / fiscal_submissions   ← AADE/Novus transmission ledger
 //   - finance_settings / finance_branches / finance_categories / pricing_rules
-//   - finance_manual_entries / trip_expense_items / trip_expense_reports
+//   - trip_expense_items / trip_expense_reports
 //   - workspace_fiscal_bindings / workspace_inbound_credentials
 //     / workspace_payment_config / workspace_storefront / workspace_doc_type
 //     / workspace_module_entitlements
@@ -425,7 +425,7 @@ const NEVER_CLEAR = new Set<string>([
   'pos_sessions', 'pos_cash_movements', 'pos_signatures', 'pos_terminals',
   'document_series', 'fiscal_connectors', 'fiscal_submissions',
   'finance_settings', 'finance_branches', 'finance_categories', 'pricing_rules',
-  'finance_manual_entries', 'trip_expense_items', 'trip_expense_reports',
+  'trip_expense_items', 'trip_expense_reports',
   'workspace_fiscal_bindings', 'workspace_inbound_credentials',
   'workspace_payment_config', 'workspace_storefront', 'workspace_doc_type',
   'workspace_module_entitlements',

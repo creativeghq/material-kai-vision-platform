@@ -6425,111 +6425,6 @@ export type Database = {
           },
         ]
       }
-      finance_manual_entries: {
-        Row: {
-          amount: number
-          amount_due: number | null
-          amount_paid: number
-          category_id: string | null
-          counterparty_company_id: string | null
-          counterparty_contact_id: string | null
-          created_at: string
-          created_by: string | null
-          currency: string
-          description: string
-          direction: string
-          due_at: string | null
-          fx_rate_to_base: number
-          id: string
-          issued_at: string
-          notes: string | null
-          project_id: string | null
-          status: string
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          amount: number
-          amount_due?: number | null
-          amount_paid?: number
-          category_id?: string | null
-          counterparty_company_id?: string | null
-          counterparty_contact_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          description: string
-          direction: string
-          due_at?: string | null
-          fx_rate_to_base?: number
-          id?: string
-          issued_at?: string
-          notes?: string | null
-          project_id?: string | null
-          status?: string
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          amount?: number
-          amount_due?: number | null
-          amount_paid?: number
-          category_id?: string | null
-          counterparty_company_id?: string | null
-          counterparty_contact_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          description?: string
-          direction?: string
-          due_at?: string | null
-          fx_rate_to_base?: number
-          id?: string
-          issued_at?: string
-          notes?: string | null
-          project_id?: string | null
-          status?: string
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "finance_manual_entries_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "finance_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "finance_manual_entries_counterparty_company_id_fkey"
-            columns: ["counterparty_company_id"]
-            isOneToOne: false
-            referencedRelation: "crm_companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "finance_manual_entries_counterparty_contact_id_fkey"
-            columns: ["counterparty_contact_id"]
-            isOneToOne: false
-            referencedRelation: "crm_contacts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "finance_manual_entries_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "finance_manual_entries_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       finance_settings: {
         Row: {
           auto_statement_day_of_month: number
@@ -11830,7 +11725,6 @@ export type Database = {
           fx_rate: number
           id: string
           invoice_id: string | null
-          manual_entry_id: string | null
           payment_id: string | null
           realized_fx_gain_loss: number
           supplier_bill_id: string | null
@@ -11844,7 +11738,6 @@ export type Database = {
           fx_rate?: number
           id?: string
           invoice_id?: string | null
-          manual_entry_id?: string | null
           payment_id?: string | null
           realized_fx_gain_loss?: number
           supplier_bill_id?: string | null
@@ -11858,7 +11751,6 @@ export type Database = {
           fx_rate?: number
           id?: string
           invoice_id?: string | null
-          manual_entry_id?: string | null
           payment_id?: string | null
           realized_fx_gain_loss?: number
           supplier_bill_id?: string | null
@@ -11877,13 +11769,6 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_allocations_manual_entry_id_fkey"
-            columns: ["manual_entry_id"]
-            isOneToOne: false
-            referencedRelation: "finance_manual_entries"
             referencedColumns: ["id"]
           },
           {

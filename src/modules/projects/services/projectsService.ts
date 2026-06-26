@@ -153,7 +153,7 @@ export interface ResolvedPrice {
 }
 
 export interface ProjectFinanceRow {
-  kind: 'invoice' | 'manual' | 'supplier_bill';
+  kind: 'invoice' | 'supplier_bill';
   id: string;
   label: string | null;
   total: number | null;
@@ -795,42 +795,27 @@ class ProjectsService {
     if (companyId) invQ.eq('customer_company_id', companyId);
     else if (contactId) invQ.eq('customer_contact_id', contactId);
 
-    const meRecvQ = (supabase as any)
-      .from('finance_manual_entries')
-      .select('id, description, amount, amount_due, status, currency, issued_at, due_at, direction')
-      .is('project_id', null).eq('direction', 'receivable').neq('status', 'void');
-    if (companyId) meRecvQ.eq('counterparty_company_id', companyId);
-    else if (contactId) meRecvQ.eq('counterparty_contact_id', contactId);
-
     const billQ = (supabase as any)
       .from('supplier_bills')
       .select('id, supplier_bill_number, total, amount_due, status, currency, issued_at, due_at')
       .is('project_id', null).neq('status', 'void');
-    const mePayQ = (supabase as any)
-      .from('finance_manual_entries')
-      .select('id, description, amount, amount_due, status, currency, issued_at, due_at, direction')
-      .is('project_id', null).eq('direction', 'payable').neq('status', 'void');
 
-    const [inv, meRecv, bills, mePay] = await Promise.all([invQ, meRecvQ, billQ, mePayQ]);
+    const [inv, bills] = await Promise.all([invQ, billQ]);
     if (inv.error) throw inv.error;
-    if (meRecv.error) throw meRecv.error;
     if (bills.error) throw bills.error;
-    if (mePay.error) throw mePay.error;
 
     const recv = [
       ...(inv.data || []).map((i: any) => ({ kind: 'invoice', id: i.id, label: i.internal_number, total: i.total, amount_due: i.amount_due, status: i.status, currency: i.currency, issued_at: i.issued_at })),
-      ...(meRecv.data || []).map((m: any) => ({ kind: 'manual', id: m.id, label: m.description, total: m.amount, amount_due: m.amount_due, status: m.status, currency: m.currency, issued_at: m.issued_at })),
     ];
     const pay = [
       ...(bills.data || []).map((b: any) => ({ kind: 'supplier_bill', id: b.id, label: b.supplier_bill_number, total: b.total, amount_due: b.amount_due, status: b.status, currency: b.currency, issued_at: b.issued_at })),
-      ...(mePay.data || []).map((m: any) => ({ kind: 'manual', id: m.id, label: m.description, total: m.amount, amount_due: m.amount_due, status: m.status, currency: m.currency, issued_at: m.issued_at })),
     ];
     return { receivables: recv, payables: pay };
   }
 
   /** Attach (project_id set) or detach (null) a finance document to/from a project. */
-  async setFinanceAttachment(kind: 'invoice' | 'manual' | 'supplier_bill', id: string, projectId: string | null): Promise<void> {
-    const table = kind === 'invoice' ? 'invoices' : kind === 'supplier_bill' ? 'supplier_bills' : 'finance_manual_entries';
+  async setFinanceAttachment(kind: 'invoice' | 'supplier_bill', id: string, projectId: string | null): Promise<void> {
+    const table = kind === 'invoice' ? 'invoices' : 'supplier_bills';
     const { error } = await (supabase as any).from(table).update({ project_id: projectId }).eq('id', id);
     if (error) throw error;
   }
