@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -189,8 +189,8 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
 
 // ---------------------------------------------------------------------------
 
-type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string; available?: number | null };
-const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE, available: null });
+type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string; available?: number | null; supplier_company_id?: string | null };
+const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE, available: null, supplier_company_id: null });
 
 const NewOrderModal: React.FC<{
   workspaceId: string;
@@ -306,7 +306,7 @@ const NewOrderModal: React.FC<{
       });
       setItems((ls) => ls.map((l, idx) => {
         if (idx !== i) return l;
-        const next: Line = { ...l, available: pr.available };
+        const next: Line = { ...l, available: pr.available, supplier_company_id: pr.supplier_company_id };
         if (pr.unit_cost != null) next.unit_cost = pr.unit_cost;
         if (pr.measurement_unit_code) next.unit_code = pr.measurement_unit_code;
         if (pr.unit_price != null && (!l.unit_price || l.unit_price === 0)) next.unit_price = pr.unit_price;
@@ -360,6 +360,7 @@ const NewOrderModal: React.FC<{
           unit_price: Number(it.unit_price) || 0,
           // Purchase: what we pay the supplier IS our cost.
           unit_cost: isSales ? it.unit_cost : (Number(it.unit_price) || 0),
+          supplier_company_id: it.supplier_company_id ?? null,
           measurement_unit_code: it.unit_code,
           vat_percent: pctOf(it.vat_code),
           vat_category: parseInt(it.vat_code, 10) || undefined,
@@ -531,32 +532,41 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [payDir, setPayDir] = useState<'in' | 'out'>('in');
   // Optional: issue the order's receipt/invoice in the same step as recording money in.
   const [payIssueDoc, setPayIssueDoc] = useState(false);
+  // Money in carries a reason; money out is attached to a supplier (so it registers what we pay them).
+  const [payReason, setPayReason] = useState('');
+  const [paySupplier, setPaySupplier] = useState<{ id: string; name: string } | null>(null);
+  const [paySupplierSearch, setPaySupplierSearch] = useState('');
+  const [paySupplierOpts, setPaySupplierOpts] = useState<Array<{ id: string; name: string }>>([]);
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
   // Catalog list prices for the order's products → summarised as a discount total below.
   const [listPrices, setListPrices] = useState<Map<string, number>>(new Map());
-  // Per-product supplier (who we buy/owe) → shown on each catalog line, settable inline.
-  const [suppliers, setSuppliers] = useState<Map<string, { id: string; name: string }>>(new Map());
-  const [supplierPick, setSupplierPick] = useState<{ productId: string; label: string } | null>(null);
+  // Per-LINE supplier (who supplies this line / who we owe) → settable inline on any line.
+  const [supplierNames, setSupplierNames] = useState<Map<string, string>>(new Map());
+  const [supplierPick, setSupplierPick] = useState<{ itemId: string; productId: string | null; label: string; currentId: string | null } | null>(null);
+  // What we owe each supplier on this order (line cost grouped by supplier − money already paid out).
+  const [supExposure, setSupExposure] = useState<Awaited<ReturnType<typeof ordersService.getOrderSupplierExposure>>>([]);
 
   const load = async (id: string) => {
     try {
       setLoading(true);
       const res = await ordersService.get(id);
       const productIds = res.items.map((it) => it.product_id).filter(Boolean) as string[];
-      const [finance, lp, sup] = await Promise.all([
+      const supplierIds = res.items.map((it) => it.supplier_company_id).filter(Boolean) as string[];
+      const [finance, lp, names, exposure] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
-        ordersService.getProductSuppliers(productIds).catch(() => new Map<string, { id: string; name: string }>()),
+        ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
+        ordersService.getOrderSupplierExposure(id).catch(() => []),
       ]);
-      setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSuppliers(sup);
+      setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setListPrices(new Map()); setSuppliers(new Map()); setSupplierPick(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -587,11 +597,11 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     } finally { setSaving(false); }
   };
 
-  // #7 — set a product's supplier (who we owe when we restock it).
-  const setProductSupplier = async (productId: string, supplierCompanyId: string | null) => {
+  // #6/#7 — set the supplier on an order line (who we owe for it).
+  const setLineSupplier = async (itemId: string, productId: string | null, supplierCompanyId: string | null) => {
     setSaving(true);
     try {
-      await ordersService.setProductSupplier(productId, supplierCompanyId);
+      await ordersService.setOrderItemSupplier(itemId, supplierCompanyId, productId);
       setSupplierPick(null);
       if (order) await load(order.id);
     } catch (err: any) {
@@ -605,13 +615,35 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     if (!order) return;
     setPayDir(dir);
     setPayIssueDoc(false);
+    setPayReason(''); setPaySupplier(null); setPaySupplierSearch(''); setPaySupplierOpts([]);
     setPayAmt(String(Math.max(0, Number(order.total) - (dir === 'in' ? (fin?.received ?? 0) : (fin?.paid_out ?? 0)))));
     setPayOpen(true);
   };
+
+  // Pay a specific supplier straight from the "what we owe" rollup — money out, pre-filled.
+  const openPaySupplier = (sup: { id: string; name: string }, owed: number) => {
+    setPayDir('out'); setPayIssueDoc(false); setPayReason('');
+    setPaySupplier(sup); setPaySupplierSearch(''); setPaySupplierOpts([]);
+    setPayAmt(String(Math.max(0, owed)));
+    setPayOpen(true);
+  };
+
+  // Supplier search for money-out (CRM companies flagged supplier).
+  useEffect(() => {
+    if (!payOpen || payDir !== 'out' || paySupplier) { return; }
+    const t = paySupplierSearch.trim();
+    if (t.length < 2) { setPaySupplierOpts([]); return; }
+    const h = setTimeout(async () => {
+      const { data } = await supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike('name', `%${t}%`).limit(8);
+      setPaySupplierOpts((data ?? []) as Array<{ id: string; name: string }>);
+    }, 200);
+    return () => clearTimeout(h);
+  }, [paySupplierSearch, payOpen, payDir, paySupplier]);
   const recordPay = async () => {
     if (!order) return;
     const amt = parseFloat(payAmt);
     if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
+    if (payDir === 'out' && !paySupplier) { toast({ title: 'Pick the supplier', description: 'Money out is registered against a supplier so we track what we paid them.', variant: 'destructive' }); return; }
     const alsoIssue = payIssueDoc && payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
     setSaving(true);
     try {
@@ -622,6 +654,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
         currency: order.currency,
         order_id: order.id,
         paid_at: new Date().toISOString(),
+        reference: payReason.trim() || null,
+        // Money in → the order's customer; money out → the chosen supplier (drives party ledgers).
+        counterparty_company_id: payDir === 'out' ? (paySupplier?.id ?? null) : (order.customer_company_id ?? null),
+        counterparty_contact_id: payDir === 'in' ? (order.customer_contact_id ?? null) : null,
       });
       if (error) throw error;
       setPayOpen(false); setPayAmt('');
@@ -638,7 +674,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   // #3 — edit the order's line items (only while it has no invoice yet).
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled' && (fin?.invoices.length ?? 0) === 0;
   const startEdit = () => {
-    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent) })));
+    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent), supplier_company_id: it.supplier_company_id })));
     setEditing(true);
   };
   const setEditItem = (i: number, patch: Partial<Line>) => setEditItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
@@ -652,6 +688,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
         product_id: l.product_id ?? null, description: l.description, quantity: Number(l.quantity) || 0,
         unit_price: Number(l.unit_price) || 0,
         unit_cost: order.order_type === 'purchase' ? (Number(l.unit_price) || 0) : l.unit_cost,
+        supplier_company_id: l.supplier_company_id ?? null,
         measurement_unit_code: l.unit_code,
         vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
       })));
@@ -796,25 +833,25 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
-                  <div className="grid grid-cols-[1fr_44px_52px_120px_82px_78px_44px_88px_92px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[800px]">
-                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right">Price</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span className="text-right">Net</span><span className="text-right">Total</span>
+                  <div className="grid grid-cols-[1fr_44px_52px_120px_82px_84px_44px_88px_84px_92px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[880px]">
+                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right">Price</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span className="text-right">Net</span><span className="text-right">Profit</span><span className="text-right">Total</span>
                   </div>
                   {items.map((it) => {
                     const gross = Number(it.net_value) + Number(it.vat_amount);
                     const unitLabel = UNIT_OPTIONS.find((u) => u.code === it.measurement_unit_code)?.label ?? (it.measurement_unit_code || '—');
-                    const sup = it.product_id ? suppliers.get(it.product_id) : undefined;
+                    const supName = it.supplier_company_id ? supplierNames.get(it.supplier_company_id) : undefined;
+                    const lineCost = it.unit_cost != null ? Number(it.unit_cost) * Number(it.quantity) : null;
+                    const lineProfit = lineCost != null ? Number(it.net_value) - lineCost : null;
                     const del = Number(it.quantity_delivered); const q = Number(it.quantity);
                     const delTone = del >= q && q > 0 ? 'text-emerald-600' : del > 0 ? 'text-amber-600' : 'text-muted-foreground';
                     return (
-                    <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_78px_44px_88px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[800px]">
+                    <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_84px_44px_88px_84px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[880px]">
                       <span className="min-w-0">
                         <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
-                        {/* #7 — who we buy this from (and therefore owe). Set it inline. */}
-                        {it.product_id && (
-                          <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ productId: it.product_id!, label: it.description })}>
-                            {sup ? <><Building2 className="h-2.5 w-2.5" /> {sup.name}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
-                          </button>
-                        )}
+                        {/* #6/#7 — who supplies this line (and therefore who we owe). Any line, catalog or ad-hoc. */}
+                        <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
+                          {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
+                        </button>
                       </span>
                       <span className="text-right tabular-nums">{Number(it.quantity)}</span>
                       <span className="text-muted-foreground text-xs">{unitLabel}</span>
@@ -836,9 +873,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                         </DropdownMenu>
                       </div>
                       <span className="text-right tabular-nums">{formatMoney(Number(it.unit_price), order.currency)}</span>
-                      <span className="text-right tabular-nums text-muted-foreground">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
+                      <span className="text-right tabular-nums text-muted-foreground" title="Line cost (cost/unit × qty)">{lineCost != null ? formatMoney(lineCost, order.currency) : '—'}</span>
                       <span className="text-right tabular-nums text-muted-foreground">{Number(it.vat_percent ?? 0)}%</span>
                       <span className="text-right tabular-nums">{formatMoney(Number(it.net_value), order.currency)}</span>
+                      <span className={`text-right tabular-nums ${lineProfit == null ? 'text-muted-foreground' : lineProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>{lineProfit != null ? formatMoney(lineProfit, order.currency) : '—'}</span>
                       <span className="text-right tabular-nums">{formatMoney(gross, order.currency)}</span>
                     </div>
                     );
@@ -854,7 +892,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{formatMoney(Number(order.vat_amount), order.currency)}</span></div>
                   <div className="flex justify-between gap-8 w-60 font-semibold border-t border-border/60 pt-0.5"><span>Total (incl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.total), order.currency)}</span></div>
                   {orderMargin != null && (
-                    <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Margin (excl. VAT)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
+                    <div className="flex justify-between gap-8 w-60 font-medium"><span className="text-muted-foreground">Profit (excl. VAT)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
                   )}
                 </div>
               </>
@@ -892,15 +930,41 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
 
             {payOpen && (
               <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-medium flex items-center gap-1">
                     {payDir === 'in' ? <><ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500" /> Money in (received)</> : <><ArrowUpRight className="h-3.5 w-3.5 text-red-400" /> Money out (sent)</>}
                   </span>
-                  <Input className="h-8 w-32 text-right text-sm" type="number" step="0.01" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
+                  <Input className="h-8 w-28 text-right text-sm" type="number" step="0.01" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
                   <span className="text-xs text-muted-foreground">{order.currency}</span>
+                  {/* Money in: free-text reason (pre-payment, deposit…). */}
+                  {payDir === 'in' && (
+                    <Input className="h-8 w-44 text-sm" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder="Reason (e.g. pre-payment)" />
+                  )}
                   <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}</Button>
                   <Button size="sm" variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>
                 </div>
+                {/* Money out: which supplier we're paying (so it registers against them) + a reason. */}
+                {payDir === 'out' && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {paySupplier ? (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs"><Building2 className="h-3 w-3" /> {paySupplier.name}
+                        <button type="button" className="ml-1 text-muted-foreground hover:text-foreground" onClick={() => setPaySupplier(null)}>✕</button>
+                      </span>
+                    ) : (
+                      <div className="relative">
+                        <Input className="h-8 w-56 text-sm" value={paySupplierSearch} onChange={(e) => setPaySupplierSearch(e.target.value)} placeholder="Pay which supplier? Search…" />
+                        {paySupplierOpts.length > 0 && (
+                          <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
+                            {paySupplierOpts.map((s) => (
+                              <button key={s.id} type="button" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setPaySupplier(s); setPaySupplierSearch(''); setPaySupplierOpts([]); }}>{s.name}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <Input className="h-8 w-44 text-sm" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder="Reason (e.g. deposit)" />
+                  </div>
+                )}
                 {/* Cash sale: record the money AND issue the order's receipt/invoice in one step. */}
                 {payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
                   <label className="flex items-center gap-2 text-[11px] cursor-pointer pt-0.5">
@@ -916,7 +980,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               </div>
             )}
 
-            {/* Profit: what we received (customer payments) − what we paid suppliers (linked payments out). */}
+            {/* Realised cash on the order — money actually received minus money actually paid out.
+                (Distinct from the order's Profit-margin above, which is revenue − cost on the lines.) */}
             {fin && (
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-md border border-border/60 p-2">
@@ -928,9 +993,31 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <div className="text-sm font-semibold text-red-400">{formatMoney(fin.paid_out, order.currency)}</div>
                 </div>
                 <div className="rounded-md border border-border/60 p-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Profit</div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Net cash (in − out)</div>
                   <div className={`text-sm font-semibold ${fin.profit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.profit, order.currency)}</div>
                 </div>
+              </div>
+            )}
+
+            {/* What we owe suppliers on this order — line costs grouped by the line's supplier,
+                minus money-out already paid to them. "Pay" pre-fills a money-out for the balance. */}
+            {supExposure.length > 0 && (
+              <div className="rounded-md border border-border/60">
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Suppliers on this order — what we owe</div>
+                {supExposure.map((s) => (
+                  <div key={s.supplier_company_id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                    <span className="inline-flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-muted-foreground" /> {s.name}</span>
+                    <span className="flex items-center gap-3 tabular-nums">
+                      <span className="text-[11px] text-muted-foreground">cost {formatMoney(s.cost, order.currency)} · paid {formatMoney(s.paid, order.currency)}</span>
+                      <span className={s.owed > 0 ? 'text-red-400 font-medium' : 'text-emerald-500'}>owe {formatMoney(s.owed, order.currency)}</span>
+                      {s.owed > 0.005 && (
+                        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => openPaySupplier({ id: s.supplier_company_id, name: s.name }, s.owed)}>
+                          <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
+                        </Button>
+                      )}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -988,9 +1075,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       {supplierPick && (
         <SupplierPickerDialog
           label={supplierPick.label}
-          currentName={suppliers.get(supplierPick.productId)?.name ?? null}
+          currentName={supplierPick.currentId ? (supplierNames.get(supplierPick.currentId) ?? null) : null}
           onClose={() => setSupplierPick(null)}
-          onPick={(companyId) => void setProductSupplier(supplierPick.productId, companyId)}
+          onPick={(companyId) => void setLineSupplier(supplierPick.itemId, supplierPick.productId, companyId)}
         />
       )}
     </Dialog>

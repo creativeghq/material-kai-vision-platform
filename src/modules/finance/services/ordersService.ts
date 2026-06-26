@@ -42,6 +42,7 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   unit_cost: number | null;   // snapshot cost/unit (margin before invoicing)
+  supplier_company_id: string | null;  // who supplies this line (what we owe)
   measurement_unit_code: string | null;  // unit of measure (item, m2, kg…)
   vat_percent?: number | null;
   vat_category?: number | null;
@@ -63,6 +64,7 @@ export interface NewOrderItem {
   quantity: number;
   unit_price: number;
   unit_cost?: number | null;  // cost/unit snapshot (from catalog or manual)
+  supplier_company_id?: string | null;  // who supplies this line
   measurement_unit_code?: string | null; // unit of measure (item, m2, kg…)
   vat_percent?: number;       // per-line VAT %
   vat_category?: number;      // myDATA VAT category code (1=24%, …)
@@ -76,6 +78,7 @@ export interface LinePricing {
   discount_pct: number | null;
   measurement_unit_code: string | null;
   available: number | null;   // qty on hand across the workspace's warehouses (null = not stocked)
+  supplier_company_id: string | null;  // product's default supplier, to seed the line
 }
 
 export const ordersService = {
@@ -234,6 +237,7 @@ export const ordersService = {
         quantity: l.it.quantity,
         unit_price: l.it.unit_price,
         unit_cost: l.it.unit_cost ?? null,
+        supplier_company_id: l.it.supplier_company_id ?? null,
         measurement_unit_code: l.it.measurement_unit_code ?? null,
         vat_percent: l.pct,
         vat_category: l.it.vat_category ?? null,
@@ -292,6 +296,7 @@ export const ordersService = {
       const { error: itErr } = await supabase.from('order_items').insert(lines.map((l, i) => ({
         order_id: orderId, workspace_id: workspaceId, product_id: l.it.product_id ?? null,
         description: l.it.description, quantity: l.it.quantity, unit_price: l.it.unit_price, unit_cost: l.it.unit_cost ?? null,
+        supplier_company_id: l.it.supplier_company_id ?? null,
         measurement_unit_code: l.it.measurement_unit_code ?? null,
         vat_percent: l.pct, vat_category: l.it.vat_category ?? null,
         net_value: l.net, vat_amount: l.vat, line_total: l.net, update_warehouse: l.it.update_warehouse ?? true, sort_order: i,
@@ -317,15 +322,16 @@ export const ordersService = {
     companyId?: string | null; contactId?: string | null;
   }): Promise<LinePricing> {
     const [{ data: prod }, available] = await Promise.all([
-      supabase.from('products').select('cost').eq('id', opts.productId).maybeSingle(),
+      supabase.from('products').select('cost, supplier_company_id').eq('id', opts.productId).maybeSingle(),
       this.getAvailableStock([opts.productId], opts.workspaceId).then((m) => m.get(opts.productId) ?? null),
     ]);
     // NB: products.measurement_unit_code is the integer myDATA code, NOT our text unit label
     // (item/m²/…), so we don't seed the line's unit from it — the user picks it.
     const unit: string | null = null;
     const cost = prod?.cost != null ? Number(prod.cost) : null;
+    const supplier = (prod?.supplier_company_id as string | null) ?? null;
     if (opts.orderType === 'purchase') {
-      return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available };
+      return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available, supplier_company_id: supplier };
     }
     try {
       const { data } = await supabase.rpc('get_product_price_for_workspace', {
@@ -337,10 +343,10 @@ export const ordersService = {
         unit_price: r.final_sell != null ? Number(r.final_sell) : (r.retail != null ? Number(r.retail) : null),
         unit_cost: r.cost_basis != null ? Number(r.cost_basis) : cost,
         discount_pct: r.discount_pct != null ? Number(r.discount_pct) : null,
-        measurement_unit_code: unit, available,
+        measurement_unit_code: unit, available, supplier_company_id: supplier,
       };
     } catch {
-      return { unit_price: null, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available };
+      return { unit_price: null, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available, supplier_company_id: supplier };
     }
   },
 
@@ -357,28 +363,48 @@ export const ordersService = {
     return out;
   },
 
-  /** Set / clear a product's primary supplier (the manual "+ supplier" on an order line). */
-  async setProductSupplier(productId: string, supplierCompanyId: string | null): Promise<void> {
-    const { error } = await supabase.from('products').update({ supplier_company_id: supplierCompanyId }).eq('id', productId);
+  /** Set / clear the supplier on a specific ORDER LINE (the "+ supplier" picker). Also seeds the
+   * product's default supplier when it doesn't have one yet, so future lines auto-fill. */
+  async setOrderItemSupplier(itemId: string, supplierCompanyId: string | null, productId?: string | null): Promise<void> {
+    const { error } = await supabase.from('order_items').update({ supplier_company_id: supplierCompanyId }).eq('id', itemId);
     if (error) throw error;
+    if (productId && supplierCompanyId) {
+      await supabase.from('products').update({ supplier_company_id: supplierCompanyId }).eq('id', productId).is('supplier_company_id', null);
+    }
   },
 
-  /** Resolve the supplier (id + name) for a set of products, for the order detail's per-line badge. */
-  async getProductSuppliers(productIds: string[]): Promise<Map<string, { id: string; name: string }>> {
-    const ids = [...new Set(productIds.filter(Boolean))];
-    const out = new Map<string, { id: string; name: string }>();
+  /** Company id → name, for showing supplier labels on order lines. */
+  async getCompanyNames(companyIds: string[]): Promise<Map<string, string>> {
+    const ids = [...new Set(companyIds.filter(Boolean))];
+    const out = new Map<string, string>();
     if (ids.length === 0) return out;
-    const { data: prods } = await supabase.from('products').select('id, supplier_company_id').in('id', ids);
-    const supIds = [...new Set((prods ?? []).map((p: any) => p.supplier_company_id).filter(Boolean))] as string[];
-    if (supIds.length === 0) return out;
-    const { data: comps } = await supabase.from('crm_companies').select('id, name').in('id', supIds);
-    const names = new Map<string, string>((comps ?? []).map((c: any) => [c.id, c.name]));
-    for (const p of (prods ?? []) as Array<{ id: string; supplier_company_id: string | null }>) {
-      if (p.supplier_company_id && names.has(p.supplier_company_id)) {
-        out.set(p.id, { id: p.supplier_company_id, name: names.get(p.supplier_company_id)! });
-      }
-    }
+    const { data } = await supabase.from('crm_companies').select('id, name').in('id', ids);
+    for (const c of (data ?? []) as Array<{ id: string; name: string }>) out.set(c.id, c.name);
     return out;
+  },
+
+  /** What we owe each supplier on an order = Σ line cost (qty × unit_cost) grouped by the line's
+   * supplier, minus money already paid out to that supplier on this order. Drives the AP view. */
+  async getOrderSupplierExposure(orderId: string): Promise<Array<{ supplier_company_id: string; name: string; cost: number; paid: number; owed: number }>> {
+    const { data: items } = await supabase.from('order_items')
+      .select('supplier_company_id, quantity, unit_cost').eq('order_id', orderId);
+    const bySup = new Map<string, number>();
+    for (const it of (items ?? []) as Array<{ supplier_company_id: string | null; quantity: number; unit_cost: number | null }>) {
+      if (!it.supplier_company_id || it.unit_cost == null) continue;
+      bySup.set(it.supplier_company_id, (bySup.get(it.supplier_company_id) ?? 0) + Number(it.unit_cost) * Number(it.quantity));
+    }
+    if (bySup.size === 0) return [];
+    const { data: pays } = await supabase.from('payments')
+      .select('counterparty_company_id, amount').eq('order_id', orderId).eq('direction', 'out');
+    const paid = new Map<string, number>();
+    for (const p of (pays ?? []) as Array<{ counterparty_company_id: string | null; amount: number }>) {
+      if (p.counterparty_company_id) paid.set(p.counterparty_company_id, (paid.get(p.counterparty_company_id) ?? 0) + Number(p.amount));
+    }
+    const names = await this.getCompanyNames([...bySup.keys()]);
+    return [...bySup.entries()].map(([sid, cost]) => {
+      const p = paid.get(sid) ?? 0;
+      return { supplier_company_id: sid, name: names.get(sid) ?? 'Supplier', cost: Math.round(cost * 100) / 100, paid: p, owed: Math.round((cost - p) * 100) / 100 };
+    });
   },
 
   /** Batch list-price lookup for a set of products (order detail shows discount-vs-list). */
