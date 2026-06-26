@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -528,6 +529,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [payAmt, setPayAmt] = useState('');
   // The order only deals in REAL cash: money in (a payment received) or money out (a payment sent).
   const [payDir, setPayDir] = useState<'in' | 'out'>('in');
+  // Optional: issue the order's receipt/invoice in the same step as recording money in.
+  const [payIssueDoc, setPayIssueDoc] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
   // Catalog list prices for the order's products → summarised as a discount total below.
@@ -601,6 +604,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const openPay = (dir: 'in' | 'out') => {
     if (!order) return;
     setPayDir(dir);
+    setPayIssueDoc(false);
     setPayAmt(String(Math.max(0, Number(order.total) - (dir === 'in' ? (fin?.received ?? 0) : (fin?.paid_out ?? 0)))));
     setPayOpen(true);
   };
@@ -608,6 +612,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     if (!order) return;
     const amt = parseFloat(payAmt);
     if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
+    const alsoIssue = payIssueDoc && payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
     setSaving(true);
     try {
       const { error } = await supabase.from('payments').insert({
@@ -620,6 +625,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       });
       if (error) throw error;
       setPayOpen(false); setPayAmt('');
+      // Cash sale: issue the order's receipt/invoice from the same step, then open it to transmit.
+      if (alsoIssue) { await createInvoice(); return; }
       await load(order.id);
       onChanged();
       toast({ title: payDir === 'in' ? 'Money in recorded' : 'Money out recorded' });
@@ -664,7 +671,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       const { data, error } = await supabase.rpc('generate_invoice_from_order', { p_order: order.id });
       if (error) throw error;
       await load(order.id); onChanged();
-      toast({ title: 'Draft invoice created', description: 'Review it, then issue & transmit to myDATA.' });
+      toast({ title: `Draft ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} created`, description: 'Review it, then issue & transmit to myDATA.' });
       if (data) navigate(`/finance/invoices/${data}`);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -894,7 +901,18 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}</Button>
                   <Button size="sm" variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Just the cash movement — it doesn't issue a document. Use Actions → {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'} for the receipt/invoice.</p>
+                {/* Cash sale: record the money AND issue the order's receipt/invoice in one step. */}
+                {payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
+                  <label className="flex items-center gap-2 text-[11px] cursor-pointer pt-0.5">
+                    <Checkbox checked={payIssueDoc} onCheckedChange={(v) => setPayIssueDoc(v === true)} />
+                    Also issue a {salesDocKind === 'receipt' ? 'receipt' : 'invoice'} for this order (opens it to review &amp; transmit)
+                  </label>
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  {payIssueDoc
+                    ? `Records the cash and creates the ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} draft — review &amp; transmit it next.`
+                    : <>Just the cash movement — no document. Tick the box above, or use Actions → {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}, to issue one.</>}
+                </p>
               </div>
             )}
 
