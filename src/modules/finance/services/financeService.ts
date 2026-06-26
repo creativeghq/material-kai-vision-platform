@@ -1509,6 +1509,55 @@ const _financeServiceCore = {
     return (data ?? []) as CashFlowRow[];
   },
 
+  /**
+   * Money received but NOT yet turned into a document — customer deposits / on-account credit.
+   * = inbound payments whose allocated-to-invoices amount is less than the payment, i.e. the
+   * unallocated remainder. This is cash held as a liability (revenue isn't recognised until a
+   * receipt/invoice is issued), so it never shows in P&L/AR — this surfaces it + lets you reconcile.
+   */
+  async getDepositsOnAccount(workspaceId: string): Promise<{
+    total: number; currency: string;
+    rows: Array<{ payment_id: string; paid_at: string; amount: number; unallocated: number; currency: string; reference: string | null; order_id: string | null; order_number: string | null; party_name: string | null }>;
+  }> {
+    const { data: pays } = await supabase.from('payments')
+      .select('id, amount, currency, paid_at, reference, order_id, counterparty_company_id, counterparty_contact_id')
+      .eq('workspace_id', workspaceId).eq('direction', 'in')
+      .order('paid_at', { ascending: false }).limit(500);
+    const payments = (pays ?? []) as Array<{ id: string; amount: number; currency: string; paid_at: string; reference: string | null; order_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null }>;
+    if (payments.length === 0) return { total: 0, currency: 'EUR', rows: [] };
+    const ids = payments.map((p) => p.id);
+
+    // Allocated per payment (in payment currency = amount_doc_currency).
+    const { data: allocs } = await supabase.from('payment_allocations').select('payment_id, amount_doc_currency').in('payment_id', ids);
+    const allocated = new Map<string, number>();
+    for (const a of (allocs ?? []) as Array<{ payment_id: string; amount_doc_currency: number | null }>) {
+      allocated.set(a.payment_id, (allocated.get(a.payment_id) ?? 0) + Number(a.amount_doc_currency ?? 0));
+    }
+
+    // Order numbers + party names in batch.
+    const orderIds = [...new Set(payments.map((p) => p.order_id).filter(Boolean))] as string[];
+    const compIds = [...new Set(payments.map((p) => p.counterparty_company_id).filter(Boolean))] as string[];
+    const contactIds = [...new Set(payments.map((p) => p.counterparty_contact_id).filter(Boolean))] as string[];
+    const [ords, comps, conts] = await Promise.all([
+      orderIds.length ? supabase.from('orders').select('id, order_number').in('id', orderIds) : Promise.resolve({ data: [] as any[] }),
+      compIds.length ? supabase.from('crm_companies').select('id, name').in('id', compIds) : Promise.resolve({ data: [] as any[] }),
+      contactIds.length ? supabase.from('crm_contacts').select('id, name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const omap = new Map<string, string | null>((ords.data ?? []).map((o: any) => [o.id, o.order_number]));
+    const cmap = new Map<string, string>((comps.data ?? []).map((c: any) => [c.id, c.name]));
+    const ctmap = new Map<string, string>((conts.data ?? []).map((c: any) => [c.id, c.name]));
+
+    const rows = payments.map((p) => {
+      const unallocated = Math.round((Number(p.amount) - (allocated.get(p.id) ?? 0)) * 100) / 100;
+      return {
+        payment_id: p.id, paid_at: p.paid_at, amount: Number(p.amount), unallocated, currency: p.currency,
+        reference: p.reference, order_id: p.order_id, order_number: p.order_id ? (omap.get(p.order_id) ?? null) : null,
+        party_name: p.counterparty_company_id ? (cmap.get(p.counterparty_company_id) ?? null) : (p.counterparty_contact_id ? (ctmap.get(p.counterparty_contact_id) ?? null) : null),
+      };
+    }).filter((r) => r.unallocated > 0.005);
+    return { total: Math.round(rows.reduce((a, r) => a + r.unallocated, 0) * 100) / 100, currency: rows[0]?.currency ?? 'EUR', rows };
+  },
+
   async getCustomerAccount(opts: { contactId?: string; companyId?: string }): Promise<{
     quoteCount: number;
     quotedTotal: number;

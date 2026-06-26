@@ -151,6 +151,8 @@ const FinancePage: React.FC = () => {
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [cashPosition, setCashPosition] = useState(0); // money in bank = Σ payments in − out
   const [bankBalances, setBankBalances] = useState<BankAccountBalance[]>([]);
+  // Money received but not yet invoiced (deposits / on-account) — cash held, not yet revenue.
+  const [deposits, setDeposits] = useState<Awaited<ReturnType<typeof financeService.getDepositsOnAccount>>>({ total: 0, currency: 'EUR', rows: [] });
 
   // Dashboard sales insights (period-scoped — reuse the Reports RPCs at a glance).
   type DashPeriod = 'this_month' | 'last_month' | 'last_quarter' | 'ytd';
@@ -184,6 +186,19 @@ const FinancePage: React.FC = () => {
   // Dashboard insights — re-fetch when the workspace or period changes, independent
   // of the heavy loadAll() so flipping the period is cheap.
   useEffect(() => { if (workspaceId) void loadInsights(workspaceId, dashPeriod); }, [workspaceId, dashPeriod]);
+
+  // Reconcile a deposit → turn the order it was taken on into a receipt/invoice draft.
+  const issueFromOrder = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('generate_invoice_from_order', { p_order: orderId });
+      if (error) throw error;
+      toast({ title: 'Draft document created', description: 'Review it, then issue & transmit to myDATA.' });
+      if (workspaceId) void loadAll(workspaceId);
+      if (data) navigate(`${financeBase}/invoices/${data}`);
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
 
   const loadInsights = async (wsId: string, period: DashPeriod) => {
     try {
@@ -253,6 +268,8 @@ const FinancePage: React.FC = () => {
       setCashPosition((pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'in' ? Number(p.amount) : -Number(p.amount)), 0));
       // Per-account balances (where the money actually sits).
       setBankBalances(await financeService.getBankAccountBalances(wsId).catch(() => [] as BankAccountBalance[]));
+      // Deposits / on-account — cash received that isn't a document (revenue) yet.
+      setDeposits(await financeService.getDepositsOnAccount(wsId).catch(() => ({ total: 0, currency: 'EUR', rows: [] })));
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load finance data');
       toast({ title: 'Load failed', description: err?.message, variant: 'destructive' });
@@ -409,7 +426,7 @@ const FinancePage: React.FC = () => {
                 label="Cash in bank"
                 value={formatMoney(cashPosition)}
                 accent={cashPosition < 0 ? 'destructive' : 'default'}
-                subtext="Payments in − out"
+                subtext={deposits.total > 0 ? `incl. ${formatMoney(deposits.total)} not yet invoiced` : 'Payments in − out'}
               />
               <KpiCard
                 icon={ArrowDownCircle}
@@ -452,6 +469,41 @@ const FinancePage: React.FC = () => {
               <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" />
               <BucketSummary title="Payables by age" buckets={apBuckets} viewLink="ap" />
             </div>
+
+            {/* Money received but not yet a document — deposits / on-account. Cash we hold that
+                isn't revenue yet (not in P&L / AR). Reconcile each → issue its receipt/invoice. */}
+            {deposits.total > 0 && (
+              <Card>
+                <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2"><BanknoteIcon className="h-4 w-4" /> Received, not yet invoiced — deposits / on-account</CardTitle>
+                  <span className="text-sm font-semibold text-amber-600">{formatMoney(deposits.total, deposits.currency)}</span>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <p className="px-5 pt-3 text-xs text-muted-foreground">Cash you've received that isn't a receipt/invoice yet — it's held as a customer deposit (not revenue, not in AR). Issue a document to recognise it.</p>
+                  <ul className="divide-y divide-border/40 mt-2">
+                    {deposits.rows.slice(0, 8).map((d) => (
+                      <li key={d.payment_id} className="flex items-center justify-between gap-3 px-5 py-2.5">
+                        <div className="min-w-0">
+                          <div className="text-sm">
+                            {d.party_name ?? 'Unattributed'}
+                            {d.order_number && <span className="text-xs text-muted-foreground"> · Order {d.order_number}</span>}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">{new Date(d.paid_at).toLocaleDateString()}{d.reference ? ` · ${d.reference}` : ''}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium tabular-nums">{formatMoney(d.unallocated, d.currency)}</span>
+                          {!isAccountant && d.order_id && (
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => issueFromOrder(d.order_id!)}>
+                              <Receipt className="h-3.5 w-3.5 mr-1" /> Issue document
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Cash flow + P&L stacked */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
