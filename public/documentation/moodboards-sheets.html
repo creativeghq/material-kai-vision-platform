@@ -14,10 +14,16 @@
   <p class="lead">Presentation sheets are polished, client-ready A3 pages produced from a board — a material grid, a colour scheme, a lighting plan, a full deck. They are how a board stops being an internal collection and becomes a deliverable a client understands. This guide explains <strong>what each sheet type is, whether it's interactive or passive, what it costs and the inputs it expects</strong>, how sheets are generated through the Agent Hub (with an in-chat canvas for the interactive ones), and how the finished PDFs are stored on the board and bundled into a Client View.</p>
 
   <h2>Where it is</h2>
-  <p>Open a board at <span class="badge route">/moodboard/:id</span>. Sheets are started from the board's <strong>Tools</strong> tab via <strong>New Tool</strong>, or simply by asking the <a href="agent-hub.html">Agent Hub</a> for the sheet you want. The finished PDF is attached to the board so you can re-open and re-render it later.</p>
+  <p>Open a board at <span class="badge route">/moodboard/:id</span> and go to its <strong>Sheets</strong> tab. Pick a sheet type and a <strong>guided wizard</strong> walks you through creating it. You can also start one from the <a href="agent-hub.html">Agent Hub</a> (the Sheets toolkit quick-starts open the same wizard). The finished PDF is attached to the board so you can re-open and re-render it later.</p>
 
-  <h2>What's on the screen</h2>
-  <p><strong>What it is —</strong> sheets are generated through the <a href="agent-hub.html">Agent Hub</a>: you describe the sheet you want, the assistant assembles it, and the finished PDF is attached to the board. <strong>Why it matters —</strong> each sheet is stored with the moodboard and can later be bundled into a project-level <a href="projects.html">Client View</a>. <strong>How —</strong> for <strong>passive</strong> sheets the assistant assembles the content and renders to PDF immediately; for <strong>interactive</strong> sheets it first opens an <strong>in-chat canvas</strong> where you place fixture symbols, draw dimensions, or position callouts directly on the image, and only then is the PDF rendered.</p>
+  <h2>How a sheet is created — the guided wizard</h2>
+  <p><strong>What it is —</strong> sheets are now built through a short <strong>step-by-step wizard</strong> (it replaced the older “seed a chat message” hand-off), so you fill in exactly what each sheet type needs instead of describing it in prose. <strong>Why it matters —</strong> the wizard only asks for what's relevant and pulls the choices straight from your board, so you can't miss a required input. The steps are:</p>
+  <ol>
+    <li><strong>Type</strong> — pick the sheet type (skipped when you launched from a specific type).</li>
+    <li><strong>Which moodboard?</strong> — choose the board to build from (skipped when you're already on one).</li>
+    <li><strong>Details</strong> — give the sheet a <strong>title</strong> and provide the type-specific inputs, drawn from the board: pick <strong>products</strong> (material board), sample <strong>images</strong> (palette / concept), choose a <strong>quote</strong> (FF&amp;E schedule), or upload a <strong>floor-plan image</strong> with its real-world <strong>dimensions</strong> (lighting plan / elevation). Empty states tell you if the board has no products/images/quotes yet.</li>
+  </ol>
+  <p>For <strong>passive</strong> sheets the wizard renders the PDF immediately on finish. For <strong>interactive</strong> sheets (lighting plan, annotated render, elevation/render pair) it hands off to an <strong>in-chat canvas</strong> where you place fixture symbols, draw dimensions or position callouts on the image — <em>“you'll place the symbols on the canvas after this”</em> — and the PDF renders once you're done. Each finished sheet is stored with the board and can be bundled into a project-level <a href="projects.html">Client View</a>.</p>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboard-detail.png" alt="MoodBoard detail">
     <figcaption>A board's detail view — the Tools tab and New Tool are where presentation sheets begin.</figcaption>
@@ -58,10 +64,10 @@
 
   <h2>Step by step: produce a presentation sheet</h2>
   <ol>
-    <li>From the board, choose a sheet type — for example a <strong>material board</strong>, <strong>colour palette</strong>, <strong>lighting plan</strong>, <strong>FF&amp;E schedule</strong> or <strong>full deck</strong> — via the <strong>Tools</strong> tab's <strong>New Tool</strong>, or simply ask the assistant for it.</li>
-    <li>The <a href="agent-hub.html">Agent Hub</a> drives the sheet: describe what you want and the assistant assembles it.</li>
-    <li>For an interactive sheet, complete the <strong>in-chat canvas</strong> — place fixture symbols, draw dimensions, or position callouts directly on the image.</li>
-    <li>The finished sheet renders as an <strong>A3 PDF attached to the board</strong>, ready to re-open and re-render later.</li>
+    <li>On the board's <strong>Sheets</strong> tab, choose a sheet type — for example a <strong>material board</strong>, <strong>colour palette</strong>, <strong>lighting plan</strong>, <strong>FF&amp;E schedule</strong> or <strong>full deck</strong>. The guided <strong>wizard</strong> opens.</li>
+    <li>Work through the wizard: confirm the <strong>moodboard</strong>, set a <strong>title</strong>, and fill the type-specific <strong>details</strong> (products / images / quote / floor-plan image + dimensions).</li>
+    <li>Finish. A <strong>passive</strong> sheet renders straight away; an <strong>interactive</strong> one opens the <strong>in-chat canvas</strong> to place fixture symbols, draw dimensions or position callouts before it renders.</li>
+    <li>The finished sheet is an <strong>A3 PDF attached to the board</strong>, ready to re-open, re-render, or bundle into a <a href="projects.html">Client View</a>.</li>
   </ol>
 
   <h2>Worked example — building a full deck for hand-off</h2>
