@@ -19,7 +19,6 @@ import {
   Package,
   Settings as SettingsIcon,
   Banknote as BanknoteIcon,
-  Ban,
   Plane,
   Award,
   Boxes,
@@ -59,8 +58,6 @@ import {
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
-import { ManualEntryDialog } from '@/modules/finance/components/ManualEntryDialog';
-import { RecordPaymentDialog, type RecordPaymentPreset } from '@/modules/finance/components/RecordPaymentDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
@@ -169,29 +166,11 @@ const FinancePage: React.FC = () => {
   const [scnOpen, setScnOpen] = useState(false);
   const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
-  // Un-invoiced receivables / payables
-  const [manualEntryOpen, setManualEntryOpen] = useState(false);
-  const [manualEntryDir, setManualEntryDir] = useState<'receivable' | 'payable'>('receivable');
-  const [settlePreset, setSettlePreset] = useState<RecordPaymentPreset | null>(null);
-  const [settleOpen, setSettleOpen] = useState(false);
 
   // AR/AP list filters (party search + category + age bucket), one set per side.
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [arQuery, setArQuery] = useState(''); const [arCat, setArCat] = useState('all'); const [arBucket, setArBucket] = useState<string>('all');
   const [apQuery, setApQuery] = useState(''); const [apCat, setApCat] = useState('all'); const [apBucket, setApBucket] = useState<string>('all');
-
-  const openManualEntry = (dir: 'receivable' | 'payable') => { setManualEntryDir(dir); setManualEntryOpen(true); };
-  const openSettle = (preset: RecordPaymentPreset) => { setSettlePreset(preset); setSettleOpen(true); };
-  const removeManual = async (id: string) => {
-    if (!window.confirm('Delete this entry permanently? This cannot be undone.')) return;
-    try {
-      await financeService.deleteManualEntry(id);
-      toast({ title: 'Entry deleted' });
-      if (workspaceId) void loadAll(workspaceId);
-    } catch (err: any) {
-      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
-    }
-  };
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -237,12 +216,11 @@ const FinancePage: React.FC = () => {
         financeService.listInvoices({ workspaceId: wsId, limit: 25 }),
         financeCategoriesService.list(wsId).catch(() => [] as FinanceCategory[]),
       ]);
-      // Confirmed orders not yet invoiced are real money owed but aren't AR/AP documents yet.
-      // Synthesize them as rows (same data + filter logic as the CRM party Account tab) so the
-      // global Receivables/Payables tabs show the complete "money owed" picture. Once invoiced,
-      // the invoice/bill takes over and the order drops out — no double counting.
-      let arWithOrders = arRows;
-      let apWithOrders = apRows;
+      // Cash + documents only: receivables/payables are issued invoices / supplier bills, plus
+      // confirmed-but-not-yet-invoiced orders (real order-derived money). Manual "virtual" AR/AP
+      // entries are intentionally excluded everywhere now.
+      let arWithOrders = arRows.filter((r) => r.entry_kind !== 'manual');
+      let apWithOrders = apRows.filter((r) => r.entry_kind !== 'manual');
       try {
         const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: wsId });
         const toAgingRow = (o: typeof uninvoiced[number]): AgingRow => ({
@@ -260,9 +238,9 @@ const FinancePage: React.FC = () => {
           description: `Order ${o.order_number ?? o.id.slice(0, 8)}`,
           party_name: o.party_name,
         });
-        arWithOrders = [...arRows, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
-        apWithOrders = [...apRows, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
-      } catch { /* orders overlay is best-effort — invoices/manual rows still render */ }
+        arWithOrders = [...arWithOrders, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
+        apWithOrders = [...apWithOrders, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
+      } catch { /* orders overlay is best-effort — invoices/bills still render */ }
       setAr(arWithOrders);
       setAp(apWithOrders);
       setCategories(cats);
@@ -597,11 +575,10 @@ const FinancePage: React.FC = () => {
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <h3 className="text-sm font-semibold">Receivables — money customers owe us</h3>
-                <p className="text-xs text-muted-foreground">Open invoices plus un-invoiced receivables (deposits, advances, fees). To invoice an accepted quote, use Issue invoice on the quote page.</p>
+                <p className="text-xs text-muted-foreground">Open invoices plus confirmed orders not yet invoiced. To invoice an accepted quote, use Issue invoice on the quote page.</p>
               </div>
               {!isAccountant && (
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" onClick={() => openManualEntry('receivable')}><Plus className="h-4 w-4 mr-1" /> Add receivable</Button>
                   <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
                 </div>
               )}
@@ -636,19 +613,18 @@ const FinancePage: React.FC = () => {
                       <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">{ar.length === 0 ? 'No open receivables.' : 'No receivables match the filters.'}</td></tr>
                     )}
                     {arFiltered.map((r) => {
-                      const isManual = r.entry_kind === 'manual';
                       const isOrder = r.entry_kind === 'order';
                       return (
                       <tr
                         key={r.id}
-                        className={`border-b border-border/30 hover:bg-muted/30 ${isManual ? '' : 'cursor-pointer'}`}
-                        onClick={isOrder ? () => onTabChange('doc_orders') : isManual ? undefined : () => navigate(`${financeBase}/invoices/${r.id}`)}
+                        className="border-b border-border/30 hover:bg-muted/30 cursor-pointer"
+                        onClick={isOrder ? () => onTabChange('doc_orders') : () => navigate(`${financeBase}/invoices/${r.id}`)}
                       >
                         <td className="px-4 py-2">
-                          {isManual || isOrder ? (
+                          {isOrder ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.description}</span>
-                              <Badge variant="secondary" className="text-[10px]">{isOrder ? 'Order · not invoiced' : 'Un-invoiced'}</Badge>
+                              <Badge variant="secondary" className="text-[10px]">Order · not invoiced</Badge>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.internal_number}</span>
@@ -669,17 +645,6 @@ const FinancePage: React.FC = () => {
                             <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onTabChange('doc_orders')}>
                               <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
                             </Button>
-                          ) : isManual ? (
-                            !isAccountant && (
-                              <div className="flex items-center justify-end gap-1">
-                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openSettle({ direction: 'received', targetType: 'manual_entry', targetId: r.id })}>
-                                  <BanknoteIcon className="h-3.5 w-3.5 mr-1" /> Settle
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Delete" onClick={() => removeManual(r.id)}>
-                                  <Ban className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )
                           ) : (
                             <InvoiceActionsMenu invoiceId={r.id} financeBase={financeBase} onChanged={() => loadAll(workspaceId)} />
                           )}
@@ -698,10 +663,9 @@ const FinancePage: React.FC = () => {
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <h3 className="text-sm font-semibold">Payables — money we owe</h3>
-                <p className="text-xs text-muted-foreground">Open supplier bills plus un-invoiced payables (rent, utilities, advances). Suppliers must be marked <code>is_supplier</code> in CRM.</p>
+                <p className="text-xs text-muted-foreground">Open supplier bills plus confirmed purchase orders not yet billed. Suppliers must be marked <code>is_supplier</code> in CRM.</p>
               </div>
               <div className="flex items-center gap-2">
-                {!isAccountant && <Button variant="outline" onClick={() => openManualEntry('payable')}><Plus className="h-4 w-4 mr-1" /> Add payable</Button>}
                 {!isAccountant && <Button variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
                 {!isAccountant && <Button onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
               </div>
@@ -736,7 +700,6 @@ const FinancePage: React.FC = () => {
                       <tr><td colSpan={isAccountant ? 9 : 10} className="px-4 py-8 text-center text-muted-foreground">{ap.length === 0 ? 'No open payables.' : 'No payables match the filters.'}</td></tr>
                     )}
                     {apFiltered.map((r) => {
-                      const isManual = r.entry_kind === 'manual';
                       const isOrder = r.entry_kind === 'order';
                       return (
                       <tr
@@ -745,10 +708,10 @@ const FinancePage: React.FC = () => {
                         onClick={isOrder ? () => onTabChange('doc_orders') : undefined}
                       >
                         <td className="px-4 py-2">
-                          {isManual || isOrder ? (
+                          {isOrder ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.description}</span>
-                              <Badge variant="secondary" className="text-[10px]">{isOrder ? 'Order · not invoiced' : 'Un-invoiced'}</Badge>
+                              <Badge variant="secondary" className="text-[10px]">Order · not invoiced</Badge>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.supplier_bill_number ?? '—'}</span>
@@ -770,15 +733,6 @@ const FinancePage: React.FC = () => {
                               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onTabChange('doc_orders')}>
                                 <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
                               </Button>
-                            ) : isManual ? (
-                              <div className="flex items-center justify-end gap-1">
-                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openSettle({ direction: 'paid_out', targetType: 'manual_entry', targetId: r.id })}>
-                                  <BanknoteIcon className="h-3.5 w-3.5 mr-1" /> Settle
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Delete" onClick={() => removeManual(r.id)}>
-                                  <Ban className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
                             ) : (
                               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
                                 <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
@@ -902,20 +856,6 @@ const FinancePage: React.FC = () => {
         onOpenChange={setScnOpen}
         supplierBillId={scnBillId}
         onCreated={async () => { setScnOpen(false); if (workspaceId) await loadAll(workspaceId); }}
-      />
-      <ManualEntryDialog
-        workspaceId={workspaceId}
-        direction={manualEntryDir}
-        open={manualEntryOpen}
-        onOpenChange={setManualEntryOpen}
-        onSaved={() => { if (workspaceId) void loadAll(workspaceId); }}
-      />
-      <RecordPaymentDialog
-        workspaceId={workspaceId}
-        open={settleOpen}
-        onOpenChange={setSettleOpen}
-        preset={settlePreset}
-        onSaved={() => { setSettleOpen(false); setSettlePreset(null); if (workspaceId) void loadAll(workspaceId); }}
       />
     </div>
   );
