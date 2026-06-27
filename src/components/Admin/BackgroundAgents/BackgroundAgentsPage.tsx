@@ -157,7 +157,7 @@ export function BackgroundAgentsPage() {
   }, [runs, allAlerts]);
 
   return (
-    <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+    <div className="px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* Top-level mode selector — Background runs vs Chat agent activity */}
       <Tabs defaultValue="background" className="space-y-4 sm:space-y-6">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">

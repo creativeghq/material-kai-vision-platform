@@ -144,7 +144,7 @@ const InvoiceDetailPage: React.FC = () => {
 
   if (error || !invoice) {
     return (
-      <div className="container max-w-2xl py-10">
+      <div className="px-3 sm:px-6 py-10">
         <Card className="border-destructive/50">
           <CardContent className="flex gap-2 p-6 text-sm text-destructive">
             <AlertCircle className="h-4 w-4 mt-0.5" />
@@ -161,7 +161,7 @@ const InvoiceDetailPage: React.FC = () => {
     invoice.subtotal_net > 0 ? (totalMargin / invoice.subtotal_net) * 100 : null;
 
   return (
-    <div className="container max-w-6xl space-y-6 py-6">
+    <div className="px-3 sm:px-6 space-y-6 py-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <Link to={financeBase}>

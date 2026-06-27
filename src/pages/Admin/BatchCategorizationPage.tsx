@@ -132,7 +132,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
   };
 
   return (
-    <div className={embedded ? 'space-y-6' : 'p-3 sm:p-8 space-y-6 max-w-5xl mx-auto'}>
+    <div className={embedded ? 'space-y-6' : 'p-3 sm:p-8 space-y-6'}>
       {/* Header — hidden when embedded as a tab (host page supplies the header) */}
       {!embedded && (
         <div className="flex items-center gap-4">
