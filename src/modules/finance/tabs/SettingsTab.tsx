@@ -24,9 +24,6 @@ import { CustomPricingRulesCard } from '@/modules/finance/components/CustomPrici
 import { PendingDiscountApprovalsCard } from '@/modules/finance/components/PendingDiscountApprovalsCard';
 import { ServicesCard } from '@/modules/finance/components/ServicesCard';
 import { TeamInviteCard } from '@/modules/finance/components/TeamInviteCard';
-import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
-import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
-import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 import { CategoriesCard } from '@/modules/finance/components/CategoriesCard';
 import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
@@ -52,6 +49,17 @@ const SETTINGS_SECTIONS = [
   { value: 'digest', label: 'Finance Digest', icon: Mail },
   { value: 'payments', label: 'Payments', icon: CreditCard },
 ] as const;
+
+/** Provider keys (Resend sender, ΑΑΔΕ codes, myDATA Inbox) now live in Profile → Keys. */
+const ProviderKeysNote: React.FC = () => (
+  <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+    <Info className="h-4 w-4 shrink-0 mt-0.5" />
+    <span>
+      Provider keys — email sender (Resend), ΑΑΔΕ Special Access Codes and the myDATA Inbox — are managed in{' '}
+      <Link to="/profile?tab=keys" className="text-primary underline">Profile → Keys</Link>.
+    </span>
+  </div>
+);
 
 export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged }) => {
   const { toast } = useToast();
@@ -202,8 +210,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
       <div className="w-full min-w-0 space-y-4">
         <TabsContent value="identity" className="mt-0 space-y-4">
           <BusinessIdentityCard workspaceId={workspaceId} />
-          <AadeCredentialsCard workspaceId={workspaceId} />
-          <WorkspaceEmailConfigCard workspaceId={workspaceId} />
+          <ProviderKeysNote />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-0 space-y-4">
@@ -211,7 +218,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <DocumentSetupCard workspaceId={workspaceId} />
           <InvoiceTemplateCard workspaceId={workspaceId} />
           <PosTerminalsCard workspaceId={workspaceId} />
-          <InboundSetupCard workspaceId={workspaceId} />
+          <ProviderKeysNote />
         </TabsContent>
 
         <TabsContent value="einvoicing" className="mt-0">

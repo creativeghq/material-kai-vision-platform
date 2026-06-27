@@ -9,7 +9,6 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { aadeService, type AadeLookupResult } from '../services/aadeService';
-import { AadeCredentialsCard } from '../components/AadeCredentialsCard';
 
 // "Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ" — the separate credentials you create specifically for
 // software access to ΑΑΔΕ web services. The app redirects through TAXISnet login.
@@ -66,8 +65,16 @@ const MyAadeModulePage: React.FC = () => {
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
-        {/* Per-workspace credentials */}
-        {activeWorkspaceId && <AadeCredentialsCard workspaceId={activeWorkspaceId} />}
+        {/* Per-workspace credentials live in Profile → Keys */}
+        <Card>
+          <CardContent className="flex items-start gap-2 p-4 text-sm text-muted-foreground">
+            <KeyRound className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              Your ΑΑΔΕ Special Access Codes are managed in{' '}
+              <Link to="/profile?tab=keys" className="text-primary underline">Profile → Keys</Link>. Set them there, then use the test lookup below.
+            </span>
+          </CardContent>
+        </Card>
 
         {/* Registration hint */}
         <Card>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, Star, Share2, ReceiptText } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, Star, Share2, ReceiptText, KeyRound } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -10,6 +10,7 @@ import { BillingHistoryTab } from '@/components/core/Profile/BillingHistoryTab';
 import { MyDocumentsTab } from '@/components/core/Profile/MyDocumentsTab';
 import { InboxTab } from '@/components/core/Profile/InboxTab';
 import { SocialAccountsTab } from '@/modules/social-media/components/SocialAccountsTab';
+import { WorkspaceKeysTab } from '@/components/core/Profile/WorkspaceKeysTab';
 import { AppointmentsPage } from './AppointmentsPage';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { useAuth } from '@/contexts/AuthContext';
@@ -76,6 +77,10 @@ export const UserProfilePage: React.FC = () => {
             <Share2 className="h-4 w-4" />
             Social Accounts
           </TabsTrigger>
+          <TabsTrigger value="keys" className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4" />
+            Keys
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
@@ -123,6 +128,10 @@ export const UserProfilePage: React.FC = () => {
 
         <TabsContent value="social-accounts" className="space-y-6">
           <SocialAccountsTab />
+        </TabsContent>
+
+        <TabsContent value="keys" className="space-y-6">
+          <WorkspaceKeysTab />
         </TabsContent>
       </Tabs>
       </div>
