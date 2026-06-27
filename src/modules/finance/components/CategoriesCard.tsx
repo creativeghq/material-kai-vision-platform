@@ -9,6 +9,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Plus, Trash2, Tags, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { parseDecimal } from '@/utils/decimal';
 
 export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -48,7 +49,7 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
   const saveMargin = async (id: string, raw: string) => {
-    const n = raw.trim() === '' ? null : Number(raw);
+    const n = raw.trim() === '' ? null : parseDecimal(raw);
     try { await financeCategoriesService.setMargin(id, n != null && Number.isFinite(n) ? n : null); }
     catch (err: any) { toast({ title: 'Failed to save margin', description: err?.message, variant: 'destructive' }); }
   };
@@ -79,7 +80,7 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <div className="flex items-center gap-3">
                   <Badge variant={kindBadge(c.kind)} className="text-[10px]">{c.kind}</Badge>
                   <div className="flex items-center gap-1" title="Default sell margin % — auto-prices received goods in this category">
-                    <input type="number" step="0.5" min="0" defaultValue={c.margin_pct ?? ''} placeholder="margin"
+                    <input type="text" inputMode="decimal" defaultValue={c.margin_pct ?? ''} placeholder="margin"
                       className="h-7 w-14 rounded border border-border/60 bg-background px-1 text-right text-xs"
                       onBlur={(e) => saveMargin(c.id, e.target.value)} />
                     <span className="text-[10px] text-muted-foreground">%</span>

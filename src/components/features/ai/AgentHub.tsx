@@ -441,6 +441,15 @@ interface AgentHubProps {
   /** Deep-link: pre-pin a catalog material (e.g. from a product page) so the
    *  interior flow already knows which material to apply. */
   initialPinnedMaterial?: { id: string; name: string; imageUrl?: string };
+  /** Deep-link: preload image attachment(s) (public URLs) into the composer so a
+   *  flow / prompt acts on them — e.g. "edit this room photo" from another page. */
+  initialImages?: string[];
+  /** Deep-link: force the generation pipeline (e.g. 'image-edit', 'redesign'). */
+  initialGenerationMode?: string;
+  /** Deep-link: deterministically launch a guided flow on open, by toolkit + label
+   *  (e.g. {toolkitId:'generation', label:'Test on a room'}). Runs the same
+   *  handleQuickStart dispatcher the in-app UI uses, so ANY flow is reachable. */
+  initialQuickStart?: { toolkitId: string; label: string };
   onConversationChange?: (conversationId: string | null) => void;
 }
 
@@ -501,6 +510,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   initialMoodboardId,
   initialAgent,
   initialPinnedMaterial,
+  initialImages,
+  initialGenerationMode,
+  initialQuickStart,
   onConversationChange,
 }) => {
   const { toast } = useToast();
@@ -2921,14 +2933,41 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     handleSendMessageRef.current = handleSendMessage;
   }, [handleSendMessage]);
 
-  // Auto-send initialPrompt once userId is available
+  // Auto-send initialPrompt once userId is available. Skipped when an explicit
+  // quickstart deep-link is present (the flow drives the interaction instead).
   useEffect(() => {
-    if (initialPrompt && userId && !initialPromptSent.current) {
+    if (initialPrompt && userId && !initialPromptSent.current && !initialQuickStart) {
       initialPromptSent.current = true;
       setInput(initialPrompt);
       setTimeout(() => { handleSendMessageRef.current(); }, 300);
     }
-  }, [userId, initialPrompt]);
+  }, [userId, initialPrompt, initialQuickStart]);
+
+  // Deep-link: preload image attachment(s) + generation mode once, so a flow or
+  // prompt from another page acts on them (e.g. "edit this room photo").
+  const deepLinkSeeded = useRef(false);
+  useEffect(() => {
+    if (deepLinkSeeded.current || !userId) return;
+    if (initialImages?.length) setAttachedImages(initialImages);
+    if (initialGenerationMode) setSelectedGenerationMode(initialGenerationMode);
+    deepLinkSeeded.current = true;
+  }, [userId, initialImages, initialGenerationMode]);
+
+  // Deep-link: deterministically launch a guided flow by toolkit + label, using
+  // the SAME handleQuickStart dispatcher as the in-app UI — so any flow (interior
+  // capture, sheet wizard, SEO run, …) is reachable from another page, fully
+  // preloaded. Waits for any requested image to land first so a generation
+  // form's image field pre-fills from it.
+  const deepLinkLaunched = useRef(false);
+  useEffect(() => {
+    if (deepLinkLaunched.current || !userId || !initialQuickStart) return;
+    if (initialImages?.length && attachedImages.length === 0) return; // wait for the seed
+    deepLinkLaunched.current = true;
+    const tk = TOOLKITS.find((t) => t.id === initialQuickStart.toolkitId);
+    const qs = tk?.quick_starts?.find((q) => q.label === initialQuickStart.label);
+    if (tk && qs) handleQuickStart(qs, tk);
+    else console.warn('[AgentHub] Unknown quickstart deep-link:', initialQuickStart);
+  }, [userId, initialQuickStart, initialImages, attachedImages, handleQuickStart]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

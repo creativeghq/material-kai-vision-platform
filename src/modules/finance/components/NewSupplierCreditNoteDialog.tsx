@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, VAT_CATEGORIES, type SupplierBill } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
+import { parseDecimalOr } from '@/utils/decimal';
 
 type Supplier = { type: 'company' | 'contact'; id: string; label: string };
 interface Line { id: string; description: string; qty: string; unitPrice: string; vatCode: string; }
@@ -103,15 +104,15 @@ export const NewSupplierCreditNoteDialog: React.FC<{
   const computed = useMemo(() => {
     let net = 0, vat = 0;
     const payloadLines = lines
-      .filter((l) => l.description.trim() && parseFloat(l.unitPrice) > 0)
+      .filter((l) => l.description.trim() && parseDecimalOr(l.unitPrice, 0) > 0)
       .map((l) => {
-        const qty = parseFloat(l.qty) || 0;
-        const lineNet = round2(qty * (parseFloat(l.unitPrice) || 0));
+        const qty = parseDecimalOr(l.qty, 0);
+        const lineNet = round2(qty * parseDecimalOr(l.unitPrice, 0));
         const pct = pctOf(l.vatCode);
         const lineVat = round2(lineNet * pct / 100);
         net = round2(net + lineNet); vat = round2(vat + lineVat);
         return {
-          description: l.description.trim(), quantity: qty, unit_price: parseFloat(l.unitPrice) || 0,
+          description: l.description.trim(), quantity: qty, unit_price: parseDecimalOr(l.unitPrice, 0),
           net_value: lineNet, vat_amount: lineVat, vat_category: parseInt(l.vatCode, 10), vat_percent: pct,
         };
       });
@@ -231,13 +232,13 @@ export const NewSupplierCreditNoteDialog: React.FC<{
                 <span>Description</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">VAT</span><span className="text-right">Line total</span><span />
               </div>
               {lines.map((l) => {
-                const qty = parseFloat(l.qty) || 0; const up = parseFloat(l.unitPrice) || 0;
+                const qty = parseDecimalOr(l.qty, 0); const up = parseDecimalOr(l.unitPrice, 0);
                 const lineNet = round2(qty * up); const lineTotal = round2(lineNet * (1 + pctOf(l.vatCode) / 100));
                 return (
                   <div key={l.id} className="grid grid-cols-[1fr_60px_84px_88px_84px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
                     <Input className="h-8 text-sm" value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} placeholder="Item / reason" />
-                    <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.qty} onChange={(e) => setLine(l.id, { qty: e.target.value })} />
-                    <Input className="h-8 text-right text-sm" type="number" step="0.01" value={l.unitPrice} onChange={(e) => setLine(l.id, { unitPrice: e.target.value })} placeholder="0.00" />
+                    <Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.qty} onChange={(e) => setLine(l.id, { qty: e.target.value })} />
+                    <Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.unitPrice} onChange={(e) => setLine(l.id, { unitPrice: e.target.value })} placeholder="0.00" />
                     <Select value={l.vatCode} onValueChange={(v) => setLine(l.id, { vatCode: v })}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>

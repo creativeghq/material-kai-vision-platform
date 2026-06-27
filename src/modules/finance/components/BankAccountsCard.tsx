@@ -13,6 +13,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Plus, Trash2, Landmark, Star, Wallet, CreditCard, Globe, Banknote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, type BankAccountBalance, type BankAccountKind } from '@/modules/finance/services/financeService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 const KIND_META: Record<BankAccountKind, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
   bank: { label: 'Bank', icon: Landmark },
@@ -46,7 +47,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
     try {
       await financeService.createBankAccount({
         workspaceId, name: name.trim(), kind, currency: currency.trim().toUpperCase() || 'EUR',
-        openingBalance: openingBalance.trim() === '' ? 0 : Number(openingBalance) || 0,
+        openingBalance: openingBalance.trim() === '' ? 0 : parseDecimalOr(openingBalance, 0),
       });
       setName(''); setKind('bank'); setCurrency('EUR'); setOpeningBalance('');
       await load();
@@ -154,7 +155,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Opening balance</Label>
-            <Input className="h-8 w-28 text-xs text-right" type="number" step="0.01" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} placeholder="0.00" />
+            <Input className="h-8 w-28 text-xs text-right" type="text" inputMode="decimal" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} placeholder="0.00" />
           </div>
           <Button size="sm" variant="outline" onClick={add} disabled={busy}>
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}

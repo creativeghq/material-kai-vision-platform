@@ -4,6 +4,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
@@ -593,11 +594,10 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
               <Label htmlFor="default-vat-rate">Default VAT Rate (%)</Label>
               <Input
                 id="default-vat-rate"
-                type="number"
-                step="0.5"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={pdfConfig.vat_rate_default}
-                onChange={(e) => setPdfConfig(prev => ({ ...prev, vat_rate_default: parseFloat(e.target.value) || 0 }))}
+                onChange={(e) => setPdfConfig(prev => ({ ...prev, vat_rate_default: parseDecimalOr(e.target.value, 0) }))}
               />
             </div>
           </div>

@@ -19,6 +19,7 @@ import {
   Workflow,
   ChevronDown,
   FileJson,
+  ShieldCheck,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -175,6 +176,14 @@ const adminSections = {
       path: '/admin/logs',
       status: 'active',
       count: 'Real-time',
+    },
+    {
+      title: 'Data Health',
+      description: 'Cross-platform data integrity checks — detects and auto-heals record drift.',
+      icon: ShieldCheck,
+      path: '/admin/data-health',
+      status: 'active',
+      count: 'Daily',
     },
   ],
 };

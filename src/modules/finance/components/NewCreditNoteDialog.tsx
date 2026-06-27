@@ -17,6 +17,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, VAT_CATEGORIES, type Invoice } from '@/modules/finance/services/financeService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 interface InvItem {
   id: string; description: string; sku: string | null; unit: string | null; product_id: string | null;
@@ -78,7 +79,7 @@ export const NewCreditNoteDialog: React.FC<{
     const lines = items.flatMap((it) => {
       const st = lineState[it.id];
       if (!st?.include) return [];
-      const cq = parseFloat(st.creditQty) || 0;
+      const cq = parseDecimalOr(st.creditQty, 0);
       if (cq <= 0) return [];
       const ratio = it.quantity > 0 ? Math.min(cq, it.quantity) / it.quantity : 1;
       const lineNet = round2(Number(it.net_value) * ratio);
@@ -95,7 +96,7 @@ export const NewCreditNoteDialog: React.FC<{
   }, [items, lineState]);
 
   const hasItems = items.length > 0;
-  const legacyAmount = parseFloat(amount) || 0;
+  const legacyAmount = parseDecimalOr(amount, 0);
   const effectiveTotal = hasItems ? computed.total : legacyAmount;
 
   const save = async () => {
@@ -153,7 +154,7 @@ export const NewCreditNoteDialog: React.FC<{
                   </div>
                   {items.map((it) => {
                     const st = lineState[it.id] ?? { include: false, creditQty: '0' };
-                    const cq = parseFloat(st.creditQty) || 0;
+                    const cq = parseDecimalOr(st.creditQty, 0);
                     const ratio = it.quantity > 0 ? Math.min(cq, it.quantity) / it.quantity : 1;
                     const lineNet = round2(Number(it.net_value) * (st.include ? ratio : 0));
                     return (
@@ -161,7 +162,7 @@ export const NewCreditNoteDialog: React.FC<{
                         <input type="checkbox" checked={st.include} onChange={(e) => setLine(it.id, { include: e.target.checked })} />
                         <span className="truncate">{it.description}</span>
                         <span className="text-right tabular-nums text-muted-foreground">{Number(it.quantity)}{it.unit ? ` ${it.unit}` : ''}</span>
-                        <Input className="h-7 text-right text-xs" type="number" step="0.01" min="0" max={Number(it.quantity)} value={st.creditQty} disabled={!st.include} onChange={(e) => setLine(it.id, { creditQty: e.target.value })} />
+                        <Input className="h-7 text-right text-xs" type="text" inputMode="decimal" value={st.creditQty} disabled={!st.include} onChange={(e) => setLine(it.id, { creditQty: e.target.value })} />
                         <span className="text-right tabular-nums text-muted-foreground">{pctOfCat(it.vat_category)}%</span>
                         <span className="text-right tabular-nums">{formatMoney(lineNet, cur)}</span>
                       </div>
@@ -177,7 +178,7 @@ export const NewCreditNoteDialog: React.FC<{
             ) : (
               <div className="space-y-1">
                 <Label>Amount (gross) — legacy invoice without stored lines</Label>
-                <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
             )
           )}

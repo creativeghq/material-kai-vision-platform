@@ -14,6 +14,7 @@ import {
   financeService, type PlannedPaymentCategory, type PlannedPaymentDirection,
 } from '@/modules/finance/services/financeService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
+import { parseDecimal } from '@/utils/decimal';
 
 interface Party { type: 'company' | 'contact'; id: string; label: string }
 
@@ -102,8 +103,8 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
   }, [partySearch, open, direction]);
 
   const handleSave = async () => {
-    const parsedAmount = parseFloat(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    const parsedAmount = parseDecimal(amount);
+    if (parsedAmount == null || parsedAmount <= 0) {
       toast({ title: 'Amount must be positive', variant: 'destructive' }); return;
     }
     if (!title.trim()) {
@@ -202,7 +203,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Amount *</Label>
-              <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>Currency</Label>

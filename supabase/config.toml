@@ -51,6 +51,9 @@ verify_jwt = false
 [functions.auto-recovery-cron]
 verify_jwt = false
 
+[functions.data-integrity-runner]
+verify_jwt = false
+
 [functions.campaign-processor]
 verify_jwt = false
 

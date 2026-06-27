@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { warehouseService, type PendingProduct, type Warehouse } from '@/services/warehouseService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { formatMoney } from '@/modules/finance/services/financeService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 interface Edit { name: string; sku: string; unit: string; quantity: string; unit_cost: string; sales_price: string; category_id: string; warehouse_id: string; add_to_catalog: boolean; }
 
@@ -63,9 +64,9 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
     try {
       await warehouseService.approvePending(it.id, {
         name: e.name, sku: e.sku || null, unit: e.unit || null,
-        quantity: parseFloat(e.quantity) || it.quantity,
-        unit_cost: e.unit_cost === '' ? null : parseFloat(e.unit_cost),
-        sales_price: e.sales_price === '' ? null : parseFloat(e.sales_price),
+        quantity: parseDecimalOr(e.quantity, 0) || it.quantity,
+        unit_cost: e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, 0),
+        sales_price: e.sales_price === '' ? null : parseDecimalOr(e.sales_price, 0),
         category_id: e.category_id || null,
         target_warehouse_id: e.warehouse_id || null,
         add_to_catalog: e.add_to_catalog,
@@ -101,7 +102,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
         <div className="divide-y divide-border/40">
           {items.map((it) => {
             const e = edits[it.id]; if (!e) return null;
-            const cost = parseFloat(e.unit_cost) || 0;
+            const cost = parseDecimalOr(e.unit_cost, 0);
             const margin = e.category_id ? marginOf(e.category_id) : null;
             const autoPrice = e.sales_price === '' && cost > 0 && margin != null && margin > 0 ? Math.round(cost * (1 + margin / 100) * 100) / 100 : null;
             return (
@@ -111,16 +112,16 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                   <Input className="h-8 text-sm" value={e.name} onChange={(ev) => setEdit(it.id, { name: ev.target.value })} placeholder="Product name" />
                   <Input className="h-8 text-sm" value={e.sku} onChange={(ev) => setEdit(it.id, { sku: ev.target.value })} placeholder="SKU" />
                   <Input className="h-8 text-sm" value={e.unit} onChange={(ev) => setEdit(it.id, { unit: ev.target.value })} placeholder="unit" />
-                  <Input className="h-8 text-sm text-right" type="number" step="0.01" value={e.quantity} onChange={(ev) => setEdit(it.id, { quantity: ev.target.value })} placeholder="qty" />
+                  <Input className="h-8 text-sm text-right" type="text" inputMode="decimal" value={e.quantity} onChange={(ev) => setEdit(it.id, { quantity: ev.target.value })} placeholder="qty" />
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-[120px_140px_1fr_160px]">
                   <div className="space-y-0.5">
                     <label className="text-[10px] text-muted-foreground">Unit cost</label>
-                    <Input className="h-8 text-sm text-right" type="number" step="0.01" value={e.unit_cost} onChange={(ev) => setEdit(it.id, { unit_cost: ev.target.value })} placeholder="0.00" />
+                    <Input className="h-8 text-sm text-right" type="text" inputMode="decimal" value={e.unit_cost} onChange={(ev) => setEdit(it.id, { unit_cost: ev.target.value })} placeholder="0.00" />
                   </div>
                   <div className="space-y-0.5">
                     <label className="text-[10px] text-muted-foreground">Sale price</label>
-                    <Input className="h-8 text-sm text-right" type="number" step="0.01" value={e.sales_price}
+                    <Input className="h-8 text-sm text-right" type="text" inputMode="decimal" value={e.sales_price}
                       onChange={(ev) => setEdit(it.id, { sales_price: ev.target.value })}
                       placeholder={autoPrice != null ? `auto ${formatMoney(autoPrice, it.currency)}` : 'set price'} />
                   </div>

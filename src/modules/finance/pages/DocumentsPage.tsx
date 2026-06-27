@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch' | 'delivery_notes' | 'cheques' | 'expenses';
 
@@ -733,7 +734,7 @@ const ReceiveToWarehouseDialog: React.FC<{
   const setRow = (i: number, patch: Partial<LineRow>) => setRows((m) => ({ ...m, [i]: { ...m[i], ...patch } }));
 
   const submit = async () => {
-    const active = lines.map((_, i) => ({ i, r: rows[i] })).filter(({ r }) => r && r.mode !== 'skip' && (parseFloat(r.qty) || 0) > 0);
+    const active = lines.map((_, i) => ({ i, r: rows[i] })).filter(({ r }) => r && r.mode !== 'skip' && parseDecimalOr(r.qty, 0) > 0);
     if (active.length === 0) { toast({ title: 'Nothing to receive', description: 'Match or create at least one line.', variant: 'destructive' }); return; }
     const needsCreate = active.some(({ r }) => r.mode === '__create');
     if (needsCreate && !targetWh) { toast({ title: 'Pick a target warehouse', description: 'New stock items need a warehouse.', variant: 'destructive' }); return; }
@@ -742,7 +743,7 @@ const ReceiveToWarehouseDialog: React.FC<{
       const mappings: { item_id: string; quantity: number }[] = [];
       let created = 0;
       for (const { r } of active) {
-        const qty = parseFloat(r.qty) || 0;
+        const qty = parseDecimalOr(r.qty, 0);
         if (r.mode === '__create') {
           const productId = addToCatalog ? await warehouseService.createProduct({ workspaceId, name: r.name.trim() || 'Item', sku: r.sku.trim() || null }) : null;
           const itemId = await warehouseService.createItem({
@@ -808,7 +809,7 @@ const ReceiveToWarehouseDialog: React.FC<{
                           {items.map((it) => <SelectItem key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ''}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      <Input className="h-8 text-xs text-right" type="number" min="0" step="0.01"
+                      <Input className="h-8 text-xs text-right" type="text" inputMode="decimal"
                         value={r.qty} onChange={(e) => setRow(i, { qty: e.target.value })} placeholder="qty" disabled={r.mode === 'skip'} />
                     </div>
                     {r.mode === '__create' && (

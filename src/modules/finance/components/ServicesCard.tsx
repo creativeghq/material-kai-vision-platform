@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { servicesService, type ServiceItem, type ServiceInput } from '@/modules/finance/services/servicesService';
 import { invoicingSetupService, type RefRow } from '@/services/invoicingSetupService';
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
+import { parseDecimal } from '@/utils/decimal';
 
 const EMPTY: ServiceInput = { name: '', description: '', unit: '', price: null, currency: 'EUR', vatCategory: 1, incType: '', incCat: '' };
 
@@ -103,7 +104,7 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs">Price</Label>
-                  <Input className="h-8 text-xs" type="number" step="0.01" min="0" value={form.price ?? ''} onChange={(e) => setForm({ ...form, price: e.target.value ? Number(e.target.value) : null })} placeholder="0.00" />
+                  <Input className="h-8 text-xs" type="text" inputMode="decimal" value={form.price ?? ''} onChange={(e) => setForm({ ...form, price: e.target.value ? parseDecimal(e.target.value) : null })} placeholder="0.00" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Currency</Label>

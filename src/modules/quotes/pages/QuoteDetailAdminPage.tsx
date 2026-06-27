@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '../services/QuotesService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
@@ -317,8 +318,8 @@ export const QuoteDetailPage: React.FC = () => {
     try {
       setAddingUpsell(true);
       const metadata = {
-        custom_price: upsellPrice ? parseFloat(upsellPrice) : undefined,
-        quantity: upsellQuantity ? parseFloat(upsellQuantity) : 1,
+        custom_price: upsellPrice ? parseDecimal(upsellPrice) ?? undefined : undefined,
+        quantity: upsellQuantity ? parseDecimalOr(upsellQuantity, 1) : 1,
         measurement: upsellMeasurement || undefined,
       };
       await quotesService.addUpsellToQuote(id, selectedUpsellId, undefined, metadata);
@@ -382,8 +383,8 @@ export const QuoteDetailPage: React.FC = () => {
 
   // Pricing helpers
   const getItemEffectivePrice = (itemId: string): number => {
-    const price = parseFloat(itemPrices[itemId] || '0');
-    const discountPct = parseFloat(itemDiscounts[itemId] || '0');
+    const price = parseDecimalOr(itemPrices[itemId], 0);
+    const discountPct = parseDecimalOr(itemDiscounts[itemId], 0);
     if (discountPct > 0 && price > 0) {
       return Math.round(price * (1 - discountPct / 100) * 100) / 100;
     }
@@ -398,7 +399,7 @@ export const QuoteDetailPage: React.FC = () => {
     return sum + getItemLineTotal(item.id, item.quantity);
   }, 0);
 
-  const pricingVatRate = parseFloat(vatRate) || 0;
+  const pricingVatRate = parseDecimalOr(vatRate, 0);
   // #227 — paid-upfront (cash) discount applies to the net subtotal before VAT
   const pricingCashPct = paidUpfront ? cashPct : 0;
   const pricingCashDiscount = pricingSubtotal * (pricingCashPct / 100);
@@ -408,8 +409,8 @@ export const QuoteDetailPage: React.FC = () => {
 
   const allItemsHavePrices = (quote?.items || []).length > 0 &&
     (quote?.items || []).every(item => {
-      const price = parseFloat(itemPrices[item.id] || '');
-      return !isNaN(price) && price > 0;
+      const price = parseDecimal(itemPrices[item.id]);
+      return price !== null && price > 0;
     });
 
   const handleSavePrices = async () => {
@@ -434,8 +435,8 @@ export const QuoteDetailPage: React.FC = () => {
     try {
       setSavingPrices(true);
       const items = quote.items.map(item => {
-        const unitPrice = parseFloat(itemPrices[item.id] || '0');
-        const discountPct = parseFloat(itemDiscounts[item.id] || '0');
+        const unitPrice = parseDecimalOr(itemPrices[item.id], 0);
+        const discountPct = parseDecimalOr(itemDiscounts[item.id], 0);
         const effectivePrice = getItemEffectivePrice(item.id);
         const discountedPrice = discountPct > 0 ? effectivePrice : null;
         return {
@@ -686,8 +687,8 @@ export const QuoteDetailPage: React.FC = () => {
                 onClick={async () => {
                   const raw = window.prompt('Margin % to add on top for the end user?', '20');
                   if (raw === null) return;
-                  const margin = parseFloat(raw);
-                  if (!Number.isFinite(margin) || margin < 0) {
+                  const margin = parseDecimal(raw);
+                  if (margin === null || margin < 0) {
                     toast({ title: 'Enter a valid margin %', variant: 'destructive' });
                     return;
                   }
@@ -1018,8 +1019,8 @@ export const QuoteDetailPage: React.FC = () => {
                         </thead>
                         <tbody>
                           {(quote.items || []).map((item, idx) => {
-                            const unitPrice = parseFloat(itemPrices[item.id] || '0');
-                            const discountPct = parseFloat(itemDiscounts[item.id] || '0');
+                            const unitPrice = parseDecimalOr(itemPrices[item.id], 0);
+                            const discountPct = parseDecimalOr(itemDiscounts[item.id], 0);
                             const effectivePrice = getItemEffectivePrice(item.id);
                             const lineTotal = getItemLineTotal(item.id, item.quantity);
                             const hasDiscount = discountPct > 0 && unitPrice > 0;
@@ -1045,9 +1046,8 @@ export const QuoteDetailPage: React.FC = () => {
                                   <div className="relative">
                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
                                     <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="0.00"
                                       className="pl-6 h-8 w-28"
                                       value={itemPrices[item.id] || ''}
@@ -1058,10 +1058,8 @@ export const QuoteDetailPage: React.FC = () => {
                                 <td className="p-3">
                                   <div className="relative">
                                     <Input
-                                      type="number"
-                                      step="1"
-                                      min="0"
-                                      max="100"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="0"
                                       className="h-8 w-20 pr-6 text-right"
                                       value={itemDiscounts[item.id] || ''}
@@ -1116,9 +1114,8 @@ export const QuoteDetailPage: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">VAT</span>
                             <Input
-                              type="number"
-                              step="0.5"
-                              min="0"
+                              type="text"
+                              inputMode="decimal"
                               className="h-7 w-16 text-center text-xs"
                               value={vatRate}
                               onChange={(e) => setVatRate(e.target.value)}
@@ -1191,8 +1188,8 @@ export const QuoteDetailPage: React.FC = () => {
                       Price (€)
                     </label>
                     <Input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="Custom price"
                       value={upsellPrice}
                       onChange={(e) => setUpsellPrice(e.target.value)}
@@ -1206,9 +1203,8 @@ export const QuoteDetailPage: React.FC = () => {
                       Quantity
                     </label>
                     <Input
-                      type="number"
-                      step="1"
-                      min="1"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="1"
                       value={upsellQuantity}
                       onChange={(e) => setUpsellQuantity(e.target.value)}

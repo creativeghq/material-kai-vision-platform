@@ -71,6 +71,7 @@ const AdminDashboard = lazy(() => import('./components/Admin/AdminDashboard'));
 const KnowledgeBaseManagement = lazy(() => import('./components/Admin/KnowledgeBase').then(m => ({ default: m.KnowledgeBaseManagement })));
 const MaterialsDataPage = lazy(() => import('./components/Admin/MaterialsData').then(m => ({ default: m.MaterialsDataPage })));
 const LogViewer = lazy(() => import('./components/Admin/LogViewer').then(m => ({ default: m.LogViewer })));
+const DataHealthPage = lazy(() => import('./components/Admin/DataHealthPage'));
 const AgentConfigsPage = lazy(() => import('./components/Admin/AgentConfigs').then(m => ({ default: m.AgentConfigsPage })));
 const ApiGatewayAdmin = lazy(() => import('./components/Admin/ApiGatewayAdmin').then(m => ({ default: m.ApiGatewayAdmin })));
 const OperationsDashboard = lazy(() => import('./components/Admin/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
@@ -473,6 +474,19 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <LogViewer />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+
+                <Route
+                  path="/admin/data-health"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <DataHealthPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>

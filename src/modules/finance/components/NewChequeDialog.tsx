@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { chequesService } from '@/modules/finance/services/chequesService';
+import { parseDecimal } from '@/utils/decimal';
 
 export const NewChequeDialog: React.FC<{
   workspaceId: string; open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void;
@@ -27,8 +28,8 @@ export const NewChequeDialog: React.FC<{
   }, [open]);
 
   const save = async () => {
-    const amt = parseFloat(amount);
-    if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
+    const amt = parseDecimal(amount);
+    if (amt == null || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
     setBusy(true);
     try {
       await chequesService.create(workspaceId, { direction, chequeNumber: number, bank, amount: amt, dueDate, notes });
@@ -57,7 +58,7 @@ export const NewChequeDialog: React.FC<{
             </div>
             <div className="space-y-1">
               <Label>Amount</Label>
-              <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+              <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
             </div>
             <div className="space-y-1">
               <Label>Cheque no.</Label>

@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { financeService, formatMoney } from '@/modules/finance/services/financeService';
+import { parseDecimal } from '@/utils/decimal';
 
 type Target = { companyId?: string; contactId?: string };
 
@@ -80,7 +81,7 @@ export const CustomerFinanceRulesCard: React.FC<Target> = ({ companyId, contactI
     if (!rowId) return;
     setSaving(true);
     try {
-      const num = (s: string) => s.trim() === '' ? null : Number(s);
+      const num = (s: string) => s.trim() === '' ? null : parseDecimal(s);
       const { error } = await (supabase as any).from(table).update({
         credit_limit: num(creditLimit),
         min_order_value: num(minOrder),
@@ -114,12 +115,12 @@ export const CustomerFinanceRulesCard: React.FC<Target> = ({ companyId, contactI
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className="space-y-1">
             <span className="block text-[11px] text-muted-foreground">Credit / balance hold (€)</span>
-            <input type="number" step="0.01" min="0" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)}
+            <input type="text" inputMode="decimal" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)}
               placeholder={`Default: ${hint(defaults?.credit_limit)}`} className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-sm" />
           </label>
           <label className="space-y-1">
             <span className="block text-[11px] text-muted-foreground">Minimum order value (€)</span>
-            <input type="number" step="0.01" min="0" value={minOrder} onChange={(e) => setMinOrder(e.target.value)}
+            <input type="text" inputMode="decimal" value={minOrder} onChange={(e) => setMinOrder(e.target.value)}
               placeholder={`Default: ${hint(defaults?.min_order_value)}`} className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-sm" />
           </label>
           <label className="space-y-1">

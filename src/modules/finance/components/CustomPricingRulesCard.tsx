@@ -14,6 +14,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 interface Rule {
   id: string; rule_type: string; category_key: string | null; params: any;
@@ -53,7 +54,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
   useEffect(() => { void load(); }, [workspaceId]);
 
   const add = async () => {
-    const p = parseFloat(pct);
+    const p = parseDecimalOr(pct, NaN);
     const isCash = type === 'cash_payment';
     if (!isCash && !cat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
     if (!Number.isFinite(p) || p < 0) { toast({ title: 'Enter a discount %', variant: 'destructive' }); return; }
@@ -147,7 +148,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
           )}
           <div className="space-y-1">
             <Label className="text-xs">% off</Label>
-            <Input className="h-8 w-20 text-xs" type="number" step="0.5" min="0" max="100" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="0" />
+            <Input className="h-8 w-20 text-xs" type="text" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="0" />
           </div>
           <Button size="sm" variant="outline" onClick={add} disabled={busy || (type !== 'cash_payment' && !cat)}>
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}

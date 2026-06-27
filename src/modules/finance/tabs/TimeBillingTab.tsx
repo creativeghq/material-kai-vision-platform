@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { timeTrackingService, type TimeEntry, type TimeReportUserRow, type TimeReportContactRow } from '@/modules/finance/services/timeTrackingService';
+import { parseDecimal } from '@/utils/decimal';
 
 interface Props { workspaceId: string }
 type Customer = { type: 'company' | 'contact'; id: string; label: string };
@@ -98,7 +99,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   }, [search]);
 
   const logEntry = async () => {
-    const h = parseFloat(hours), r = parseFloat(rate);
+    const h = parseDecimal(hours), r = parseDecimal(rate);
     if (!desc.trim()) { toast({ title: 'Description required', variant: 'destructive' }); return; }
     if (!Number.isFinite(h) || h <= 0) { toast({ title: 'Hours must be > 0', variant: 'destructive' }); return; }
     setSaving(true);
@@ -185,11 +186,11 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Hours</Label>
-            <Input type="number" step="0.25" min="0" className="h-9" value={hours} onChange={(e) => setHours(e.target.value)} />
+            <Input type="text" inputMode="decimal" className="h-9" value={hours} onChange={(e) => setHours(e.target.value)} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Rate /h</Label>
-            <Input type="number" step="0.5" min="0" className="h-9" value={rate} onChange={(e) => setRate(e.target.value)} />
+            <Input type="text" inputMode="decimal" className="h-9" value={rate} onChange={(e) => setRate(e.target.value)} />
           </div>
           <div className="flex items-end">
             <Button size="sm" className="w-full" onClick={logEntry} disabled={saving}>

@@ -19,6 +19,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeService, type Invoice, type PaymentMethod, type BankAccount } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { parseDecimal } from '@/utils/decimal';
 
 type Kind = 'received' | 'paid_out' | 'refund';
 const METHODS: PaymentMethod[] = ['cash', 'card', 'bank_transfer', 'check', 'other'];
@@ -104,8 +105,8 @@ export const RecordPaymentDialog: React.FC<{
   };
 
   const save = async () => {
-    const amt = parseFloat(amount);
-    if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
+    const amt = parseDecimal(amount);
+    if (amt == null || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
     if (kind === 'refund' && issueCreditNote && !invoiceId) {
       toast({ title: 'Pick the invoice to credit', description: 'A refund issues a credit note against an invoice. Choose it, or turn off the credit note.', variant: 'destructive' });
       return;
@@ -203,7 +204,7 @@ export const RecordPaymentDialog: React.FC<{
             </div>
             <div className="space-y-1">
               <Label>Amount</Label>
-              <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
           </div>
 

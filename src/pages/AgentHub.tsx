@@ -26,6 +26,26 @@ const AgentHubPage: React.FC = () => {
         imageUrl: searchParams.get('pinned_product_image') ?? undefined,
       }
     : undefined;
+  // Deep-link: preload image attachment(s) — `?image=<url>` or `?images=a,b` —
+  // so a flow/prompt from another page acts on them. Public URLs (e.g. the
+  // generation-images bucket) work directly.
+  const imageParam = searchParams.get('image');
+  const imagesParam = searchParams.get('images');
+  const initialImages = [
+    ...(imageParam ? [imageParam] : []),
+    ...(imagesParam ? imagesParam.split(',').map((s) => s.trim()).filter(Boolean) : []),
+  ];
+  // Deep-link: force the generation pipeline (e.g. `?generation_mode=image-edit`).
+  const initialGenerationMode = searchParams.get('generation_mode') ?? undefined;
+  // Deep-link: launch a specific guided flow — `?quickstart=<toolkitId>:<label>`
+  // (e.g. `generation:Test on a room`). Split on the FIRST colon (labels may contain none).
+  const quickstartParam = searchParams.get('quickstart');
+  const initialQuickStart = quickstartParam && quickstartParam.includes(':')
+    ? {
+        toolkitId: quickstartParam.slice(0, quickstartParam.indexOf(':')),
+        label: quickstartParam.slice(quickstartParam.indexOf(':') + 1),
+      }
+    : undefined;
   const [userRole, setUserRole] = useState<'viewer' | 'member' | 'admin' | 'owner'>('member');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -96,6 +116,9 @@ const AgentHubPage: React.FC = () => {
         initialMoodboardId={initialMoodboardId}
         initialAgent={initialAgent}
         initialPinnedMaterial={initialPinnedMaterial}
+        initialImages={initialImages.length ? initialImages : undefined}
+        initialGenerationMode={initialGenerationMode}
+        initialQuickStart={initialQuickStart}
         onConversationChange={handleConversationChange}
       />
     </div>

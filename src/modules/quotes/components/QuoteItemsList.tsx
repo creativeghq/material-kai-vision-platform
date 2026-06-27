@@ -14,6 +14,7 @@ import {
 } from '@/utils/productMetadata';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { usePermissions } from '@/hooks/usePermissions';
+import { parseDecimal } from '@/utils/decimal';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -148,15 +149,13 @@ const PriceCell: React.FC<{
         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">€</span>
         <Input
           ref={inputRef}
-          type="number"
-          min={0}
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           value={local}
           placeholder="0.00"
           onChange={e => setLocal(e.target.value)}
           onBlur={() => {
-            const num = parseFloat(local);
-            onSave(isNaN(num) ? null : num);
+            onSave(parseDecimal(local));
           }}
           onKeyDown={e => { if (e.key === 'Enter') inputRef.current?.blur(); }}
           className={`h-7 w-24 text-right text-xs pl-5 pr-1 ${highlight ? 'border-primary/40 focus-visible:ring-primary/30' : ''}`}

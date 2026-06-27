@@ -11,6 +11,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 interface Level {
   id: string; level_key: string; label: string; default_discount_pct: number;
@@ -48,7 +49,7 @@ export const UserLevelsCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
 
   const add = async () => {
     const label = newLabel.trim();
-    const pct = parseFloat(newPct || '0');
+    const pct = parseDecimalOr(newPct, 0);
     if (!label) { toast({ title: 'Enter a level name', variant: 'destructive' }); return; }
     const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     if (!key) { toast({ title: 'Invalid name', variant: 'destructive' }); return; }
@@ -93,9 +94,9 @@ export const UserLevelsCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <div className="flex shrink-0 items-center gap-2">
                   <Input
                     className="h-8 w-20 text-right text-xs"
-                    type="number" step="0.5" min="0" max="100"
+                    type="text" inputMode="decimal"
                     defaultValue={l.default_discount_pct}
-                    onBlur={(e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v) && v !== l.default_discount_pct) void saveDiscount(l, v); }}
+                    onBlur={(e) => { const v = parseDecimalOr(e.target.value, NaN); if (Number.isFinite(v) && v !== l.default_discount_pct) void saveDiscount(l, v); }}
                   />
                   <span className="text-xs text-muted-foreground">% off</span>
                   <button type="button" className="text-muted-foreground hover:text-destructive disabled:opacity-30" onClick={() => remove(l)} disabled={l.is_default}>
@@ -114,7 +115,7 @@ export const UserLevelsCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
           </div>
           <div className="space-y-1">
             <Label className="text-xs">% off</Label>
-            <Input className="h-8 w-20 text-xs" type="number" step="0.5" min="0" max="100" value={newPct} onChange={(e) => setNewPct(e.target.value)} placeholder="0" />
+            <Input className="h-8 w-20 text-xs" type="text" inputMode="decimal" value={newPct} onChange={(e) => setNewPct(e.target.value)} placeholder="0" />
           </div>
           <Button size="sm" variant="outline" onClick={add} disabled={busy || !newLabel.trim()}>
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}

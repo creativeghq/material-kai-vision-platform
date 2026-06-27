@@ -137,9 +137,12 @@ export const ordersService = {
     contactId?: string;
   }): Promise<Array<{ id: string; order_number: string | null; order_type: OrderType; party_name: string | null; total: number; settled: number; outstanding: number; currency: string; status: OrderStatus; created_at: string }>> {
     const list = await this.list({ workspaceId: opts.workspaceId, companyId: opts.companyId, contactId: opts.contactId });
-    const live = list.filter((o) => o.status !== 'draft' && o.status !== 'cancelled');
-    if (live.length === 0) return [];
-    const ids = live.map((o) => o.id);
+    // Candidates = every non-cancelled order. We include a draft/pre-order only once it has moved
+    // real cash (a deposit received / paid) — empty drafts stay hidden, but a pre-order with a
+    // deposit is real money and must surface in Receivables/Payables.
+    const candidates = list.filter((o) => o.status !== 'cancelled');
+    if (candidates.length === 0) return [];
+    const ids = candidates.map((o) => o.id);
 
     // Batch the finance lookups (3 queries total, not 3 per order). We only need presence of an
     // invoice/bill and the settled amount — not the full getOrderFinance payload.
@@ -156,9 +159,12 @@ export const ordersService = {
       const map = p.direction === 'in' ? settledIn : settledOut;
       map.set(p.order_id, (map.get(p.order_id) ?? 0) + Number(p.amount));
     }
+    const hasCash = (id: string) => settledIn.has(id) || settledOut.has(id);
 
-    return live
+    return candidates
       .filter((o) => !invoiced.has(o.id))
+      // Confirmed+ orders always; drafts/pre-orders only once cash has moved on them.
+      .filter((o) => o.status !== 'draft' || hasCash(o.id))
       .map((o) => {
         const settled = (o.order_type === 'sales' ? settledIn : settledOut).get(o.id) ?? 0;
         return {
@@ -256,7 +262,7 @@ export const ordersService = {
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
     supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
-    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null }>;
+    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null }>;
     received: number;
     paid_out: number;
     profit: number;
@@ -264,9 +270,9 @@ export const ordersService = {
     const [inv, bills, pay] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
-      supabase.from('payments').select('id, direction, amount, currency, paid_at, method').eq('order_id', orderId).order('paid_at', { ascending: false }),
+      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, bank_account_id').eq('order_id', orderId).order('paid_at', { ascending: false }),
     ]);
-    const payments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null }>;
+    const payments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null }>;
     const received = payments.filter((p) => p.direction === 'in').reduce((a, p) => a + Number(p.amount), 0);
     const paid_out = payments.filter((p) => p.direction === 'out').reduce((a, p) => a + Number(p.amount), 0);
     return {

@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
+import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
 import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCard';
@@ -350,8 +351,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
                   </div>
                   <div className="space-y-1">
                     <Label>Minimum balance</Label>
-                    <Input type="number" step="0.01" min="0" value={settings.auto_statement_min_balance}
-                      onChange={(e) => set('auto_statement_min_balance', parseFloat(e.target.value) || 0)} />
+                    <Input type="text" inputMode="decimal" value={settings.auto_statement_min_balance}
+                      onChange={(e) => set('auto_statement_min_balance', parseDecimalOr(e.target.value, 0))} />
                   </div>
                   <div className="flex items-end pb-1">
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -376,15 +377,15 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             </div>
             <div className="space-y-1">
               <Label>Default VAT %</Label>
-              <Input type="number" step="0.01" min="0" value={settings.default_vat_rate}
-                onChange={(e) => set('default_vat_rate', parseFloat(e.target.value) || 0)} />
+              <Input type="text" inputMode="decimal" value={settings.default_vat_rate}
+                onChange={(e) => set('default_vat_rate', parseDecimalOr(e.target.value, 0))} />
             </div>
           </div>
 
           <div className="space-y-1">
             <Label>Default catalog markup %</Label>
-            <Input type="number" step="0.5" min="0" value={settings.default_markup_pct ?? 0}
-              onChange={(e) => set('default_markup_pct', parseFloat(e.target.value) || 0)} />
+            <Input type="text" inputMode="decimal" value={settings.default_markup_pct ?? 0}
+              onChange={(e) => set('default_markup_pct', parseDecimalOr(e.target.value, 0))} />
             <p className="text-[11px] text-muted-foreground">
               Blanket sell uplift applied over your cost when you add a catalog product to a quote (you can still edit each line).
             </p>
@@ -420,14 +421,14 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-1">
                   <span className="block text-[11px] text-muted-foreground">Default credit / balance hold (€)</span>
-                  <input type="number" step="0.01" min="0" value={settings.default_credit_limit ?? ''}
-                    onChange={(e) => set('default_credit_limit', e.target.value === '' ? null : Number(e.target.value))}
+                  <input type="text" inputMode="decimal" value={settings.default_credit_limit ?? ''}
+                    onChange={(e) => set('default_credit_limit', e.target.value === '' ? null : parseDecimal(e.target.value))}
                     placeholder="No limit" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
                 </label>
                 <label className="space-y-1">
                   <span className="block text-[11px] text-muted-foreground">Minimum order value (€)</span>
-                  <input type="number" step="0.01" min="0" value={settings.min_order_value ?? ''}
-                    onChange={(e) => set('min_order_value', e.target.value === '' ? null : Number(e.target.value))}
+                  <input type="text" inputMode="decimal" value={settings.min_order_value ?? ''}
+                    onChange={(e) => set('min_order_value', e.target.value === '' ? null : parseDecimal(e.target.value))}
                     placeholder="No minimum" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
                 </label>
               </div>

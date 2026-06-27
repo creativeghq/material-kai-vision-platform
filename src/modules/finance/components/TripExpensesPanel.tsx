@@ -16,6 +16,7 @@ import {
   EXPENSE_CARD_TYPES, EXPENSE_CARD_TYPE_LABEL,
   type TripExpenseReport, type TripExpenseItem, type TripStatus, type ExpensePaymentMethod, type ExpenseCardType,
 } from '@/modules/finance/services/tripExpenseService';
+import { parseDecimal } from '@/utils/decimal';
 
 interface Props {
   workspaceId: string;
@@ -570,7 +571,7 @@ const AddExpenseDialog: React.FC<{
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    const amt = Number(amount);
+    const amt = parseDecimal(amount);
     if (!amt || amt <= 0) { toast({ title: 'Enter a valid amount', variant: 'destructive' }); return; }
     try {
       setSaving(true);
@@ -618,7 +619,7 @@ const AddExpenseDialog: React.FC<{
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Amount ({currency})</label>
-              <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+              <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Paid with</label>

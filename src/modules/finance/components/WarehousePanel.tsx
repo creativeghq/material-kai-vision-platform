@@ -15,6 +15,7 @@ import {
   marketplaceService, type ActiveListingSummary, type ListingCondition, type DeliveryOption,
 } from '@/services/marketplaceService';
 import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
+import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
 
@@ -45,8 +46,8 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const visibleItems = useMemo(() => {
     const q = fSearch.trim().toLowerCase();
     const loc = fLocation.trim().toLowerCase();
-    const min = fQtyMin === '' ? null : parseFloat(fQtyMin);
-    const max = fQtyMax === '' ? null : parseFloat(fQtyMax);
+    const min = fQtyMin === '' ? null : parseDecimal(fQtyMin);
+    const max = fQtyMax === '' ? null : parseDecimal(fQtyMax);
     return items.filter((it) => {
       if (q && !(`${it.name} ${it.sku ?? ''}`.toLowerCase().includes(q))) return false;
       if (fUnit !== 'all' && it.unit !== fUnit) return false;
@@ -165,8 +166,8 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
               {units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Input value={fQtyMin} onChange={(e) => setFQtyMin(e.target.value)} type="number" placeholder="min qty" className="h-8 w-24 text-xs" />
-          <Input value={fQtyMax} onChange={(e) => setFQtyMax(e.target.value)} type="number" placeholder="max qty" className="h-8 w-24 text-xs" />
+          <Input value={fQtyMin} onChange={(e) => setFQtyMin(e.target.value)} type="text" inputMode="decimal" placeholder="min qty" className="h-8 w-24 text-xs" />
+          <Input value={fQtyMax} onChange={(e) => setFQtyMax(e.target.value)} type="text" inputMode="decimal" placeholder="max qty" className="h-8 w-24 text-xs" />
           <Input value={fLocation} onChange={(e) => setFLocation(e.target.value)} placeholder="Location…" className="h-8 w-32 text-xs" />
           <Select value={fListed} onValueChange={setFListed}>
             <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
@@ -376,7 +377,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
       await warehouseService.createItem({
         workspaceId, warehouse_id: warehouseId, product_id: selected.id, name: selected.name,
         sku: selected.sku || undefined, unit: unit.trim() || 'pcs',
-        qty_on_hand: parseFloat(qty) || 0, reorder_point: parseFloat(reorder) || 0,
+        qty_on_hand: parseDecimalOr(qty, 0), reorder_point: parseDecimalOr(reorder, 0),
         location: location.trim() || undefined,
         barcode: barcode.trim() || null, serial_number: serial.trim() || null,
         cpv_code: cpv.trim() || null, taric_code: taric.trim() || null,
@@ -437,8 +438,8 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
                 <Button size="sm" variant="ghost" onClick={() => setSelected(null)} title="Choose a different product"><X className="h-4 w-4" /></Button>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1"><Label>On hand</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
-                <div className="space-y-1"><Label>Reorder pt</Label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
+                <div className="space-y-1"><Label>On hand</Label><Input type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
+                <div className="space-y-1"><Label>Reorder pt</Label><Input type="text" inputMode="decimal" value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
                 <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={(e) => setUnit(e.target.value)} /></div>
               </div>
               <div className="space-y-1"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="optional — e.g. Aisle 3 / Shelf B" /></div>
@@ -662,9 +663,9 @@ const ListToMarketplaceDialog: React.FC<{
 
   const submit = async () => {
     if (!item) return;
-    const p = parseFloat(price); const q = parseFloat(qty);
-    if (!Number.isFinite(p) || p <= 0) { toast({ title: 'Set a price', variant: 'destructive' }); return; }
-    if (!Number.isFinite(q) || q <= 0) { toast({ title: 'Set a quantity', variant: 'destructive' }); return; }
+    const p = parseDecimal(price); const q = parseDecimal(qty);
+    if (p == null || p <= 0) { toast({ title: 'Set a price', variant: 'destructive' }); return; }
+    if (q == null || q <= 0) { toast({ title: 'Set a quantity', variant: 'destructive' }); return; }
     if (q > available) { toast({ title: `Only ${available} ${item.unit} available to list`, variant: 'destructive' }); return; }
     try {
       setBusy(true);
@@ -714,11 +715,11 @@ const ListToMarketplaceDialog: React.FC<{
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Price (€)</Label>
-              <Input type="number" value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value); }} />
+              <Input type="text" inputMode="decimal" value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value); }} />
             </div>
             <div className="space-y-1">
               <Label>Qty ({item.unit})</Label>
-              <Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
+              <Input type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
               <span className="text-[11px] text-muted-foreground">{available} available</span>
             </div>
             <div className="space-y-1">

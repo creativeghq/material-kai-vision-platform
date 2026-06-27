@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService } from '@/modules/finance/services/financeService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
+import { parseDecimalOr } from '@/utils/decimal';
 
 interface Supplier {
   type: 'contact' | 'company';
@@ -103,14 +104,14 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
     return () => clearTimeout(t);
   }, [supplierSearch, open]);
 
-  const total = (parseFloat(subtotalNet) || 0) + (parseFloat(vatAmount) || 0);
+  const total = parseDecimalOr(subtotalNet, 0) + parseDecimalOr(vatAmount, 0);
 
   const handleSave = async () => {
     if (!supplier) {
       toast({ title: 'Pick a supplier', variant: 'destructive' });
       return;
     }
-    if (parseFloat(subtotalNet) < 0 || parseFloat(vatAmount) < 0) {
+    if (parseDecimalOr(subtotalNet, 0) < 0 || parseDecimalOr(vatAmount, 0) < 0) {
       toast({ title: 'Amounts cannot be negative', variant: 'destructive' });
       return;
     }
@@ -130,8 +131,8 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
         supplierCompanyId: supCompanyId,
         supplierContactId: supContactId,
         currency,
-        subtotalNet: Number((parseFloat(subtotalNet) || 0).toFixed(2)),
-        vatAmount: Number((parseFloat(vatAmount) || 0).toFixed(2)),
+        subtotalNet: Number(parseDecimalOr(subtotalNet, 0).toFixed(2)),
+        vatAmount: Number(parseDecimalOr(vatAmount, 0).toFixed(2)),
         total: Number(total.toFixed(2)),
         issuedAt: issuedAt || undefined,
         dueAt: dueAt || undefined,
@@ -220,11 +221,11 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Subtotal (net)</Label>
-              <Input type="number" step="0.01" min="0" value={subtotalNet} onChange={(e) => setSubtotalNet(e.target.value)} />
+              <Input type="text" inputMode="decimal" value={subtotalNet} onChange={(e) => setSubtotalNet(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>VAT amount</Label>
-              <Input type="number" step="0.01" min="0" value={vatAmount} onChange={(e) => setVatAmount(e.target.value)} />
+              <Input type="text" inputMode="decimal" value={vatAmount} onChange={(e) => setVatAmount(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>Total</Label>

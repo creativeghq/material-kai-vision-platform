@@ -38,6 +38,7 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { parseDecimal } from '@/utils/decimal';
 import { quotesService, Upsell } from '../services/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
@@ -140,8 +141,8 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
       return;
     }
 
-    const price = parseFloat(upsellPrice);
-    if (isNaN(price) || price < 0) {
+    const price = parseDecimal(upsellPrice);
+    if (price === null || price < 0) {
       toast({
         title: 'Validation Error',
         description: 'Please enter a valid price',
@@ -375,7 +376,7 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
               </div>
               <div>
                 <label className="text-sm font-medium">Price *</label>
-                <Input type="number" step="0.01" min="0" value={upsellPrice} onChange={(e) => setUpsellPrice(e.target.value)} placeholder="0.00" className="mt-1" />
+                <Input type="text" inputMode="decimal" value={upsellPrice} onChange={(e) => setUpsellPrice(e.target.value)} placeholder="0.00" className="mt-1" />
               </div>
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Active</label>
@@ -575,9 +576,8 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
             <div>
               <label className="text-sm font-medium text-gray-700">Price (USD) *</label>
               <Input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={upsellPrice}
                 onChange={(e) => setUpsellPrice(e.target.value)}
                 placeholder="0.00"

@@ -30,6 +30,7 @@ import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRender
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 interface Customer {
   type: 'contact' | 'company';
@@ -117,7 +118,7 @@ const taxAmountOf = (refs: TaxRef[], code: string, manualAmount: string, lineNet
   if (!code) return 0;
   const r = refs.find((x) => x.code === code);
   if (r && r.rate_kind === 'percent') return lineNet * (Number(r.rate) || 0) / 100;
-  return parseFloat(manualAmount) || 0;
+  return parseDecimalOr(manualAmount, 0);
 };
 /** True when the chosen category auto-computes from a percentage (so the amount is read-only). */
 const isPercentCat = (refs: TaxRef[], code: string): boolean => {
@@ -546,8 +547,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // ── Totals (per-line VAT via category when set, else global rate) ──
   // Net for one line, honoring the VAT-inclusive toggle (price already contains VAT).
   const lineNetOf = (l: LineItem) => {
-    const q = parseFloat(l.quantity) || 0, p = parseFloat(l.unit_price) || 0, disc = parseFloat(l.discount) || 0;
-    const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
+    const q = parseDecimalOr(l.quantity, 0), p = parseDecimalOr(l.unit_price, 0), disc = parseDecimalOr(l.discount, 0);
+    const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
     const gross = Math.max(0, q * p - disc);
     return pricesIncludeVat ? extractNet(gross, pct) : gross;
   };
@@ -555,25 +556,25 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     let net = 0, vat = 0, fees = 0, stamp = 0, other = 0, deduct = 0;
     for (const l of lines) {
       const lineNet = lineNetOf(l);
-      const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
+      const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
       net += lineNet; vat += lineNet * (pct / 100);
       // fees / stamp / other are category-driven: a 'percent' category computes net × rate%,
       // an 'amount' category uses the typed amount.
       fees += taxAmountOf(feesRefs, l.fees_category, l.fees, lineNet);
       stamp += taxAmountOf(stampRefs, l.stamp_duty_category, l.stamp_duty, lineNet);
       other += taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, lineNet);
-      deduct += parseFloat(l.deductions) || 0;
+      deduct += parseDecimalOr(l.deductions, 0);
     }
     // #227 — paid-upfront (cash) discount: scale net + vat proportionally (preserves per-line VAT rates).
     const cashFactor = paidUpfront ? (1 - cashPct / 100) : 1;
     const cashDiscount = net * (1 - cashFactor);
     net = net * cashFactor;
     vat = vat * cashFactor;
-    const digital = parseFloat(digitalFee) || 0;
+    const digital = parseDecimalOr(digitalFee, 0);
     // Document-level withholding: a 'percent' category withholds net × rate%; an 'amount'
     // category uses the manually-entered withholding amount.
     const wh = withholdings.find((w) => w.code === withholdingCode);
-    const withheld = !wh ? 0 : wh.rate_kind === 'percent' ? net * (Number(wh.rate) || 0) / 100 : (parseFloat(withholdingAmount) || 0);
+    const withheld = !wh ? 0 : wh.rate_kind === 'percent' ? net * (Number(wh.rate) || 0) / 100 : parseDecimalOr(withholdingAmount, 0);
     const total = net + vat + fees + stamp + other + digital - withheld - deduct;
     return { net, vat, fees, stamp, other, deduct, digital, withheld, cashDiscount, total };
   }, [lines, vatRate, withholdingCode, withholdingAmount, withholdings, feesRefs, stampRefs, otherTaxRefs, pricesIncludeVat, digitalFee, paidUpfront, cashPct]);
@@ -653,7 +654,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   const handleSave = async () => {
     if (!customer) { setTab('details'); toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
-    const clean = lines.filter((l) => l.description.trim() && parseFloat(l.quantity) > 0);
+    const clean = lines.filter((l) => l.description.trim() && parseDecimalOr(l.quantity, 0) > 0);
     if (clean.length === 0) { setTab('items'); toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
     if (buyerRisk.hardBlocked) {
       setTab('details');
@@ -697,11 +698,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         payment_method_code: paymentMethodCode ? parseInt(paymentMethodCode, 10) : null,
         payment_method_info: paymentMethodInfo || null,
         vat_payment_suspension: vatSuspension, self_pricing: selfPricing,
-        exchange_rate: currency !== 'EUR' && exchangeRate ? parseFloat(exchangeRate) : null,
+        exchange_rate: currency !== 'EUR' && exchangeRate ? parseDecimalOr(exchangeRate, 0) : null,
         prices_include_vat: pricesIncludeVat,
         paid_upfront: paidUpfront,
         cash_discount_pct: paidUpfront ? cashPct : 0,
-        digital_transaction_fee: parseFloat(digitalFee) || 0,
+        digital_transaction_fee: parseDecimalOr(digitalFee, 0),
         related_document: relatedDocument || null,
         print_terms: printTerms, include_in_myf: includeInMyf, print_online_code: printOnlineCode, move_stock: moveStock,
         info_box: infoBox || null, logo_mode: logoMode,
@@ -744,9 +745,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         return share;
       });
       const itemsPayload = clean.map((l, li) => {
-        const q = parseFloat(l.quantity); const p = parseFloat(l.unit_price);
-        const disc = parseFloat(l.discount) || 0;
-        const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
+        const q = parseDecimalOr(l.quantity, 0); const p = parseDecimalOr(l.unit_price, 0);
+        const disc = parseDecimalOr(l.discount, 0);
+        const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
         const net = lineNetOf(l);
         // Store the NET unit price so per-line myDATA VAT stays correct when prices include VAT.
         const unitNet = pricesIncludeVat ? extractNet(p, pct) : p;
@@ -755,7 +756,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           quantity: q, unit_price: Number(unitNet.toFixed(4)), unit: l.unit || null,
           measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
           discounted_price: disc || null, net_value: Number(net.toFixed(2)), line_total: Number(net.toFixed(2)),
-          unit_cost_snapshot: l.unit_cost.trim() ? parseFloat(l.unit_cost) : null,
+          unit_cost_snapshot: l.unit_cost.trim() ? parseDecimalOr(l.unit_cost, 0) : null,
           selected_color: l.color || null, selected_size: l.size || null,
           vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null,
           // #207 — 0%-VAT lines fall back to the customer's default myDATA exemption
@@ -774,7 +775,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           stamp_duty_amount: Number(taxAmountOf(stampRefs, l.stamp_duty_category, l.stamp_duty, net).toFixed(2)),
           other_taxes_category: l.other_taxes_category ? parseInt(l.other_taxes_category, 10) : null,
           other_taxes_amount: Number(taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, net).toFixed(2)),
-          deductions_amount: parseFloat(l.deductions) || 0,
+          deductions_amount: parseDecimalOr(l.deductions, 0),
           // Document-level withholding distributed by net share, with its category, so the
           // myDATA envelope carries per-line withheldCategory + withheldAmount (not summary-only).
           withheld_category: withholdingCode && withheldByLine[li] > 0 ? parseInt(withholdingCode, 10) : null,
@@ -830,7 +831,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       doc_language: 'en', currency, document_type: documentType,
       internal_number: nextNumber?.number != null ? `${nextNumber.series ?? ''}${nextNumber.number}` : 'DRAFT',
       issued_at: issueDate || null, due_at: dueDatePreview, related_document: relatedDocument || null,
-      vat_rate: parseFloat(vatRate) || 0,
+      vat_rate: parseDecimalOr(vatRate, 0),
       cash_discount_pct: paidUpfront ? cashPct : 0,
       total: totals.total, amount_paid: 0, amount_due: totals.total,
       total_fees_amount: totals.fees, total_stamp_duty_amount: totals.stamp,
@@ -844,12 +845,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       notes: notes || null, logo_mode: logoMode, fiscal_mark: null,
     },
     items: lines.filter((l) => l.description.trim()).map((l) => {
-      const pct = vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0);
+      const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
       const net = lineNetOf(l);
       return {
-        description: l.description, sku: l.sku || null, quantity: parseFloat(l.quantity) || 0,
+        description: l.description, sku: l.sku || null, quantity: parseDecimalOr(l.quantity, 0),
         unit: l.unit || null, measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
-        unit_price: parseFloat(l.unit_price) || 0, net_value: net, line_total: net,
+        unit_price: parseDecimalOr(l.unit_price, 0), net_value: net, line_total: net,
         vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null, vat_percent: pct,
         selected_color: l.color || null, selected_size: l.size || null, line_comments: l.line_comments || null,
       };
@@ -1034,7 +1035,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Default VAT %</Label>
-                <Input type="number" step="0.01" className="h-9" value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
+                <Input type="text" inputMode="decimal" className="h-9" value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Category</Label>
@@ -1183,9 +1184,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             </div>
                           )}
                         </div>
-                        <div className="w-16"><Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={l.quantity} onChange={(e) => update(idx, { quantity: e.target.value })} placeholder="Qty" /></div>
-                        <div className="w-24"><Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
-                        <div className="w-20"><Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="Disc." title="Discount amount" /></div>
+                        <div className="w-16"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.quantity} onChange={(e) => update(idx, { quantity: e.target.value })} placeholder="Qty" /></div>
+                        <div className="w-24"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
+                        <div className="w-20"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="Disc." title="Discount amount" /></div>
                         <div className="w-20 pt-2 text-right text-sm tabular-nums">{lineNet.toFixed(2)}</div>
                         {lines.length > 1 && <button type="button" className="mt-2 text-muted-foreground hover:text-destructive" onClick={() => removeLine(idx)}><Trash2 className="h-3.5 w-3.5" /></button>}
                       </div>
@@ -1208,8 +1209,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               <SelectContent><SelectItem value="none">Default ({vatRate}%)</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Discount ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" /></div>
-                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Unit cost (COGS)</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.unit_cost} onChange={(e) => update(idx, { unit_cost: e.target.value })} placeholder="—" /></div>
+                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Discount ({currency})</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" /></div>
+                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Unit cost (COGS)</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.unit_cost} onChange={(e) => update(idx, { unit_cost: e.target.value })} placeholder="—" /></div>
                           <div className="space-y-1 sm:col-span-2">
                             <Label className="text-[10px] text-muted-foreground">Kind of expense (income classification)</Label>
                             <div className="grid grid-cols-2 gap-2">
@@ -1259,7 +1260,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                       </div>
                                       <div className="space-y-1">
                                         <Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label>
-                                        <Input className="h-7 text-xs text-right" type="number" min="0" step="0.01"
+                                        <Input className="h-7 text-xs text-right" type="text" inputMode="decimal"
                                           value={pctCat ? computed.toFixed(2) : b.amt}
                                           readOnly={!b.cat || pctCat}
                                           onChange={(e) => b.setAmt(e.target.value)}
@@ -1270,7 +1271,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                 })}
                                 <div className="grid grid-cols-[1fr_7rem] gap-2">
                                   <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Deductions</Label><p className="pt-1.5 text-[10px] text-muted-foreground">Retained amount (no myDATA category).</p></div>
-                                  <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label><Input className="h-7 text-xs text-right" type="number" min="0" step="0.01" value={l.deductions} onChange={(e) => update(idx, { deductions: e.target.value })} placeholder="0.00" /></div>
+                                  <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.deductions} onChange={(e) => update(idx, { deductions: e.target.value })} placeholder="0.00" /></div>
                                 </div>
                               </div>
                             )}
@@ -1297,7 +1298,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </Select>
                   {/* 'amount'-kind withholding (wage/solidarity/termination/…) has no rate to compute from. */}
                   {withholdingCode && !isPercentCat(withholdings, withholdingCode) && (
-                    <Input className="h-8 text-right text-sm" type="number" min="0" step="0.01" value={withholdingAmount} onChange={(e) => setWithholdingAmount(e.target.value)} placeholder={`Withholding amount (${currency})`} />
+                    <Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={withholdingAmount} onChange={(e) => setWithholdingAmount(e.target.value)} placeholder={`Withholding amount (${currency})`} />
                   )}
                 </div>
               ) : (
@@ -1308,7 +1309,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               )}
               <div className="space-y-1">
                 <Label className="text-xs">Digital transaction fee</Label>
-                <Input className="h-9 text-right" type="number" min="0" step="0.01" value={digitalFee} onChange={(e) => setDigitalFee(e.target.value)} placeholder="0.00" />
+                <Input className="h-9 text-right" type="text" inputMode="decimal" value={digitalFee} onChange={(e) => setDigitalFee(e.target.value)} placeholder="0.00" />
               </div>
             </section>
 
@@ -1330,7 +1331,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 {currency !== 'EUR' && (
                   <div className="space-y-1">
                     <Label className="text-xs">Exchange rate → EUR</Label>
-                    <Input className="h-9" type="number" step="0.0001" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder="e.g. 1.0850" />
+                    <Input className="h-9" type="text" inputMode="decimal" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} placeholder="e.g. 1.0850" />
                   </div>
                 )}
                 <label className="flex items-center gap-2 self-end text-xs">

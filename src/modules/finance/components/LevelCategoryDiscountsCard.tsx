@@ -13,6 +13,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 interface Disc { id: string; level_key: string; category_key: string | null; discount_pct: number; }
 interface Lvl { id: string; level_key: string; label: string; }
@@ -51,7 +52,7 @@ export const LevelCategoryDiscountsCard: React.FC<{ workspaceId: string }> = ({ 
   }, [levels]);
 
   const add = async () => {
-    const pct = parseFloat(newPct);
+    const pct = parseDecimalOr(newPct, NaN);
     if (!newLevel) { toast({ title: 'Pick a level', variant: 'destructive' }); return; }
     if (!newCat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
     if (!Number.isFinite(pct) || pct < 0) { toast({ title: 'Enter a discount %', variant: 'destructive' }); return; }
@@ -123,7 +124,7 @@ export const LevelCategoryDiscountsCard: React.FC<{ workspaceId: string }> = ({ 
           </div>
           <div className="space-y-1">
             <Label className="text-xs">% off</Label>
-            <Input className="h-8 w-20 text-xs" type="number" step="0.5" min="0" max="100" value={newPct} onChange={(e) => setNewPct(e.target.value)} placeholder="0" />
+            <Input className="h-8 w-20 text-xs" type="text" inputMode="decimal" value={newPct} onChange={(e) => setNewPct(e.target.value)} placeholder="0" />
           </div>
           <Button size="sm" variant="outline" onClick={add} disabled={busy || !newLevel || !newCat}>
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}

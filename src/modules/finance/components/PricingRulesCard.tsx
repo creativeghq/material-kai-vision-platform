@@ -13,6 +13,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
+import { parseDecimalOr } from '@/utils/decimal';
 
 interface Rule {
   id: string; scope: 'category' | 'product'; target_id: string;
@@ -59,7 +60,7 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
 
   const addRule = async () => {
     const cat = newCat.trim().toLowerCase();
-    const pct = parseFloat(newMarkup);
+    const pct = parseDecimalOr(newMarkup, NaN);
     if (!cat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
     if (!Number.isFinite(pct) || pct < 0) { toast({ title: 'Enter a markup %', variant: 'destructive' }); return; }
     setBusy(true);
@@ -96,10 +97,10 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
           </div>
           <div className="flex items-center gap-1">
             <Input
-              className="h-8 w-20 text-right text-xs" type="number" step="0.5" min="0"
+              className="h-8 w-20 text-right text-xs" type="text" inputMode="decimal"
               value={defaultMarkup}
               onChange={(e) => setDefaultMarkup(e.target.value)}
-              onBlur={(e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v) && v >= 0) void saveDefaultMarkup(v); }}
+              onBlur={(e) => { const v = parseDecimalOr(e.target.value, NaN); if (Number.isFinite(v) && v >= 0) void saveDefaultMarkup(v); }}
               placeholder="0"
             />
             <span className="text-xs text-muted-foreground">%</span>
@@ -144,7 +145,7 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Markup %</Label>
-            <Input className="h-8 text-xs w-24" type="number" step="0.5" min="0" value={newMarkup} onChange={(e) => setNewMarkup(e.target.value)} placeholder="25" />
+            <Input className="h-8 text-xs w-24" type="text" inputMode="decimal" value={newMarkup} onChange={(e) => setNewMarkup(e.target.value)} placeholder="25" />
           </div>
           <Button size="sm" variant="outline" onClick={addRule} disabled={busy || !newCat}>
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
