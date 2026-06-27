@@ -758,7 +758,7 @@ export const ContactDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 gap-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                     {/* Pricing level + discount route through the approval RPC (savePricing), not patchInline. */}
                     <InlineSelect
                       alwaysEdit={isNew}
@@ -817,7 +817,7 @@ export const ContactDetailPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                   <InlineSelect
                     alwaysEdit={isNew}
                     label="Segment"
@@ -860,7 +860,7 @@ export const ContactDetailPage: React.FC = () => {
                   <p className="text-xs text-muted-foreground">
                     <span className="text-foreground font-medium">Separate billing identity</span> — fill only when invoices must be issued to a different legal entity than this contact (different ΑΦΜ / name / address). Leave blank to invoice the contact as-is.
                   </p>
-                  <div className="grid grid-cols-1 gap-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                     <InlineText alwaysEdit={isNew} label="Billing name" value={contact.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
                     <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={contact.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
                     <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={contact.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} placeholder="e.g. Tax Office Chalandriou" />
