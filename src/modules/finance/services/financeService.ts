@@ -532,6 +532,10 @@ const _financeServiceCore = {
       .select()
       .single();
     if (insErr) throw insErr;
+    // Clone the full financially-meaningful line — NOT just price/qty. Dropping unit_cost_snapshot
+    // makes the copy show 100% margin (line_cost/line_margin are generated from it); dropping the
+    // per-line tax/withholding/discount fields silently changes the document's tax breakdown.
+    // (line_cost / line_margin are GENERATED columns — never inserted.)
     const items = (src.items ?? []).map((it: any) => ({
       invoice_id: inv.id,
       product_id: it.product_id ?? null,
@@ -539,10 +543,29 @@ const _financeServiceCore = {
       sku: it.sku ?? null,
       quantity: it.quantity,
       unit_price: it.unit_price,
+      discounted_price: it.discounted_price ?? null,
+      unit_cost_snapshot: it.unit_cost_snapshot ?? null,
+      net_value: it.net_value ?? null,
+      vat_amount: it.vat_amount ?? null,
       line_total: it.line_total,
       vat_category: it.vat_category ?? null,
+      measurement_unit_code: it.measurement_unit_code ?? null,
       income_classification_type: it.income_classification_type ?? null,
       income_classification_category: it.income_classification_category ?? null,
+      selected_attributes: it.selected_attributes ?? null,
+      selected_color: it.selected_color ?? null,
+      selected_size: it.selected_size ?? null,
+      withheld_amount: it.withheld_amount ?? null,
+      withheld_category: it.withheld_category ?? null,
+      fees_amount: it.fees_amount ?? null,
+      fees_category: it.fees_category ?? null,
+      stamp_duty_amount: it.stamp_duty_amount ?? null,
+      stamp_duty_category: it.stamp_duty_category ?? null,
+      other_taxes_amount: it.other_taxes_amount ?? null,
+      other_taxes_category: it.other_taxes_category ?? null,
+      deductions_amount: it.deductions_amount ?? null,
+      vat_exemption_category: it.vat_exemption_category ?? null,
+      line_comments: it.line_comments ?? null,
     }));
     if (items.length) {
       const { error: itErr } = await supabase.from('invoice_items').insert(items);

@@ -83,7 +83,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const move = async (item: WarehouseItem, direction: 'in' | 'out') => {
     const raw = window.prompt(`${direction === 'in' ? 'Receive' : 'Issue'} quantity for ${item.name}?`, '1');
     if (raw === null) return;
-    const qty = parseFloat(raw);
+    const qty = parseDecimal(raw) ?? NaN;  // EU-format aware ("100,5" → 100.5)
     if (!Number.isFinite(qty) || qty <= 0) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
     try { await warehouseService.recordMovement(item.id, direction, qty); await load(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
@@ -99,7 +99,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
     if (!target) return;
     const raw = window.prompt(`Transfer how many "${item.name}" to ${target.name}? (on hand: ${item.qty_on_hand})`, '1');
     if (raw === null) return;
-    const qty = parseFloat(raw);
+    const qty = parseDecimal(raw) ?? NaN;  // EU-format aware ("100,5" → 100.5)
     if (!Number.isFinite(qty) || qty <= 0) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
     try { await warehouseService.transfer(item.id, target.id, qty); toast({ title: `Transferred to ${target.name}` }); await load(); }
     catch (err: any) { toast({ title: 'Transfer failed', description: err?.message, variant: 'destructive' }); }
@@ -125,7 +125,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
     if (!l) return;
     const raw = window.prompt(`How many "${item.name}" did you sell on the marketplace? (listed: ${l.qty_remaining})`, String(l.qty_remaining));
     if (raw === null) return;
-    const qty = parseFloat(raw);
+    const qty = parseDecimal(raw) ?? NaN;  // EU-format aware ("100,5" → 100.5)
     if (!Number.isFinite(qty) || qty <= 0) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
     try { await marketplaceService.markSold(l.id, qty); toast({ title: 'Sale recorded — stock updated' }); await load(selectedWh); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }

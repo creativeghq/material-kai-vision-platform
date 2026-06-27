@@ -27,6 +27,8 @@ import { financeService, formatMoney, round2, extractNet } from '@/modules/finan
 import { posSessionService, type PosSession, type PosReport } from '@/modules/finance/services/posSessionService';
 import { fiscalConnectorService, posTerminalService, type PosTerminal } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
+import { parseDecimal } from '@/utils/decimal';
+import { edgeError } from '@/utils/edgeError';
 
 interface SellItem {
   id: string;
@@ -215,7 +217,7 @@ const PosPage: React.FC = () => {
     const raw = window.prompt('Opening cash float?', '0');
     if (raw === null) return;
     try {
-      await posSessionService.open(activeWorkspaceId, parseInt(branchCode, 10) || 0, parseFloat(raw) || 0);
+      await posSessionService.open(activeWorkspaceId, parseInt(branchCode, 10) || 0, parseDecimal(raw) ?? 0);
       await loadSession();
       toast({ title: 'Shift opened' });
     } catch (e: any) { toast({ title: 'Could not open shift', description: e?.message, variant: 'destructive' }); }
@@ -224,7 +226,7 @@ const PosPage: React.FC = () => {
     if (!session || !activeWorkspaceId) return;
     const raw = window.prompt(`Cash ${direction === 'in' ? 'in (pay-in)' : 'out (pay-out)'} amount?`, '0');
     if (raw === null) return;
-    const amt = parseFloat(raw);
+    const amt = parseDecimal(raw) ?? NaN;  // EU-format aware ("1.234,50" → 1234.5)
     if (!Number.isFinite(amt) || amt <= 0) { toast({ title: 'Invalid amount', variant: 'destructive' }); return; }
     const reason = window.prompt('Reason (optional)?', '') || undefined;
     try { await posSessionService.recordCash(session.id, activeWorkspaceId, direction, amt, reason); toast({ title: 'Recorded' }); }
@@ -240,7 +242,7 @@ const PosPage: React.FC = () => {
     const raw = window.prompt('Counted cash in drawer at close?', '');
     if (raw === null) return;
     try {
-      const z = await posSessionService.close(session.id, raw.trim() ? parseFloat(raw) : undefined);
+      const z = await posSessionService.close(session.id, raw.trim() ? (parseDecimal(raw) ?? undefined) : undefined);
       setZReport(z);
       await loadSession();
       toast({ title: `Z report #${z.z_number} — shift closed` });
@@ -472,7 +474,7 @@ const PosPage: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('finance-send-invoice-email', {
         body: { invoice_id: result.invoiceId, ...(to ? { to } : {}) },
       });
-      if (error) throw error;
+      if (error) throw await edgeError(error);
       const res = data as { ok?: boolean; sent_to?: string; error?: string };
       // No customer email on file → ask for an address once and retry.
       if (!res?.ok && /no customer email/i.test(res?.error ?? '')) {
