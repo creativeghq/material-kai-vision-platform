@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, ShoppingCart } from 'lucide-react';
 import {
   CustomerAccountOverview,
+  CustomerTopItemsCard,
 } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
@@ -1028,12 +1029,14 @@ export const CompanyDetailPage: React.FC = () => {
             {company.id ? (
               <>
                 {/* 1 — Money summary up top: orders count + value, owed (invoiced & on orders),
-                       paid, net position, AR aging, plus top items to push. */}
+                       paid, net position, AR aging. */}
                 <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
                 {/* 2 — The orders themselves. Click an order to manage its receivables/payables,
                        invoices, payments and dispatch. */}
                 <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
-                {/* 3 — Secondary settings. */}
+                {/* 3 — Repeat-buy suggestions (in-stock), below the orders list. */}
+                <CustomerTopItemsCard companyId={company.id} />
+                {/* 4 — Secondary settings. */}
                 <CustomerFinanceRulesCard companyId={company.id} />
               </>
             ) : (

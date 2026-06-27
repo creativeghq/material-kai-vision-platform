@@ -141,7 +141,6 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [supplierAcct, setSupplierAcct] = useState<{ billedTotal: number; paidTotal: number; outstandingTotal: number; orderedTotal: number } | null>(null);
   const [lastPayment, setLastPayment] = useState<{ paid_at: string; amount: number; currency: string } | null>(null);
   const [openOrders, setOpenOrders] = useState(0);
-  const [topProducts, setTopProducts] = useState<CustomerTopProductRow[]>([]);
   const [aging, setAging] = useState<{ not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null>(null);
   const [emailing, setEmailing] = useState(false);
   // Orders roll-up for the KPI strip. Receivables/payables now live PER ORDER (open an order),
@@ -154,21 +153,15 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
     if (!contactId && !companyId) return;
     setLoading(true);
     try {
-      const [acct, supAcct, payments, topProds] = await Promise.all([
+      const [acct, supAcct, payments] = await Promise.all([
         financeService.getCustomerAccount({ contactId, companyId }),
         isSupplier ? financeService.getSupplierAccount({ contactId, companyId }) : Promise.resolve(null),
         financeService.listPayments({ counterpartyContactId: contactId, counterpartyCompanyId: companyId, direction: 'in', limit: 1 }),
-        activeWorkspaceId
-          // RPC already filters to in-stock items (invoice + un-invoiced order history) and
-          // returns on-hand qty, so the client just renders what comes back.
-          ? financeService.reportCustomerTopProducts({ workspaceId: activeWorkspaceId, companyId, contactId, limit: 6 })
-          : Promise.resolve([] as CustomerTopProductRow[]),
       ]);
       setAccount(acct ? { invoicedTotal: acct.invoicedTotal, paidTotal: acct.paidTotal, outstandingTotal: acct.outstandingTotal, quoteCount: acct.quoteCount } : null);
       setSupplierAcct(supAcct ? { billedTotal: supAcct.billedTotal, paidTotal: supAcct.paidTotal, outstandingTotal: supAcct.outstandingTotal, orderedTotal: supAcct.orderedTotal } : null);
       const p = payments[0];
       setLastPayment(p ? { paid_at: p.paid_at, amount: p.amount, currency: p.currency } : null);
-      setTopProducts(topProds);
 
       // Orders roll-up — count, total ordered value, and the still-owed amount on orders that
       // haven't been invoiced yet. This drives the KPI strip ("Orders" + "Owed on orders").
@@ -243,47 +236,77 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         ]}
       />
 
-      <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push <span className="text-[10px] font-normal text-muted-foreground">· in stock</span></CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground">
-              <tr className="border-b border-border/60">
-                <th className="px-4 py-2 text-left">Product</th>
-                <th className="px-4 py-2 text-right">Qty bought</th>
-                <th className="px-4 py-2 text-right">Revenue</th>
-                <th className="px-4 py-2 text-right">Orders</th>
-                <th className="px-4 py-2 text-right">On hand</th>
-                <th className="px-4 py-2 text-right">Last ordered</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topProducts.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No previously-bought items are in stock to push right now.</td></tr>
-              ) : (
-                topProducts.map((p) => (
-                  <tr key={p.product_id} className="border-b border-border/30 hover:bg-muted/30">
-                    <td className="px-4 py-2">
-                      <div className="font-medium">{p.description || 'Product'}</div>
-                      {p.sku && <div className="text-xs text-muted-foreground font-mono">{p.sku}</div>}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">{Number(p.total_quantity).toLocaleString()}</td>
-                    <td className="px-4 py-2 text-right">{formatMoney(p.revenue_net)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{p.order_count}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-emerald-600">{Number(p.on_hand).toLocaleString()}</td>
-                    <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? new Date(p.last_ordered).toLocaleDateString() : '—'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
-
-      {/* Receivables & payables are managed PER ORDER now — open an order to add/see them. */}
+      {/* Receivables & payables are managed PER ORDER now — open an order to add/see them.
+          "Top items to push" renders separately (CustomerTopItemsCard) BELOW the orders list. */}
     </div>
+  );
+};
+
+/**
+ * Standalone "Top items to push" card — the customer's repeat-buy history (invoice + un-invoiced
+ * order lines) filtered to what's currently in warehouse stock, with on-hand qty. Rendered on the
+ * CRM party page AFTER the orders list so it reads as a follow-up suggestion, not a header.
+ */
+export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId }) => {
+  const { activeWorkspaceId } = useWorkspace();
+  const [loading, setLoading] = useState(true);
+  const [topProducts, setTopProducts] = useState<CustomerTopProductRow[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!activeWorkspaceId || (!contactId && !companyId)) { setTopProducts([]); setLoading(false); return; }
+      setLoading(true);
+      try {
+        const rows = await financeService.reportCustomerTopProducts({ workspaceId: activeWorkspaceId, companyId, contactId, limit: 6 });
+        if (!cancelled) setTopProducts(rows);
+      } catch { if (!cancelled) setTopProducts([]); }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [contactId, companyId, activeWorkspaceId]);
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-border/60 px-5 py-3">
+        <CardTitle className="text-sm flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push <span className="text-[10px] font-normal text-muted-foreground">· in stock</span></CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <table className="w-full text-sm">
+          <thead className="text-xs text-muted-foreground">
+            <tr className="border-b border-border/60">
+              <th className="px-4 py-2 text-left">Product</th>
+              <th className="px-4 py-2 text-right">Qty bought</th>
+              <th className="px-4 py-2 text-right">Revenue</th>
+              <th className="px-4 py-2 text-right">Orders</th>
+              <th className="px-4 py-2 text-right">On hand</th>
+              <th className="px-4 py-2 text-right">Last ordered</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="px-4 py-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></td></tr>
+            ) : topProducts.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No previously-bought items are in stock to push right now.</td></tr>
+            ) : (
+              topProducts.map((p) => (
+                <tr key={p.product_id} className="border-b border-border/30 hover:bg-muted/30">
+                  <td className="px-4 py-2">
+                    <div className="font-medium">{p.description || 'Product'}</div>
+                    {p.sku && <div className="text-xs text-muted-foreground font-mono">{p.sku}</div>}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums">{Number(p.total_quantity).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right">{formatMoney(p.revenue_net)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{p.order_count}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-emerald-600">{Number(p.on_hand).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? new Date(p.last_ordered).toLocaleDateString() : '—'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
   );
 };
 
