@@ -686,6 +686,9 @@ const _financeServiceCore = {
     categoryId?: string | null;
     /** Which bank/cash account the money moved through (in → deposited to / out → paid from). */
     bankAccountId?: string | null;
+    /** Link the payment to an order (drives orders.payment_status). Optional — also back-filled
+     *  by the DB when the payment is allocated to that order's invoice/bill. */
+    orderId?: string | null;
     /**
      * Allocations may sum to LESS than the payment (remainder = customer credit) but not
      * more. `amount` is the value applied to the target in the TARGET's currency; for a
@@ -717,6 +720,7 @@ const _financeServiceCore = {
       })),
       p_category_id: input.categoryId ?? null,
       p_bank_account_id: input.bankAccountId ?? null,
+      p_order_id: input.orderId ?? null,
     });
     if (error) throw error;
     // Payment received → notify + email the customer via the seeded flow (fire-and-forget).
@@ -1741,7 +1745,7 @@ export interface MyDataReconRow { doc_kind: 'invoice' | 'credit_note' | 'deliver
 export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number }
 export interface MyfRow { direction: 'sales' | 'purchases'; counterparty_name: string; vat_number: string | null; doc_count: number; net: number; vat: number; gross: number }
 export interface SalesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; revenue_net: number; gross_margin: number }
-export interface CustomerTopProductRow { product_id: string; description: string; sku: string | null; total_quantity: number; revenue_net: number; order_count: number; last_ordered: string | null }
+export interface CustomerTopProductRow { product_id: string; description: string; sku: string | null; total_quantity: number; revenue_net: number; order_count: number; last_ordered: string | null; on_hand: number }
 export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
 export interface PurchasesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; total_cost: number }
 export interface OpenTaskRow { quote_id: string; quote_label: string; kind: string; scheduled_for: string; days_until: number; body: string | null; owner_user_id: string | null }

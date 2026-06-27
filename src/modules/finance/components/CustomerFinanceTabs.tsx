@@ -51,8 +51,8 @@ export const PartyAccountSummary: React.FC<{
 
   // KPI cell with a leading icon — used for the consolidated top strip (orders + balance + info),
   // so every column reads the same way (icon · label · value), like the old Balance row did.
-  const stat = (icon: React.ReactNode, label: React.ReactNode, value: React.ReactNode, opts?: { danger?: boolean; tone?: string }) => (
-    <Card className={`dashboard-card border-0 ${opts?.danger ? 'ring-1 ring-destructive/40' : opts?.tone === netTone && netRing ? netRing : ''}`}>
+  const stat = (icon: React.ReactNode, label: React.ReactNode, value: React.ReactNode, opts?: { danger?: boolean; tone?: string; title?: string }) => (
+    <Card className={`dashboard-card border-0 ${opts?.danger ? 'ring-1 ring-destructive/40' : opts?.tone === netTone && netRing ? netRing : ''}`} title={opts?.title}>
       <CardContent className="p-3">
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">{icon}{label}</div>
         <div className={`text-lg font-semibold ${opts?.danger ? 'text-destructive' : opts?.tone ?? ''}`}>{value}</div>
@@ -72,10 +72,10 @@ export const PartyAccountSummary: React.FC<{
       {/* Consolidated top strip — orders roll-up + net balance + account meta, all as compact
           icon columns in one row (Balance is no longer a full-width row of its own). */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count)}
-        {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered))}
-        {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0 })}
-        {stat(<Wallet className="h-3.5 w-3.5" />, <>Balance <span className="normal-case text-[9px]">· {netDir}</span></>, formatMoney(Math.abs(net)), { tone: netTone })}
+        {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count, { title: 'Active (non-cancelled) orders for this party' })}
+        {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered), { title: 'Total value of those orders (incl. VAT)' })}
+        {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed on orders', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0, title: 'Cash still owed on orders that have NOT been invoiced yet (order total − payments). Once invoiced, it moves into the Balance below.' })}
+        {stat(<Wallet className="h-3.5 w-3.5" />, <>Balance <span className="normal-case text-[9px]">· {netDir}</span></>, formatMoney(Math.abs(net)), { tone: netTone, title: 'Net invoiced position: what they owe us on issued invoices minus what we owe them as a supplier. Separate from un-invoiced order cash (Owed on orders).' })}
         {meta && meta.length > 0 && (
           <Card className="dashboard-card border-0">
             <CardContent className="p-3">
@@ -159,24 +159,16 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         isSupplier ? financeService.getSupplierAccount({ contactId, companyId }) : Promise.resolve(null),
         financeService.listPayments({ counterpartyContactId: contactId, counterpartyCompanyId: companyId, direction: 'in', limit: 1 }),
         activeWorkspaceId
-          // Pull a wider set than we render, then keep only items still in warehouse stock below.
-          ? financeService.reportCustomerTopProducts({ workspaceId: activeWorkspaceId, companyId, contactId, limit: 24 })
+          // RPC already filters to in-stock items (invoice + un-invoiced order history) and
+          // returns on-hand qty, so the client just renders what comes back.
+          ? financeService.reportCustomerTopProducts({ workspaceId: activeWorkspaceId, companyId, contactId, limit: 6 })
           : Promise.resolve([] as CustomerTopProductRow[]),
       ]);
       setAccount(acct ? { invoicedTotal: acct.invoicedTotal, paidTotal: acct.paidTotal, outstandingTotal: acct.outstandingTotal, quoteCount: acct.quoteCount } : null);
       setSupplierAcct(supAcct ? { billedTotal: supAcct.billedTotal, paidTotal: supAcct.paidTotal, outstandingTotal: supAcct.outstandingTotal, orderedTotal: supAcct.orderedTotal } : null);
       const p = payments[0];
       setLastPayment(p ? { paid_at: p.paid_at, amount: p.amount, currency: p.currency } : null);
-      // "Top items to push" = repeat-buy history, but only suggest what we can actually fulfil —
-      // keep the items that currently have warehouse stock on hand.
-      let visibleTop = topProds.slice(0, 6);
-      if (activeWorkspaceId && topProds.length) {
-        try {
-          const stock = await ordersService.getAvailableStock(topProds.map((t) => t.product_id), activeWorkspaceId);
-          visibleTop = topProds.filter((t) => (stock.get(t.product_id) ?? 0) > 0).slice(0, 6);
-        } catch { /* stock lookup failed → fall back to top-by-revenue */ }
-      }
-      setTopProducts(visibleTop);
+      setTopProducts(topProds);
 
       // Orders roll-up — count, total ordered value, and the still-owed amount on orders that
       // haven't been invoiced yet. This drives the KPI strip ("Orders" + "Owed on orders").
@@ -263,12 +255,13 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
                 <th className="px-4 py-2 text-right">Qty bought</th>
                 <th className="px-4 py-2 text-right">Revenue</th>
                 <th className="px-4 py-2 text-right">Orders</th>
+                <th className="px-4 py-2 text-right">On hand</th>
                 <th className="px-4 py-2 text-right">Last ordered</th>
               </tr>
             </thead>
             <tbody>
               {topProducts.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No previously-bought items are in stock to push right now.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No previously-bought items are in stock to push right now.</td></tr>
               ) : (
                 topProducts.map((p) => (
                   <tr key={p.product_id} className="border-b border-border/30 hover:bg-muted/30">
@@ -279,6 +272,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
                     <td className="px-4 py-2 text-right tabular-nums">{Number(p.total_quantity).toLocaleString()}</td>
                     <td className="px-4 py-2 text-right">{formatMoney(p.revenue_net)}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{p.order_count}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-emerald-600">{Number(p.on_hand).toLocaleString()}</td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? new Date(p.last_ordered).toLocaleDateString() : '—'}</td>
                   </tr>
                 ))

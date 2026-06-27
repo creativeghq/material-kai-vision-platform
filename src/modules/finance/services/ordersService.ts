@@ -282,6 +282,118 @@ export const ordersService = {
     };
   },
 
+  /**
+   * Record real cash on an order through the canonical `record_payment_fx` path (NOT a bare
+   * payments insert). This gets us, for free: FX plumbing, the payment receipt PDF, the
+   * "payment received" flow notification, and — the point of this method — automatic settlement
+   * of the order's open invoice (money in) or supplier bill (money out) by allocating the cash
+   * to it greedily, oldest-first. Any remainder stays as unallocated cash, still linked to the
+   * order via `order_id` so it shows in the order's Received/Paid totals.
+   */
+  async recordOrderPayment(input: {
+    order: { id: string; workspace_id: string; currency: string; customer_company_id: string | null; customer_contact_id: string | null };
+    direction: 'in' | 'out';
+    amount: number;
+    reference: string;
+    method: string | null;
+    bankAccountId: string;
+    /** money-out: the supplier we're paying (counterparty). */
+    supplierCompanyId?: string | null;
+    /** Open targets to settle: invoices for money-in, supplier_bills for money-out. */
+    targets?: Array<{ id: string; amount_due: number; type: 'invoice' | 'supplier_bill' }>;
+    fxRateToBase?: number;
+  }): Promise<string> {
+    const { financeService } = await import('@/modules/finance/services/financeService');
+    // Greedy allocate across the open targets, oldest-first, capped at the payment amount.
+    let remaining = input.amount;
+    const allocations: Array<{ target_id: string; target_type: 'invoice' | 'supplier_bill'; amount: number }> = [];
+    for (const t of input.targets ?? []) {
+      if (remaining <= 0.005) break;
+      const due = Math.max(0, Number(t.amount_due) || 0);
+      if (due <= 0) continue;
+      const alloc = Math.min(remaining, due);
+      allocations.push({ target_id: t.id, target_type: t.type, amount: Math.round(alloc * 100) / 100 });
+      remaining -= alloc;
+    }
+    return financeService.recordPayment({
+      workspaceId: input.order.workspace_id,
+      direction: input.direction,
+      amount: input.amount,
+      currency: input.order.currency,
+      method: (input.method as any) ?? undefined,
+      reference: input.reference,
+      orderId: input.order.id,
+      bankAccountId: input.bankAccountId,
+      fxRateToBase: input.fxRateToBase ?? 1,
+      // Money in → the order's customer; money out → the supplier being paid.
+      counterpartyCompanyId: input.direction === 'out' ? (input.supplierCompanyId ?? null) : (input.order.customer_company_id ?? null),
+      counterpartyContactId: input.direction === 'in' ? (input.order.customer_contact_id ?? null) : null,
+      allocations,
+    });
+  },
+
+  /**
+   * Edit an existing order payment. Updates the cash row and keeps a single linked allocation in
+   * sync (clamped to the target's remaining), so settling stays consistent. Refuses to silently
+   * change the amount of a multi-allocation payment (rare for order cash) — caller should delete
+   * and re-add in that case.
+   */
+  async updateOrderPayment(input: {
+    paymentId: string; orderId: string;
+    direction: 'in' | 'out'; amount: number; reference: string; method: string | null;
+    bankAccountId: string; counterpartyCompanyId: string | null; counterpartyContactId: string | null;
+  }): Promise<void> {
+    const { data: allocs, error: aErr } = await supabase
+      .from('payment_allocations').select('id, invoice_id, supplier_bill_id, amount').eq('payment_id', input.paymentId);
+    if (aErr) throw aErr;
+    if ((allocs?.length ?? 0) > 1) {
+      throw new Error('This payment settles more than one document — delete it and re-record instead of editing the amount.');
+    }
+    const { error } = await supabase.from('payments').update({
+      direction: input.direction, amount: input.amount, reference: input.reference, method: input.method || null,
+      bank_account_id: input.bankAccountId, counterparty_company_id: input.counterpartyCompanyId, counterparty_contact_id: input.counterpartyContactId,
+    }).eq('id', input.paymentId).eq('order_id', input.orderId);
+    if (error) throw error;
+    // Re-sync the single allocation amount so the settled invoice/bill matches the new cash amount.
+    const a = allocs?.[0];
+    if (a) {
+      const targetTable = a.invoice_id ? 'invoices' : 'supplier_bills';
+      const targetId = (a.invoice_id ?? a.supplier_bill_id) as string;
+      const { data: tgt } = await supabase.from(targetTable).select('total').eq('id', targetId).maybeSingle();
+      const col = a.invoice_id ? 'invoice_id' : 'supplier_bill_id';
+      const { data: others } = await supabase.from('payment_allocations')
+        .select('amount').eq(col, targetId).neq('id', a.id);
+      const otherSum = (others ?? []).reduce((s, r: any) => s + Number(r.amount), 0);
+      const remaining = Math.max(0, (Number((tgt as any)?.total) || 0) - otherSum);
+      const newAlloc = Math.round(Math.min(input.amount, remaining) * 100) / 100;
+      const { error: uErr } = await supabase.from('payment_allocations')
+        .update({ amount: newAlloc, amount_doc_currency: newAlloc }).eq('id', a.id);
+      if (uErr) throw uErr;
+    }
+  },
+
+  /** Delete an order payment. payment_allocations cascade, so the settled invoice/bill and the
+   *  order's payment_status both recompute via their triggers. */
+  async deleteOrderPayment(paymentId: string, orderId: string): Promise<void> {
+    const { error } = await supabase.from('payments').delete().eq('id', paymentId).eq('order_id', orderId);
+    if (error) throw error;
+  },
+
+  /** Audit trail of edits/deletes to this order's payments (newest first). Reads are RLS-gated to
+   *  finance managers, so non-finance users transparently get an empty list. */
+  async listOrderPaymentAudit(orderId: string): Promise<Array<{
+    id: string; payment_id: string | null; action: 'update' | 'delete'; actor: string | null;
+    old_row: any; new_row: any; changed_at: string;
+  }>> {
+    const { data, error } = await supabase.from('payment_audit_log')
+      .select('id, payment_id, action, actor, old_row, new_row, changed_at')
+      .filter('old_row->>order_id', 'eq', orderId)
+      .order('changed_at', { ascending: false })
+      .limit(50);
+    if (error) return [];
+    return (data ?? []) as any;
+  },
+
   async setStatus(id: string, status: OrderStatus): Promise<void> {
     const { error } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;
