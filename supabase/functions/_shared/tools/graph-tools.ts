@@ -271,3 +271,61 @@ export const createSupplierOverviewTool = (
     },
   );
 };
+
+// ── 7) products_by_brand (Phase 2 — maker as a node) ────────────────────────
+
+export const createProductsByBrandTool = (
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ company_id, brand_name }: { company_id?: string; brand_name?: string }) => {
+      const sb = svcClient();
+      const cid = await resolveCompanyId(sb, workspaceId, company_id, brand_name);
+      if (!cid) return JSON.stringify({ success: false, error: 'Need company_id or a resolvable brand_name.' });
+      const { data, error } = await sb.rpc('get_products_by_brand', { p_workspace_id: workspaceId, p_company_id: cid });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      onChunk?.({ type: 'products_by_brand_result', workspace_id: workspaceId, company_id: cid, products: data, timestamp: Date.now() });
+      return JSON.stringify({ success: true, count: Array.isArray(data) ? data.length : 0, products: data });
+    },
+    {
+      name: 'products_by_brand',
+      description:
+        'List every product made by a given brand/manufacturer. Use for "all products by brand X", ' +
+        '"what do we carry from manufacturer Y". Pass company_id or brand_name (fuzzy resolved).',
+      schema: z.object({
+        company_id: z.string().optional().describe('Brand/manufacturer CRM company UUID'),
+        brand_name: z.string().optional().describe('Brand/manufacturer name fragment (fuzzy resolved)'),
+      }),
+    },
+  );
+};
+
+// ── 8) brand_overview (Phase 2) ─────────────────────────────────────────────
+
+export const createBrandOverviewTool = (
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ company_id, brand_name }: { company_id?: string; brand_name?: string }) => {
+      const sb = svcClient();
+      const cid = await resolveCompanyId(sb, workspaceId, company_id, brand_name);
+      if (!cid) return JSON.stringify({ success: false, error: 'Need company_id or a resolvable brand_name.' });
+      const { data, error } = await sb.rpc('brand_overview', { p_workspace_id: workspaceId, p_company_id: cid });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      onChunk?.({ type: 'brand_overview_result', workspace_id: workspaceId, company_id: cid, overview: data, timestamp: Date.now() });
+      return JSON.stringify({ success: true, overview: data });
+    },
+    {
+      name: 'brand_overview',
+      description:
+        'A 360° view of a brand/manufacturer: product count, sample products, and how many projects use them. ' +
+        'Use for "tell me about brand X", "how many products does manufacturer Y have". Pass company_id or brand_name.',
+      schema: z.object({
+        company_id: z.string().optional().describe('Brand/manufacturer CRM company UUID'),
+        brand_name: z.string().optional().describe('Brand/manufacturer name fragment (fuzzy resolved)'),
+      }),
+    },
+  );
+};
