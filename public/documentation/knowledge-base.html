@@ -10,112 +10,54 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / Knowledge Base</div>
   <h1>Knowledge Base</h1>
-  <div class="routes"><span class="badge route">/knowledge-base</span> <span class="badge public">Public</span></div>
-  <p class="lead">The platform's searchable, image-rich library of materials and knowledge documents — built automatically from supplier PDFs and catalogues. Because it's public, it doubles as a shareable catalogue you can send to a customer or open without signing in. This guide teaches what the library is, how its multi-signal search actually works, how to search and filter, how to act on a result, and why it's public.</p>
-  <div class="callout"><p><strong>How to open it:</strong> open the public Knowledge Base at <span class="badge route">/knowledge-base</span> (no sign-in required).</p></div>
+  <div class="routes"><span class="badge route">/knowledge-base</span> <span class="badge route">/knowledge-base/:slug</span> <span class="badge public">Public</span></div>
+  <p class="lead">The Knowledge Base is your platform's <strong>public help centre</strong> — installation guides, how-to answers, certifications and materials know-how, in one searchable, browsable place. A visitor can <strong>search</strong> for an answer, <strong>browse by topic or brand</strong>, read a full <strong>article</strong>, or <strong>ask the AI assistant</strong> a question grounded in this content. Because it's public and SEO-friendly, it doubles as a marketing surface: real article pages that rank in Google and preview cleanly when shared. This guide walks the landing page, search, browsing, the article page, and the AI hand-off.</p>
+
+  <div class="callout"><p><strong>How to open it:</strong> open <span class="badge route">/knowledge-base</span> — no sign-in required. From inside the app there's a <strong>Back to Platform</strong> link to return.</p></div>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/knowledge-base/knowledge-base.png" alt="The public Knowledge Base, showing searchable materials and knowledge documents">
-    <figcaption>The public Knowledge Base — browse and search materials and knowledge documents.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/knowledge-base/knowledge-base.png" alt="The rebuilt public Knowledge Base help centre — search, Browse Articles, Ask the AI, Most Popular">
+    <figcaption>The Knowledge Base landing — a big search, plus Browse Articles, Ask the AI Assistant and Most Popular.</figcaption>
   </figure>
 
-  <h2>1. What the Knowledge Base is</h2>
-  <p><strong>What it is —</strong> the front door to everything the platform knows about materials. When a supplier PDF or catalogue is processed, the platform's extraction pipeline reads it page by page, finds each product, lifts out its imagery, recognises its specifications, and writes a clean, structured entry.</p>
-  <p><strong>Why it matters —</strong> the result is a single library where every material is consistent and searchable — no matter which supplier or catalogue layout it came from. Each entry typically carries product imagery, a description, technical specifications, and a link back to the catalogue it came from.</p>
-  <p><strong>What it affects elsewhere —</strong> because the page is public, it works equally well as your internal reference library and as a customer-facing catalogue you can share. Everything you find here can be carried into <a href="moodboards.html">moodboards</a>, <a href="quotes.html">quotes</a>, <a href="compare.html">comparisons</a>, and the <a href="agent-hub.html">Agent Hub</a>.</p>
+  <h2>1. What it is</h2>
+  <p><strong>What it is —</strong> a help centre for the people you serve. Its content is <strong>knowledge articles</strong> — installation guides, manuals, how-tos, care instructions, certifications and FAQs — written and published by your team, organised so a visitor can find an answer fast. <strong>Why it matters —</strong> it deflects “how do I…?” questions, gives customers a self-serve reference, and (because every article is a real public web page) earns search traffic. <strong>Who it's for —</strong> anyone: customers, prospects and your own team — no account needed.</p>
 
-  <h2>2. How multi-signal search works</h2>
-  <p><strong>What it is —</strong> search here is not a plain keyword match. The platform compares your query against several different signals at once and blends them into a single relevance score, so you can find materials by <em>what they are</em> and by <em>what they look like</em> — described in your own words.</p>
-  <p><strong>Why it matters —</strong> because the signals are combined, natural-language queries work well. Searching for "warm matte stone for a bathroom floor" weighs the words, the look, the colour family and the surface together — rather than only matching the exact characters you typed.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/knowledge-base/kb-search.png" alt="Knowledge Base search results"><figcaption>Searching the Knowledge Base filters the entries as you type.</figcaption></figure>
-  <h3>The signals that get blended</h3>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Signal</th><th>What it captures</th></tr></thead>
-    <tbody>
-      <tr><td>Text</td><td>The words on the entry — name, description and written specifications.</td></tr>
-      <tr><td>Visual appearance</td><td>How the material actually looks in its images, so a photo or a "looks like…" phrase can match.</td></tr>
-      <tr><td>Understanding</td><td>An AI reading of each material — what it is, where it's used and how it would be described.</td></tr>
-      <tr><td>Colour</td><td>The dominant colours and tones of the material.</td></tr>
-      <tr><td>Texture</td><td>Surface character — smooth, grainy, ribbed, matte, glossy, and so on.</td></tr>
-      <tr><td>Style</td><td>The overall aesthetic — modern, rustic, industrial, classic.</td></tr>
-      <tr><td>Material</td><td>The underlying material family — ceramic, wood, stone, metal, textile.</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p><strong>What it affects elsewhere —</strong> the same blended engine powers conversational and image search in the <a href="agent-hub.html">Agent Hub</a> and material identification in <a href="recognition.html">Recognition</a> — so the way you phrase a query here transfers directly to those surfaces.</p>
-  <div class="callout tip"><p><strong>Tip:</strong> describe the <em>feel</em> you want, not just the name. "Soft grey concrete-look with a fine texture" usually returns more useful results than a single keyword, because the visual and texture signals have something to work with.</p></div>
-
-  <h2>3. Searching and filtering with facets</h2>
-  <p><strong>What it is —</strong> alongside the search box, facet filters let you narrow the library by its structured attributes. Pick one or more values and the results update to match.</p>
-  <p><strong>Why it matters —</strong> facets give you precise, structured control to complement the fuzzy, natural-language search — letting you combine "describe the feel" with hard constraints like a specific material family or finish.</p>
-  <h3>How to search and filter</h3>
-  <ol>
-    <li>Type a query in the search box — a name, or a natural-language phrase describing what you want. Results filter as you type.</li>
-    <li>Open the facet filters beside the search box and pick one or more values to narrow the library:
-      <ul class="feat">
-        <li><strong>Category</strong> — the type of product (for example tiles, flooring, fixtures).</li>
-        <li><strong>Colour</strong> — filter to a colour family.</li>
-        <li><strong>Material</strong> — the material family the item is made from.</li>
-        <li><strong>Finish</strong> — surface finish such as matte, polished or textured.</li>
-        <li><strong>…and more</strong> — additional facets appear automatically based on what the catalogues contain.</li>
-      </ul>
-    </li>
-    <li>Combine facets with a text or natural-language query to zero in quickly.</li>
-  </ol>
-  <p>Facets are populated from the structured data the pipeline extracts, and equivalent values across languages and spellings are grouped together — so "white", for instance, gathers its variants under one filter instead of scattering across dozens of near-duplicates.</p>
-  <p><strong>What it affects elsewhere —</strong> the facets reflect the structured attributes extracted from your processed catalogues; the cleaner and more complete those catalogues are, the richer the filters become.</p>
-
-  <h2>4. Opening a material</h2>
-  <p><strong>What it is —</strong> the detail view you reach by selecting any result.</p>
-  <p><strong>Why it matters —</strong> it's where you confirm an item is what you need and trace any figure back to its source before you put it in front of a client.</p>
-  <h3>What you'll find inside</h3>
+  <h2>2. The landing page</h2>
+  <p>The home screen is built to get a visitor to an answer in one step. It offers four ways in:</p>
   <ul class="feat">
-    <li><strong>Imagery</strong> — the product photos and crops the pipeline extracted from the catalogue.</li>
-    <li><strong>Specifications</strong> — the recognised technical attributes (dimensions, finish, material and other catalogue details).</li>
-    <li><strong>Source</strong> — a reference back to the catalogue or document the entry was built from, so you can trace any figure to its origin.</li>
+    <li><strong>Search</strong> — the prominent box (<em>“What do you need help with today?”</em>) searches across every article. There's also a <strong>⌘K</strong> quick-search / command palette you can open from anywhere on the page.</li>
+    <li><strong>Browse Articles</strong> — <em>“Guides, manuals, and how-tos organised by topic.”</em> Opens the topic browser (see §3).</li>
+    <li><strong>Ask the AI Assistant</strong> — <em>“Get an instant answer from JARVIS, grounded in this knowledge base.”</em> Starts a chat that answers from this content (see §5).</li>
+    <li><strong>Most Popular</strong> — <em>“The articles other people are reading right now”</em> — a “see top reads” shortcut to the most-viewed articles.</li>
   </ul>
-  <p><strong>What it affects elsewhere —</strong> from the detail view you can carry the material into the rest of the platform — see below.</p>
 
-  <h2>5. Acting on a result</h2>
-  <p><strong>What it is —</strong> the Knowledge Base is a starting point, not a dead end. From a material — or from a set of results — you can carry it straight into the rest of the platform.</p>
-  <p><strong>Why it matters —</strong> this is how a search turns into real work: a scheme, a priced proposal, a comparison, or a deeper conversational search.</p>
-  <h3>Where you can take a material</h3>
-  <div class="cards">
-    <a class="card" href="moodboards.html"><div class="ico">🎨</div><h3>Add to a moodboard</h3><p>Collect materials onto a visual board to develop a scheme or share a concept.</p></a>
-    <a class="card" href="quotes.html"><div class="ico">🧾</div><h3>Include in a quote</h3><p>Drop a material into a quote and build a priced proposal for a client.</p></a>
-    <a class="card" href="compare.html"><div class="ico">⚖️</div><h3>Compare several</h3><p>Put materials side by side to weigh their specifications and look.</p></a>
-    <a class="card" href="agent-hub.html"><div class="ico">🤖</div><h3>Ask the Agent Hub</h3><p>Search conversationally or by image, and get an explanation of why results matched.</p></a>
-  </div>
-  <p><strong>What it affects elsewhere —</strong> each action writes into the corresponding module — <a href="moodboards.html">Moodboards</a>, <a href="quotes.html">Quotes</a>, <a href="compare.html">Compare</a> or the <a href="agent-hub.html">Agent Hub</a> — where you continue the work.</p>
+  <h2>3. Browsing — by topic and by brand</h2>
+  <p><strong>What it is —</strong> two structured ways to explore instead of searching. <strong>Why it matters —</strong> when a visitor doesn't have the exact words, browsing by the thing they <em>do</em> know — a topic or a brand — gets them there.</p>
+  <ul class="feat">
+    <li><strong>Browse by Topic</strong> — articles are grouped into topics/categories; a <strong>Filter by category</strong> / <strong>All categories</strong> control narrows the list, and <strong>Popular topics</strong> surfaces the busy ones. (An empty topic reads <em>“No articles in this topic yet.”</em>)</li>
+    <li><strong>Browse by brand</strong> — jump to the articles tied to a specific brand (manuals, certifications, spec sheets for that maker).</li>
+  </ul>
+  <p>The topics mirror your platform's material taxonomy, so the help centre stays organised the same way the rest of your catalogue is.</p>
 
-  <h2>6. Conversational and visual search</h2>
-  <p><strong>What it is —</strong> for anything that's easier to describe than to filter — "something like travertine but darker", or finding matches for a photo you upload — the <a href="agent-hub.html">Agent Hub</a> runs the same blended search engine.</p>
-  <p><strong>Why it matters —</strong> the difference is that it works as a conversation: you can refine across several turns, attach images, and it will explain <em>why</em> each result matched (the colour, the style, the material it picked up on).</p>
-  <h3>How to use it</h3>
-  <ol>
-    <li>Open the <a href="agent-hub.html">Agent Hub</a> and describe what you want, or attach an image.</li>
-    <li>Read the explanation of why each result matched, then refine your next message to steer the results.</li>
-    <li>If you only want to confirm whether an item in a photo exists in the library, use <a href="recognition.html">Recognition</a>, which identifies materials directly from an image.</li>
-  </ol>
-  <p><strong>What it affects elsewhere —</strong> results from the Agent Hub are the same library entries — you can act on them (moodboard, quote, compare) exactly as you would from a Knowledge Base search.</p>
+  <h2>4. The article page</h2>
+  <p><strong>What it is —</strong> each published article has its own real, slug-based address at <span class="badge route">/knowledge-base/:slug</span> <span class="badge public">Public</span> — a proper page, not a pop-up. <strong>Why it matters —</strong> it's readable, linkable and built to be found. An article page includes:</p>
+  <ul class="feat">
+    <li>A <strong>breadcrumb</strong> back to its topic, and a <strong>Table of contents</strong> (“On this page”) for long articles.</li>
+    <li>The article body, with images and formatting.</li>
+    <li>A <strong>Frequently asked questions</strong> block where present.</li>
+    <li><strong>“Have questions about this article?”</strong> — a direct hand-off to the AI assistant about <em>this</em> content.</li>
+    <li><strong>Popular / related articles</strong> to continue reading.</li>
+  </ul>
+  <div class="callout tip"><p><strong>Built to rank &amp; share.</strong> Article pages carry proper search-engine metadata and structured data (JSON-LD) and are pre-rendered, so they can rank in Google and show a rich preview (title, summary, image) when the link is pasted into a chat, email or social post. To share one, just copy its address bar — no sign-in, no PDF attachment.</p></div>
 
-  <h2>7. Why it's public</h2>
-  <p><strong>What it is —</strong> the Knowledge Base is open at <span class="badge route">/knowledge-base</span> with no sign-in required.</p>
-  <p><strong>Why it matters —</strong> being public means it doubles as a shareable, customer-facing catalogue — you can send a customer the link or open it yourself without authenticating — while remaining your internal reference library at the same time.</p>
-  <p><strong>What it affects elsewhere —</strong> the public surface only exposes published material entries; private, internal and agent-only documents never appear here (the <a href="dashboard.html">Dashboard</a>'s Latest Knowledge feed follows the same rule), so what's public is safe to share.</p>
+  <h2>5. Ask the AI Assistant</h2>
+  <p><strong>What it is —</strong> for anything easier to ask than to find, <strong>Ask the AI Assistant</strong> (and the per-article “Have questions about this article?”) starts a chat with <strong>JARVIS</strong> that answers <em>grounded in the knowledge base</em>. <strong>Why it matters —</strong> the visitor gets a direct answer with the source articles behind it, and can keep asking follow-ups. It's the same assistant documented in the <a href="agent-hub.html">Agent Hub</a>, pointed at this content.</p>
 
-  <h2>8. Knowledge articles — shareable, SEO-friendly pages</h2>
-  <p><strong>What it is —</strong> beyond material entries, the Knowledge Base also publishes <strong>knowledge articles</strong> (guides, explainers, care/spec write-ups). Each published article now has its <strong>own real, slug-based web address</strong> at <span class="badge route">/knowledge-base/:slug</span> <span class="badge public">Public</span> — a proper page you can link to directly, not a pop-up.</p>
-  <p><strong>Why it matters —</strong> these article pages are <strong>built to be found and shared</strong>: each carries proper search-engine metadata and structured data (JSON-LD) and is pre-rendered, so it can rank in Google and shows a rich preview (title, summary, image) when you paste the link into a chat, email or social post. It turns your knowledge library into a marketing surface, not just an internal reference.</p>
-  <h3>How to use it</h3>
-  <ol>
-    <li>Browse or search the Knowledge Base and open an <strong>article</strong> — it loads at its own <span class="badge route">/knowledge-base/:slug</span> URL.</li>
-    <li><strong>Copy the address bar</strong> to share that exact article with a customer or on social — the link previews nicely and needs no sign-in.</li>
-    <li>Articles are authored/managed by your team in the admin Knowledge Base area; only <strong>published</strong> ones appear publicly (the same public/private rule as material entries).</li>
-  </ol>
+  <h2>6. Where the content comes from &amp; who can see it</h2>
+  <p>Articles are authored and published by your team in the admin Knowledge Base area; <strong>only published articles</strong> appear on the public site (drafts, internal and agent-only documents never show here). Catalogue ingestion can also generate knowledge entries, filed into the matching topic automatically. Being public means the help centre works as both your <strong>internal reference</strong> and a <strong>customer-facing</strong> resource at the same time.</p>
 
-  <div class="callout warn"><p><strong>Good to know:</strong> the Knowledge Base reflects the catalogues that have been processed for your workspace. If a material seems to be missing, it usually means its source catalogue hasn't been added or finished processing yet — not that the platform can't represent it.</p></div>
+  <div class="callout"><p><strong>Looking for materials, not articles?</strong> To search the product catalogue itself — by look, colour, material and spec — use the <a href="agent-hub.html">Agent Hub</a>'s material/visual search or <a href="discover-products.html">Discover → Products</a>. The Knowledge Base is for <em>knowledge</em> (guides, manuals, certifications, how-tos).</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -19,8 +19,6 @@
         { file: "agent-tools.html", title: "Tools & Capabilities" },
       ]},
       { file: "knowledge-base.html", title: "Knowledge Base", icon: "📚" },
-      { file: "recognition.html", title: "Material Recognition", icon: "🔍" },
-      { file: "compare.html", title: "Material Compare", icon: "⚖️" },
     ]},
     { title: "Workspace", items: [
       { file: "moodboards.html", title: "MoodBoards", icon: "🎨", children: [
@@ -97,7 +95,10 @@
         { file: "discover-network.html", title: "Network" },
       ]},
       { file: "factory-analytics.html", title: "Factory Analytics", icon: "📊" },
-      { file: "tools.html", title: "Free Tools", icon: "🛠️" },
+      { file: "tools.html", title: "Tools", icon: "🛠️", children: [
+        { file: "recognition.html", title: "Material Recognition" },
+        { file: "compare.html", title: "Material Compare" },
+      ]},
     ]},
     { title: "Account", items: [
       { file: "account.html", title: "Account & Billing", icon: "⚙️", children: [
