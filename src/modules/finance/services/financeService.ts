@@ -1760,6 +1760,10 @@ export interface FinanceSettings {
 }
 
 export interface SalesPerDayRow { period: string; invoice_count: number; revenue_net: number; gross_margin: number }
+/** Daily cash movements (Oxygen "Εισπράξεις/Πληρωμές"): settled cash in vs out per day. */
+export interface CashflowPerDayRow { period: string; receipts: number; payments: number; difference: number; payment_count: number }
+/** P&L per finance category (Oxygen "Αναφορά ανά Επ. Κατηγορία"). */
+export interface PnlPerCategoryRow { category_id: string | null; category_name: string; income: number; customer_credits: number; expenses: number; supplier_credits: number; net: number; vat_income: number; vat_expense: number }
 export interface VatReportRow { section: 'output' | 'output_credit' | 'input' | 'input_credit'; vat_rate: number | null; net: number; vat: number; doc_count: number }
 export interface VatByCodeRow { vat_category: number | null; vat_rate: number | null; income_classification_type: string; income_classification_category: string; net: number; vat: number; line_count: number }
 export interface PartyLedgerRow { entry_date: string | null; doc_kind: string; doc_number: string | null; debit: number; credit: number; currency: string | null }
@@ -2073,6 +2077,22 @@ const _financeServiceV2 = {
     const { data, error } = await supabase.rpc('report_myf', { p_workspace_id: workspaceId, p_from: from, p_to: to });
     if (error) throw error;
     return (data ?? []) as MyfRow[];
+  },
+  /** Daily cash movements (Oxygen report_payexp.php): receipts vs payments vs difference per day. */
+  async reportCashflowPerDay(workspaceId: string, from: string, to: string): Promise<CashflowPerDayRow[]> {
+    const { data, error } = await supabase.rpc('report_cashflow_per_day', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as CashflowPerDayRow[];
+  },
+  /** P&L per finance category (Oxygen report_ba.php): income/credits/expenses/VAT grouped by category. */
+  async reportPnlPerCategory(workspaceId: string, from: string, to: string): Promise<PnlPerCategoryRow[]> {
+    const { data, error } = await supabase.rpc('report_pnl_per_category', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as PnlPerCategoryRow[];
   },
   async reportSalesPerCustomer(workspaceId: string, from: string, to: string): Promise<SalesPerCustomerRow[]> {
     const { data, error } = await supabase.rpc('report_sales_per_customer', {

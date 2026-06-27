@@ -10,6 +10,7 @@ import { financeService, formatMoney, formatPct } from '@/modules/finance/servic
 import { AccountingExportCard } from '@/modules/finance/components/AccountingExportCard';
 
 type ReportKind =
+  | 'cashflow_per_day' | 'pnl_per_category'
   | 'sales_per_day' | 'sales_per_customer' | 'sales_per_product' | 'sales_per_category'
   | 'sales_per_factory' | 'sales_per_designer'
   | 'purchases_per_product' | 'receipts_per_product'
@@ -21,9 +22,12 @@ type ReportKind =
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
 type SortDir = 'desc' | 'asc';
 
-type ReportGroup = 'sales' | 'purchases' | 'payments' | 'outstanding' | 'vat' | 'tasks';
+type ReportGroup = 'overview' | 'sales' | 'purchases' | 'payments' | 'outstanding' | 'vat' | 'tasks';
 
 const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: 'range' | 'snapshot' }[] = [
+  // Overview (Oxygen Ταμείο)
+  { value: 'cashflow_per_day', label: 'Daily cash flow',   group: 'overview', period: 'range' },
+  { value: 'pnl_per_category', label: 'P&L by category',   group: 'overview', period: 'range' },
   // Sales
   { value: 'sales_per_day',       label: 'Sales per day',           group: 'sales',       period: 'range' },
   { value: 'sales_per_customer',  label: 'Sales per customer',      group: 'sales',       period: 'range' },
@@ -51,6 +55,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
 ];
 
 const GROUP_LABELS: Record<ReportGroup, string> = {
+  overview: 'Overview (cash & P&L)',
   sales: 'Sales',
   purchases: 'Purchases',
   payments: 'Payments (cash movements)',
@@ -91,7 +96,7 @@ interface Props { workspaceId: string }
 
 export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
   const { toast } = useToast();
-  const [report, setReport] = useState<ReportKind>('sales_per_day');
+  const [report, setReport] = useState<ReportKind>('cashflow_per_day');
   const [period, setPeriod] = useState<Period>('this_month');
   const [customFrom, setCustomFrom] = useState<string>(() => rangeForPeriod('this_month').from);
   const [customTo, setCustomTo] = useState<string>(() => rangeForPeriod('this_month').to);
@@ -109,6 +114,10 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
       setLoading(true);
       let data: any[] = [];
       switch (report) {
+        case 'cashflow_per_day':
+          data = await financeService.reportCashflowPerDay(workspaceId, range.from, range.to); break;
+        case 'pnl_per_category':
+          data = await financeService.reportPnlPerCategory(workspaceId, range.from, range.to); break;
         case 'sales_per_day':
           data = await financeService.reportSalesPerDay(workspaceId, range.from, range.to); break;
         case 'sales_per_customer':
@@ -180,7 +189,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
             <Select value={report} onValueChange={(v) => setReport(v as ReportKind)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(['sales', 'purchases', 'payments', 'vat', 'outstanding', 'tasks'] as ReportGroup[]).map((g) => {
+                {(['overview', 'sales', 'purchases', 'payments', 'vat', 'outstanding', 'tasks'] as ReportGroup[]).map((g) => {
                   const inGroup = REPORTS.filter((r) => r.group === g);
                   if (inGroup.length === 0) return null;
                   return (
@@ -291,6 +300,10 @@ function downloadReportCsv(report: ReportKind, rows: any[]): void {
 
 function primarySortKey(report: ReportKind): string {
   switch (report) {
+    case 'cashflow_per_day':
+      return 'period';
+    case 'pnl_per_category':
+      return 'net';
     case 'sales_per_day':
     case 'sales_per_customer':
     case 'sales_per_product':
@@ -324,6 +337,24 @@ function primarySortKey(report: ReportKind): string {
 
 function computeTotals(report: ReportKind, rows: any[]): { label: string; value: string }[] {
   switch (report) {
+    case 'cashflow_per_day': {
+      let inAmt = 0, outAmt = 0;
+      for (const r of rows) { inAmt += Number(r.receipts || 0); outAmt += Number(r.payments || 0); }
+      return [
+        { label: 'Receipts (in)', value: formatMoney(inAmt) },
+        { label: 'Payments (out)', value: formatMoney(outAmt) },
+        { label: 'Net movement', value: formatMoney(inAmt - outAmt) },
+      ];
+    }
+    case 'pnl_per_category': {
+      let income = 0, expenses = 0, net = 0;
+      for (const r of rows) { income += Number(r.income || 0); expenses += Number(r.expenses || 0); net += Number(r.net || 0); }
+      return [
+        { label: 'Income', value: formatMoney(income) },
+        { label: 'Expenses', value: formatMoney(expenses) },
+        { label: 'Net', value: formatMoney(net) },
+      ];
+    }
     case 'sales_per_day':
     case 'sales_per_customer':
     case 'sales_per_product':
@@ -432,6 +463,27 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
 }
 
 function renderReport(report: ReportKind, rows: any[], totals: { label: string; value: string }[]): React.ReactNode {
+  if (report === 'cashflow_per_day') {
+    return (
+      <Table headers={['Date', 'Receipts', 'Payments', 'Difference']} totals={totals} rows={rows.map((r: any) => [
+        r.period, formatMoney(Number(r.receipts || 0)), formatMoney(Number(r.payments || 0)), formatMoney(Number(r.difference || 0)),
+      ])} />
+    );
+  }
+  if (report === 'pnl_per_category') {
+    return (
+      <Table headers={['Category', 'Income', 'Cust. credits', 'Expenses', 'Suppl. credits', 'Net', 'VAT in', 'VAT out']} totals={totals} rows={rows.map((r: any) => [
+        r.category_name,
+        formatMoney(Number(r.income || 0)),
+        formatMoney(Number(r.customer_credits || 0)),
+        formatMoney(Number(r.expenses || 0)),
+        formatMoney(Number(r.supplier_credits || 0)),
+        formatMoney(Number(r.net || 0)),
+        formatMoney(Number(r.vat_income || 0)),
+        formatMoney(Number(r.vat_expense || 0)),
+      ])} />
+    );
+  }
   if (report === 'sales_per_day') {
     return (
       <Table headers={['Date', 'Invoices', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
