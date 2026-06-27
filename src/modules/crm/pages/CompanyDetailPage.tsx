@@ -598,8 +598,8 @@ export const CompanyDetailPage: React.FC = () => {
               {/* LEFT — company identity */}
               <div className={isNew ? 'space-y-4' : 'space-y-3 lg:sticky lg:top-4'}>
             <CollapsibleCard title="Company Information" icon={Building2} defaultOpen>
-                <div className="grid grid-cols-1 gap-x-6 gap-y-2">
-                  <div className={isNew ? 'sm:col-span-2' : ''}>
+                <div className="grid grid-cols-1 gap-y-2">
+                  <div>
                     <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
                   </div>
                   <div>
@@ -623,14 +623,14 @@ export const CompanyDetailPage: React.FC = () => {
                   <InlineText alwaysEdit={isNew} type="url" label="Website" value={company.website} onSave={(v) => patchInline({ website: v })} placeholder="https://company.com" />
                   <InlineText alwaysEdit={isNew} label="Employee Count" value={company.employee_count} onSave={(v) => patchInline({ employee_count: v })} placeholder="e.g. 1-10, 50, 500+" copy={false} />
                   <InlineText alwaysEdit={isNew} label="Annual Revenue" value={company.annual_revenue} onSave={(v) => patchInline({ annual_revenue: v })} placeholder="e.g. $1M - $10M" copy={false} />
-                  <div className={isNew ? 'sm:col-span-2' : ''}>
+                  <div>
                     <InlineText alwaysEdit={isNew} multiline label="Description" value={company.description} onSave={(v) => patchInline({ description: v })} placeholder="Brief description of the company…" copy={false} />
                   </div>
                   {/* Role — a company can be a Customer, a Supplier, or BOTH (e.g. a
                       supplier you also need to invoice for returns / credit notes).
                       Editable anytime after onboarding; drives the Products tab +
                       customer/supplier lists + finance party type. */}
-                  <div className="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 mt-1 border-t">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 mt-1 border-t">
                     <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5"/>Role</span>
                     <label htmlFor="role_is_customer" className="flex items-center gap-2 text-sm cursor-pointer">
                       <Checkbox id="role_is_customer" checked={!!company.is_customer} onCheckedChange={(v) => patchInline({ is_customer: v === true })} />
