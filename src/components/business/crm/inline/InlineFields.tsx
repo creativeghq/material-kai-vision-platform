@@ -148,7 +148,7 @@ export const InlineText: React.FC<InlineTextProps> = ({
   return (
     <Field label={label} hint={hint}>
       <div
-        className="group flex items-center gap-2 min-h-[28px] cursor-text rounded px-1 -mx-1 hover:bg-muted/40"
+        className="group flex items-center gap-2 min-h-[28px] cursor-text rounded px-2 hover:bg-muted/40"
         onClick={begin}
       >
         <span className="flex-1 text-sm break-words">
@@ -195,7 +195,7 @@ export const InlineSelect: React.FC<InlineSelectProps> = ({
   const [saving, setSaving] = useState(false);
   const triggerClass = alwaysEdit
     ? ''
-    : 'border-0 shadow-none h-auto py-1 px-1 -mx-1 hover:bg-muted/40 focus:ring-0 focus:ring-offset-0 [&>svg]:opacity-0 group-hover:[&>svg]:opacity-50';
+    : 'border-0 shadow-none h-auto py-1 px-2 hover:bg-muted/40 focus:ring-0 focus:ring-offset-0 [&>svg]:opacity-0 group-hover:[&>svg]:opacity-50';
   return (
     <Field label={label} hint={hint}>
       <div className="group flex items-center gap-1">
