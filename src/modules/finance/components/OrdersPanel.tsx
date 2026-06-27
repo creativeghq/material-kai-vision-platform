@@ -532,6 +532,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const [fin, setFin] = useState<Awaited<ReturnType<typeof ordersService.getOrderFinance>> | null>(null);
   const [saving, setSaving] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  // When set, the pay panel is editing an existing payment (update) rather than recording a new one.
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [payAmt, setPayAmt] = useState('');
   // The order only deals in REAL cash: money in (a payment received) or money out (a payment sent).
   const [payDir, setPayDir] = useState<'in' | 'out'>('in');
@@ -628,6 +630,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const defaultAccountId = () => (bankAccounts.find((a) => a.is_default) ?? bankAccounts[0])?.id ?? '';
   const openPay = (dir: 'in' | 'out') => {
     if (!order) return;
+    setEditingPaymentId(null);
     setPayDir(dir);
     setPayIssueDoc(false);
     setPayReason(''); setPaySupplier(null); setPaySupplierSearch(''); setPaySupplierOpts([]);
@@ -638,6 +641,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
 
   // Pay a specific supplier straight from the "what we owe" rollup — money out, pre-filled.
   const openPaySupplier = (sup: { id: string; name: string }, owed: number) => {
+    setEditingPaymentId(null);
     setPayDir('out'); setPayIssueDoc(false); setPayReason('');
     setPaySupplier(sup); setPaySupplierSearch(''); setPaySupplierOpts([]);
     setPayAccountId(defaultAccountId()); setPayMethod('bank_transfer');
@@ -676,32 +680,87 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     if (!payReason.trim()) { toast({ title: 'Add a reason', description: 'Every cash movement needs a reason so the payment is traceable (e.g. pre-payment, deposit, balance).', variant: 'destructive' }); return; }
     if (!payAccountId) { toast({ title: 'Pick an account', description: 'Choose which cash/bank account the money lands in (or leaves from) so it shows in your finance balances.', variant: 'destructive' }); return; }
     if (payDir === 'out' && !paySupplier) { toast({ title: 'Pick the supplier', description: 'Money out is registered against a supplier so we track what we paid them.', variant: 'destructive' }); return; }
-    const alsoIssue = payIssueDoc && payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
+    const alsoIssue = !editingPaymentId && payIssueDoc && payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
     setSaving(true);
     try {
-      const { error } = await supabase.from('payments').insert({
-        workspace_id: order.workspace_id,
-        direction: payDir,
-        amount: amt,
-        currency: order.currency,
-        order_id: order.id,
-        paid_at: new Date().toISOString(),
-        reference: payReason.trim(),
-        method: payMethod || null,
-        bank_account_id: payAccountId,
-        // Money in → the order's customer; money out → the chosen supplier (drives party ledgers).
-        counterparty_company_id: payDir === 'out' ? (paySupplier?.id ?? null) : (order.customer_company_id ?? null),
-        counterparty_contact_id: payDir === 'in' ? (order.customer_contact_id ?? null) : null,
-      });
-      if (error) throw error;
-      setPayOpen(false); setPayAmt('');
+      // Money in → the order's customer; money out → the chosen supplier (drives party ledgers).
+      const counterparty_company_id = payDir === 'out' ? (paySupplier?.id ?? null) : (order.customer_company_id ?? null);
+      const counterparty_contact_id = payDir === 'in' ? (order.customer_contact_id ?? null) : null;
+      if (editingPaymentId) {
+        // Edit in place — keep the original paid_at, just correct the fields. The payment trigger
+        // recomputes payment_status; getOrderFinance refreshes Received/Paid/Net.
+        const { error } = await supabase.from('payments').update({
+          direction: payDir, amount: amt, reference: payReason.trim(), method: payMethod || null,
+          bank_account_id: payAccountId, counterparty_company_id, counterparty_contact_id,
+        }).eq('id', editingPaymentId).eq('order_id', order.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('payments').insert({
+          workspace_id: order.workspace_id,
+          direction: payDir,
+          amount: amt,
+          currency: order.currency,
+          order_id: order.id,
+          paid_at: new Date().toISOString(),
+          reference: payReason.trim(),
+          method: payMethod || null,
+          bank_account_id: payAccountId,
+          counterparty_company_id,
+          counterparty_contact_id,
+        });
+        if (error) throw error;
+      }
+      const wasEdit = !!editingPaymentId;
+      setPayOpen(false); setPayAmt(''); setEditingPaymentId(null);
       // Cash sale: issue the order's receipt/invoice from the same step, then open it to transmit.
       if (alsoIssue) { await createInvoice(); return; }
       await load(order.id);
       onChanged();
-      toast({ title: payDir === 'in' ? 'Money in recorded' : 'Money out recorded' });
+      toast({ title: wasEdit ? 'Payment updated' : (payDir === 'in' ? 'Money in recorded' : 'Money out recorded') });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  // Edit an existing payment: pre-fill the pay panel from the row and flip it into update mode.
+  const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null }) => {
+    setEditingPaymentId(p.id);
+    setPayDir(p.direction);
+    setPayIssueDoc(false);
+    setPayAmt(String(p.amount));
+    setPayReason(p.reference ?? '');
+    setPayMethod(p.method || 'cash');
+    setPayAccountId(p.bank_account_id ?? defaultAccountId());
+    setPaySupplierSearch(''); setPaySupplierOpts([]);
+    // Money out is attached to a supplier — restore the chip so the user sees who it pays.
+    if (p.direction === 'out' && p.counterparty_company_id) {
+      const name = supplierNames.get(p.counterparty_company_id);
+      if (name) { setPaySupplier({ id: p.counterparty_company_id, name }); }
+      else {
+        setPaySupplier({ id: p.counterparty_company_id, name: '…' });
+        const { data } = await supabase.from('crm_companies').select('name').eq('id', p.counterparty_company_id).maybeSingle();
+        if (data?.name) setPaySupplier({ id: p.counterparty_company_id, name: data.name });
+      }
+    } else {
+      setPaySupplier(null);
+    }
+    setPayOpen(true);
+  };
+
+  // Delete a payment off the order (reverses the cash). Trigger recomputes payment_status on delete.
+  const deletePay = async (p: { id: string; amount: number; currency: string; direction: 'in' | 'out' }) => {
+    if (!order) return;
+    if (!window.confirm(`Delete this ${p.direction === 'in' ? 'money in' : 'money out'} of ${formatMoney(Number(p.amount), p.currency)}? This removes the cash from the order and your finance balances.`)) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('payments').delete().eq('id', p.id).eq('order_id', order.id);
+      if (error) throw error;
+      if (editingPaymentId === p.id) { setPayOpen(false); setEditingPaymentId(null); }
+      await load(order.id);
+      onChanged();
+      toast({ title: 'Payment deleted' });
+    } catch (err: any) {
+      toast({ title: 'Failed to delete', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -874,8 +933,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
-                  <div className="grid grid-cols-[1fr_44px_52px_120px_82px_84px_92px_44px_88px_84px_92px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[972px]">
-                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right">Price</span><span className="text-right">Cost</span><span className="text-right">Cost total</span><span className="text-right">VAT</span><span className="text-right">Net</span><span className="text-right">Profit</span><span className="text-right">Total</span>
+                  <div className="grid grid-cols-[1fr_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[1040px]">
+                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right" title="Sell price per unit (excl. VAT)">Price</span><span className="text-right" title="Net = price × qty (excl. VAT)">Net</span><span className="text-right" title="Cost per unit — what this costs us">Cost</span><span className="text-right" title="Cost total = cost/unit × qty">Cost total</span><span className="text-right" title="Profit = net − cost total (excl. VAT)">Profit</span><span className="text-right" title="VAT amount on this line">VAT</span><span className="text-right" title="Total = net + VAT">Total</span>
                   </div>
                   {items.map((it) => {
                     const gross = Number(it.net_value) + Number(it.vat_amount);
@@ -886,7 +945,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     const del = Number(it.quantity_delivered); const q = Number(it.quantity);
                     const delTone = del >= q && q > 0 ? 'text-emerald-600' : del > 0 ? 'text-amber-600' : 'text-muted-foreground';
                     return (
-                    <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_84px_92px_44px_88px_84px_92px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[972px]">
+                    <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[1040px]">
                       <span className="min-w-0">
                         <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
                         {/* #6/#7 — who supplies this line (and therefore who we owe). Any line, catalog or ad-hoc. */}
@@ -913,13 +972,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <span className="text-right tabular-nums">{formatMoney(Number(it.unit_price), order.currency)}</span>
+                      <span className="text-right tabular-nums" title="Sell price per unit (excl. VAT)">{formatMoney(Number(it.unit_price), order.currency)}</span>
+                      <span className="text-right tabular-nums" title="Net = price × qty (excl. VAT)">{formatMoney(Number(it.net_value), order.currency)}</span>
                       <span className="text-right tabular-nums text-muted-foreground" title="Cost per unit">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
                       <span className="text-right tabular-nums text-muted-foreground" title="Cost total (cost/unit × qty) — what this line costs us">{lineCost != null ? formatMoney(lineCost, order.currency) : '—'}</span>
-                      <span className="text-right tabular-nums text-muted-foreground">{Number(it.vat_percent ?? 0)}%</span>
-                      <span className="text-right tabular-nums">{formatMoney(Number(it.net_value), order.currency)}</span>
-                      <span className={`text-right tabular-nums ${lineProfit == null ? 'text-muted-foreground' : lineProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>{lineProfit != null ? formatMoney(lineProfit, order.currency) : '—'}</span>
-                      <span className="text-right tabular-nums">{formatMoney(gross, order.currency)}</span>
+                      <span className={`text-right tabular-nums ${lineProfit == null ? 'text-muted-foreground' : lineProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`} title="Profit on this line (excl. VAT)">{lineProfit != null ? formatMoney(lineProfit, order.currency) : '—'}</span>
+                      <span className="text-right tabular-nums text-muted-foreground" title={`VAT ${Number(it.vat_percent ?? 0)}%`}>{formatMoney(Number(it.vat_amount), order.currency)}</span>
+                      <span className="text-right tabular-nums font-medium" title="Line total incl. VAT (price × qty + VAT)">{formatMoney(gross, order.currency)}</span>
                     </div>
                     );
                   })}
@@ -984,12 +1043,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
               <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-medium flex items-center gap-1">
+                    {editingPaymentId && <span className="text-muted-foreground">Edit ·</span>}
                     {payDir === 'in' ? <><ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500" /> Money in (received)</> : <><ArrowUpRight className="h-3.5 w-3.5 text-red-400" /> Money out (sent)</>}
                   </span>
                   <Input className="h-8 w-28 text-right text-sm" type="text" inputMode="decimal" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
                   <span className="text-xs text-muted-foreground">{order.currency}</span>
-                  <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>
+                  <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (editingPaymentId ? 'Update' : 'Save')}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setPayOpen(false); setEditingPaymentId(null); }}>Cancel</Button>
                 </div>
                 {/* Money out: which supplier we're paying (so it registers against them) + a reason. */}
                 {payDir === 'out' && (
@@ -1120,12 +1180,16 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                 {fin.payments.map((p) => {
                   const acctName = p.bank_account_id ? bankAccounts.find((a) => a.id === p.bank_account_id)?.name : null;
                   return (
-                  <div key={p.id} className="flex items-start justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                  <div key={p.id} className={`flex items-start justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0 ${editingPaymentId === p.id ? 'bg-muted/30' : ''}`}>
                     <span className="min-w-0">
                       <span className="block truncate">{p.reference || <span className="text-muted-foreground italic">No reason</span>}</span>
                       <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'In' : 'Out'}{p.method ? ` · ${p.method.replace('_', ' ')}` : ''}{acctName ? ` · ${acctName}` : ''}</span>
                     </span>
-                    <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
+                      <button type="button" title="Edit payment" className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={saving} onClick={() => void editPay(p)}><Pencil className="h-3.5 w-3.5" /></button>
+                      <button type="button" title="Delete payment" className="text-muted-foreground hover:text-destructive disabled:opacity-40" disabled={saving} onClick={() => void deletePay(p)}><Trash2 className="h-3.5 w-3.5" /></button>
+                    </span>
                   </div>
                   );
                 })}

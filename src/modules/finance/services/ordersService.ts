@@ -262,7 +262,7 @@ export const ordersService = {
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
     supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
-    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null }>;
+    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null }>;
     received: number;
     paid_out: number;
     profit: number;
@@ -270,9 +270,9 @@ export const ordersService = {
     const [inv, bills, pay] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
-      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, bank_account_id').eq('order_id', orderId).order('paid_at', { ascending: false }),
+      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, bank_account_id, counterparty_company_id').eq('order_id', orderId).order('paid_at', { ascending: false }),
     ]);
-    const payments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null }>;
+    const payments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null }>;
     const received = payments.filter((p) => p.direction === 'in').reduce((a, p) => a + Number(p.amount), 0);
     const paid_out = payments.filter((p) => p.direction === 'out').reduce((a, p) => a + Number(p.amount), 0);
     return {

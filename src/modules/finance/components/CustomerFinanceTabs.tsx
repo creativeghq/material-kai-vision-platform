@@ -3,7 +3,7 @@
 // and lazy-loads its data on first render.
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, FileText, Mail, Wallet, ShoppingBag } from 'lucide-react';
+import { Loader2, FileText, Mail, Wallet, ShoppingBag, ShoppingCart, Banknote, AlertCircle, CalendarClock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -49,6 +49,17 @@ export const PartyAccountSummary: React.FC<{
     </Card>
   );
 
+  // KPI cell with a leading icon — used for the consolidated top strip (orders + balance + info),
+  // so every column reads the same way (icon · label · value), like the old Balance row did.
+  const stat = (icon: React.ReactNode, label: React.ReactNode, value: React.ReactNode, opts?: { danger?: boolean; tone?: string }) => (
+    <Card className={`dashboard-card border-0 ${opts?.danger ? 'ring-1 ring-destructive/40' : opts?.tone === netTone && netRing ? netRing : ''}`}>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">{icon}{label}</div>
+        <div className={`text-lg font-semibold ${opts?.danger ? 'text-destructive' : opts?.tone ?? ''}`}>{value}</div>
+      </CardContent>
+    </Card>
+  );
+
   const agingCell = (label: string, value: number, danger = false) => (
     <div className={`rounded-md border border-border/50 px-2.5 py-1.5 ${danger && value > 0 ? 'border-destructive/40' : ''}`}>
       <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</div>
@@ -58,16 +69,29 @@ export const PartyAccountSummary: React.FC<{
 
   return (
     <div className="space-y-3">
-      {orders && (
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-medium text-muted-foreground">Orders</div>
-          <div className="grid grid-cols-3 gap-3">
-            {cell('Orders', orders.count)}
-            {cell('Ordered', formatMoney(orders.ordered))}
-            {cell('Owed on orders', formatMoney(orders.owedUninvoiced), orders.owedUninvoiced > 0)}
-          </div>
-        </div>
-      )}
+      {/* Consolidated top strip — orders roll-up + net balance + account meta, all as compact
+          icon columns in one row (Balance is no longer a full-width row of its own). */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count)}
+        {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered))}
+        {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0 })}
+        {stat(<Wallet className="h-3.5 w-3.5" />, <>Balance <span className="normal-case text-[9px]">· {netDir}</span></>, formatMoney(Math.abs(net)), { tone: netTone })}
+        {meta && meta.length > 0 && (
+          <Card className="dashboard-card border-0">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><CalendarClock className="h-3.5 w-3.5" /> Account</div>
+              <div className="mt-1 space-y-0.5 text-xs">
+                {meta.map((m, i) => (
+                  <div key={i} className="flex items-baseline justify-between gap-2">
+                    <span className="text-muted-foreground">{m.label}</span>
+                    <span className="text-foreground font-medium">{m.value}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {customer && (
         <div className="space-y-1.5">
@@ -100,21 +124,6 @@ export const PartyAccountSummary: React.FC<{
         </div>
       )}
 
-      {/* Net balance — the roll-up of the columns above, shown last. */}
-      <Card className={`dashboard-card border-0 ${netRing}`}>
-        <CardContent className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-            <Wallet className="h-3.5 w-3.5" /> Balance <span className="normal-case text-[10px]">· {netDir}</span>
-          </div>
-          <div className={`text-2xl font-semibold ${netTone}`}>{formatMoney(Math.abs(net))}</div>
-        </CardContent>
-      </Card>
-
-      {meta && meta.length > 0 && (
-        <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-          {meta.map((m, i) => <div key={i}>{m.label}: <span className="text-foreground">{m.value}</span></div>)}
-        </div>
-      )}
     </div>
   );
 };
@@ -150,14 +159,24 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         isSupplier ? financeService.getSupplierAccount({ contactId, companyId }) : Promise.resolve(null),
         financeService.listPayments({ counterpartyContactId: contactId, counterpartyCompanyId: companyId, direction: 'in', limit: 1 }),
         activeWorkspaceId
-          ? financeService.reportCustomerTopProducts({ workspaceId: activeWorkspaceId, companyId, contactId, limit: 6 })
+          // Pull a wider set than we render, then keep only items still in warehouse stock below.
+          ? financeService.reportCustomerTopProducts({ workspaceId: activeWorkspaceId, companyId, contactId, limit: 24 })
           : Promise.resolve([] as CustomerTopProductRow[]),
       ]);
       setAccount(acct ? { invoicedTotal: acct.invoicedTotal, paidTotal: acct.paidTotal, outstandingTotal: acct.outstandingTotal, quoteCount: acct.quoteCount } : null);
       setSupplierAcct(supAcct ? { billedTotal: supAcct.billedTotal, paidTotal: supAcct.paidTotal, outstandingTotal: supAcct.outstandingTotal, orderedTotal: supAcct.orderedTotal } : null);
       const p = payments[0];
       setLastPayment(p ? { paid_at: p.paid_at, amount: p.amount, currency: p.currency } : null);
-      setTopProducts(topProds);
+      // "Top items to push" = repeat-buy history, but only suggest what we can actually fulfil —
+      // keep the items that currently have warehouse stock on hand.
+      let visibleTop = topProds.slice(0, 6);
+      if (activeWorkspaceId && topProds.length) {
+        try {
+          const stock = await ordersService.getAvailableStock(topProds.map((t) => t.product_id), activeWorkspaceId);
+          visibleTop = topProds.filter((t) => (stock.get(t.product_id) ?? 0) > 0).slice(0, 6);
+        } catch { /* stock lookup failed → fall back to top-by-revenue */ }
+      }
+      setTopProducts(visibleTop);
 
       // Orders roll-up — count, total ordered value, and the still-owed amount on orders that
       // haven't been invoiced yet. This drives the KPI strip ("Orders" + "Owed on orders").
@@ -234,7 +253,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push</CardTitle>
+          <CardTitle className="text-sm flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push <span className="text-[10px] font-normal text-muted-foreground">· in stock</span></CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
@@ -249,7 +268,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
             </thead>
             <tbody>
               {topProducts.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No purchase history yet for this customer.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No previously-bought items are in stock to push right now.</td></tr>
               ) : (
                 topProducts.map((p) => (
                   <tr key={p.product_id} className="border-b border-border/30 hover:bg-muted/30">
