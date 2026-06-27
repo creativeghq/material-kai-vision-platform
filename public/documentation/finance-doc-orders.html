@@ -83,8 +83,13 @@
   <h3>1. The header</h3>
   <p>The order's <strong>number</strong>, a <strong>type</strong> badge (sales / purchase), the <strong>fulfilment status</strong> badge, the <strong>payment status</strong>, and the order <strong>total</strong>.</p>
 
-  <h3>2. Line items (with cost, units &amp; delivery progress)</h3>
-  <p>A table of the order's lines — <strong>Item</strong>, <strong>Qty</strong>, <strong>Unit</strong>, <strong>Delivered</strong>, <strong>Price</strong>, <strong>Cost</strong>, <strong>VAT</strong> and line totals (Net / Total). Each line carries its unit of measure and a snapshot <strong>cost</strong> (so the order knows its margin), and is marked <em>“(off-warehouse)”</em> when it isn't linked to stock. Per line you can set <strong>delivery</strong> directly — a small menu offers <strong>Mark fully delivered</strong>, <strong>Mark half delivered</strong> or <strong>Mark not delivered</strong>, and you can set a line's <strong>supplier</strong> (who you'll owe when you restock it). While the order is still a draft / un-invoiced, <strong>Edit items</strong> turns this into an editable grid.</p>
+  <h3>2. Line items (with cost, profit, units, supplier &amp; delivery)</h3>
+  <p>A table of the order's lines — <strong>Item</strong>, <strong>Qty</strong>, <strong>Unit</strong>, <strong>Delivered</strong>, <strong>Price</strong>, <strong>Cost</strong>, <strong>VAT</strong> and line totals (Net / Total), plus each line's <strong>cost total and profit</strong> so you can see the margin line by line, not just for the whole order. Each line carries its unit of measure and a snapshot <strong>cost</strong>, and is marked <em>“(off-warehouse)”</em> when it isn't linked to stock. Per line you can:</p>
+  <ul class="feat">
+    <li>Set <strong>delivery</strong> directly — a small menu offers <strong>Mark fully delivered</strong>, <strong>Mark half delivered</strong> or <strong>Mark not delivered</strong>.</li>
+    <li>Set the line's <strong>supplier</strong> inline — who supplies it / who you'll owe when you restock (auto-filled from the product's supplier, editable on any line).</li>
+  </ul>
+  <p>While the order is still a draft / un-invoiced, <strong>Edit items</strong> turns this into an editable grid.</p>
 
   <h3>3. The Actions menu</h3>
   <p>A <strong>Status</strong> dropdown (plus one-click <strong>Mark completed</strong>) and an <strong>Actions</strong> menu gather the operations — <strong>Record money in / out</strong>, <strong>Create invoice / receipt</strong>, <strong>Record supplier bill</strong>, <strong>Receive into warehouse</strong> and <strong>Dispatch board</strong> — covered in the next section.</p>
@@ -113,7 +118,7 @@
     <thead><tr><th>Action</th><th>On</th><th>What it does</th></tr></thead>
     <tbody>
       <tr><td><strong>Record money in</strong></td><td>Sales</td><td>Logs cash <em>received from the customer</em>. For a cash sale you can tick to <strong>issue the receipt/invoice in the same step</strong>. Updates payment status + the cash figures.</td></tr>
-      <tr><td><strong>Record money out</strong></td><td>Purchase</td><td>Logs cash <em>paid to the supplier</em> (or a refund).</td></tr>
+      <tr><td><strong>Record money out</strong></td><td>Purchase</td><td>Logs cash <em>paid to the supplier</em> (or a refund). Money out is <strong>attached to the supplier</strong> you're paying, so it registers against what you owe them. The order also tracks your <strong>supplier exposure</strong> — what's still owed to each supplier (their line costs minus what you've already paid out).</td></tr>
       <tr><td><strong>Create invoice / receipt</strong></td><td>Sales</td><td>Raises the sales document for the order's lines and links it back. A sale to a <strong>company (B2B)</strong> raises an <a href="finance-doc-invoices.html">invoice</a>; a sale to a bare <strong>contact (retail)</strong> raises a <strong>receipt</strong>. You review it, then issue &amp; transmit to myDATA.</td></tr>
       <tr><td><strong>Record supplier bill</strong></td><td>Purchase</td><td>Records the supplier's bill against the order (the purchase-side equivalent of an invoice) → it appears in <a href="finance-rp-payables.html">Payables</a>.</td></tr>
       <tr><td><strong>Receive into warehouse</strong></td><td>Purchase</td><td>Receives the ordered goods into <a href="finance-op-warehouse.html">Warehouse</a> stock (catalogue lines), so on-hand quantities go up.</td></tr>

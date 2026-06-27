@@ -92,6 +92,41 @@
   </ul>
   <div class="callout"><p><strong>Credits:</strong> chatting and searching are inexpensive; explicit generation actions (images, presentation sheets, scans, 3D/VR) consume credits, and the assistant tells you the cost when an action is metered. See <a href="account.html">Account &amp; Billing</a>.</p></div>
   <div class="callout tip"><p><strong>Where results go:</strong> because actions create real artefacts that also appear in their own module, treat the Agent Hub as the front door to the whole platform — start here, and find the finished work in Moodboards, Projects, Finance and the monitoring modules later.</p></div>
+
+  <!-- 6 -->
+  <h2>6. Deep-linking &amp; preloading the assistant</h2>
+  <p><strong>What it is —</strong> the Agent Hub can be opened from anywhere — another page, a button, an email, a chat message — with the conversation <strong>pre-loaded and even auto-started</strong>, by adding parameters to the <span class="badge route">/agent-hub</span> URL. <strong>Why it matters —</strong> it turns “open the assistant and explain what you want” into a single click: a product page can launch “test this material on a room”, an email can drop a customer straight into a guided flow, and an internal button can pre-attach a photo and fire an edit. You don't have to retype or re-attach anything.</p>
+
+  <h3>The parameters</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Parameter</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>?agent=</code></td><td>Pick the agent/mode — <code>kai</code> (JARVIS), <code>interior-designer</code> or <code>demo</code>.</td></tr>
+      <tr><td><code>?prompt=</code></td><td>Pre-fill the message box with this text — and, on its own, <strong>auto-send</strong> it.</td></tr>
+      <tr><td><code>?image=&lt;url&gt;</code> · <code>?images=a,b,c</code></td><td>Preload one or more real <strong>chat attachments</strong> into the composer (comma-separated for several) — the image(s) the generation pipeline acts on.</td></tr>
+      <tr><td><code>?generation_mode=&lt;mode&gt;</code></td><td>Force the generation pipeline — e.g. <code>image-edit</code>, <code>redesign</code>, <code>floor-plan-render</code>.</td></tr>
+      <tr><td><code>?quickstart=&lt;toolkitId&gt;:&lt;label&gt;</code></td><td>Launch a specific <strong>guided flow</strong> deterministically — e.g. <code>generation:Test on a room</code>, <code>presentation-sheets:Material board</code>, <code>seo-research:Research a keyword</code>. (Split on the first colon, so the label may itself contain colons.)</td></tr>
+      <tr><td><code>?conversation=</code></td><td>Open a specific existing conversation.</td></tr>
+      <tr><td><code>?moodboard=</code></td><td>Set the moodboard context (so results can be added to that board, and the context survives a reload).</td></tr>
+      <tr><td><code>?pinned_product_id=</code> (+ <code>pinned_product_name</code>, <code>pinned_product_image</code>)</td><td>Pre-pin a material so an interior flow already knows which product to apply (this is what a product's <em>“Test on a room”</em> button uses).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>How they combine</h3>
+  <ul class="feat">
+    <li>The launch waits for a seeded <strong>image</strong> to finish attaching <em>before</em> firing the flow, so a generation form's image field is already filled in when it opens.</li>
+    <li>An explicit <code>quickstart</code> <strong>suppresses the freeform prompt auto-send</strong> — the guided flow drives the interaction instead of a one-shot message.</li>
+    <li><strong>Permissions still apply server-side.</strong> A deep-link can't reach a tool your role isn't allowed to use — RBAC is enforced on the server, so a crafted URL can't escalate to admin-only capabilities.</li>
+  </ul>
+
+  <h3>Examples</h3>
+  <ul class="feat">
+    <li><strong>Edit a photo from any page</strong> — <code>/agent-hub?agent=interior-designer&amp;image=&lt;roomURL&gt;&amp;generation_mode=image-edit&amp;prompt=Apply warm oak flooring</code> → the photo is attached, the mode is set, the prompt auto-sends, and the agent edits it.</li>
+    <li><strong>Open a guided flow preloaded</strong> — <code>/agent-hub?quickstart=generation:Test on a room&amp;image=&lt;roomURL&gt;</code> → opens the “Test on a room” capture with the photo already in place.</li>
+    <li><strong>Jump straight to a tool</strong> — <code>/agent-hub?quickstart=presentation-sheets:Material board</code> (opens the <a href="moodboards-sheets.html">sheet wizard</a>) or <code>/agent-hub?quickstart=seo-research:Research a keyword</code>.</li>
+  </ul>
+
+  <div class="callout"><p><strong>Note — “flows” here means the assistant's <em>guided flows</em>,</strong> reached via <code>?quickstart=</code> (every form / run / generation / sheet-wizard / modal flow is reachable this way). This is <em>not</em> the automation <strong>Flows engine</strong> (events / webhooks / schedules) — that's a separate subsystem and isn't triggered by these URL parameters.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>
