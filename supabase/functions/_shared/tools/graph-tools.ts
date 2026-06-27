@@ -361,3 +361,49 @@ export const createRelatedProductsTool = (
     },
   );
 };
+
+// ── 10) find_products_by_spec (Phase 3b — numeric spec range filters) ───────
+
+export const createFindProductsBySpecTool = (
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ ip_min, ip_max, pei_min, thickness_min, thickness_max, wattage_min, wattage_max, limit }: {
+      ip_min?: number; ip_max?: number; pei_min?: number;
+      thickness_min?: number; thickness_max?: number; wattage_min?: number; wattage_max?: number; limit?: number;
+    }) => {
+      const sb = svcClient();
+      const filters: Record<string, number> = {};
+      if (ip_min != null) filters.ip_min = ip_min;
+      if (ip_max != null) filters.ip_max = ip_max;
+      if (pei_min != null) filters.pei_min = pei_min;
+      if (thickness_min != null) filters.thickness_min = thickness_min;
+      if (thickness_max != null) filters.thickness_max = thickness_max;
+      if (wattage_min != null) filters.wattage_min = wattage_min;
+      if (wattage_max != null) filters.wattage_max = wattage_max;
+      if (Object.keys(filters).length === 0) return JSON.stringify({ success: false, error: 'Provide at least one numeric spec filter (ip/pei/thickness/wattage).' });
+      const { data, error } = await sb.rpc('search_products_by_specs', { p_workspace_id: workspaceId, p_filters: filters, p_limit: limit ?? 50 });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      onChunk?.({ type: 'find_products_by_spec_result', workspace_id: workspaceId, filters, products: data, timestamp: Date.now() });
+      return JSON.stringify({ success: true, count: Array.isArray(data) ? data.length : 0, filters, products: data });
+    },
+    {
+      name: 'find_products_by_spec',
+      description:
+        'Filter products by NUMERIC spec ranges — IP rating, PEI class, thickness (mm), wattage (W) — ' +
+        'parsed from product specs into queryable numbers. Use for "tiles with IP rating 65 or higher", ' +
+        '"PEI IV and above", "panels 6–10mm thick", "fixtures 50–100W". Pass any combination of min/max bounds.',
+      schema: z.object({
+        ip_min: z.number().optional().describe('Minimum IP rating, e.g. 65'),
+        ip_max: z.number().optional().describe('Maximum IP rating'),
+        pei_min: z.number().optional().describe('Minimum PEI class (1–5; III = 3)'),
+        thickness_min: z.number().optional().describe('Minimum thickness in mm'),
+        thickness_max: z.number().optional().describe('Maximum thickness in mm'),
+        wattage_min: z.number().optional().describe('Minimum wattage in W'),
+        wattage_max: z.number().optional().describe('Maximum wattage in W'),
+        limit: z.number().optional().describe('Max results (default 50)'),
+      }),
+    },
+  );
+};
