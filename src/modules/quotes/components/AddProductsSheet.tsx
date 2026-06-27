@@ -49,9 +49,11 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { ScrollArea } from '@/components/core/ui/scroll-area';
+import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
+import { ordersService } from '@/modules/finance/services/ordersService';
 import { quotesService } from '../services/QuotesService';
 import {
   getAvailableSizes,
@@ -154,6 +156,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ProductWithImage[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  // On-hand per product for the search results (only products that are warehoused appear).
+  const [availStock, setAvailStock] = useState<Map<string, number>>(new Map());
 
   // Selected catalog products
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
@@ -191,6 +195,16 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
     return () => clearTimeout(debounceTimer);
   }, [searchQuery, existingProductIds, selectedProducts]);
+
+  // Warehouse on-hand for the current results, so we can flag low/out-of-stock before adding.
+  useEffect(() => {
+    if (!activeWorkspaceId || searchResults.length === 0) { setAvailStock(new Map()); return; }
+    let cancelled = false;
+    void ordersService.getAvailableStock(searchResults.map((p) => p.id), activeWorkspaceId)
+      .then((m) => { if (!cancelled) setAvailStock(m); })
+      .catch(() => { /* best-effort */ });
+    return () => { cancelled = true; };
+  }, [searchResults, activeWorkspaceId]);
 
   // Add catalog product to selection
   const handleSelectProduct = useCallback((product: ProductWithImage) => {
@@ -270,7 +284,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     }
     try {
       setAdding(true);
-      const unitPrice = customForm.unit_price ? parseFloat(customForm.unit_price) : undefined;
+      const unitPrice = customForm.unit_price ? parseDecimal(customForm.unit_price) ?? undefined : undefined;
       await quotesService.addCustomItem({
         quote_id: quoteId,
         custom_product_name: customForm.name.trim(),
@@ -420,6 +434,12 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                                   <Ruler className="h-3 w-3" />
                                   {availableSizes.length} size{availableSizes.length !== 1 ? 's' : ''}
                                 </span>
+                              )}
+                              {/* On-hand flag — only for warehoused products. */}
+                              {availStock.has(product.id) && (
+                                (availStock.get(product.id) ?? 0) > 0
+                                  ? <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded">{availStock.get(product.id)} in stock</span>
+                                  : <span className="text-xs text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded">Out of stock</span>
                               )}
                             </div>
                           </div>
@@ -602,7 +622,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                         Get price
                       </Button>
                     </div>
-                    <Input id="cp-price" type="number" min="0" step="0.01" value={customForm.unit_price} onChange={e => setCustomField('unit_price', e.target.value)} placeholder="0.00" />
+                    <Input id="cp-price" type="text" inputMode="decimal" value={customForm.unit_price} onChange={e => setCustomField('unit_price', e.target.value)} placeholder="0.00" />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="cp-qty">Quantity</Label>
@@ -657,11 +677,11 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                 </div>
 
                 {/* Preview total */}
-                {customForm.unit_price && parseFloat(customForm.unit_price) > 0 && (
+                {customForm.unit_price && parseDecimalOr(customForm.unit_price, 0) > 0 && (
                   <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Line Total</span>
                     <span className="font-semibold text-primary">
-                      €{(parseFloat(customForm.unit_price) * customForm.quantity).toFixed(2)}
+                      €{(parseDecimalOr(customForm.unit_price, 0) * customForm.quantity).toFixed(2)}
                     </span>
                   </div>
                 )}

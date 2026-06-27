@@ -288,11 +288,17 @@ const FinancePage: React.FC = () => {
     const monthRevenue = Number(lastMonth?.revenue_net ?? 0);
     const monthMargin = Number(lastMonth?.gross_margin ?? 0);
     const monthMarginPct = lastMonth?.gross_margin_pct ?? null;
-    const avgDsoProxy = ar.length > 0
-      ? Math.round(ar.reduce((acc, r) => acc + (r.days_overdue || 0), 0) / ar.length) + 30
-      : 0;
-    return { arOutstanding, apOutstanding, overdueTotal, monthRevenue, monthMargin, monthMarginPct, avgDsoProxy };
+    // Invoiced AR only ages (uninvoiced orders have no due date) → DSO is over invoiced receivables.
+    const invoicedAr = ar.filter((r) => r.entry_kind !== 'order').reduce((acc, r) => acc + (r.amount_due || 0), 0);
+    // True DSO = AR ÷ trailing-12-mo revenue × 365. Null when there's no revenue to divide by.
+    const annualRevenue = pnl.reduce((acc, p) => acc + Number(p.revenue_net ?? 0), 0);
+    const dso = annualRevenue > 0 ? Math.round((invoicedAr / annualRevenue) * 365) : null;
+    return { arOutstanding, apOutstanding, overdueTotal, monthRevenue, monthMargin, monthMarginPct, dso };
   }, [ar, ap, pnl]);
+
+  // Uninvoiced-order money (expected) shown alongside the invoiced aging buckets, per side.
+  const arExpected = useMemo(() => ar.filter((r) => r.entry_kind === 'order').reduce((a, r) => a + (r.amount_due || 0), 0), [ar]);
+  const apExpected = useMemo(() => ap.filter((r) => r.entry_kind === 'order').reduce((a, r) => a + (r.amount_due || 0), 0), [ap]);
 
   const arBuckets = useMemo(() => bucketize(ar), [ar]);
   const apBuckets = useMemo(() => bucketize(ap), [ap]);
@@ -449,9 +455,9 @@ const FinancePage: React.FC = () => {
               />
               <KpiCard
                 icon={Clock}
-                label="DSO (rough)"
-                value={`${kpis.avgDsoProxy}d`}
-                subtext={`${followUps.length} quote(s) need follow-up`}
+                label="DSO"
+                value={kpis.dso != null ? `${kpis.dso}d` : '—'}
+                subtext={kpis.dso != null ? `${followUps.length} quote(s) need follow-up` : 'No revenue yet'}
               />
             </div>
 
@@ -466,8 +472,8 @@ const FinancePage: React.FC = () => {
 
             {/* AR / AP buckets side-by-side */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" />
-              <BucketSummary title="Payables by age" buckets={apBuckets} viewLink="ap" />
+              <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" expected={arExpected} />
+              <BucketSummary title="Payables by age" buckets={apBuckets} viewLink="ap" expected={apExpected} />
             </div>
 
             {/* Money received but not yet a document — deposits / on-account. Cash we hold that
@@ -1002,7 +1008,10 @@ const BucketSummary: React.FC<{
   title: string;
   buckets: Record<AgeBucket, { count: number; total: number }>;
   viewLink: 'ar' | 'ap';
-}> = ({ title, buckets, viewLink }) => (
+  /** Money from confirmed-but-uninvoiced orders (no due date, so it can't age) — shown as a
+   *  separate "expected" line so committed revenue/spend isn't invisible here. */
+  expected?: number;
+}> = ({ title, buckets, viewLink, expected = 0 }) => (
   <Card>
     <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
       <CardTitle className="text-sm">{title}</CardTitle>
@@ -1018,6 +1027,13 @@ const BucketSummary: React.FC<{
               <td className={`px-4 py-2 text-right font-medium ${b === '90+' || b === '61-90' ? 'text-destructive' : ''}`}>{formatMoney(buckets[b].total)}</td>
             </tr>
           ))}
+          {expected > 0 && (
+            <tr className="border-b border-border/30 bg-muted/20">
+              <td className="px-4 py-2 text-xs text-muted-foreground" title="Confirmed orders not yet invoiced — no due date, so not aged above">Expected (uninvoiced orders)</td>
+              <td className="px-4 py-2" />
+              <td className="px-4 py-2 text-right font-medium text-amber-600">{formatMoney(expected)}</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </CardContent>
