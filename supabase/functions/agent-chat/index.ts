@@ -876,7 +876,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // supplier_overview carries finance data and is admin/owner-gated at injection time.
       'product_provenance', 'product_price_history', 'projects_using_product',
       'products_in_project', 'customer_overview', 'supplier_overview',
-      'products_by_brand', 'brand_overview',
+      'products_by_brand', 'brand_overview', 'related_products',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -1031,7 +1031,7 @@ async function executeAgent(
       tool_ids: [
         'product_provenance', 'product_price_history', 'projects_using_product',
         'products_in_project', 'customer_overview', 'supplier_overview',
-        'products_by_brand', 'brand_overview',
+        'products_by_brand', 'brand_overview', 'related_products',
       ],
     },
     'presentation-sheets': {
@@ -1629,6 +1629,7 @@ async function executeAgent(
       if (isAdmin && config.tools.includes('supplier_overview')) tools.push(graphMod.createSupplierOverviewTool(workspaceId, onChunk));
       if (config.tools.includes('products_by_brand')) tools.push(graphMod.createProductsByBrandTool(workspaceId, onChunk));
       if (config.tools.includes('brand_overview')) tools.push(graphMod.createBrandOverviewTool(workspaceId, onChunk));
+      if (config.tools.includes('related_products')) tools.push(graphMod.createRelatedProductsTool(workspaceId, onChunk));
     } catch (graphErr) {
       console.warn('⚠️ Could not register knowledge-graph tools:', graphErr);
     }

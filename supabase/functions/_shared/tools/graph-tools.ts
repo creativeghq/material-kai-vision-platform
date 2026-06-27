@@ -329,3 +329,35 @@ export const createBrandOverviewTool = (
     },
   );
 };
+
+// ── 9) related_products (Phase 3c — relational co-occurrence) ───────────────
+
+export const createRelatedProductsTool = (
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ product_id, sku, limit }: { product_id?: string; sku?: string; limit?: number }) => {
+      const sb = svcClient();
+      const pid = await resolveProductId(sb, workspaceId, product_id, sku);
+      if (!pid) return JSON.stringify({ success: false, error: 'Need product_id or a resolvable sku.' });
+      const { data, error } = await sb.rpc('get_cooccurring_products', { p_workspace_id: workspaceId, p_product_id: pid, p_limit: limit ?? 20 });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      onChunk?.({ type: 'related_products_result', workspace_id: workspaceId, product_id: pid, related: data, timestamp: Date.now() });
+      return JSON.stringify({ success: true, count: Array.isArray(data) ? data.length : 0, related: data });
+    },
+    {
+      name: 'related_products',
+      description:
+        'Products frequently used TOGETHER with a given product — co-occurrence across the same projects, quotes, ' +
+        'and moodboards (a relational "used together" signal, distinct from visual/embedding similarity). ' +
+        'Each result carries the breakdown (via_projects / via_quotes / via_moodboards) + a combined score. ' +
+        'Use for "what goes with product X", "what do people buy alongside X". Pass product_id or sku.',
+      schema: z.object({
+        product_id: z.string().optional().describe('Product UUID'),
+        sku: z.string().optional().describe('SKU / external SKU to resolve'),
+        limit: z.number().optional().describe('Max related products (default 20)'),
+      }),
+    },
+  );
+};
