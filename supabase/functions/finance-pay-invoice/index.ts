@@ -1,8 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
-import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 
 // Sales/Finance — create a Stripe Checkout session for an invoice.
 //
@@ -38,19 +39,22 @@ function json(body: any, status = 200): Response {
   });
 }
 
-const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
-const publicAppUrl = Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
+// PUBLIC_APP_URL is not a Stripe secret — keep it lazy locally.
+const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  if (!stripeKey) return json({ error: 'STRIPE_SECRET_KEY not configured' }, 500);
+  // Resolve platform_secrets → Deno.env BEFORE reading STRIPE_SECRET_KEY.
+  // Env-first / DB-fallback. No-op on subsequent requests (memoised).
+  await bootstrapForFunction();
 
-  const stripe = new Stripe(stripeKey, {
-    apiVersion: '2023-10-16',
-    httpClient: Stripe.createFetchHttpClient(),
-  });
+  // Safety rail: payments require a configured provider. If STRIPE_SECRET_KEY
+  // is missing in BOTH env and platform_secrets, no provider can accept the
+  // invoice payment — canonical 503 routes the admin to the right settings.
+  const stripe = getStripe();
+  if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -112,7 +116,7 @@ Deno.serve(async (req) => {
         });
         if (tokenErr) return json({ error: `mint_invoice_pay_token failed: ${tokenErr.message}` }, 500);
         token = tk as string;
-        payLink = `${publicAppUrl.replace(/\/$/, '')}/pay/${token}`;
+        payLink = `${publicAppUrl().replace(/\/$/, '')}/pay/${token}`;
         return json({ ok: true, pay_link: payLink, pay_token: token, invoice_id: inv.id });
       }
 
@@ -140,9 +144,9 @@ Deno.serve(async (req) => {
         // Customer-self mode has no token; fall back to the admin invoice page or
         // a generic success page. Frontend should override with a sensible URL.
         success_url: (body as AdminBody).success_url
-          || (token ? `${publicAppUrl}/pay/${token}?status=success` : `${publicAppUrl}/admin/finance/invoices/${inv.id}?status=success`),
+          || (token ? `${publicAppUrl()}/pay/${token}?status=success` : `${publicAppUrl()}/admin/finance/invoices/${inv.id}?status=success`),
         cancel_url: (body as AdminBody).cancel_url
-          || (token ? `${publicAppUrl}/pay/${token}?status=cancelled` : `${publicAppUrl}/admin/finance/invoices/${inv.id}?status=cancelled`),
+          || (token ? `${publicAppUrl()}/pay/${token}?status=cancelled` : `${publicAppUrl()}/admin/finance/invoices/${inv.id}?status=cancelled`),
       });
 
       await supabase
@@ -198,8 +202,8 @@ Deno.serve(async (req) => {
           internal_number: row.internal_number,
         },
       },
-      success_url: pb.success_url || `${publicAppUrl}/pay/${pb.pay_token}?status=success`,
-      cancel_url: pb.cancel_url || `${publicAppUrl}/pay/${pb.pay_token}?status=cancelled`,
+      success_url: pb.success_url || `${publicAppUrl()}/pay/${pb.pay_token}?status=success`,
+      cancel_url: pb.cancel_url || `${publicAppUrl()}/pay/${pb.pay_token}?status=cancelled`,
     });
 
     await supabase

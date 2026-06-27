@@ -12,10 +12,12 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex h-10 items-center justify-center rounded-md p-1 text-muted-foreground',
+      // Token-driven so the single :root / html.light token block controls it
+      // globally — no hardcoded dark literal (was inline hsl(0,0%,9%), which
+      // stayed dark in light mode because inline styles bypass the theme layer).
+      'inline-flex h-10 items-center justify-center rounded-md p-1 text-muted-foreground bg-muted',
       className,
     )}
-    style={{ backgroundColor: 'hsl(0, 0%, 9%)', ...(props.style as React.CSSProperties) }}
     {...props}
   />
 ));
