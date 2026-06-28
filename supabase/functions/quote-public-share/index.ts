@@ -33,7 +33,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'POST only' }, 405);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const { token, event, session_id } = await req.json().catch(() => ({}));
+  const { token, event, session_id, signer_name, signer_email } = await req.json().catch(() => ({}));
 
   if (!token || typeof token !== 'string' || token.length < 32) {
     return jsonResponse({ error: 'Invalid token' }, 400);
@@ -82,6 +82,46 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       line_total: it.line_total != null ? Number(it.line_total) : null,
     };
   });
+
+  // ── Sign & Accept (e-sign + immutable audit trail, Blueprint #242 Phase 2b) ──
+  // The client signs the estimate on the public page. We capture signer + IP + UA
+  // + a content hash of exactly what was signed, flip the quote to accepted, and
+  // return early. The page re-fetches (no event) to render the accepted state.
+  if (event === 'accept') {
+    if (!signer_name || typeof signer_name !== 'string' || signer_name.trim().length < 2) {
+      return jsonResponse({ error: 'A signer name is required to accept.' }, 400);
+    }
+    const canonical = JSON.stringify({
+      id: quote.id,
+      grand_total: quote.grand_total,
+      subtotal: quote.subtotal,
+      items: (rawItems ?? []).map((it: any) => [it.id, it.line_total]),
+    });
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+    const version_hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim()
+      || req.headers.get('cf-connecting-ip') || null;
+
+    // link the originating plan, if any
+    const { data: plan } = await supabase.from('project_plans').select('id').eq('quote_id', quote.id).maybeSingle();
+
+    const { error: apprErr } = await supabase.from('quote_approvals').insert({
+      quote_id: quote.id,
+      plan_id: plan?.id ?? null,
+      signer_name: signer_name.trim(),
+      signer_email: (typeof signer_email === 'string' && signer_email.trim()) ? signer_email.trim() : null,
+      ip_address: ip,
+      user_agent: req.headers.get('user-agent') ?? null,
+      version_hash,
+    });
+    if (apprErr) return jsonResponse({ error: 'Failed to record approval' }, 500);
+
+    if (quote.status !== 'accepted') {
+      await supabase.from('quotes').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', quote.id);
+      if (plan?.id) await supabase.from('project_plans').update({ status: 'approved' }).eq('id', plan.id);
+    }
+    return jsonResponse({ ok: true, accepted: true, signed_at: new Date().toISOString() });
+  }
 
   // Resolve a friendly bill-to name (no contact details exposed publicly) + the customer's
   // VAT-inclusive display preference (#227 — gross prices for retail/consumer customers).
@@ -185,12 +225,28 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     }
   }
 
+  // Latest signature (if accepted) — for the public "Accepted" banner.
+  let signed_by: string | null = null;
+  let signed_at: string | null = null;
+  {
+    const { data: appr } = await supabase
+      .from('quote_approvals')
+      .select('signer_name, signed_at')
+      .eq('quote_id', quote.id)
+      .order('signed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (appr) { signed_by = appr.signer_name; signed_at = appr.signed_at; }
+  }
+
   return jsonResponse({
     quote: {
       id: quote.id,
       name: quote.name,
       quote_number: quote.quote_number,
       status: quote.status,
+      signed_by,
+      signed_at,
       currency: quote.currency || 'EUR',
       subtotal: quote.subtotal != null ? Number(quote.subtotal) : null,
       vat_rate: quote.vat_rate != null ? Number(quote.vat_rate) : null,

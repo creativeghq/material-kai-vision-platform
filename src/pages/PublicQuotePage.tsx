@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loader2, Download, ExternalLink, FileText } from 'lucide-react';
+import { Loader2, Download, ExternalLink, FileText, CheckCircle2, PenLine } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
+import { Input } from '@/components/core/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { computeTotalsBreakdown, totalsRows } from '@/modules/quotes/utils/quoteTotals';
 
@@ -35,6 +36,8 @@ interface PublicQuote {
   name: string | null;
   quote_number: string | null;
   status: string;
+  signed_by: string | null;
+  signed_at: string | null;
   currency: string;
   subtotal: number | null;
   vat_rate: number | null;
@@ -85,28 +88,47 @@ export default function PublicQuotePage() {
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!token) { setLoading(false); setNotFound(true); return; }
-      try {
-        const { data } = await supabase.functions.invoke('quote-public-share', {
-          body: { token, session_id: sessionId.current },
-        });
-        if (cancelled) return;
-        setQuote(data?.quote ?? null);
-        setSeller(data?.seller ?? null);
-        setPdfUrl(data?.pdf_url ?? null);
-        setIssuedDoc(data?.issued_document ?? null);
-        setNotFound(!!data?.not_found || !data?.quote);
-      } catch {
-        if (!cancelled) setNotFound(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  const [signerName, setSignerName] = useState('');
+  const [signerEmail, setSignerEmail] = useState('');
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+
+  const load = React.useCallback(async () => {
+    if (!token) { setLoading(false); setNotFound(true); return; }
+    try {
+      const { data } = await supabase.functions.invoke('quote-public-share', {
+        body: { token, session_id: sessionId.current },
+      });
+      setQuote(data?.quote ?? null);
+      setSeller(data?.seller ?? null);
+      setPdfUrl(data?.pdf_url ?? null);
+      setIssuedDoc(data?.issued_document ?? null);
+      setNotFound(!!data?.not_found || !data?.quote);
+    } catch {
+      setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAccept = async () => {
+    if (!signerName.trim()) { setAcceptError('Please enter your name to sign.'); return; }
+    setAccepting(true);
+    setAcceptError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('quote-public-share', {
+        body: { token, event: 'accept', signer_name: signerName.trim(), signer_email: signerEmail.trim() || undefined },
+      });
+      if (error || data?.error) throw new Error(data?.error || 'Could not accept the quote.');
+      await load();
+    } catch (e) {
+      setAcceptError((e as Error)?.message ?? 'Could not accept the quote.');
+    } finally {
+      setAccepting(false);
+    }
+  };
 
   const handleDownload = async () => {
     if (!pdfUrl) return;
@@ -280,6 +302,32 @@ export default function PublicQuotePage() {
             ))}
           </div>
         </div>
+
+        {/* Sign & Accept (e-sign + audit trail). Shows the accepted banner once signed. */}
+        {(quote.status === 'accepted' || quote.signed_by) ? (
+          <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+            <div className="text-sm">
+              <span className="font-medium">Accepted</span>
+              {quote.signed_by && <span className="text-muted-foreground"> · signed by {quote.signed_by}</span>}
+              {quote.signed_at && <span className="text-muted-foreground"> · {new Date(quote.signed_at).toLocaleDateString()}</span>}
+            </div>
+          </div>
+        ) : (
+          <Card className="dashboard-card border border-white/10 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium"><PenLine className="h-4 w-4 text-primary" /> Approve this quote</div>
+            <p className="text-xs text-muted-foreground">Type your name to sign and accept this estimate. Your signature is recorded with a timestamp.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Input placeholder="Full name *" value={signerName} onChange={(e) => setSignerName(e.target.value)} />
+              <Input placeholder="Email (optional)" value={signerEmail} onChange={(e) => setSignerEmail(e.target.value)} />
+            </div>
+            {acceptError && <div className="text-xs text-destructive">{acceptError}</div>}
+            <Button className="rounded-full" disabled={accepting || !signerName.trim()} onClick={handleAccept}>
+              {accepting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+              Sign &amp; Accept
+            </Button>
+          </Card>
+        )}
 
         {/* PDF actions */}
         {pdfUrl && (
