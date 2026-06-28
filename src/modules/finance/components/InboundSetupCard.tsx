@@ -63,6 +63,9 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         <p className="text-xs text-muted-foreground">
           Enter your <strong>myDATA REST API</strong> credentials — a <strong>User ID</strong> and a <strong>Subscription Key</strong> you get by registering an application in the AADE myDATA REST API portal (<a href="https://www1.aade.gr/saadeapps2/bookkeeper-web/" target="_blank" rel="noreferrer" className="text-primary underline">bookkeeper-web</a> → Registration → REST API). These are <strong>not</strong> the Special Access Codes used for VAT/registry lookups (those are username+password). Once enabled, documents suppliers issue to you appear under <strong>Documents → Expenses</strong>, ready to turn into supplier bills or warehouse intake.
         </p>
+        <p className="text-xs text-muted-foreground">
+          Unlike VAT lookups and email, the Expenses Inbox has <strong>no platform default</strong> — myDATA tags every received document to a specific issuer, so each workspace must use its own credentials. Enter yours below to switch it on.
+        </p>
         <div className="space-y-1">
           <Label className="text-xs">User ID <span className="text-muted-foreground">(sent as <code>aade-user-id</code>)</span></Label>
           <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="your myDATA REST API user id" />

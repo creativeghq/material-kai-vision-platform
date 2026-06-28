@@ -90,6 +90,23 @@ export const aadeService = {
     };
   },
 
+  /** Report the EFFECTIVE ΑΑΔΕ codes for a workspace — the workspace's own row, or (only for the
+   *  operator's root workspace) the platform env/secret default. Lets the Keys page show the
+   *  operator "you already have working codes" instead of an empty form. Never returns the
+   *  password (only `has_password`). Returns null on any error (card falls back to the row view). */
+  async getDefaultStatus(workspaceId: string): Promise<{
+    source: 'workspace' | 'platform_default' | 'none';
+    username: string | null;
+    afm_called_by: string | null;
+    has_password: boolean;
+  } | null> {
+    const { data, error } = await supabase.functions.invoke('myaade-rgwspublic2', {
+      body: { action: 'creds-status', workspace_id: workspaceId },
+    });
+    if (error || !data || data.error) return null;
+    return data;
+  },
+
   /** Save this workspace's Special Access Codes. The password is only written when a new value
    *  is provided — saving with a blank password preserves the stored one (the masked form never
    *  wipes a stored secret). */

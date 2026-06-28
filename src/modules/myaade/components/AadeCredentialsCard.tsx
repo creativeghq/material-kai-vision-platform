@@ -15,7 +15,8 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
-import { Loader2, Save, KeyRound, ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/core/ui/badge';
+import { Loader2, Save, KeyRound, ExternalLink, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { aadeService } from '../services/aadeService';
 
@@ -30,11 +31,14 @@ export const AadeCredentialsCard: React.FC<{ workspaceId: string }> = ({ workspa
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Set when this workspace has no own row but the platform default is active (operator root).
+  const [platformDefault, setPlatformDefault] = useState<{ username: string | null; afm_called_by: string | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setPlatformDefault(null);
       const c = await aadeService.getCreds(workspaceId).catch(() => null);
       if (cancelled) return;
       setUsername(c?.username ?? '');
@@ -42,7 +46,15 @@ export const AadeCredentialsCard: React.FC<{ workspaceId: string }> = ({ workspa
       setPassword(''); // never prefill the secret — the server only tells us whether one is set
       setHasPassword(!!c?.has_password);
       setEnabled(c?.enabled ?? true);
-      setLoading(false);
+      // No own row → check whether platform-default codes are active for this workspace
+      // (only the operator's root workspace inherits the env/secret default).
+      if (!c) {
+        const def = await aadeService.getDefaultStatus(workspaceId).catch(() => null);
+        if (!cancelled && def?.source === 'platform_default' && def.has_password) {
+          setPlatformDefault({ username: def.username, afm_called_by: def.afm_called_by });
+        }
+      }
+      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [workspaceId]);
@@ -77,6 +89,22 @@ export const AadeCredentialsCard: React.FC<{ workspaceId: string }> = ({ workspa
         <CardTitle className="text-sm flex items-center gap-2"><KeyRound className="h-4 w-4" /> myAADE — Business Lookup Credentials</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
+        {platformDefault && (
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              <span className="text-sm font-medium">Platform default codes are active</span>
+              <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">In use</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Business lookups already work on the platform-level codes configured for your account
+              {platformDefault.username ? <> (username <code className="font-mono">{platformDefault.username}</code></> : null}
+              {platformDefault.username && platformDefault.afm_called_by ? <>, caller VAT <code className="font-mono">{platformDefault.afm_called_by}</code></> : null}
+              {platformDefault.username ? <>, password configured)</> : null}
+              . You don't need to enter anything here — fill the form below only to use <em>different</em> codes for this workspace.
+            </p>
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">
           Enter <strong>your own</strong> ΑΑΔΕ <strong>Special Access Codes</strong> (username + password) — created at the{' '}
           <a href={TOKEN_SERVICES_APP_URL} target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">

@@ -149,7 +149,10 @@ export const SocialAccountsTab: React.FC = () => {
           platform,
           workspace_id: workspaceId,
           // Zernio redirects back here after OAuth; this tab finishes the connection.
-          redirect_url: `${window.location.origin}${window.location.pathname}`,
+          // MUST point at the social-accounts tab (not bare /profile) — otherwise the user
+          // lands on the default Profile tab, this component never mounts, and the
+          // ?connected=&accountId= callback that persists the account is never processed.
+          redirect_url: `${window.location.origin}${window.location.pathname}?tab=social-accounts`,
         }),
       });
 

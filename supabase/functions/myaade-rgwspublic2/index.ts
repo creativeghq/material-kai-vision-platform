@@ -44,6 +44,8 @@ interface LookupBody {
   /** Why this lookup was made — audited because every live call notifies the looked-up ΑΦΜ. */
   reason?: 'own_business' | 'crm_enrichment' | 'invoice_counterparty' | string;
   workspace_id?: string;
+  /** 'creds-status' → report the EFFECTIVE codes (workspace row, else operator root default). */
+  action?: 'creds-status' | string;
 }
 
 interface FirmActivity {
@@ -145,6 +147,28 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     if (!user) return jsonResponse({ error: 'Unauthorized' }, 401);
 
     const body = (await req.json()) as LookupBody;
+
+    // ── creds-status: surface the EFFECTIVE ΑΑΔΕ codes for the Keys page ────────────
+    // Reports whatever a real lookup would use — the workspace's own row, or (only for the
+    // operator's root workspace) the platform env/secret default — WITHOUT ever returning the
+    // password. Finance-manager gated, same as the get_aade_creds_status RPC.
+    if (body.action === 'creds-status') {
+      if (!body.workspace_id) return jsonResponse({ error: 'workspace_id required' }, 400);
+      const { data: isMgr } = await userClient.rpc('is_workspace_finance_manager', { p_workspace_id: body.workspace_id });
+      if (!isMgr) return jsonResponse({ error: 'not authorized' }, 403);
+      const admin = createClient(supabaseUrl, supabaseServiceKey);
+      const creds = await resolveAadeCredentials(admin, body.workspace_id);
+      const source = creds.sources.username === 'workspace'
+        ? 'workspace'
+        : (creds.username ? 'platform_default' : 'none');
+      return jsonResponse({
+        source,
+        username: creds.username || null,
+        afm_called_by: creds.afmCalledBy || null,
+        has_password: !!creds.password,
+      });
+    }
+
     const rawAfm = (body.afm || '').replace(/[^0-9]/g, '');
     if (rawAfm.length !== 9) {
       return jsonResponse({ error: 'invalid_afm', message: 'Greek ΑΦΜ must be exactly 9 digits.' }, 400);

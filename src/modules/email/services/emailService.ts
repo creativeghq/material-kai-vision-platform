@@ -238,6 +238,11 @@ export class EmailService {
     has_api_key: boolean;
     effective_daily_limit: number;
     sent_today: number;
+    /** Which sender a real send resolves to right now: own Resend key or the platform default. */
+    source: 'workspace' | 'platform';
+    /** The platform default sender (global email_settings) — shown when source = 'platform'. */
+    platform_from_email: string | null;
+    platform_from_name: string | null;
   } | null> {
     const { data, error } = await supabase.rpc('get_workspace_email_config_status', { p_workspace_id: workspaceId });
     if (error) throw error;
@@ -250,6 +255,9 @@ export class EmailService {
       has_api_key: !!row.has_api_key,
       effective_daily_limit: row.effective_daily_limit ?? 0,
       sent_today: row.sent_today ?? 0,
+      source: row.source === 'workspace' ? 'workspace' : 'platform',
+      platform_from_email: row.platform_from_email ?? null,
+      platform_from_name: row.platform_from_name ?? null,
     };
   }
 
