@@ -889,7 +889,7 @@ export const CompanyDetailPage: React.FC = () => {
               supplier. Read-only view for now. */}
           {company.is_supplier && (
             <TabsContent value="products" className="space-y-4">
-              <SupplierProductsTab supplierName={company.name} factoryNames={company.factory_names ?? []}/>
+              <SupplierProductsTab workspaceId={activeWorkspaceId ?? ''} supplierName={company.name} factoryNames={company.factory_names ?? []}/>
             </TabsContent>
           )}
 

@@ -16,6 +16,13 @@ import {
 } from '@/utils/productMetadata';
 
 interface SupplierProductsTabProps {
+  /**
+   * The active workspace. Products are matched ONLY within this workspace — the
+   * supplier company is workspace-scoped, so its catalog must be too. Without this
+   * gate the maker-name match would pull in other tenants' products that happen to
+   * share a factory name (cross-tenant leak).
+   */
+  workspaceId: string;
   /** The supplier party name to match against products.metadata.factory_name */
   supplierName: string;
   /** Optional list of aliases (e.g. trading names, legal names) to also match */
@@ -51,6 +58,7 @@ interface ProductRow {
  * CRM parties today — the maker is a free-text string on product metadata.
  */
 export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
+  workspaceId,
   supplierName,
   aliases = [],
   factoryNames = [],
@@ -80,7 +88,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
 
   useEffect(() => {
     let cancelled = false;
-    if (candidateNames.length === 0) { setRows([]); setLoading(false); return; }
+    if (!workspaceId || candidateNames.length === 0) { setRows([]); setLoading(false); return; }
 
     (async () => {
       try {
@@ -105,6 +113,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
         const { data, error: err } = await supabase
           .from('products')
           .select(`id, name, sku, external_sku, status, created_at, metadata, ${PRODUCT_IMAGE_SELECT}`)
+          .eq('workspace_id', workspaceId)
           .or(ors.join(','))
           .order('created_at', { ascending: false })
           .limit(500);
@@ -131,7 +140,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [candidateNames.join('|')]);
+  }, [workspaceId, candidateNames.join('|')]);
 
   const filteredRows = React.useMemo(() => {
     const q = search.trim().toLowerCase();
