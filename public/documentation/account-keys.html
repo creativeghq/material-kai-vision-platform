@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account: Keys &amp; Connections | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="account.html">Account &amp; Billing</a> / Keys &amp; Connections</div>
+  <h1>Account · Keys &amp; Connections</h1>
+  <div class="routes"><span class="badge route">/profile</span></div>
+  <p class="lead">The <strong>Keys</strong> tab is the one place to connect a workspace to the outside services it uses — your <strong>social accounts</strong>, your <strong>WhatsApp</strong> number, your own <strong>Stripe</strong> payout account, and your own provider API keys (<strong>bring-your-own-key</strong>). It consolidates connections that used to be scattered across different settings screens, so everything a workspace plugs into is managed and visible together.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open your <strong>Profile</strong> menu (top-right) → the <strong>Keys</strong> tab. Connections are <strong>per workspace</strong> — if you belong to several, pick the workspace whose keys you're managing (<em>“Select a workspace to manage its keys.”</em>).</p></div>
+
+  <h2>What you can connect</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Connection</th><th>What it's for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Social accounts</strong></td><td>Connect Instagram, Facebook, LinkedIn, TikTok and more (via Zernio) for publishing — see <a href="account-social.html">Social Accounts</a>.</td></tr>
+      <tr><td><strong>WhatsApp</strong></td><td>Connect a WhatsApp number (via Zernio) to send &amp; receive messages in the <a href="inbox.html">Inbox</a>.</td></tr>
+      <tr><td><strong>Stripe payouts</strong></td><td>Connect (onboard) your own <strong>Stripe</strong> account to <em>receive store payments into it</em> — for selling through the platform.</td></tr>
+      <tr><td><strong>Bring your own key</strong></td><td>Supply your own provider API key(s) so the workspace runs on your account where you'd rather use your own credentials.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Each connection shows a clear <strong>Connected</strong> / <strong>Not connected</strong> state, with an onboarding/connect action where it isn't set up yet.</p>
+
+  <h2>How to connect something</h2>
+  <ol>
+    <li>Open <strong>Profile → Keys</strong> and (if prompted) pick the <strong>workspace</strong>.</li>
+    <li>Find the connection you want — Social, WhatsApp, Stripe payouts, or Bring-your-own-key.</li>
+    <li>Click its <strong>connect / onboard</strong> action and complete the provider's flow (an OAuth sign-in for social/WhatsApp, Stripe onboarding for payouts, or pasting a key for BYOK).</li>
+    <li>The card flips to <strong>Connected</strong>; the capability it powers is now available to the workspace.</li>
+  </ol>
+
+  <div class="callout"><p><strong>Two different “keys”.</strong> This tab is for the <em>outbound</em> services <strong>your workspace</strong> connects to. It's separate from the <code>kai_*</code> <strong>partner API keys</strong> that let <em>other projects</em> call <em>your</em> price/mention/job tracking — those live on the <a href="account-subscription.html">Subscription</a> tab.</p></div>
+
+  <h2>What it affects</h2>
+  <ul class="feat">
+    <li>Connected <strong>social</strong> accounts enable publishing; <strong>WhatsApp</strong> enables Inbox conversations on that number.</li>
+    <li><strong>Stripe payouts</strong> is what lets store payments land in your own account.</li>
+    <li><strong>Bring-your-own-key</strong> routes the workspace's usage through your own provider credentials. (Operators may surface a platform-default credential where you haven't supplied your own.)</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

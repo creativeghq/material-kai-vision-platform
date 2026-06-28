@@ -13,7 +13,7 @@
   <div class="routes"><span class="badge route">/blueprints</span> <span class="badge route">/blueprints/:id</span> <span class="badge gated">owner</span></div>
   <p class="lead">A <strong>Blueprint</strong> is a reusable, parametric template for estimating a job — a structured <strong>scope of works</strong> (sections and tasks) plus the <strong>measurements</strong> it needs and the <strong>formulas</strong> that turn those measurements into quantities and prices. Build a “Standard Bathroom Reno” once, and every future bathroom is a few numbers away from a full estimate. The Blueprint Library is where you create, edit and organise these templates; the <a href="projects-plan.html">Plan tab</a> is where you put them to work on a project.</p>
 
-  <div class="callout"><p><strong>Where:</strong> top navigation → <strong>Blueprints</strong> (or open <span class="badge route">/blueprints</span>); edit one at <span class="badge route">/blueprints/:id</span>.</p></div>
+  <div class="callout"><p><strong>Where:</strong> the Blueprint Library lives <strong>under Projects</strong> — open <strong>Projects</strong> and click the <strong>Blueprints</strong> button on the list page (or go to <span class="badge route">/blueprints</span>); edit one at <span class="badge route">/blueprints/:id</span>. <span class="badge gated">owner</span></p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/blueprint-library.png" alt="The Blueprint Library — your templates plus starter blueprints to copy">
@@ -23,7 +23,7 @@
   <h2>The library</h2>
   <ul class="feat">
     <li><strong>Your blueprints</strong> — the templates this workspace has built; open one to edit it, or <strong>More</strong> for actions (archive, etc.).</li>
-    <li><strong>Starter blueprints</strong> — ready-made templates (e.g. bathroom reno, full repaint, kitchen refit) you can <strong>Copy to my library</strong> and then tailor to how you actually price.</li>
+    <li><strong>Starter blueprints</strong> — ready-made platform templates (e.g. full home renovation, bathroom reno, full repaint, kitchen refit). They're <strong>read-only</strong> — you can <strong>open one to view</strong> it, then <strong>Copy to my library</strong> to get an editable copy you tailor to how you actually price.</li>
     <li><strong>New blueprint</strong> — create one from scratch.</li>
   </ul>
   <p>You don't only build blueprints here — on a project's <a href="projects-plan.html">Plan tab</a> you can <strong>Save as blueprint</strong> to turn a plan you've just built into a reusable template, which then appears in this library.</p>
@@ -48,8 +48,11 @@
   <h3>The scope tree (sections &amp; tasks)</h3>
   <p>The body of the template: <strong>sections</strong> (headings) containing <strong>tasks</strong> (the estimable lines). Each task carries the same pricing fields the plan uses — a <strong>line kind</strong> (labour / materials / both), a linked <strong>service or product</strong> for its rate, a quantity <strong>formula</strong>, a <strong>margin</strong>, and optional <strong>option-group / tier</strong> (good-better-best) and <strong>allowance</strong> flags. Because the template already carries all of this, instantiating it on a project produces a priced estimate immediately — you just supply the measurements. See <a href="projects-plan.html">Plan &amp; Estimating</a> for how those fields behave line by line.</p>
 
+  <h2>Premade sections (the section library)</h2>
+  <p><strong>What it is —</strong> reusable <strong>sections</strong> you can <strong>drop into any plan or blueprint</strong> from a library picker, rather than re-typing a common block of work each time. <strong>Why it matters —</strong> a “Demolition &amp; prep” or “Electrical first-fix” section is the same on many jobs; add it once from the library and its tasks, formulas and rates come with it. You'll find the section-library picker both in the <a href="projects-plan.html">Plan tab</a> and in the blueprint editor.</p>
+
   <h2>The public estimator</h2>
-  <p>A trimmed, public version of this engine runs at <span class="badge route">/tools/project-plan</span> — a visitor picks a project type (a starter blueprint), enters the measurements, passes a bot check, and gets a ballpark <strong>estimate</strong> with no account. It's a lead-gen on-ramp to the full estimating flow; see <a href="tools.html">Tools</a>.</p>
+  <p>A public, <strong>value-first</strong> version of this engine runs at <span class="badge route">/tools/project-plan</span>. It leads with a <strong>Full Home Renovation</strong> and shows the <em>whole priced scope up front</em> — <em>“Free, instant, no sign-up to try”</em> (no captcha). A visitor enters the measurements and can <strong>edit rows, add tasks, change units and drop in library sections</strong>, then <strong>Save &amp; create free account</strong> to keep the plan and import it into their workspace after sign-up. (Other project types prompt sign-up.) It's the lead-gen on-ramp to the full estimating flow; see <a href="tools.html">Tools</a>.</p>
 
   <div class="callout tip"><p><strong>Build your library once.</strong> Copy a starter, adjust its tasks and margins to match how <em>you</em> price, save it, and from then on every similar job starts as a near-complete estimate — enter the measurements on the <a href="projects-plan.html">Plan tab</a> and you're done.</p></div>
 </main>
