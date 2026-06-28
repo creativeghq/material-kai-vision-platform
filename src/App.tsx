@@ -50,6 +50,8 @@ const CrmCompanyDetailPage = lazy(() => import('./modules/crm/pages/CompanyDetai
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
 const PosPage = lazy(() => import('./modules/finance/pages/PosPage'));
 const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
+const BlueprintLibraryPage = lazy(() => import('./pages/Blueprints/BlueprintLibraryPage').then(m => ({ default: m.BlueprintLibraryPage })));
+const BlueprintEditorPage = lazy(() => import('./pages/Blueprints/BlueprintEditorPage').then(m => ({ default: m.BlueprintEditorPage })));
 
 // Feature pages
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
@@ -650,6 +652,27 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <CreditPackagesPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                {/* Blueprint Estimating Engine (#242) — reusable scope-of-works library. */}
+                <Route
+                  path="/blueprints"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <BlueprintLibraryPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/blueprints/:id"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <BlueprintEditorPage />
                       </Layout>
                     </AuthGuard>
                   }
