@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2, Sigma } from 'lucide-react';
+import { Plus, Trash2, Sigma, Circle, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -21,6 +21,8 @@ export interface PlanTreeEditorProps {
   onDelete: (id: string) => void;
   onAddTask: (sectionId: string) => void;
   onAddSection: () => void;
+  /** Select one member of an option_group (single-select within the group). */
+  onSelectOption?: (item: ProjectPlanItem) => void;
 }
 
 function money(n: number, currency: string) {
@@ -28,15 +30,21 @@ function money(n: number, currency: string) {
   return `${currency === 'EUR' ? '€' : currency + ' '}${v}`;
 }
 
-export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDelete, onAddTask, onAddSection }: PlanTreeEditorProps) {
+export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDelete, onAddTask, onAddSection, onSelectOption }: PlanTreeEditorProps) {
   const sections = items.filter((i) => i.kind === 'section').sort((a, b) => a.sort_order - b.sort_order);
   const tasksOf = (sectionId: string) => items.filter((i) => i.kind === 'task' && i.parent_id === sectionId).sort((a, b) => a.sort_order - b.sort_order);
   const looseTasks = items.filter((i) => i.kind === 'task' && (!i.parent_id || !sections.find((s) => s.id === i.parent_id)));
 
-  const TaskRow = ({ it }: { it: ProjectPlanItem }) => (
+  const TaskRow = ({ it, optionMode }: { it: ProjectPlanItem; optionMode?: boolean }) => (
     <div className="rounded-md border border-border/60 bg-background/40 px-2 py-1.5">
       <div className="flex items-center gap-2">
-        <Switch checked={it.is_selected} disabled={busy} onCheckedChange={(v) => onPatch(it.id, { is_selected: v })} />
+        {optionMode ? (
+          <button type="button" disabled={busy} onClick={() => onSelectOption?.(it)} className="shrink-0" title="Select this option">
+            {it.is_selected ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+          </button>
+        ) : (
+          <Switch checked={it.is_selected} disabled={busy} onCheckedChange={(v) => onPatch(it.id, { is_selected: v })} />
+        )}
         <Input
           className="h-8 flex-1 min-w-0"
           defaultValue={it.label}
@@ -114,7 +122,13 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
               </Button>
             </div>
             <div className="p-2 space-y-1.5">
-              {tasks.map((t) => <TaskRow key={t.id} it={t} />)}
+              {tasks.filter((t) => !t.option_group).map((t) => <TaskRow key={t.id} it={t} />)}
+              {Array.from(new Set(tasks.filter((t) => t.option_group).map((t) => t.option_group as string))).map((grp) => (
+                <div key={grp} className="rounded-md border border-dashed border-border/70 p-2 space-y-1.5">
+                  <div className="text-[11px] font-medium text-muted-foreground px-1">{grp} · choose one</div>
+                  {tasks.filter((t) => t.option_group === grp).map((t) => <TaskRow key={t.id} it={t} optionMode />)}
+                </div>
+              ))}
               <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" disabled={busy} onClick={() => onAddTask(sec.id)}>
                 <Plus className="h-3 w-3 mr-1" /> Add task
               </Button>

@@ -126,6 +126,23 @@ async function loadBlueprintTree(
   visited.delete(blueprintId);
 }
 
+// Within each option_group, ensure exactly one member is selected by default
+// (prefer tier 'good', else the lowest sort_order). Mutates is_selected in place.
+// Used on import; manual edits thereafter manage selection via is_selected directly.
+function applyOptionDefaults(items: ItemRow[]) {
+  const groups: Record<string, ItemRow[]> = {};
+  for (const it of items) {
+    if (it.option_group) (groups[it.option_group] ||= []).push(it);
+  }
+  for (const members of Object.values(groups)) {
+    const already = members.find((m) => m.is_selected === true);
+    const pick = already
+      ?? members.find((m) => m.tier === 'good')
+      ?? [...members].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0];
+    for (const m of members) m.is_selected = m.id === pick?.id;
+  }
+}
+
 // Persist resolved items for a plan (replace-all) and return the stored rows + subtotal.
 async function writePlanItems(supabase: SupabaseClient, planId: string, items: ItemRow[], dims: Record<string, number>) {
   const rates = await buildRateMap(supabase, items);
@@ -259,6 +276,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       // build plan item tree from the blueprint (with sub-blueprint expansion)
       const tree: ItemRow[] = [];
       await loadBlueprintTree(supabase, blueprint_id, null, 0, new Set(), tree);
+      applyOptionDefaults(tree); // one tier per option_group selected by default
 
       const { data: plan, error: planErr } = await supabase.from('project_plans').insert({
         project_id: project_id ?? null,

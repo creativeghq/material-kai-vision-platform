@@ -101,6 +101,17 @@ export const BlueprintEditorPage: React.FC = () => {
           <span className="flex items-center gap-1">margin
             <Input className="h-6 w-12 text-right" value={String(it.margin_pct ?? 0)} onChange={(e) => patch(it.id, { margin_pct: Number(e.target.value) || 0 })} />%
           </span>
+          <span className="flex items-center gap-1">option
+            <Input className="h-6 w-24" value={it.option_group ?? ''} placeholder="group" onChange={(e) => patch(it.id, { option_group: e.target.value || null })} />
+          </span>
+          {it.option_group && (
+            <select className="h-6 bg-transparent border border-border rounded px-1 text-[11px]" value={it.tier ?? ''} onChange={(e) => patch(it.id, { tier: (e.target.value || null) as EditItem['tier'] })}>
+              <option value="">tier…</option>
+              <option value="good">good</option>
+              <option value="better">better</option>
+              <option value="best">best</option>
+            </select>
+          )}
         </div>
       )}
     </div>

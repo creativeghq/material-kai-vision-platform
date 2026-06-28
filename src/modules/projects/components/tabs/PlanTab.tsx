@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Loader2, Plus, ClipboardList, FileText, Save, History, LayoutTemplate, Trash2, Sparkles,
+  Loader2, Plus, ClipboardList, FileText, Save, History, LayoutTemplate, Trash2, Sparkles, RefreshCw,
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -157,6 +157,29 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
     } finally { setBusy(false); }
   };
 
+  const selectOption = async (item: ProjectPlanItem) => {
+    if (!plan || !item.option_group) return;
+    const group = items.filter((i) => i.option_group === item.option_group);
+    setBusy(true);
+    try {
+      const res = await projectPlansService.updateItems(plan.id, group.map((i) => ({ id: i.id, is_selected: i.id === item.id })));
+      refreshItems(res);
+    } catch (e) {
+      toast({ title: 'Update failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const refreshPricing = async () => {
+    if (!plan) return;
+    setBusy(true);
+    try {
+      refreshItems(await projectPlansService.reprice(plan.id));
+      toast({ title: 'Pricing refreshed', description: 'Re-applied current service-catalog rates.' });
+    } catch (e) {
+      toast({ title: 'Refresh failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
   const saveVersion = async () => {
     if (!plan) return;
     setBusy(true);
@@ -254,6 +277,9 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
         <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={() => setPickerOpen(true)}>
           <Plus className="h-3.5 w-3.5 mr-1" /> New
         </Button>
+        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={refreshPricing}>
+          <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh pricing
+        </Button>
         <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={saveVersion}>
           <Save className="h-3.5 w-3.5 mr-1" /> Save version
         </Button>
@@ -288,6 +314,7 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
         onDelete={deleteItem}
         onAddTask={(sectionId) => addItem('task', sectionId)}
         onAddSection={() => addItem('section')}
+        onSelectOption={selectOption}
       />
 
       <BlueprintPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} workspaceId={workspaceId} onPick={importBlueprint} />
