@@ -60,8 +60,13 @@ export default function ProjectPlanPage() {
       .then(({ data, error }) => {
         if (error) return;
         const list = (data?.starters ?? []) as Starter[];
+        // Lead with the Full Home Renovation blueprint — it's the most complete
+        // estimate, so it's the default selection and shows first.
+        const isFull = (s: Starter) => s.project_type === 'full_home_renovation';
+        list.sort((a, b) => (isFull(a) ? 0 : 1) - (isFull(b) ? 0 : 1));
         setStarters(list);
-        if (list.length) setSelectedId(list[0].id);
+        const preferred = list.find(isFull) ?? list[0];
+        if (preferred) setSelectedId(preferred.id);
       })
       .finally(() => setStartersLoading(false));
   }, []);
