@@ -147,6 +147,22 @@ jobs:
       - run: npm run typecheck
 
   # ────────────────────────────────────────────────────────────────────
+  # unit-tests: hermetic Vitest suite — pure decimal/formula logic + the
+  # edge⇄frontend blueprint-formula parity check. No secrets, no network;
+  # runs on every push as a fast gate.
+  # ────────────────────────────────────────────────────────────────────
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+
+  # ────────────────────────────────────────────────────────────────────
   # deploy-frontend: prebuilt Vercel upload (no double build).
   # ────────────────────────────────────────────────────────────────────
   deploy-frontend:
@@ -336,3 +352,29 @@ jobs:
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
         run: npx playwright test --reporter=line
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # integration-tests — live-system Vitest suites: cross-workspace RLS isolation
+  # (crm_companies) + the blueprint money-path contract. Creates throwaway
+  # e2e-…@materialshub.gr users/workspaces on prod and tears them down inline;
+  # cleanup_test_artifacts is the backstop. The tenancy suite self-SKIPs unless
+  # BOTH SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY are set, so a missing
+  # secret degrades to "contract test only" instead of a red deploy.
+  integration-tests:
+    needs: [deploy-frontend, deploy-functions]
+    if: ${{ always() && (needs.deploy-frontend.result == 'success' || needs.deploy-functions.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: 🔗 Live integration tests
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: npm run test:integration

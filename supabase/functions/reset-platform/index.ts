@@ -80,8 +80,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - invoices / invoice_items / credit_notes / credit_note_items
 //   - supplier_bills / supplier_credit_notes / supplier_credit_note_items
 //   - payments / payment_allocations / planned_payments / cheques
-//   - delivery_notes / delivery_note_items
-//   - purchase_orders / purchase_order_items / inbound_documents
+//   - delivery_notes / delivery_note_items / inbound_documents
+//   - stock_allocations / supplier_products / warehouse_coverage
 //   - marketplace_commission_ledger / stock_movements / time_entries
 //   - warehouses / warehouse_items / warehouse_pending_items
 //   - pos_sessions / pos_cash_movements / pos_signatures / pos_terminals
@@ -419,8 +419,9 @@ const NEVER_CLEAR = new Set<string>([
   'invoices', 'invoice_items', 'credit_notes', 'credit_note_items',
   'supplier_bills', 'supplier_credit_notes', 'supplier_credit_note_items',
   'payments', 'payment_allocations', 'planned_payments', 'cheques',
-  'delivery_notes', 'delivery_note_items', 'purchase_orders', 'purchase_order_items',
+  'delivery_notes', 'delivery_note_items',
   'inbound_documents', 'marketplace_commission_ledger', 'stock_movements', 'time_entries',
+  'stock_allocations', 'supplier_products', 'warehouse_coverage',
   'warehouses', 'warehouse_items', 'warehouse_pending_items',
   'pos_sessions', 'pos_cash_movements', 'pos_signatures', 'pos_terminals',
   'document_series', 'fiscal_connectors', 'fiscal_submissions',

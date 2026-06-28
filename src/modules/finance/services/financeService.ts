@@ -202,44 +202,6 @@ export interface PaymentWithAllocation extends Payment {
   allocations: PaymentAllocation[];
 }
 
-export type PurchaseOrderStatus =
-  | 'draft'
-  | 'ordered'
-  | 'partially_received'
-  | 'received'
-  | 'cancelled';
-
-export interface PurchaseOrder {
-  id: string;
-  workspace_id: string;
-  po_number: string;
-  supplier_company_id: string | null;
-  supplier_contact_id: string | null;
-  status: PurchaseOrderStatus;
-  currency: string;
-  subtotal_net: number;
-  vat_amount: number;
-  total: number;
-  ordered_at: string | null;
-  expected_at: string | null;
-  received_at: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PurchaseOrderItem {
-  id: string;
-  po_id: string;
-  product_id: string | null;
-  description: string | null;
-  sku: string | null;
-  quantity: number;
-  unit_cost: number;
-  line_total: number;
-  added_at: string;
-}
-
 export type SupplierBillStatus =
   | 'received'
   | 'partially_paid'
@@ -254,7 +216,6 @@ export interface SupplierBill {
   supplier_bill_number: string | null;
   supplier_company_id: string | null;
   supplier_contact_id: string | null;
-  po_id: string | null;
   status: SupplierBillStatus;
   currency: string;
   subtotal_net: number;
@@ -1126,95 +1087,6 @@ const _financeServiceCore = {
     if (error) throw error;
   },
 
-  // -------- Purchase orders --------
-
-  async createPurchaseOrder(input: {
-    workspaceId: string;
-    supplierCompanyId?: string;
-    supplierContactId?: string;
-    currency?: string;
-    expectedAt?: string;
-    notes?: string;
-    items: Array<{
-      productId?: string;
-      description: string;
-      sku?: string;
-      quantity: number;
-      unit_cost: number;
-    }>;
-  }): Promise<PurchaseOrder> {
-    const { data: nextNum, error: numErr } = await supabase.rpc('next_po_number', {
-      p_workspace_id: input.workspaceId,
-    });
-    if (numErr) throw numErr;
-
-    const subtotal = input.items.reduce((acc, it) => acc + it.quantity * it.unit_cost, 0);
-
-    const { data: po, error: poErr } = await supabase
-      .from('purchase_orders')
-      .insert({
-        workspace_id: input.workspaceId,
-        po_number: nextNum,
-        supplier_company_id: input.supplierCompanyId ?? null,
-        supplier_contact_id: input.supplierContactId ?? null,
-        status: 'draft',
-        currency: input.currency ?? 'EUR',
-        subtotal_net: subtotal,
-        vat_amount: 0,
-        total: subtotal,
-        expected_at: input.expectedAt ?? null,
-        notes: input.notes ?? null,
-      })
-      .select()
-      .single();
-    if (poErr) throw poErr;
-
-    if (input.items.length > 0) {
-      const { error: itemsErr } = await supabase.from('purchase_order_items').insert(
-        input.items.map((it) => ({
-          po_id: (po as PurchaseOrder).id,
-          product_id: it.productId ?? null,
-          description: it.description,
-          sku: it.sku ?? null,
-          quantity: it.quantity,
-          unit_cost: it.unit_cost,
-        })),
-      );
-      if (itemsErr) throw itemsErr;
-    }
-
-    return po as PurchaseOrder;
-  },
-
-  async listPurchaseOrders(opts: { workspaceId?: string; supplierCompanyId?: string; status?: PurchaseOrderStatus[] } = {}): Promise<PurchaseOrder[]> {
-    let q = supabase.from('purchase_orders').select('*').order('created_at', { ascending: false });
-    if (opts.workspaceId) q = q.eq('workspace_id', opts.workspaceId);
-    if (opts.supplierCompanyId) q = q.eq('supplier_company_id', opts.supplierCompanyId);
-    if (opts.status?.length) q = q.in('status', opts.status);
-    const { data, error } = await q;
-    if (error) throw error;
-    return (data ?? []) as PurchaseOrder[];
-  },
-
-  async getPurchaseOrder(poId: string): Promise<PurchaseOrder & { items: PurchaseOrderItem[] }> {
-    const { data: po, error } = await supabase.from('purchase_orders').select('*').eq('id', poId).single();
-    if (error) throw error;
-    const { data: items } = await supabase
-      .from('purchase_order_items')
-      .select('*')
-      .eq('po_id', poId)
-      .order('added_at', { ascending: true });
-    return { ...(po as PurchaseOrder), items: (items ?? []) as PurchaseOrderItem[] };
-  },
-
-  async updatePurchaseOrderStatus(poId: string, status: PurchaseOrderStatus): Promise<void> {
-    const patch: Record<string, unknown> = { status };
-    if (status === 'ordered') patch.ordered_at = new Date().toISOString();
-    if (status === 'received') patch.received_at = new Date().toISOString();
-    const { error } = await supabase.from('purchase_orders').update(patch).eq('id', poId);
-    if (error) throw error;
-  },
-
   // -------- Supplier bills --------
 
   async createSupplierBill(input: {
@@ -1222,7 +1094,6 @@ const _financeServiceCore = {
     supplierBillNumber?: string;
     supplierCompanyId?: string;
     supplierContactId?: string;
-    poId?: string;
     currency?: string;
     subtotalNet: number;
     vatAmount: number;
@@ -1238,7 +1109,6 @@ const _financeServiceCore = {
         supplier_bill_number: input.supplierBillNumber ?? null,
         supplier_company_id: input.supplierCompanyId ?? null,
         supplier_contact_id: input.supplierContactId ?? null,
-        po_id: input.poId ?? null,
         currency: input.currency ?? 'EUR',
         subtotal_net: input.subtotalNet,
         vat_amount: input.vatAmount,
