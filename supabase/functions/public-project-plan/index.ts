@@ -61,12 +61,25 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
   const action = body?.action as string;
 
   if (action === 'starters') {
-    const { data, error } = await supabase
+    // Return each starter WITH its full works list so the public page can render +
+    // price the scope of works entirely client-side (pure math, no metering needed).
+    const { data: bps, error } = await supabase
       .from('blueprints')
       .select('id, title, description, project_type, dimensions_schema, source_currency')
       .eq('is_platform_starter', true).eq('status', 'active').order('title');
     if (error) throw new HttpError(400, error.message);
-    return json({ starters: data ?? [] });
+    const ids = (bps ?? []).map((b: any) => b.id);
+    const itemsByBp: Record<string, any[]> = {};
+    if (ids.length) {
+      const { data: items } = await supabase
+        .from('blueprint_items')
+        .select('id, blueprint_id, parent_id, sort_order, kind, label, unit, quantity_formula, default_quantity, line_kind, material_cost, labor_rate, margin_pct, is_allowance, allowance_amount, option_group, tier')
+        .in('blueprint_id', ids)
+        .order('sort_order', { ascending: true });
+      for (const it of (items ?? []) as any[]) (itemsByBp[it.blueprint_id] ||= []).push(it);
+    }
+    const starters = (bps ?? []).map((b: any) => ({ ...b, items: itemsByBp[b.id] ?? [] }));
+    return json({ starters });
   }
 
   if (action === 'estimate') {

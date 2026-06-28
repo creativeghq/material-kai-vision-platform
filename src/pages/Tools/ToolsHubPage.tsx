@@ -74,9 +74,9 @@ const TOOLS: ToolEntry[] = [
     slug: 'project-plan',
     title: 'Project plan estimator',
     description:
-      'Pick a renovation type, enter a few measurements, and get a structured scope of works with a ballpark price.',
+      'Pick a renovation type and see the full scope of works, priced — fine-tune the numbers and the total updates live.',
     icon: ClipboardList,
-    badge: 'Free · 2/day',
+    badge: 'Free · instant',
   },
 ];
 
