@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney, financeService, VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import { parseDecimal } from '@/utils/decimal';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
@@ -837,6 +838,29 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     finally { setSaving(false); }
   };
 
+  // #237 A3 — email the purchase order to the supplier (PDF), mark it placed.
+  const sendToSupplier = async () => {
+    if (!order) return;
+    if (!order.supplier_company_id && !order.supplier_contact_id) {
+      toast({ title: 'No supplier', description: 'This purchase order has no supplier set.', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-purchase-sheet-pdf', {
+        body: { order_id: order.id, send: true },
+      });
+      if (error) throw new Error(await edgeErrorMessage(error, 'Failed to send purchase order'));
+      if (!data?.success) throw new Error(data?.error || 'Failed to send purchase order');
+      await load(order.id); onChanged();
+      toast({
+        title: 'Sent to supplier',
+        description: data.recipient ? `Purchase order emailed to ${data.recipient}.` : 'Purchase order generated.',
+      });
+    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setSaving(false); }
+  };
+
   // Order margin = Σ (unit_price − unit_cost) × qty over lines that carry a cost. null = no cost yet.
   const anyCost = items.some((it) => it.unit_cost != null);
   const orderMargin = order && anyCost
@@ -893,6 +917,11 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
                       <DropdownMenuItem onClick={createInvoice}>
                         <FileText className="h-3.5 w-3.5 mr-2" /> {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}
+                      </DropdownMenuItem>
+                    )}
+                    {order.order_type === 'purchase' && (
+                      <DropdownMenuItem onClick={sendToSupplier}>
+                        <Send className="h-3.5 w-3.5 mr-2" /> Send to supplier
                       </DropdownMenuItem>
                     )}
                     {order.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) === 0 && (
