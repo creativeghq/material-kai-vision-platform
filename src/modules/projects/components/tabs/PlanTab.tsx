@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DimensionsPanel } from '@/components/features/blueprint/DimensionsPanel';
 import { PlanTreeEditor } from '@/components/features/blueprint/PlanTreeEditor';
 import { BlueprintPickerDialog } from '@/components/features/blueprint/BlueprintPickerDialog';
+import { SectionLibraryPicker } from '@/components/features/blueprint/SectionLibraryPicker';
 import { PlanVersionHistory } from '@/components/features/blueprint/PlanVersionHistory';
 import { blueprintsService, type DimensionDef } from '@/services/blueprintsService';
 import {
@@ -43,6 +44,7 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
   const [dims, setDims] = useState<Record<string, number>>({});
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsTitle, setSaveAsTitle] = useState('');
@@ -154,6 +156,28 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
       refreshItems(await projectPlansService.reprice(plan.id));
     } catch (e) {
       toast({ title: 'Add failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const startBlankPlan = async () => {
+    setBusy(true);
+    try {
+      const p = await projectPlansService.createBlank({ project_id: projectId, workspace_id: workspaceId, title: 'Project plan' });
+      setPlans((prev) => [p, ...prev]);
+      await loadPlanFull(p);
+      toast({ title: 'Blank plan created', description: 'Add sections from the library, or build your own.' });
+    } catch (e) {
+      toast({ title: 'Could not create plan', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const addSectionFromLibrary = async (blueprintId: string, sectionId: string) => {
+    if (!plan) return;
+    setBusy(true);
+    try {
+      refreshItems(await projectPlansService.addSectionFromBlueprint(plan.id, blueprintId, sectionId));
+    } catch (e) {
+      toast({ title: 'Could not add section', description: String((e as Error)?.message ?? e), variant: 'destructive' });
     } finally { setBusy(false); }
   };
 
@@ -269,9 +293,15 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
               Start from a reusable blueprint — a structured scope of works. Enter a few measurements
               and it prices itself; then turn it into a quote in one click.
             </p>
-            <Button className="rounded-full" onClick={() => setPickerOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Import a blueprint
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button className="rounded-full" onClick={() => setPickerOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Import a blueprint
+              </Button>
+              <Button variant="outline" className="rounded-full" disabled={busy} onClick={startBlankPlan}>
+                <ClipboardList className="h-4 w-4 mr-1" /> Start a blank plan
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">A blank plan lets you add only the sections you need from the library.</p>
           </CardContent>
         </Card>
         <BlueprintPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} workspaceId={workspaceId} onPick={importBlueprint} />
@@ -347,9 +377,11 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
         onAddTask={(sectionId) => addItem('task', sectionId)}
         onAddSection={() => addItem('section')}
         onSelectOption={selectOption}
+        onAddFromLibrary={() => setSectionPickerOpen(true)}
       />
 
       <BlueprintPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} workspaceId={workspaceId} onPick={importBlueprint} />
+      <SectionLibraryPicker open={sectionPickerOpen} onOpenChange={setSectionPickerOpen} onPick={(bpId, secId) => addSectionFromLibrary(bpId, secId)} />
       <PlanVersionHistory open={historyOpen} onOpenChange={setHistoryOpen} planId={plan.id} onRestored={() => load()} />
 
       <Dialog open={saveAsOpen} onOpenChange={setSaveAsOpen}>

@@ -52,13 +52,17 @@ export const BlueprintLibraryPage: React.FC = () => {
   useEffect(() => {
     const raw = (() => { try { return localStorage.getItem('mk_pending_blueprint'); } catch { return null; } })();
     if (!raw || !workspaceId) return;
-    let pending: { starter_id: string; title?: string; dimensions?: Record<string, number> };
+    let pending: { starter_id?: string; title?: string; dimensions?: Record<string, number>; dimensions_schema?: any[]; items?: any[]; source_currency?: string };
     try { pending = JSON.parse(raw); } catch { localStorage.removeItem('mk_pending_blueprint'); return; }
     localStorage.removeItem('mk_pending_blueprint'); // consume once (guards double-invoke)
-    if (!pending?.starter_id) return;
+    if (!pending?.starter_id && !pending?.items?.length) return;
     (async () => {
       try {
-        const bp = await blueprintsService.duplicate(pending.starter_id, workspaceId, { title: pending.title, dimensionValues: pending.dimensions });
+        // If the user edited the plan on the public tool, recreate exactly what they
+        // built; otherwise duplicate the starter with their entered measurements.
+        const bp = pending.items?.length
+          ? await blueprintsService.createFromItems({ workspace_id: workspaceId, title: pending.title || 'Imported plan', source_currency: pending.source_currency, dimensions_schema: pending.dimensions_schema, items: pending.items })
+          : await blueprintsService.duplicate(pending.starter_id!, workspaceId, { title: pending.title, dimensionValues: pending.dimensions });
         toast({ title: 'Imported your plan', description: 'Your saved estimate is now an editable blueprint.' });
         navigate(`/blueprints/${bp.id}`);
       } catch (e) {

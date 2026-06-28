@@ -420,6 +420,35 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       return json({ quote_id: quote.id });
     }
 
+    case 'add-section-from-blueprint': {
+      // Append a single premade section (+ its tasks) from any blueprint into an
+      // existing plan, then reprice. Lets a project be built from parts without
+      // importing a whole blueprint.
+      const { plan_id, source_blueprint_id, section_id } = body;
+      if (!plan_id || !source_blueprint_id || !section_id) throw new HttpError(400, 'plan_id, source_blueprint_id, section_id required');
+      const plan = await loadPlan(supabase, plan_id);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+
+      const { data: srcItems, error } = await supabase.from('blueprint_items').select('*').eq('blueprint_id', source_blueprint_id);
+      if (error) throw new HttpError(400, error.message);
+      const rows = (srcItems ?? []) as ItemRow[];
+      const section = rows.find((i) => i.id === section_id && i.kind === 'section');
+      if (!section) throw new HttpError(404, 'Section not found');
+      const tasks = rows.filter((i) => i.parent_id === section_id);
+
+      const existing = await loadPlanItems(supabase, plan_id);
+      const maxSort = existing.filter((i) => i.kind === 'section').reduce((m, i) => Math.max(m, i.sort_order ?? 0), -1);
+      const newSecId = crypto.randomUUID();
+      const appended: ItemRow[] = [{ ...section, id: newSecId, parent_id: null, sort_order: maxSort + 1 }];
+      tasks.forEach((t, idx) => appended.push({ ...t, id: crypto.randomUUID(), parent_id: newSecId, sort_order: idx }));
+
+      const dims = plan.dimensions ?? {};
+      const { subtotal } = await writePlanItems(supabase, plan_id, [...existing, ...appended], dims);
+      await supabase.from('project_plans').update({ subtotal }).eq('id', plan_id);
+      const items = await loadPlanItems(supabase, plan_id);
+      return json({ plan: { ...plan, subtotal }, items });
+    }
+
     case 'generate-material-list': {
       // Derive a material shopping list from the plan's selected material-bearing
       // leaf tasks → project_purchase_items (existing finance/PDF surface).

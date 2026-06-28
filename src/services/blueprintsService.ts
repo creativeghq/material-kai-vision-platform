@@ -124,6 +124,44 @@ class BlueprintsService {
     if (error) throw error;
   }
 
+  /**
+   * The premade-section library: every starter blueprint's sections, for the
+   * "Add section from library" pickers (project Plan tab + public estimator).
+   * Readable by anon too (starters pass the RLS select policy).
+   */
+  async getSectionLibrary(): Promise<Array<{ blueprintId: string; blueprintTitle: string; sections: Array<{ id: string; label: string; taskCount: number }> }>> {
+    const starters = await this.listStarters();
+    const out: Array<{ blueprintId: string; blueprintTitle: string; sections: Array<{ id: string; label: string; taskCount: number }> }> = [];
+    for (const bp of starters) {
+      const items = await this.listItems(bp.id);
+      const sections = items.filter((i) => i.kind === 'section').map((s) => ({
+        id: s.id, label: s.label, taskCount: items.filter((i) => i.parent_id === s.id).length,
+      }));
+      out.push({ blueprintId: bp.id, blueprintTitle: bp.title, sections });
+    }
+    return out;
+  }
+
+  /** Create a workspace blueprint from an arbitrary item tree (the public tool's
+   *  edited plan → import after sign-up). */
+  async createFromItems(input: { workspace_id: string; title: string; source_currency?: string; dimensions_schema?: DimensionDef[]; items: Array<Partial<BlueprintItem> & { id: string; kind: 'section' | 'task'; label: string }>; }): Promise<Blueprint> {
+    const bp = await this.create({
+      workspace_id: input.workspace_id,
+      title: input.title,
+      source_currency: input.source_currency ?? 'EUR',
+      dimensions_schema: input.dimensions_schema ?? [],
+    });
+    const idMap: Record<string, string> = {};
+    for (const it of input.items) idMap[it.id] = crypto.randomUUID();
+    await this.replaceItems(bp.id, input.items.map((it) => ({
+      ...it,
+      id: idMap[it.id],
+      parent_id: it.parent_id ? idMap[it.parent_id] ?? null : null,
+      source: 'template' as const,
+    })));
+    return bp;
+  }
+
   /** Replace the full item tree for a blueprint (editor "Save"). */
   async replaceItems(blueprintId: string, items: Array<Partial<BlueprintItem> & { kind: 'section' | 'task'; label: string }>): Promise<void> {
     const { error: delErr } = await supabase.from('blueprint_items').delete().eq('blueprint_id', blueprintId);

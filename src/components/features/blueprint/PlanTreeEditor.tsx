@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2, Sigma, Circle, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Sigma, Circle, CheckCircle2, Layers } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -24,6 +24,8 @@ export interface PlanTreeEditorProps {
   onAddSection: () => void;
   /** Select one member of an option_group (single-select within the group). */
   onSelectOption?: (item: ProjectPlanItem) => void;
+  /** Open the premade-section library picker (build the plan from parts). */
+  onAddFromLibrary?: () => void;
 }
 
 function money(n: number, currency: string) {
@@ -31,7 +33,7 @@ function money(n: number, currency: string) {
   return `${currency === 'EUR' ? '€' : currency + ' '}${v}`;
 }
 
-export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDelete, onAddTask, onAddSection, onSelectOption }: PlanTreeEditorProps) {
+export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDelete, onAddTask, onAddSection, onSelectOption, onAddFromLibrary }: PlanTreeEditorProps) {
   const sections = items.filter((i) => i.kind === 'section').sort((a, b) => a.sort_order - b.sort_order);
   const tasksOf = (sectionId: string) => items.filter((i) => i.kind === 'task' && i.parent_id === sectionId).sort((a, b) => a.sort_order - b.sort_order);
   const looseTasks = items.filter((i) => i.kind === 'task' && (!i.parent_id || !sections.find((s) => s.id === i.parent_id)));
@@ -140,9 +142,16 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
       )}
 
       <div className="flex items-center justify-between">
-        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={onAddSection}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> Add section
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={onAddSection}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add section
+          </Button>
+          {onAddFromLibrary && (
+            <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={onAddFromLibrary}>
+              <Layers className="h-3.5 w-3.5 mr-1" /> Add from library
+            </Button>
+          )}
+        </div>
         <div className="text-sm">
           <span className="text-muted-foreground mr-2">Subtotal</span>
           <span className="font-medium tabular-nums">{money(subtotal, currency)}</span>

@@ -1,82 +1,34 @@
 /**
  * Project plan estimator (/tools/project-plan) — anonymous lead-gen tool (#242).
  *
- * Value-first: pick a project type and the full organized scope of works (sections
- * + tasks) is shown immediately with prices computed from sensible defaults. A
- * couple of homeowner-friendly inputs (home size, bathrooms) sit inline and update
- * the total live; the technical measurements are tucked behind "Fine-tune details".
+ * Value-first AND editable: pick a project type → the full scope of works shows
+ * immediately, priced; then edit every row, add tasks, add whole sections from the
+ * library, and tweak measurements — exactly like the backend Plan tab, but fully
+ * client-side (no DB, no captcha, no quota). "Save & create free account" stashes
+ * the edited plan and imports it into the user's library after signup.
  *
- * The compute is PURE client-side math (shared blueprintFormula), so there's no
- * captcha and no quota — the breakdown just updates as you type. Sign up to import
- * the plan into your library, edit it with your own rates, and turn it into a quote.
+ * Only Full Home Renovation runs free here; the other types unlock after sign-up.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Loader2, Sparkles, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { ClipboardList, Loader2, Sparkles, Lock } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
-import { Badge } from '@/components/core/ui/badge';
-import { evaluateFormula, computeLinePricing, round2 } from '@/utils/blueprintFormula';
+import { DimensionsPanel } from '@/components/features/blueprint/DimensionsPanel';
+import { PlanTreeEditor } from '@/components/features/blueprint/PlanTreeEditor';
+import { SectionLibraryPicker } from '@/components/features/blueprint/SectionLibraryPicker';
+import type { DimensionDef } from '@/services/blueprintsService';
+import type { ProjectPlanItem } from '@/services/projectPlansService';
+import { seedPlanItems, repriceItems, subtotalOf } from '@/utils/blueprintCompute';
 import { ToolsShell } from './toolsShared';
 
-interface DimDef { key: string; label: string; unit?: string; default?: number }
-interface Item {
-  id: string; parent_id: string | null; sort_order: number; kind: 'section' | 'task';
-  label: string; unit: string | null; quantity_formula: string | null; default_quantity: number;
-  line_kind: string; material_cost: number | null; labor_rate: number | null; margin_pct: number;
-  is_allowance: boolean; allowance_amount: number | null; option_group: string | null; tier: string | null;
-}
-interface Starter { id: string; title: string; description: string | null; project_type: string | null; dimensions_schema: DimDef[]; source_currency: string; items: Item[] }
+interface Item { id: string; parent_id: string | null; sort_order: number; kind: 'section' | 'task'; label: string; unit: string | null; quantity_formula: string | null; default_quantity: number; line_kind: string; material_cost: number | null; labor_rate: number | null; margin_pct: number; is_allowance: boolean; allowance_amount: number | null; option_group: string | null; tier: string | null }
+interface Starter { id: string; title: string; description: string | null; project_type: string | null; dimensions_schema: DimensionDef[]; source_currency: string; items: Item[] }
 
-// Homeowner-friendly fields shown up front; everything else is "Fine-tune".
-const PRIMARY_KEYS = ['floor_area', 'n_bathrooms', 'n_rooms'];
-const FRIENDLY_LABEL: Record<string, string> = { floor_area: 'Home size', n_bathrooms: 'Bathrooms', n_rooms: 'Rooms' };
-
-const money = (v: number, currency: string) => {
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(v); }
-  catch { return `${currency} ${Math.round(v)}`; }
-};
-
-function computeBreakdown(items: Item[], dims: Record<string, number>) {
-  const sections = items.filter((i) => i.kind === 'section').sort((a, b) => a.sort_order - b.sort_order);
-  const optSel: Record<string, string> = {};
-  for (const it of items) {
-    if (it.kind !== 'task' || !it.option_group) continue;
-    if (!optSel[it.option_group] || it.tier === 'good') optSel[it.option_group] = it.id;
-  }
-  const calc = (it: Item) => {
-    const selected = it.option_group ? optSel[it.option_group] === it.id : true;
-    let qty: number;
-    if (it.quantity_formula && String(it.quantity_formula).trim()) {
-      const r = evaluateFormula(it.quantity_formula, dims);
-      qty = r.ok ? r.value : Number(it.default_quantity ?? 1);
-    } else qty = Number(it.default_quantity ?? 1);
-    qty = round2(qty);
-    const { unit_price, line_total } = computeLinePricing({
-      is_allowance: it.is_allowance, allowance_amount: it.allowance_amount,
-      material_cost: it.material_cost, labor_rate: it.labor_rate, margin_pct: it.margin_pct,
-      quantity: qty, is_selected: selected,
-    });
-    return { label: it.label, unit: it.unit, quantity: qty, unit_price, line_total, is_allowance: it.is_allowance, selected };
-  };
-  let subtotal = 0;
-  const out = sections.map((s) => {
-    const tasks = items.filter((i) => i.kind === 'task' && i.parent_id === s.id).sort((a, b) => a.sort_order - b.sort_order).map(calc).filter((t) => t.selected);
-    const total = round2(tasks.reduce((a, t) => a + t.line_total, 0));
-    subtotal += total;
-    return { label: s.label, total, tasks };
-  }).filter((s) => s.tasks.length > 0);
-  return { sections: out, subtotal: round2(subtotal) };
-}
-
-// Only the Full Home Renovation estimate runs free on the public tool; the rest are
-// teased as locked and unlock after sign-up.
 const isUnlocked = (s: Starter) => s.project_type === 'full_home_renovation';
 
 export default function ProjectPlanPage() {
@@ -87,71 +39,97 @@ export default function ProjectPlanPage() {
   const [starters, setStarters] = useState<Starter[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState('');
-  const [dims, setDims] = useState<Record<string, string>>({});
-  const [showMore, setShowMore] = useState(false);
+  const [dims, setDims] = useState<Record<string, number>>({});
+  const [items, setItems] = useState<ProjectPlanItem[]>([]);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const selected = useMemo(() => starters.find((s) => s.id === selectedId) ?? null, [starters, selectedId]);
+  const subtotal = useMemo(() => subtotalOf(items), [items]);
+  const currency = selected?.source_currency || 'EUR';
 
   useEffect(() => {
     supabase.functions.invoke('public-project-plan', { body: { action: 'starters' } })
       .then(({ data, error }) => {
         if (error) return;
         const list = (data?.starters ?? []) as Starter[];
-        const isFull = (s: Starter) => s.project_type === 'full_home_renovation';
-        list.sort((a, b) => (isFull(a) ? 0 : 1) - (isFull(b) ? 0 : 1));
+        list.sort((a, b) => (isUnlocked(a) ? 0 : 1) - (isUnlocked(b) ? 0 : 1));
         setStarters(list);
-        const preferred = list.find(isFull) ?? list[0];
+        const preferred = list.find(isUnlocked) ?? list[0];
         if (preferred) setSelectedId(preferred.id);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  // Reset dimension values to the blueprint's defaults whenever the type changes.
+  // Seed editable items + default dims whenever the selected type changes.
   useEffect(() => {
     if (!selected) return;
-    const next: Record<string, string> = {};
-    for (const d of selected.dimensions_schema ?? []) next[d.key] = String(d.default ?? 0);
-    setDims(next);
-    setShowMore(false);
+    const d: Record<string, number> = {};
+    for (const dim of selected.dimensions_schema ?? []) d[dim.key] = Number(dim.default ?? 0);
+    setDims(d);
+    setItems(seedPlanItems(selected.items, d));
   }, [selected]);
 
-  const numericDims = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const [k, v] of Object.entries(dims)) out[k] = Number(String(v).replace(',', '.')) || 0;
-    return out;
-  }, [dims]);
-
-  const breakdown = useMemo(
-    () => (selected ? computeBreakdown(selected.items, numericDims) : { sections: [], subtotal: 0 }),
-    [selected, numericDims],
-  );
-
-  const currency = selected?.source_currency || 'EUR';
-  const schema = selected?.dimensions_schema ?? [];
-  const primaryDims = schema.filter((d) => PRIMARY_KEYS.includes(d.key));
-  const moreDims = schema.filter((d) => !PRIMARY_KEYS.includes(d.key));
-  // If none of the preferred keys exist, promote the first 2 dims to primary.
-  const effPrimary = primaryDims.length ? primaryDims : schema.slice(0, 2);
-  const effMore = primaryDims.length ? moreDims : schema.slice(2);
+  const onDimsChange = (next: Record<string, number>) => {
+    setDims(next);
+    setItems((cur) => repriceItems(cur, next));
+  };
+  const patchItem = (id: string, patch: Partial<ProjectPlanItem>) =>
+    setItems((cur) => repriceItems(cur.map((it) => (it.id === id ? { ...it, ...patch } : it)), dims));
+  const deleteItem = (id: string) =>
+    setItems((cur) => repriceItems(cur.filter((it) => it.id !== id && it.parent_id !== id), dims));
+  const addTask = (sectionId: string) =>
+    setItems((cur) => {
+      const sibs = cur.filter((i) => i.parent_id === sectionId).length;
+      const row: ProjectPlanItem = { id: crypto.randomUUID(), plan_id: 'local', parent_id: sectionId, sort_order: sibs, kind: 'task', label: 'New task', notes: null, unit: 'item', quantity_formula: null, quantity: 1, line_kind: 'labor', service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0, unit_price: 0, line_total: 0, option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null, source: 'manual', created_at: '', updated_at: '' };
+      return repriceItems([...cur, row], dims);
+    });
+  const addSection = () =>
+    setItems((cur) => {
+      const n = cur.filter((i) => i.kind === 'section').length;
+      const row: ProjectPlanItem = { id: crypto.randomUUID(), plan_id: 'local', parent_id: null, sort_order: n, kind: 'section', label: 'New section', notes: null, unit: null, quantity_formula: null, quantity: 0, line_kind: 'labor', service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0, unit_price: 0, line_total: 0, option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null, source: 'manual', created_at: '', updated_at: '' };
+      return [...cur, row];
+    });
+  const selectOption = (item: ProjectPlanItem) => {
+    if (!item.option_group) return;
+    setItems((cur) => repriceItems(cur.map((it) => (it.option_group === item.option_group ? { ...it, is_selected: it.id === item.id } : it)), dims));
+  };
+  const addFromLibrary = (blueprintId: string, sectionId: string) => {
+    const src = starters.find((s) => s.id === blueprintId);
+    if (!src) return;
+    const section = src.items.find((i) => i.id === sectionId && i.kind === 'section');
+    if (!section) return;
+    const tasks = src.items.filter((i) => i.parent_id === sectionId);
+    setItems((cur) => {
+      const n = cur.filter((i) => i.kind === 'section').length;
+      const newSecId = crypto.randomUUID();
+      const seeded = seedPlanItems([{ ...section, parent_id: null, sort_order: n }, ...tasks.map((t, idx) => ({ ...t, parent_id: section.id, sort_order: idx }))], dims);
+      // remap ids so the appended subtree is unique
+      const idMap: Record<string, string> = { [section.id]: newSecId };
+      for (const t of tasks) idMap[t.id] = crypto.randomUUID();
+      const remapped = seeded.map((it) => ({ ...it, id: idMap[it.id] ?? it.id, parent_id: it.parent_id ? idMap[it.parent_id] ?? null : null }));
+      return repriceItems([...cur, ...remapped], dims);
+    });
+    toast({ title: `Added “${section.label}”` });
+  };
 
   const saveAndSignUp = () => {
     if (!selected) return;
     try {
-      localStorage.setItem('mk_pending_blueprint', JSON.stringify({
-        starter_id: selected.id, title: selected.title, dimensions: numericDims, savedAt: Date.now(),
+      // carry the full edited plan so the import recreates exactly what the user built
+      const exportItems = items.map((it) => ({
+        id: it.id, parent_id: it.parent_id, sort_order: it.sort_order, kind: it.kind, label: it.label,
+        unit: it.unit, quantity_formula: it.quantity_formula, default_quantity: it.quantity,
+        line_kind: it.line_kind, material_cost: it.material_cost, labor_rate: it.labor_rate, margin_pct: it.margin_pct,
+        option_group: it.option_group, tier: it.tier, is_allowance: it.is_allowance, allowance_amount: it.allowance_amount,
       }));
-    } catch { /* private mode — fall through to plain signup */ }
+      const schema = (selected.dimensions_schema ?? []).map((d) => ({ ...d, default: dims[d.key] ?? d.default }));
+      localStorage.setItem('mk_pending_blueprint', JSON.stringify({
+        starter_id: selected.id, title: selected.title, source_currency: currency,
+        dimensions: dims, dimensions_schema: schema, items: exportItems, savedAt: Date.now(),
+      }));
+    } catch { /* private mode — fall through */ }
     window.location.href = isAuthenticated ? '/blueprints' : '/auth?mode=signup&redirect=/blueprints';
   };
-
-  const DimInput = ({ d }: { d: DimDef }) => (
-    <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">
-        {FRIENDLY_LABEL[d.key] ?? d.label}{d.unit ? ` (${d.unit})` : ''}
-      </Label>
-      <Input inputMode="decimal" value={dims[d.key] ?? ''} onChange={(e) => setDims((s) => ({ ...s, [d.key]: e.target.value }))} />
-    </div>
-  );
 
   return (
     <ToolsShell>
@@ -161,7 +139,7 @@ export default function ProjectPlanPage() {
           Project plan estimator
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Pick a project type and see the full scope of works, priced — then fine-tune the numbers. Free, instant, no sign-up to look.
+          See the full scope of works, priced — then edit rows, add tasks, and drop in whole sections from the library. Free, instant, no sign-up to try.
         </p>
       </div>
 
@@ -171,100 +149,51 @@ export default function ProjectPlanPage() {
         <Card className="dashboard-card"><CardContent className="py-10 text-center text-sm text-muted-foreground">No project types available.</CardContent></Card>
       ) : (
         <div className="space-y-5">
-          {/* type picker — only Full Home Renovation runs free; others unlock after sign-up */}
           <div className="flex flex-wrap gap-2">
             {starters.map((s) => {
               const locked = !isUnlocked(s);
               const active = selectedId === s.id;
               return (
-                <button
-                  key={s.id}
+                <button key={s.id}
                   onClick={() => {
-                    if (locked) {
-                      toast({ title: `${s.title} unlocks after sign-up`, description: 'Create a free account to use this template — the Full Home Renovation estimate is free to try right now.' });
-                      return;
-                    }
+                    if (locked) { toast({ title: `${s.title} unlocks after sign-up`, description: 'Create a free account to use this template — the Full Home Renovation estimate is free to try right now.' }); return; }
                     setSelectedId(s.id);
                   }}
-                  className={`rounded-full border px-3.5 py-1.5 text-sm transition inline-flex items-center gap-1.5 ${
-                    active ? 'border-primary bg-primary/10 text-foreground'
-                    : locked ? 'border-dashed border-border text-muted-foreground/70 hover:bg-muted/30'
-                    : 'border-border text-muted-foreground hover:bg-muted/40'}`}
-                >
-                  {locked && <Lock className="h-3 w-3" />}
-                  {s.title}
+                  className={`rounded-full border px-3.5 py-1.5 text-sm transition inline-flex items-center gap-1.5 ${active ? 'border-primary bg-primary/10 text-foreground' : locked ? 'border-dashed border-border text-muted-foreground/70 hover:bg-muted/30' : 'border-border text-muted-foreground hover:bg-muted/40'}`}>
+                  {locked && <Lock className="h-3 w-3" />}{s.title}
                 </button>
               );
             })}
           </div>
 
-          {/* headline + simple inputs */}
-          <Card className="dashboard-card">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between flex-wrap gap-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1 min-w-[260px]">
-                  {effPrimary.map((d) => <DimInput key={d.key} d={d} />)}
-                </div>
-                <div className="text-right">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Estimated total</div>
-                  <div className="text-3xl font-semibold">{money(breakdown.subtotal, currency)}</div>
-                </div>
-              </div>
+          <DimensionsPanel schema={selected.dimensions_schema} values={dims} onChange={onDimsChange} />
 
-              {effMore.length > 0 && (
-                <div className="mt-3">
-                  <button onClick={() => setShowMore((v) => !v)} className="text-xs text-primary inline-flex items-center gap-1">
-                    {showMore ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                    Fine-tune details ({effMore.length})
-                  </button>
-                  {showMore && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                      {effMore.map((d) => <DimInput key={d.key} d={d} />)}
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <PlanTreeEditor
+            items={items}
+            currency={currency}
+            subtotal={subtotal}
+            onPatch={patchItem}
+            onDelete={deleteItem}
+            onAddTask={addTask}
+            onAddSection={addSection}
+            onSelectOption={selectOption}
+            onAddFromLibrary={() => setLibraryOpen(true)}
+          />
 
-          {/* the scope of works — the centerpiece */}
-          <div className="space-y-3">
-            {breakdown.sections.map((s, i) => (
-              <Card key={i} className="dashboard-card overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-muted/30">
-                  <span className="text-sm font-medium">{s.label}</span>
-                  <span className="text-sm tabular-nums font-medium">{money(s.total, currency)}</span>
-                </div>
-                <div className="divide-y divide-border/40">
-                  {s.tasks.map((t, j) => (
-                    <div key={j} className="flex items-center justify-between px-4 py-2 text-sm">
-                      <span className="text-muted-foreground">
-                        {t.label}
-                        {t.is_allowance
-                          ? <Badge variant="outline" className="ml-2 text-[10px] h-4">allowance</Badge>
-                          : <span className="text-xs text-muted-foreground/70"> · {t.quantity}{t.unit ? ` ${t.unit}` : ''} × {money(t.unit_price, currency)}</span>}
-                      </span>
-                      <span className="tabular-nums">{money(t.line_total, currency)}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          {/* CTA */}
           <Card className="border-primary/30 bg-primary/[0.03]">
             <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center gap-3">
               <Sparkles className="h-5 w-5 text-primary shrink-0" />
               <div className="text-sm flex-1">
                 <div className="font-medium">Make this yours</div>
-                <div className="text-muted-foreground">Save this plan and we'll import it after you sign up — edit every line, use your own rates, and turn it into a client quote.</div>
+                <div className="text-muted-foreground">Save your edited plan and we'll import it after you sign up — keep refining with your own rates and turn it into a client quote.</div>
               </div>
               <Button className="rounded-full whitespace-nowrap" onClick={saveAndSignUp}>Save &amp; create free account</Button>
             </CardContent>
           </Card>
 
           <p className="text-[11px] text-muted-foreground text-center">Ballpark estimate using standard rates — your actual pricing will differ.</p>
+
+          <SectionLibraryPicker open={libraryOpen} onOpenChange={setLibraryOpen} onPick={(bpId, secId) => addFromLibrary(bpId, secId)} />
         </div>
       )}
     </ToolsShell>

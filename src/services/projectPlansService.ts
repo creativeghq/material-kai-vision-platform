@@ -116,6 +116,27 @@ class ProjectPlansService {
     return callEngine<PlanWithItems>('create-from-blueprint', input);
   }
 
+  /** Start an empty plan on a project (build it from premade sections / blank rows). */
+  async createBlank(input: { project_id: string; workspace_id: string; title?: string }): Promise<ProjectPlan> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    const { data, error } = await supabase.from('project_plans').insert({
+      project_id: input.project_id,
+      workspace_id: input.workspace_id,
+      user_id: user.id,
+      title: input.title || 'Project plan',
+      status: 'draft',
+      created_by: user.id,
+    }).select('*').single();
+    if (error) throw error;
+    return data as ProjectPlan;
+  }
+
+  /** Append a premade section (+ its tasks) from a blueprint into the plan. */
+  addSectionFromBlueprint(planId: string, sourceBlueprintId: string, sectionId: string): Promise<PlanWithItems> {
+    return callEngine<PlanWithItems>('add-section-from-blueprint', { plan_id: planId, source_blueprint_id: sourceBlueprintId, section_id: sectionId });
+  }
+
   /** Update dimensions and recompute quantities + prices. */
   rescale(planId: string, dimensions: Record<string, number>): Promise<PlanWithItems> {
     return callEngine<PlanWithItems>('rescale', { plan_id: planId, dimensions });
