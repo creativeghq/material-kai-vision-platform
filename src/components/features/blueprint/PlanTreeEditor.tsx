@@ -54,7 +54,7 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
           disabled={busy}
           onBlur={(e) => { if (e.target.value !== it.label) onPatch(it.id, { label: e.target.value }); }}
         />
-        <UnitSelect className="w-32" value={it.unit} disabled={busy} onChange={(u) => { if (u !== it.unit) onPatch(it.id, { unit: u }); }} />
+        <UnitSelect className="w-40 shrink-0" value={it.unit} disabled={busy} onChange={(u) => { if (u !== it.unit) onPatch(it.id, { unit: u }); }} />
         {it.is_allowance ? (
           <Input
             className="h-8 w-24 text-right"
@@ -89,7 +89,7 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
               onBlur={(e) => { const raw = e.target.value.trim(); const v = raw === '' ? null : parseDecimalOr(raw, it.material_cost ?? 0); if (v !== it.material_cost) onPatch(it.id, { material_cost: v }); }} />
           </span>
           <span className="flex items-center gap-1">margin
-            <Input className="h-6 w-12 text-right" defaultValue={String(it.margin_pct ?? 0)} disabled={busy}
+            <Input className="h-6 w-14 text-right" defaultValue={String(it.margin_pct ?? 0)} disabled={busy}
               onBlur={(e) => { const v = parseDecimalOr(e.target.value, it.margin_pct ?? 0); if (v !== it.margin_pct) onPatch(it.id, { margin_pct: v }); }} />%
           </span>
           <span className="ml-auto">{money(it.unit_price, currency)}{it.unit ? `/${it.unit}` : ''}</span>

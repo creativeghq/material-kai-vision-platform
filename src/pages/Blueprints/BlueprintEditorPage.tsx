@@ -92,7 +92,7 @@ export const BlueprintEditorPage: React.FC = () => {
     <div className="rounded-md border border-border/60 bg-background/40 px-2 py-1.5 space-y-1">
       <div className="flex items-center gap-2">
         <Input className="h-8 flex-1" value={it.label} onChange={(e) => patch(it.id, { label: e.target.value })} />
-        <UnitSelect className="w-36" value={it.unit} onChange={(u) => patch(it.id, { unit: u })} />
+        <UnitSelect className="w-40 shrink-0" value={it.unit} onChange={(u) => patch(it.id, { unit: u })} />
         <div className="flex items-center gap-1 text-[11px] text-muted-foreground">allow
           <Switch checked={!!it.is_allowance} onCheckedChange={(v) => patch(it.id, { is_allowance: v })} />
         </div>
@@ -117,7 +117,7 @@ export const BlueprintEditorPage: React.FC = () => {
             <Input className="h-6 w-16 text-right" value={it.material_cost != null ? String(it.material_cost) : ''} placeholder="—" onChange={(e) => patch(it.id, { material_cost: e.target.value === '' ? null : Number(e.target.value) })} />
           </span>
           <span className="flex items-center gap-1">margin
-            <Input className="h-6 w-12 text-right" value={String(it.margin_pct ?? 0)} onChange={(e) => patch(it.id, { margin_pct: Number(e.target.value) || 0 })} />%
+            <Input className="h-6 w-14 text-right" value={String(it.margin_pct ?? 0)} onChange={(e) => patch(it.id, { margin_pct: Number(e.target.value) || 0 })} />%
           </span>
           <span className="flex items-center gap-1">option
             <Input className="h-6 w-24" value={it.option_group ?? ''} placeholder="group" onChange={(e) => patch(it.id, { option_group: e.target.value || null })} />
