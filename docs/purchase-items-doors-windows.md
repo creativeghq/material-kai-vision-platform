@@ -44,7 +44,7 @@ POST. Auth: `Authorization: Bearer <token>`. Items are read under the **caller's
 
 ## Finance integration
 
-Purchase items are **quote-referenced, not converted to purchase orders** (hence `quote_not_po`). `project_purchase_items.quote_id` links an item to the quote that priced it, so a project's purchase specifications live alongside its accepted quotes rather than spawning a separate PO document. Project-level finance rollups are surfaced by the `get_project_finance_summary(p_project_id)` RPC (`projectsService.getProjectFinanceSummary`). The unrelated `purchase_order_items` table (formal POs) is a separate concern.
+Purchase items are **quote-referenced, not converted to purchase orders** (hence `quote_not_po`). `project_purchase_items.quote_id` links an item to the quote that priced it, so a project's purchase specifications live alongside its accepted quotes rather than spawning a separate PO document. Project-level finance rollups are surfaced by the `get_project_finance_summary(p_project_id)` RPC (`projectsService.getProjectFinanceSummary`). Formal purchase orders are a separate concern, handled via `orders` with `order_type='purchase'` (see #237 — the legacy `purchase_orders`/`purchase_order_items` tables were retired 2026-06-28).
 
 ## Image source
 
