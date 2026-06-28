@@ -2,11 +2,14 @@
  * generate-purchase-sheet-pdf
  *
  * Renders a project's purchase items (internal doors, windows, etc.) into a
- * polished purchase specification PDF. Two output modes, combinable:
- *   - 'per_item'  → one A4-portrait spec page per item (render + spec table +
+ * polished purchase specification PDF. Output modes, combinable:
+ *   - 'schedule'  → A3-landscape architectural elevation schedule ("SCHEDULE OF
+ *                   DOORS / WINDOWS") — dimensioned CAD elevation line-drawings in
+ *                   a grid, each with a tag (D-1/W-1), set count + location, type,
+ *                   material and glass. Deterministic line-art, no AI.
+ *   - 'per_item'  → one A4-portrait spec page per item (image/render + spec table +
  *                   door swing symbol + finish swatches + PUR-00N block)
- *   - 'schedule'  → an A4-landscape combined schedule table across all items
- *   - 'both'      → schedule page(s) first, then a detail page per item
+ *   - 'both'      → the elevation schedule, then a detail page per item
  *
  * Data source: `project_purchase_items` (fetched under RLS via the caller's JWT),
  * or inline `items` when called with the service-role key (smoke tests / server).
@@ -16,7 +19,7 @@
  * and returned as a 7-day signed URL.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
@@ -162,8 +165,19 @@ Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) =>
 }));
 
 // =====================================================================
-// Combined schedule (A4 landscape table)
+// Architectural elevation schedule (A3 landscape) — "SCHEDULE OF DOORS" /
+// "SCHEDULE OF WINDOWS": a grid of dimensioned elevation line-drawings, each
+// with a tag (D-1 / W-1), set count + location, type, material and glass.
+// This is the construction/supplier sheet — deterministic CAD line-art, no AI.
 // =====================================================================
+const A3W = 1190.55, A3H = 841.89, SM = 30;
+const SCOLS = 6;                       // cells per row, like a real schedule strip
+const CELL_W = (A3W - 2 * SM) / SCOLS;
+const ELEV_TOPDIM = 16;                // space above leaf for the width dimension
+const ELEV_H = 220;                    // elevation drawing height
+const CAP_H = 96;                      // caption block height
+const ROW_H = ELEV_TOPDIM + ELEV_H + CAP_H + 16;
+
 async function drawSchedulePages(
   pdf: PDFDocument,
   font: any,
@@ -171,82 +185,231 @@ async function drawSchedulePages(
   items: PurchaseItem[],
   projectName: string,
 ) {
-  const W = 841.89, H = 595.28, M = 40;
-  const cols = [
-    { key: 'idx', label: '#', w: 26, align: 'left' as const },
-    { key: 'type', label: 'TYPE', w: 70, align: 'left' as const },
-    { key: 'name', label: 'ITEM', w: 200, align: 'left' as const },
-    { key: 'room', label: 'ROOM', w: 110, align: 'left' as const },
-    { key: 'spec', label: 'KEY SPEC', w: 175, align: 'left' as const },
-    { key: 'qty', label: 'QTY', w: 40, align: 'right' as const },
-    { key: 'unit', label: 'UNIT', w: 65, align: 'right' as const },
-    { key: 'total', label: 'TOTAL', w: 70, align: 'right' as const },
-  ];
-  const rowH = 22;
-  const perPage = Math.floor((H - M - 120) / rowH);
-  let grand = 0;
-  const currency = items.find((i) => i.currency)?.currency || 'EUR';
+  const doors = items.filter((i) => i.item_type === 'door');
+  const windows = items.filter((i) => i.item_type === 'window');
+  const others = items.filter((i) => i.item_type !== 'door' && i.item_type !== 'window');
+  const groups: { title: string; prefix: string; items: PurchaseItem[] }[] = [
+    { title: 'SCHEDULE OF DOORS', prefix: 'D', items: doors },
+    { title: 'SCHEDULE OF WINDOWS', prefix: 'W', items: windows },
+    { title: 'SCHEDULE OF ITEMS', prefix: 'X', items: others },
+  ].filter((g) => g.items.length > 0);
 
-  let page = newPage();
-  let y = drawScheduleHeader(page);
-  let rowsOnPage = 0;
+  let page = pdf.addPage([A3W, A3H]);
+  let y = drawScheduleHeader(page, projectName, font, bold, true);
 
-  function newPage() {
-    return pdf.addPage([W, H]);
+  for (const g of groups) {
+    // Group title needs a title row + at least one cell row to start on this page.
+    if (y - (30 + ROW_H) < SM) { page = pdf.addPage([A3W, A3H]); y = drawScheduleHeader(page, projectName, font, bold, false); }
+    // Centered group title with rules either side (the reference's "SCHEDULE OF …" band).
+    const tW = textW(bold, g.title, 13);
+    const tcx = A3W / 2;
+    page.drawText(g.title, { x: tcx - tW / 2, y: y - 14, size: 13, font: bold, color: INK });
+    hr(page, SM, y - 18, tcx - tW / 2 - 14, 0.8);
+    hr(page, tcx + tW / 2 + 14, y - 18, A3W - SM, 0.8);
+    y -= 34;
+
+    for (let i = 0; i < g.items.length; i += SCOLS) {
+      if (y - ROW_H < SM) { page = pdf.addPage([A3W, A3H]); y = drawScheduleHeader(page, projectName, font, bold, false); }
+      const rowItems = g.items.slice(i, i + SCOLS);
+      rowItems.forEach((it, c) => {
+        const cellX = SM + c * CELL_W;
+        const tag = `${g.prefix}-${i + c + 1}`;
+        drawElevationCell(page, font, bold, cellX, y, it, tag);
+      });
+      y -= ROW_H;
+    }
   }
-  function drawScheduleHeader(p: any): number {
-    p.drawText('PROJECT PURCHASE SCHEDULE', { x: M, y: H - M - 4, size: 14, font: bold, color: INK });
-    p.drawText(truncate(projectName, 70), { x: M, y: H - M - 22, size: 9, font, color: GRAY });
-    hr(p, M, H - M - 32, W - M);
-    // column header
-    let cx = M;
-    const hy = H - M - 52;
-    for (const c of cols) {
-      p.drawText(c.label, { x: c.align === 'right' ? cx + c.w - textW(bold, c.label, 7.5) : cx, y: hy, size: 7.5, font: bold, color: GRAY });
-      cx += c.w;
-    }
-    hr(p, M, hy - 6, W - M, 0.8);
-    return hy - 6 - rowH;
+}
+
+function drawScheduleHeader(page: any, projectName: string, font: any, bold: any, first: boolean): number {
+  if (first) {
+    page.drawText('DOOR & WINDOW SCHEDULE', { x: SM, y: A3H - SM - 6, size: 15, font: bold, color: INK });
+    page.drawText(truncate(projectName, 90), { x: SM, y: A3H - SM - 24, size: 9, font, color: GRAY });
+    hr(page, SM, A3H - SM - 32, A3W - SM, 1);
+    return A3H - SM - 44;
   }
+  hr(page, SM, A3H - SM, A3W - SM, 0.6, LIGHT);
+  return A3H - SM - 12;
+}
 
-  items.forEach((it, i) => {
-    if (rowsOnPage >= perPage) {
-      page = newPage();
-      y = drawScheduleHeader(page);
-      rowsOnPage = 0;
-    }
-    if (i % 2 === 1) page.drawRectangle({ x: M, y: y - 4, width: W - 2 * M, height: rowH, color: ZEBRA });
-    const qty = Number(it.quantity ?? 1);
-    const unit = it.unit_cost != null ? Number(it.unit_cost) : null;
-    const line = unit != null ? unit * qty : null;
-    if (line != null) grand += line;
-    const cells: Record<string, string> = {
-      idx: String(i + 1),
-      type: cap(it.item_type),
-      name: truncate(it.name, 34),
-      room: truncate(it.room_name || '—', 18),
-      spec: truncate(keySpec(it), 30),
-      qty: String(qty),
-      unit: unit != null ? money(unit, currency) : '—',
-      total: line != null ? money(line, currency) : '—',
-    };
-    let cx = M;
-    for (const c of cols) {
-      const txt = cells[c.key];
-      const tx = c.align === 'right' ? cx + c.w - textW(font, txt, 8.5) : cx;
-      page.drawText(txt, { x: tx, y: y, size: 8.5, font, color: INK });
-      cx += c.w;
-    }
-    hr(page, M, y - 6, W - M, 0.3, LIGHT);
-    y -= rowH;
-    rowsOnPage++;
-  });
+// One schedule cell: dimensioned elevation on top, caption block beneath.
+function drawElevationCell(page: any, font: any, bold: any, cellX: number, topY: number, it: PurchaseItem, tag: string) {
+  const cx = cellX + CELL_W / 2;
+  const baseY = topY - ELEV_TOPDIM - ELEV_H;     // finish-floor line (bottom of the elevation)
+  const maxW = CELL_W - 46;                       // leave room for the side height dimension
+  const maxH = ELEV_H - 8;
+  if (it.item_type === 'window') drawWindowElevation(page, font, cx, baseY, maxW, maxH, it);
+  else if (it.item_type === 'door') drawDoorElevation(page, font, bold, cx, baseY, maxW, maxH, it);
+  else drawOtherElevation(page, font, cx, baseY, maxW, maxH, it);
+  drawCaption(page, font, bold, cellX, baseY - 12, it, tag);
+}
 
-  // totals
-  const totLabel = 'TOTAL';
-  page.drawText(totLabel, { x: W - M - 70 - textW(bold, totLabel, 10) - 10, y: y - 6, size: 10, font: bold, color: INK });
-  page.drawText(money(grand, currency), { x: W - M - textW(bold, money(grand, currency), 10), y: y - 6, size: 10, font: bold, color: INK });
-  hr(page, W - M - 200, y + 14, W - M, 0.8);
+// ---- elevation drawing primitives ----
+function dashedLine(page: any, a: { x: number; y: number }, b: { x: number; y: number }, color = GRAY, thickness = 0.5, dash = 4) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  const steps = Math.max(1, Math.floor(len / (dash * 2)));
+  for (let i = 0; i < steps; i++) {
+    const t0 = (i * 2 * dash) / len, t1 = Math.min(1, (i * 2 * dash + dash) / len);
+    page.drawLine({ start: { x: a.x + dx * t0, y: a.y + dy * t0 }, end: { x: a.x + dx * t1, y: a.y + dy * t1 }, color, thickness });
+  }
+}
+function dimH(page: any, font: any, x1: number, x2: number, y: number, label: string) {
+  page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, color: GRAY, thickness: 0.5 });
+  page.drawLine({ start: { x: x1, y: y - 3 }, end: { x: x1, y: y + 3 }, color: GRAY, thickness: 0.5 });
+  page.drawLine({ start: { x: x2, y: y - 3 }, end: { x: x2, y: y + 3 }, color: GRAY, thickness: 0.5 });
+  const w = textW(font, label, 7);
+  page.drawText(label, { x: (x1 + x2) / 2 - w / 2, y: y + 3, size: 7, font, color: INK });
+}
+function dimV(page: any, font: any, x: number, y1: number, y2: number, label: string) {
+  page.drawLine({ start: { x, y: y1 }, end: { x, y: y2 }, color: GRAY, thickness: 0.5 });
+  page.drawLine({ start: { x: x - 3, y: y1 }, end: { x: x + 3, y: y1 }, color: GRAY, thickness: 0.5 });
+  page.drawLine({ start: { x: x - 3, y: y2 }, end: { x: x + 3, y: y2 }, color: GRAY, thickness: 0.5 });
+  // rotated 90° so it reads up the right edge
+  page.drawText(label, { x: x + 8, y: (y1 + y2) / 2 - textW(font, label, 7) / 2, size: 7, font, color: INK, rotate: degrees(90) });
+}
+function fitLeaf(wmm: number, hmm: number, maxW: number, maxH: number) {
+  const ratio = wmm / hmm;
+  let h = maxH, w = h * ratio;
+  if (w > maxW) { w = maxW; h = w / ratio; }
+  return { w, h };
+}
+function doorLeafStyle(it: PurchaseItem): 'flush' | 'panel' | 'louvre' | 'glazed' {
+  const d = it.details || {};
+  const hint = `${d.leaf_style || ''} ${it.name || ''} ${d.finish || ''} ${d.frame || ''} ${it.category || ''}`.toLowerCase();
+  if (/louv/.test(hint)) return 'louvre';
+  if (/glaz|glass|alumin|sliding|\bpvc\b/.test(hint)) return 'glazed';
+  if (/flush/.test(hint)) return 'flush';
+  if (/panel/.test(hint)) return 'panel';
+  return 'panel';
+}
+function windowGrid(it: PurchaseItem): { cols: number; rows: number } {
+  const d = it.details || {};
+  const clamp = (n: number) => Math.max(1, Math.min(5, n));
+  const cols = Number(d.grid_cols) || (/(slid|casement)/.test(String(d.opening_type || '')) && Number(d.width_mm) > 1500 ? 3
+    : d.width_mm ? clamp(Math.round(Number(d.width_mm) / 600)) : 2);
+  const rows = Number(d.grid_rows) || (d.height_mm ? clamp(Math.round(Number(d.height_mm) / 700)) : 2);
+  return { cols: clamp(cols), rows: clamp(rows) };
+}
+
+function drawDoorElevation(page: any, font: any, bold: any, cx: number, baseY: number, maxW: number, maxH: number, it: PurchaseItem) {
+  const d = it.details || {};
+  const wmm = Number(d.width_mm) || 900, hmm = Number(d.height_mm) || 2100;
+  const { w, h } = fitLeaf(wmm, hmm, maxW, maxH);
+  const x = cx - w / 2, y = baseY;
+  const fo = 4;
+  page.drawRectangle({ x: x - fo, y, width: w + 2 * fo, height: h + fo, borderColor: INK, borderWidth: 1.3 }); // casing
+  page.drawRectangle({ x, y, width: w, height: h, borderColor: INK, borderWidth: 1 });                         // leaf
+  const inset = Math.min(9, w * 0.12);
+  const style = doorLeafStyle(it);
+  if (style === 'panel') {
+    const ix = x + inset, iw = w - 2 * inset;
+    const midY = y + h * 0.46;
+    page.drawRectangle({ x: ix, y: midY + 5, width: iw, height: (y + h - inset) - (midY + 5), borderColor: GRAY, borderWidth: 0.7 });
+    page.drawRectangle({ x: ix, y: y + inset, width: iw, height: (midY - 5) - (y + inset), borderColor: GRAY, borderWidth: 0.7 });
+  } else if (style === 'louvre') {
+    const slats = Math.max(8, Math.floor(h / 10));
+    for (let i = 1; i < slats; i++) { const ly = y + (h * i) / slats; dashedLine(page, { x: x + inset, y: ly }, { x: x + w - inset, y: ly }, GRAY, 0.5, 2); }
+  } else if (style === 'glazed') {
+    page.drawRectangle({ x: x + inset, y: y + h * 0.1, width: w - 2 * inset, height: h * 0.8, color: rgb(0.9, 0.93, 0.95), borderColor: GRAY, borderWidth: 0.6 });
+  } else {
+    page.drawRectangle({ x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, borderColor: LIGHT, borderWidth: 0.5 });
+  }
+  // hinge side from handing; handle opposite. Swing triangle apex at hinge jamb (elevation convention).
+  const leftHinge = String(d.handing || 'left').toLowerCase().startsWith('l');
+  const hingeX = leftHinge ? x : x + w;
+  const handleX = leftHinge ? x + w - inset - 3 : x + inset + 3;
+  page.drawCircle({ x: handleX, y: y + h * 0.5, size: 1.6, color: INK });
+  dashedLine(page, { x: leftHinge ? x + w : x, y }, { x: hingeX, y: y + h * 0.5 });
+  dashedLine(page, { x: leftHinge ? x + w : x, y: y + h }, { x: hingeX, y: y + h * 0.5 });
+  // dimensions + finish floor line
+  dimH(page, font, x, x + w, y + h + fo + 9, String(wmm));
+  dimV(page, font, x + w + fo + 12, y, y + h, String(hmm));
+  drawFinishFloor(page, font, x - fo - 16, x + w + fo + 16, y);
+}
+
+function drawWindowElevation(page: any, font: any, cx: number, baseY: number, maxW: number, maxH: number, it: PurchaseItem) {
+  const d = it.details || {};
+  const wmm = Number(d.width_mm) || 1200, hmm = Number(d.height_mm) || 1400;
+  const { w, h } = fitLeaf(wmm, hmm, maxW, maxH);
+  const x = cx - w / 2, y = baseY;
+  page.drawRectangle({ x, y, width: w, height: h, borderColor: INK, borderWidth: 1.4 });
+  page.drawRectangle({ x: x + 3, y: y + 3, width: w - 6, height: h - 6, borderColor: INK, borderWidth: 0.7 });
+  const { cols, rows } = windowGrid(it);
+  for (let c = 1; c < cols; c++) { const mx = x + (w * c) / cols; page.drawLine({ start: { x: mx, y: y + 3 }, end: { x: mx, y: y + h - 3 }, color: INK, thickness: 0.7 }); }
+  for (let r = 1; r < rows; r++) { const my = y + (h * r) / rows; page.drawLine({ start: { x: x + 3, y: my }, end: { x: x + w - 3, y: my }, color: INK, thickness: 0.7 }); }
+  drawOpeningGlyph(page, x, y, w / cols, h / rows, String(d.opening_type || 'casement'));
+  dimH(page, font, x, x + w, y + h + 9, String(wmm));
+  dimV(page, font, x + w + 12, y, y + h, String(hmm));
+  drawFinishFloor(page, font, x - 16, x + w + 16, y);
+}
+
+// Opening symbol drawn inside one pane (bottom-left), per architectural convention.
+function drawOpeningGlyph(page: any, px: number, py: number, pw: number, ph: number, type: string) {
+  const t = (type || '').toLowerCase();
+  const ax = px + 4, ay = py + 4, bw = pw - 8, bh = ph - 8;
+  if (t.includes('tilt')) { // tilt-turn: apex at bottom-centre (tilt) — two diagonals from top corners
+    dashedLine(page, { x: ax, y: ay + bh }, { x: ax + bw / 2, y: ay }, GRAY, 0.6, 3);
+    dashedLine(page, { x: ax + bw, y: ay + bh }, { x: ax + bw / 2, y: ay }, GRAY, 0.6, 3);
+  } else if (t.includes('casement')) { // side-hung: apex at the hinge side mid
+    dashedLine(page, { x: ax + bw, y: ay + bh }, { x: ax, y: ay + bh / 2 }, GRAY, 0.6, 3);
+    dashedLine(page, { x: ax + bw, y: ay }, { x: ax, y: ay + bh / 2 }, GRAY, 0.6, 3);
+  } else if (t.includes('slid')) { // sliding: horizontal arrows
+    const my = ay + bh / 2;
+    page.drawLine({ start: { x: ax + 3, y: my }, end: { x: ax + bw - 3, y: my }, color: GRAY, thickness: 0.8 });
+  } // fixed: no glyph
+}
+
+function drawOtherElevation(page: any, font: any, cx: number, baseY: number, maxW: number, maxH: number, it: PurchaseItem) {
+  const d = it.details || {};
+  const wmm = Number(d.width_mm) || 1000, hmm = Number(d.height_mm) || 1000;
+  const { w, h } = fitLeaf(wmm, hmm, maxW, maxH);
+  const x = cx - w / 2, y = baseY;
+  page.drawRectangle({ x, y, width: w, height: h, borderColor: INK, borderWidth: 1.1 });
+  page.drawRectangle({ x: x + 6, y: y + 6, width: w - 12, height: h - 12, borderColor: LIGHT, borderWidth: 0.5 });
+  if (d.width_mm) dimH(page, font, x, x + w, y + h + 9, String(wmm));
+  if (d.height_mm) dimV(page, font, x + w + 12, y, y + h, String(hmm));
+  drawFinishFloor(page, font, x - 16, x + w + 16, y);
+}
+
+function drawFinishFloor(page: any, font: any, x1: number, x2: number, y: number) {
+  page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, color: INK, thickness: 0.9 });
+  page.drawText('FINISH FLOOR LINE', { x: x1, y: y - 8, size: 4.6, font, color: GRAY });
+}
+
+// Caption block under the elevation: tag + set/location + type + material + glass.
+function drawCaption(page: any, font: any, bold: any, cellX: number, topY: number, it: PurchaseItem, tag: string) {
+  const cx = cellX + CELL_W / 2;
+  hr(page, cellX + 6, topY, cellX + CELL_W - 6, 0.9, INK);
+  let yy = topY - 13;
+  page.drawText(tag, { x: cx - textW(bold, tag, 12) / 2, y: yy, size: 12, font: bold, color: INK });
+  yy -= 5;
+  hr(page, cellX + 6, yy, cellX + CELL_W - 6, 0.5, INK);
+  yy -= 11;
+  for (const ln of captionLines(it)) {
+    const t = truncate(ln, 38);
+    const isType = ln === (it.name || '').toUpperCase();
+    page.drawText(t, { x: cx - textW(isType ? bold : font, t, 6.1) / 2, y: yy, size: 6.1, font: isType ? bold : font, color: INK });
+    yy -= 8.5;
+  }
+}
+function captionLines(it: PurchaseItem): string[] {
+  const d = it.details || {};
+  const qty = Number(it.quantity ?? 1);
+  const setLine = `${qty} SET${qty > 1 ? 'S' : ''}${it.room_name ? `; ${String(it.room_name).toUpperCase()}` : ''}`;
+  const lines = [setLine, (it.name || '').toUpperCase()];
+  if (it.item_type === 'door') {
+    const m = [d.finish, d.frame].filter(Boolean).join(', ');
+    if (m) lines.push(String(m).toUpperCase());
+    if (d.glazing) lines.push(String(d.glazing).toUpperCase());
+  } else if (it.item_type === 'window') {
+    if (d.frame_type) lines.push(String(d.frame_type).toUpperCase());
+    if (d.glazing) lines.push(String(d.glazing).toUpperCase());
+  } else {
+    const m = Object.values(d).filter((v) => v != null && v !== '').slice(0, 2).join(', ');
+    if (m) lines.push(String(m).toUpperCase());
+  }
+  return lines;
 }
 
 // =====================================================================

@@ -133,8 +133,8 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
           <Select value={sheetMode} onValueChange={(v) => setSheetMode(v as typeof sheetMode)}>
             <SelectTrigger className="w-[150px] h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="both">Schedule + sheets</SelectItem>
-              <SelectItem value="schedule">Schedule only</SelectItem>
+              <SelectItem value="both">Elevation schedule + spec sheets</SelectItem>
+              <SelectItem value="schedule">Elevation schedule only</SelectItem>
               <SelectItem value="per_item">Spec sheets only</SelectItem>
             </SelectContent>
           </Select>
