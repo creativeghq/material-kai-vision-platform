@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects: Plan &amp; Estimating | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Plan &amp; Estimating</div>
+  <h1>Projects · Plan &amp; Estimating</h1>
+  <div class="routes"><span class="badge route">/projects/:id</span> <span class="badge gated">owner</span></div>
+  <p class="lead">The <strong>Plan</strong> tab turns a project into a priced, professional <strong>estimate</strong>. You start from a reusable <a href="projects-blueprints.html">blueprint</a> (a structured scope of works), type in a few <strong>measurements</strong>, and the plan prices itself — labour and materials, line by line — from parametric formulas and your service catalogue. From there you offer <strong>good/better/best options</strong> and <strong>allowances</strong>, keep <strong>versions</strong> as the scope changes, turn it into a client <strong>quote</strong> they can <strong>e-sign</strong>, pull a <strong>material list</strong> for purchasing, and raise <strong>change orders</strong>. This is the estimating engine — built on Blueprints (#242).</p>
+
+  <div class="callout"><p><strong>Where:</strong> open a project (<span class="badge route">/projects/:id</span>) → the <strong>Plan</strong> tab. It's <strong>owner-only</strong>. The reusable templates it draws on live in the <a href="projects-blueprints.html">Blueprint Library</a>; there's also a public <a href="tools.html">project-plan estimator</a> for quick ballpark figures.</p></div>
+
+  <h2>How it fits together</h2>
+  <p>Three things work in concert — get the model and the rest is easy:</p>
+  <ul class="feat">
+    <li><strong>Blueprint</strong> — a reusable template: the scope (sections + tasks) plus the <em>measurements</em> it needs and the <em>formulas</em> that turn those measurements into quantities. Built once, reused on every similar job. See <a href="projects-blueprints.html">Blueprint Library</a>.</li>
+    <li><strong>Plan</strong> — a blueprint <em>instantiated on this project</em>. You fill in the measurements; it computes quantities, prices and a subtotal.</li>
+    <li><strong>Outputs</strong> — a client <strong>quote</strong>, a <strong>material list</strong>, and <strong>change orders</strong>, all generated from the plan.</li>
+  </ul>
+
+  <h2>Step by step: build an estimate</h2>
+  <ol>
+    <li><strong>Start the plan.</strong> On the Plan tab click <strong>Import a blueprint</strong> and pick one from your library (or a starter). The blueprint's scope and measurement fields load in. (You can also build a plan from scratch and <em>Save as blueprint</em> later.)</li>
+    <li><strong>Enter the measurements.</strong> In <strong>Project measurements</strong>, type the numbers the blueprint asks for — e.g. <em>Floor area (m²)</em>, <em>Wall area (m²)</em>, <em>Electrical points</em>. These are the inputs the formulas read.</li>
+    <li><strong>Watch it price itself.</strong> Each task's <strong>quantity</strong> comes from its formula (e.g. <code>= floor_area * 1.1</code> for a 10% waste factor), and its price comes from the linked <strong>service / product</strong> (labour rate + material cost + margin). The <strong>Subtotal</strong> updates live.</li>
+    <li><strong>Adjust the scope.</strong> Add or remove <strong>sections</strong> and <strong>tasks</strong>, tweak quantities, units, costs or margins on any line — see the plan tree below.</li>
+    <li><strong>Offer options &amp; allowances</strong> where the client has a choice or the price isn't final yet (below).</li>
+    <li><strong>Save a version</strong> to lock in the current state before you send or change it.</li>
+    <li><strong>Turn it into a deliverable</strong> — create the <strong>quote</strong>, generate the <strong>material list</strong>, or raise a <strong>change order</strong>.</li>
+  </ol>
+
+  <h2>Project measurements (the parametric inputs)</h2>
+  <p><strong>What it is —</strong> the named numbers that drive the estimate — each has a <strong>key</strong> (used in formulas), a <strong>label</strong> and a <strong>unit</strong>. <strong>Why it matters —</strong> this is what makes the estimate <em>parametric</em>: change one measurement and every formula that references it recalculates, so re-pricing a slightly bigger room is one number, not a rebuild. The note on screen says it plainly: <em>“these drive the parametric formulas.”</em></p>
+
+  <h2>The plan tree — sections, tasks &amp; line pricing</h2>
+  <p><strong>What it is —</strong> the scope of works as a tree of <strong>sections</strong> (headings) and <strong>tasks</strong> (the priced lines). <strong>Why it matters —</strong> it's both the estimate's maths and the document the client reads. Each <strong>task</strong> carries:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Label · Unit · Quantity</strong></td><td>What the line is, its unit of measure, and how many — the quantity comes from the line's <strong>formula</strong> (referencing measurement keys) or a typed-in number.</td></tr>
+      <tr><td><strong>Line kind</strong></td><td><strong>Labour</strong>, <strong>Materials</strong>, or <strong>Both</strong> — what the line represents.</td></tr>
+      <tr><td><strong>Service / Product</strong></td><td>The catalogue link that supplies the rate — a <strong>labour rate</strong> and/or a <strong>material cost</strong>.</td></tr>
+      <tr><td><strong>Margin %</strong></td><td>Your mark-up on the line; with cost + margin it yields the <strong>unit price</strong> and <strong>line total</strong>.</td></tr>
+    </tbody>
+  </table></div>
+  <p>A line can be sourced as <em>manual</em>, from a <em>template</em> (the blueprint), or <em>AI</em>-drafted. <strong>Refresh pricing</strong> re-applies your current service-catalogue rates across the whole plan in one click (<em>“Re-applied current service-catalog rates”</em>) — so a rate change in your catalogue can be pulled into an open estimate without redoing lines.</p>
+
+  <h2>Options (good / better / best) &amp; allowances</h2>
+  <p><strong>What it is —</strong> two ways to handle choice and uncertainty in a quote. <strong>Why it matters —</strong> clients rarely want a single take-it-or-leave-it number; options sell up, and allowances let you quote honestly before a selection is final.</p>
+  <ul class="feat">
+    <li><strong>Options / good-better-best.</strong> Group alternative lines into an <strong>option group</strong> and tag each with a <strong>tier</strong> — <em>good</em>, <em>better</em> or <em>best</em>. One is <strong>selected</strong> as the priced choice; the client sees the tiers and the upgrade path. Only the selected tier counts toward the subtotal.</li>
+    <li><strong>Allowances.</strong> Mark a line as an <strong>allowance</strong> with an <strong>allowance amount</strong> — a budgeted placeholder (e.g. “€1,500 tile allowance”) for something not yet chosen. It carries a number now and is reconciled to the real selection later.</li>
+  </ul>
+
+  <h2>Versions &amp; revisions</h2>
+  <p><strong>What it is —</strong> a snapshot history of the plan. <strong>Why it matters —</strong> estimates change — a client trims scope, a price moves — and you need a record of what was quoted when. <strong>Save version</strong> stores a full snapshot (the measurements, the lines and the subtotal) with an optional note, and bumps the plan's <strong>version</strong> number; the <strong>version history</strong> lets you see and compare earlier states. This is the revisions / audit backbone behind change orders.</p>
+
+  <h2>Turning the plan into deliverables</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Action</th><th>What it produces</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Create quote</strong></td><td>Generates a client <a href="quotes-build.html">quote</a> from the plan (linked back to it). The customer opens the public quote, reviews it, and can <strong>approve &amp; e-sign</strong> it — see below.</td></tr>
+      <tr><td><strong>Generate material list</strong></td><td>Pulls the plan's material lines into a <strong>material list / budget</strong> as <a href="finance.html">purchase items</a>, so what you priced is what you buy.</td></tr>
+      <tr><td><strong>Create change order</strong></td><td>Raises a <strong>change order</strong> from the plan to capture an agreed change in scope/price after the original was accepted.</td></tr>
+      <tr><td><strong>Save as blueprint</strong></td><td>Saves this plan back to the <a href="projects-blueprints.html">Blueprint Library</a> as a reusable template (<em>“reuse it on your next project”</em>).</td></tr>
+    </tbody>
+  </table></div>
+  <p>The plan moves through statuses as it goes: <strong>draft → finalized → quoted → approved → archived</strong>.</p>
+
+  <h2>Approval &amp; e-sign (with audit trail)</h2>
+  <p><strong>What it is —</strong> when a plan becomes a quote, the customer-facing public quote page lets them <strong>accept and electronically sign</strong> it. <strong>Why it matters —</strong> you get a recorded, timestamped acceptance instead of a “yes” in an email. The acceptance is captured with an <strong>audit trail</strong> (who accepted, when), and the quote shows as <strong>Accepted</strong>. See <a href="quotes-build.html">Quotes · Build &amp; send</a> and <a href="public-pages.html">Public &amp; Shared Pages</a> for the customer side.</p>
+
+  <div class="callout tip"><p><strong>Quick start:</strong> Plan tab → <strong>Import a blueprint</strong> (e.g. a bathroom reno) → type the floor/wall areas → the estimate prices itself → add a good/better/best fixtures option and a tile allowance → <strong>Save version</strong> → <strong>Create quote</strong> and send it for e-sign → once approved, <strong>Generate material list</strong> for purchasing.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -26,6 +26,8 @@
         { file: "moodboards-sheets.html", title: "Presentation sheets" },
       ]},
       { file: "projects.html", title: "Projects", icon: "📁", children: [
+        { file: "projects-plan.html", title: "Plan & Estimating" },
+        { file: "projects-blueprints.html", title: "Blueprint Library" },
         { file: "projects-rooms.html", title: "Rooms" },
         { file: "projects-client-view.html", title: "Client View" },
         { file: "projects-tabs.html", title: "Other tabs" },
