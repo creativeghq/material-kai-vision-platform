@@ -209,6 +209,33 @@ function topoOrder<T extends { id: string; parent_id: string | null }>(rows: T[]
   return out;
 }
 
+// Build quote_item rows from a plan's selected leaf tasks, grouped by section→room.
+function buildQuoteItems(quoteId: string, items: ItemRow[]) {
+  const sectionLabel: Record<string, string> = {};
+  for (const it of items) if (it.kind === 'section') sectionLabel[it.id] = it.label;
+  const leaf = items.filter((it) => it.kind !== 'section' && it.is_selected !== false);
+  const rows = leaf.map((it) => {
+    const qty = Number(it.quantity ?? 1);
+    const lineTotal = Number(it.line_total ?? 0);
+    const dimsText = it.is_allowance ? 'Allowance' : `${qty}${it.unit ? ` ${it.unit}` : ''} × ${Number(it.unit_price ?? 0).toFixed(2)}`;
+    return {
+      quote_id: quoteId,
+      product_id: null,
+      custom_product_name: it.label,
+      custom_unit: it.unit ?? null,
+      quantity: 1,
+      unit_price: lineTotal,
+      line_total: lineTotal,
+      room: it.parent_id ? sectionLabel[it.parent_id] ?? null : null,
+      dimensions: dimsText,
+      notes: it.notes ?? null,
+      added_from: 'manual',
+    };
+  });
+  const subtotal = round2(leaf.reduce((s, it) => s + Number(it.line_total ?? 0), 0));
+  return { rows, subtotal };
+}
+
 async function loadPlan(supabase: SupabaseClient, planId: string) {
   const { data, error } = await supabase.from('project_plans').select('*').eq('id', planId).maybeSingle();
   if (error) throw new HttpError(400, error.message);
@@ -357,10 +384,6 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       await requireWorkspace(supabase, userId, plan.workspace_id, isService);
       const items = await loadPlanItems(supabase, plan_id);
 
-      // section label map for grouping leaf lines into the quote `room` column
-      const sectionLabel: Record<string, string> = {};
-      for (const it of items) if (it.kind === 'section') sectionLabel[it.id] = it.label;
-
       const { data: quote, error: qErr } = await supabase.from('quotes').insert({
         user_id: plan.user_id,
         workspace_id: plan.workspace_id,
@@ -372,34 +395,88 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       }).select().single();
       if (qErr) throw new HttpError(400, `Failed to create quote: ${qErr.message}`);
 
-      const leafRows = items.filter((it) => it.kind !== 'section' && it.is_selected !== false);
-      const quoteItems = leafRows.map((it) => {
-        const qty = Number(it.quantity ?? 1);
-        const lineTotal = Number(it.line_total ?? 0);
-        const room = it.parent_id ? sectionLabel[it.parent_id] ?? null : null;
-        const dimsText = it.is_allowance
-          ? 'Allowance'
-          : `${qty}${it.unit ? ` ${it.unit}` : ''} × ${Number(it.unit_price ?? 0).toFixed(2)}`;
-        return {
-          quote_id: quote.id,
-          product_id: null,
-          custom_product_name: it.label,
-          custom_unit: it.unit ?? null,
-          quantity: 1, // quote_items.quantity is integer; full amount carried in unit_price
-          unit_price: lineTotal,
-          line_total: lineTotal,
-          room,
-          dimensions: dimsText,
-          notes: it.notes ?? null,
-          added_from: 'manual',
-        };
-      });
+      const { rows: quoteItems, subtotal } = buildQuoteItems(quote.id, items);
       if (quoteItems.length) {
         const { error: qiErr } = await supabase.from('quote_items').insert(quoteItems);
         if (qiErr) throw new HttpError(400, `Failed to add quote items: ${qiErr.message}`);
       }
+      await supabase.from('quotes').update({ total_items: quoteItems.length, subtotal }).eq('id', quote.id);
+      await supabase.from('project_plans').update({ quote_id: quote.id, status: 'quoted' }).eq('id', plan_id);
+      return json({ quote_id: quote.id });
+    }
 
-      const subtotal = round2(leafRows.reduce((s, it) => s + Number(it.line_total ?? 0), 0));
+    case 'generate-material-list': {
+      // Derive a material shopping list from the plan's selected material-bearing
+      // leaf tasks → project_purchase_items (existing finance/PDF surface).
+      const { plan_id } = body;
+      if (!plan_id) throw new HttpError(400, 'plan_id required');
+      const plan = await loadPlan(supabase, plan_id);
+      if (!plan.project_id) throw new HttpError(400, 'Plan is not attached to a project');
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      const items = await loadPlanItems(supabase, plan_id);
+      const sectionLabel: Record<string, string> = {};
+      for (const it of items) if (it.kind === 'section') sectionLabel[it.id] = it.label;
+
+      const materialRows = items.filter((it) =>
+        it.kind !== 'section' && it.is_selected !== false &&
+        (it.is_allowance || it.line_kind === 'materials' || it.line_kind === 'both' || it.material_cost != null || it.product_id != null));
+
+      const purchaseItems = materialRows.map((it, idx) => {
+        const qty = it.is_allowance ? 1 : Math.max(Number(it.quantity ?? 1), 0.0001);
+        const unitCost = it.is_allowance
+          ? Number(it.allowance_amount ?? 0)
+          : (it.material_cost != null ? Number(it.material_cost) : null);
+        return {
+          project_id: plan.project_id,
+          workspace_id: plan.workspace_id,
+          created_by: userId,
+          item_type: 'other',
+          name: it.label,
+          category: it.parent_id ? sectionLabel[it.parent_id] ?? null : null,
+          quantity: qty,
+          unit_cost: unitCost,
+          currency: plan.source_currency || 'EUR',
+          status: 'draft',
+          details: { source: 'blueprint_plan', plan_id, unit: it.unit ?? null, is_allowance: !!it.is_allowance },
+          sort_order: idx,
+        };
+      });
+      if (purchaseItems.length) {
+        const { error: piErr } = await supabase.from('project_purchase_items').insert(purchaseItems);
+        if (piErr) throw new HttpError(400, `Failed to write material list: ${piErr.message}`);
+      }
+      return json({ count: purchaseItems.length });
+    }
+
+    case 'create-change-order': {
+      // Plan changed after its quote was approved → spawn a revision quote (delta
+      // captured as a fresh quote in the parent_quote_id chain) for re-approval.
+      const { plan_id } = body;
+      if (!plan_id) throw new HttpError(400, 'plan_id required');
+      const plan = await loadPlan(supabase, plan_id);
+      await requireWorkspace(supabase, userId, plan.workspace_id, isService);
+      if (!plan.quote_id) throw new HttpError(400, 'Plan has no quote to revise');
+      const { data: prevQuote } = await supabase.from('quotes').select('revision_number').eq('id', plan.quote_id).maybeSingle();
+      const items = await loadPlanItems(supabase, plan_id);
+
+      const { data: quote, error: qErr } = await supabase.from('quotes').insert({
+        user_id: plan.user_id,
+        workspace_id: plan.workspace_id,
+        project_id: plan.project_id,
+        name: `${plan.title} (revised)`,
+        status: 'draft',
+        currency: plan.source_currency || 'EUR',
+        parent_quote_id: plan.quote_id,
+        revision_number: (prevQuote?.revision_number ?? 1) + 1,
+        notes: 'Change order generated from updated project plan',
+      }).select().single();
+      if (qErr) throw new HttpError(400, `Failed to create change order: ${qErr.message}`);
+
+      const { rows: quoteItems, subtotal } = buildQuoteItems(quote.id, items);
+      if (quoteItems.length) {
+        const { error: qiErr } = await supabase.from('quote_items').insert(quoteItems);
+        if (qiErr) throw new HttpError(400, `Failed to add quote items: ${qiErr.message}`);
+      }
       await supabase.from('quotes').update({ total_items: quoteItems.length, subtotal }).eq('id', quote.id);
       await supabase.from('project_plans').update({ quote_id: quote.id, status: 'quoted' }).eq('id', plan_id);
       return json({ quote_id: quote.id });

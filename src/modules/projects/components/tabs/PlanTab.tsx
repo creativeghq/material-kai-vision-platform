@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Loader2, Plus, ClipboardList, FileText, Save, History, LayoutTemplate, Trash2, Sparkles, RefreshCw,
+  Loader2, Plus, ClipboardList, FileText, Save, History, LayoutTemplate, Trash2, Sparkles, RefreshCw, Package,
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -203,6 +203,29 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
     } finally { setBusy(false); }
   };
 
+  const generateMaterialList = async () => {
+    if (!plan) return;
+    setBusy(true);
+    try {
+      const n = await projectPlansService.generateMaterialList(plan.id);
+      toast({ title: `Added ${n} material item${n === 1 ? '' : 's'}`, description: 'Find them under the project Finance / purchase items.' });
+    } catch (e) {
+      toast({ title: 'Material list failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const createChangeOrder = async () => {
+    if (!plan) return;
+    setBusy(true);
+    try {
+      const quoteId = await projectPlansService.createChangeOrder(plan.id);
+      toast({ title: 'Change order created' });
+      navigate(`/quotes/${quoteId}`);
+    } catch (e) {
+      toast({ title: 'Change order failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
   const saveAsBlueprint = async () => {
     if (!plan || !saveAsTitle.trim()) return;
     setBusy(true);
@@ -289,9 +312,18 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
         <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={() => { setSaveAsTitle(plan.title); setSaveAsOpen(true); }}>
           <Sparkles className="h-3.5 w-3.5 mr-1" /> Save as blueprint
         </Button>
-        <Button size="sm" className="rounded-full" disabled={busy} onClick={createQuote}>
-          <FileText className="h-3.5 w-3.5 mr-1" /> Create quote
+        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={generateMaterialList}>
+          <Package className="h-3.5 w-3.5 mr-1" /> Material list
         </Button>
+        {plan.status === 'approved' ? (
+          <Button size="sm" className="rounded-full" disabled={busy} onClick={createChangeOrder}>
+            <FileText className="h-3.5 w-3.5 mr-1" /> Change order
+          </Button>
+        ) : (
+          <Button size="sm" className="rounded-full" disabled={busy} onClick={createQuote}>
+            <FileText className="h-3.5 w-3.5 mr-1" /> Create quote
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-8 w-8" disabled={busy} onClick={deletePlan}>
           <Trash2 className="h-4 w-4 text-muted-foreground" />
         </Button>

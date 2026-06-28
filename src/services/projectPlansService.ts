@@ -140,6 +140,18 @@ class ProjectPlansService {
     return quote_id;
   }
 
+  /** Derive a material shopping list (→ project_purchase_items). Returns count written. */
+  async generateMaterialList(planId: string): Promise<number> {
+    const { count } = await callEngine<{ count: number }>('generate-material-list', { plan_id: planId });
+    return count;
+  }
+
+  /** After approval: spawn a revision quote (change order) from the current plan. */
+  async createChangeOrder(planId: string): Promise<string> {
+    const { quote_id } = await callEngine<{ quote_id: string }>('create-change-order', { plan_id: planId });
+    return quote_id;
+  }
+
   /** Direct metadata edit (title/brief). Item edits go through updateItems + reprice. */
   async update(planId: string, patch: Partial<Pick<ProjectPlan, 'title' | 'brief' | 'status'>>): Promise<ProjectPlan> {
     const { data, error } = await supabase.from('project_plans').update(patch).eq('id', planId).select('*').single();
