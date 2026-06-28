@@ -78,9 +78,10 @@ export function ToolsShell({
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/40 sticky top-0 z-30 bg-background/80 backdrop-blur">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2 font-semibold">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <span>MaterialsHub</span>
+          <Link to="/" className="flex items-center">
+            {/* Main brand logo — swaps with theme like the app nav. */}
+            <img src="/mh-logo.png" alt="materialshub" className="h-7 w-auto block dark:hidden" />
+            <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-7 w-auto hidden dark:block" />
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 text-sm">
             {headerRight}
