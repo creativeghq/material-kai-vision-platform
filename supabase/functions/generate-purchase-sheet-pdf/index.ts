@@ -61,7 +61,7 @@ interface Body {
   item_ids?: string[];
   items?: PurchaseItem[];
   project_name?: string;
-  mode?: 'per_item' | 'schedule' | 'both';
+  mode?: 'per_item' | 'schedule' | 'both' | 'order';
   title?: string;
   // ---- purchase-order mode (#237 A3 send-to-supplier) ----
   // When set, renders a purchase ORDER (orders.order_type='purchase') + its
@@ -133,6 +133,16 @@ Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) =>
 
   if (mode === 'schedule' || mode === 'both') {
     await drawSchedulePages(pdf, font, bold, items, projectName);
+  }
+  if (mode === 'order') {
+    // One detailed architectural order / shop-drawing sheet per item (large
+    // dimensioned elevation + full spec/order table). Tags run per type (W-1, D-1…).
+    const counters: Record<string, number> = {};
+    for (const it of items) {
+      const prefix = it.item_type === 'window' ? 'W' : it.item_type === 'door' ? 'D' : 'X';
+      counters[prefix] = (counters[prefix] || 0) + 1;
+      await drawOrderSheet(pdf, font, bold, it, projectName, `${prefix}-${counters[prefix]}`);
+    }
   }
   if (mode === 'per_item' || mode === 'both') {
     for (let i = 0; i < items.length; i++) {
@@ -410,6 +420,68 @@ function captionLines(it: PurchaseItem): string[] {
     if (m) lines.push(String(m).toUpperCase());
   }
   return lines;
+}
+
+// =====================================================================
+// Single-item ORDER / shop-drawing sheet (A4 landscape) — one window or door:
+// a large dimensioned architectural elevation on the left + a full spec/order
+// table on the right + a drawing-number block. This is what you'd send a
+// fabricator to ORDER one item.
+// =====================================================================
+async function drawOrderSheet(pdf: PDFDocument, font: any, bold: any, it: PurchaseItem, projectName: string, tag: string) {
+  const W = 841.89, H = 595.28, M = 40;
+  const page = pdf.addPage([W, H]);
+  const typeWord = it.item_type === 'door' ? 'DOOR' : it.item_type === 'window' ? 'WINDOW' : 'ITEM';
+
+  // ---- header ----
+  page.drawText(`${typeWord} ORDER & SPECIFICATION`, { x: M, y: H - M, size: 16, font: bold, color: INK });
+  page.drawText(truncate(projectName, 70), { x: M, y: H - M - 17, size: 9, font, color: GRAY });
+  // tag box top-right
+  const tbW = 96, tbH = 40, tbX = W - M - tbW, tbY = H - M - 24;
+  page.drawRectangle({ x: tbX, y: tbY, width: tbW, height: tbH, borderColor: HAIR, borderWidth: 1 });
+  page.drawText(tag, { x: tbX + tbW / 2 - textW(bold, tag, 20) / 2, y: tbY + 12, size: 20, font: bold, color: INK });
+  hr(page, M, H - M - 30, W - M, 1);
+
+  // ---- left: large elevation ----
+  const elevColW = (W - 2 * M) * 0.46;
+  const cx = M + elevColW / 2;
+  const baseY = M + 64;                               // finish floor line
+  const maxH = (H - M - 56) - baseY;                  // up to just under the header
+  const maxW = elevColW - 70;                         // room for the side height dim
+  if (it.item_type === 'door') drawDoorElevation(page, font, bold, cx, baseY, maxW, maxH, it);
+  else if (it.item_type === 'window') drawWindowElevation(page, font, cx, baseY, maxW, maxH, it);
+  else drawOtherElevation(page, font, cx, baseY, maxW, maxH, it);
+  page.drawText('ELEVATION · SCALE NTS', { x: M, y: M + 30, size: 7, font, color: GRAY });
+
+  // vertical divider between drawing and spec
+  const divX = M + elevColW + 24;
+  page.drawLine({ start: { x: divX, y: M }, end: { x: divX, y: H - M - 40 }, color: LIGHT, thickness: 0.6 });
+
+  // ---- right: spec / order table ----
+  const sx = divX + 24;
+  const sw = W - M - sx;
+  let sy = H - M - 52;
+  page.drawText('SPECIFICATION', { x: sx, y: sy, size: 10, font: bold, color: INK });
+  sy -= 22;
+  const rows: [string, string][] = [
+    ['Tag', tag],
+    ['Type', it.name || '—'],
+    ['Location', it.room_name || '—'],
+    ...specRows(it),
+  ];
+  for (const [label, value] of rows) {
+    page.drawText(label.toUpperCase(), { x: sx, y: sy, size: 8, font, color: GRAY });
+    const v = truncate(value, 40);
+    page.drawText(v, { x: sx + 120, y: sy, size: 9.5, font: bold, color: INK });
+    hr(page, sx, sy - 7, sx + sw, 0.3, LIGHT);
+    sy -= 21;
+    if (sy < M + 50) break;
+  }
+
+  // ---- footer: drawing-number block ----
+  const code = `${typeWord.slice(0, 3)}-${tag}`;
+  page.drawRectangle({ x: W - M - 130, y: M, width: 130, height: 30, borderColor: HAIR, borderWidth: 0.8 });
+  page.drawText(code, { x: W - M - 120, y: M + 10, size: 12, font: bold, color: INK });
 }
 
 // =====================================================================

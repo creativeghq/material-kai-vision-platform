@@ -67,7 +67,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [dialogItem, setDialogItem] = useState<ProjectPurchaseItem | 'new' | null>(null);
-  const [sheetMode, setSheetMode] = useState<'both' | 'schedule' | 'per_item'>('both');
+  const [sheetMode, setSheetMode] = useState<'both' | 'schedule' | 'per_item' | 'order'>('both');
   const [generatingSheet, setGeneratingSheet] = useState(false);
 
   const load = useCallback(async () => {
@@ -135,6 +135,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
             <SelectContent>
               <SelectItem value="both">Elevation schedule + spec sheets</SelectItem>
               <SelectItem value="schedule">Elevation schedule only</SelectItem>
+              <SelectItem value="order">Order sheet (per item)</SelectItem>
               <SelectItem value="per_item">Spec sheets only</SelectItem>
             </SelectContent>
           </Select>

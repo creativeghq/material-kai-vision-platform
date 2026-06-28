@@ -1238,7 +1238,7 @@ class ProjectsService {
    */
   async generatePurchaseSheet(projectId: string, opts: {
     item_ids?: string[];
-    mode?: 'schedule' | 'per_item' | 'both';
+    mode?: 'schedule' | 'per_item' | 'both' | 'order';
     title?: string;
     project_name?: string;
   } = {}): Promise<{ pdf_url: string; pdf_storage_path: string; page_count: number; item_count: number; mode: string }> {
