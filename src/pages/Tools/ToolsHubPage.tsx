@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import {
   Calculator,
   ChevronRight,
+  ClipboardList,
   Columns3,
   Flame,
   MessageSquareText,
@@ -67,6 +68,14 @@ const TOOLS: ToolEntry[] = [
     description:
       'Find recent news, blog and editorial coverage of a brand or product, grouped by outlet.',
     icon: MessageSquareText,
+    badge: 'Free · 2/day',
+  },
+  {
+    slug: 'project-plan',
+    title: 'Project plan estimator',
+    description:
+      'Pick a renovation type, enter a few measurements, and get a structured scope of works with a ballpark price.',
+    icon: ClipboardList,
     badge: 'Free · 2/day',
   },
 ];

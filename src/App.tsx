@@ -101,6 +101,7 @@ const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const ToolsHubPage = lazy(() => import('./pages/Tools/ToolsHubPage'));
 const PriceScanPage = lazy(() => import('./pages/Tools/PriceScanPage'));
 const MentionScanPage = lazy(() => import('./pages/Tools/MentionScanPage'));
+const ProjectPlanPage = lazy(() => import('./pages/Tools/ProjectPlanPage'));
 const HeatPumpToolPage = lazy(() => import('./pages/Tools/HeatPumpToolPage'));
 const HeatingCostPage = lazy(() => import('./pages/Tools/HeatingCostPage'));
 const PublicQuotePage = lazy(() => import('./pages/PublicQuotePage'));
@@ -175,6 +176,7 @@ const App = () => (
                 <Route path="/tools" element={<PageErrorBoundary name="Tools Hub"><ToolsHubPage /></PageErrorBoundary>} />
                 <Route path="/tools/price-scan" element={<PageErrorBoundary name="Price Scan"><PriceScanPage /></PageErrorBoundary>} />
                 <Route path="/tools/mention-scan" element={<PageErrorBoundary name="Mention Scan"><MentionScanPage /></PageErrorBoundary>} />
+                <Route path="/tools/project-plan" element={<PageErrorBoundary name="Project Plan Estimator"><ProjectPlanPage /></PageErrorBoundary>} />
                 <Route path="/tools/heat-pump" element={<PageErrorBoundary name="Heat Pump Sizer"><HeatPumpToolPage /></PageErrorBoundary>} />
                 <Route path="/tools/heating-cost" element={<PageErrorBoundary name="Heating Cost Comparison"><HeatingCostPage /></PageErrorBoundary>} />
                 {/* Project Workspace invitations — passwordless flow, no AuthGuard. The accept page
