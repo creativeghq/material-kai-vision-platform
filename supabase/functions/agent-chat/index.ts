@@ -868,6 +868,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'generate_catalog_pdf', 'publish_catalog',
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
+      'add_purchase_item', 'generate_purchase_sheet',
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
@@ -903,6 +904,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'generate_presentation_sheet',
       // Project Workspace — interior designers benefit most from the container
       'create_project', 'list_my_projects', 'find_project', 'add_task',
+      'add_purchase_item', 'generate_purchase_sheet',
     ],
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
@@ -1022,7 +1024,7 @@ async function executeAgent(
       tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
     },
     'projects': {
-      tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task'],
+      tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'],
     },
     'tech-radar': {
       tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
@@ -1267,7 +1269,7 @@ async function executeAgent(
   const needsPresentation = config.tools.includes('generate_presentation_sheet');
   const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
-  const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task'].includes(t));
+  const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
   // (internal ops capability) — gate to admin/owner like price_lookup.
   const needsTechRadar = isAdmin && config.tools.some((t: string) => ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'].includes(t));
@@ -1381,6 +1383,8 @@ async function executeAgent(
   const createListMyProjectsTool = projectsMod?.createListMyProjectsTool;
   const createFindProjectTool = projectsMod?.createFindProjectTool;
   const createAddTaskTool = projectsMod?.createAddTaskTool;
+  const createAddPurchaseItemTool = projectsMod?.createAddPurchaseItemTool;
+  const createGeneratePurchaseSheetTool = projectsMod?.createGeneratePurchaseSheetTool;
   const createReviewSolutionTool = techRadarMod?.createReviewSolutionTool;
   const createTrackTechRadarTool = techRadarMod?.createTrackTechRadarTool;
   const createListTechRadarTool = techRadarMod?.createListTechRadarTool;
@@ -1614,6 +1618,12 @@ async function executeAgent(
   }
   if (config.tools.includes('add_task') && createAddTaskTool) {
     tools.push(createAddTaskTool(userId, onChunk));
+  }
+  if (config.tools.includes('add_purchase_item') && createAddPurchaseItemTool) {
+    tools.push(createAddPurchaseItemTool(userId, onChunk));
+  }
+  if (config.tools.includes('generate_purchase_sheet') && createGeneratePurchaseSheetTool) {
+    tools.push(createGeneratePurchaseSheetTool(userId, onChunk));
   }
 
   // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).

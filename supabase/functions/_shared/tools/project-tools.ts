@@ -2,12 +2,15 @@
  * Project Workspace Tools — agent-chat surface for the Projects module.
  *
  * Tools:
- *   - create_project       — new project with optional client + rooms
- *   - list_my_projects     — user's active projects with budget / deadline summary
- *   - find_project         — fuzzy lookup by name (returns id + summary)
- *   - add_task             — add a task (optionally a subtask via parent_task_id)
+ *   - create_project        — new project with optional client + rooms
+ *   - list_my_projects      — user's active projects with budget / deadline summary
+ *   - find_project          — fuzzy lookup by name (returns id + summary)
+ *   - add_task              — add a task (optionally a subtask via parent_task_id)
+ *   - add_purchase_item     — add a made-to-order door/window (with spec) to a project
+ *   - generate_purchase_sheet — render the project's purchase items into a spec-sheet PDF
  *
- * Cost discipline: every tool is 0 credits (DB-only writes/reads).
+ * Cost discipline: project DB tools are 0 credits. generate_purchase_sheet renders a
+ * PDF (no AI) — also free; per-item image generation is a separate UI action.
  * Module-gated on `projects` slug — disabled-module errors are returned as
  * friendly strings rather than thrown.
  */
@@ -364,6 +367,210 @@ export const createAddTaskTool = (
         room_name: z.string().optional().describe('Room name to scope task to (fuzzy match)'),
         due_date: z.string().optional().describe('ISO date YYYY-MM-DD'),
         visibility: z.enum(['internal', 'client_visible']).optional().describe('Default internal'),
+      }),
+    },
+  );
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// 5) add_purchase_item — made-to-order door / window with a measurement spec
+// ───────────────────────────────────────────────────────────────────────────
+
+export const createAddPurchaseItemTool = (
+  userId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async (input: {
+      project_id?: string;
+      project_name?: string;
+      item_type?: 'door' | 'window' | 'other';
+      name: string;
+      width_mm?: number;
+      height_mm?: number;
+      thickness_mm?: number;
+      finish?: string;
+      frame?: string;
+      hardware?: string;
+      opening?: string;
+      handing?: string;
+      frame_type?: string;
+      glazing?: string;
+      opening_type?: string;
+      quantity?: number;
+      unit_cost?: number;
+      currency?: string;
+      room_name?: string;
+      notes?: string;
+    }) => {
+      if (!await isModuleEnabled()) return moduleDisabledError();
+      const sb = svcClient();
+
+      const projectId = await resolveProjectId(userId, input.project_id, input.project_name);
+      if (!projectId) {
+        return JSON.stringify({
+          success: false,
+          error: input.project_name
+            ? `No project found matching "${input.project_name}". Use find_project first or pass project_id.`
+            : 'Need either project_id or project_name to add a purchase item.',
+        });
+      }
+      // workspace_id is required on the row.
+      const { data: proj } = await sb.from('projects').select('workspace_id').eq('id', projectId).maybeSingle();
+      const workspaceId = (proj as any)?.workspace_id;
+      if (!workspaceId) {
+        return JSON.stringify({ success: false, error: 'This project has no workspace — purchase items need one.' });
+      }
+
+      // Resolve optional room.
+      let roomId: string | null = null;
+      if (input.room_name) {
+        const { data: rooms } = await sb.from('project_rooms').select('id')
+          .eq('project_id', projectId).ilike('name', `%${input.room_name}%`).limit(1);
+        roomId = (rooms && (rooms[0] as any)?.id) || null;
+      }
+
+      // Build the structured spec from whichever fields were supplied.
+      const details: Record<string, unknown> = {};
+      for (const k of ['width_mm', 'height_mm', 'thickness_mm', 'finish', 'frame', 'hardware',
+        'opening', 'handing', 'frame_type', 'glazing', 'opening_type'] as const) {
+        const v = (input as any)[k];
+        if (v !== undefined && v !== null && String(v).trim() !== '') details[k] = v;
+      }
+
+      onChunk?.({ type: 'tool_progress', status: `Adding ${input.item_type || 'door'} "${input.name}"...`, timestamp: Date.now() });
+
+      const { data: row, error } = await sb
+        .from('project_purchase_items')
+        .insert({
+          project_id: projectId,
+          workspace_id: workspaceId,
+          item_type: input.item_type || 'door',
+          name: input.name,
+          room_id: roomId,
+          quantity: input.quantity ?? 1,
+          unit_cost: input.unit_cost ?? null,
+          currency: input.currency || 'EUR',
+          details,
+          created_by: userId,
+        } as any)
+        .select('id')
+        .single();
+      if (error) return JSON.stringify({ success: false, error: error.message });
+
+      return JSON.stringify({
+        success: true,
+        purchase_item_id: (row as any).id,
+        project_id: projectId,
+        message: `Added ${input.item_type || 'door'} "${input.name}". It has no photo yet — open the project's Purchases tab to generate one from the spec, or run generate_purchase_sheet to produce the spec PDF.`,
+        url: `/projects/${projectId}`,
+      });
+    },
+    {
+      name: 'add_purchase_item',
+      description:
+        'Add a made-to-order purchase item (a door, window, or other custom item) with its ' +
+        'measurements/spec to a project. Specify the project by id OR name. For doors pass ' +
+        'width_mm/height_mm/thickness_mm/finish/frame/hardware/opening (inward|outward)/handing (left|right); ' +
+        'for windows pass width_mm/height_mm/frame_type/glazing/opening_type (tilt-turn|casement|sliding)/finish. ' +
+        'Use when the user says "add a door/window to the project", "we need 3 oak doors 900x2100", etc. ' +
+        'After adding, the spec sheet is produced with generate_purchase_sheet.',
+      schema: z.object({
+        project_id: z.string().optional().describe('UUID of the project'),
+        project_name: z.string().optional().describe('Project name fragment (fuzzy match)'),
+        item_type: z.enum(['door', 'window', 'other']).optional().describe('Default door'),
+        name: z.string().describe('Item name e.g. "Master bedroom oak door"'),
+        width_mm: z.number().optional(),
+        height_mm: z.number().optional(),
+        thickness_mm: z.number().optional().describe('Doors'),
+        finish: z.string().optional().describe('e.g. "oak veneer, satin lacquer"'),
+        frame: z.string().optional().describe('Doors — frame material/finish'),
+        hardware: z.string().optional().describe('Doors — handle/lock set'),
+        opening: z.string().optional().describe('Doors — inward | outward'),
+        handing: z.string().optional().describe('Doors — left | right'),
+        frame_type: z.string().optional().describe('Windows — e.g. aluminium, uPVC'),
+        glazing: z.string().optional().describe('Windows — e.g. double, triple, low-E'),
+        opening_type: z.string().optional().describe('Windows — tilt-turn | casement | sliding | fixed'),
+        quantity: z.number().optional().describe('Default 1'),
+        unit_cost: z.number().optional(),
+        currency: z.string().optional().describe('Default EUR'),
+        room_name: z.string().optional().describe('Room to scope to (fuzzy match)'),
+        notes: z.string().optional(),
+      }),
+    },
+  );
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// 6) generate_purchase_sheet — render purchase items to a PDF spec sheet
+// ───────────────────────────────────────────────────────────────────────────
+
+export const createGeneratePurchaseSheetTool = (
+  userId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ project_id, project_name, mode }: {
+      project_id?: string;
+      project_name?: string;
+      mode?: 'schedule' | 'per_item' | 'both';
+    }) => {
+      if (!await isModuleEnabled()) return moduleDisabledError();
+      const sb = svcClient();
+
+      const projectId = await resolveProjectId(userId, project_id, project_name);
+      if (!projectId) {
+        return JSON.stringify({
+          success: false,
+          error: project_name
+            ? `No project found matching "${project_name}". Use find_project first or pass project_id.`
+            : 'Need either project_id or project_name to generate the sheet.',
+        });
+      }
+
+      const { count } = await sb.from('project_purchase_items')
+        .select('id', { count: 'exact', head: true }).eq('project_id', projectId);
+      if (!count) {
+        return JSON.stringify({ success: false, error: 'This project has no purchase items yet. Add a door/window with add_purchase_item first.' });
+      }
+
+      const { data: proj } = await sb.from('projects').select('name').eq('id', projectId).maybeSingle();
+
+      onChunk?.({ type: 'tool_progress', status: 'Rendering purchase spec sheet...', timestamp: Date.now() });
+
+      // Call the PDF function server-to-server with the service-role key (it reads the
+      // project's items as admin in that mode).
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/generate-purchase-sheet-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
+        body: JSON.stringify({ project_id: projectId, mode: mode || 'both', project_name: (proj as any)?.name }),
+      });
+      const out = await resp.json().catch(() => ({}));
+      if (!resp.ok || !out?.success) {
+        return JSON.stringify({ success: false, error: out?.error || `Sheet generation failed (${resp.status})` });
+      }
+
+      onChunk?.({ type: 'purchase_sheet_ready', pdf_url: out.pdf_url, page_count: out.page_count, item_count: out.item_count });
+
+      return JSON.stringify({
+        success: true,
+        pdf_url: out.pdf_url,
+        page_count: out.page_count,
+        item_count: out.item_count,
+        message: `Purchase spec sheet ready — ${out.item_count} item(s), ${out.page_count} page(s).`,
+      });
+    },
+    {
+      name: 'generate_purchase_sheet',
+      description:
+        "Render a project's purchase items (doors/windows) into a PDF: a combined schedule table " +
+        'and/or per-item specification sheets with door-swing / window glyph drawings. ' +
+        "mode='schedule' for the table only, 'per_item' for spec pages only, 'both' (default) for both. " +
+        'Use when the user says "make the purchase sheet", "send the door schedule to the supplier", etc.',
+      schema: z.object({
+        project_id: z.string().optional().describe('UUID of the project'),
+        project_name: z.string().optional().describe('Project name fragment (fuzzy match)'),
+        mode: z.enum(['schedule', 'per_item', 'both']).optional().describe('Default both'),
       }),
     },
   );

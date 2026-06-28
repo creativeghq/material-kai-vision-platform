@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { edgeError } from '@/utils/edgeError';
 
 // =====================================================
 // TYPES
@@ -174,6 +175,54 @@ export interface ProjectFinanceSummary {
     payable_total: number;
     payable_due: number;
   };
+}
+
+// ---------- PURCHASE ITEMS (made-to-order doors / windows) ----------
+
+export type PurchaseItemType = 'door' | 'window' | 'other';
+export const PURCHASE_ITEM_TYPES: PurchaseItemType[] = ['door', 'window', 'other'];
+
+/** Structured spec stored on project_purchase_items.details. Keys are item-type specific;
+ *  the PDF generator + product-shot prompt both read from here. All optional. */
+export interface PurchaseItemDetails {
+  width_mm?: number;
+  height_mm?: number;
+  thickness_mm?: number;
+  finish?: string;
+  frame?: string;
+  hardware?: string;
+  // door
+  opening?: 'inward' | 'outward' | string;
+  handing?: 'left' | 'right' | string;
+  hinge_side?: string;
+  // window
+  frame_type?: string;
+  glazing?: string;
+  opening_type?: 'tilt-turn' | 'casement' | 'sliding' | string;
+  [k: string]: unknown;
+}
+
+export interface ProjectPurchaseItem {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  item_type: PurchaseItemType | string;
+  name: string;
+  category: string | null;
+  room_id: string | null;
+  quantity: number;
+  unit_cost: number | null;
+  currency: string;
+  supplier_company_id: string | null;
+  status: string;
+  details: PurchaseItemDetails;
+  design_image_url: string | null;
+  design_image_path: string | null;
+  notes: string | null;
+  sort_order: number;
+  quote_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface InvitationPreview {
@@ -1058,6 +1107,170 @@ class ProjectsService {
   <p style="margin:24px 0 0;font-size:13px;color:#666;">No password needed — just confirm your email on the next screen. Link expires in 90 days.</p>
   <p style="margin:8px 0 0;font-size:12px;color:#999;word-break:break-all;">If the button doesn't work, paste this URL into your browser:<br>${escape(input.inviteUrl)}</p>
 </body></html>`;
+  }
+
+  // ---------- PURCHASE ITEMS (doors / windows → purchase spec sheet) ----------
+
+  async listPurchaseItems(projectId: string): Promise<ProjectPurchaseItem[]> {
+    const { data, error } = await (supabase as any)
+      .from('project_purchase_items')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []) as ProjectPurchaseItem[];
+  }
+
+  async addPurchaseItem(input: {
+    project_id: string;
+    workspace_id: string;
+    item_type?: PurchaseItemType | string;
+    name: string;
+    category?: string | null;
+    room_id?: string | null;
+    quantity?: number;
+    unit_cost?: number | null;
+    currency?: string;
+    supplier_company_id?: string | null;
+    quote_id?: string | null;
+    details?: PurchaseItemDetails;
+    design_image_url?: string | null;
+    design_image_path?: string | null;
+    notes?: string | null;
+    sort_order?: number;
+  }): Promise<ProjectPurchaseItem> {
+    if (!input.name?.trim()) throw new Error('Give the purchase item a name.');
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await (supabase as any)
+      .from('project_purchase_items')
+      .insert({
+        project_id: input.project_id,
+        workspace_id: input.workspace_id,
+        item_type: input.item_type ?? 'door',
+        name: input.name.trim(),
+        category: input.category ?? null,
+        room_id: input.room_id ?? null,
+        quantity: input.quantity ?? 1,
+        unit_cost: input.unit_cost ?? null,
+        currency: input.currency ?? 'EUR',
+        supplier_company_id: input.supplier_company_id ?? null,
+        quote_id: input.quote_id ?? null,
+        details: input.details ?? {},
+        design_image_url: input.design_image_url ?? null,
+        design_image_path: input.design_image_path ?? null,
+        notes: input.notes ?? null,
+        sort_order: input.sort_order ?? 0,
+        created_by: user?.id ?? null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ProjectPurchaseItem;
+  }
+
+  async updatePurchaseItem(id: string, input: Partial<{
+    item_type: PurchaseItemType | string;
+    name: string;
+    category: string | null;
+    room_id: string | null;
+    quantity: number;
+    unit_cost: number | null;
+    currency: string;
+    supplier_company_id: string | null;
+    quote_id: string | null;
+    status: string;
+    details: PurchaseItemDetails;
+    design_image_url: string | null;
+    design_image_path: string | null;
+    notes: string | null;
+    sort_order: number;
+  }>): Promise<ProjectPurchaseItem> {
+    const { data, error } = await (supabase as any)
+      .from('project_purchase_items')
+      .update(input)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ProjectPurchaseItem;
+  }
+
+  async deletePurchaseItem(id: string): Promise<void> {
+    const { error } = await (supabase as any).from('project_purchase_items').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  /**
+   * Generate a studio product image for a made-to-order door/window from its spec, via the
+   * `product-shot` mode of generate-interior-gemini. Used when the item is NOT a catalog
+   * product (no real photo). Persists the returned URL onto the item's design_image_url and
+   * returns it. Costs image-generation credits (debited inside the edge function).
+   */
+  async generatePurchaseItemImage(itemId: string, opts: { extraPrompt?: string } = {}): Promise<string> {
+    const { data: item, error: readErr } = await (supabase as any)
+      .from('project_purchase_items')
+      .select('item_type, name, details')
+      .eq('id', itemId)
+      .single();
+    if (readErr) throw readErr;
+
+    const { data, error } = await supabase.functions.invoke('generate-interior-gemini', {
+      body: {
+        mode: 'product-shot',
+        item_type: item.item_type || 'door',
+        item_name: item.name,
+        spec: item.details || {},
+        prompt: opts.extraPrompt || undefined,
+      },
+    });
+    if (error) throw await edgeError(error, 'Image generation failed');
+    const url: string | undefined = (data as any)?.image_url;
+    if (!url) throw new Error((data as any)?.error || 'Image generation returned no image');
+
+    await this.updatePurchaseItem(itemId, { design_image_url: url });
+    return url;
+  }
+
+  /**
+   * Render the project's purchase items into a PDF (schedule + per-item spec sheets) via the
+   * generate-purchase-sheet-pdf edge function. Returns a 7-day signed URL.
+   */
+  async generatePurchaseSheet(projectId: string, opts: {
+    item_ids?: string[];
+    mode?: 'schedule' | 'per_item' | 'both';
+    title?: string;
+    project_name?: string;
+  } = {}): Promise<{ pdf_url: string; pdf_storage_path: string; page_count: number; item_count: number; mode: string }> {
+    const { data, error } = await supabase.functions.invoke('generate-purchase-sheet-pdf', {
+      body: {
+        project_id: projectId,
+        item_ids: opts.item_ids,
+        mode: opts.mode ?? 'both',
+        title: opts.title,
+        project_name: opts.project_name,
+      },
+    });
+    if (error) throw await edgeError(error, 'Purchase sheet generation failed');
+    if (!(data as any)?.success) throw new Error((data as any)?.error || 'Purchase sheet generation failed');
+    return data as { pdf_url: string; pdf_storage_path: string; page_count: number; item_count: number; mode: string };
+  }
+
+  /** Best-effort primary catalog image for a product (via image_product_associations). */
+  async getProductPrimaryImageUrl(productId: string): Promise<string | null> {
+    const { data: assoc } = await (supabase as any)
+      .from('image_product_associations')
+      .select('image_id')
+      .eq('product_id', productId)
+      .limit(1)
+      .maybeSingle();
+    if (!assoc?.image_id) return null;
+    const { data: img } = await (supabase as any)
+      .from('document_images')
+      .select('image_url')
+      .eq('id', assoc.image_id)
+      .maybeSingle();
+    return img?.image_url ?? null;
   }
 
   // ---------- CRM LOOKUP (for the wizard) ----------

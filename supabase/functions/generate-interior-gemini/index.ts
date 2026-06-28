@@ -338,7 +338,7 @@ const CREDIT_COSTS: Record<string, number> = {
   'grok-aurora': 15,
 };
 
-type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board';
+type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot';
 type BoardMode = 'presentation-board' | 'selection-board' | 'photorealistic-render';
 
 interface GenerateInteriorRequest {
@@ -359,6 +359,11 @@ interface GenerateInteriorRequest {
   style_reference_url?: string;
   // Materials Selection Board
   board_mode?: BoardMode;
+  // Product shot (purchase-sheet doors/windows): a clean studio render of ONE made-to-order
+  // item, driven by its structured spec rather than a room scene.
+  item_type?: 'door' | 'window' | string;
+  item_name?: string;
+  spec?: Record<string, unknown>;
   // User context
   user_id?: string;
   workspace_id?: string;
@@ -494,6 +499,35 @@ Photorealistic micro-textures, natural imperfections, and realistic reflections;
 Negative prompt: oversized props, exaggerated scale, distorted proportions, fisheye, warped lines, CGI, 3D render, plastic texture, fake materials, blurry details, label artifacts, duplicated objects, watermark, text artifacts. ${extraPrompt ?? ''}`;
 }
 
+// Studio product shot for a made-to-order door/window on a purchase spec sheet. NOT a room
+// scene — a single isolated item on seamless white, front elevation, true-to-spec proportions,
+// so the buyer/supplier sees exactly the configured item. Driven by the structured `spec`.
+function buildProductShotPrompt(itemType: string, name: string, spec: Record<string, unknown>, extraPrompt?: string): string {
+  const t = (itemType || 'door').toLowerCase();
+  // Render the spec as readable "Key: value" lines so the model honours real measurements/finishes.
+  const specLines = Object.entries(spec || {})
+    .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+    .map(([k, v]) => `- ${k.replace(/_/g, ' ')}: ${String(v)}`)
+    .join('\n');
+
+  if (t === 'window') {
+    return `Studio product photograph of a SINGLE ${name || 'window'}, shown as a clean front elevation, centred on a seamless pure-white background. Architectural product-catalogue style: even soft lighting, no room, no furniture, no people, no props, subtle contact shadow only.
+
+Render the window EXACTLY to this specification — honour the frame type, opening type, glazing and finish; keep proportions true to the width/height ratio:
+${specLines || '- a standard casement window'}
+
+The opening mechanism must be visually clear (e.g. tilt-turn vs casement vs sliding) with correct hinge/sash lines. Realistic glass with faint reflection, accurate frame finish colour and material. Sharp focus, high detail, no text, no watermark, no dimension labels. ${extraPrompt ?? ''}`.trim();
+  }
+
+  // door (default)
+  return `Studio product photograph of a SINGLE ${name || 'interior door'}, shown as a clean front elevation, centred on a seamless pure-white background. Architectural product-catalogue style: even soft lighting, no room, no furniture, no people, no props, subtle contact shadow only.
+
+Render the door EXACTLY to this specification — honour the finish, frame, hardware, opening direction and handing; keep proportions true to the width/height ratio:
+${specLines || '- a flush interior door with a satin finish'}
+
+Show the door leaf within its frame, with the handle/hardware on the correct side per the handing. Accurate finish colour, wood grain or paint texture as specified, realistic materials. Sharp focus, high detail, no text, no watermark, no dimension labels. ${extraPrompt ?? ''}`.trim();
+}
+
 Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
@@ -574,6 +608,25 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       }
 
       const result = await generateImageWithGemini(prompt, { model, aspectRatio });
+      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+    }
+
+    // ── Mode: product-shot (purchase-sheet door/window) ────────────────────
+    // A single isolated item on seamless white, rendered true to its spec. Portrait by
+    // default for doors, landscape-ish for windows. Used when a purchase item is NOT a
+    // catalog product (no real photo), so the spec sheet still shows the configured item.
+    else if (mode === 'product-shot') {
+      const itemType = body.item_type ?? 'door';
+      const hasName = Boolean(body.item_name && body.item_name.trim());
+      const shotPrompt = buildProductShotPrompt(
+        itemType,
+        hasName ? body.item_name! : (body.prompt ?? ''),
+        body.spec ?? {},
+        hasName ? body.prompt : undefined,
+      );
+      const shotRatio = (body.aspect_ratio
+        ?? (itemType.toLowerCase() === 'window' ? '4:3' : '3:4')) as ImageAspectRatio;
+      const result = await generateImageWithGemini(shotPrompt, { model, aspectRatio: shotRatio });
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
 
