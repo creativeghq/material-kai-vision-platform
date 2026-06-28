@@ -80,6 +80,20 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
 
+  // Hold the callbacks in refs and keep them current, so the render effect can
+  // depend ONLY on [siteKey, action, theme]. Without this, every parent re-render
+  // that passes a new inline onVerify/onExpired/onError (e.g. typing in a sibling
+  // input) re-ran the effect, whose cleanup removes + re-renders the CF widget —
+  // making it visibly "blink" and drop the just-issued token.
+  const onVerifyRef = useRef(onVerify);
+  const onExpiredRef = useRef(onExpired);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onVerifyRef.current = onVerify;
+    onExpiredRef.current = onExpired;
+    onErrorRef.current = onError;
+  });
+
   const reset = useCallback(() => {
     if (window.turnstile && widgetIdRef.current) {
       window.turnstile.reset(widgetIdRef.current);
@@ -99,12 +113,12 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
           sitekey: siteKey,
           action,
           theme,
-          callback: onVerify,
-          'expired-callback': () => onExpired?.(),
-          'error-callback': (code) => onError?.(code),
+          callback: (token) => onVerifyRef.current(token),
+          'expired-callback': () => onExpiredRef.current?.(),
+          'error-callback': (code) => onErrorRef.current?.(code),
         });
       })
-      .catch((err) => onError?.(err instanceof Error ? err.message : 'load_failed'));
+      .catch((err) => onErrorRef.current?.(err instanceof Error ? err.message : 'load_failed'));
 
     return () => {
       cancelled = true;
@@ -117,7 +131,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>
         widgetIdRef.current = null;
       }
     };
-  }, [siteKey, action, theme, onVerify, onExpired, onError]);
+  }, [siteKey, action, theme]);
 
   return <div ref={containerRef} className="cf-turnstile" />;
 });
