@@ -176,6 +176,37 @@ await check('mivaa.price-cron-refresh', ['MIVAA_CRON_SECRET'], async () => {
   return 'ok';
 });
 
+// 6. Blueprint public estimator (#242) — the anonymous /tools/project-plan path.
+//   We hit the `starters` action (NOT `estimate`): starters needs no Turnstile token and
+//   burns no quota, yet it still exercises the deployed edge fn + the service-role read of
+//   `blueprints` + `blueprint_items` + the shared blueprint/formula module import. If the fn
+//   isn't deployed, the tables are missing, or the import breaks, this FAILS.
+await check('edge.public-project-plan.starters', ['SUPABASE_URL'], async () => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (DB_KEY) { headers.apikey = DB_KEY; headers.Authorization = `Bearer ${DB_KEY}`; }
+  const { res, json } = await http(`${SUPABASE_URL}/functions/v1/public-project-plan`, {
+    method: 'POST', headers, body: JSON.stringify({ action: 'starters' }),
+  });
+  assert(res.ok, `POST public-project-plan → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json?.starters), `starters not an array (${JSON.stringify(json)?.slice(0, 120)})`);
+  return `${json.starters.length} starters`;
+});
+
+// 7. Data-integrity framework — is the reconciliation backbone actually wired? We read the
+//   `data_integrity_checks` registry (REST, no side effects). The cron path of the runner fn
+//   runs the FULL battery + auto-heal, so it's deliberately NOT hit from a 15-min monitor;
+//   the run_data_integrity_checks RPC itself is compile-covered by db.plpgsql-lint above.
+//   A missing table (migration not applied) FAILS; an empty registry SKIPs (nothing wired yet).
+await check('db.data-integrity.registry', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/data_integrity_checks?select=key&is_enabled=eq.true&limit=1`, {
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}` },
+  });
+  assert(res.ok, `GET data_integrity_checks → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'data_integrity_checks did not return an array');
+  skipIf(json.length === 0, 'no enabled integrity checks registered yet');
+  return 'framework wired';
+});
+
 // ── Report ──────────────────────────────────────────────────────────────────
 const pad = (s, n) => String(s).padEnd(n);
 console.log('\n  Production smoke tests');

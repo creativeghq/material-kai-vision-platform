@@ -11,13 +11,20 @@ import { test, expect } from '@playwright/test';
  */
 const ROUTES = [
   // Public (no auth)
-  '/tools', '/tools/price-scan', '/tools/mention-scan', '/knowledge-base',
+  '/tools', '/tools/price-scan', '/tools/mention-scan',
+  '/tools/project-plan', '/tools/heat-pump', '/tools/heating-cost', // public lead-gen tools (blueprint estimator + heating)
+  '/knowledge-base', '/brands',
   // Core authed
   '/', '/profile', '/moodboard', '/agent-hub', '/compare', '/recognition',
+  '/blueprints', '/projects', '/portal', '/factory-analytics', // newer authed surfaces
+  '/billing/subscriptions', '/billing/credits',
   // Previously white-screened / capability- & entitlement-gated
   '/finance', '/quotes', '/discover', '/crm', '/sales', '/pos', '/network',
+  '/inbox', '/trip-expenses', // newer gated surfaces
   // Admin (operator-only)
   '/admin', '/admin/operations', '/admin/modules', '/admin/background-agents',
+  '/admin/data-health', '/admin/knowledge-base', '/admin/materials-data', // newer / heavy admin pages
+  '/admin/flows', '/admin/data-import', '/admin/plans',
 ];
 
 // A failed dynamic import / runtime crash — the white-screen signatures.
