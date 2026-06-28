@@ -10,6 +10,7 @@ import {
   Palette,
   FileText,
   AlertTriangle,
+  ClipboardList,
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -99,6 +100,10 @@ export const ProjectsListPage: React.FC = () => {
         subtitle="Container above moodboards and quotes — rooms, budget vs actual, tasks"
         actions={
           <>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate('/blueprints')}>
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Blueprints
+            </Button>
             <Button
               variant="outline"
               size="sm"

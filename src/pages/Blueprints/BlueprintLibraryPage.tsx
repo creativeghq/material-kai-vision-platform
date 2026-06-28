@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, LayoutTemplate, Sparkles, Trash2, Pencil, Copy, Eye } from 'lucide-react';
+import { Loader2, Plus, LayoutTemplate, Sparkles, Trash2, Pencil, Copy, Eye, ChevronLeft } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -144,14 +144,22 @@ export const BlueprintLibraryPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-background">
       <PageHeader
         icon={LayoutTemplate}
         title="Blueprints"
         subtitle="Reusable scope-of-works templates. Build once, reuse on every project."
-        actions={<Button className="rounded-full" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" /> New blueprint</Button>}
+        actions={
+          <>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate('/projects')}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> Projects
+            </Button>
+            <Button size="sm" className="rounded-full" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" /> New blueprint</Button>
+          </>
+        }
       />
 
+      <main className="px-4 sm:px-6 py-6">
       {loading ? (
         <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
@@ -173,6 +181,7 @@ export const BlueprintLibraryPage: React.FC = () => {
           </section>
         </div>
       )}
+      </main>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-sm">

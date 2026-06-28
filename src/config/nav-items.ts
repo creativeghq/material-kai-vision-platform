@@ -11,7 +11,6 @@ import {
   Contact,
   Briefcase,
   Inbox,
-  ClipboardList,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -48,8 +47,8 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireCapability: 'marketplace.browse' },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes' },
-  // Blueprint Estimating Engine (#242) — reusable scope-of-works → priceable plans → quotes.
-  { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: ClipboardList, requireCapability: 'quotes.use' },
+  // Blueprints (#242) are reached from under Projects (Projects list → Blueprints,
+  // and each project's Plan tab), not as a top-level nav item.
   // #201 — Sales portal for invited reps (persona 'sales'). Gated on sales.portal so only
   // sales reps see it; managers use the full Quotes/Finance surfaces.
   { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal' },

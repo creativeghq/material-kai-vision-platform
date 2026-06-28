@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import { parseDecimalOr } from '@/utils/decimal';
+import { UnitSelect } from '@/components/features/blueprint/UnitSelect';
 import type { ProjectPlanItem } from '@/services/projectPlansService';
 
 /**
@@ -51,13 +52,7 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
           disabled={busy}
           onBlur={(e) => { if (e.target.value !== it.label) onPatch(it.id, { label: e.target.value }); }}
         />
-        <Input
-          className="h-8 w-16 text-center"
-          defaultValue={it.unit ?? ''}
-          placeholder="unit"
-          disabled={busy}
-          onBlur={(e) => { const v = e.target.value || null; if (v !== it.unit) onPatch(it.id, { unit: v }); }}
-        />
+        <UnitSelect className="w-32" value={it.unit} disabled={busy} onChange={(u) => { if (u !== it.unit) onPatch(it.id, { unit: u }); }} />
         {it.is_allowance ? (
           <Input
             className="h-8 w-24 text-right"

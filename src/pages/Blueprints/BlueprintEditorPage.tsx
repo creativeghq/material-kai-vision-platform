@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { blueprintsService, type Blueprint, type BlueprintItem, type DimensionDef } from '@/services/blueprintsService';
+import { UnitSelect } from '@/components/features/blueprint/UnitSelect';
 
 type EditItem = Partial<BlueprintItem> & { id: string; kind: 'section' | 'task'; label: string };
 
@@ -91,7 +92,7 @@ export const BlueprintEditorPage: React.FC = () => {
     <div className="rounded-md border border-border/60 bg-background/40 px-2 py-1.5 space-y-1">
       <div className="flex items-center gap-2">
         <Input className="h-8 flex-1" value={it.label} onChange={(e) => patch(it.id, { label: e.target.value })} />
-        <Input className="h-8 w-16 text-center" value={it.unit ?? ''} placeholder="unit" onChange={(e) => patch(it.id, { unit: e.target.value || null })} />
+        <UnitSelect className="w-36" value={it.unit} onChange={(u) => patch(it.id, { unit: u })} />
         <div className="flex items-center gap-1 text-[11px] text-muted-foreground">allow
           <Switch checked={!!it.is_allowance} onCheckedChange={(v) => patch(it.id, { is_allowance: v })} />
         </div>
@@ -135,7 +136,7 @@ export const BlueprintEditorPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-background">
       <PageHeader
         icon={LayoutTemplate}
         title={readOnly ? 'View blueprint' : 'Edit blueprint'}
@@ -152,6 +153,7 @@ export const BlueprintEditorPage: React.FC = () => {
         }
       />
 
+      <main className="px-4 sm:px-6 py-6 space-y-6">
       {readOnly && (
         <div className="rounded-lg border border-primary/30 bg-primary/[0.04] px-4 py-2.5 text-sm text-muted-foreground flex items-center gap-2">
           <LayoutTemplate className="h-4 w-4 text-primary shrink-0" />
@@ -206,6 +208,7 @@ export const BlueprintEditorPage: React.FC = () => {
         <Button variant="outline" size="sm" className="rounded-full" onClick={addSection}><Plus className="h-3.5 w-3.5 mr-1" /> Add section</Button>
       </div>
       </fieldset>
+      </main>
     </div>
   );
 };
