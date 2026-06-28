@@ -12,9 +12,10 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Loader2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { ClipboardList, Loader2, Sparkles, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -74,8 +75,13 @@ function computeBreakdown(items: Item[], dims: Record<string, number>) {
   return { sections: out, subtotal: round2(subtotal) };
 }
 
+// Only the Full Home Renovation estimate runs free on the public tool; the rest are
+// teased as locked and unlock after sign-up.
+const isUnlocked = (s: Starter) => s.project_type === 'full_home_renovation';
+
 export default function ProjectPlanPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isAuthenticated = !!user;
 
   const [starters, setStarters] = useState<Starter[]>([]);
@@ -165,14 +171,31 @@ export default function ProjectPlanPage() {
         <Card className="dashboard-card"><CardContent className="py-10 text-center text-sm text-muted-foreground">No project types available.</CardContent></Card>
       ) : (
         <div className="space-y-5">
-          {/* type picker */}
+          {/* type picker — only Full Home Renovation runs free; others unlock after sign-up */}
           <div className="flex flex-wrap gap-2">
-            {starters.map((s) => (
-              <button key={s.id} onClick={() => setSelectedId(s.id)}
-                className={`rounded-full border px-3.5 py-1.5 text-sm transition ${selectedId === s.id ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:bg-muted/40'}`}>
-                {s.title}
-              </button>
-            ))}
+            {starters.map((s) => {
+              const locked = !isUnlocked(s);
+              const active = selectedId === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    if (locked) {
+                      toast({ title: `${s.title} unlocks after sign-up`, description: 'Create a free account to use this template — the Full Home Renovation estimate is free to try right now.' });
+                      return;
+                    }
+                    setSelectedId(s.id);
+                  }}
+                  className={`rounded-full border px-3.5 py-1.5 text-sm transition inline-flex items-center gap-1.5 ${
+                    active ? 'border-primary bg-primary/10 text-foreground'
+                    : locked ? 'border-dashed border-border text-muted-foreground/70 hover:bg-muted/30'
+                    : 'border-border text-muted-foreground hover:bg-muted/40'}`}
+                >
+                  {locked && <Lock className="h-3 w-3" />}
+                  {s.title}
+                </button>
+              );
+            })}
           </div>
 
           {/* headline + simple inputs */}
