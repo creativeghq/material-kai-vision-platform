@@ -384,16 +384,31 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       await requireWorkspace(supabase, userId, plan.workspace_id, isService);
       const items = await loadPlanItems(supabase, plan_id);
 
-      const { data: quote, error: qErr } = await supabase.from('quotes').insert({
-        user_id: plan.user_id,
-        workspace_id: plan.workspace_id,
-        project_id: plan.project_id,
-        name: plan.title,
-        status: 'draft',
-        currency: plan.source_currency || 'EUR',
-        notes: `Created from project plan${plan.brief ? `: ${plan.brief}` : ''}`,
-      }).select().single();
-      if (qErr) throw new HttpError(400, `Failed to create quote: ${qErr.message}`);
+      // Reuse the plan's existing DRAFT quote if it has one (idempotent regenerate —
+      // avoids piling up duplicate drafts on repeated clicks / re-quotes). Once the
+      // quote has been sent/accepted we leave it alone and create a fresh one.
+      let quote: { id: string } | null = null;
+      if (plan.quote_id) {
+        const { data: existing } = await supabase.from('quotes').select('id, status').eq('id', plan.quote_id).maybeSingle();
+        if (existing && existing.status === 'draft') {
+          quote = { id: existing.id };
+          await supabase.from('quote_items').delete().eq('quote_id', existing.id); // rebuild from the current plan
+          await supabase.from('quotes').update({ name: plan.title }).eq('id', existing.id);
+        }
+      }
+      if (!quote) {
+        const { data: created, error: qErr } = await supabase.from('quotes').insert({
+          user_id: plan.user_id,
+          workspace_id: plan.workspace_id,
+          project_id: plan.project_id,
+          name: plan.title,
+          status: 'draft',
+          currency: plan.source_currency || 'EUR',
+          notes: `Created from project plan${plan.brief ? `: ${plan.brief}` : ''}`,
+        }).select().single();
+        if (qErr) throw new HttpError(400, `Failed to create quote: ${qErr.message}`);
+        quote = { id: created.id };
+      }
 
       const { rows: quoteItems, subtotal } = buildQuoteItems(quote.id, items);
       if (quoteItems.length) {

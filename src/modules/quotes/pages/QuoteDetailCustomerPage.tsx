@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '../services/QuotesService';
 import { AddProductsSheet } from '../components/AddProductsSheet';
 import { QuoteItemsList } from '../components/QuoteItemsList';
+import { QuoteApprovalsCard } from '../components/QuoteApprovalsCard';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
@@ -451,6 +452,8 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="page-container py-6">
+        {/* E-sign audit trail (self-hides when the quote has no approvals) */}
+        <QuoteApprovalsCard quoteId={quote.id} />
         {/* Tabs */}
         <Tabs defaultValue="items" className="w-full mt-2">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
