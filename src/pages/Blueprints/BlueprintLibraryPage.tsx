@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, LayoutTemplate, Sparkles, Trash2, Pencil, Copy } from 'lucide-react';
+import { Loader2, Plus, LayoutTemplate, Sparkles, Trash2, Pencil, Copy, Eye } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -46,6 +46,27 @@ export const BlueprintLibraryPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Import-after-signup: the public /tools/project-plan estimator stashes a chosen
+  // starter + dimensions in localStorage; once the now-logged-in user lands here
+  // with an active workspace, materialize it as an editable blueprint (once).
+  useEffect(() => {
+    const raw = (() => { try { return localStorage.getItem('mk_pending_blueprint'); } catch { return null; } })();
+    if (!raw || !workspaceId) return;
+    let pending: { starter_id: string; title?: string; dimensions?: Record<string, number> };
+    try { pending = JSON.parse(raw); } catch { localStorage.removeItem('mk_pending_blueprint'); return; }
+    localStorage.removeItem('mk_pending_blueprint'); // consume once (guards double-invoke)
+    if (!pending?.starter_id) return;
+    (async () => {
+      try {
+        const bp = await blueprintsService.duplicate(pending.starter_id, workspaceId, { title: pending.title, dimensionValues: pending.dimensions });
+        toast({ title: 'Imported your plan', description: 'Your saved estimate is now an editable blueprint.' });
+        navigate(`/blueprints/${bp.id}`);
+      } catch (e) {
+        toast({ title: 'Could not import your saved plan', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+      }
+    })();
+  }, [workspaceId, navigate, toast]);
+
   const own = blueprints.filter((b) => !b.is_platform_starter);
   const starters = blueprints.filter((b) => b.is_platform_starter);
 
@@ -66,24 +87,7 @@ export const BlueprintLibraryPage: React.FC = () => {
     if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
     setBusy(true);
     try {
-      const items = await blueprintsService.listItems(starter.id);
-      const bp = await blueprintsService.create({
-        workspace_id: workspaceId,
-        title: `${starter.title} (copy)`,
-        description: starter.description ?? undefined,
-        project_type: starter.project_type ?? undefined,
-        source_currency: starter.source_currency,
-        dimensions_schema: starter.dimensions_schema,
-      });
-      // re-id items preserving hierarchy
-      const idMap: Record<string, string> = {};
-      for (const it of items) idMap[it.id] = crypto.randomUUID();
-      await blueprintsService.replaceItems(bp.id, items.map((it) => ({
-        ...it,
-        id: idMap[it.id],
-        parent_id: it.parent_id ? idMap[it.parent_id] ?? null : null,
-        source: 'template' as const,
-      })));
+      const bp = await blueprintsService.duplicate(starter.id, workspaceId);
       toast({ title: 'Copied to your library' });
       navigate(`/blueprints/${bp.id}`);
     } catch (e) {
@@ -116,9 +120,14 @@ export const BlueprintLibraryPage: React.FC = () => {
         </div>
         <div className="mt-auto pt-2 flex items-center gap-2">
           {b.is_platform_starter ? (
-            <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={() => duplicateStarter(b)}>
-              <Copy className="h-3.5 w-3.5 mr-1" /> Copy to my library
-            </Button>
+            <>
+              <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(`/blueprints/${b.id}`)}>
+                <Eye className="h-3.5 w-3.5 mr-1" /> View
+              </Button>
+              <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={() => duplicateStarter(b)}>
+                <Copy className="h-3.5 w-3.5 mr-1" /> Copy to my library
+              </Button>
+            </>
           ) : (
             <>
               <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(`/blueprints/${b.id}`)}>

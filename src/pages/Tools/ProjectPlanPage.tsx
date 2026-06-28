@@ -8,7 +8,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { AlertCircle, ClipboardList, Loader2, Shield, Sparkles, Calculator } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -74,6 +73,22 @@ export default function ProjectPlanPage() {
     setDims(next);
     setResult(null);
   }, [selected]);
+
+  // Stash the current selection so we can import it into the user's library after
+  // they sign up (the public tool has no workspace to save into). Picked up by
+  // BlueprintLibraryPage on the post-login landing.
+  const saveAndSignUp = () => {
+    if (!selected) return;
+    const numericDims: Record<string, number> = {};
+    for (const [k, v] of Object.entries(dims)) numericDims[k] = Number(String(v).replace(',', '.')) || 0;
+    try {
+      localStorage.setItem('mk_pending_blueprint', JSON.stringify({
+        starter_id: selected.id, title: selected.title, dimensions: numericDims, savedAt: Date.now(),
+      }));
+    } catch { /* private mode / storage full — fall through to plain signup */ }
+    // Already signed in? skip the auth bounce — /blueprints imports the pending plan on mount.
+    window.location.href = isAuthenticated ? '/blueprints' : '/auth?mode=signup&redirect=/blueprints';
+  };
 
   const handleVerify = useCallback((t: string) => { setTurnstileToken(t); setTurnstileError(null); }, []);
   const resetCaptcha = () => { setTurnstileToken(null); turnstileRef.current?.reset(); };
@@ -214,10 +229,10 @@ export default function ProjectPlanPage() {
               <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center gap-3">
                 <Sparkles className="h-5 w-5 text-primary shrink-0" />
                 <div className="text-sm flex-1">
-                  <div className="font-medium">Make this yours</div>
-                  <div className="text-muted-foreground">Sign up to edit every line, use your own rates, save it, and turn it into a client quote.</div>
+                  <div className="font-medium">Save &amp; make this yours</div>
+                  <div className="text-muted-foreground">We'll keep this plan and import it into your library after you sign up — then edit every line, use your own rates, and turn it into a client quote.</div>
                 </div>
-                <Link to="/auth?mode=signup&redirect=/blueprints"><Button className="rounded-full whitespace-nowrap">Create free account</Button></Link>
+                <Button className="rounded-full whitespace-nowrap" onClick={saveAndSignUp}>Save &amp; create free account</Button>
               </CardContent>
             </Card>
             <p className="text-[11px] text-muted-foreground text-center">Ballpark estimate using standard rates — your actual pricing will differ.</p>

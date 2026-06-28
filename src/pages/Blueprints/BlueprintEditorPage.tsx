@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2, ChevronLeft, Plus, Trash2, Save, LayoutTemplate } from 'lucide-react';
+import { Loader2, ChevronLeft, Plus, Trash2, Save, LayoutTemplate, Copy } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -10,6 +10,8 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { blueprintsService, type Blueprint, type BlueprintItem, type DimensionDef } from '@/services/blueprintsService';
 
 type EditItem = Partial<BlueprintItem> & { id: string; kind: 'section' | 'task'; label: string };
@@ -18,6 +20,8 @@ export const BlueprintEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const workspaceId = getActiveWorkspaceId(user?.id);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -67,8 +71,21 @@ export const BlueprintEditorPage: React.FC = () => {
     } finally { setSaving(false); }
   };
 
+  const copyToEdit = async () => {
+    if (!bp || !workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
+    setSaving(true);
+    try {
+      const copy = await blueprintsService.duplicate(bp.id, workspaceId);
+      toast({ title: 'Copied to your library' });
+      navigate(`/blueprints/${copy.id}`);
+    } catch (e) {
+      toast({ title: 'Copy failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   if (loading) return <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!bp) return null;
+  const readOnly = !!bp.is_platform_starter;
 
   const TaskRow = ({ it }: { it: EditItem }) => (
     <div className="rounded-md border border-border/60 bg-background/40 px-2 py-1.5 space-y-1">
@@ -121,15 +138,28 @@ export const BlueprintEditorPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         icon={LayoutTemplate}
-        title="Edit blueprint"
+        title={readOnly ? 'View blueprint' : 'Edit blueprint'}
         subtitle={bp.title}
         actions={
           <>
             <Button variant="outline" className="rounded-full" onClick={() => navigate('/blueprints')}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
-            <Button className="rounded-full" disabled={saving} onClick={save}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save</Button>
+            {readOnly ? (
+              <Button className="rounded-full" disabled={saving} onClick={copyToEdit}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Copy className="h-4 w-4 mr-1" />} Copy to my library</Button>
+            ) : (
+              <Button className="rounded-full" disabled={saving} onClick={save}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save</Button>
+            )}
           </>
         }
       />
+
+      {readOnly && (
+        <div className="rounded-lg border border-primary/30 bg-primary/[0.04] px-4 py-2.5 text-sm text-muted-foreground flex items-center gap-2">
+          <LayoutTemplate className="h-4 w-4 text-primary shrink-0" />
+          This is a read-only starter blueprint. <span className="font-medium text-foreground">Copy it to your library</span> to edit the works, rates, and formulas.
+        </div>
+      )}
+
+      <fieldset disabled={readOnly} className="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-90">
 
       <Card className="dashboard-card"><CardContent className="p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -175,6 +205,7 @@ export const BlueprintEditorPage: React.FC = () => {
         ))}
         <Button variant="outline" size="sm" className="rounded-full" onClick={addSection}><Plus className="h-3.5 w-3.5 mr-1" /> Add section</Button>
       </div>
+      </fieldset>
     </div>
   );
 };

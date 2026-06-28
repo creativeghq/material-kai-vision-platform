@@ -158,6 +158,43 @@ class BlueprintsService {
   }
 
   /**
+   * Copy any blueprint (a platform starter or one of your own) into the active
+   * workspace. Optionally override the title and bake dimension values in as the
+   * new defaults (used by the public-tool "import after sign-up" flow). One method
+   * reused by: library "Copy to my library", the read-only starter viewer's
+   * "Copy to edit", and the post-login import.
+   */
+  async duplicate(sourceId: string, workspaceId: string, opts?: { title?: string; dimensionValues?: Record<string, number> }): Promise<Blueprint> {
+    const source = await this.get(sourceId);
+    if (!source) throw new Error('Blueprint not found');
+    const items = await this.listItems(sourceId);
+
+    const schema = (source.dimensions_schema ?? []).map((d) => ({
+      ...d,
+      default: opts?.dimensionValues?.[d.key] ?? d.default,
+    }));
+
+    const bp = await this.create({
+      workspace_id: workspaceId,
+      title: opts?.title ?? `${source.title} (copy)`,
+      description: source.description ?? undefined,
+      project_type: source.project_type ?? undefined,
+      source_currency: source.source_currency,
+      dimensions_schema: schema,
+    });
+
+    const idMap: Record<string, string> = {};
+    for (const it of items) idMap[it.id] = crypto.randomUUID();
+    await this.replaceItems(bp.id, items.map((it) => ({
+      ...it,
+      id: idMap[it.id],
+      parent_id: it.parent_id ? idMap[it.parent_id] ?? null : null,
+      source: 'template' as const,
+    })));
+    return bp;
+  }
+
+  /**
    * Save a project plan back into the workspace blueprint library so it can be
    * reused. Copies the plan's items (stripping resolved prices/quantities — a
    * blueprint stores formulas + rates, not resolved numbers) into a fresh blueprint.
