@@ -20,6 +20,7 @@ import { PDFDocument, rgb } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -59,6 +60,14 @@ interface Body {
   project_name?: string;
   mode?: 'per_item' | 'schedule' | 'both';
   title?: string;
+  // ---- purchase-order mode (#237 A3 send-to-supplier) ----
+  // When set, renders a purchase ORDER (orders.order_type='purchase') + its
+  // order_items as a PO document. With send=true it also emails the supplier,
+  // marks the order placed (draft→confirmed) and emits a Flows event.
+  order_id?: string;
+  send?: boolean;
+  to?: string;        // override recipient email
+  message?: string;   // optional note included in the email body
 }
 
 Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) => {
@@ -79,6 +88,11 @@ Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) =>
   const reader = isService
     ? admin
     : createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
+
+  // ---- purchase-order mode (#237 A3) ----
+  if (body.order_id) {
+    return await handlePurchaseOrder(body, admin, reader);
+  }
 
   let items: PurchaseItem[] = [];
   let projectName = body.project_name || 'Project';
@@ -451,4 +465,244 @@ async function embedImage(pdf: PDFDocument, bytes: Uint8Array): Promise<any | nu
 }
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+// =====================================================================
+// Purchase-order mode (#237 A3) — render a purchase ORDER + optionally
+// email it to the supplier and mark the order placed.
+// =====================================================================
+async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise<Response> {
+  // Load the order under the caller's RLS (enforces workspace access).
+  const { data: order, error: oErr } = await reader
+    .from('orders')
+    .select('id, workspace_id, order_type, order_number, status, currency, subtotal_net, vat_amount, total, notes, supplier_company_id, supplier_contact_id')
+    .eq('id', body.order_id)
+    .eq('order_type', 'purchase')
+    .maybeSingle();
+  if (oErr) throw new HttpError(403, `Could not read order: ${oErr.message}`);
+  if (!order) throw new HttpError(404, 'Purchase order not found');
+
+  const { data: lines, error: liErr } = await reader
+    .from('order_items')
+    .select('description, quantity, unit_cost, unit_price, line_total, sort_order')
+    .eq('order_id', order.id)
+    .order('sort_order', { ascending: true });
+  if (liErr) throw new HttpError(403, `Could not read order lines: ${liErr.message}`);
+  const items = lines || [];
+  if (items.length === 0) throw new HttpError(400, 'Purchase order has no line items');
+
+  // Supplier + buyer identity (service-role reads — these are needed to address the PO).
+  let supplier: any = null;
+  if (order.supplier_company_id) {
+    const { data } = await admin.from('crm_companies').select('name, email, vat_number').eq('id', order.supplier_company_id).maybeSingle();
+    supplier = data;
+  }
+  let contactEmail: string | null = null;
+  let contactName: string | null = null;
+  if (order.supplier_contact_id) {
+    const { data } = await admin.from('crm_contacts').select('name, email').eq('id', order.supplier_contact_id).maybeSingle();
+    contactEmail = data?.email ?? null;
+    contactName = data?.name ?? null;
+  }
+  const { data: ws } = await admin.from('workspaces').select('name').eq('id', order.workspace_id).maybeSingle();
+  const buyerName = ws?.name || 'Our company';
+
+  const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
+  const currency = order.currency || 'EUR';
+
+  // ---- render ----
+  const pdf = await PDFDocument.create();
+  const { regular: font, bold } = await embedOpenSans(pdf);
+  drawPurchaseOrderDoc(pdf, font, bold, {
+    orderNumber, buyerName,
+    supplierName: supplier?.name || contactName || 'Supplier',
+    supplierVat: supplier?.vat_number || null,
+    supplierEmail: contactEmail || supplier?.email || null,
+    deliverNote: order.notes || null,
+    message: body.message || null,
+    currency,
+    subtotal: Number(order.subtotal_net || 0),
+    vat: Number(order.vat_amount || 0),
+    total: Number(order.total || 0),
+    lines: items.map((it: any) => ({
+      description: it.description || '—',
+      qty: Number(it.quantity || 0),
+      unitCost: Number(it.unit_cost ?? it.unit_price ?? 0),
+      lineTotal: Number(it.line_total ?? (Number(it.quantity || 0) * Number(it.unit_cost ?? it.unit_price ?? 0))),
+    })),
+  });
+  const bytes = await pdf.save();
+  const pageCount = pdf.getPageCount();
+
+  const ts = Date.now();
+  const path = `purchase-order/${order.id}/po-${ts}.pdf`;
+  const { error: upErr } = await admin.storage.from('pdf-documents').upload(path, bytes, {
+    contentType: 'application/pdf', upsert: true,
+  });
+  if (upErr) throw new HttpError(500, `PDF upload failed: ${upErr.message}`);
+  const { data: signed } = await admin.storage.from('pdf-documents').createSignedUrl(path, 60 * 60 * 24 * 7);
+
+  let sent = false;
+  let recipient: string | null = null;
+  if (body.send) {
+    recipient = (body.to || contactEmail || supplier?.email || '').trim() || null;
+    if (!recipient) throw new HttpError(400, 'No supplier email on file — add a supplier contact/company email or pass `to`.');
+
+    const subject = `Purchase Order ${orderNumber} — ${buyerName}`;
+    const intro = body.message ? `<p>${escapeHtml(body.message)}</p>` : '';
+    const html = `<div style="font-family:system-ui,Arial,sans-serif;color:#1a1a1a">
+      <p>Dear ${escapeHtml(supplier?.name || contactName || 'Supplier')},</p>
+      <p>Please find attached our purchase order <strong>${escapeHtml(orderNumber)}</strong> from ${escapeHtml(buyerName)}.</p>
+      ${intro}
+      <table style="border-collapse:collapse;margin:12px 0">
+        <tr><td style="padding:2px 12px 2px 0;color:#666">Items</td><td><strong>${items.length}</strong></td></tr>
+        <tr><td style="padding:2px 12px 2px 0;color:#666">Total</td><td><strong>${order.total?.toFixed ? order.total.toFixed(2) : order.total} ${escapeHtml(currency)}</strong></td></tr>
+      </table>
+      <p style="color:#666;font-size:13px">The full order detail is in the attached PDF.</p>
+    </div>`;
+
+    const { error: mailErr } = await admin.functions.invoke('email-api', {
+      body: {
+        action: 'send',
+        to: recipient,
+        subject,
+        html,
+        emailType: 'transactional',
+        attachments: [{ filename: `purchase-order-${orderNumber}.pdf`, content: bytesToBase64(bytes) }],
+        tags: { feature: 'purchase_orders', order_id: order.id },
+        workspace_id: order.workspace_id,
+      },
+    });
+    if (mailErr) throw new HttpError(502, `Email send failed: ${mailErr.message ?? 'unknown'}`);
+    sent = true;
+
+    // Mark the PO placed (draft → confirmed) once it's actually been sent.
+    if (order.status === 'draft') {
+      await admin.from('orders').update({ status: 'confirmed' }).eq('id', order.id);
+    }
+
+    // Notify via Flows (no-op if no flow consumes it yet).
+    await emitFlowEvent('purchase_order.sent', {
+      order_id: order.id,
+      order_number: orderNumber,
+      supplier_id: order.supplier_company_id,
+      supplier_name: supplier?.name || contactName || null,
+      supplier_email: recipient,
+      workspace_id: order.workspace_id,
+      total: Number(order.total || 0),
+      currency,
+      item_count: items.length,
+      buyer_name: buyerName,
+    });
+  }
+
+  return json({
+    success: true,
+    pdf_url: signed?.signedUrl ?? null,
+    pdf_storage_path: path,
+    order_id: order.id,
+    order_number: orderNumber,
+    page_count: pageCount,
+    sent,
+    recipient,
+  });
+}
+
+interface POLine { description: string; qty: number; unitCost: number; lineTotal: number; }
+interface POCtx {
+  orderNumber: string; buyerName: string; supplierName: string; supplierVat: string | null;
+  supplierEmail: string | null; deliverNote: string | null; message: string | null;
+  currency: string; subtotal: number; vat: number; total: number; lines: POLine[];
+}
+
+function drawPurchaseOrderDoc(pdf: PDFDocument, font: any, bold: any, ctx: POCtx) {
+  const W = 595.28, H = 841.89, M = 42;
+  const money = (n: number) => `${n.toFixed(2)} ${ctx.currency}`;
+  const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max - 1) + '…' : s);
+  const cols = [
+    { key: 'idx', label: '#', w: 24, align: 'left' as const },
+    { key: 'desc', label: 'DESCRIPTION', w: 271, align: 'left' as const },
+    { key: 'qty', label: 'QTY', w: 50, align: 'right' as const },
+    { key: 'unit', label: 'UNIT COST', w: 88, align: 'right' as const },
+    { key: 'total', label: 'LINE TOTAL', w: 78, align: 'right' as const },
+  ];
+  const rowH = 20;
+
+  let page = pdf.addPage([W, H]);
+  const drawHeader = (p: any): number => {
+    let y = H - M;
+    p.drawText('PURCHASE ORDER', { x: M, y: y - 6, size: 20, font: bold, color: INK });
+    p.drawText(`No. ${ctx.orderNumber}`, { x: W - M - bold.widthOfTextAtSize(`No. ${ctx.orderNumber}`, 11), y: y - 2, size: 11, font: bold, color: INK });
+    y -= 34;
+    p.drawText(`From: ${clip(ctx.buyerName, 60)}`, { x: M, y, size: 10, font, color: GRAY });
+    y -= 16;
+    p.drawText(`To (Supplier): ${clip(ctx.supplierName, 50)}`, { x: M, y, size: 11, font: bold, color: INK });
+    y -= 14;
+    const sub: string[] = [];
+    if (ctx.supplierVat) sub.push(`VAT ${ctx.supplierVat}`);
+    if (ctx.supplierEmail) sub.push(ctx.supplierEmail);
+    if (sub.length) { p.drawText(clip(sub.join('  ·  '), 70), { x: M, y, size: 9, font, color: GRAY }); y -= 14; }
+    if (ctx.deliverNote) { p.drawText(clip(ctx.deliverNote, 80), { x: M, y, size: 9, font, color: GRAY }); y -= 14; }
+    y -= 6;
+    // table header row
+    let x = M;
+    p.drawRectangle({ x: M, y: y - rowH + 4, width: W - 2 * M, height: rowH, color: ZEBRA });
+    for (const c of cols) {
+      const tw = bold.widthOfTextAtSize(c.label, 8);
+      p.drawText(c.label, { x: c.align === 'right' ? x + c.w - tw - 4 : x + 4, y: y - rowH + 10, size: 8, font: bold, color: HAIR });
+      x += c.w;
+    }
+    return y - rowH;
+  };
+
+  let y = drawHeader(page);
+  const drawRow = (cells: Record<string, string>, idx: number) => {
+    if (idx % 2 === 1) page.drawRectangle({ x: M, y: y - rowH + 4, width: W - 2 * M, height: rowH, color: WHITE });
+    let x = M;
+    for (const c of cols) {
+      const v = cells[c.key] ?? '';
+      const tw = font.widthOfTextAtSize(v, 9);
+      page.drawText(v, { x: c.align === 'right' ? x + c.w - tw - 4 : x + 4, y: y - rowH + 10, size: 9, font, color: INK });
+      x += c.w;
+    }
+    y -= rowH;
+  };
+
+  ctx.lines.forEach((l, i) => {
+    if (y < M + 110) { page = pdf.addPage([W, H]); y = drawHeader(page); }
+    drawRow({ idx: String(i + 1), desc: clip(l.description, 62), qty: String(l.qty), unit: money(l.unitCost), total: money(l.lineTotal) }, i);
+  });
+
+  // totals block
+  y -= 10;
+  page.drawLine({ start: { x: W - M - 230, y: y + 6 }, end: { x: W - M, y: y + 6 }, thickness: 0.6, color: LIGHT });
+  const totalsRow = (label: string, val: string, strong = false) => {
+    const f = strong ? bold : font; const sz = strong ? 11 : 9;
+    page.drawText(label, { x: W - M - 230, y, size: sz, font: f, color: strong ? INK : GRAY });
+    const tw = f.widthOfTextAtSize(val, sz);
+    page.drawText(val, { x: W - M - tw, y, size: sz, font: f, color: INK });
+    y -= strong ? 18 : 15;
+  };
+  totalsRow('Subtotal (net)', money(ctx.subtotal));
+  totalsRow('VAT', money(ctx.vat));
+  totalsRow('TOTAL', money(ctx.total), true);
+
+  if (ctx.message) {
+    y -= 8;
+    page.drawText('Notes', { x: M, y, size: 9, font: bold, color: GRAY }); y -= 14;
+    page.drawText(clip(ctx.message, 95), { x: M, y, size: 9, font, color: INK });
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
 }
