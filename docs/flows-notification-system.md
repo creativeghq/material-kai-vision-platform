@@ -275,16 +275,42 @@ If the new feature instead needs an **external/webhook** or **scheduled** trigge
 
 ---
 
-## 9. Known follow-ups (not yet converted)
+## 9. Governance decisions (#245 D)
 
-- `stripe` **invoice_paid** notification — needs an `invoice_paid` trigger type.
-- **Finance statement** email (`finance-send-statement`) — needs `send_email`
-  attachment support (it sends a PDF).
+Automated bell paths that previously bypassed Flows are now governable trigger types
+(seeded active locked `system-default` flows, registered in the area registry):
+
+- **`material_alert`** — `check-material-alerts` cron (saved-search matches). Was a
+  direct `user_notifications` insert; now emits one event per match.
+- **`finance_follow_up`** — `finance-digest-aggregate` cron (due/stale quote bell).
+  Was a direct insert; now emits per follow-up. (The digest **email** stays a direct
+  `email-api` template send — see "intentionally direct" below.)
+- **`invoice_paid`** — `stripe-webhooks` `invoice.paid`, the **creator** bell. The
+  customer-facing `payment_received` event was already on Flows and is unchanged.
+
+**Resolved (no change needed):**
+- **WhatsApp replies** already flow through Flows: `zernio-webhook-handler` emits
+  `inbox.message_received` (+ `inbox.thread_assigned`), both registered with seeded
+  flows. There is **no** separate `whatsapp.reply_received` event — the earlier
+  "dead event" note was stale.
+- **role-upgrade-requests** is **not** a duplicate: the `role_upgrade_*` flow events
+  drive the **bell**; the direct `sendEmail` calls are the **email** channel
+  (transactional, intentionally direct — see below). Two channels, not a dup.
+
+**Intentionally direct (NOT routed through Flows):**
+- User-initiated / transactional sends — `finance-send-invoice-email`,
+  `send-quote-email`, `finance-send-statement`, `catalog-send-to-customers`,
+  role-upgrade emails — Flows governs **automation**, not button-clicks.
+- **Python monitoring** (price / mention / job alerts) — detection + credit metering
+  intentionally stay in Python; only a future emit-to-flow bridge + a `debit_credits`
+  action would move channel fan-out into Flows. Decided to keep them out for now.
+
+## Known follow-ups (not yet converted)
+
+- **Finance statement / digest** email — needs `send_email` action with attachment
+  support (they send a PDF), to fully route the email channel through Flows.
 - **Email channel** for role-upgrade / factory — needs `send_email` to support
   `template_slug` + `variables` (the bell channel is already on flows).
-- **Python monitoring** (price / mention / job alerts) — detection + credit
-  metering intentionally stay in Python; only a future emit-to-flow bridge +
-  `debit_credits` action would move channel fan-out into Flows.
 
 ---
 
