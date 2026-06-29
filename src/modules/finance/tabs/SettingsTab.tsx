@@ -10,6 +10,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
@@ -550,6 +551,10 @@ interface DigestPanelProps {
 
 const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, saving, workspaceId }) => {
   const { toast } = useToast();
+  // The flow-cron + email-template editors are platform-operator surfaces (/admin/*),
+  // so only show the deep-links to operators. The per-workspace config below stays
+  // visible to every finance manager who can reach Settings.
+  const { isOperator } = usePermissions();
   const [newRecipient, setNewRecipient] = useState('');
   const [testEmail, setTestEmail] = useState('');
   const [sending, setSending] = useState<'configured' | 'test' | null>(null);
@@ -608,21 +613,24 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
       <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs flex items-start gap-2">
         <Info className="h-4 w-4 mt-0.5 text-primary shrink-0" />
         <div className="flex-1">
-          <div className="font-medium text-foreground">Composed from the platform pieces</div>
+          <div className="font-medium text-foreground">Configure your digest</div>
           <p className="mt-0.5 text-muted-foreground leading-snug">
-            Layout lives in the <strong>finance.digest</strong> email template (edit in Email → Templates).
-            Schedule lives in the <strong>Finance digest</strong> flow (edit cron in Flows).
-            Per-workspace recipients, frequency, hour and on/off live here.
+            Recipients, frequency, hour and on/off are per-workspace and live here.
+            {isOperator && (
+              <> The email layout lives in the <strong>finance.digest</strong> template and the schedule in the <strong>Finance digest</strong> flow.</>
+            )}
           </p>
-          <div className="mt-2 flex gap-2">
-            <Link to="/admin/flows" className="inline-flex items-center gap-1 text-primary hover:underline">
-              Open flow editor <ExternalLink className="h-3 w-3" />
-            </Link>
-            <span className="text-muted-foreground">·</span>
-            <Link to="/admin/emails" className="inline-flex items-center gap-1 text-primary hover:underline">
-              Edit template design <ExternalLink className="h-3 w-3" />
-            </Link>
-          </div>
+          {isOperator && (
+            <div className="mt-2 flex gap-2">
+              <Link to="/admin/flows" className="inline-flex items-center gap-1 text-primary hover:underline">
+                Open flow editor <ExternalLink className="h-3 w-3" />
+              </Link>
+              <span className="text-muted-foreground">·</span>
+              <Link to="/admin/emails" className="inline-flex items-center gap-1 text-primary hover:underline">
+                Edit template design <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
