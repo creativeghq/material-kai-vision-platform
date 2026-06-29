@@ -65,13 +65,14 @@ import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
 import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
+import { SourcingBoardPanel } from '@/modules/finance/components/SourcingBoardPanel';
 import { MarketplaceEarningsTab } from '@/modules/finance/components/MarketplaceEarningsTab';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
 import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
-import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart } from 'lucide-react';
+import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -413,6 +414,11 @@ const FinancePage: React.FC = () => {
             {!isAccountant && (
               <TabsTrigger value="warehouse" className="w-full justify-start">
                 <Package className="h-4 w-4 mr-2" /> Warehouse
+              </TabsTrigger>
+            )}
+            {!isAccountant && (
+              <TabsTrigger value="sourcing" className="w-full justify-start">
+                <PackageSearch className="h-4 w-4 mr-2" /> Sourcing
               </TabsTrigger>
             )}
             {!isAccountant && (
@@ -846,6 +852,10 @@ const FinancePage: React.FC = () => {
 
           <TabsContent value="warehouse" className="space-y-4">
             <WarehousePanel workspaceId={workspaceId} />
+          </TabsContent>
+
+          <TabsContent value="sourcing" className="space-y-4">
+            <SourcingBoardPanel workspaceId={workspaceId} />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-4">
