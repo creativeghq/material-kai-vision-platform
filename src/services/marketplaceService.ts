@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import {
   PRODUCT_IMAGE_SELECT, getProductName, getMaterialCategory,
   getAvailableSizes, getAvailableColors,
@@ -236,7 +237,7 @@ export const marketplaceService = {
   },
 
   /** Buyer → seller inquiry: opens an Inbox thread cross-tenant + notifies the seller. */
-  async createInquiry(input: { listingId: string; buyerWorkspaceId: string; qtyWanted?: number | null; message?: string }): Promise<{ inquiry_id: string; thread_id: string }> {
+  async createInquiry(input: { listingId: string; buyerWorkspaceId: string; qtyWanted?: number | null; message?: string; demandType?: 'order_item' | 'quote_item' | null; demandId?: string | null }): Promise<{ inquiry_id: string; thread_id: string }> {
     const { data, error } = await supabase.functions.invoke('inbox-api', {
       body: {
         action: 'create_marketplace_inquiry',
@@ -244,10 +245,28 @@ export const marketplaceService = {
         buyer_workspace_id: input.buyerWorkspaceId,
         qty_wanted: input.qtyWanted ?? null,
         message: input.message ?? null,
+        // #247 A5p2 — when sourcing a specific demand line, carry it so accept can allocate
+        demand_type: input.demandType ?? null,
+        demand_id: input.demandId ?? null,
       },
     });
-    if (error) throw error;
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to send inquiry'));
     return data as { inquiry_id: string; thread_id: string };
+  },
+
+  // #247 A5p2 — SELLER accepts a surplus inquiry → materializes a draft purchase order
+  // (+ on_order allocation if the inquiry carried a sourcing demand) in the BUYER's workspace.
+  async acceptInquiry(inquiryId: string, opts?: { acceptedQty?: number; unitPrice?: number }): Promise<{ inquiry_id: string; order_id: string; already?: boolean }> {
+    const { data, error } = await supabase.functions.invoke('inbox-api', {
+      body: {
+        action: 'accept_marketplace_inquiry',
+        inquiry_id: inquiryId,
+        accepted_qty: opts?.acceptedQty,
+        unit_price: opts?.unitPrice,
+      },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to accept inquiry'));
+    return data as { inquiry_id: string; order_id: string; already?: boolean };
   },
 
   async incrementView(id: string): Promise<void> {

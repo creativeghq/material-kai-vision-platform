@@ -4,9 +4,10 @@ import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
-  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, PanelRight,
+  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, PanelRight, CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { marketplaceService } from '@/services/marketplaceService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -294,6 +295,20 @@ const InboxPage: React.FC = () => {
   // sheet so the controls stay reachable without crowding the mobile header.
   const memberControls = isMember && activeThread ? (
     <>
+      {(activeThread.metadata as any)?.marketplace_inquiry_id && (
+        <Button
+          variant="default" size="sm" className="rounded-full"
+          title="Accept this surplus inquiry — creates a draft purchase order in the buyer's workspace"
+          onClick={async () => {
+            try {
+              const res = await marketplaceService.acceptInquiry(String((activeThread.metadata as any).marketplace_inquiry_id));
+              toast({ title: res.already ? 'Already accepted' : 'Inquiry accepted', description: 'A draft purchase order was created for the buyer.' });
+            } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+          }}
+        >
+          <CheckCircle2 className="w-4 h-4 mr-1.5" /> Accept inquiry
+        </Button>
+      )}
       <Button
         variant={activeThread.agent_state === 'active' ? 'default' : 'outline'}
         size="icon" className="rounded-full h-9 w-9"

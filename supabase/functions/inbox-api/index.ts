@@ -1117,6 +1117,9 @@ async function handleJwtAction(
         qty_wanted: qtyWanted,
         message: customMsg || null,
         status: 'open',
+        // #247 A5p2 — carry the sourcing demand so accept can materialize an allocation
+        demand_type: (payload.demand_type === 'order_item' || payload.demand_type === 'quote_item') ? payload.demand_type : null,
+        demand_id: payload.demand_id ? String(payload.demand_id) : null,
       }).select('id').single();
       if (inqErr) throw new HttpError(500, `Failed to create inquiry: ${inqErr.message}`);
       const inquiryId = (inq as { id: string }).id;
@@ -1166,6 +1169,130 @@ async function handleJwtAction(
 
       await db.from('marketplace_inquiries').update({ inbox_thread_id: threadId }).eq('id', inquiryId);
       return json({ inquiry_id: inquiryId, thread_id: threadId });
+    }
+
+    case 'accept_marketplace_inquiry': {
+      // #247 A5p2 — SELLER accepts a surplus inquiry → materialize a DRAFT purchase
+      // order (+ an on_order allocation, if the inquiry carried a sourcing demand) in
+      // the BUYER's workspace. Cross-tenant write under the service role; the caller
+      // must be a business member of the SELLER's (listing's) workspace.
+      const acceptInquiryId = String(payload.inquiry_id || '');
+      if (!acceptInquiryId) throw new HttpError(400, 'inquiry_id is required');
+
+      const { data: inqRow } = await db.from('marketplace_inquiries')
+        .select('id, listing_id, buyer_workspace_id, qty_wanted, status, inbox_thread_id, demand_type, demand_id, accepted_order_id')
+        .eq('id', acceptInquiryId).maybeSingle();
+      const inq2 = inqRow as Record<string, any> | null;
+      if (!inq2) throw new HttpError(404, 'Inquiry not found');
+      if (inq2.status === 'accepted' && inq2.accepted_order_id) {
+        return json({ inquiry_id: acceptInquiryId, order_id: inq2.accepted_order_id, already: true });
+      }
+      if (inq2.status !== 'open') throw new HttpError(409, `Inquiry is ${inq2.status}, not open`);
+
+      const { data: listingRow } = await db.from('marketplace_listings')
+        .select('id, workspace_id, seller_name, title, price, currency, unit, status')
+        .eq('id', inq2.listing_id).maybeSingle();
+      const lst = listingRow as Record<string, any> | null;
+      if (!lst) throw new HttpError(404, 'Listing not found');
+      const sellerWs = String(lst.workspace_id);
+      const buyerWs = String(inq2.buyer_workspace_id);
+
+      const sellerRole = await callerRoleInWorkspace(db, userId, sellerWs);
+      if (!sellerRole || !BUSINESS_ROLES.has(sellerRole)) {
+        throw new HttpError(403, 'Only a member of the selling workspace can accept this inquiry');
+      }
+
+      const acceptQty = Number(payload.accepted_qty ?? inq2.qty_wanted ?? 1) || 1;
+      const acceptPrice = Number(payload.unit_price ?? lst.price ?? 0) || 0;
+      const acceptCurrency = lst.currency || 'EUR';
+      const sellerName = lst.seller_name || 'Marketplace seller';
+
+      // Seller's legal-entity VAT (if their workspace links one) → carried onto the buyer-side
+      // supplier row, where the _crm_link_platform_supplier trigger links the canonical identity.
+      let sellerVat: string | null = null; let sellerCountry: string | null = null;
+      const { data: sellerWsRow } = await db.from('workspaces').select('parent_crm_company_id').eq('id', sellerWs).maybeSingle();
+      const parentCo = (sellerWsRow as Record<string, any> | null)?.parent_crm_company_id;
+      if (parentCo) {
+        const { data: co } = await db.from('crm_companies').select('vat_number, country_code').eq('id', parentCo).maybeSingle();
+        sellerVat = (co as Record<string, any> | null)?.vat_number ?? null;
+        sellerCountry = (co as Record<string, any> | null)?.country_code ?? null;
+      }
+
+      // Find-or-create a supplier in the BUYER's workspace representing the seller.
+      let supplierCompanyId: string;
+      const { data: existingSup } = await db.from('crm_companies')
+        .select('id').eq('workspace_id', buyerWs).eq('is_supplier', true).ilike('name', sellerName).maybeSingle();
+      if (existingSup) {
+        supplierCompanyId = (existingSup as Record<string, any>).id;
+      } else {
+        const { data: newSup, error: supErr } = await db.from('crm_companies')
+          .insert({ workspace_id: buyerWs, name: sellerName, is_supplier: true, vat_number: sellerVat, country_code: sellerCountry })
+          .select('id').single();
+        if (supErr) throw new HttpError(500, `Failed to create supplier: ${supErr.message}`);
+        supplierCompanyId = (newSup as Record<string, any>).id;
+      }
+
+      // Buyer-side product from the demand line, if any.
+      let productId: string | null = null;
+      if (inq2.demand_type === 'order_item' && inq2.demand_id) {
+        const { data: di } = await db.from('order_items').select('product_id').eq('id', inq2.demand_id).eq('workspace_id', buyerWs).maybeSingle();
+        productId = (di as Record<string, any> | null)?.product_id ?? null;
+      } else if (inq2.demand_type === 'quote_item' && inq2.demand_id) {
+        const { data: di } = await db.from('quote_items').select('product_id').eq('id', inq2.demand_id).maybeSingle();
+        productId = (di as Record<string, any> | null)?.product_id ?? null;
+      }
+
+      const net = Math.round(acceptQty * acceptPrice * 100) / 100;
+
+      const { data: ord, error: ordErr } = await db.from('orders').insert({
+        workspace_id: buyerWs, order_type: 'purchase', status: 'draft',
+        supplier_company_id: supplierCompanyId, currency: acceptCurrency,
+        subtotal_net: net, vat_amount: 0, total: net,
+        notes: `Sourced from marketplace listing "${lst.title || ''}" (${sellerName}).`,
+      }).select('id').single();
+      if (ordErr) throw new HttpError(500, `Failed to create purchase order: ${ordErr.message}`);
+      const acceptOrderId = (ord as Record<string, any>).id;
+
+      const { data: oi, error: oiErr } = await db.from('order_items').insert({
+        order_id: acceptOrderId, workspace_id: buyerWs, product_id: productId,
+        description: lst.title || 'Marketplace item', quantity: acceptQty,
+        unit_price: acceptPrice, unit_cost: acceptPrice, supplier_company_id: supplierCompanyId,
+        net_value: net, vat_amount: 0, line_total: net, update_warehouse: true, sort_order: 0,
+      }).select('id').single();
+      if (oiErr) throw new HttpError(500, `Failed to create order line: ${oiErr.message}`);
+      const acceptOrderItemId = (oi as Record<string, any>).id;
+
+      // on_order allocation against the sourcing demand (only when the inquiry carried one).
+      if (inq2.demand_type && inq2.demand_id) {
+        await db.from('stock_allocations').insert({
+          workspace_id: buyerWs, demand_type: inq2.demand_type, demand_id: inq2.demand_id,
+          product_id: productId, quantity: acceptQty, source_type: 'purchase_order',
+          supply_order_item_id: acceptOrderItemId, status: 'on_order',
+        });
+      }
+
+      // Decrement the seller's listing + close the inquiry.
+      await db.rpc('mark_listing_sold', { p_id: lst.id, p_qty: acceptQty }).then(() => {}, () => {});
+      await db.from('marketplace_inquiries')
+        .update({ status: 'accepted', accepted_order_id: acceptOrderId, accepted_at: new Date().toISOString() })
+        .eq('id', acceptInquiryId);
+
+      // Notify the buyer on the inquiry thread.
+      if (inq2.inbox_thread_id) {
+        const { data: thr } = await db.from('inbox_threads').select('*').eq('id', inq2.inbox_thread_id).maybeSingle();
+        const { data: sellerPart } = await db.from('inbox_participants')
+          .select('id').eq('thread_id', inq2.inbox_thread_id).eq('user_id', userId).maybeSingle();
+        if (thr) {
+          await insertMessageAndNotify(db, {
+            thread: thr as Record<string, unknown>,
+            senderParticipantId: (sellerPart as Record<string, any> | null)?.id ?? null,
+            body: `Inquiry accepted — a draft purchase order for ${acceptQty} ${lst.unit || ''} at ${acceptPrice} ${acceptCurrency} was created in your workspace.`.replace(/\s+/g, ' ').trim(),
+            attachments: [], messageType: 'text', senderUserId: userId, senderLabel: `${sellerName} · marketplace`,
+          });
+        }
+      }
+
+      return json({ inquiry_id: acceptInquiryId, order_id: acceptOrderId, order_item_id: acceptOrderItemId });
     }
 
     case 'get_thread_context': {
