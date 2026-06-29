@@ -92,6 +92,7 @@ const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
 const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
+const SupplierClaimsPage = lazy(() => import('./pages/Admin/SupplierClaimsPage'));
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
@@ -720,6 +721,19 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <MonitoringPage />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* #247 F — operator review queue for supplier identity claims */}
+                <Route
+                  path="/admin/supplier-claims"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <SupplierClaimsPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>
