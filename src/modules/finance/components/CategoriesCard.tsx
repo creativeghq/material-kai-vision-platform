@@ -10,6 +10,7 @@ import { Loader2, Plus, Trash2, Tags, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { parseDecimal } from '@/utils/decimal';
+import { humanizeLabel } from '@/utils/humanize';
 
 export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -78,9 +79,9 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
               <div key={c.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
                 <span>{c.name}</span>
                 <div className="flex items-center gap-3">
-                  <Badge variant={kindBadge(c.kind)} className="text-[10px]">{c.kind}</Badge>
+                  <Badge variant={kindBadge(c.kind)} className="text-[10px]">{humanizeLabel(c.kind)}</Badge>
                   <div className="flex items-center gap-1" title="Default sell margin % — auto-prices received goods in this category">
-                    <input type="text" inputMode="decimal" defaultValue={c.margin_pct ?? ''} placeholder="margin"
+                    <input type="text" inputMode="decimal" defaultValue={c.margin_pct ?? ''} placeholder="Margin"
                       className="h-7 w-14 rounded border border-border/60 bg-background px-1 text-right text-xs"
                       onBlur={(e) => saveMargin(c.id, e.target.value)} />
                     <span className="text-[10px] text-muted-foreground">%</span>

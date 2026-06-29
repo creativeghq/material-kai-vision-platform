@@ -46,8 +46,7 @@ const SETTINGS_SECTIONS = [
   { value: 'team', label: 'Team', icon: Users },
   { value: 'storefront', label: 'Online Store', icon: Store },
   { value: 'banks', label: 'Bank accounts', icon: Landmark },
-  { value: 'statements', label: 'Statement PDF', icon: ImageIcon },
-  { value: 'digest', label: 'Finance Digest', icon: Mail },
+  { value: 'digest', label: 'Statements & Digest', icon: Mail },
   { value: 'payments', label: 'Payments', icon: CreditCard },
 ] as const;
 
@@ -480,38 +479,44 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
       </Card>
         </TabsContent>
 
-        <TabsContent value="statements" className="mt-0">
+        <TabsContent value="digest" className="mt-0 space-y-4">
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Statement PDF Design</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3">
+          <CardTitle className="text-sm flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Statement PDF design</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4 p-5">
           <p className="text-xs text-muted-foreground">
             Same dimensions as quote PDFs: A4 (595 × 842 pt). The statement table renders on top of these backdrops. PNG or JPG.
           </p>
 
-          <BackdropSlot
-            title="Cover / page backdrop"
-            previewUrl={coverPreviewUrl}
-            uploading={uploading === 'cover'}
-            onPick={() => coverInputRef.current?.click()}
-            onClear={() => clearImage('cover')}
-          />
-          <input ref={coverInputRef} type="file" accept="image/png,image/jpeg" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload('cover', f); e.target.value = ''; }} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <BackdropSlot
+                title="Cover / page backdrop"
+                previewUrl={coverPreviewUrl}
+                uploading={uploading === 'cover'}
+                onPick={() => coverInputRef.current?.click()}
+                onClear={() => clearImage('cover')}
+              />
+              <input ref={coverInputRef} type="file" accept="image/png,image/jpeg" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) upload('cover', f); e.target.value = ''; }} />
+            </div>
 
-          <BackdropSlot
-            title="Footer (optional)"
-            previewUrl={footerPreviewUrl}
-            uploading={uploading === 'footer'}
-            onPick={() => footerInputRef.current?.click()}
-            onClear={() => clearImage('footer')}
-          />
-          <input ref={footerInputRef} type="file" accept="image/png,image/jpeg" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload('footer', f); e.target.value = ''; }} />
+            <div>
+              <BackdropSlot
+                title="Back cover / footer (optional)"
+                previewUrl={footerPreviewUrl}
+                uploading={uploading === 'footer'}
+                onPick={() => footerInputRef.current?.click()}
+                onClear={() => clearImage('footer')}
+              />
+              <input ref={footerInputRef} type="file" accept="image/png,image/jpeg" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) upload('footer', f); e.target.value = ''; }} />
+            </div>
+          </div>
         </CardContent>
       </Card>
-        </TabsContent>
 
-        <TabsContent value="digest" className="mt-0">
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
           <CardTitle className="text-sm flex items-center gap-2"><Mail className="h-4 w-4" /> Finance Digest</CardTitle>
