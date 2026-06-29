@@ -339,6 +339,24 @@ interface Message {
       latest_at: string | null;
     };
   };
+  // #237 A6 — sourcing
+  sourcingOptionsData?: {
+    product_id: string;
+    quantity: number;
+    counts: { warehouse: number; inbound_po: number; supplier: number; marketplace: number };
+    result: any;
+  };
+  purchaseOrderCreatedData?: {
+    allocations_created: number;
+    purchase_orders_created: number;
+    orders: Array<{ order_id: string; supplier_company_id: string; subtotal_net: number }>;
+  };
+  purchaseOrderSentData?: {
+    order_id: string;
+    order_number: string;
+    recipient: string | null;
+    pdf_url: string | null;
+  };
   llmVisibilityData?: {
     product_id: string;
     snapshot: {

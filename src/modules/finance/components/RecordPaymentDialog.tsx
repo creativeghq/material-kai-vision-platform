@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { financeService, type Invoice, type PaymentMethod, type BankAccount } from '@/modules/finance/services/financeService';
+import { financeService, paymentMethodLabel, type Invoice, type PaymentMethod, type BankAccount } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { parseDecimal } from '@/utils/decimal';
 
@@ -274,7 +274,7 @@ export const RecordPaymentDialog: React.FC<{
               <Label>Method</Label>
               <Select value={method} onValueChange={(v: any) => setMethod(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{METHODS.map((m) => <SelectItem key={m} value={m}>{m.replace('_', ' ')}</SelectItem>)}</SelectContent>
+                <SelectContent>{METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1">

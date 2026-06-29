@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
-import { financeService, formatMoney, type InvoiceWithItems } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, paymentMethodLabel, type InvoiceWithItems } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -344,7 +344,7 @@ function buildHistory(inv: InvoiceWithItems): { label: string; when: string | nu
   const submittedAt = (inv as any).fiscal_submitted_at as string | null;
   if (submittedAt) out.push({ label: `Transmitted to myDATA${(inv as any).fiscal_mark ? ` · MARK ${(inv as any).fiscal_mark}` : ''}`, when: submittedAt });
   for (const p of inv.payments ?? []) {
-    out.push({ label: `Payment ${formatMoney(p.amount, p.currency)} (${(p.method ?? 'other').replace('_', ' ')})`, when: p.paid_at });
+    out.push({ label: `Payment ${formatMoney(p.amount, p.currency)} (${paymentMethodLabel(p.method ?? 'other')})`, when: p.paid_at });
   }
   for (const cn of inv.credit_notes ?? []) {
     out.push({ label: `Credit note ${(cn as any).credit_note_number ?? ''} ${formatMoney((cn as any).total ?? (cn as any).amount, cn.currency)}`, when: (cn as any).issued_at });

@@ -862,6 +862,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
       // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
       'manage_job_sites',
+      // Sourcing / fulfillment (#237; RPC-gated — resolve=member, create_po=finance-manager; 0 cr)
+      'source_product', 'create_purchase_order', 'send_purchase_order',
       // Presentation catalogs (admin/owner only — gated at injection time)
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
       'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
@@ -1270,6 +1272,7 @@ async function executeAgent(
   const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
+  const needsSourcing = config.tools.some((t: string) => ['source_product', 'create_purchase_order', 'send_purchase_order'].includes(t));
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
   // (internal ops capability) — gate to admin/owner like price_lookup.
   const needsTechRadar = isAdmin && config.tools.some((t: string) => ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'].includes(t));
@@ -1280,7 +1283,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1297,6 +1300,7 @@ async function executeAgent(
     needsJobResearch  ? import('../_shared/tools/job-research-tools.ts') : null,
     needsProjects     ? import('../_shared/tools/project-tools.ts') : null,
     needsTechRadar    ? import('../_shared/tools/tech-radar-tools.ts') : null,
+    needsSourcing     ? import('../_shared/tools/sourcing-tools.ts') : null,
   ]);
 
   const createSearchTool = searchMod?.createSearchTool;
@@ -1379,6 +1383,9 @@ async function executeAgent(
   const createFindJobsTool = jobResearchMod?.createFindJobsTool;
   const createGetJobDigestPreviewTool = jobResearchMod?.createGetJobDigestPreviewTool;
   const createManageJobSitesTool = jobResearchMod?.createManageJobSitesTool;
+  const createSourceProductTool = sourcingMod?.createSourceProductTool;
+  const createCreatePurchaseOrderTool = sourcingMod?.createCreatePurchaseOrderTool;
+  const createSendPurchaseOrderTool = sourcingMod?.createSendPurchaseOrderTool;
   const createCreateProjectTool = projectsMod?.createCreateProjectTool;
   const createListMyProjectsTool = projectsMod?.createListMyProjectsTool;
   const createFindProjectTool = projectsMod?.createFindProjectTool;
@@ -1604,6 +1611,17 @@ async function executeAgent(
   }
   if (config.tools.includes('manage_job_sites') && createManageJobSitesTool) {
     tools.push(createManageJobSitesTool(userId, userJwt, onChunk));
+  }
+
+  // Sourcing tools (#237; RPC-gated at the DB layer — resolve=member, create_po=finance-manager; 0 cr)
+  if (config.tools.includes('source_product') && createSourceProductTool) {
+    tools.push(createSourceProductTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('create_purchase_order') && createCreatePurchaseOrderTool) {
+    tools.push(createCreatePurchaseOrderTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('send_purchase_order') && createSendPurchaseOrderTool) {
+    tools.push(createSendPurchaseOrderTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Project Workspace tools (all users; module-gated inside each tool; 0 cr — DB-only)

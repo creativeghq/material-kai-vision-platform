@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   financeService,
   formatMoney,
+  paymentMethodLabel,
   type InvoiceWithItems,
   type PaymentMethod,
 } from '@/modules/finance/services/financeService';
@@ -663,7 +664,7 @@ const RecordPaymentDialog: React.FC<{
               <Select value={method} onValueChange={(v: PaymentMethod) => setMethod(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m.replace('_', ' ')}</SelectItem>)}
+                  {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

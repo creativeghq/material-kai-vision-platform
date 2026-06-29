@@ -137,6 +137,20 @@ export interface InvoiceWithItems extends Invoice {
 export type PaymentDirection = 'in' | 'out';
 export type PaymentMethod = 'bank_transfer' | 'cash' | 'card' | 'check' | 'other';
 
+/** Human display labels for payment methods (Title Case). */
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  bank_transfer: 'Bank Transfer',
+  check: 'Check',
+  other: 'Other',
+};
+
+/** Title-case a payment method for display; falls back gracefully for unknown values. */
+export const paymentMethodLabel = (m: string | null | undefined): string =>
+  (m && PAYMENT_METHOD_LABEL[m as PaymentMethod]) ||
+  (m ? m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '');
+
 export interface Payment {
   id: string;
   workspace_id: string;

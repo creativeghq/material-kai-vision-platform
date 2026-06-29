@@ -14,7 +14,7 @@ import {
 } from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { formatMoney, financeService, VAT_CATEGORIES } from '@/modules/finance/services/financeService';
+import { formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel } from '@/modules/finance/services/financeService';
 import { parseDecimal } from '@/utils/decimal';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { flowEventService } from '@/services/flows/flowEventService';
@@ -1134,7 +1134,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   )}
                   <Select value={payMethod} onValueChange={setPayMethod}>
                     <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>{PAY_METHODS.map((m) => <SelectItem key={m} value={m}>{m.replace('_', ' ')}</SelectItem>)}</SelectContent>
+                    <SelectContent>{PAY_METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}</SelectContent>
                   </Select>
                   <Input className="h-8 w-52 text-sm" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'Reason (e.g. pre-payment, deposit)' : 'Reason (e.g. deposit to supplier)'} />
                 </div>
@@ -1230,7 +1230,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <div key={p.id} className={`flex items-start justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0 ${editingPaymentId === p.id ? 'bg-muted/30' : ''}`}>
                     <span className="min-w-0">
                       <span className="block truncate">{p.reference || <span className="text-muted-foreground italic">No reason</span>}</span>
-                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'In' : 'Out'}{p.method ? ` · ${p.method.replace('_', ' ')}` : ''}{acctName ? ` · ${acctName}` : ''}</span>
+                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'In' : 'Out'}{p.method ? ` · ${paymentMethodLabel(p.method)}` : ''}{acctName ? ` · ${acctName}` : ''}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>

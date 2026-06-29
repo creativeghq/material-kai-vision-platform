@@ -93,41 +93,41 @@ export const BlueprintEditorPage: React.FC = () => {
       <div className="flex items-center gap-2">
         <Input className="h-8 flex-1" value={it.label} onChange={(e) => patch(it.id, { label: e.target.value })} />
         <UnitSelect className="w-40 shrink-0" value={it.unit} onChange={(u) => patch(it.id, { unit: u })} />
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">allow
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">Allowance
           <Switch checked={!!it.is_allowance} onCheckedChange={(v) => patch(it.id, { is_allowance: v })} />
         </div>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => del(it.id)}><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>
       </div>
       {it.is_allowance ? (
-        <div className="flex items-center gap-2 pl-1 text-[11px] text-muted-foreground">allowance amount
+        <div className="flex items-center gap-2 pl-1 text-[11px] text-muted-foreground">Allowance Amount
           <Input className="h-6 w-24 text-right" value={String(it.allowance_amount ?? 0)} onChange={(e) => patch(it.id, { allowance_amount: Number(e.target.value) || 0 })} />
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3 pl-1 text-[11px] text-muted-foreground">
-          <span className="flex items-center gap-1">qty formula
+          <span className="flex items-center gap-1">QTY Formula
             <Input className="h-6 w-40" value={it.quantity_formula ?? ''} placeholder="= floor_area * 1.1" onChange={(e) => patch(it.id, { quantity_formula: e.target.value || null })} />
           </span>
-          <span className="flex items-center gap-1">default
+          <span className="flex items-center gap-1">Default
             <Input className="h-6 w-14 text-right" value={String(it.default_quantity ?? 1)} onChange={(e) => patch(it.id, { default_quantity: Number(e.target.value) || 0 })} />
           </span>
-          <span className="flex items-center gap-1">labor
+          <span className="flex items-center gap-1">Labor
             <Input className="h-6 w-16 text-right" value={it.labor_rate != null ? String(it.labor_rate) : ''} placeholder="—" onChange={(e) => patch(it.id, { labor_rate: e.target.value === '' ? null : Number(e.target.value) })} />
           </span>
-          <span className="flex items-center gap-1">material
+          <span className="flex items-center gap-1">Material
             <Input className="h-6 w-16 text-right" value={it.material_cost != null ? String(it.material_cost) : ''} placeholder="—" onChange={(e) => patch(it.id, { material_cost: e.target.value === '' ? null : Number(e.target.value) })} />
           </span>
-          <span className="flex items-center gap-1">margin
+          <span className="flex items-center gap-1">Margin
             <Input className="h-6 w-14 text-right" value={String(it.margin_pct ?? 0)} onChange={(e) => patch(it.id, { margin_pct: Number(e.target.value) || 0 })} />%
           </span>
-          <span className="flex items-center gap-1">option
+          <span className="flex items-center gap-1">Option
             <Input className="h-6 w-24" value={it.option_group ?? ''} placeholder="group" onChange={(e) => patch(it.id, { option_group: e.target.value || null })} />
           </span>
           {it.option_group && (
             <select className="h-6 bg-transparent border border-border rounded px-1 text-[11px]" value={it.tier ?? ''} onChange={(e) => patch(it.id, { tier: (e.target.value || null) as EditItem['tier'] })}>
-              <option value="">tier…</option>
-              <option value="good">good</option>
-              <option value="better">better</option>
-              <option value="best">best</option>
+              <option value="">Tier…</option>
+              <option value="good">Good</option>
+              <option value="better">Better</option>
+              <option value="best">Best</option>
             </select>
           )}
         </div>

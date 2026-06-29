@@ -14,7 +14,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { financeService, formatMoney, type Invoice, type CreditNote, type PaymentWithAllocation } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
@@ -570,7 +570,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
             <td className="px-4 py-2">
               <Badge variant={p.direction === 'in' ? 'default' : 'outline'} className="text-[10px]">{p.direction === 'in' ? 'Received' : 'Paid out'}</Badge>
             </td>
-            <td className="px-4 py-2 capitalize">{(p.method ?? '—').replace('_', ' ')}</td>
+            <td className="px-4 py-2">{p.method ? paymentMethodLabel(p.method) : '—'}</td>
             <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName(p.category_id)}</td>
             <td className="px-4 py-2 text-muted-foreground">{p.reference ?? '—'}</td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(p.amount, p.currency)}</td>
