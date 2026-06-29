@@ -207,6 +207,13 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'pricing_change_decided', group: 'Finance',
     label: 'Discount Approval Decided', description: 'A finance approver approved or declined a discount change', icon: 'CheckCircle2', color: 'blue',
     defaultData: { label: 'Discount Approval Decided', category: 'trigger', triggerType: 'pricing_change_decided', config: {} } as TriggerNodeData },
+  // #237 — sourcing / purchase orders to suppliers
+  { type: 'triggerNode', category: 'trigger', subType: 'purchase_order.sent', group: 'Finance',
+    label: 'Purchase Order Sent', description: 'A purchase order was emailed to a supplier', icon: 'Send', color: 'emerald',
+    defaultData: { label: 'Purchase Order Sent', category: 'trigger', triggerType: 'purchase_order.sent', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'purchase_order.received', group: 'Finance',
+    label: 'Purchase Order Received', description: 'A purchase order was received into the warehouse', icon: 'Package', color: 'emerald',
+    defaultData: { label: 'Purchase Order Received', category: 'trigger', triggerType: 'purchase_order.received', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

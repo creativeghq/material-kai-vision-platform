@@ -5,7 +5,7 @@ import {
   LogIn, CheckCircle2, XCircle, ClipboardCheck, Image, FileCheck, Package,
   Search, Box, Orbit,
   SearchCheck, ScanEye, PackagePlus,
-  LayoutGrid, ImagePlus, Share2, Inbox,
+  LayoutGrid, ImagePlus, Share2, Inbox, Send,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -67,6 +67,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   invoice_issued: FileText,
   receipt_issued: FileCheck,
   payment_received: CheckCircle2,
+  'purchase_order.sent': Send,
+  'purchase_order.received': Package,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,
   pricing_change_requested: ClipboardCheck,

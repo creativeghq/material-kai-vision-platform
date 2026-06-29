@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatMoney, financeService, VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import { parseDecimal } from '@/utils/decimal';
 import { edgeErrorMessage } from '@/utils/edgeError';
+import { flowEventService } from '@/services/flows/flowEventService';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
@@ -834,6 +835,20 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       if (error) throw error;
       await load(order.id); onChanged();
       toast({ title: 'Received', description: `${data ?? 0} warehouse line(s) updated` });
+      // #237 — notify via Flows that the PO arrived (allocations flipped to reserved).
+      if (order.order_type === 'purchase') {
+        const { data: u } = await supabase.auth.getUser();
+        void flowEventService.emit('purchase_order.received', {
+          user_id: u?.user?.id ?? null,
+          title: `Purchase order ${order.order_number ?? order.id.slice(0, 8)} received`,
+          body: `${data ?? 0} warehouse line(s) updated`,
+          action_url: `/finance?tab=orders&order=${order.id}`,
+          order_id: order.id,
+          order_number: order.order_number,
+          supplier_id: order.supplier_company_id,
+          workspace_id: order.workspace_id,
+        });
+      }
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setSaving(false); }
   };

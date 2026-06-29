@@ -76,7 +76,10 @@ export type TriggerType =
   // Finance documents: a tax invoice / retail receipt was issued, or a payment was received
   | 'invoice_issued'
   | 'receipt_issued'
-  | 'payment_received';
+  | 'payment_received'
+  // Sourcing / purchase orders (#237)
+  | 'purchase_order.sent'
+  | 'purchase_order.received';
 
 export interface ManualTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
@@ -92,6 +95,8 @@ export interface FinanceDocumentRequestedTriggerConfig {}
 export interface InvoiceIssuedTriggerConfig {}
 export interface ReceiptIssuedTriggerConfig {}
 export interface PaymentReceivedTriggerConfig {}
+export interface PurchaseOrderSentTriggerConfig {}
+export interface PurchaseOrderReceivedTriggerConfig {}
 export interface ReviewSubmittedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
@@ -263,6 +268,8 @@ export type TriggerConfigMap = {
   invoice_issued: InvoiceIssuedTriggerConfig;
   receipt_issued: ReceiptIssuedTriggerConfig;
   payment_received: PaymentReceivedTriggerConfig;
+  'purchase_order.sent': PurchaseOrderSentTriggerConfig;
+  'purchase_order.received': PurchaseOrderReceivedTriggerConfig;
 };
 
 // =====================================================
