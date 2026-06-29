@@ -21,6 +21,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService, type ProjectEvent } from '../../services/projectsService';
+import { humanizeLabel } from '@/utils/humanize';
 
 interface TimelineTabProps {
   projectId: string;
@@ -67,7 +68,7 @@ const describe = (e: ProjectEvent): string => {
     case 'room.removed': return `Room removed — "${p.name}"`;
     case 'moodboard.attached': return `Moodboard attached — "${p.title}"`;
     case 'moodboard.detached': return `Moodboard detached — "${p.title}"`;
-    case 'quote.attached': return `Quote attached — "${p.name || 'Untitled'}" (${p.status})`;
+    case 'quote.attached': return `Quote attached — "${p.name || 'Untitled'}" (${humanizeLabel(p.status)})`;
     case 'quote.detached': return `Quote detached — "${p.name || 'Untitled'}"`;
     case 'quote.status_changed': return `Quote "${p.name || 'Untitled'}": ${p.from} → ${p.to}${p.grand_total ? ` (${formatMoney(p.grand_total, p.currency)})` : ''}`;
     case 'quote.revised': return `Quote revision ${p.revision_number} issued — "${p.name}"`;

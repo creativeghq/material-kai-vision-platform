@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService } from '../../services/projectsService';
+import { humanizeLabel } from '@/utils/humanize';
 
 interface SheetsTabProps {
   projectId: string;
@@ -114,7 +115,7 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId }) => {
                     </p>
                   </div>
                   <Badge variant="outline" className={`text-xs ${STATUS_TONE[s.status] || ''}`}>
-                    {s.status}
+                    {humanizeLabel(s.status)}
                   </Badge>
                   {s.pdf_storage_path && (
                     <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />

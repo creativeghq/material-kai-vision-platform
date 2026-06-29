@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { campaignService } from '../services/campaignService';
 import { RecipientsTab } from './RecipientsTab';
 import { format } from 'date-fns';
+import { humanizeLabel } from '@/utils/humanize';
 
 interface Campaign {
   id: string;
@@ -269,7 +270,7 @@ export const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({
             <div className="flex items-center gap-3">
               <span>{campaign.name}</span>
               <Badge className={statusColors[campaign.status]}>
-                {campaign.status}
+                {humanizeLabel(campaign.status)}
               </Badge>
             </div>
             <Button variant="ghost" size="sm" onClick={onClose}>

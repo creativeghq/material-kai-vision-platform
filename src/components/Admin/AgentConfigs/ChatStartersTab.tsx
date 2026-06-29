@@ -280,10 +280,10 @@ export const ChatStartersTab: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-1">
                                 <span className="text-sm font-medium">{r.name}</span>
-                                {r.is_default && <Badge variant="outline" className="text-[10px]">default</Badge>}
-                                {!r.is_active && <Badge variant="outline" className="text-[10px]"><EyeOff className="h-2.5 w-2.5 mr-0.5" />inactive</Badge>}
-                                {r.configuration?.visibility === 'admin' && <Badge variant="outline" className="text-[10px]">admin</Badge>}
-                                {r.configuration?.requires_image && <Badge variant="outline" className="text-[10px]"><ImageIcon className="h-2.5 w-2.5 mr-0.5" />image</Badge>}
+                                {r.is_default && <Badge variant="outline" className="text-[10px]">Default</Badge>}
+                                {!r.is_active && <Badge variant="outline" className="text-[10px]"><EyeOff className="h-2.5 w-2.5 mr-0.5" />Inactive</Badge>}
+                                {r.configuration?.visibility === 'admin' && <Badge variant="outline" className="text-[10px]">Admin</Badge>}
+                                {r.configuration?.requires_image && <Badge variant="outline" className="text-[10px]"><ImageIcon className="h-2.5 w-2.5 mr-0.5" />Image</Badge>}
                                 {r.configuration?.skill_hint && <Badge variant="outline" className="text-[10px]">skill: {r.configuration.skill_hint}</Badge>}
                                 {r.configuration?.credit_estimate && (
                                   <span className="text-[10px] text-muted-foreground">~{r.configuration.credit_estimate} cr</span>

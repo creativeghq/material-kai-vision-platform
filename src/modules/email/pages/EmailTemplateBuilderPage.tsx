@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getProductName, getMaterialCategory, getAvailableColors } from '@/utils/productMetadata';
 import { getAllTriggerGroups } from '@/services/flows/triggerVariables';
+import { humanizeLabel } from '@/utils/humanize';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type DeviceView = 'desktop' | 'tablet' | 'mobile';
@@ -709,7 +710,7 @@ export const EmailTemplateBuilder: React.FC = () => {
             </Button>
             <div>
               <p className="font-semibold text-sm leading-tight">{template?.name}</p>
-              <p className="text-xs text-muted-foreground capitalize">{template?.category}</p>
+              <p className="text-xs text-muted-foreground capitalize">{humanizeLabel(template?.category)}</p>
             </div>
           </div>
 

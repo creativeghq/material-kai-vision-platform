@@ -11,6 +11,7 @@ import { Input } from '@/components/core/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { humanizeLabel } from '@/utils/humanize';
 
 interface Recipient {
   id: string;
@@ -102,7 +103,7 @@ export const RecipientsTab: React.FC<RecipientsTabProps> = ({ campaignId }) => {
 
     return (
       <Badge className={colors[status] || 'bg-gray-500'}>
-        {status}
+        {humanizeLabel(status)}
       </Badge>
     );
   };

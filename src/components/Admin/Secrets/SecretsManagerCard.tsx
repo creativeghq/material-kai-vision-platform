@@ -195,7 +195,7 @@ const SourceBadge: React.FC<{ source: 'env' | 'db' | 'default' | 'missing'; pres
   if (!present) return <Badge variant="destructive">Missing</Badge>;
   if (source === 'env') return <Badge className="bg-indigo-700 hover:bg-indigo-700 text-white" title="Set via env var — DB value is ignored at runtime">env</Badge>;
   if (source === 'db') return <Badge className="bg-emerald-700 hover:bg-emerald-700 text-white">db</Badge>;
-  if (source === 'default') return <Badge variant="outline">default</Badge>;
+  if (source === 'default') return <Badge variant="outline">Default</Badge>;
   return <Badge variant="outline">{source}</Badge>;
 };
 

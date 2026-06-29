@@ -9,6 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { messagingCampaignService, MessagingCampaign } from '../services/messagingCampaignService';
+import { humanizeLabel } from '@/utils/humanize';
 import { format } from 'date-fns';
 
 const WhatsAppIcon = <MessageCircle className="h-4 w-4 text-green-500" />;
@@ -195,7 +196,7 @@ export const MessagingCampaignsTab: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <Badge className={statusColors[campaign.status]}>
-                        {campaign.status}
+                        {humanizeLabel(campaign.status)}
                       </Badge>
                     </td>
                     <td className="py-3 px-4">

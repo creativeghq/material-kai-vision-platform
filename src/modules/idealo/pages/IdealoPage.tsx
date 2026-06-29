@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useModule } from '@/modules/_core';
 import { MIVAA_API_URL as MIVAA_BASE_URL } from '@/config/mivaa';
+import { humanizeLabel } from '@/utils/humanize';
 
 interface SourceStatus {
   key: string;
@@ -338,7 +339,7 @@ const IdealoPage: React.FC = () => {
                       {searchResult.hits.map((hit, idx) => (
                         <tr key={`${hit.source}-${hit.product_url}-${idx}`} className="border-t border-white/5">
                           <td className="px-3 py-2">
-                            <Badge variant="outline" className="capitalize">{hit.source}</Badge>
+                            <Badge variant="outline" className="capitalize">{humanizeLabel(hit.source)}</Badge>
                           </td>
                           <td className="px-3 py-2">{hit.retailer_name}</td>
                           <td className="px-3 py-2 text-right font-mono text-xs">

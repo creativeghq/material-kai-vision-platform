@@ -13,6 +13,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { humanizeLabel } from '@/utils/humanize';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { projectsService } from '../../services/projectsService';
@@ -106,7 +107,7 @@ export const BillingTab: React.FC<{ projectId: string }> = ({ projectId }) => {
               </div>
               <div className="text-right shrink-0">
                 <p className="font-medium">{money(inv.total, inv.currency)}</p>
-                <Badge variant="outline" className="text-[10px] mt-1">{inv.status}</Badge>
+                <Badge variant="outline" className="text-[10px] mt-1">{humanizeLabel(inv.status)}</Badge>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>

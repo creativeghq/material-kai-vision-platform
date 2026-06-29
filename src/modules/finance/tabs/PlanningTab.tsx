@@ -9,6 +9,7 @@ import {
   financeService, formatMoney, type PlannedPayment,
 } from '@/modules/finance/services/financeService';
 import { NewPlannedPaymentDialog } from '@/modules/finance/components/NewPlannedPaymentDialog';
+import { humanizeLabel } from '@/utils/humanize';
 
 interface Props { workspaceId: string }
 
@@ -199,7 +200,7 @@ const FlatTable: React.FC<{
           <td className={`px-4 py-2 text-right font-medium ${r.direction === 'out' ? 'text-red-400' : 'text-emerald-500'}`}>{formatMoney(Number(r.amount), r.currency)}</td>
           <td className="px-4 py-2 text-right">{r.scheduled_for}</td>
           <td className="px-4 py-2 text-right">{r.reminder_at ? <span className="inline-flex items-center gap-1 text-xs"><Bell className="h-3 w-3" /> {r.reminder_at}</span> : '—'}</td>
-          <td className="px-4 py-2 text-right"><Badge variant={r.status === 'overdue' ? 'destructive' : r.status === 'paid' ? 'default' : 'outline'} className="text-[10px]">{r.status}</Badge></td>
+          <td className="px-4 py-2 text-right"><Badge variant={r.status === 'overdue' ? 'destructive' : r.status === 'paid' ? 'default' : 'outline'} className="text-[10px]">{humanizeLabel(r.status)}</Badge></td>
           <td className="px-4 py-2 text-right">
             {r.status === 'planned' || r.status === 'overdue' ? (
               <div className="flex justify-end gap-1">

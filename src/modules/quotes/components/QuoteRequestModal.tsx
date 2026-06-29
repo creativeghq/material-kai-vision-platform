@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, Upsell, QuoteUpsell } from '../services/QuotesService';
 import { ProjectTimelineModal } from './ProjectTimelineModal';
+import { humanizeLabel } from '@/utils/humanize';
 
 interface QuoteRequestModalProps {
   quote: QuoteWithItems;
@@ -154,7 +155,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
               </DialogDescription>
             </div>
             <Badge variant="secondary" className={getStatusColor(quote.status)}>
-              {quote.status}
+              {humanizeLabel(quote.status)}
             </Badge>
           </div>
         </DialogHeader>

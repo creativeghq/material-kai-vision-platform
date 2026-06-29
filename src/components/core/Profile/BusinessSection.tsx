@@ -728,7 +728,7 @@ const AadeInline: React.FC<AadeInlineProps> = ({ show, checking, result, onLooku
             ) : (
               <Badge variant="destructive" className="text-[10px]">Inactive</Badge>
             )}
-            {result.source === 'cache' && <Badge variant="secondary" className="text-[10px]">cache</Badge>}
+            {result.source === 'cache' && <Badge variant="secondary" className="text-[10px]">Cache</Badge>}
           </div>
           <div className="text-[11px] text-muted-foreground space-y-0.5 pl-5">
             {result.basic_rec.doy_descr && <div>Tax office: {result.basic_rec.doy_descr}</div>}

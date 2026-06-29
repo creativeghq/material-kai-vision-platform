@@ -123,9 +123,9 @@ const MentionMonitoringDashboard: React.FC = () => {
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant="outline" className="text-[10px]">{r.subject_type}</Badge>
                         {r.is_active ? (
-                          <Badge className="text-[10px] bg-green-500/20 text-green-300 border-green-500/40">active</Badge>
+                          <Badge className="text-[10px] bg-green-500/20 text-green-300 border-green-500/40">Active</Badge>
                         ) : (
-                          <Badge className="text-[10px] bg-gray-500/20 text-gray-300">inactive</Badge>
+                          <Badge className="text-[10px] bg-gray-500/20 text-gray-300">Inactive</Badge>
                         )}
                         <span className="font-medium text-sm truncate">
                           {r.subject_label}

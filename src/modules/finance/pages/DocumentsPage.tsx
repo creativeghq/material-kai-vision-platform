@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
+import { humanizeLabel } from '@/utils/humanize';
 import { parseDecimalOr } from '@/utils/decimal';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch' | 'delivery_notes' | 'cheques' | 'expenses';
@@ -292,7 +293,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                           </td>
                           <td className="px-4 py-2 text-right">{formatMoney(i.total, i.currency)}</td>
                           <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
-                          <td className="px-4 py-2 text-center"><Badge variant={statusVariant(i.status)} className="text-[10px]">{i.status}</Badge></td>
+                          <td className="px-4 py-2 text-center"><Badge variant={statusVariant(i.status)} className="text-[10px]">{humanizeLabel(i.status)}</Badge></td>
                           <td className="px-4 py-2 text-center">{transmitted((i as any).fiscal_status) ? <span className="text-emerald-500" title="Transmitted to myDATA">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                           <td className="px-4 py-2 text-right">
                             <InvoiceActionsMenu invoiceId={i.id} financeBase={financeBase} status={i.status} fiscalStatus={(i as any).fiscal_status ?? null} fiscalMark={(i as any).fiscal_mark ?? null} onChanged={load} />
@@ -396,11 +397,11 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
             <td className="px-4 py-2 text-right font-medium">{formatMoney(c.amount, c.currency)}</td>
             <td className="px-4 py-2">
               {readOnly ? (
-                <Badge variant="outline" className="text-[10px]">{c.status}</Badge>
+                <Badge variant="outline" className="text-[10px]">{humanizeLabel(c.status)}</Badge>
               ) : (
                 <Select value={c.status} onValueChange={(v: any) => setStatus(c.id, v)}>
                   <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{CHEQUE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  <SelectContent>{CHEQUE_STATUSES.map((s) => <SelectItem key={s} value={s}>{humanizeLabel(s)}</SelectItem>)}</SelectContent>
                 </Select>
               )}
             </td>
@@ -462,7 +463,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
             <td className="px-4 py-2">{d.issued_at ? new Date(d.issued_at).toLocaleDateString() : new Date(d.created_at).toLocaleDateString()}</td>
             <td className="px-4 py-2 text-center">
               <div className="flex items-center justify-center gap-1">
-                <Badge variant={d.status === 'draft' ? 'outline' : d.status === 'void' ? 'secondary' : 'default'} className="text-[10px]">{d.status}</Badge>
+                <Badge variant={d.status === 'draft' ? 'outline' : d.status === 'void' ? 'secondary' : 'default'} className="text-[10px]">{humanizeLabel(d.status)}</Badge>
                 {d.fiscal_mark && <Badge variant="secondary" className="text-[10px]" title={`MARK ${d.fiscal_mark}`}>myDATA ✓</Badge>}
               </div>
             </td>
@@ -644,7 +645,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                 : <CategoryCell value={cat} options={categories} onChange={(v) => setCategory(d.id, v)} />}
             </td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
-            <td className="px-4 py-2 text-center"><Badge variant={d.status === 'dismissed' ? 'secondary' : d.status === 'new' ? 'outline' : 'default'} className="text-[10px]">{d.status}</Badge></td>
+            <td className="px-4 py-2 text-center"><Badge variant={d.status === 'dismissed' ? 'secondary' : d.status === 'new' ? 'outline' : 'default'} className="text-[10px]">{humanizeLabel(d.status)}</Badge></td>
             <td className="px-4 py-2 text-right">
               {!readOnly && workspaceId && (
                 <div className="flex justify-end">

@@ -18,6 +18,7 @@ import {
 } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { humanizeLabel } from '@/utils/humanize';
 import CreateTemplateModal from './CreateTemplateModal';
 
 /**
@@ -143,7 +144,7 @@ export const EmailTemplatesTab: React.FC = () => {
       marketing: 'secondary',
       notification: 'outline',
     };
-    return <Badge variant={colors[category] || 'outline'}>{category}</Badge>;
+    return <Badge variant={colors[category] || 'outline'}>{humanizeLabel(category)}</Badge>;
   };
 
   // Topics that actually have at least one template in the current list,

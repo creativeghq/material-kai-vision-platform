@@ -273,7 +273,7 @@ export const WebhooksPanel: React.FC = () => {
                       </td>
                       <td className="px-3 py-3">
                         {r.status === 'active' ? (
-                          <Badge className="bg-green-600 hover:bg-green-700">active</Badge>
+                          <Badge className="bg-green-600 hover:bg-green-700">Active</Badge>
                         ) : (
                           <Badge variant="outline">{r.status}</Badge>
                         )}

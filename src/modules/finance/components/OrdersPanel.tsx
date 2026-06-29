@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel } from '@/modules/finance/services/financeService';
 import { parseDecimal } from '@/utils/decimal';
+import { humanizeLabel } from '@/utils/humanize';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { MoneyInput } from '@/components/core/ui/money-input';
@@ -1200,7 +1201,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                 <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Invoices</div>
                 {fin.invoices.map((iv) => (
                   <div key={iv.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
-                    <span className="font-mono text-xs">{iv.internal_number ?? iv.id.slice(0, 8)} · {iv.status}</span>
+                    <span className="font-mono text-xs">{iv.internal_number ?? iv.id.slice(0, 8)} · {humanizeLabel(iv.status)}</span>
                     <span className="tabular-nums">{formatMoney(Number(iv.total), iv.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(iv.amount_due), iv.currency)}</span></span>
                   </div>
                 ))}
@@ -1213,7 +1214,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                 <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Supplier bills</div>
                 {fin.supplierBills.map((b) => (
                   <div key={b.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
-                    <span className="font-mono text-xs">{b.supplier_bill_number ?? b.id.slice(0, 8)} · {b.status}</span>
+                    <span className="font-mono text-xs">{b.supplier_bill_number ?? b.id.slice(0, 8)} · {humanizeLabel(b.status)}</span>
                     <span className="tabular-nums">{formatMoney(Number(b.total), b.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(b.amount_due), b.currency)}</span></span>
                   </div>
                 ))}

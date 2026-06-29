@@ -716,7 +716,7 @@ export const SearchAnalyticsDashboard = () => {
                       <Badge variant="outline" className="font-mono shrink-0">#{i + 1}</Badge>
                       <span className="font-medium truncate">{q.query_text}</span>
                       {q.cache_hit && (
-                        <Badge variant="secondary" className="shrink-0">cached</Badge>
+                        <Badge variant="secondary" className="shrink-0">Cached</Badge>
                       )}
                     </div>
                     <div className="text-right shrink-0">

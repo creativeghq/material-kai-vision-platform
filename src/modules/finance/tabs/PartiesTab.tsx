@@ -15,6 +15,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
 import { ExternalLink } from 'lucide-react';
+import { humanizeLabel } from '@/utils/humanize';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
@@ -428,7 +429,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                     <ul className="divide-y divide-border/40">
                       {invoices.slice(0, 15).map((i) => (
                         <li key={i.id} className="flex justify-between gap-2 px-3 py-2 text-sm">
-                          <div><span className="font-mono">{i.internal_number}</span> · {i.status}</div>
+                          <div><span className="font-mono">{i.internal_number}</span> · {humanizeLabel(i.status)}</div>
                           <div className="text-right tabular-nums">{formatMoney(Number(i.total), i.currency)}<div className="text-[10px] text-muted-foreground">Due {formatMoney(Number(i.amount_due), i.currency)}</div></div>
                         </li>
                       ))}
@@ -441,7 +442,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                     <ul className="divide-y divide-border/40">
                       {bills.slice(0, 15).map((b) => (
                         <li key={b.id} className="flex justify-between gap-2 px-3 py-2 text-sm">
-                          <div><span className="font-mono">{b.supplier_bill_number ?? '—'}</span> · {b.status}</div>
+                          <div><span className="font-mono">{b.supplier_bill_number ?? '—'}</span> · {humanizeLabel(b.status)}</div>
                           <div className="text-right tabular-nums">{formatMoney(Number(b.total), b.currency)}<div className="text-[10px] text-muted-foreground">Due {formatMoney(Number(b.amount_due), b.currency)}</div></div>
                         </li>
                       ))}

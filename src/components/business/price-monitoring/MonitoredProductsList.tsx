@@ -145,7 +145,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                             {tq.current_price.toFixed(2)} {tq.current_currency || ''}
                           </span>
                           {tq.current_price_verified ? (
-                            <Badge variant="outline" className="ml-2 text-xs">verified</Badge>
+                            <Badge variant="outline" className="ml-2 text-xs">Verified</Badge>
                           ) : null}
                         </div>
                       ) : (

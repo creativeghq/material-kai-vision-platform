@@ -248,7 +248,7 @@ const KeywordResearchTab: React.FC = () => {
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant="outline" className="text-[10px]">{r.kind}</Badge>
                       {r.country_code && <Badge className="text-[10px] bg-white/10">{r.country_code}</Badge>}
-                      {r.success ? null : <Badge className="text-[10px] bg-red-500/20 text-red-300 border-red-500/40">failed</Badge>}
+                      {r.success ? null : <Badge className="text-[10px] bg-red-500/20 text-red-300 border-red-500/40">Failed</Badge>}
                       <span className="font-medium text-sm truncate">{r.label || r.subject}</span>
                     </div>
                     <div className="text-xs text-muted-foreground space-x-4">
@@ -364,9 +364,9 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {d.is_active ? (
-                          <Badge className="text-[10px] bg-green-500/20 text-green-300 border-green-500/40">active</Badge>
+                          <Badge className="text-[10px] bg-green-500/20 text-green-300 border-green-500/40">Active</Badge>
                         ) : (
-                          <Badge className="text-[10px] bg-gray-500/20 text-gray-300">inactive</Badge>
+                          <Badge className="text-[10px] bg-gray-500/20 text-gray-300">Inactive</Badge>
                         )}
                         {d.country_code && <Badge variant="outline" className="text-[10px]">{d.country_code}</Badge>}
                         <span className="font-medium text-sm truncate">{d.display_label || d.domain}</span>

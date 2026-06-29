@@ -11,6 +11,7 @@ import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingLog, MessagingChannelType, MessageStatus } from '../services';
+import { humanizeLabel } from '@/utils/humanize';
 import { format } from 'date-fns';
 
 const WhatsAppIcon = <MessageCircle className="h-4 w-4 text-green-500" />;
@@ -166,7 +167,7 @@ export const MessagingLogsTab: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <Badge className={statusColors[log.status]}>
-                        {log.status}
+                        {humanizeLabel(log.status)}
                       </Badge>
                       {log.error_message && (
                         <div className="text-xs text-red-500 mt-1" title={log.error_message}>

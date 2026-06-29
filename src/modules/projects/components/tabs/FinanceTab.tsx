@@ -23,6 +23,7 @@ import {
   type ProjectFinanceRow,
   type ProjectFinanceSummary,
 } from '../../services/projectsService';
+import { humanizeLabel } from '@/utils/humanize';
 
 const money = (n: number | null | undefined, c: string | null | undefined) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
@@ -103,7 +104,7 @@ export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-medium">{money(r.total, r.currency)}</p>
-                  <Badge variant="outline" className="text-[10px] mt-1">{r.status}</Badge>
+                  <Badge variant="outline" className="text-[10px] mt-1">{humanizeLabel(r.status)}</Badge>
                 </div>
                 {r.kind === 'invoice' && (
                   <Button size="sm" variant="ghost" onClick={() => navigate(`/finance/invoices/${r.id}`)}>Open</Button>

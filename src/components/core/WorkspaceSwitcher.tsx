@@ -65,7 +65,7 @@ export const WorkspaceSwitcher: React.FC = () => {
             <DropdownMenuItem key={m.workspaceId} onClick={() => switchWorkspace(m.workspaceId)} className="gap-2">
               <Check className={`h-4 w-4 ${m.workspaceId === activeWorkspaceId ? 'opacity-100' : 'opacity-0'}`} />
               <span className="truncate flex-1">{m.workspace.name}</span>
-              {m.workspace.isRoot && <Badge variant="secondary" className="text-[10px]">root</Badge>}
+              {m.workspace.isRoot && <Badge variant="secondary" className="text-[10px]">Root</Badge>}
             </DropdownMenuItem>
           ))}
           {canManage && (

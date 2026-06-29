@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService, type PresentationCatalog, type CatalogStatus } from '@/services/catalogsService';
 import { CreateCatalogModal } from '../../../components/business/catalogs/CreateCatalogModal';
+import { humanizeLabel } from '@/utils/humanize';
 
 const STATUS_VARIANT: Record<CatalogStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
   draft: 'secondary',
@@ -104,7 +105,7 @@ export const CatalogsListPage: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-medium text-base truncate">{c.title}</h3>
-                      <Badge variant={STATUS_VARIANT[c.status]}>{c.status}</Badge>
+                      <Badge variant={STATUS_VARIANT[c.status]}>{humanizeLabel(c.status)}</Badge>
                       {c.slug && <span className="text-xs text-muted-foreground">/c/{c.slug}</span>}
                     </div>
                     {c.subtitle && <p className="text-sm text-muted-foreground truncate">{c.subtitle}</p>}

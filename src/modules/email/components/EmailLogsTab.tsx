@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { emailService, EmailLog } from '../services/emailService';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { humanizeLabel } from '@/utils/humanize';
 
 export const EmailLogsTab: React.FC = () => {
   const [logs, setLogs] = useState<EmailLog[]>([]);
@@ -61,7 +62,7 @@ export const EmailLogsTab: React.FC = () => {
       failed: 'destructive',
     };
 
-    return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
+    return <Badge variant={variants[status] || 'outline'}>{humanizeLabel(status)}</Badge>;
   };
 
   const exportLogs = () => {
@@ -166,7 +167,7 @@ export const EmailLogsTab: React.FC = () => {
                     <TableCell className="text-sm">{log.to_email}</TableCell>
                     <TableCell className="text-sm max-w-xs truncate">{log.subject}</TableCell>
                     <TableCell>{getStatusBadge(log.status)}</TableCell>
-                    <TableCell className="text-sm capitalize">{log.email_type || 'N/A'}</TableCell>
+                    <TableCell className="text-sm capitalize">{log.email_type ? humanizeLabel(log.email_type) : 'N/A'}</TableCell>
                     <TableCell className="text-sm">
                       {log.delivered_at ? format(new Date(log.delivered_at), 'MMM dd, HH:mm') : '-'}
                     </TableCell>

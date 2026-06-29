@@ -7,6 +7,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService } from '../../services/projectsService';
+import { humanizeLabel } from '@/utils/humanize';
 
 interface QuotesTabProps {
   projectId: string;
@@ -154,7 +155,7 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
                     <div className="text-right shrink-0">
                       <p className="font-medium">{formatMoney(q.grand_total, q.currency)}</p>
                       <Badge variant="outline" className={`text-xs mt-1 ${STATUS_TONES[q.status] || ''}`}>
-                        {q.status}
+                        {humanizeLabel(q.status)}
                       </Badge>
                     </div>
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
