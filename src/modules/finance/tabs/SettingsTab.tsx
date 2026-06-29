@@ -610,17 +610,19 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
 
   return (
     <>
-      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs flex items-start gap-2">
-        <Info className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-        <div className="flex-1">
-          <div className="font-medium text-foreground">Configure your digest</div>
-          <p className="mt-0.5 text-muted-foreground leading-snug">
-            Recipients, frequency, hour and on/off are per-workspace and live here.
-            {isOperator && (
-              <> The email layout lives in the <strong>finance.digest</strong> template and the schedule in the <strong>Finance digest</strong> flow.</>
-            )}
-          </p>
-          {isOperator && (
+      {/* Platform-composition box: entirely operator-facing (template + flow internals
+          on /admin/* routes). Hidden for finance managers, who only configure the
+          per-workspace recipients/schedule/on-off below. */}
+      {isOperator && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs flex items-start gap-2">
+          <Info className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+          <div className="flex-1">
+            <div className="font-medium text-foreground">Composed from the platform pieces</div>
+            <p className="mt-0.5 text-muted-foreground leading-snug">
+              Layout lives in the <strong>finance.digest</strong> email template (edit in Email → Templates).
+              Schedule lives in the <strong>Finance digest</strong> flow (edit cron in Flows).
+              Per-workspace recipients, frequency, hour and on/off live here.
+            </p>
             <div className="mt-2 flex gap-2">
               <Link to="/admin/flows" className="inline-flex items-center gap-1 text-primary hover:underline">
                 Open flow editor <ExternalLink className="h-3 w-3" />
@@ -630,9 +632,9 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
                 Edit template design <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
         <div>
