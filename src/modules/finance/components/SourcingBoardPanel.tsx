@@ -82,18 +82,19 @@ export const SourcingBoardPanel: React.FC<{ workspaceId: string }> = ({ workspac
   const { toast } = useToast();
   const [data, setData] = useState<BoardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mine, setMine] = useState(false);
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
     setLoading(true);
     try {
-      const { data: res, error } = await supabase.rpc('get_sourcing_board', { p_workspace_id: workspaceId });
+      const { data: res, error } = await supabase.rpc('get_sourcing_board', { p_workspace_id: workspaceId, p_mine: mine });
       if (error) throw error;
       setData(res as unknown as BoardData);
     } catch (err: any) {
       toast({ title: 'Failed to load sourcing board', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
-  }, [workspaceId, toast]);
+  }, [workspaceId, mine, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -104,9 +105,21 @@ export const SourcingBoardPanel: React.FC<{ workspaceId: string }> = ({ workspac
           <h2 className="text-lg font-medium">Sourcing</h2>
           <p className="text-xs text-muted-foreground">What needs ordering, what's on its way, and what's reserved for customers.</p>
         </div>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-full border border-border overflow-hidden text-xs">
+            <button
+              className={`px-3 py-1 ${!mine ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+              onClick={() => setMine(false)}
+            >All</button>
+            <button
+              className={`px-3 py-1 ${mine ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+              onClick={() => setMine(true)}
+            >My orders</button>
+          </div>
+          <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+        </div>
       </div>
       {loading && !data ? (
         <div className="flex items-center gap-2 justify-center py-16 text-muted-foreground">
