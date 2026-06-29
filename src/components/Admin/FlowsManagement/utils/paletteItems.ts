@@ -214,6 +214,16 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'purchase_order.received', group: 'Finance',
     label: 'Purchase Order Received', description: 'A purchase order was received into the warehouse', icon: 'Package', color: 'emerald',
     defaultData: { label: 'Purchase Order Received', category: 'trigger', triggerType: 'purchase_order.received', config: {} } as TriggerNodeData },
+  // #245 D — automated paths routed through Flows
+  { type: 'triggerNode', category: 'trigger', subType: 'invoice_paid', group: 'Finance',
+    label: 'Invoice Paid (card)', description: 'A Stripe card payment settled an invoice', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'Invoice Paid (card)', category: 'trigger', triggerType: 'invoice_paid', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'finance_follow_up', group: 'Finance',
+    label: 'Finance Follow-up Due', description: 'A quote is due for follow-up or has gone stale', icon: 'Bell', color: 'blue',
+    defaultData: { label: 'Finance Follow-up Due', category: 'trigger', triggerType: 'finance_follow_up', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'material_alert', group: 'Users',
+    label: 'Saved-Search Material Alert', description: 'A new material matches a saved search', icon: 'Bell', color: 'blue',
+    defaultData: { label: 'Saved-Search Material Alert', category: 'trigger', triggerType: 'material_alert', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

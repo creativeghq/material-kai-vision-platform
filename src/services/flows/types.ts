@@ -79,7 +79,11 @@ export type TriggerType =
   | 'payment_received'
   // Sourcing / purchase orders (#237)
   | 'purchase_order.sent'
-  | 'purchase_order.received';
+  | 'purchase_order.received'
+  // Flows governance — automated paths routed through Flows (#245 D)
+  | 'material_alert'
+  | 'finance_follow_up'
+  | 'invoice_paid';
 
 export interface ManualTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
@@ -97,6 +101,9 @@ export interface ReceiptIssuedTriggerConfig {}
 export interface PaymentReceivedTriggerConfig {}
 export interface PurchaseOrderSentTriggerConfig {}
 export interface PurchaseOrderReceivedTriggerConfig {}
+export interface MaterialAlertTriggerConfig {}
+export interface FinanceFollowUpTriggerConfig {}
+export interface InvoicePaidTriggerConfig {}
 export interface ReviewSubmittedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
@@ -270,6 +277,9 @@ export type TriggerConfigMap = {
   payment_received: PaymentReceivedTriggerConfig;
   'purchase_order.sent': PurchaseOrderSentTriggerConfig;
   'purchase_order.received': PurchaseOrderReceivedTriggerConfig;
+  material_alert: MaterialAlertTriggerConfig;
+  finance_follow_up: FinanceFollowUpTriggerConfig;
+  invoice_paid: InvoicePaidTriggerConfig;
 };
 
 // =====================================================

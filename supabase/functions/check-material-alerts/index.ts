@@ -19,6 +19,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
   await bootstrapForFunction();
@@ -113,27 +114,21 @@ Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
 
       const newAlerts = insertedAlerts ?? [];
 
-      // 4. Create user_notification for each truly new alert
+      // 4. Notify for each truly new alert — routed through Flows (#245 D) so the
+      //    bell is governable. The seeded `material_alert` system-default flow runs
+      //    create_notification from this payload.
       if (newAlerts.length > 0) {
-        const notifRows = newAlerts.map((a) => {
+        for (const a of newAlerts) {
           const product = matchedProducts.find((p) => p.id === a.product_id);
-          return {
+          await emitFlowEvent('material_alert', {
             user_id:    ss.user_id,
             type:       'material_alert',
             title:      `New match: "${product?.name ?? 'Material'}"`,
             body:       `A new material matches your saved search "${ss.name}"`,
             action_url: `/search?q=${encodeURIComponent(ss.query)}`,
-            is_read:    false,
-            metadata:   { saved_search_id: ss.id, product_id: a.product_id },
-          };
-        });
-
-        const { error: notifErr } = await admin
-          .from('user_notifications')
-          .insert(notifRows);
-
-        if (notifErr) {
-          console.error(`user_notifications insert failed for ${ss.id}:`, notifErr.message);
+            saved_search_id: ss.id,
+            product_id: a.product_id,
+          }).catch((e) => console.error(`material_alert emit failed for ${ss.id}:`, e?.message));
         }
 
         totalAlerts += newAlerts.length;

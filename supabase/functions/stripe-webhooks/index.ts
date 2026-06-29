@@ -368,17 +368,22 @@ async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent
 
   console.log(`Recorded Stripe payment ${paymentRow.id} for invoice ${inv.internal_number} (${amount} ${currency})`);
 
-  // Bell notify the invoice creator (if known)
+  // Bell-notify the invoice creator (if known) — routed through Flows (#245 D)
+  // so admins can pause/retarget. The seeded `invoice_paid` system-default flow
+  // turns this into the create_notification bell.
   if (inv.created_by) {
-    supabase.from('user_notifications').insert({
+    await emitFlowEvent('invoice_paid', {
       user_id: inv.created_by,
       type: 'invoice_paid',
       title: `Invoice ${inv.internal_number} paid`,
       body: `${currency} ${amount.toFixed(2)} received via card.`,
       action_url: `/admin/finance/invoices/${inv.id}`,
-      is_read: false,
-      metadata: { invoice_id: inv.id, amount, currency, payment_intent_id: paymentIntent.id },
-    }).then(() => {});
+      invoice_id: inv.id,
+      amount,
+      currency,
+      payment_intent_id: paymentIntent.id,
+      workspace_id: inv.workspace_id,
+    }).catch(() => {});
   }
 
   // Customer-facing: notify + email the buyer that their payment was received (seeded flow).

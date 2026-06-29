@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // Sales/Finance — digest aggregator.
 //
@@ -357,22 +358,21 @@ async function dispatchFollowUps(supabase: any): Promise<{ dispatched: number; s
       : `No activity in ${r.days_since_activity} days. Worth a nudge to the customer?`;
 
     if (r.owner_user_id) {
-      await supabase.from('user_notifications').insert({
+      // Routed through Flows (#245 D): the seeded `finance_follow_up` system-default
+      // flow turns this into the owner's bell notification (governable/retargetable).
+      await emitFlowEvent('finance_follow_up', {
         user_id: r.owner_user_id,
         type: 'finance_follow_up',
         title,
         body,
         action_url: `/quotes/${r.id}`,
-        is_read: false,
-        metadata: {
-          quote_id: r.id,
-          workspace_id: r.workspace_id,
-          stale,
-          due_scheduled: dueScheduled,
-          grand_total: r.grand_total,
-          currency: r.currency,
-        },
-      });
+        quote_id: r.id,
+        workspace_id: r.workspace_id,
+        stale,
+        due_scheduled: dueScheduled,
+        grand_total: r.grand_total,
+        currency: r.currency,
+      }).catch(() => {});
       await supabase.from('quote_activities').insert({
         quote_id: r.id,
         kind: 'reminder_dispatched',
