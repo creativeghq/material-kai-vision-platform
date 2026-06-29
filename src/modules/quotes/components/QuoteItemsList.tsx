@@ -6,6 +6,7 @@ import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { QuoteItemWithProduct } from '../services/QuotesService';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
+import { MarketIntelCard } from '@/components/business/MarketIntelCard';
 import { Product, SimpleProduct } from '@/components/features/products/types';
 import {
   getProductImageUrl,
@@ -610,6 +611,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 </div>
                               )}
                             </div>
+                            {item.product_id && (
+                              <div className="pl-[52px] mt-3">
+                                <MarketIntelCard productId={item.product_id} />
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )}
