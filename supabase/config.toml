@@ -19,6 +19,9 @@ verify_jwt = false
 [functions.inbox-api]
 verify_jwt = false
 
+[functions.supplier-orders-api]
+verify_jwt = false
+
 [functions.dashboard-insights]
 verify_jwt = false
 
