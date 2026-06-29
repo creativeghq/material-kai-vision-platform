@@ -54,4 +54,36 @@ export const supplierClaimsService = {
     const { data } = await supabase.from('workspaces').select('id, name').in('id', [...new Set(ids)]);
     return Object.fromEntries((data ?? []).map((w: any) => [w.id, w.name]));
   },
+
+  // ── Supplier portal (F phase-3) ──────────────────────────────────────────
+  /** Cross-workspace inbound PO feed for the caller's claimed supplier identity. */
+  async getInboundOrders(workspaceId: string): Promise<SupplierInboundOrder[]> {
+    const { data, error } = await supabase.rpc('get_supplier_inbound_orders', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as SupplierInboundOrder[];
+  },
+
+  /** Acknowledge / set ETA / mark shipped on a buyer's PO addressed to your claimed identity. */
+  async updateInboundOrder(workspaceId: string, orderId: string, opts: { status?: 'acknowledged' | 'shipped'; eta?: string | null; note?: string | null }): Promise<void> {
+    const { error } = await supabase.rpc('supplier_update_inbound_order', {
+      p_workspace_id: workspaceId, p_order_id: orderId,
+      p_status: opts.status ?? null, p_eta: opts.eta ?? null, p_note: opts.note ?? null,
+    });
+    if (error) throw error;
+  },
 };
+
+export interface SupplierInboundOrderLine { description: string; quantity: number; unit_price: number; line_total: number; }
+export interface SupplierInboundOrder {
+  order_id: string;
+  order_number: string;
+  status: string;
+  currency: string;
+  total: number;
+  created_at: string;
+  buyer_name: string;
+  supplier_status: 'acknowledged' | 'shipped' | null;
+  supplier_acknowledged_at: string | null;
+  supplier_eta: string | null;
+  lines: SupplierInboundOrderLine[];
+}

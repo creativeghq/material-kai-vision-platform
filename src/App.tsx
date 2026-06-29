@@ -93,6 +93,7 @@ const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
 const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
 const SupplierClaimsPage = lazy(() => import('./pages/Admin/SupplierClaimsPage'));
+const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
@@ -736,6 +737,17 @@ const App = () => (
                           <SupplierClaimsPage />
                         </Layout>
                       </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* #247 F — supplier portal (claimed suppliers; RPC-gated, not admin) */}
+                <Route
+                  path="/supplier-portal"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <SupplierPortalPage />
+                      </Layout>
                     </AuthGuard>
                   }
                 />
