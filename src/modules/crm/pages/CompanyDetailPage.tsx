@@ -539,10 +539,11 @@ export const CompanyDetailPage: React.FC = () => {
               <FileText className="h-4 w-4 mr-2"/>
               Notes
             </TabsTrigger>
-            {showCommercial && (
+            {(showCommercial || showSupplierFeatures) && (
               <>
                 {/* One tab: the Account = balance/ledger + the Orders that drive it.
-                    Quotes / Invoices / Payments live per-order (open an order). */}
+                    Quotes / Invoices / Payments live per-order (open an order). Shown for
+                    suppliers too — there it reads "we owe them" + their bills & money-out. */}
                 <TabsTrigger value="account">
                   <Wallet className="h-4 w-4 mr-2"/>
                   Account
@@ -1018,32 +1019,30 @@ export const CompanyDetailPage: React.FC = () => {
             <CrmNotesTimeline targetKind="company" targetId={company.id || null}/>
           </TabsContent>
 
-          {/* Customer-only commercial tabs — hidden for a pure supplier. */}
-          {showCommercial && (
-            <>
           {/* Account = one flow: the money summary up top (orders, owed, paid, net + AR aging),
               then the Orders list itself as the working surface. An order tracks real cash only
               (open an order → Received / money in-out / Invoices / Payments); the per-order
-              "virtual receivable/payable" concept was removed. */}
+              "virtual receivable/payable" concept was removed. Shown for customers AND suppliers
+              — for a supplier the overview flips to "we owe them" + their bills & money-out, and
+              the customer-only cards (repeat-buy, pricing rules) are hidden. */}
+          {(showCommercial || showSupplierFeatures) && (
           <TabsContent value="account" className="space-y-4">
             {company.id ? (
               <>
                 {/* 1 — Money summary up top: orders count + value, owed (invoiced & on orders),
-                       paid, net position, AR aging. */}
+                       paid, net position, AR aging (or AP / "we owe" for a supplier). */}
                 <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
-                {/* 2 — The orders themselves. Click an order to manage its receivables/payables,
-                       invoices, payments and dispatch. */}
+                {/* 2 — The orders themselves (customer + supplier orders). Click an order to manage
+                       its receivables/payables, invoices, supplier bills, payments and dispatch. */}
                 <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
-                {/* 3 — Repeat-buy suggestions (in-stock), below the orders list. */}
-                <CustomerTopItemsCard companyId={company.id} />
-                {/* 4 — Secondary settings. */}
-                <CustomerFinanceRulesCard companyId={company.id} />
+                {/* 3 + 4 — Customer-only: repeat-buy suggestions + finance/pricing rules. */}
+                {showCommercial && <CustomerTopItemsCard companyId={company.id} />}
+                {showCommercial && <CustomerFinanceRulesCard companyId={company.id} />}
               </>
             ) : (
               <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its account &amp; orders.</CardContent></Card>
             )}
           </TabsContent>
-            </>
           )}
         </Tabs>
       </div>

@@ -2404,6 +2404,61 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     metadata: { agentId: selectedAgent, model: selectedModel, mentionSummaryData: m.mentionSummaryData },
                   });
                 }
+              } else if (chunk.type === 'sourcing_options') {
+                const c = chunk.counts || {};
+                const m: Message = {
+                  id: `msg-sourcing-options-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Supply options: ${c.warehouse ?? 0} warehouse · ${c.inbound_po ?? 0} inbound PO · ${c.supplier ?? 0} supplier.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  sourcingOptionsData: { product_id: chunk.product_id, quantity: chunk.quantity, counts: chunk.counts, result: chunk.result },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, sourcingOptionsData: m.sourcingOptionsData },
+                  });
+                }
+              } else if (chunk.type === 'purchase_order_created') {
+                const r = chunk.result || {};
+                const m: Message = {
+                  id: `msg-po-created-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Committed sourcing: ${r.allocations_created ?? 0} allocation(s), ${r.purchase_orders_created ?? 0} draft purchase order(s).`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  purchaseOrderCreatedData: { allocations_created: r.allocations_created ?? 0, purchase_orders_created: r.purchase_orders_created ?? 0, orders: r.orders ?? [] },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, purchaseOrderCreatedData: m.purchaseOrderCreatedData },
+                  });
+                }
+              } else if (chunk.type === 'purchase_order_sent') {
+                const m: Message = {
+                  id: `msg-po-sent-${Date.now()}`,
+                  role: 'assistant',
+                  content: chunk.recipient
+                    ? `Purchase order ${chunk.order_number} emailed to ${chunk.recipient}.`
+                    : `Purchase order ${chunk.order_number} generated.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  purchaseOrderSentData: { order_id: chunk.order_id, order_number: chunk.order_number, recipient: chunk.recipient, pdf_url: chunk.pdf_url },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, purchaseOrderSentData: m.purchaseOrderSentData },
+                  });
+                }
               } else if (chunk.type === 'llm_visibility_result') {
                 const sov = chunk.snapshot?.share_of_voice ? Math.round(chunk.snapshot.share_of_voice * 100) : 0;
                 const m: Message = {
@@ -3077,6 +3132,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           heatingCostData: msg.metadata?.heatingCostData as any | undefined,
           searchSpec: msg.metadata?.searchSpec as any | undefined,
           mentionSummaryData: msg.metadata?.mentionSummaryData as any | undefined,
+          sourcingOptionsData: msg.metadata?.sourcingOptionsData as any | undefined,
+          purchaseOrderCreatedData: msg.metadata?.purchaseOrderCreatedData as any | undefined,
+          purchaseOrderSentData: msg.metadata?.purchaseOrderSentData as any | undefined,
           llmVisibilityData: msg.metadata?.llmVisibilityData as any | undefined,
           mentionFeedData: msg.metadata?.mentionFeedData as any | undefined,
           mentionTrackingStartedData: msg.metadata?.mentionTrackingStartedData as any | undefined,
@@ -3785,7 +3843,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-primary text-white shadow-sm'
@@ -3910,6 +3968,48 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           </div>
                           <div className="text-[11px] text-white/40 mt-3">
                             Tip: ask "show me the rest" or "find more like #2" to dig in.
+                          </div>
+                        </div>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.sourcingOptionsData ? (
+                      <div className="space-y-3">
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <div className="text-xs text-white/60 mb-2">Supply options · qty {message.sourcingOptionsData.quantity}</div>
+                          <div className="grid grid-cols-3 gap-3 text-center">
+                            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.warehouse ?? 0}</div><div className="text-[11px] text-white/60">Warehouse</div></div>
+                            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.inbound_po ?? 0}</div><div className="text-[11px] text-white/60">Inbound PO</div></div>
+                            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.supplier ?? 0}</div><div className="text-[11px] text-white/60">Supplier</div></div>
+                          </div>
+                          {(message.sourcingOptionsData.result?.options?.supplier || []).length > 0 && (
+                            <div className="mt-3 space-y-1">
+                              {message.sourcingOptionsData.result.options.supplier.slice(0, 5).map((s: any, i: number) => (
+                                <div key={i} className="flex justify-between text-xs">
+                                  <span>{s.supplier_name || 'Supplier'}{s.is_preferred ? ' ★' : ''}</span>
+                                  <span className="text-white/60">{s.cost != null ? `${s.cost} ${s.currency || ''}` : '—'}{s.lead_time_days != null ? ` · ${s.lead_time_days}d` : ''}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.purchaseOrderCreatedData ? (
+                      <div className="space-y-3">
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <div className="text-xs text-white/60 mb-2">Sourcing committed</div>
+                          <div className="text-sm">{message.purchaseOrderCreatedData.purchase_orders_created} draft purchase order(s) · {message.purchaseOrderCreatedData.allocations_created} allocation(s)</div>
+                        </div>
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.purchaseOrderSentData ? (
+                      <div className="space-y-3">
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <div className="text-xs text-white/60 mb-2">Purchase order sent</div>
+                          <div className="space-y-1 text-sm">
+                            <div><span className="text-white/60">PO #:</span> {message.purchaseOrderSentData.order_number}</div>
+                            {message.purchaseOrderSentData.recipient && <div><span className="text-white/60">To:</span> {message.purchaseOrderSentData.recipient}</div>}
+                            {message.purchaseOrderSentData.pdf_url && <a href={message.purchaseOrderSentData.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">Open PDF</a>}
                           </div>
                         </div>
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
