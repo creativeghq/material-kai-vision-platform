@@ -91,6 +91,7 @@ const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
 // Messaging pages live in `src/modules/messaging/` — registered through buildModuleRoutes().
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
+const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
@@ -706,6 +707,19 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <BackgroundAgentsPage />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* #244 B — unified monitoring (Price / Mention / Job) */}
+                <Route
+                  path="/admin/monitoring"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <MonitoringPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>
