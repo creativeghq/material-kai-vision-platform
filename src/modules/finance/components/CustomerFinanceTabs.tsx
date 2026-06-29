@@ -6,14 +6,17 @@ import { Link } from 'react-router-dom';
 import { Loader2, FileText, Mail, Wallet, ShoppingBag, ShoppingCart, Banknote, AlertCircle, CalendarClock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   financeService,
   formatMoney,
   type CustomerTopProductRow,
+  type PaymentWithAllocation,
 } from '@/modules/finance/services/financeService';
 import { ordersService } from '@/modules/finance/services/ordersService';
+import { humanizeLabel } from '@/utils/humanize';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -239,6 +242,85 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
       {/* Receivables & payables are managed PER ORDER now — open an order to add/see them.
           "Top items to push" renders separately (CustomerTopItemsCard) BELOW the orders list. */}
     </div>
+  );
+};
+
+/**
+ * Party-level payments list — every cash movement against this customer/supplier across ALL
+ * their orders, money received (in) and paid out, newest first. The Account overview only shows
+ * paid totals + the last-payment date; this card is the itemised history. Read-only — payments
+ * are recorded per order (open an order to add one).
+ */
+export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) => {
+  const { activeWorkspaceId } = useWorkspace();
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<PaymentWithAllocation[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!activeWorkspaceId || (!contactId && !companyId)) { setRows([]); setLoading(false); return; }
+      setLoading(true);
+      try {
+        const list = await financeService.listPayments({
+          workspaceId: activeWorkspaceId, counterpartyCompanyId: companyId, counterpartyContactId: contactId, limit: 50,
+        });
+        if (!cancelled) setRows(list);
+      } catch { if (!cancelled) setRows([]); }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [contactId, companyId, activeWorkspaceId]);
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-border/60 px-5 py-3">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Banknote className="h-4 w-4" /> Payments <span className="text-[10px] font-normal text-muted-foreground">· money in &amp; out</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>
+        ) : rows.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No payments recorded for this party yet. Payments are recorded per order — open an order to add one.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground">
+              <tr className="border-b border-border/60">
+                <th className="px-4 py-2 text-left">Date</th>
+                <th className="px-4 py-2 text-left">Direction</th>
+                <th className="px-4 py-2 text-left">Method</th>
+                <th className="px-4 py-2 text-left">Reference</th>
+                <th className="px-4 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((p) => {
+                const isIn = p.direction === 'in';
+                return (
+                  <tr key={p.id} className="border-b border-border/30 hover:bg-muted/30">
+                    <td className="px-4 py-2 whitespace-nowrap">{new Date(p.paid_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant="outline" className={isIn ? 'border-emerald-500/40 text-emerald-400' : 'border-amber-500/40 text-amber-400'}>
+                        {isIn ? 'Received' : 'Paid out'}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-2">{p.method ? humanizeLabel(p.method) : '—'}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{p.reference || '—'}</td>
+                    <td className={`px-4 py-2 text-right tabular-nums font-medium ${isIn ? 'text-emerald-500' : ''}`}>
+                      {isIn ? '+' : '−'}{formatMoney(Number(p.amount), p.currency)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

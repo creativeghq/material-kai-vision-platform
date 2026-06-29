@@ -4,6 +4,7 @@ import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, S
 import {
   CustomerAccountOverview,
   CustomerTopItemsCard,
+  PartyPaymentsCard,
 } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
@@ -1035,6 +1036,9 @@ export const CompanyDetailPage: React.FC = () => {
                 {/* 2 — The orders themselves (customer + supplier orders). Click an order to manage
                        its receivables/payables, invoices, supplier bills, payments and dispatch. */}
                 <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
+                {/* 2b — Itemised cash movements across all their orders (money in & out), so the
+                       payments made to / received from this party are visible at the party level. */}
+                <PartyPaymentsCard companyId={company.id} />
                 {/* 3 + 4 — Customer-only: repeat-buy suggestions + finance/pricing rules. */}
                 {showCommercial && <CustomerTopItemsCard companyId={company.id} />}
                 {showCommercial && <CustomerFinanceRulesCard companyId={company.id} />}

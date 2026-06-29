@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, X } from 'lucide-react';
-import { CustomerAccountOverview, CustomerTopItemsCard } from '@/modules/finance/components/CustomerFinanceTabs';
+import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -901,6 +901,8 @@ export const ContactDetailPage: React.FC = () => {
               <>
                 <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
                 <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} />
+                {/* Itemised cash movements (money in & out) across all this party's orders. */}
+                <PartyPaymentsCard contactId={contact.id} />
                 {/* Repeat-buy suggestions (in-stock), below the orders list. */}
                 <CustomerTopItemsCard contactId={contact.id} />
                 <CustomerFinanceRulesCard contactId={contact.id} />
