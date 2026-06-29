@@ -6,6 +6,8 @@ purchase orders (to suppliers) both live in one model; every money/document/fulf
 off an order so you can see, per order, what was invoiced, what was received, what was paid to
 suppliers, what's been delivered, and the **profit**.
 
+> **Sourcing:** how a customer demand gets satisfied — own stock vs a purchase order to a supplier, the allocation ledger, send-to-supplier, and the Finance Sourcing board — is documented in [sourcing-fulfillment.md](sourcing-fulfillment.md). A purchase order is an `orders` row with `order_type='purchase'`.
+
 > **Money vocabulary** (used throughout the order UI)
 > - **Invoice / Pre-invoice** — the demand (what they owe). A *pre-invoice* is a **draft invoice** (`status='draft'`, no gapless myDATA series until issued).
 > - **Receivable** — an un-invoiced amount owed.
