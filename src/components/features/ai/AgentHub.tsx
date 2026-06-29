@@ -65,6 +65,7 @@ import { agentChatHistoryService, ChatConversation } from '@/services/agents/age
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
+import { AgentResultCard } from './AgentResultCard';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
@@ -187,6 +188,34 @@ const AI_MODELS = [
   { id: 'voyage/voyage-4', name: 'Voyage AI 4', provider: 'voyage', type: 'text-embedding' },
   { id: 'openai/text-embedding-3-small', name: 'OpenAI Embedding 3 Small', provider: 'openai', type: 'text-embedding' },
 ];
+
+// #245 E — chunk types that were emitted but rendered as plain text. Routed
+// through one generic AgentResultCard (title + structured payload).
+const AGENT_RESULT_TITLES: Record<string, string> = {
+  // Knowledge-graph tools
+  customer_overview_result: 'Customer overview',
+  supplier_overview_result: 'Supplier overview',
+  product_provenance_result: 'Product provenance',
+  product_price_history_result: 'Price history',
+  projects_using_product_result: 'Projects using this product',
+  products_in_project_result: 'Products in project',
+  // Trip / expense cards
+  trip_card_created: 'Trip card created',
+  trip_expense_added: 'Expense added',
+  trip_cards_list: 'Trip cards',
+  trip_card_submitted: 'Trip card submitted',
+  expense_card_submitted: 'Expense card submitted',
+  // Job research
+  job_search_created: 'Job search created',
+  job_search_updated: 'Job search updated',
+  job_searches_list: 'Job searches',
+  job_listings_feed: 'Job listings',
+  job_digest_preview: 'Job digest preview',
+  // Misc
+  price_lookup_matches: 'Price lookup matches',
+  project_created: 'Project created',
+  video_generated: 'Video generated',
+};
 
 interface Message {
   id: string;
@@ -357,6 +386,8 @@ interface Message {
     recipient: string | null;
     pdf_url: string | null;
   };
+  // #245 E — generic structured result card for previously-unrendered chunks
+  agentResultData?: { title: string; data: Record<string, any> };
   llmVisibilityData?: {
     product_id: string;
     snapshot: {
@@ -2459,6 +2490,26 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     metadata: { agentId: selectedAgent, model: selectedModel, purchaseOrderSentData: m.purchaseOrderSentData },
                   });
                 }
+              } else if (AGENT_RESULT_TITLES[chunk.type]) {
+                // #245 E — generic structured render for previously-plain-text result chunks
+                const { type: _t, timestamp: _ts, ...payload } = chunk as Record<string, any>;
+                const title = AGENT_RESULT_TITLES[chunk.type];
+                const m: Message = {
+                  id: `msg-result-${chunk.type}-${Date.now()}`,
+                  role: 'assistant',
+                  content: title,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  agentResultData: { title, data: payload },
+                };
+                setMessages(prev => [...prev, m]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId, role: 'assistant', content: m.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, agentResultData: m.agentResultData },
+                  });
+                }
               } else if (chunk.type === 'llm_visibility_result') {
                 const sov = chunk.snapshot?.share_of_voice ? Math.round(chunk.snapshot.share_of_voice * 100) : 0;
                 const m: Message = {
@@ -3135,6 +3186,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           sourcingOptionsData: msg.metadata?.sourcingOptionsData as any | undefined,
           purchaseOrderCreatedData: msg.metadata?.purchaseOrderCreatedData as any | undefined,
           purchaseOrderSentData: msg.metadata?.purchaseOrderSentData as any | undefined,
+          agentResultData: msg.metadata?.agentResultData as any | undefined,
           llmVisibilityData: msg.metadata?.llmVisibilityData as any | undefined,
           mentionFeedData: msg.metadata?.mentionFeedData as any | undefined,
           mentionTrackingStartedData: msg.metadata?.mentionTrackingStartedData as any | undefined,
@@ -3843,7 +3895,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-primary text-white shadow-sm'
@@ -3971,6 +4023,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           </div>
                         </div>
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.agentResultData ? (
+                      <div className="space-y-3">
+                        <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} />
                       </div>
                     ) : message.sourcingOptionsData ? (
                       <div className="space-y-3">
