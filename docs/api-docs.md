@@ -4,7 +4,7 @@
 **Last Updated:** 2026-06-22
 **Base URL:** `https://v1api.materialshub.gr`
 
-> **This is a hand-written index.** The authoritative, always-current schema is the FastAPI-generated **OpenAPI** at `/openapi.json` below (the MIVAA Python backend lives in a separate repo, `creativeghq/mivaa-pdf-extractor`). For the **Supabase Edge Functions** surface (a separate Deno runtime with no auto-generated schema), see the companion hand-maintained spec at [docs/api/openapi-edge.json](./api/openapi-edge.json) (served live at `/api/edge-swagger.html`).
+> **This is a hand-written index.** The authoritative, always-current schema is the FastAPI-generated **OpenAPI** at `/openapi.json` below (the MIVAA Python backend lives in a separate repo, `creativeghq/mivaa-pdf-extractor`). For the **Supabase Edge Functions** surface (a separate Deno runtime with no auto-generated schema), see the companion hand-maintained spec at [public/api/openapi-edge.json](../public/api/openapi-edge.json) (served live at `/api/edge-swagger.html`).
 
 ---
 

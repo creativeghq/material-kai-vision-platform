@@ -93,7 +93,7 @@ the company the same way.
 ## Not an edge function
 Orders are accessed via direct, RLS-gated Supabase table access (`ordersService.ts`) + the DB
 triggers/RPCs above — there is **no `orders` edge function**, so orders do not appear in the edge
-OpenAPI (`docs/api/openapi-edge.json`).
+OpenAPI (`public/api/openapi-edge.json`).
 
 ## Known follow-ups (not yet built)
 - "Record payment / issue Receipt" action **on the order** (today payments are recorded elsewhere and

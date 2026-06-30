@@ -2,7 +2,7 @@
 /**
  * build-openapi-edge.mjs
  *
- * Generates docs/api/openapi-edge.json — an OpenAPI 3.0.3 spec for the
+ * Generates public/api/openapi-edge.json — an OpenAPI 3.0.3 spec for the
  * Supabase Edge Functions (the Deno/TypeScript surface that FastAPI's
  * /openapi.json does NOT cover).
  *
@@ -22,10 +22,11 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const SRC = join(__dirname, 'edge-endpoints.json');
-// Emit to BOTH the repo doc (GitHub-viewable) and the served static asset
-// (public/api → dist/api → https://<frontend>/api/openapi-edge.json). One source,
-// two identical outputs, so they can't drift.
-const OUTS = [join(ROOT, 'docs', 'api', 'openapi-edge.json'), join(ROOT, 'public', 'api', 'openapi-edge.json')];
+// Single home: public/api (committed to git AND bundled by Vite → dist/api →
+// https://<frontend>/api/openapi-edge.json, where the live Swagger UI + the admin
+// dashboard link load it). Docs reference this one file via relative links — no
+// second copy under docs/api to keep in sync.
+const OUTS = [join(ROOT, 'public', 'api', 'openapi-edge.json')];
 
 const fns = JSON.parse(readFileSync(SRC, 'utf8'));
 

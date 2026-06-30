@@ -8,7 +8,7 @@ Single source of truth for every API surface in the platform. Two layers:
 For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoints.md`](api-endpoints.md) (Python).
 
 **Machine-readable specs / Swagger:**
-- **Edge Functions** → hand-maintained OpenAPI 3.0.3 (all 88). Repo: [`docs/api/openapi-edge.json`](api/openapi-edge.json). **Live** (after frontend deploy): Swagger UI `https://app.materialshub.gr/api/edge-swagger.html`, spec `https://app.materialshub.gr/api/openapi-edge.json` (served from `public/api/`; `/api/*` is excluded from the SPA rewrite). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs` (writes both `docs/api/` and `public/api/`).
+- **Edge Functions** → hand-maintained OpenAPI 3.0.3 (all 93). Repo: [`public/api/openapi-edge.json`](../public/api/openapi-edge.json). **Live** (after frontend deploy): Swagger UI `https://app.materialshub.gr/api/edge-swagger.html`, spec `https://app.materialshub.gr/api/openapi-edge.json` (served from `public/api/`; `/api/*` is excluded from the SPA rewrite). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs` (writes both `docs/api/` and `public/api/`).
 - **MIVAA Python** → FastAPI-generated `https://v1api.materialshub.gr/openapi.json` + Swagger UI at `https://v1api.materialshub.gr/docs`. (Edge functions are a separate runtime and are **not** in that spec.)
 
 ---
@@ -39,7 +39,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
-> Machine-readable: [`docs/api/openapi-edge.json`](api/openapi-edge.json) (browse via [`edge-swagger.html`](api/edge-swagger.html)). The table below is the complete index (auth column: JWT = user session, `kai_*` = partner key, secret = admin `apikey`, cron = `x-cron-secret`, sig = webhook signature, token = share/query token, public = none). The §1.x subsections that follow add call-pattern detail for the high-traffic groups.
+> Machine-readable: [`public/api/openapi-edge.json`](../public/api/openapi-edge.json) (browse via [`edge-swagger.html`](../public/api/edge-swagger.html)). The table below is the complete index (auth column: JWT = user session, `kai_*` = partner key, secret = admin `apikey`, cron = `x-cron-secret`, sig = webhook signature, token = share/query token, public = none). The §1.x subsections that follow add call-pattern detail for the high-traffic groups.
 
 ### 1.0 Complete edge-function index
 <!-- AUTO-DERIVED from scripts/edge-endpoints.json — keep in sync when adding functions. -->
