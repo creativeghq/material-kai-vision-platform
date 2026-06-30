@@ -11,6 +11,7 @@ import {
   Contact,
   Briefcase,
   Inbox,
+  Truck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -52,6 +53,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // #201 — Sales portal for invited reps (persona 'sales'). Gated on sales.portal so only
   // sales reps see it; managers use the full Quotes/Finance surfaces.
   { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal' },
+  // #247 F — supplier portal (claimed suppliers see POs sent to them across buyers).
+  // Gated to marketplace business users; the page self-gates when the workspace has no claim.
+  { id: 'supplier-portal', label: 'Supplier Portal', path: '/supplier-portal', icon: Truck, requireCapability: 'marketplace.browse' },
   // Business-workspace surfaces — gated through the #195 capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance. Part of #174.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm' },

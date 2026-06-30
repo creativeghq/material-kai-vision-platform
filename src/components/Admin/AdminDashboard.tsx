@@ -145,6 +145,22 @@ const adminSections = {
       count: 'Real-time',
     },
     {
+      title: 'Monitoring',
+      description: 'Price, mention, and job-research tracking in one place',
+      icon: Activity,
+      path: '/admin/monitoring',
+      status: 'active',
+      count: 'Price · Mentions · Jobs',
+    },
+    {
+      title: 'Supplier Identity Claims',
+      description: 'Operator review of workspaces claiming a global supplier identity',
+      icon: ShieldCheck,
+      path: '/admin/supplier-claims',
+      status: 'active',
+      count: 'Operator',
+    },
+    {
       title: 'Operations Management',
       description: 'Monitor data processing, AI performance, and system health',
       icon: BarChart3,

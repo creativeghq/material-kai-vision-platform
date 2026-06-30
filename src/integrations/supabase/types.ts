@@ -3992,6 +3992,7 @@ export type Database = {
           name: string
           payment_terms_days: number | null
           phone: string | null
+          platform_supplier_id: string | null
           postal_code: string | null
           prices_vat_inclusive: boolean
           profession: string | null
@@ -4059,6 +4060,7 @@ export type Database = {
           name: string
           payment_terms_days?: number | null
           phone?: string | null
+          platform_supplier_id?: string | null
           postal_code?: string | null
           prices_vat_inclusive?: boolean
           profession?: string | null
@@ -4126,6 +4128,7 @@ export type Database = {
           name?: string
           payment_terms_days?: number | null
           phone?: string | null
+          platform_supplier_id?: string | null
           postal_code?: string | null
           prices_vat_inclusive?: boolean
           profession?: string | null
@@ -4148,6 +4151,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "crm_companies_platform_supplier_id_fkey"
+            columns: ["platform_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "platform_suppliers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "crm_companies_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -10012,10 +10022,14 @@ export type Database = {
       }
       marketplace_inquiries: {
         Row: {
+          accepted_at: string | null
+          accepted_order_id: string | null
           buyer_name: string | null
           buyer_user_id: string
           buyer_workspace_id: string
           created_at: string
+          demand_id: string | null
+          demand_type: string | null
           id: string
           inbox_thread_id: string | null
           listing_id: string
@@ -10025,10 +10039,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accepted_at?: string | null
+          accepted_order_id?: string | null
           buyer_name?: string | null
           buyer_user_id: string
           buyer_workspace_id: string
           created_at?: string
+          demand_id?: string | null
+          demand_type?: string | null
           id?: string
           inbox_thread_id?: string | null
           listing_id: string
@@ -10038,10 +10056,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accepted_at?: string | null
+          accepted_order_id?: string | null
           buyer_name?: string | null
           buyer_user_id?: string
           buyer_workspace_id?: string
           created_at?: string
+          demand_id?: string | null
+          demand_type?: string | null
           id?: string
           inbox_thread_id?: string | null
           listing_id?: string
@@ -10051,6 +10073,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "marketplace_inquiries_accepted_order_id_fkey"
+            columns: ["accepted_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "marketplace_inquiries_buyer_workspace_id_fkey"
             columns: ["buyer_workspace_id"]
@@ -12448,8 +12477,12 @@ export type Database = {
           source_quote_id: string | null
           status: string
           subtotal_net: number
+          supplier_acknowledged_at: string | null
           supplier_company_id: string | null
           supplier_contact_id: string | null
+          supplier_eta: string | null
+          supplier_note: string | null
+          supplier_status: string | null
           total: number
           updated_at: string
           vat_amount: number
@@ -12470,8 +12503,12 @@ export type Database = {
           source_quote_id?: string | null
           status?: string
           subtotal_net?: number
+          supplier_acknowledged_at?: string | null
           supplier_company_id?: string | null
           supplier_contact_id?: string | null
+          supplier_eta?: string | null
+          supplier_note?: string | null
+          supplier_status?: string | null
           total?: number
           updated_at?: string
           vat_amount?: number
@@ -12492,8 +12529,12 @@ export type Database = {
           source_quote_id?: string | null
           status?: string
           subtotal_net?: number
+          supplier_acknowledged_at?: string | null
           supplier_company_id?: string | null
           supplier_contact_id?: string | null
+          supplier_eta?: string | null
+          supplier_note?: string | null
+          supplier_status?: string | null
           total?: number
           updated_at?: string
           vat_amount?: number
@@ -13380,6 +13421,62 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "modules"
             referencedColumns: ["slug"]
+          },
+        ]
+      }
+      platform_suppliers: {
+        Row: {
+          claimed_workspace_id: string | null
+          country_code: string
+          created_at: string
+          id: string
+          legal_name: string | null
+          primary_email: string | null
+          status: string
+          updated_at: string
+          vat_number: string
+          vat_validated: boolean | null
+          vat_validated_at: string | null
+          vat_validation_source: string | null
+          website: string | null
+        }
+        Insert: {
+          claimed_workspace_id?: string | null
+          country_code: string
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          primary_email?: string | null
+          status?: string
+          updated_at?: string
+          vat_number: string
+          vat_validated?: boolean | null
+          vat_validated_at?: string | null
+          vat_validation_source?: string | null
+          website?: string | null
+        }
+        Update: {
+          claimed_workspace_id?: string | null
+          country_code?: string
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          primary_email?: string | null
+          status?: string
+          updated_at?: string
+          vat_number?: string
+          vat_validated?: boolean | null
+          vat_validated_at?: string | null
+          vat_validation_source?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_suppliers_claimed_workspace_id_fkey"
+            columns: ["claimed_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -19532,6 +19629,72 @@ export type Database = {
           },
         ]
       }
+      supplier_claim_requests: {
+        Row: {
+          country_code: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          evidence: Json
+          id: string
+          platform_supplier_id: string
+          requesting_user_id: string
+          requesting_workspace_id: string
+          risk_flag: string
+          status: string
+          updated_at: string
+          vat_number: string
+        }
+        Insert: {
+          country_code: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          evidence?: Json
+          id?: string
+          platform_supplier_id: string
+          requesting_user_id: string
+          requesting_workspace_id: string
+          risk_flag?: string
+          status?: string
+          updated_at?: string
+          vat_number: string
+        }
+        Update: {
+          country_code?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          evidence?: Json
+          id?: string
+          platform_supplier_id?: string
+          requesting_user_id?: string
+          requesting_workspace_id?: string
+          risk_flag?: string
+          status?: string
+          updated_at?: string
+          vat_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_claim_requests_platform_supplier_id_fkey"
+            columns: ["platform_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "platform_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_claim_requests_requesting_workspace_id_fkey"
+            columns: ["requesting_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_credit_note_items: {
         Row: {
           created_at: string
@@ -23828,6 +23991,19 @@ export type Database = {
         Args: { p_counted_cash?: number; p_session_id: string }
         Returns: Json
       }
+      commit_sourcing_options: {
+        Args: {
+          p_currency?: string
+          p_customer_company_id?: string
+          p_customer_contact_id?: string
+          p_deliver_to_address_unit_id?: string
+          p_demand_id: string
+          p_demand_type: string
+          p_selections: Json
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       count_embeddings_by_type: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -23955,6 +24131,10 @@ export type Database = {
       }
       decide_customer_pricing_request: {
         Args: { p_approve: boolean; p_note?: string; p_request_id: string }
+        Returns: Json
+      }
+      decide_supplier_claim: {
+        Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
         Returns: Json
       }
       deduct_generation_credits: { Args: { p_job_id: string }; Returns: Json }
@@ -24653,6 +24833,18 @@ export type Database = {
           vector_search_ms: number
         }[]
       }
+      get_sourcing_board: {
+        Args: { p_mine?: boolean; p_workspace_id: string }
+        Returns: Json
+      }
+      get_supplier_inbound_orders: {
+        Args: { p_workspace_id: string }
+        Returns: Json
+      }
+      get_supplier_inbound_orders_svc: {
+        Args: { p_workspace_id: string }
+        Returns: Json
+      }
       get_tool_call_stats: {
         Args: { time_interval?: string }
         Returns: {
@@ -24989,6 +25181,7 @@ export type Database = {
       }
       is_internal_ip: { Args: { ip_addr: unknown }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      is_platform_operator: { Args: never; Returns: boolean }
       is_workspace_admin: { Args: { p_workspace_id: string }; Returns: boolean }
       is_workspace_entitled: {
         Args: { p_module_slug: string; p_workspace_id: string }
@@ -25925,6 +26118,15 @@ export type Database = {
           party_type: string
         }[]
       }
+      request_supplier_claim: {
+        Args: {
+          p_country: string
+          p_evidence?: Json
+          p_vat: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       reset_lock_aware_tables: {
         Args: { p_tables: string[] }
         Returns: string[]
@@ -25973,6 +26175,17 @@ export type Database = {
           status: string
           workspace_id: string
         }[]
+      }
+      resolve_platform_supplier: {
+        Args: {
+          p_country: string
+          p_legal_name?: string
+          p_source?: string
+          p_validated?: boolean
+          p_validated_at?: string
+          p_vat: string
+        }
+        Returns: string
       }
       resolve_sourcing_options: {
         Args: {
@@ -26155,6 +26368,26 @@ export type Database = {
       }
       supplier_360: {
         Args: { p_company_id: string; p_workspace_id: string }
+        Returns: Json
+      }
+      supplier_update_inbound_order: {
+        Args: {
+          p_eta?: string
+          p_note?: string
+          p_order_id: string
+          p_status?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      supplier_update_inbound_order_svc: {
+        Args: {
+          p_eta?: string
+          p_note?: string
+          p_order_id: string
+          p_status?: string
+          p_workspace_id: string
+        }
         Returns: Json
       }
       tenant_purity_audit: { Args: never; Returns: Json }

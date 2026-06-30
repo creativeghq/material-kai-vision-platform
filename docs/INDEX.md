@@ -482,6 +482,8 @@ Complete documentation for Material Kai Vision Platform.
 - `stock_allocations` lifecycle ledger (demand → warehouse|PO → reserved-to-customer); `supplier_products` cost tier; `warehouse_coverage` ship-from routing
 - resolve → commit (draft POs) → send-to-supplier (PDF+email) → receive (reserve) → Finance Sourcing board; `purchase_order.sent/.received` Flows triggers
 - Built on `orders(order_type='purchase')`; legacy `purchase_orders` tables retired
+- KAI sourcing tools + `/admin/monitoring` shell + market-intel on quotes; marketplace sourcing (inquiry→accept→materialize)
+- **Workstream F** — global supplier identity (`platform_suppliers`) + operator-gated claim (`/admin/supplier-claims`) + supplier portal (`/supplier-portal`) + ERP API ([supplier-orders-api](api/supplier-orders-api.md))
 
 **[pos-retail-system.md](pos-retail-system.md)** - POS / retail ✨ NEW (2026-06)
 - vPOS shifts + cash drawer + X/Z reports; Law 5155 card/IRIS signature flow; EFT-POS registry; thermal receipt

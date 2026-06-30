@@ -21,10 +21,12 @@ const ROUTES = [
   // Previously white-screened / capability- & entitlement-gated
   '/finance', '/quotes', '/discover', '/crm', '/sales', '/pos', '/network',
   '/inbox', '/trip-expenses', // newer gated surfaces
+  '/supplier-portal', // #247 F — supplier portal (self-gates when no claimed identity)
   // Admin (operator-only)
   '/admin', '/admin/operations', '/admin/modules', '/admin/background-agents',
   '/admin/data-health', '/admin/knowledge-base', '/admin/materials-data', // newer / heavy admin pages
   '/admin/flows', '/admin/data-import', '/admin/plans',
+  '/admin/monitoring', '/admin/supplier-claims', // #244/#247 — monitoring shell + supplier-claim review
 ];
 
 // A failed dynamic import / runtime crash — the white-screen signatures.

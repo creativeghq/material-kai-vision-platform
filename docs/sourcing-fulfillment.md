@@ -52,7 +52,26 @@ It sits **on top of** the [Orders System](orders-system.md): the order (sales) i
 - Edge: [`generate-purchase-sheet-pdf`](../supabase/functions/generate-purchase-sheet-pdf/index.ts) (`order_id` PO mode + send).
 - Frontend: [`SourcingBoardPanel`](../src/modules/finance/components/SourcingBoardPanel.tsx), the "Send to supplier" action in [`OrdersPanel`](../src/modules/finance/components/OrdersPanel.tsx).
 
-## Roadmap (not built — tracked separately)
+## Agent surface (drive sourcing from chat)
 
-- **#243** — KAI agent tools (`source_product`/`create_purchase_order`/`send_purchase_order`) + AgentHub cards · marketplace sourcing (inquiry-first, reuses #219) · sales-scoped board view · **global supplier identity / portal / ERP feed** (the cross-workspace upgrade, full locked design).
-- See also #219 (surplus marketplace), #227 (pricing pyramid).
+KAI tools in [`sourcing-tools.ts`](../supabase/functions/_shared/tools/sourcing-tools.ts), registered on the `kai` agent: `source_product` (→ `resolve_sourcing_options`), `create_purchase_order` (→ `commit_sourcing_options`), `send_purchase_order` (→ the `{order_id}` send mode). Called with the **user's JWT** so the RPC gates resolve (resolve = member, create-PO = finance-manager). AgentHub renders `sourcing_options` / `purchase_order_created` / `purchase_order_sent` cards.
+
+## Monitoring & market intel
+
+A single **`/admin/monitoring`** shell tabs Price / Mentions / Job Research (each gated by its module flag — Price Monitoring is a registered `public.modules` row as of #244 B0). A **`MarketIntelCard`** on expanded quote lines surfaces the tracked price + 7-day mention snapshot for the product being quoted.
+
+## Marketplace sourcing (A5)
+
+`resolve_sourcing_options` includes a 4th lane: active cross-tenant `marketplace_listings` matched by material category / product-name. **Inquiry-first** — "source from marketplace" creates an inquiry via #219's `create_marketplace_inquiry` (which now carries the sourcing `demand_type`/`demand_id`). When the **seller accepts** (`inbox-api` `accept_marketplace_inquiry`, seller-gated), a draft purchase order + an `on_order` allocation are materialized in the **buyer's** workspace, the listing is decremented, and the buyer is notified. Seller "Accept" button lives on the inbox thread.
+
+## Global Supplier Identity / Portal / ERP (Workstream F)
+
+The cross-workspace upgrade of the per-workspace supplier model:
+- **Identity** — `platform_suppliers` canonical registry keyed on `(vat_number, country_code)`; per-workspace `crm_companies` link via `platform_supplier_id` (additive; the `_crm_link_platform_supplier` trigger + `resolve_platform_supplier` keep it current). **RLS: service-role only** — no cross-tenant read surface from the registry itself.
+- **Claim flow** — `supplier_claim_requests` + `request_supplier_claim` (any member; computes a low/needs-review risk flag from the workspace's own VAT) + **`decide_supplier_claim` (operator-only** = owner/admin of the root workspace, via `is_platform_operator()`). Operator review queue at `/admin/supplier-claims`. Approval sets `platform_suppliers.claimed_workspace_id` + `status='claimed'` — this is what grants cross-workspace order visibility.
+- **Portal** — a claimed supplier sees the POs sent to their identity across **all** buyer workspaces at `/supplier-portal` (`get_supplier_inbound_orders` — header + lines + buyer name only, the visibility contract) and can acknowledge / set ETA / mark shipped (`supplier_update_inbound_order` → `orders.supplier_status/eta/note`).
+- **ERP outbound** — [`supplier-orders-api`](../supabase/functions/supplier-orders-api/index.ts), a `kai_*` partner API so a supplier's own ERP lists its inbound POs + posts status back (service-role `_svc` RPCs, gated to the workspace's approved claim). See [docs/api/supplier-orders-api.md](api/supplier-orders-api.md).
+
+**Not yet built:** the inbound XML supplier-price feed → `supplier_products` (supplier costs are already ingestible via `parse-supplier-cost-list`). Tracked in #247.
+
+See also #219 (surplus marketplace), #227 (pricing pyramid), #237/#243/#244/#245/#247.
