@@ -4,13 +4,16 @@ This directory contains per-function deep docs for Supabase Edge Function APIs.
 
 > **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **90+ edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
 >
-> **🧪 Machine-readable / Swagger.** The MIVAA Python API has its FastAPI-generated spec at `https://v1api.materialshub.gr/openapi.json` (Swagger UI `/docs`). The Edge Functions (Deno) are **not** in that spec — they have their own hand-maintained OpenAPI at [**openapi-edge.json**](./openapi-edge.json), browsable via [**edge-swagger.html**](./edge-swagger.html). Covers all **88 edge functions**.
+> **🧪 Machine-readable / Swagger.** Three OpenAPI surfaces cover the platform:
+> 1. **MIVAA Python API** — FastAPI-generated spec at `https://v1api.materialshub.gr/openapi.json` (Swagger UI `/docs`). Auto-generated; nothing to maintain.
+> 2. **Supabase Edge Functions (Deno)** — **not** in MIVAA's spec; their own OpenAPI at [**openapi-edge.json**](./openapi-edge.json), browsable via [**edge-swagger.html**](./edge-swagger.html). Covers all **93 edge functions**.
+> 3. **Supabase PostgREST (tables/views/RPCs)** — PostgREST auto-serves a Swagger 2.0 spec at the REST root `https://<project>.supabase.co/rest/v1/`. **As of 2026-06 this endpoint is locked to the `service_role` key** (anon/publishable keys get `401 "Only the service_role API key can be used for this endpoint"`), so fetch it server-side: `curl -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" https://<project>.supabase.co/rest/v1/` → ~2.9 MB, 700+ paths / 340+ RPCs (includes every table + RPC, e.g. the Workstream-F `platform_suppliers` / `supplier_claim_requests` / `request_supplier_claim`). It's auto-generated from the live schema — fetch on demand rather than committing the blob.
 >
 > **Live URLs** (served from the frontend's `public/api/` after the next build+deploy; `/api/*` is excluded from the SPA rewrite in `vercel.json`):
 > - Swagger UI → `https://app.materialshub.gr/api/edge-swagger.html`
 > - Spec JSON → `https://app.materialshub.gr/api/openapi-edge.json`
 >
-> Regenerate after changing a function: edit [`scripts/edge-endpoints.json`](../../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs` (emits to both `docs/api/` and `public/api/`).
+> Regenerate the **edge** spec after changing a function: edit [`scripts/edge-endpoints.json`](../../scripts/edge-endpoints.json), run `npm run openapi:edge` (or `node scripts/build-openapi-edge.mjs`) — emits to both `docs/api/` and `public/api/`.
 
 ## Overview
 

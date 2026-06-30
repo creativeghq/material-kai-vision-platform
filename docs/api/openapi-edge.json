@@ -11569,9 +11569,44 @@
                       },
                       "message": {
                         "type": "string"
+                      },
+                      "demand_type": {
+                        "type": "string",
+                        "description": "Carries the sourcing demand so an accepted inquiry can materialize an allocation (one of: string ('order_item'|'quote_item'))"
+                      },
+                      "demand_id": {
+                        "type": "string",
+                        "description": "FK of the order_item / quote_item that needs sourcing (string (uuid))"
                       }
                     },
                     "description": "Returns: {data: thread}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "inquiry_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "accept_marketplace_inquiry"
+                        ],
+                        "description": "Seller accepts an inquiry → materializes a draft purchase order + on_order allocation in the buyer workspace, decrements the listing, notifies the buyer (seller-gated, idempotent)"
+                      },
+                      "inquiry_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "accepted_qty": {
+                        "type": "number"
+                      },
+                      "unit_price": {
+                        "type": "number"
+                      }
+                    },
+                    "description": "Returns: {data: {order_id, allocation_id}}"
                   },
                   {
                     "type": "object",
@@ -11842,6 +11877,200 @@
                       }
                     },
                     "description": "Returns: {success, pdf_url, pdf_storage_path}"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supplier-orders-api": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back",
+        "operationId": "get_supplier_orders_api",
+        "description": "Workstream F (#247). A supplier's ERP authenticates with a kai_* partner key; the key's workspace must hold an operator-approved supplier-identity claim (platform_suppliers.claimed_workspace_id). Returns the purchase orders addressed to that identity across every buyer workspace (header + lines + buyer name only — visibility contract) and accepts acknowledge/ship/ETA write-backs. GET lists; POST {action} lists or updates. Backed by service-role RPCs get_supplier_inbound_orders_svc / supplier_update_inbound_order_svc.\n\n📖 [docs/api/supplier-orders-api.md](supplier-orders-api.md)",
+        "security": [
+          {
+            "apiKeyPartner": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back",
+        "operationId": "post_supplier_orders_api",
+        "description": "Workstream F (#247). A supplier's ERP authenticates with a kai_* partner key; the key's workspace must hold an operator-approved supplier-identity claim (platform_suppliers.claimed_workspace_id). Returns the purchase orders addressed to that identity across every buyer workspace (header + lines + buyer name only — visibility contract) and accepts acknowledge/ship/ETA write-backs. GET lists; POST {action} lists or updates. Backed by service-role RPCs get_supplier_inbound_orders_svc / supplier_update_inbound_order_svc.\n\n📖 [docs/api/supplier-orders-api.md](supplier-orders-api.md)",
+        "security": [
+          {
+            "apiKeyPartner": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list_orders"
+                        ],
+                        "description": "List the inbound POs addressed to the caller's claimed supplier identity (default for GET)"
+                      }
+                    },
+                    "description": "Returns: {orders: [{order_id, order_number, status, currency, total, created_at, buyer_name, supplier_status, supplier_eta, lines[]}]}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "order_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update_order"
+                        ],
+                        "description": "Acknowledge / mark shipped / set ETA on an inbound PO addressed to your identity"
+                      },
+                      "order_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "one of: string ('acknowledged'|'shipped')"
+                      },
+                      "eta": {
+                        "type": "string",
+                        "description": "string (date)"
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {order_id, ok}"
                   }
                 ],
                 "discriminator": {
