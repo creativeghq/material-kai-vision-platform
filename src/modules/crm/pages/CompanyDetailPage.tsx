@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI } from '@/services/crm.service';
+import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
@@ -407,6 +408,29 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
+  // Supplier↔factory pin. Persist the new pin list, then claim: re-point every matching
+  // product's brand_company_id onto this company + fold in any duplicate auto-created brand
+  // node. This makes the pin authoritative immediately (not just for future ingests) and keeps
+  // the FK — read by SupplierProductsTab — as the single source of truth.
+  const handleFactoryPinChange = async (names: string[]) => {
+    await patchInline({ factory_names: names });
+    if (isNew || !id || !activeWorkspaceId) return;
+    try {
+      const { data, error } = await supabase.rpc('claim_brand_for_company', {
+        p_workspace_id: activeWorkspaceId, p_company_id: id, p_names: names,
+      });
+      if (error) throw error;
+      const claimed = (data as any)?.claimed ?? 0;
+      const merged = (data as any)?.merged ?? 0;
+      if (claimed > 0 || merged > 0) {
+        toast({ title: 'Products linked', description: `Claimed ${claimed} product${claimed === 1 ? '' : 's'}${merged ? `, merged ${merged} duplicate brand node${merged === 1 ? '' : 's'}` : ''}.` });
+      }
+      await loadCompany();
+    } catch (e: any) {
+      toast({ title: 'Could not link products', description: e?.message ?? 'Try again', variant: 'destructive' });
+    }
+  };
+
   const handleAttachContact = async () => {
     if (!id || !selectedContactId) return;
     try {
@@ -669,7 +693,8 @@ export const CompanyDetailPage: React.FC = () => {
               <FactoryLinkCard
                 value={company.factory_names ?? []}
                 supplierName={company.name}
-                onChange={(names) => patchInline({ factory_names: names })}
+                workspaceId={activeWorkspaceId ?? ''}
+                onChange={handleFactoryPinChange}
               />
             )}
 
@@ -891,7 +916,7 @@ export const CompanyDetailPage: React.FC = () => {
               supplier. Read-only view for now. */}
           {company.is_supplier && (
             <TabsContent value="products" className="space-y-4">
-              <SupplierProductsTab workspaceId={activeWorkspaceId ?? ''} supplierName={company.name} factoryNames={company.factory_names ?? []}/>
+              <SupplierProductsTab workspaceId={activeWorkspaceId ?? ''} companyId={company.id}/>
             </TabsContent>
           )}
 

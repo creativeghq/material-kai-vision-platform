@@ -17,22 +17,17 @@ import {
 
 interface SupplierProductsTabProps {
   /**
-   * The active workspace. Products are matched ONLY within this workspace — the
-   * supplier company is workspace-scoped, so its catalog must be too. Without this
-   * gate the maker-name match would pull in other tenants' products that happen to
-   * share a factory name (cross-tenant leak).
+   * The active workspace. Belt-and-braces scope on top of the brand_company_id match
+   * (the company is workspace-scoped, so its catalog must be too).
    */
   workspaceId: string;
-  /** The supplier party name to match against products.metadata.factory_name */
-  supplierName: string;
-  /** Optional list of aliases (e.g. trading names, legal names) to also match */
-  aliases?: string[];
   /**
-   * Explicitly pinned factory/manufacturer names (crm_companies.factory_names). When
-   * non-empty these are authoritative — we match the catalog by them and ignore the
-   * fuzzy supplier-name match. Empty falls back to matching on supplierName + aliases.
+   * The supplier's crm_companies id. This is the SINGLE source of truth: products carry
+   * a brand_company_id FK that ingestion stamps (resolve_brand_company) and the
+   * "Linked factory / manufacturer" pin claims (claim_brand_for_company). We list every
+   * product whose brand_company_id = this company — exact, indexed, no fuzzy name match.
    */
-  factoryNames?: string[];
+  companyId: string;
 }
 
 interface ProductRow {
@@ -50,88 +45,40 @@ interface ProductRow {
 }
 
 /**
- * Lists every product whose maker (metadata.factory_name / manufacturer / brand
- * / supplier) matches this supplier's name. Used on CRM company / contact
- * profiles tagged is_supplier=true.
+ * Lists every product whose brand_company_id FK points at this supplier company.
+ * Used on CRM company profiles tagged is_supplier=true.
  *
- * Matching is case-insensitive ilike. No FK link exists between products and
- * CRM parties today — the maker is a free-text string on product metadata.
+ * brand_company_id is the single source of truth: ingestion stamps it
+ * (resolve_brand_company) and the "Linked factory / manufacturer" pin claims matching
+ * products onto the company (claim_brand_for_company). No fuzzy metadata-name match.
  */
 export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
   workspaceId,
-  supplierName,
-  aliases = [],
-  factoryNames = [],
+  companyId,
 }) => {
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
-  const pinned = factoryNames.filter((s) => (s ?? '').trim());
-  const isPinned = pinned.length > 0;
-
-  const candidateNames = React.useMemo(() => {
-    // Explicit pin wins; otherwise fall back to the supplier name + aliases.
-    const source = isPinned ? pinned : [supplierName, ...aliases];
-    const all = source.map((s) => (s ?? '').trim()).filter(Boolean);
-    // Dedupe case-insensitively
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const s of all) {
-      const key = s.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); out.push(s); }
-    }
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplierName, aliases.join('|'), pinned.join('|')]);
-
   useEffect(() => {
     let cancelled = false;
-    if (!workspaceId || candidateNames.length === 0) { setRows([]); setLoading(false); return; }
+    if (!companyId) { setRows([]); setLoading(false); return; }
 
     (async () => {
       try {
         setLoading(true);
         setError(null);
-        // Fetch up to 200 candidate products that have any maker key set, then
-        // filter client-side. The maker key can live under any of the legacy
-        // aliases (factory_name / manufacturer / brand / supplier), so a
-        // single ilike per key would miss rows that use a different key. The
-        // canonical key is metadata.factory_name post-ingestion.
-        // We do a broad fetch on metadata->>factory_name first, then fall
-        // back to the alias keys client-side.
-        const ors: string[] = [];
-        for (const n of candidateNames) {
-          const esc = n.replace(/[%_]/g, '\\$&');
-          ors.push(`metadata->>factory_name.ilike.%${esc}%`);
-          ors.push(`metadata->>manufacturer.ilike.%${esc}%`);
-          ors.push(`metadata->>brand.ilike.%${esc}%`);
-          ors.push(`metadata->>supplier.ilike.%${esc}%`);
-        }
-
         const { data, error: err } = await supabase
           .from('products')
           .select(`id, name, sku, external_sku, status, created_at, metadata, ${PRODUCT_IMAGE_SELECT}`)
-          .eq('workspace_id', workspaceId)
-          .or(ors.join(','))
+          .eq('brand_company_id', companyId)
           .order('created_at', { ascending: false })
           .limit(500);
 
         if (err) throw err;
         if (cancelled) return;
-
-        // Defence-in-depth: verify each row actually matches via the canonical
-        // getManufacturer() helper (handles structured {value, confidence}
-        // envelopes that ilike on plain text wouldn't catch).
-        const lower = candidateNames.map((n) => n.toLowerCase());
-        const filtered = (data ?? []).filter((p: any) => {
-          const maker = (getManufacturer(p.metadata) ?? '').toLowerCase();
-          if (!maker) return false;
-          return lower.some((n) => maker.includes(n) || n.includes(maker));
-        });
-
-        setRows(filtered as ProductRow[]);
+        setRows((data ?? []) as ProductRow[]);
       } catch (e: any) {
         if (!cancelled) setError(e?.message ?? 'Failed to load products');
       } finally {
@@ -140,7 +87,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [workspaceId, candidateNames.join('|')]);
+  }, [workspaceId, companyId]);
 
   const filteredRows = React.useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -161,9 +108,8 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
             Products from this supplier
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            {isPinned
-              ? 'Matched by the factory name(s) pinned on this supplier (Linked factory / manufacturer).'
-              : 'Matched by maker name on product metadata — pin a factory under “Linked factory / manufacturer” for an exact link.'}
+            Linked by <code>brand_company_id</code> — the products claimed by this company (set at
+            ingestion, or via the “Linked factory / manufacturer” pin).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -191,11 +137,10 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
         ) : filteredRows.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground space-y-2">
             <Package className="h-10 w-10 mx-auto opacity-40" />
-            <p className="text-sm">No products linked to this supplier yet.</p>
+            <p className="text-sm">No products claimed by this supplier yet.</p>
             <p className="text-xs">
-              Products are linked by their maker name in metadata
-              (<code>factory_name</code>, <code>manufacturer</code>, <code>brand</code>, <code>supplier</code>).
-              Make sure the supplier name here matches what's stored on the products.
+              Pin the ingested factory name(s) under “Linked factory / manufacturer” to claim their
+              products — that stamps each product's <code>brand_company_id</code> to this company.
             </p>
           </div>
         ) : (

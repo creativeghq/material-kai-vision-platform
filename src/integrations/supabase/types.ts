@@ -23912,6 +23912,22 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      backfill_brand_company_ids: {
+        Args: { p_limit?: number; p_workspace_id: string }
+        Returns: Json
+      }
+      claim_brand_for_company: {
+        Args: { p_company_id: string; p_names: string[]; p_workspace_id: string }
+        Returns: Json
+      }
+      list_workspace_makers: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          brand_company_id: string
+          factory_name: string
+          product_count: number
+        }[]
+      }
       auto_adjust_vector_index_lists: { Args: never; Returns: undefined }
       backfill_factory_from_document_filename: { Args: never; Returns: number }
       backfill_pending_kb_embeddings: {

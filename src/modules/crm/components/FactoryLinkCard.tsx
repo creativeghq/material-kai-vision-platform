@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Button } from '@/components/core/ui/button';
-import { getManufacturer } from '@/utils/productMetadata';
 
 /**
  * Pins a CRM supplier to one or more ingested factory/manufacturer identities
@@ -22,38 +21,33 @@ import { getManufacturer } from '@/utils/productMetadata';
 export const FactoryLinkCard: React.FC<{
   value: string[];
   supplierName?: string;
+  workspaceId: string;
   onChange: (names: string[]) => void;
-}> = ({ value, supplierName, onChange }) => {
+}> = ({ value, supplierName, workspaceId, onChange }) => {
   const [allFactories, setAllFactories] = useState<{ name: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
+    if (!workspaceId) { setAllFactories([]); setLoading(false); return; }
     (async () => {
       try {
-        const { data } = await supabase
-          .from('products')
-          .select('metadata')
-          .limit(2000);
+        // Distinct maker names in THIS workspace's catalog with product counts, straight from
+        // the DB (list_workspace_makers) — the same makers ingestion resolved to brand nodes.
+        const { data } = await supabase.rpc('list_workspace_makers', { p_workspace_id: workspaceId });
         if (cancelled) return;
-        const counts = new Map<string, number>();
-        for (const row of data ?? []) {
-          const maker = (getManufacturer((row as any).metadata) ?? '').trim();
-          if (!maker) continue;
-          counts.set(maker, (counts.get(maker) ?? 0) + 1);
-        }
         setAllFactories(
-          Array.from(counts.entries())
-            .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => b.count - a.count),
+          ((data ?? []) as Array<{ factory_name: string; product_count: number }>)
+            .map((r) => ({ name: (r.factory_name ?? '').trim(), count: Number(r.product_count) || 0 }))
+            .filter((r) => r.name),
         );
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [workspaceId]);
 
   const selected = value ?? [];
   const toggle = (name: string) => {

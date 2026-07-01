@@ -895,7 +895,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-6xl w-[95vw] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-[1400px] w-[95vw] max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle></DialogHeader>
         {loading || !order ? (
           <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -976,7 +976,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
-                  <div className="grid grid-cols-[1fr_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[1040px]">
+                  <div className="grid grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[1040px]">
                     <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right" title="Sell price per unit (excl. VAT)">Price</span><span className="text-right" title="Net = price × qty (excl. VAT)">Net</span><span className="text-right" title="Cost per unit — what this costs us">Cost</span><span className="text-right" title="Cost total = cost/unit × qty">Cost total</span><span className="text-right" title="Profit = net − cost total (excl. VAT)">Profit</span><span className="text-right" title="VAT amount on this line">VAT</span><span className="text-right" title="Total = net + VAT">Total</span>
                   </div>
                   {items.map((it) => {
@@ -988,7 +988,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     const del = Number(it.quantity_delivered); const q = Number(it.quantity);
                     const delTone = del >= q && q > 0 ? 'text-emerald-600' : del > 0 ? 'text-amber-600' : 'text-muted-foreground';
                     return (
-                    <div key={it.id} className="grid grid-cols-[1fr_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[1040px]">
+                    <div key={it.id} className="grid grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[1040px]">
                       <span className="min-w-0">
                         <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
                         {/* #6/#7 — who supplies this line (and therefore who we owe). Any line, catalog or ad-hoc. */}
