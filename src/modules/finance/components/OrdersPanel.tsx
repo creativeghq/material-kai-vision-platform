@@ -642,7 +642,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     setPayIssueDoc(false);
     setPayReason(''); setPaySupplier(null); setPaySupplierSearch(''); setPaySupplierOpts([]);
     setPayAccountId(defaultAccountId()); setPayMethod('cash');
-    setPayAmt(String(Math.max(0, Number(order.total) - (dir === 'in' ? (fin?.received ?? 0) : (fin?.paid_out ?? 0)))));
+    // Money out: no prefill — the operator types what they're actually paying (which supplier +
+    // how much is their call, not the whole order balance). Money in: prefill the remaining
+    // receivable (rounded to cents so no float dust), a sensible "customer pays the balance" default.
+    setPayAmt(dir === 'out' ? '' : String(Math.max(0, Math.round((Number(order.total) - (fin?.received ?? 0)) * 100) / 100)));
     setPayOpen(true);
   };
 
@@ -1094,7 +1097,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     {editingPaymentId && <span className="text-muted-foreground">Edit ·</span>}
                     {payDir === 'in' ? <><ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500" /> Money in (received)</> : <><ArrowUpRight className="h-3.5 w-3.5 text-red-400" /> Money out (sent)</>}
                   </span>
-                  <Input className="h-8 w-28 text-right text-sm" type="text" inputMode="decimal" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
+                  <Input className="h-8 w-28 text-right text-sm" type="text" inputMode="decimal" placeholder="0.00" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
                   <span className="text-xs text-muted-foreground">{order.currency}</span>
                   <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (editingPaymentId ? 'Update' : 'Save')}</Button>
                   <Button size="sm" variant="ghost" onClick={() => { setPayOpen(false); setEditingPaymentId(null); }}>Cancel</Button>
