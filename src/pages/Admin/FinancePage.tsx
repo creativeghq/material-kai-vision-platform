@@ -72,6 +72,7 @@ import { CommissionSummaryCard } from '@/components/business/marketplace/Commiss
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
+import SupplierPortalPage from '@/pages/SupplierPortalPage';
 import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -377,6 +378,11 @@ const FinancePage: React.FC = () => {
             <TabsTrigger value="ap" className="w-full justify-start">
               <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
             </TabsTrigger>
+            {!isAccountant && (
+              <TabsTrigger value="supplier_portal" className="w-full justify-start">
+                <Truck className="h-4 w-4 mr-2" /> Supplier Portal
+              </TabsTrigger>
+            )}
 
             <SectionLabel>Documents</SectionLabel>
             {DOC_TABS.map((d) => (
@@ -811,6 +817,11 @@ const FinancePage: React.FC = () => {
                 </table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ─────────── SUPPLIER PORTAL (inbound POs to your claimed identity) ─────────── */}
+          <TabsContent value="supplier_portal" className="space-y-4">
+            <SupplierPortalPage />
           </TabsContent>
 
           {/* ─────────── DOCUMENTS (folded in) ─────────── */}

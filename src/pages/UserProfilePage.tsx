@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, Star, Share2, ReceiptText, KeyRound } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, Star, Share2, ReceiptText, KeyRound, Truck } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -11,13 +11,21 @@ import { MyDocumentsTab } from '@/components/core/Profile/MyDocumentsTab';
 import { InboxTab } from '@/components/core/Profile/InboxTab';
 import { SocialAccountsTab } from '@/modules/social-media/components/SocialAccountsTab';
 import { WorkspaceKeysTab } from '@/components/core/Profile/WorkspaceKeysTab';
+import SupplierPortalPage from './SupplierPortalPage';
 import { AppointmentsPage } from './AppointmentsPage';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export const UserProfilePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { can } = usePermissions();
+  // Supplier-only participation: a workspace can claim a (VAT, country) supplier identity
+  // and receive purchase orders WITHOUT enabling the Finance module. Finance-enabled workspaces
+  // reach the Supplier Portal under Finance → Payables instead, so we only surface it here for
+  // marketplace business users who are not finance-managed.
+  const showSupplierPortal = can('marketplace.browse') && !can('finance.manage');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') ?? 'profile');
 
   useEffect(() => {
@@ -81,6 +89,12 @@ export const UserProfilePage: React.FC = () => {
             <KeyRound className="h-4 w-4" />
             Keys
           </TabsTrigger>
+          {showSupplierPortal && (
+            <TabsTrigger value="supplier-portal" className="flex items-center gap-2">
+              <Truck className="h-4 w-4" />
+              Supplier Portal
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
@@ -133,6 +147,12 @@ export const UserProfilePage: React.FC = () => {
         <TabsContent value="keys" className="space-y-6">
           <WorkspaceKeysTab />
         </TabsContent>
+
+        {showSupplierPortal && (
+          <TabsContent value="supplier-portal" className="space-y-6">
+            <SupplierPortalPage />
+          </TabsContent>
+        )}
       </Tabs>
       </div>
     </div>
