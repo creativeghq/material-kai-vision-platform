@@ -69,8 +69,30 @@ export async function addMember(svc: SupabaseClient, wsId: string, userId: strin
 // Best-effort teardown. Data first (FK), then memberships, workspaces, users. Never throws —
 // the email-prefix cron is the backstop if anything here fails.
 export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; userIds?: string[] }): Promise<void> {
-  const wsIds = (opts.wsIds || []).filter(Boolean);
+  const explicitWs = (opts.wsIds || []).filter(Boolean);
   const userIds = (opts.userIds || []).filter(Boolean);
+
+  // EVERY test user is auto-provisioned a personal "<email>'s workspace" at signup
+  // (handle_new_user_workspace_assignment: a child of root with created_by = user, which in turn
+  // spawns a "(reseller)" crm_companies mirror in the parent via _autolink_dealer_crm). Deleting
+  // the auth user does NOT remove it — created_by → SET NULL, not cascade — so it and its mirror
+  // would linger until the name-cron backstop (visible in the CRM Companies list for up to the
+  // cron's grace window). Collect each user's owned workspaces here so we delete them outright.
+  const wsIds = new Set<string>(explicitWs);
+  for (const u of userIds) {
+    const { data } = await svc.from('workspaces').select('id').eq('created_by', u)
+      .then((r) => r, () => ({ data: [] as Array<{ id: string }> }));
+    for (const w of (data ?? [])) wsIds.add(w.id);
+  }
+
+  // The reseller mirror lives in the PARENT workspace, not the child, so `delete where
+  // workspace_id = child` never touches it. Deleting the child fires the cleanup trigger, but
+  // delete the mirror explicitly too so teardown never depends on the trigger being enabled.
+  for (const ws of wsIds) {
+    const { data } = await svc.from('workspaces').select('parent_crm_company_id').eq('id', ws).maybeSingle()
+      .then((r) => r, () => ({ data: null as { parent_crm_company_id: string | null } | null }));
+    if (data?.parent_crm_company_id) await svc.from('crm_companies').delete().eq('id', data.parent_crm_company_id).then(() => {}, () => {});
+  }
   for (const ws of wsIds) await svc.from('crm_companies').delete().eq('workspace_id', ws).then(() => {}, () => {});
   for (const ws of wsIds) await svc.from('workspace_members').delete().eq('workspace_id', ws).then(() => {}, () => {});
   for (const ws of wsIds) await svc.from('workspaces').delete().eq('id', ws).then(() => {}, () => {});
