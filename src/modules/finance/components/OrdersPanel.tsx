@@ -635,13 +635,21 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   // The payment trigger recomputes payment_status; getOrderFinance refreshes Received/Paid/Profit.
   // Default to the workspace's default account (or the first), so the money lands somewhere real.
   const defaultAccountId = () => (bankAccounts.find((a) => a.is_default) ?? bankAccounts[0])?.id ?? '';
+  // The payment method follows the account: a Cash account moved cash, a Card account a card, a
+  // Bank/online account a transfer (by default). So the operator picks WHERE the money lands and
+  // the HOW is inferred — the method picker only surfaces for accounts where it's genuinely
+  // ambiguous (bank/online/other can be transfer vs cheque vs card).
+  const METHOD_FOR_KIND: Record<string, string> = { cash: 'cash', card: 'card', bank: 'bank_transfer', online: 'bank_transfer', other: 'other' };
+  const accountKind = (id: string): string => bankAccounts.find((a) => a.id === id)?.kind ?? '';
+  const methodForAccount = (id: string): string => METHOD_FOR_KIND[accountKind(id)] ?? 'cash';
+  const methodIsAmbiguous = (id: string): boolean => { const k = accountKind(id); return k === 'bank' || k === 'online' || k === 'other' || k === ''; };
   const openPay = (dir: 'in' | 'out') => {
     if (!order) return;
     setEditingPaymentId(null);
     setPayDir(dir);
     setPayIssueDoc(false);
     setPayReason(''); setPaySupplier(null); setPaySupplierSearch(''); setPaySupplierOpts([]);
-    setPayAccountId(defaultAccountId()); setPayMethod('cash');
+    setPayAccountId(defaultAccountId()); setPayMethod(methodForAccount(defaultAccountId()));
     // Money out: no prefill — the operator types what they're actually paying (which supplier +
     // how much is their call, not the whole order balance). Money in: prefill the remaining
     // receivable (rounded to cents so no float dust), a sensible "customer pays the balance" default.
@@ -654,7 +662,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     setEditingPaymentId(null);
     setPayDir('out'); setPayIssueDoc(false); setPayReason('');
     setPaySupplier(sup); setPaySupplierSearch(''); setPaySupplierOpts([]);
-    setPayAccountId(defaultAccountId()); setPayMethod('bank_transfer');
+    setPayAccountId(defaultAccountId()); setPayMethod(methodForAccount(defaultAccountId()));
     setPayAmt(String(Math.max(0, owed)));
     setPayOpen(true);
   };
@@ -666,7 +674,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
     try {
       const acct = await financeService.createBankAccount({ workspaceId: order.workspace_id, name: 'Cash', kind: 'cash', currency: order.currency });
       setBankAccounts((prev) => [...prev, acct]);
-      setPayAccountId(acct.id);
+      setPayAccountId(acct.id); setPayMethod('cash');
     } catch (err: any) {
       toast({ title: 'Could not create account', description: err?.message, variant: 'destructive' });
     } finally { setCreatingAccount(false); }
@@ -1127,7 +1135,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     Without an account the money floats unattached and never shows in finance balances. */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {bankAccounts.length > 0 ? (
-                    <Select value={payAccountId} onValueChange={setPayAccountId}>
+                    <Select value={payAccountId} onValueChange={(v) => { setPayAccountId(v); setPayMethod(methodForAccount(v)); }}>
                       <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Account…" /></SelectTrigger>
                       <SelectContent>{bankAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}{a.currency !== order.currency ? ` · ${a.currency}` : ''}</SelectItem>)}</SelectContent>
                     </Select>
@@ -1136,10 +1144,15 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                       {creatingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Plus className="h-3.5 w-3.5 mr-1" /> Create cash account</>}
                     </Button>
                   )}
-                  <Select value={payMethod} onValueChange={setPayMethod}>
-                    <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>{PAY_METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}</SelectContent>
-                  </Select>
+                  {/* Method follows the account. Only ask when the account allows more than one way in
+                      (a bank/online account can be a transfer, a cheque, or a card); a cash/card account
+                      is unambiguous, so we infer it and don't clutter the form. */}
+                  {methodIsAmbiguous(payAccountId) && (
+                    <Select value={payMethod} onValueChange={setPayMethod}>
+                      <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>{PAY_METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
                   <Input className="h-8 w-52 text-sm" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'Reason (e.g. pre-payment, deposit)' : 'Reason (e.g. deposit to supplier)'} />
                 </div>
                 {/* Cash sale: record the money AND issue the order's receipt/invoice in one step. */}
