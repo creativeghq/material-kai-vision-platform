@@ -92,8 +92,10 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         name: form.name.trim(),
         kind: form.kind,
         currency: form.currency.trim().toUpperCase() || 'EUR',
-        iban: form.iban.trim() || null,
-        accountRef: form.accountRef.trim() || null,
+        // IBAN only applies to a bank account; a reference (card no. / account ref) to anything
+        // but cash. Cash has neither — don't persist stale values if the kind was switched.
+        iban: form.kind === 'bank' ? (form.iban.trim() || null) : null,
+        accountRef: form.kind === 'cash' ? null : (form.accountRef.trim() || null),
         openingBalance: form.openingBalance.trim() === '' ? 0 : parseDecimalOr(form.openingBalance, 0),
         notes: form.notes.trim() || null,
       };
@@ -225,15 +227,21 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
                 <Input className="h-9 text-sm uppercase" value={form.currency} onChange={(e) => patch('currency', e.target.value)} maxLength={3} />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">IBAN</Label>
-              <Input className="h-9 text-sm" value={form.iban} onChange={(e) => patch('iban', e.target.value)} placeholder="GR00 0000 0000 0000 0000 0000 000" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{refLabelFor(form.kind)}</Label>
-              <Input className="h-9 text-sm" value={form.accountRef} onChange={(e) => patch('accountRef', e.target.value)}
-                placeholder={form.kind === 'card' ? 'Last 4 or full card number' : 'Account number / reference'} />
-            </div>
+            {/* IBAN only for a bank account; a reference for anything but cash. A cash account is
+                just a name + balance — no bank numbers to fill in. */}
+            {form.kind === 'bank' && (
+              <div className="space-y-1">
+                <Label className="text-xs">IBAN</Label>
+                <Input className="h-9 text-sm" value={form.iban} onChange={(e) => patch('iban', e.target.value)} placeholder="GR00 0000 0000 0000 0000 0000 000" />
+              </div>
+            )}
+            {form.kind !== 'cash' && (
+              <div className="space-y-1">
+                <Label className="text-xs">{refLabelFor(form.kind)}</Label>
+                <Input className="h-9 text-sm" value={form.accountRef} onChange={(e) => patch('accountRef', e.target.value)}
+                  placeholder={form.kind === 'card' ? 'Last 4 or full card number' : 'Account number / reference'} />
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs">Opening balance</Label>
               <Input className="h-9 text-sm text-right" type="text" inputMode="decimal" value={form.openingBalance}
