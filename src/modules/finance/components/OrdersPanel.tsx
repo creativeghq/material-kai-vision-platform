@@ -1227,11 +1227,18 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                 <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments</div>
                 {fin.payments.map((p) => {
                   const acctName = p.bank_account_id ? bankAccounts.find((a) => a.id === p.bank_account_id)?.name : null;
+                  // Who the cash moved between: money-in came FROM the customer, money-out went TO the supplier.
+                  const who = p.counterparty_name;
                   return (
                   <div key={p.id} className={`flex items-start justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0 ${editingPaymentId === p.id ? 'bg-muted/30' : ''}`}>
                     <span className="min-w-0">
-                      <span className="block truncate">{p.reference || <span className="text-muted-foreground italic">No reason</span>}</span>
-                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'In' : 'Out'}{p.method ? ` · ${paymentMethodLabel(p.method)}` : ''}{acctName ? ` · ${acctName}` : ''}</span>
+                      <span className="block truncate">
+                        {p.reference || <span className="text-muted-foreground italic">No reason</span>}
+                        {who
+                          ? <span className="text-muted-foreground">{p.direction === 'in' ? ' · from ' : ' · to '}<span className="text-foreground/80">{who}</span></span>
+                          : (p.direction === 'out' && <span className="text-muted-foreground italic"> · to (no supplier set)</span>)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'Money in' : 'Money out'}{p.method ? ` · ${paymentMethodLabel(p.method)}` : ''}{acctName ? ` · ${acctName}` : ''}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>

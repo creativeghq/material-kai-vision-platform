@@ -262,7 +262,7 @@ export const ordersService = {
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
     supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
-    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null }>;
+    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_name: string | null }>;
     received: number;
     paid_out: number;
     profit: number;
@@ -270,9 +270,22 @@ export const ordersService = {
     const [inv, bills, pay] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
-      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, bank_account_id, counterparty_company_id').eq('order_id', orderId).order('paid_at', { ascending: false }),
+      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, bank_account_id, counterparty_company_id, counterparty_contact_id').eq('order_id', orderId).order('paid_at', { ascending: false }),
     ]);
-    const payments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null }>;
+    const rawPayments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null }>;
+    // Resolve the counterparty (who the cash went to / came from) so the UI can show it.
+    // Money-in → the order's customer; money-out → the supplier paid. Both land in counterparty_company_id;
+    // a bare contact customer/supplier lands in counterparty_contact_id instead.
+    const [companyNames, contactNames] = await Promise.all([
+      this.getCompanyNames(rawPayments.map((p) => p.counterparty_company_id).filter(Boolean) as string[]).catch(() => new Map<string, string>()),
+      this.getContactNames(rawPayments.map((p) => p.counterparty_contact_id).filter(Boolean) as string[]).catch(() => new Map<string, string>()),
+    ]);
+    const payments = rawPayments.map((p) => ({
+      ...p,
+      counterparty_name: (p.counterparty_company_id ? companyNames.get(p.counterparty_company_id) : null)
+        ?? (p.counterparty_contact_id ? contactNames.get(p.counterparty_contact_id) : null)
+        ?? null,
+    }));
     const received = payments.filter((p) => p.direction === 'in').reduce((a, p) => a + Number(p.amount), 0);
     const paid_out = payments.filter((p) => p.direction === 'out').reduce((a, p) => a + Number(p.amount), 0);
     return {
@@ -497,6 +510,16 @@ export const ordersService = {
     const out = new Map<string, string>();
     if (ids.length === 0) return out;
     const { data } = await supabase.from('crm_companies').select('id, name').in('id', ids);
+    for (const c of (data ?? []) as Array<{ id: string; name: string }>) out.set(c.id, c.name);
+    return out;
+  },
+
+  /** Resolve CRM contact ids → display name (for bare-contact payment counterparties). */
+  async getContactNames(contactIds: string[]): Promise<Map<string, string>> {
+    const ids = [...new Set(contactIds.filter(Boolean))];
+    const out = new Map<string, string>();
+    if (ids.length === 0) return out;
+    const { data } = await supabase.from('crm_contacts').select('id, name').in('id', ids);
     for (const c of (data ?? []) as Array<{ id: string; name: string }>) out.set(c.id, c.name);
     return out;
   },
