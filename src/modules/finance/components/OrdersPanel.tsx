@@ -197,8 +197,6 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
 type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string; available?: number | null; supplier_company_id?: string | null };
 const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE, available: null, supplier_company_id: null });
 
-// How the cash moved — same vocabulary the standalone RecordPaymentDialog uses.
-const PAY_METHODS = ['cash', 'card', 'bank_transfer', 'check', 'other'] as const;
 
 const NewOrderModal: React.FC<{
   workspaceId: string;
@@ -642,7 +640,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const METHOD_FOR_KIND: Record<string, string> = { cash: 'cash', card: 'card', bank: 'bank_transfer', online: 'bank_transfer', other: 'other' };
   const accountKind = (id: string): string => bankAccounts.find((a) => a.id === id)?.kind ?? '';
   const methodForAccount = (id: string): string => METHOD_FOR_KIND[accountKind(id)] ?? 'cash';
-  const methodIsAmbiguous = (id: string): boolean => { const k = accountKind(id); return k === 'bank' || k === 'online' || k === 'other' || k === ''; };
   const openPay = (dir: 'in' | 'out') => {
     if (!order) return;
     setEditingPaymentId(null);
@@ -1144,15 +1141,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                       {creatingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Plus className="h-3.5 w-3.5 mr-1" /> Create cash account</>}
                     </Button>
                   )}
-                  {/* Method follows the account. Only ask when the account allows more than one way in
-                      (a bank/online account can be a transfer, a cheque, or a card); a cash/card account
-                      is unambiguous, so we infer it and don't clutter the form. */}
-                  {methodIsAmbiguous(payAccountId) && (
-                    <Select value={payMethod} onValueChange={setPayMethod}>
-                      <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>{PAY_METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )}
+                  {/* No method dropdown — the method is inferred from the account (a bank account →
+                      bank transfer, a cash account → cash). The saved payment still carries it. */}
                   <Input className="h-8 w-52 text-sm" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'Reason (e.g. pre-payment, deposit)' : 'Reason (e.g. deposit to supplier)'} />
                 </div>
                 {/* Cash sale: record the money AND issue the order's receipt/invoice in one step. */}
