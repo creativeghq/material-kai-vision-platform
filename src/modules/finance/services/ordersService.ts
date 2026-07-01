@@ -524,29 +524,25 @@ export const ordersService = {
     return out;
   },
 
-  /** What we owe each supplier on an order. The line `unit_cost` is stored NET, but a supplier
-   * invoices us VAT-inclusive — so what we actually owe (and pay) is gross. We gross the net cost
-   * up by the workspace's default VAT rate (finance_settings.default_vat_rate) and subtract the
-   * cash already paid out to that supplier on this order. `cost_net` + `vat_rate` are returned too
-   * so the UI can show the breakdown. Drives the AP view. */
-  async getOrderSupplierExposure(orderId: string): Promise<Array<{ supplier_company_id: string; name: string; cost_net: number; vat_rate: number; cost: number; paid: number; owed: number }>> {
+  /** What we owe each supplier on an order. `unit_cost` is stored NET; VAT on the purchase mirrors
+   * the SAME rate the line carries on the order (order_items.vat_percent) — so it's the exact VAT
+   * already totalled at the bottom of the order, counted ONCE, never a synthetic markup. A 0%-VAT
+   * line therefore owes the net cost (matching the line's "Cost total"); a 24% line owes cost×1.24.
+   * `cost_net`/`has_vat` are returned for the UI breakdown. Subtract cash already paid to the
+   * supplier on this order. Drives the AP view. */
+  async getOrderSupplierExposure(orderId: string): Promise<Array<{ supplier_company_id: string; name: string; cost_net: number; cost: number; has_vat: boolean; paid: number; owed: number }>> {
     const { data: items } = await supabase.from('order_items')
-      .select('supplier_company_id, quantity, unit_cost').eq('order_id', orderId);
-    const bySup = new Map<string, number>();
-    for (const it of (items ?? []) as Array<{ supplier_company_id: string | null; quantity: number; unit_cost: number | null }>) {
+      .select('supplier_company_id, quantity, unit_cost, vat_percent').eq('order_id', orderId);
+    const bySup = new Map<string, { net: number; gross: number }>();
+    for (const it of (items ?? []) as Array<{ supplier_company_id: string | null; quantity: number; unit_cost: number | null; vat_percent: number | null }>) {
       if (!it.supplier_company_id || it.unit_cost == null) continue;
-      bySup.set(it.supplier_company_id, (bySup.get(it.supplier_company_id) ?? 0) + Number(it.unit_cost) * Number(it.quantity));
+      const net = Number(it.unit_cost) * Number(it.quantity);
+      const gross = net * (1 + (Number(it.vat_percent ?? 0) || 0) / 100);
+      const cur = bySup.get(it.supplier_company_id) ?? { net: 0, gross: 0 };
+      cur.net += net; cur.gross += gross;
+      bySup.set(it.supplier_company_id, cur);
     }
     if (bySup.size === 0) return [];
-    // Suppliers invoice with VAT → gross the net cost up by the workspace's standard rate.
-    const { data: ord } = await supabase.from('orders').select('workspace_id').eq('id', orderId).maybeSingle();
-    let vatPct = 0;
-    if ((ord as { workspace_id?: string } | null)?.workspace_id) {
-      const { data: fs } = await supabase.from('finance_settings').select('default_vat_rate')
-        .eq('workspace_id', (ord as { workspace_id: string }).workspace_id).maybeSingle();
-      vatPct = Number((fs as { default_vat_rate?: number } | null)?.default_vat_rate ?? 0) || 0;
-    }
-    const mult = 1 + vatPct / 100;
     const { data: pays } = await supabase.from('payments')
       .select('counterparty_company_id, amount').eq('order_id', orderId).eq('direction', 'out');
     const paid = new Map<string, number>();
@@ -554,13 +550,14 @@ export const ordersService = {
       if (p.counterparty_company_id) paid.set(p.counterparty_company_id, (paid.get(p.counterparty_company_id) ?? 0) + Number(p.amount));
     }
     const names = await this.getCompanyNames([...bySup.keys()]);
-    return [...bySup.entries()].map(([sid, costNet]) => {
-      const gross = Math.round(costNet * mult * 100) / 100;
+    return [...bySup.entries()].map(([sid, c]) => {
+      const net = Math.round(c.net * 100) / 100;
+      const gross = Math.round(c.gross * 100) / 100;
       const p = paid.get(sid) ?? 0;
       return {
         supplier_company_id: sid, name: names.get(sid) ?? 'Supplier',
-        cost_net: Math.round(costNet * 100) / 100, vat_rate: vatPct,
-        cost: gross, paid: p, owed: Math.round((gross - p) * 100) / 100,
+        cost_net: net, cost: gross, has_vat: Math.abs(gross - net) >= 0.005,
+        paid: p, owed: Math.round((gross - p) * 100) / 100,
       };
     });
   },

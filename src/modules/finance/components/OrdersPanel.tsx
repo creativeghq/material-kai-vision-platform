@@ -1198,8 +1198,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <div key={s.supplier_company_id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                     <span className="inline-flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-muted-foreground" /> {s.name}</span>
                     <span className="flex items-center gap-3 tabular-nums">
-                      <span className="text-[11px] text-muted-foreground" title={s.vat_rate ? `net ${formatMoney(s.cost_net, order.currency)} + ${s.vat_rate}% VAT = ${formatMoney(s.cost, order.currency)}` : undefined}>cost {formatMoney(s.cost, order.currency)}{s.vat_rate ? ' incl. VAT' : ''} · paid {formatMoney(s.paid, order.currency)}</span>
-                      <span className={s.owed > 0 ? 'text-red-400 font-medium' : 'text-emerald-500'}>owe {formatMoney(s.owed, order.currency)}</span>
+                      <span className="text-[11px] text-muted-foreground" title={s.has_vat ? `net ${formatMoney(s.cost_net, order.currency)} + VAT = ${formatMoney(s.cost, order.currency)}` : undefined}>cost {formatMoney(s.cost, order.currency)}{s.has_vat ? ' incl. VAT' : ''} · paid {formatMoney(s.paid, order.currency)}</span>
+                      <span className={s.owed > 0.005 ? 'text-red-400 font-medium' : 'text-emerald-500'}>
+                        {s.owed > 0.005 ? `owe ${formatMoney(s.owed, order.currency)}` : s.owed < -0.005 ? `overpaid ${formatMoney(-s.owed, order.currency)}` : 'settled'}
+                      </span>
                       {s.owed > 0.005 && (
                         <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => openPaySupplier({ id: s.supplier_company_id, name: s.name }, s.owed)}>
                           <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
