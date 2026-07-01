@@ -1134,7 +1134,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     </Button>
                   )}
                   <Select value={payMethod} onValueChange={setPayMethod}>
-                    <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>{PAY_METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}</SelectContent>
                   </Select>
                   <Input className="h-8 w-52 text-sm" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'Reason (e.g. pre-payment, deposit)' : 'Reason (e.g. deposit to supplier)'} />
@@ -1182,7 +1182,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   <div key={s.supplier_company_id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                     <span className="inline-flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-muted-foreground" /> {s.name}</span>
                     <span className="flex items-center gap-3 tabular-nums">
-                      <span className="text-[11px] text-muted-foreground">cost {formatMoney(s.cost, order.currency)} · paid {formatMoney(s.paid, order.currency)}</span>
+                      <span className="text-[11px] text-muted-foreground" title={s.vat_rate ? `net ${formatMoney(s.cost_net, order.currency)} + ${s.vat_rate}% VAT = ${formatMoney(s.cost, order.currency)}` : undefined}>cost {formatMoney(s.cost, order.currency)}{s.vat_rate ? ' incl. VAT' : ''} · paid {formatMoney(s.paid, order.currency)}</span>
                       <span className={s.owed > 0 ? 'text-red-400 font-medium' : 'text-emerald-500'}>owe {formatMoney(s.owed, order.currency)}</span>
                       {s.owed > 0.005 && (
                         <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => openPaySupplier({ id: s.supplier_company_id, name: s.name }, s.owed)}>

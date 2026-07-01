@@ -524,9 +524,12 @@ export const ordersService = {
     return out;
   },
 
-  /** What we owe each supplier on an order = Σ line cost (qty × unit_cost) grouped by the line's
-   * supplier, minus money already paid out to that supplier on this order. Drives the AP view. */
-  async getOrderSupplierExposure(orderId: string): Promise<Array<{ supplier_company_id: string; name: string; cost: number; paid: number; owed: number }>> {
+  /** What we owe each supplier on an order. The line `unit_cost` is stored NET, but a supplier
+   * invoices us VAT-inclusive — so what we actually owe (and pay) is gross. We gross the net cost
+   * up by the workspace's default VAT rate (finance_settings.default_vat_rate) and subtract the
+   * cash already paid out to that supplier on this order. `cost_net` + `vat_rate` are returned too
+   * so the UI can show the breakdown. Drives the AP view. */
+  async getOrderSupplierExposure(orderId: string): Promise<Array<{ supplier_company_id: string; name: string; cost_net: number; vat_rate: number; cost: number; paid: number; owed: number }>> {
     const { data: items } = await supabase.from('order_items')
       .select('supplier_company_id, quantity, unit_cost').eq('order_id', orderId);
     const bySup = new Map<string, number>();
@@ -535,6 +538,15 @@ export const ordersService = {
       bySup.set(it.supplier_company_id, (bySup.get(it.supplier_company_id) ?? 0) + Number(it.unit_cost) * Number(it.quantity));
     }
     if (bySup.size === 0) return [];
+    // Suppliers invoice with VAT → gross the net cost up by the workspace's standard rate.
+    const { data: ord } = await supabase.from('orders').select('workspace_id').eq('id', orderId).maybeSingle();
+    let vatPct = 0;
+    if ((ord as { workspace_id?: string } | null)?.workspace_id) {
+      const { data: fs } = await supabase.from('finance_settings').select('default_vat_rate')
+        .eq('workspace_id', (ord as { workspace_id: string }).workspace_id).maybeSingle();
+      vatPct = Number((fs as { default_vat_rate?: number } | null)?.default_vat_rate ?? 0) || 0;
+    }
+    const mult = 1 + vatPct / 100;
     const { data: pays } = await supabase.from('payments')
       .select('counterparty_company_id, amount').eq('order_id', orderId).eq('direction', 'out');
     const paid = new Map<string, number>();
@@ -542,9 +554,14 @@ export const ordersService = {
       if (p.counterparty_company_id) paid.set(p.counterparty_company_id, (paid.get(p.counterparty_company_id) ?? 0) + Number(p.amount));
     }
     const names = await this.getCompanyNames([...bySup.keys()]);
-    return [...bySup.entries()].map(([sid, cost]) => {
+    return [...bySup.entries()].map(([sid, costNet]) => {
+      const gross = Math.round(costNet * mult * 100) / 100;
       const p = paid.get(sid) ?? 0;
-      return { supplier_company_id: sid, name: names.get(sid) ?? 'Supplier', cost: Math.round(cost * 100) / 100, paid: p, owed: Math.round((cost - p) * 100) / 100 };
+      return {
+        supplier_company_id: sid, name: names.get(sid) ?? 'Supplier',
+        cost_net: Math.round(costNet * 100) / 100, vat_rate: vatPct,
+        cost: gross, paid: p, owed: Math.round((gross - p) * 100) / 100,
+      };
     });
   },
 
