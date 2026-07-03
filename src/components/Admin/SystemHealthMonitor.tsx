@@ -89,6 +89,7 @@ interface HealthStatus {
     claude?: AIServiceHealth;
     chatgpt?: AIServiceHealth;
     slig?: AIServiceHealth;
+    paddleocr?: AIServiceHealth;
     voyage_ai?: AIServiceHealth;
     supabase?: AIServiceHealth;
     vercel?: AIServiceHealth;
@@ -105,6 +106,20 @@ interface ExternalServiceStatus {
   last_checked: string;
 }
 
+// Third-party provider uptime, derived from real ai_usage_logs outcomes (not a
+// reachability ping) — surfaces balance/402/outage failures the reachability
+// checks miss. Source: get_provider_health() RPC.
+interface ProviderHealth {
+  provider: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  calls: number;
+  failed: number;
+  failure_rate: number;
+  last_ok: string | null;
+  last_fail: string | null;
+  last_error: string | null;
+}
+
 
 const CATEGORY_STYLES: Record<string, { bg: string; border: string; text: string }> = {
   messaging: { bg: 'from-blue-50 to-blue-100', border: 'border-blue-200', text: 'text-blue-900' },
@@ -119,6 +134,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string; text: string
 export const SystemHealthMonitor: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [externalServices, setExternalServices] = useState<ExternalServiceStatus[]>([]);
+  const [providers, setProviders] = useState<ProviderHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -140,12 +156,17 @@ export const SystemHealthMonitor: React.FC = () => {
         mainHealthResponse,
         supabaseHealthy,
         edgeResults,
+        providerRows,
       ] = await Promise.all([
         fetch(`${apiUrl}/health/detailed`).catch(() => null),
         fetch(`${apiUrl}/health${forceRefresh ? '?force_refresh=true' : ''}`),
         supabase.from('materials_catalog').select('id', { count: 'exact', head: true }).then(({ error }) => !error).catch(() => false),
         supabase.functions.invoke('health-check').then(({ data }) => data).catch(() => null),
+        // Third-party provider uptime from real usage outcomes (catches 402/outage
+        // that reachability pings miss — e.g. DataForSEO balance depleted).
+        supabase.rpc('get_provider_health', { p_window_minutes: 360 }).then(({ data }) => data ?? []).catch(() => []),
       ]);
+      setProviders((providerRows as ProviderHealth[]) || []);
 
       if (!mainHealthResponse.ok) {
         throw new Error(`Health check failed (${mainHealthResponse.status}): ${mainHealthResponse.statusText}`);
@@ -157,6 +178,7 @@ export const SystemHealthMonitor: React.FC = () => {
       const claudeResult      = edgeResults?.claude      ?? null;
       const openaiResult      = edgeResults?.openai      ?? null;
       const hfResult          = edgeResults?.slig ?? null;
+      const paddleResult      = edgeResults?.paddleocr  ?? null;
       const voyageResult      = edgeResults?.voyage_ai   ?? null;
       const embeddingsResult  = edgeResults?.embeddings  ?? null;
       const aiServicesResult  = edgeResults?.ai_services ?? null;
@@ -200,6 +222,9 @@ export const SystemHealthMonitor: React.FC = () => {
         slig: hfResult
           ? { status: hfResult.status, latency_ms: hfResult.latency_ms, message: hfResult.message, error: hfResult.error }
           : { status: 'unhealthy', error: 'Check unavailable' },
+        paddleocr: paddleResult
+          ? { status: paddleResult.status, latency_ms: paddleResult.latency_ms, message: paddleResult.message, error: paddleResult.error }
+          : { status: 'unhealthy', error: 'Check unavailable' },
         voyage_ai: voyageResult
           ? { status: voyageResult.status, latency_ms: voyageResult.latency_ms, message: voyageResult.message, error: voyageResult.error }
           : { status: 'unhealthy', error: 'Check unavailable' },
@@ -215,7 +240,12 @@ export const SystemHealthMonitor: React.FC = () => {
 
       // Derive overall status from real checks
       const criticalDown = !supabaseHealthy || claudeResult?.status === 'unhealthy';
-      const degraded = openaiResult?.status === 'unhealthy' || hfResult?.status === 'unhealthy' || voyageResult?.status === 'unhealthy';
+      // A third-party provider being down (e.g. DataForSEO 402) drops overall to
+      // degraded — this is what "everything healthy" was previously blind to.
+      const providerDown = Array.isArray(providerRows)
+        && (providerRows as ProviderHealth[]).some((p) => p.status === 'unhealthy');
+      const degraded = openaiResult?.status === 'unhealthy' || hfResult?.status === 'unhealthy'
+        || voyageResult?.status === 'unhealthy' || providerDown;
       if (criticalDown) {
         data.overall_status = 'unhealthy';
       } else if (degraded) {
@@ -623,6 +653,32 @@ export const SystemHealthMonitor: React.FC = () => {
                 </div>
               </div>
 
+              {/* PaddleOCR-VL (structural layout + OCR backbone) — Modal /health probe */}
+              <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📄</span>
+                    <span className="text-sm font-medium text-yellow-900">PaddleOCR-VL (Modal)</span>
+                  </div>
+                  {health.ai_services.paddleocr?.status === 'healthy' ? (
+                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  ) : (
+                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-yellow-700">
+                  {health.ai_services.paddleocr?.latency_ms != null && (
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.paddleocr.latency_ms}ms</span>
+                  )}
+                  {health.ai_services.paddleocr?.message && health.ai_services.paddleocr.status === 'healthy' && (
+                    <span className="truncate">{health.ai_services.paddleocr.message}</span>
+                  )}
+                  {health.ai_services.paddleocr?.error && health.ai_services.paddleocr.error !== 'API key not configured' && (
+                    <span className="text-red-600 truncate" title={health.ai_services.paddleocr.error}>{health.ai_services.paddleocr.error}</span>
+                  )}
+                </div>
+              </div>
+
               {/* Voyage AI — real embeddings check */}
               <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-cyan-50 to-cyan-100 border border-cyan-200 rounded-lg">
                 <div className="flex items-center justify-between">
@@ -703,6 +759,54 @@ export const SystemHealthMonitor: React.FC = () => {
                   <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Third-Party Provider Uptime — from real usage outcomes (catches 402/outages) */}
+      {providers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Third-Party Provider Uptime
+            </CardTitle>
+            <CardDescription>
+              Derived from real API outcomes over the last 6h (not just reachability) — surfaces balance/402 and outage failures. Window: last 360 min.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {providers.map((p) => {
+                const tone = p.status === 'unhealthy'
+                  ? { border: 'border-red-300', bg: 'from-red-50 to-red-100', text: 'text-red-900' }
+                  : p.status === 'degraded'
+                  ? { border: 'border-yellow-300', bg: 'from-yellow-50 to-yellow-100', text: 'text-yellow-900' }
+                  : { border: 'border-green-200', bg: 'from-green-50 to-green-100', text: 'text-green-900' };
+                return (
+                  <div key={p.provider} className={`flex flex-col gap-1 p-3 bg-gradient-to-br ${tone.bg} border ${tone.border} rounded-lg`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-medium ${tone.text}`}>{p.provider}</span>
+                      {p.status === 'healthy' ? (
+                        <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Healthy</Badge>
+                      ) : p.status === 'degraded' ? (
+                        <Badge className="bg-yellow-500 hover:bg-yellow-600 text-black"><AlertTriangle className="h-3 w-3 mr-1" />Degraded</Badge>
+                      ) : (
+                        <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Down</Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.calls} calls · {p.failed} failed ({Math.round((p.failure_rate || 0) * 100)}%)
+                    </div>
+                    {p.status !== 'healthy' && p.last_error && (
+                      <div className="text-xs text-red-700 break-words line-clamp-2" title={p.last_error}>
+                        {p.last_error.split('\n')[0].slice(0, 120)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

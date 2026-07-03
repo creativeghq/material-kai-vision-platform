@@ -78,6 +78,23 @@ async function checkOpenAI(): Promise<ServiceResult> {
   }
 }
 
+async function checkPaddleOcr(): Promise<ServiceResult> {
+  // PaddleOCR-VL structural/OCR backbone on Modal (GET /health, unauth). 303 =
+  // scale-to-zero container cold-starting (still healthy).
+  const url = (Deno.env.get('PADDLEOCR_MODAL_URL')
+    || 'https://basilakis--paddleocr-vl-paddleservice-web.modal.run').replace(/\/$/, '');
+  const start = Date.now();
+  try {
+    const res = await fetch(`${url}/health`, { redirect: 'manual', signal: AbortSignal.timeout(8000) });
+    const latency_ms = Date.now() - start;
+    if (res.ok) return { status: 'healthy', latency_ms, message: 'PaddleOCR-VL on Modal (PP-DocLayoutV2 + 0.9B VLM)' };
+    if (res.status === 303 || res.status === 0) return { status: 'healthy', latency_ms, message: 'PaddleOCR cold-starting (Modal)' };
+    return { status: 'unhealthy', latency_ms, error: `HTTP ${res.status}` };
+  } catch (e) {
+    return { status: 'unhealthy', latency_ms: Date.now() - start, error: (e as Error).message };
+  }
+}
+
 async function checkSlig(): Promise<ServiceResult> {
   // SLIG (SigLIP2) visual embeddings moved off HuggingFace to Modal 2026-06-14.
   // Probe the unauthenticated GET /health; a 303 means the scale-to-zero
@@ -215,13 +232,14 @@ serve(withApiLogging('health-check', async (req) => {
   const externalChecks = activeServices.map(svc => checkExternalService(svc.url));
 
   const [
-    claude, openai, slig, voyage_ai,
+    claude, openai, slig, paddleocr, voyage_ai,
     embeddings, ai_services,
     ...externalResults
   ] = await Promise.all([
     checkClaude(),
     checkOpenAI(),
     checkSlig(),
+    checkPaddleOcr(),
     checkVoyageAI(),
     checkPythonEndpoint('/api/embeddings/health'),
     checkPythonEndpoint('/api/v1/ai-services/health'),
@@ -236,7 +254,7 @@ serve(withApiLogging('health-check', async (req) => {
   }));
 
   return new Response(JSON.stringify({
-    claude, openai, slig, voyage_ai,
+    claude, openai, slig, paddleocr, voyage_ai,
     embeddings, ai_services,
     external,
     timestamp: new Date().toISOString(),
