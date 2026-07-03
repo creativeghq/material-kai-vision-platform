@@ -159,7 +159,7 @@ export const SystemHealthMonitor: React.FC = () => {
         providerRows,
       ] = await Promise.all([
         fetch(`${apiUrl}/health/detailed`).catch(() => null),
-        fetch(`${apiUrl}/health${forceRefresh ? '?force_refresh=true' : ''}`),
+        fetch(`${apiUrl}/health${forceRefresh ? '?force_refresh=true' : ''}`).catch(() => null),
         supabase.from('materials_catalog').select('id', { count: 'exact', head: true }).then(({ error }) => !error).catch(() => false),
         supabase.functions.invoke('health-check').then(({ data }) => data).catch(() => null),
         // Third-party provider uptime from real usage outcomes (catches 402/outage
@@ -168,11 +168,13 @@ export const SystemHealthMonitor: React.FC = () => {
       ]);
       setProviders((providerRows as ProviderHealth[]) || []);
 
-      if (!mainHealthResponse.ok) {
-        throw new Error(`Health check failed (${mainHealthResponse.status}): ${mainHealthResponse.statusText}`);
-      }
-
-      const healthData = await mainHealthResponse.json();
+      // The MIVAA backend being down must NOT blank the whole health page — a
+      // health dashboard's job is to SHOW which dependency is down, including
+      // the backend itself. Degrade gracefully instead of throwing.
+      const backendReachable = !!(mainHealthResponse && mainHealthResponse.ok);
+      const healthData = backendReachable
+        ? await mainHealthResponse!.json().catch(() => ({}))
+        : { timestamp: new Date().toISOString() };
 
       // Extract results from edge function
       const claudeResult      = edgeResults?.claude      ?? null;
@@ -239,7 +241,7 @@ export const SystemHealthMonitor: React.FC = () => {
       };
 
       // Derive overall status from real checks
-      const criticalDown = !supabaseHealthy || claudeResult?.status === 'unhealthy';
+      const criticalDown = !supabaseHealthy || !backendReachable || claudeResult?.status === 'unhealthy';
       // A third-party provider being down (e.g. DataForSEO 402) drops overall to
       // degraded — this is what "everything healthy" was previously blind to.
       const providerDown = Array.isArray(providerRows)
