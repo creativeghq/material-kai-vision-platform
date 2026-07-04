@@ -190,7 +190,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
                             href={r.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-blue-500 hover:underline truncate inline-flex items-center gap-1 max-w-[280px]"
+                            className="text-xs text-primary hover:underline truncate inline-flex items-center gap-1 max-w-[280px]"
                           >
                             {r.url}
                             <ExternalLink className="w-3 h-3" />

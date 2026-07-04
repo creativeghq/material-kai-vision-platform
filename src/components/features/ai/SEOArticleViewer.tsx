@@ -833,7 +833,7 @@ function ResearchTab({ data }: { data: ResearchTabData }) {
                   href={comp.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-blue-500 hover:underline truncate block"
+                  className="text-xs text-primary hover:underline truncate block"
                 >
                   {comp.url}
                 </a>
@@ -975,7 +975,7 @@ function InterlinkingTab({ data, markdown }: { data: InterlinkingData; markdown:
                     href={m.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-blue-500 hover:underline truncate inline-flex items-center gap-1"
+                    className="text-xs text-primary hover:underline truncate inline-flex items-center gap-1"
                   >
                     {m.url}
                     <ExternalLink className="w-3 h-3" />
@@ -1065,7 +1065,7 @@ function InterlinkingTab({ data, markdown }: { data: InterlinkingData; markdown:
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-blue-500 hover:underline truncate max-w-[45%]"
+                  className="text-xs text-primary hover:underline truncate max-w-[45%]"
                 >
                   {link.href}
                 </a>
@@ -1117,7 +1117,7 @@ function InterlinkingTab({ data, markdown }: { data: InterlinkingData; markdown:
                     href={comp.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-blue-500 hover:underline truncate block"
+                    className="text-xs text-primary hover:underline truncate block"
                   >
                     {comp.domain}
                   </a>

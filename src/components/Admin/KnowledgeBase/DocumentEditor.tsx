@@ -522,7 +522,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                       href={document.slug ? `/knowledge-base/${document.slug}` : `/knowledge-base?doc=${document.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-500 hover:underline"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                       View on public Knowledge Base

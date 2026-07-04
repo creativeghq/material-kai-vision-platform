@@ -491,7 +491,7 @@ export const ConnectedWebsitesTab: React.FC = () => {
                         href={s.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-blue-500 hover:underline truncate block pl-5"
+                        className="text-xs text-primary hover:underline truncate block pl-5"
                       >
                         {s.url}
                       </a>

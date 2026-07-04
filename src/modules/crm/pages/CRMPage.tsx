@@ -573,8 +573,8 @@ export const CRMManagement: React.FC = () => {
                               {contact.name}<ExternalLink className="h-3 w-3" />
                             </button>
                           </TableCell>
-                          <TableCell>{contact.email ? <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">{contact.email}</a> : '-'}</TableCell>
-                          <TableCell>{contact.phone ? <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">{contact.phone}</a> : '-'}</TableCell>
+                          <TableCell>{contact.email ? <a href={`mailto:${contact.email}`} className="text-primary hover:underline">{contact.email}</a> : '-'}</TableCell>
+                          <TableCell>{contact.phone ? <a href={`tel:${contact.phone}`} className="text-primary hover:underline">{contact.phone}</a> : '-'}</TableCell>
                           <TableCell>{contactCompanyName(contact) || '-'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{professionalTypeLabel(contact.profession) || contact.profession || '-'}</TableCell>
                           <TableCell className="text-right">
@@ -641,9 +641,9 @@ export const CRMManagement: React.FC = () => {
                               {company.name}<ExternalLink className="h-3 w-3" />
                             </button>
                           </TableCell>
-                          <TableCell>{company.email ? <a href={`mailto:${company.email}`} className="text-blue-600 hover:underline">{company.email}</a> : '-'}</TableCell>
-                          <TableCell>{company.phone ? <a href={`tel:${company.phone}`} className="text-blue-600 hover:underline">{company.phone}</a> : '-'}</TableCell>
-                          <TableCell>{company.website ? <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{company.website}</a> : '-'}</TableCell>
+                          <TableCell>{company.email ? <a href={`mailto:${company.email}`} className="text-primary hover:underline">{company.email}</a> : '-'}</TableCell>
+                          <TableCell>{company.phone ? <a href={`tel:${company.phone}`} className="text-primary hover:underline">{company.phone}</a> : '-'}</TableCell>
+                          <TableCell>{company.website ? <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a> : '-'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{professionalTypeLabel(company.profession) || company.profession || company.industry || '-'}</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" onClick={() => handleDeleteCompany(company.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>

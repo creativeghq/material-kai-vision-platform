@@ -979,7 +979,7 @@ export const CompanyDetailPage: React.FC = () => {
                             {contact.contact_email ? (
                               <a
                                 href={`mailto:${contact.contact_email}`}
-                                className="text-blue-600 hover:underline"
+                                className="text-primary hover:underline"
 >
                                 {contact.contact_email}
                               </a>
@@ -991,7 +991,7 @@ export const CompanyDetailPage: React.FC = () => {
                             {contact.contact_phone ? (
                               <a
                                 href={`tel:${contact.contact_phone}`}
-                                className="text-blue-600 hover:underline"
+                                className="text-primary hover:underline"
 >
                                 {contact.contact_phone}
                               </a>
