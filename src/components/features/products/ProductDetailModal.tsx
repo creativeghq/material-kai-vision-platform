@@ -1753,13 +1753,36 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   )}
                 </div>
               </div>
-              <DialogTitle className="text-xl sm:text-2xl mb-1 break-words">
+              <DialogTitle className="text-2xl sm:text-3xl mb-1 break-words font-display tracking-tight" style={{ fontWeight: 700 }}>
                 {safeString(product.name, 'Unnamed Product')}
               </DialogTitle>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
                 {collection && <span className="font-medium">{collection}</span>}
                 {collection && <span className="text-muted-foreground/40">•</span>}
                 <span>SKU: {safeString(product.sku, 'N/A')}</span>
+              </div>
+              {/* Key facets at a glance — same computed values as the spec cards below. */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                {material && material !== '—' && (
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-lg border border-border bg-muted px-2.5 py-1">
+                    <span className="text-muted-foreground">Material</span><span className="font-medium text-foreground">{material}</span>
+                  </span>
+                )}
+                {primaryColors && (
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-lg border border-border bg-muted px-2.5 py-1">
+                    <span className="text-muted-foreground">Color</span><span className="font-medium text-foreground">{primaryColors.split(',')[0].trim()}</span>
+                  </span>
+                )}
+                {finish && finish !== '—' && (
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-lg border border-border bg-muted px-2.5 py-1">
+                    <span className="text-muted-foreground">Finish</span><span className="font-medium text-foreground">{finish}</span>
+                  </span>
+                )}
+                {size && size !== 'N/A' && size !== '—' && (
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-lg border border-border bg-muted px-2.5 py-1">
+                    <span className="text-muted-foreground">Size</span><span className="font-medium text-foreground">{String(size).split(',')[0].trim()}</span>
+                  </span>
+                )}
               </div>
             </div>
             {/* Quick actions — full-width on mobile (below the title), compact on the right from sm up */}
