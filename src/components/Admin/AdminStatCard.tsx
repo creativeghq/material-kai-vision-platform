@@ -31,13 +31,13 @@ export const AdminStatCard: React.FC<AdminStatCardProps> = ({
         <Icon className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
         <p className="text-xs text-muted-foreground">{title}</p>
       </div>
-      <div className="text-2xl font-bold">{value}</div>
-      {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+      <div className="text-[28px] font-display leading-none tracking-tight tabular-nums" style={{ fontWeight: 700 }}>{value}</div>
+      {description && <p className="text-xs text-muted-foreground mt-1.5">{description}</p>}
       {trend && (
         <p
           className={cn(
-            'text-xs mt-1 flex items-center gap-1',
-            trend.isPositive ? 'text-green-600' : 'text-red-600',
+            'text-xs mt-1.5 flex items-center gap-1',
+            trend.isPositive ? 'text-success' : 'text-destructive',
           )}
         >
           <span>{trend.isPositive ? '↑' : '↓'}</span>
