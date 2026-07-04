@@ -1315,7 +1315,7 @@ async function handleJwtAction(
         .limit(1)
         .maybeSingle();
       const contactId = (custP as { contact_id?: string } | null)?.contact_id ?? null;
-      if (!contactId) return json({ contact: null, company: null, quotes: [], projects: [] });
+      if (!contactId) return json({ contact: null, company: null, quotes: [], projects: [], invoices: [], metrics: null });
 
       const { data: contact } = await db
         .from('crm_contacts')
@@ -1350,7 +1350,44 @@ async function handleJwtAction(
         company = c as Record<string, unknown> | null;
       }
 
-      return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [] });
+      // Finance context: the customer's invoices (linked by contact/company),
+      // scoped to this thread's workspace. Aggregates → lifetime value + open
+      // balance; the open (amount_due > 0) invoices drive the rail list. Open-
+      // ness is derived from amount_due, not a status string, so it's robust to
+      // the finance status vocabulary.
+      const invFilter = [`customer_contact_id.eq.${contactId}`];
+      if (companyId) invFilter.push(`customer_company_id.eq.${companyId}`);
+      const { data: invRows } = await db
+        .from('invoices')
+        .select('id, total, amount_due, status, currency, due_at, issued_at, internal_number, legal_number')
+        .eq('workspace_id', thread.workspace_id)
+        .or(invFilter.join(','))
+        .order('issued_at', { ascending: false })
+        .limit(200);
+      const allInv = (invRows || []) as Array<Record<string, unknown>>;
+      const num = (v: unknown) => (typeof v === 'number' ? v : Number(v) || 0);
+      const openInv = allInv.filter((i) => num(i.amount_due) > 0);
+      const metrics = {
+        currency: (allInv[0]?.currency as string) || (quotes?.[0]?.currency as string) || 'EUR',
+        lifetime_value: allInv.reduce((s, i) => s + num(i.total), 0),
+        open_balance: openInv.reduce((s, i) => s + num(i.amount_due), 0),
+        invoice_count: allInv.length,
+        open_count: openInv.length,
+      };
+      const invoices = openInv
+        .slice()
+        .sort((a, b) => String(a.due_at || '').localeCompare(String(b.due_at || '')))
+        .slice(0, 6)
+        .map((i) => ({
+          id: i.id as string,
+          number: (i.legal_number || i.internal_number || null) as string | null,
+          amount_due: num(i.amount_due),
+          currency: (i.currency as string) || metrics.currency,
+          status: (i.status as string) || null,
+          due_at: (i.due_at as string) || null,
+        }));
+
+      return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, metrics });
     }
 
     default:

@@ -125,11 +125,33 @@ export interface InboxProjectRef {
   created_at: string;
 }
 
+export interface InboxInvoiceRef {
+  id: string;
+  number: string | null;
+  amount_due: number;
+  currency: string | null;
+  status: string | null;
+  due_at: string | null;
+}
+
+/** Rolled-up finance figures for the customer on the thread (from `invoices`). */
+export interface InboxCustomerMetrics {
+  currency: string;
+  lifetime_value: number;
+  open_balance: number;
+  invoice_count: number;
+  open_count: number;
+}
+
 export interface InboxThreadContext {
   contact: InboxContactContext | null;
   company: InboxCompanyContext | null;
   quotes: InboxQuoteRef[];
   projects: InboxProjectRef[];
+  /** Open invoices for the customer (amount_due > 0). Absent on older API responses. */
+  invoices?: InboxInvoiceRef[];
+  /** Lifetime value + open balance. Absent on older API responses / internal threads. */
+  metrics?: InboxCustomerMetrics | null;
 }
 
 /** Per-workspace AI-assistant config (workspaces.settings.inbox_agent). Both default true server-side. */

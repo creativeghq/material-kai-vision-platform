@@ -4,7 +4,7 @@ import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
-  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, PanelRight, CheckCircle2,
+  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, PanelRight, CheckCircle2, Wallet,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { marketplaceService } from '@/services/marketplaceService';
@@ -735,6 +735,8 @@ const DetailsRail: React.FC<{
   const displayName = contact?.name || thread.subject || 'Conversation';
   const quotedTotal = quotes.reduce((s, q) => s + (q.grand_total || 0), 0);
   const subtitle = [contact?.position, company?.name].filter(Boolean).join(' · ');
+  const metrics = context?.metrics ?? null;
+  const invoices = context?.invoices ?? [];
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -754,20 +756,44 @@ const DetailsRail: React.FC<{
         </div>
       </div>
 
-      {/* Customer value — real numbers from linked quotes/projects. Open-invoice +
-          lifetime-value KPIs land once inbox-api.get_thread_context returns finance data. */}
-      {(quotes.length > 0 || projects.length > 0) && (
+      {/* Customer value — lifetime value + open balance from the customer's invoices
+          (via inbox-api). Falls back to quoted-total + project-count on older API
+          responses / internal threads where finance metrics aren't returned. */}
+      {(metrics || quotes.length > 0 || projects.length > 0) && (
         <div className="p-5 border-b border-white/10">
-          <SectionTitle icon={<FileText className="h-4 w-4" />}>Customer value</SectionTitle>
+          <SectionTitle icon={<Wallet className="h-4 w-4" />}>Customer value</SectionTitle>
           <div className="grid grid-cols-2 gap-2.5">
             <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-              <div className="text-lg font-display" style={{ fontWeight: 700 }}>{money(quotedTotal, quotes[0]?.currency)}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">Quoted · {quotes.length}</div>
+              <div className="text-lg font-display" style={{ fontWeight: 700 }}>
+                {money(metrics ? metrics.lifetime_value : quotedTotal, metrics?.currency || quotes[0]?.currency)}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">{metrics ? 'Lifetime' : `Quoted · ${quotes.length}`}</div>
             </div>
             <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-              <div className="text-lg font-display" style={{ fontWeight: 700 }}>{projects.length}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">Project{projects.length === 1 ? '' : 's'}</div>
+              <div className={`text-lg font-display ${metrics && metrics.open_balance > 0 ? 'text-warning' : ''}`} style={{ fontWeight: 700 }}>
+                {metrics ? money(metrics.open_balance, metrics.currency) : projects.length}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">{metrics ? 'Open balance' : `Project${projects.length === 1 ? '' : 's'}`}</div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Open invoices — the customer's unpaid invoices, soonest-due first. */}
+      {invoices.length > 0 && (
+        <div className="p-5 border-b border-white/10">
+          <SectionTitle icon={<FileText className="h-4 w-4" />} count={metrics?.open_count}>Open invoices</SectionTitle>
+          <div className="space-y-0.5">
+            {invoices.map((inv) => (
+              <div key={inv.id} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-accent transition-colors">
+                <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="truncate">{inv.number || 'Invoice'}</div>
+                  {inv.due_at && <div className="text-[11px] text-muted-foreground">Due {new Date(inv.due_at).toLocaleDateString()}</div>}
+                </div>
+                <span className="text-xs shrink-0 text-warning" style={{ fontWeight: 600 }}>{money(inv.amount_due, inv.currency)}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
