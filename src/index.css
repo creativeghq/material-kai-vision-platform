@@ -635,9 +635,10 @@ All colors MUST be HSL.
 }
 
 @layer components {
-  /* Page wrapper - Consistent layout system */
+  /* Page wrapper — transparent so the fixed app atmosphere (aurora + grain)
+     shows through; the solid ground comes from the body background. */
   .page-wrapper {
-    background: hsl(var(--page-background));
+    background: transparent;
   }
 
   /* Page container - ONLY left/right padding, NO top/bottom */
@@ -1253,3 +1254,36 @@ html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foregr
    active/primary control reads instantly. The brand gradient is reserved for
    IDENTITY surfaces (PageHeader, logo, hero), which apply var(--brand-gradient)
    explicitly — see PageHeader.tsx. */
+
+/* ============================================================
+   APP ATMOSPHERE — command-center depth behind every page.
+   A fixed brand-aurora mesh + film grain sit over the solid body
+   ground and below all page content (main is relative z-10). The
+   aurora is driven by --primary so it adapts per theme: a magenta
+   glow on the plum-black dark ground, a soft olive glow on cream.
+   ============================================================ */
+.app-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(760px 520px at 85% -8%, hsl(var(--primary) / 0.16), transparent 60%),
+    radial-gradient(620px 460px at 4% 6%, hsl(var(--primary) / 0.09), transparent 60%),
+    radial-gradient(700px 620px at 62% 110%, hsl(var(--primary) / 0.06), transparent 60%);
+}
+html.light .app-aurora {
+  background:
+    radial-gradient(760px 520px at 85% -8%, hsl(var(--primary) / 0.10), transparent 62%),
+    radial-gradient(620px 460px at 4% 6%, hsl(var(--primary) / 0.06), transparent 62%);
+}
+.app-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.022;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+html.light .app-grain { opacity: 0.03; }
