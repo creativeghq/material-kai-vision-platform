@@ -1289,9 +1289,9 @@ html.light .app-aurora {
    stays put while content scrolls over it (cards tint as they pass). */
 html.light body {
   background:
-    radial-gradient(700px 500px at 8% 112%, rgba(146, 136, 66, 0.34), transparent 60%),
-    radial-gradient(560px 420px at 96% 116%, rgba(216, 150, 96, 0.24), transparent 60%),
-    linear-gradient(160deg, #f6f3ec 0%, #ece3ce 38%, #dbcfa9 76%, #d1c69c 100%);
+    radial-gradient(680px 480px at 8% 112%, rgba(150, 140, 80, 0.18), transparent 60%),
+    radial-gradient(540px 400px at 96% 116%, rgba(212, 156, 106, 0.12), transparent 60%),
+    linear-gradient(160deg, #f7f5ef 0%, #f1ece0 42%, #ece5d5 78%, #e7e0cf 100%);
   background-attachment: fixed;
 }
 
