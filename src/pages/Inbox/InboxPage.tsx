@@ -283,9 +283,11 @@ const InboxPage: React.FC = () => {
 
   const threadDisplayName = (t: InboxThread) => t.subject || (t.channel === 'whatsapp' ? 'WhatsApp contact' : 'Conversation');
 
+  // WhatsApp is now signalled by the green channel dot on the avatar, so only
+  // non-WhatsApp threads carry a text channel badge here.
   const channelBadge = (t: InboxThread) =>
     t.channel === 'whatsapp'
-      ? <Badge variant="secondary" className="text-[10px] bg-green-600/15 text-green-400 border-0">WhatsApp</Badge>
+      ? null
       : <Badge variant="secondary" className="text-[10px] capitalize">{t.thread_type}</Badge>;
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
@@ -421,9 +423,16 @@ const InboxPage: React.FC = () => {
                   onClick={() => openThread(t.id)}
                   className={`w-full text-left px-3 py-3 flex gap-3 border-l-2 border-b border-white/5 transition-colors ${active ? 'bg-accent border-l-primary' : 'border-l-transparent hover:bg-accent'}`}
                 >
-                  <Avatar className="h-9 w-9 mt-0.5 shrink-0">
-                    <AvatarFallback className={`text-xs ${avatarTint(name)}`}>{initials(name)}</AvatarFallback>
-                  </Avatar>
+                  <div className="relative shrink-0 mt-0.5">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className={`text-xs ${avatarTint(name)}`}>{initials(name)}</AvatarFallback>
+                    </Avatar>
+                    {t.channel === 'whatsapp' && (
+                      <span className="absolute -right-0.5 -bottom-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-card flex items-center justify-center">
+                        <MessageSquare className="w-2 h-2 text-white" />
+                      </span>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
@@ -469,7 +478,7 @@ const InboxPage: React.FC = () => {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate text-sm font-medium">{threadDisplayName(activeThread)}</div>
+                  <div className="truncate text-[15px] font-display" style={{ fontWeight: 600 }}>{threadDisplayName(activeThread)}</div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <span className="capitalize">{activeThread.channel}</span>
                     <span className="opacity-50">·</span>
@@ -641,10 +650,8 @@ const MessageBubble: React.FC<{
 
   if (isSystem) {
     return (
-      <div className="flex items-center gap-2 my-1">
-        <div className="flex-1 h-px bg-white/8" />
-        <span className="text-[11px] text-muted-foreground">{m.body}</span>
-        <div className="flex-1 h-px bg-white/8" />
+      <div className="flex justify-center my-1.5">
+        <span className="text-[11px] text-muted-foreground bg-muted rounded-full px-3 py-1">{m.body}</span>
       </div>
     );
   }
@@ -654,34 +661,42 @@ const MessageBubble: React.FC<{
     ? (info?.kind === 'member' || info?.kind === 'agent')
     : (info?.userId != null && info.userId === myUserId);
 
-  const solidOurs = ours && !isNote && !isAgent;
-  const tsClass = solidOurs ? 'text-primary-foreground/70' : 'text-muted-foreground';
+  // Modern bubbles: a small sender avatar beside each message, soft accent-tinted
+  // outgoing (no heavy solid fill), card-surface incoming, note=amber, agent=accent.
+  const bubbleClass = isNote
+    ? 'bg-amber-bg/60 border border-amber/30 rounded-tl-sm'
+    : isAgent
+      ? 'bg-primary/10 border border-primary/25 rounded-tl-sm'
+      : ours
+        ? 'bg-primary/10 border border-primary/25 rounded-tr-sm text-foreground'
+        : 'bg-card border border-border rounded-tl-sm';
 
   return (
-    <div className={`flex flex-col max-w-[78%] ${ours ? 'ml-auto items-end' : 'items-start'}`}>
-      {info && !isNote && (
-        <div className="text-[10px] text-muted-foreground mb-1 px-1">{info.label}</div>
-      )}
-      <div className={`rounded-2xl px-3.5 py-2 ${isNote
-        ? 'bg-amber-bg/60 border border-amber/30'
-        : isAgent
-          ? 'bg-primary/12 border border-primary/30'
-          : solidOurs
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-white/5 border border-white/10'}`}>
-        {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-foreground mb-1"><Lock className="w-3 h-3" /> Private note</div>}
-        {isAgent && <div className="flex items-center gap-1 text-[10px] text-primary mb-1"><Bot className="w-3 h-3" /> Assistant</div>}
-        {m.body && <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</div>}
-        {(m.attachments || []).map((a, i) => {
-          const k = a.storage_object_path || a.url || '';
-          return (
-            <a key={k || i} href={urls[k]} target="_blank" rel="noreferrer"
-               className={`flex items-center gap-1 text-xs mt-1 underline ${solidOurs ? 'text-primary-foreground' : 'text-primary'}`}>
-              <Paperclip className="w-3 h-3" /> {a.name || 'attachment'}
-            </a>
-          );
-        })}
-        <div className={`text-[10px] mt-1 ${tsClass}`}>{new Date(m.created_at).toLocaleString()}</div>
+    <div className={`flex gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
+      <Avatar className="h-7 w-7 mt-5 shrink-0">
+        <AvatarFallback className={`text-[10px] ${isAgent ? 'bg-primary/15 text-primary' : avatarTint(info?.label)}`}>
+          {isAgent ? <Bot className="w-3.5 h-3.5" /> : initials(info?.label)}
+        </AvatarFallback>
+      </Avatar>
+      <div className={`flex flex-col min-w-0 ${ours ? 'items-end' : 'items-start'}`}>
+        {info && !isNote && (
+          <div className="text-[10px] text-muted-foreground mb-1 px-1">{info.label}</div>
+        )}
+        <div className={`rounded-2xl px-3.5 py-2 text-left ${bubbleClass}`}>
+          {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-foreground mb-1"><Lock className="w-3 h-3" /> Private note</div>}
+          {isAgent && <div className="flex items-center gap-1 text-[10px] text-primary mb-1"><Bot className="w-3 h-3" /> KAI assistant</div>}
+          {m.body && <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</div>}
+          {(m.attachments || []).map((a, i) => {
+            const k = a.storage_object_path || a.url || '';
+            return (
+              <a key={k || i} href={urls[k]} target="_blank" rel="noreferrer"
+                 className="flex items-center gap-1 text-xs mt-1 underline text-primary">
+                <Paperclip className="w-3 h-3" /> {a.name || 'attachment'}
+              </a>
+            );
+          })}
+        </div>
+        <div className="text-[10px] mt-1 px-1 text-muted-foreground">{new Date(m.created_at).toLocaleString()}</div>
       </div>
     </div>
   );
@@ -718,21 +733,44 @@ const DetailsRail: React.FC<{
   const quotes = context?.quotes ?? [];
   const projects = context?.projects ?? [];
   const displayName = contact?.name || thread.subject || 'Conversation';
+  const quotedTotal = quotes.reduce((s, q) => s + (q.grand_total || 0), 0);
+  const subtitle = [contact?.position, company?.name].filter(Boolean).join(' · ');
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {/* Contact header */}
+      {/* Contact header — rounded gradient monogram + display name */}
       <div className="p-5 flex flex-col items-center text-center border-b border-white/10">
-        <Avatar className="h-16 w-16 mb-3">
-          <AvatarFallback className={`text-lg ${avatarTint(displayName)}`}>{initials(displayName)}</AvatarFallback>
-        </Avatar>
-        <div className="text-sm font-medium">{displayName}</div>
-        {contact?.position && <div className="text-xs text-muted-foreground mt-0.5">{contact.position}</div>}
+        <div
+          className="h-16 w-16 mb-3 rounded-2xl flex items-center justify-center text-lg font-display text-white bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/25"
+          style={{ fontWeight: 700 }}
+        >
+          {initials(displayName)}
+        </div>
+        <div className="text-base font-display" style={{ fontWeight: 600 }}>{displayName}</div>
+        {subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
         <div className="flex flex-wrap gap-1.5 justify-center mt-2.5">
           {contact?.is_client && <Badge variant="outline" className="text-[10px]"><BadgeCheck className="w-3 h-3 mr-0.5" />Client</Badge>}
           {contact?.lead_status && <Badge variant="secondary" className="text-[10px] capitalize">{contact.lead_status}</Badge>}
         </div>
       </div>
+
+      {/* Customer value — real numbers from linked quotes/projects. Open-invoice +
+          lifetime-value KPIs land once inbox-api.get_thread_context returns finance data. */}
+      {(quotes.length > 0 || projects.length > 0) && (
+        <div className="p-5 border-b border-white/10">
+          <SectionTitle icon={<FileText className="h-4 w-4" />}>Customer value</SectionTitle>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+              <div className="text-lg font-display" style={{ fontWeight: 700 }}>{money(quotedTotal, quotes[0]?.currency)}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Quoted · {quotes.length}</div>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+              <div className="text-lg font-display" style={{ fontWeight: 700 }}>{projects.length}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Project{projects.length === 1 ? '' : 's'}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {contact ? (
         <>
