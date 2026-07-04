@@ -46,7 +46,7 @@ function OverviewCard({
   return (
     <div className="dashboard-card flex flex-col gap-3 p-5 h-full">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-sm flex items-center gap-2">
+        <h3 className="font-display text-sm flex items-center gap-2" style={{ fontWeight: 600 }}>
           <Icon className="h-4 w-4 text-primary" />
           {title}
         </h3>
@@ -72,8 +72,8 @@ function OverviewCard({
 
 const Metric: React.FC<{ value: React.ReactNode; label: string }> = ({ value, label }) => (
   <div>
-    <p className="text-2xl font-semibold leading-none tracking-tight">{value}</p>
-    <p className="text-xs text-muted-foreground mt-1">{label}</p>
+    <p className="text-3xl font-display leading-none tracking-tight tabular-nums" style={{ fontWeight: 700 }}>{value}</p>
+    <p className="text-xs text-muted-foreground mt-1.5">{label}</p>
   </div>
 );
 

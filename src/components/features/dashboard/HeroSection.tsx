@@ -11,12 +11,15 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
   return (
-    <div className="relative overflow-hidden h-full min-h-[280px] sm:min-h-[400px] flex items-center justify-center rounded-xl border border-white/8 bg-card">
-      {/* Subtle backdrop gradient for depth */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
+    <div className="relative overflow-hidden h-full min-h-[280px] sm:min-h-[400px] flex items-center justify-center rounded-2xl border border-white/8 bg-card">
+      {/* Brand glow backdrop for depth — soft radial accents, not decorative motion */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ backgroundImage: 'radial-gradient(600px 300px at 82% 0%, hsl(var(--primary) / 0.13), transparent 65%), radial-gradient(420px 300px at 8% 100%, hsl(var(--primary) / 0.06), transparent 60%)' }}
+      />
 
       <div className="relative z-10 p-4 sm:p-8 text-center max-w-2xl mx-auto flex flex-col gap-4 sm:gap-6">
-        <div className="flex justify-center animate-float">
+        <div className="flex justify-center">
           <div className="hero-badge flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-light border border-primary/20">
             <heroConfig.badge.icon className="h-4 w-4" />
             {heroConfig.badge.text}
