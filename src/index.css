@@ -664,6 +664,9 @@ All colors MUST be HSL.
     padding: var(--card-padding);
     transition: var(--transition-bounce);
     border: 1px solid transparent;
+    /* Layered depth: resting glass shadow + a faint top edge-light for the
+       premium "elevated glass" read from the redesign. */
+    box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.045);
   }
 
   /* Gradient border ring for boxes — a masked pseudo-element draws the
@@ -700,8 +703,9 @@ All colors MUST be HSL.
 
   .dashboard-card:hover {
     background: rgba(255, 255, 255, 0.08);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
     border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: var(--shadow-premium), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   /* A card that holds a table must NOT repaint/lift its whole surface on
@@ -1265,7 +1269,7 @@ html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foregr
 .app-aurora {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
   background:
     radial-gradient(760px 520px at 85% -8%, hsl(var(--primary) / 0.16), transparent 60%),
@@ -1280,7 +1284,7 @@ html.light .app-aurora {
 .app-grain {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
   opacity: 0.022;
   mix-blend-mode: overlay;

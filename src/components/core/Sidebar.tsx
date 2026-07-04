@@ -188,34 +188,12 @@ export const Sidebar: React.FC = () => {
     );
   }
 
+  // Desktop: a slim glassy TOP BAR. Primary navigation now lives in the left
+  // icon rail (DesktopRail); this bar carries the workspace/module/profile
+  // controls. The left region is reserved for a future breadcrumb / command bar.
   return (
-    <header className="sticky top-0 z-50 h-14 flex items-center px-6 bg-sidebar border-b border-white/8">
-      <Link to="/" className="flex items-center mr-8 flex-shrink-0">
-        {/* Logo swaps with theme: dark wordmark on light nav, white wordmark on dark nav */}
-        <img src="/mh-logo.png" alt="materialshub" className="h-8 w-auto block dark:hidden" />
-        <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-8 w-auto hidden dark:block" />
-      </Link>
-
-      {/* Scrolls horizontally when there are more nav items than fit (e.g. the
-          operator's full set on a 1280 laptop) so the right-side controls below
-          are never pushed off-screen and clipped by Layout's overflow-hidden. */}
-      <nav className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        {navigationItems.map((item) => (
-          <Link
-            key={item.id}
-            to={item.path}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap shrink-0 transition-all duration-200 ${
-              isActive(item.path)
-                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
-            }`}
-          >
-            <item.icon className="w-4 h-4 flex-shrink-0" />
-            <span className="font-light">{item.label}</span>
-          </Link>
-        ))}
-      </nav>
-
+    <header className="sticky top-0 z-40 h-14 flex items-center px-4 sm:px-6 bg-sidebar/70 backdrop-blur-xl border-b border-white/8">
+      <div className="flex-1 min-w-0" />
       <div className="flex items-center gap-2 shrink-0 pl-2">
         <ShowPricesToggle />
         <WorkspaceSwitcher />
