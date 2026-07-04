@@ -1,5 +1,6 @@
-/* Open Sans - Only weights actually used (300, 400, 500, 600). display=swap prevents FOIT. */
+/* Open Sans — body/UI text. Bricolage Grotesque — display face (headings, numbers, brand). display=swap prevents FOIT. */
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap');
 /* GrapesJS editor styles — loaded globally so they are available when the lazy chunk mounts */
 @import 'grapesjs/dist/css/grapes.min.css';
 
@@ -144,6 +145,7 @@ All colors MUST be HSL.
 
     /* ===== FONT FAMILY ===== */
     --font-sans: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Bricolage Grotesque', 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
     /* ===== FONT WEIGHTS (Open Sans - Complete Range) ===== */
     --font-light: 300;     /* Light */
@@ -155,41 +157,41 @@ All colors MUST be HSL.
 
     /* ===== DARK THEME COLOR SYSTEM ===== */
     /* Main Background - Near black */
-    --background: 0 0% 7%;  /* #121212 - Near black */
-    --foreground: 0 0% 92%;  /* #EBEBEB - Light text */
+    --background: 258 22% 5%;   /* #0a090e — deep plum-black command center */
+    --foreground: 280 15% 93%;  /* warm near-white ink */
 
     /* Page container */
-    --page-background: 0 0% 7%;  /* Unified with --background */
+    --page-background: 258 22% 5%;
 
-    /* Content sections/cards - Dark elevated surfaces */
-    --card: 0 0% 11%;  /* #1C1C1C - Dark card */
-    --card-foreground: 0 0% 92%;  /* Light text */
+    /* Content sections/cards — elevation ladder step 1 */
+    --card: 266 22% 8%;         /* #141019 */
+    --card-foreground: 280 15% 93%;
 
-    --popover: 0 0% 13%;  /* #212121 - Slightly elevated */
-    --popover-foreground: 0 0% 92%;  /* Light text */
+    --popover: 262 24% 12%;     /* #1b1626 — elevated */
+    --popover-foreground: 280 15% 93%;
 
-    /* Primary - Deep Plum brightened for dark bg */
-    --primary: 1 72% 59%;  /* Brightened plum */
-    --primary-foreground: 0 0% 100%;  /* White text on red */
+    /* Primary — brightened magenta-plum (flat brand accent) */
+    --primary: 335 74% 60%;     /* #e64c8c */
+    --primary-foreground: 0 0% 100%;
 
-    /* Brand gradient (blue → red) — drives primary fills (buttons, active
-       tabs/nav, badges) and the hero banners. Solid --brand-blue below is
-       also the new --primary, so text/border/ring/icons read blue not plum. */
-    --brand-blue: 216 53% 47%;   /* #386BB7 */
-    --brand-red: 1 72% 59%;      /* #E24C4A */
-    --brand-gradient: linear-gradient(262deg, #386BB7 0%, #E24C4A 100%);
+    /* Brand gradient (plum) — reserved for IDENTITY surfaces only (PageHeader,
+       logo, hero). No longer painted on every bg-primary fill; buttons, active
+       tabs and nav now use the flat --primary accent. */
+    --brand-blue: 300 45% 30%;
+    --brand-red: 335 74% 60%;
+    --brand-gradient: linear-gradient(135deg, #3a1230 0%, #7a2456 46%, #c93d84 100%);
 
-    /* Secondary - Dark gray surfaces */
-    --secondary: 0 0% 14%;  /* #242424 - Dark surface */
-    --secondary-foreground: 0 0% 85%;  /* Light text */
+    /* Secondary — elevation ladder step 3 (recessed) */
+    --secondary: 262 24% 15%;  /* #241d31 */
+    --secondary-foreground: 0 0% 85%;
 
-    /* Muted - Subtle dark backgrounds */
-    --muted: 0 0% 14%;  /* #242424 */
-    --muted-foreground: 0 0% 55%;  /* #8C8C8C - Good contrast on dark */
+    /* Muted */
+    --muted: 262 24% 15%;
+    --muted-foreground: 258 14% 60%;  /* violet-grey */
 
-    /* Accent - Warm peach toned down for dark */
-    --accent: 22 60% 18%;  /* Dark warm accent */
-    --accent-foreground: 22 100% 85%;  /* Warm peach text */
+    /* Accent — subtle plum-tinted hover surface */
+    --accent: 280 22% 16%;
+    --accent-foreground: 300 40% 88%;
 
     /* Amber - Vibrant warm highlight */
     --amber: 32 100% 65%;       /* Slightly toned amber */
@@ -201,18 +203,18 @@ All colors MUST be HSL.
     --destructive-foreground: 0 0% 100%;  /* White text */
 
     /* Borders - Subtle white borders */
-    --border: 0 0% 16%;  /* #292929 - Subtle border */
-    --input: 0 0% 16%;  /* #292929 - Input border */
-    --ring: 1 72% 59%;  /* Focus ring (primary plum) */
+    --border: 260 16% 18%;
+    --input: 260 16% 18%;
+    --ring: 335 74% 60%;  /* Focus ring — magenta accent */
 
     --radius: 0.5rem;  /* 8px */
 
     /* Sidebar/TopNav - Dark theme */
-    --sidebar-background: 0 0% 9%;  /* Slightly lighter than bg */
-    --sidebar-foreground: 0 0% 60%;  /* Medium gray text */
-    --sidebar-accent: 1 72% 59%;  /* Primary plum for active items */
-    --sidebar-accent-foreground: 0 0% 100%;  /* White text on plum */
-    --sidebar-border: 0 0% 16%;  /* Subtle border */
+    --sidebar-background: 264 22% 7%;  /* rail — slightly lifted from bg */
+    --sidebar-foreground: 258 12% 60%;
+    --sidebar-accent: 335 74% 60%;  /* magenta active */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 260 16% 18%;
 
     /* Hero section background */
     --hero-background: 0 0% 11%;  /* Same as card */
@@ -318,62 +320,63 @@ All colors MUST be HSL.
   html.light {
     /* Layered warm off-whites — the page is the deeper tone so cards read as
        elevated WITHOUT being stark white. base #edefe6 → cards ~#f6f8f1. */
-    --background: 45 29% 97%;        /* page — #faf9f6 warm near-white */
-    --foreground: 0 0% 14%;          /* near-black ink */
+    --background: 42 27% 93%;        /* #f2efe8 — warm oat main area */
+    --foreground: 46 14% 21%;        /* #3b382e — warm near-black ink */
 
-    --page-background: 45 29% 97%;
+    --page-background: 42 27% 93%;
 
-    /* Surface hover — the previous page off-white (#edefe6), now reused as the
-       hover tint on cards, table rows and list items. */
-    --surface-hover: 72 16% 93%;
+    /* Surface hover — warm sand tint on cards, table rows and list items. */
+    --surface-hover: 44 24% 90%;
 
-    /* Cards — warm off-white (~the #f7f8f3 the brief specified), one step
-       lighter than the page so panels lift without going pure white. */
-    --card: 72 26% 97%;
-    --card-foreground: 0 0% 14%;
+    /* Cards — warm ivory, one step lighter than the oat page so panels lift. */
+    --card: 48 30% 97%;              /* #fbfaf5 */
+    --card-foreground: 46 14% 21%;
 
-    --popover: 72 30% 98%;
-    --popover-foreground: 0 0% 14%;
+    --popover: 48 30% 98%;
+    --popover-foreground: 46 14% 21%;
 
-    /* Primary — plum, slightly deepened so white text stays AA on light */
-    --primary: 1 72% 59%;
+    /* Primary — muted khaki-olive (quiet-luxury); white text stays legible. */
+    --primary: 56 23% 40%;           /* #7d7a4e */
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — muted warm grey surface, clearly deeper than cards */
-    --secondary: 72 13% 88%;
-    --secondary-foreground: 0 0% 20%;
+    /* Secondary — warm sand, deeper than cards (active-nav pill tone) */
+    --secondary: 44 28% 89%;         /* #ece7db */
+    --secondary-foreground: 46 16% 24%;
 
     /* Muted */
-    --muted: 72 13% 89%;
-    --muted-foreground: 0 0% 38%;
+    --muted: 44 26% 90%;
+    --muted-foreground: 48 14% 52%;  /* #8f8b79 olive-grey */
 
-    /* Accent — warm peach tint */
-    --accent: 22 55% 90%;
-    --accent-foreground: 22 75% 30%;
+    /* Accent — warm sand hover */
+    --accent: 44 26% 87%;
+    --accent-foreground: 48 22% 28%;
 
     /* Amber */
     --amber: 32 90% 42%;
     --amber-bg: 32 90% 92%;
     --amber-foreground: 32 90% 28%;
 
-    /* Destructive */
-    --destructive: 0 72% 48%;
+    /* Destructive — warm terracotta on cream */
+    --destructive: 12 51% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders / inputs — gentle warm grey lines, visible against cards */
-    --border: 72 11% 82%;
-    --input: 72 11% 83%;
-    --ring: 1 72% 59%;
+    /* Olive brand gradient for identity surfaces (light) */
+    --brand-gradient: linear-gradient(135deg, #4a4726 0%, #65623c 46%, #8f8c5a 100%);
 
-    /* Sidebar / TopNav — clean card-toned bar with grey text, plum active */
-    --sidebar-background: 72 26% 97%;
-    --sidebar-foreground: 0 0% 40%;
-    --sidebar-accent: 1 72% 59%;
+    /* Borders / inputs — warm olive-grey lines */
+    --border: 46 18% 82%;
+    --input: 46 18% 83%;
+    --ring: 56 23% 40%;
+
+    /* Sidebar / TopNav — ivory bar, olive active */
+    --sidebar-background: 48 30% 97%;
+    --sidebar-foreground: 48 12% 40%;
+    --sidebar-accent: 56 23% 40%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 72 11% 82%;
+    --sidebar-border: 46 18% 82%;
 
     /* Hero */
-    --hero-background: 72 26% 97%;
+    --hero-background: 48 30% 97%;
 
     /* Stat bubble colors — coloured fills with white text still read fine */
     --bubble-sage: 95 25% 45%;
@@ -384,8 +387,8 @@ All colors MUST be HSL.
     --bubble-text-muted: 0 0% 92%;
 
     /* Card gradients */
-    --card-gradient-start: 72 30% 98%;
-    --card-gradient-end: 72 18% 95%;
+    --card-gradient-start: 48 30% 98%;
+    --card-gradient-end: 46 24% 94%;
 
     /* Subtle gradients — black-based low-alpha so they show on light */
     --gradient-sage: linear-gradient(180deg, rgba(120, 140, 100, 0.07) 0%, rgba(120, 140, 100, 0.01) 100%);
@@ -472,7 +475,9 @@ All colors MUST be HSL.
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-weight: var(--font-light);  /* Light weight for headings (300) */
+    font-family: var(--font-display);   /* Bricolage Grotesque display face */
+    font-weight: var(--font-semibold);  /* 600 — expressive hierarchy, not crushed to 300 */
+    letter-spacing: -0.02em;
   }
 
   strong, b {
@@ -1082,44 +1087,44 @@ html.light .border-white\/20, html.light .hover\:border-white\/20:hover { border
 /* ---- 3. Literal white surfaces → warm off-white card tone ----
    Fixes the "extra white" panels: bg-white in light-built components
    becomes the same soft off-white as token cards. */
-html.light .bg-white   { background-color: hsl(72 26% 97%); }
-html.light .bg-white\/95 { background-color: hsl(72 26% 97% / 0.95); }
-html.light .bg-white\/90 { background-color: hsl(72 26% 97% / 0.90); }
-html.light .bg-white\/80 { background-color: hsl(72 26% 97% / 0.80); }
-html.light .bg-white\/70 { background-color: hsl(72 26% 97% / 0.70); }
-html.light .bg-white\/60 { background-color: hsl(72 26% 97% / 0.60); }
-html.light .bg-white\/50 { background-color: hsl(72 26% 97% / 0.50); }
+html.light .bg-white   { background-color: hsl(48 30% 97%); }
+html.light .bg-white\/95 { background-color: hsl(48 30% 97% / 0.95); }
+html.light .bg-white\/90 { background-color: hsl(48 30% 97% / 0.90); }
+html.light .bg-white\/80 { background-color: hsl(48 30% 97% / 0.80); }
+html.light .bg-white\/70 { background-color: hsl(48 30% 97% / 0.70); }
+html.light .bg-white\/60 { background-color: hsl(48 30% 97% / 0.60); }
+html.light .bg-white\/50 { background-color: hsl(48 30% 97% / 0.50); }
 
 /* ---- 4. Dark gray SURFACES → layered light surfaces ----
    gray/slate/zinc/neutral/stone 700–950 are unambiguously dark
    panels; no light-built component uses them as a light surface. */
 html.light .bg-gray-700,   html.light .bg-slate-700,  html.light .bg-zinc-700,
-html.light .bg-neutral-700,html.light .bg-stone-700  { background-color: hsl(72 14% 90%); }
+html.light .bg-neutral-700,html.light .bg-stone-700  { background-color: hsl(46 20% 89%); }
 html.light .bg-gray-800,   html.light .bg-slate-800,  html.light .bg-zinc-800,
-html.light .bg-neutral-800,html.light .bg-stone-800  { background-color: hsl(72 16% 92%); }
+html.light .bg-neutral-800,html.light .bg-stone-800  { background-color: hsl(46 22% 91%); }
 html.light .bg-gray-900,   html.light .bg-slate-900,  html.light .bg-zinc-900,
-html.light .bg-neutral-900,html.light .bg-stone-900  { background-color: hsl(72 24% 96%); }
+html.light .bg-neutral-900,html.light .bg-stone-900  { background-color: hsl(46 26% 95%); }
 html.light .bg-gray-950,   html.light .bg-slate-950,  html.light .bg-zinc-950,
-html.light .bg-neutral-950,html.light .bg-stone-950  { background-color: hsl(72 20% 94%); }
+html.light .bg-neutral-950,html.light .bg-stone-950  { background-color: hsl(46 24% 93%); }
 
 /* hover: variants of the same */
 html.light .hover\:bg-gray-700:hover,  html.light .hover\:bg-slate-700:hover,
-html.light .hover\:bg-zinc-700:hover,  html.light .hover\:bg-neutral-700:hover { background-color: hsl(72 13% 88%); }
+html.light .hover\:bg-zinc-700:hover,  html.light .hover\:bg-neutral-700:hover { background-color: hsl(44 22% 88%); }
 html.light .hover\:bg-gray-800:hover,  html.light .hover\:bg-slate-800:hover,
-html.light .hover\:bg-zinc-800:hover,  html.light .hover\:bg-neutral-800:hover { background-color: hsl(72 14% 90%); }
+html.light .hover\:bg-zinc-800:hover,  html.light .hover\:bg-neutral-800:hover { background-color: hsl(46 20% 89%); }
 
 /* Opacity-suffixed dark-gray surfaces actually used in the codebase
    (semi-transparent sub-panels) → solid light sub-panel tone. */
 html.light .bg-slate-800\/50,
 html.light .bg-slate-800\/30,
-html.light .bg-gray-700\/30 { background-color: hsl(72 16% 92%); }
+html.light .bg-gray-700\/30 { background-color: hsl(46 22% 91%); }
 
 /* 4b. Named arbitrary-hex surfaces (AgentHub chat bubbles).
    Dark mode keeps the exact #1f2937 / #3E192A bubbles; light mode gets a
    neutral bubble (user) + soft plum bubble (assistant). Their text-white is
    flipped to dark ink by rule 5 since no scrim/colored protection matches. */
-html.light .bg-\[\#1f2937\] { background-color: hsl(72 14% 91%); }
-html.light .bg-\[\#3E192A\] { background-color: hsl(330 36% 92%); }
+html.light .bg-\[\#1f2937\] { background-color: hsl(46 22% 90%); }
+html.light .bg-\[\#3E192A\] { background-color: hsl(44 26% 91%); }
 
 /* ---- 5. Light TEXT → dark ink ----
    Solid light text + the very-light gray text shades only make sense
@@ -1143,7 +1148,7 @@ html.light .text-white\/30, html.light .text-white\/20 { color: hsl(0 0% 38%); }
 html.light .border-gray-700,  html.light .border-gray-800,  html.light .border-gray-900,
 html.light .border-slate-700, html.light .border-slate-800, html.light .border-slate-900,
 html.light .border-zinc-700,  html.light .border-zinc-800,  html.light .border-zinc-900,
-html.light .border-neutral-700, html.light .border-neutral-800 { border-color: hsl(72 11% 82%); }
+html.light .border-neutral-700, html.light .border-neutral-800 { border-color: hsl(46 18% 82%); }
 
 /* ---- 7. Dark scrim / dark gradient protection ----
    Photo scrims (bg-black/NN) and intentional dark gradient surfaces
@@ -1244,8 +1249,7 @@ html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foregr
    border-primary, focus ring, icons) read blue — no more pink.
    Un-layered so it beats Tailwind's utilities layer.
    ============================================================ */
-.bg-primary,
-.hover\:bg-primary:hover,
-.data-\[state\=active\]\:bg-primary[data-state="active"] {
-  background-image: var(--brand-gradient) !important;
-}
+/* Primary fills are now the FLAT accent (magenta on dark, olive on light) so the
+   active/primary control reads instantly. The brand gradient is reserved for
+   IDENTITY surfaces (PageHeader, logo, hero), which apply var(--brand-gradient)
+   explicitly — see PageHeader.tsx. */

@@ -1196,6 +1196,7 @@ KB categories now MIRROR the ingestion/PDF-processing taxonomy (`material_catego
 
 ## Design System Summary
 Full reference: `.claude/design-system.md`
+- **⚠️ 2026 redesign Phase 1 (foundation) landed** — supersedes the plum/blue→red bullets below. **Dark** = plum-black command center (`--background: 258 22% 5%`), flat **magenta** primary (`--primary: 335 74% 60%`). **Light** = warm olive/cream "ventureshub" (`--background: 42 27% 93%`, `--card: 48 30% 97%`), muted **khaki-olive** primary (`--primary: 56 23% 40%`), terracotta destructive. **Headings** use **Bricolage Grotesque** (`font-display`). The global `bg-primary → brand-gradient` rule was **removed** — primary fills are flat accent; the gradient is reserved for identity surfaces (PageHeader/logo/hero). Layout rebuilds (command center, product modal) are later phases.
 - **Theme**: Dark mode. **Background**: near black (`--background: 0 0% 7%`). **Foreground**: light (`--foreground: 0 0% 92%`).
 - **Primary**: brightened plum (`--primary: 330 50% 35%`). **Accent**: dark warm (`--accent: 22 60% 18%`).
 - **Navigation**: Horizontal top nav bar (h-14), not sidebar. Logo left, nav center, profile right. Admin accessed via `/admin` page boxes.
