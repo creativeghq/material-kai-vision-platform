@@ -452,8 +452,9 @@ All colors MUST be HSL.
     --badge-draft-border: 0 0% 82%;
 
     /* ===== GLASSMORPHISM SYSTEM (Light) ===== */
-    /* Warm frosted off-white, not pure white, so glass cards match the palette */
-    --glass-background: rgba(249, 250, 244, 0.72);
+    /* Warm frosted ivory, translucent enough that the gradient canvas tints
+       through the glass panels (glass-over-gradient look). */
+    --glass-background: rgba(250, 248, 240, 0.58);
     --glass-blur: 12px;
     --glass-border: rgba(0, 0, 0, 0.07);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
@@ -1277,9 +1278,21 @@ html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foregr
     radial-gradient(700px 620px at 62% 110%, hsl(var(--primary) / 0.06), transparent 60%);
 }
 html.light .app-aurora {
+  /* Calmed on light — the warm gradient canvas (on body) is the main treatment. */
   background:
-    radial-gradient(760px 520px at 85% -8%, hsl(var(--primary) / 0.10), transparent 62%),
-    radial-gradient(620px 460px at 4% 6%, hsl(var(--primary) / 0.06), transparent 62%);
+    radial-gradient(760px 520px at 85% -8%, hsl(var(--primary) / 0.05), transparent 62%);
+}
+
+/* Light theme canvas — warm cream→sand gradient with faint olive/peach corner
+   glows, the ground the frosted (translucent) panels tint against. Dark keeps
+   the plum-black command center. background-attachment:fixed so the gradient
+   stays put while content scrolls over it (cards tint as they pass). */
+html.light body {
+  background:
+    radial-gradient(620px 440px at 10% 110%, rgba(150, 140, 80, 0.16), transparent 60%),
+    radial-gradient(520px 380px at 94% 114%, rgba(205, 150, 110, 0.13), transparent 60%),
+    linear-gradient(158deg, #f5f2ea 0%, #efe9dd 42%, #e9e1d0 78%, #e4dcc8 100%);
+  background-attachment: fixed;
 }
 .app-grain {
   position: fixed;
