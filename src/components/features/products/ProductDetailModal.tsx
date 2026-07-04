@@ -1764,22 +1764,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {/* Key facets at a glance — same computed values as the spec cards below. */}
               <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                 {material && material !== '—' && (
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-lg border border-border bg-muted px-2.5 py-1">
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
                     <span className="text-muted-foreground">Material</span><span className="font-medium text-foreground">{material}</span>
                   </span>
                 )}
                 {primaryColors && (
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-lg border border-border bg-muted px-2.5 py-1">
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
                     <span className="text-muted-foreground">Color</span><span className="font-medium text-foreground">{primaryColors.split(',')[0].trim()}</span>
                   </span>
                 )}
                 {finish && finish !== '—' && (
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-lg border border-border bg-muted px-2.5 py-1">
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
                     <span className="text-muted-foreground">Finish</span><span className="font-medium text-foreground">{finish}</span>
                   </span>
                 )}
                 {size && size !== 'N/A' && size !== '—' && (
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-lg border border-border bg-muted px-2.5 py-1">
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
                     <span className="text-muted-foreground">Size</span><span className="font-medium text-foreground">{String(size).split(',')[0].trim()}</span>
                   </span>
                 )}
@@ -1819,7 +1819,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         {/* Tabs — end-users see Details / Knowledge / Related.
             Admins additionally see Monitoring / SEO / Pricing after those. */}
         <Tabs defaultValue="details" className="mt-6">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-5 bg-transparent p-0 border-b border-border tabs-underline">
             {/* End-user tabs (always visible) */}
             <TabsTrigger value="details" className="flex items-center gap-2">
               <Info className="h-4 w-4" />
