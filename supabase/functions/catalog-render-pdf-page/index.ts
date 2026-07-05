@@ -12,6 +12,7 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isCronAuthorized } from '../_shared/auth.ts';
 
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
@@ -41,6 +42,16 @@ Deno.serve(withApiLogging('catalog-render-pdf-page', async (req) => {
 
   if (!CRON_SECRET()) {
     return jsonResponse({ success: false, error: 'CRON_SECRET not configured on edge function' }, 500);
+  }
+
+  // Pentest #250 H9: this proxy forwards to MIVAA's internal rasterizer under the
+  // platform cron secret; it previously only checked that CRON_SECRET was *set*, never
+  // that the CALLER presented valid auth — so anyone could rasterize any tenant's PDF
+  // page and get a signed PNG URL. Its only legit callers (catalog-extract-from-pdfs /
+  // catalog-translate-pdf) invoke it with the service-role key, so gate on
+  // isCronAuthorized (service-role OR x-cron-secret); fails closed for anon.
+  if (!isCronAuthorized(req)) {
+    return jsonResponse({ success: false, error: 'unauthorized' }, 401);
   }
 
   try {

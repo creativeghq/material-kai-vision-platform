@@ -73,6 +73,28 @@ async function companyInScope(
   return !!data;
 }
 
+// Pentest #250 H7: mirror of companyInScope for contacts. The company↔contact link
+// insert verified the company but NOT the contact, so a caller could attach another
+// tenant's contact_id to their own company and then read that contact's PII via the
+// nested crm_contacts join on GET /companies/{id}.
+async function contactInScope(
+  contactId: string,
+  scope: import('./_scope.ts').CrmScope,
+): Promise<boolean> {
+  if (scope.isGlobalOperator) {
+    const { data } = await supabase.from('crm_contacts').select('id').eq('id', contactId).maybeSingle();
+    return !!data;
+  }
+  if (scope.workspaceIds.length === 0) return false;
+  const { data } = await supabase
+    .from('crm_contacts')
+    .select('id')
+    .eq('id', contactId)
+    .in('workspace_id', scope.workspaceIds)
+    .maybeSingle();
+  return !!data;
+}
+
 /**
  * CRM Companies API
  * Handles company management: create, list, update, delete
@@ -351,6 +373,15 @@ export async function handleCompanies(req: Request): Promise<Response> {
       if (!(await companyInScope(companyId, scope))) {
         return new Response(
           JSON.stringify({ error: 'Company not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
+
+      // Pentest #250 H7: the contact must also be in the caller's scope, else attaching
+      // a foreign contact_id leaks that tenant's contact PII via the company's join.
+      if (!(await contactInScope(contact_id, scope))) {
+        return new Response(
+          JSON.stringify({ error: 'Contact not found' }),
           { status: 404, headers: corsHeaders },
         );
       }

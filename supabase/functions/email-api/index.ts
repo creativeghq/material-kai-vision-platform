@@ -10,7 +10,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
@@ -113,6 +113,20 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         }
 
         const body: SendEmailRequest = requestBody;
+
+        // Pentest #250 H4: body.workspace_id selects WHOSE Resend key + verified sender
+        // domain is used. Without binding it to the caller, a workspace-A owner could
+        // send from workspace B's verified domain — billed to B's key, counted against
+        // B's quota, stamped to B. Require membership when a workspace_id is supplied
+        // (server-to-server admin-secret callers are exempt — trusted system sends).
+        if (!isAdminAccess(auth) && body.workspace_id) {
+          if (!(await userCanAccessWorkspace(supabaseClient, auth.userId, body.workspace_id))) {
+            return new Response(
+              JSON.stringify({ success: false, error: 'Not authorized for the requested workspace sender' }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
+        }
 
         // Resolve the Resend key + sender: the workspace's own BYOK config wins when set,
         // otherwise the platform key + global email_settings sender.
