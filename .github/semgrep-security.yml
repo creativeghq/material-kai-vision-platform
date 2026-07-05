@@ -1,0 +1,52 @@
+# Semgrep security ruleset — enforces the CLAUDE.md "Security Invariants" (pentest #250)
+# at PR time so the classes we fixed can't silently regress. High-signal / low-false-
+# positive rules only; run via .github/workflows/semgrep.yml.
+rules:
+  # ── J · XSS / output encoding (invariant 11) ────────────────────────────────
+  - id: no-dangerously-set-inner-html
+    languages: [typescript, tsx, javascript]
+    severity: ERROR
+    message: >
+      XSS (#250 J / invariant 11): dangerouslySetInnerHTML renders raw HTML. Use JSX or
+      react-markdown (WITHOUT rehype-raw), or escape with the esc() helper.
+    pattern: dangerouslySetInnerHTML={=~/.*/}
+
+  - id: no-document-write
+    languages: [typescript, tsx, javascript]
+    severity: ERROR
+    message: >
+      XSS (#250 J1): document.write() with app/user content runs in the page origin and
+      can steal the Supabase session. Build DOM safely or escape via esc().
+    pattern: document.write(...)
+
+  - id: no-rehype-raw
+    languages: [typescript, tsx, javascript]
+    severity: ERROR
+    message: "XSS (#250 J / invariant 11): rehype-raw renders raw HTML from markdown — do not use."
+    pattern-either:
+      - pattern: require('rehype-raw')
+      - pattern: import 'rehype-raw'
+      - pattern: import $X from 'rehype-raw'
+
+  # ── A · Auth (invariant 1/5) ────────────────────────────────────────────────
+  - id: no-jwt-verification-disabled
+    languages: [python]
+    severity: ERROR
+    message: "Auth bypass (#250 A5): JWT decoded with audience/signature verification disabled."
+    pattern-either:
+      - pattern: jwt.decode(..., options={..., "verify_aud": False, ...}, ...)
+      - pattern: jwt.decode(..., options={..., "verify_signature": False, ...}, ...)
+
+  # ── G / BOPLA · Mass assignment (invariant 8) ───────────────────────────────
+  - id: no-mass-assignment-db-insert
+    languages: [python]
+    severity: WARNING
+    message: >
+      Mass-assignment (#250 G / invariant 8): don't spread a request model into a DB write
+      — a caller can set trust/identity fields (workspace_id, user_id, role, price). Build
+      an allowlisted payload instead.
+    pattern-either:
+      - pattern: $T.insert($REQ.dict())
+      - pattern: $T.insert($REQ.model_dump())
+      - pattern: $T.insert(**$REQ.dict())
+      - pattern: $T.insert(**$REQ.model_dump())

@@ -1,0 +1,28 @@
+# Semgrep security gate (pentest #250) — runs the invariant ruleset on PRs + pushes.
+#
+# ROLLOUT: currently REPORT-ONLY (non-blocking) — it prints findings but never fails the
+# build, because the existing codebase has legitimate matches (e.g. PartiesTab's now-
+# ESCAPED document.write). To finish the gate:
+#   1. Triage the current findings; add `// nosemgrep: <rule-id>` on the legit ones.
+#   2. Flip the "Enforce" step below to blocking (remove `|| true` / add `--error`),
+#      ideally diff-aware on PRs via `--baseline-commit origin/main` so only NEW findings
+#      fail the build.
+name: 🔒 Semgrep Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  semgrep:
+    name: Scan (invariant ruleset)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run semgrep (report-only)
+        run: semgrep --config .github/semgrep-security.yml --severity ERROR --severity WARNING || true
