@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isCronAuthorized } from '../_shared/auth.ts';
 
 interface StuckJob {
   id: string;
@@ -32,6 +33,17 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Pentest #250 C2: this cron drives privileged RPCs (fail_exhausted_pdf_jobs,
+  // detect_stuck_pdf_jobs) + re-dispatches jobs under the service-role key. It was
+  // reachable with zero auth. Gate on the same service-role / x-cron-secret check
+  // every sibling cron uses (fails closed).
+  if (!isCronAuthorized(req)) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
