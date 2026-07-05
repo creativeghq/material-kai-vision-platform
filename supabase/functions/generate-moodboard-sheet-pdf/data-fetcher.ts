@@ -65,13 +65,23 @@ export async function fetchOwnerBranding(
 export async function fetchProductChips(
   supabase: SupabaseClient,
   productIds: string[],
+  scopeWorkspaceIds?: string[] | null,
 ): Promise<ProductChip[]> {
   if (productIds.length === 0) return [];
 
-  const { data: products } = await supabase
+  // Pentest #250 H3: when a caller scope is supplied (non-service path), only include
+  // products in the caller's own workspaces — an embedded foreign product_id can't leak.
+  let productQuery = supabase
     .from('products')
     .select('id, name, description, category_id, metadata')
     .in('id', productIds);
+  if (scopeWorkspaceIds) {
+    productQuery = productQuery.in(
+      'workspace_id',
+      scopeWorkspaceIds.length ? scopeWorkspaceIds : ['00000000-0000-0000-0000-000000000000'],
+    );
+  }
+  const { data: products } = await productQuery;
 
   const { data: rels } = await supabase
     .from('image_product_associations')
@@ -101,7 +111,22 @@ export async function fetchProductChips(
 export async function fetchQuoteFfeItems(
   supabase: SupabaseClient,
   quoteId: string,
+  scope?: { userId: string; workspaceIds: string[] } | null,
 ): Promise<FfeItem[]> {
+  // Pentest #250 H3: verify the caller owns the quote before reading its items,
+  // else an embedded foreign quote_id would leak that tenant's FF&E pricing.
+  if (scope) {
+    const { data: q } = await supabase
+      .from('quotes')
+      .select('user_id, workspace_id')
+      .eq('id', quoteId)
+      .maybeSingle();
+    const ownsQuote = !!q && (
+      (q as any).user_id === scope.userId ||
+      (scope.workspaceIds.length > 0 && scope.workspaceIds.includes((q as any).workspace_id))
+    );
+    if (!ownsQuote) return [];
+  }
   const { data, error } = await supabase
     .from('quote_items')
     .select('room, name, dimensions, installation_requirements, delivery_date, qty, unit_price')
@@ -127,12 +152,17 @@ export async function fetchQuoteFfeItems(
 export async function fetchSheets(
   supabase: SupabaseClient,
   sheetIds: string[],
+  scopeUserId?: string | null,
 ): Promise<SheetRow[]> {
   if (sheetIds.length === 0) return [];
-  const { data, error } = await supabase
+  // Pentest #250 H3: only include sub-sheets owned by the caller — an embedded foreign
+  // included_sheet_id can't pull another user's sheet content into the deck.
+  let sheetsQuery = supabase
     .from('moodboard_presentation_sheets')
     .select('id, moodboard_id, created_by, sheet_type, title, data')
     .in('id', sheetIds);
+  if (scopeUserId) sheetsQuery = sheetsQuery.eq('created_by', scopeUserId);
+  const { data, error } = await sheetsQuery;
   if (error) throw error;
   return (data || []) as SheetRow[];
 }

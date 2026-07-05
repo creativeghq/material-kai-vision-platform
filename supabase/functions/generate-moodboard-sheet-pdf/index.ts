@@ -169,6 +169,22 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       return jsonResponse({ success: false, error: 'Not authorized for this sheet' }, 403);
     }
 
+    // Pentest #250 H3: sheet.data can embed quote_id / product_ids / included_sheet_ids
+    // that point at OTHER users' entities. The created_by check only proves the top-level
+    // sheet belongs to the caller — bind every embedded fetch below to the caller too.
+    // Service-role calls (the upstream tool already verified ownership) bypass, mirroring
+    // the ownership check above.
+    const scopeUserId = auth.isService ? null : (auth.userId ?? null);
+    let scopeWorkspaceIds: string[] | null = null;
+    if (scopeUserId) {
+      const { data: mems } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', scopeUserId);
+      scopeWorkspaceIds = (mems || []).map((m: { workspace_id: string }) => m.workspace_id);
+    }
+    const quoteScope = scopeUserId ? { userId: scopeUserId, workspaceIds: scopeWorkspaceIds ?? [] } : null;
+
     await supabase
       .from('moodboard_presentation_sheets')
       .update({ status: 'generating' })
@@ -218,7 +234,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     switch (sheet.sheet_type) {
       case 'material_board': {
         const ids: string[] = sheet.data.product_ids || [];
-        const chips = await fetchProductChips(supabase, ids);
+        const chips = await fetchProductChips(supabase, ids, scopeWorkspaceIds);
         if (sheet.data.chip_descriptions) {
           for (const chip of chips) {
             const custom = sheet.data.chip_descriptions[chip.product_id];
@@ -252,7 +268,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         const ids = (sheet.data.annotations || [])
           .map((a: AnnotationData) => a.product_id)
           .filter((x: string | undefined): x is string => !!x);
-        const chips = await fetchProductChips(supabase, ids);
+        const chips = await fetchProductChips(supabase, ids, scopeWorkspaceIds);
         await buildAnnotatedRender(pdfDoc, fonts, td, {
           backdrop_image_url: sheet.data.backdrop_image_url,
           annotations: sheet.data.annotations || [],
@@ -271,7 +287,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       case 'ffe_schedule': {
         let items = sheet.data.items || [];
         if (sheet.data.quote_id && items.length === 0) {
-          items = await fetchQuoteFfeItems(supabase, sheet.data.quote_id);
+          items = await fetchQuoteFfeItems(supabase, sheet.data.quote_id, quoteScope);
         }
         buildFfeSchedule(pdfDoc, fonts, td, items);
         break;
@@ -281,7 +297,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         break;
       case 'full_deck': {
         const includedIds: string[] = sheet.data.included_sheet_ids || [];
-        const subSheets = await fetchSheets(supabase, includedIds);
+        const subSheets = await fetchSheets(supabase, includedIds, scopeUserId);
         // Maintain user-specified order
         subSheets.sort((a, b) => includedIds.indexOf(a.id) - includedIds.indexOf(b.id));
 
@@ -299,8 +315,8 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
             subSheets[i],
             i + 2,
             subSheets.length + 1,
-            (ids) => fetchProductChips(supabase, ids),
-            (qid) => fetchQuoteFfeItems(supabase, qid),
+            (ids) => fetchProductChips(supabase, ids, scopeWorkspaceIds),
+            (qid) => fetchQuoteFfeItems(supabase, qid, quoteScope),
           );
         }
         pageCount = subSheets.length + 1;
