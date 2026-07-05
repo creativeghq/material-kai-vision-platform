@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Sales/Finance PR-A — Supplier Cost List parser
@@ -165,6 +165,14 @@ Deno.serve(withApiLogging('parse-supplier-cost-list', async (req) => {
       .single();
 
     if (docErr || !doc) return json({ error: `KB doc not found: ${docErr?.message ?? body.kb_doc_id}` }, 404);
+
+    // Pentest #250 H2: the role gate above only proves the caller is an owner of SOME
+    // workspace; the service-role load bypasses RLS. Without this, an owner of tenant A
+    // could pass tenant B's kb_doc_id and both leak B's SKU→cost table AND overwrite
+    // B's products.cost. Bind the caller to the doc's workspace (404 to avoid id enum).
+    if (!(await userCanAccessWorkspace(supabase, auth.userId, doc.workspace_id))) {
+      return json({ error: `KB doc not found: ${body.kb_doc_id}` }, 404);
+    }
 
     if (doc.price_doc_type !== 'supplier_cost_list') {
       return json(

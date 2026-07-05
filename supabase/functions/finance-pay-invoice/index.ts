@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -99,6 +99,26 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
         .eq('id', (body as AdminBody).invoice_id)
         .maybeSingle();
       if (invErr || !inv) return json({ error: 'invoice not found or not accessible' }, 404);
+
+      // Pentest #250 H1: authenticate() returns the SERVICE-ROLE client, so the SELECT
+      // above does NOT enforce RLS (the "caller's JWT gates access" comment was wrong).
+      // Bind the caller to this invoice explicitly: an active member of its workspace
+      // (or global admin), OR the linked customer (crm_contacts.user_id). 404 on
+      // mismatch to avoid cross-tenant id enumeration.
+      const isMember = await userCanAccessWorkspace(supabase, auth.userId, inv.workspace_id);
+      let isLinkedCustomer = false;
+      if (!isMember && inv.customer_contact_id) {
+        const { data: linkedContact } = await supabase
+          .from('crm_contacts')
+          .select('id')
+          .eq('id', inv.customer_contact_id)
+          .eq('user_id', auth.userId)
+          .maybeSingle();
+        isLinkedCustomer = !!linkedContact;
+      }
+      if (!isMember && !isLinkedCustomer) {
+        return json({ error: 'invoice not found or not accessible' }, 404);
+      }
 
       if (inv.status === 'void' || inv.status === 'credit_noted') {
         return json({ error: `invoice is ${inv.status}; cannot collect` }, 409);

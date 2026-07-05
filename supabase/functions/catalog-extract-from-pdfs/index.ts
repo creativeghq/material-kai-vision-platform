@@ -7,7 +7,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
@@ -124,11 +124,22 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
 
     const { data: pdfs, error: pdfErr } = await supabase
       .from('catalog_source_pdfs')
-      .select('id, original_filename, manufacturer_name, storage_path, page_count')
+      .select('id, workspace_id, original_filename, manufacturer_name, storage_path, page_count')
       .in('id', body.source_pdf_ids);
 
     if (pdfErr) return jsonResponse({ success: false, error: pdfErr.message }, 500);
     if (!pdfs || pdfs.length === 0) return jsonResponse({ success: false, error: 'No source PDFs found' }, 404);
+
+    // Pentest #250 H6: authenticate() proves only that the caller is *some* user; the
+    // service-role load bypasses RLS. Without this, any authenticated user could pass
+    // another tenant's source_pdf_ids and exfiltrate their private catalog PDFs. Bind
+    // the caller to every referenced PDF's workspace before downloading any bytes.
+    const pdfWorkspaceIds = Array.from(new Set(pdfs.map((p) => p.workspace_id)));
+    for (const wsId of pdfWorkspaceIds) {
+      if (!(await userCanAccessWorkspace(supabase, auth.userId, wsId))) {
+        return jsonResponse({ success: false, error: 'Not authorized for one or more source PDFs' }, 403);
+      }
+    }
 
     const allCandidates: Candidate[] = [];
     const errors: string[] = [];

@@ -174,6 +174,16 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       return jsonResponse({ error: 'invalid_afm', message: 'Greek ΑΦΜ must be exactly 9 digits.' }, 400);
     }
 
+    // Pentest #250 H8/C10: the live lookup runs on the target workspace's regulated
+    // ΑΑΔΕ Special Access Codes — consuming that tenant's TAXISnet monthly quota and
+    // firing the mandatory audit notification under their identity. Require the caller
+    // to be a finance-manager of that workspace (mirror the creds-status gate) before
+    // resolving its credentials — otherwise a user in workspace A could burn workspace
+    // B's quota by passing {afm, workspace_id: B}.
+    if (!body.workspace_id) return jsonResponse({ error: 'workspace_id required' }, 400);
+    const { data: isLookupMgr } = await userClient.rpc('is_workspace_finance_manager', { p_workspace_id: body.workspace_id });
+    if (!isLookupMgr) return jsonResponse({ error: 'not authorized' }, 403);
+
     const admin = createClient(supabaseUrl, supabaseServiceKey);
     // Per-workspace Special Access Codes — only the operator's root workspace falls back
     // to the env / platform_secrets default; every tenant uses its own codes.
