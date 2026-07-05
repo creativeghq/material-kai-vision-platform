@@ -488,6 +488,22 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       );
     }
 
+    // Pentest #250 C1: platform-admin actions (path under /api/admin) must require an
+    // admin/super_admin role. Previously the only gate was "authenticated", so ANY
+    // logged-in user could invoke admin_delete_job / admin_cleanup_data /
+    // admin_backup_data / admin_prompts_update etc. under the gateway's trusted
+    // MIVAA identity. Admin-secret (trusted backend) callers are exempt; everyone else
+    // is re-checked for the role and 403'd if they lack it.
+    if (!isAdmin && MIVAA_ENDPOINTS[action].path.startsWith('/api/admin')) {
+      const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
+      if (!adminAuth.success) {
+        return new Response(
+          JSON.stringify({ error: 'Admin role required for this action', action }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
     // --- CREDIT BILLING MIDDLEWARE ---
     let pricing = getMivaaActionCost(action);
 
