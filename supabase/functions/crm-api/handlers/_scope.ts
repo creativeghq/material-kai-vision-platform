@@ -24,6 +24,9 @@ export interface CrmScope {
    * which have no user context and must pass workspace_id explicitly on create.
    */
   workspaceIds: string[];
+  /** The authenticated caller's user id (null for secret-key/no-user context). Used to
+   *  stamp linked_by / created_by from the JWT rather than a client-supplied field. */
+  callerUserId: string | null;
 }
 
 export async function getCrmScope(
@@ -32,11 +35,11 @@ export async function getCrmScope(
 ): Promise<CrmScope> {
   // Server-to-server secret key → full admin access (no user context).
   if (auth.level === 'secret') {
-    return { isGlobalOperator: true, workspaceIds: [] };
+    return { isGlobalOperator: true, workspaceIds: [], callerUserId: null };
   }
 
   const userId = auth.userId;
-  if (!userId) return { isGlobalOperator: false, workspaceIds: [] };
+  if (!userId) return { isGlobalOperator: false, workspaceIds: [], callerUserId: null };
 
   const [{ data: prof }, { data: mems }] = await Promise.all([
     adminClient
@@ -61,10 +64,10 @@ export async function getCrmScope(
   if (globalRole && ['admin', 'super_admin'].includes(globalRole)) {
     // Global read/write across all tenants, but keep the operator's own memberships so a
     // create with no explicit workspace_id can default to their home workspace.
-    return { isGlobalOperator: true, workspaceIds };
+    return { isGlobalOperator: true, workspaceIds, callerUserId: userId };
   }
 
-  return { isGlobalOperator: false, workspaceIds };
+  return { isGlobalOperator: false, workspaceIds, callerUserId: userId };
 }
 
 /** True when `workspaceId` is reachable by the scope. */

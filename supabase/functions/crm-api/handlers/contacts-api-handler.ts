@@ -370,6 +370,25 @@ export async function handleContacts(req: Request): Promise<Response> {
         );
       }
 
+      // Pentest #250 C18: only link a user who is an active member of the caller's
+      // workspace(s) — otherwise an admin could bind an arbitrary platform user_id to a
+      // contact (granting that user the contact's inbox/finance scope).
+      if (!scope.isGlobalOperator) {
+        const { data: targetMem } = await supabase
+          .from('workspace_members')
+          .select('user_id')
+          .eq('user_id', userId)
+          .in('workspace_id', scope.workspaceIds.length ? scope.workspaceIds : ['00000000-0000-0000-0000-000000000000'])
+          .limit(1)
+          .maybeSingle();
+        if (!targetMem) {
+          return new Response(
+            JSON.stringify({ error: 'User is not a member of your workspace' }),
+            { status: 403, headers: corsHeaders },
+          );
+        }
+      }
+
       // Check if user is already linked to another contact
       const { data: existingLink } = await supabase
         .from('crm_contacts')
@@ -393,7 +412,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         .update({
           user_id: userId,
           linked_at: new Date().toISOString(),
-          linked_by: userId || 'system',
+          linked_by: scope.callerUserId ?? 'system',
         })
         .eq('id', contactId)
         .select();
@@ -430,7 +449,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         .update({
           user_id: null,
           linked_at: null,
-          linked_by: userId || 'system', // Track who unlinked
+          linked_by: scope.callerUserId ?? 'system', // Track who unlinked (pentest #250 C18)
         })
         .eq('id', contactId)
         .select();
@@ -536,6 +555,21 @@ export async function handleContacts(req: Request): Promise<Response> {
             continue;
           }
 
+          // Pentest #250 C18: only link a user who is a member of the caller's workspace.
+          if (!scope.isGlobalOperator) {
+            const { data: targetMem } = await supabase
+              .from('workspace_members')
+              .select('user_id')
+              .eq('user_id', userId)
+              .in('workspace_id', scope.workspaceIds.length ? scope.workspaceIds : ['00000000-0000-0000-0000-000000000000'])
+              .limit(1)
+              .maybeSingle();
+            if (!targetMem) {
+              errors.push({ contactId, userId, error: 'User is not a member of your workspace' });
+              continue;
+            }
+          }
+
           // Check if user is already linked
           const { data: existingLink } = await supabase
             .from('crm_contacts')
@@ -558,7 +592,7 @@ export async function handleContacts(req: Request): Promise<Response> {
             .update({
               user_id: userId,
               linked_at: new Date().toISOString(),
-              linked_by: userId || 'system',
+              linked_by: scope.callerUserId ?? 'system',
             })
             .eq('id', contactId)
             .select();
