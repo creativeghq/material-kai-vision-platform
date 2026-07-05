@@ -50,7 +50,10 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   const sender = fs?.business_name || 'our company';
   const number = inv.legal_number || inv.internal_number;
   const total = money(Number(inv.total ?? 0), inv.currency);
-  const mark = inv.fiscal_mark ? `<p style="margin:4px 0;color:#666">myDATA MARK: <strong>${inv.fiscal_mark}</strong></p>` : '';
+  // Pentest #250 J2: escape any tenant/customer-supplied value interpolated into the email HTML.
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  const mark = inv.fiscal_mark ? `<p style="margin:4px 0;color:#666">myDATA MARK: <strong>${esc(inv.fiscal_mark)}</strong></p>` : '';
   const qr = inv.fiscal_qr_url ? `<p style="margin:12px 0"><a href="${inv.fiscal_qr_url}" style="color:#7a1f5c">View / verify the invoice »</a></p>` : '';
 
   // Generate (or reuse) the invoice PDF and attach it — best-effort, forwarding the
@@ -83,16 +86,16 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   const subject = `Invoice ${number} from ${sender}`;
   const html = `
     <div style="font-family:'Open Sans',Arial,sans-serif;max-width:560px;margin:auto;color:#222">
-      <h2 style="font-weight:600">Invoice ${number}</h2>
-      <p>Dear ${name || 'customer'},</p>
-      <p>Please find your invoice from <strong>${sender}</strong>.</p>
+      <h2 style="font-weight:600">Invoice ${esc(number)}</h2>
+      <p>Dear ${esc(name) || 'customer'},</p>
+      <p>Please find your invoice from <strong>${esc(sender)}</strong>.</p>
       <table style="margin:16px 0;border-collapse:collapse">
         <tr><td style="padding:4px 16px 4px 0;color:#666">Total</td><td style="padding:4px 0;font-weight:600">${total}</td></tr>
         ${inv.due_at ? `<tr><td style="padding:4px 16px 4px 0;color:#666">Due</td><td style="padding:4px 0">${inv.due_at}</td></tr>` : ''}
       </table>
       ${mark}
       ${qr}
-      <p style="color:#999;font-size:12px;margin-top:24px">Sent via ${sender}.</p>
+      <p style="color:#999;font-size:12px;margin-top:24px">Sent via ${esc(sender)}.</p>
     </div>`;
 
   const { data: dispatch, error: dispatchErr } = await supabase.functions.invoke('email-api', {

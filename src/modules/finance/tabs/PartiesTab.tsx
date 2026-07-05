@@ -307,12 +307,18 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
 
   const printLedger = () => {
     if (!party) return;
+    // Pentest #250 J1: this HTML is written into a same-origin about:blank popup via
+    // document.write — CRM party name/email + ledger doc fields (attacker-influenced via
+    // counterparty/import data) MUST be escaped or an <img onerror> in a party name runs
+    // in the app origin and can read the Supabase session token from localStorage.
+    const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
     const sideLabel = ledgerSide === 'customer' ? 'Πελάτης / Customer' : 'Προμηθευτής / Supplier';
     const rowsHtml = ledgerWithBalance.map((r) => `
       <tr>
         <td>${r.entry_date ? new Date(r.entry_date).toLocaleDateString() : ''}</td>
-        <td>${LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
-        <td>${r.doc_number ?? ''}</td>
+        <td>${esc(LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind)}</td>
+        <td>${esc(r.doc_number)}</td>
         <td class="r">${Number(r.debit) ? m(Number(r.debit)) : ''}</td>
         <td class="r">${Number(r.credit) ? m(Number(r.credit)) : ''}</td>
         <td class="r g">${m(r.progrDebit)}</td>
@@ -323,7 +329,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
     const closingLabel = owes
       ? (ledgerSide === 'customer' ? 'Χρεωστικό υπόλοιπο (οφείλει) / owes us' : 'Πιστωτικό υπόλοιπο (οφείλουμε) / we owe')
       : (ledgerSide === 'customer' ? 'Πιστωτικό υπόλοιπο / credit' : 'Χρεωστικό υπόλοιπο / debit');
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Καρτέλα — ${party.display_name}</title>
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Καρτέλα — ${esc(party.display_name)}</title>
       <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
       <style>body{font-family:'Open Sans',Arial,Helvetica,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 2px}
       .sub{color:#555;font-size:12px;margin-bottom:4px}.id{font-size:11px;color:#444;margin-bottom:14px}
@@ -333,7 +339,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
       .open td{font-weight:600;color:#555;background:#fafafa}.close{margin-top:10px;font-size:13px;text-align:right}</style></head>
       <body><h1>Καρτέλα ${ledgerSide === 'customer' ? 'Πελάτη' : 'Προμηθευτή'}</h1>
       <div class="sub">Από ${new Date(fromDate).toLocaleDateString()} Έως ${new Date(toDate).toLocaleDateString()} · ${sideLabel}</div>
-      <div class="id">${party.display_name ?? ''}${party.email ? ' · ' + party.email : ''} · printed ${new Date().toLocaleDateString()}</div>
+      <div class="id">${esc(party.display_name)}${party.email ? ' · ' + esc(party.email) : ''} · printed ${new Date().toLocaleDateString()}</div>
       <table>
       <thead><tr><th>Ημ/νία</th><th>Τύπος</th><th>Παραστατικό</th><th class="r">Χρέωση</th><th class="r">Πίστωση</th><th class="r">Προοδ. Χρέωση</th><th class="r">Προοδ. Πίστωση</th><th class="r">Υπόλοιπο</th></tr></thead>
       <tbody>

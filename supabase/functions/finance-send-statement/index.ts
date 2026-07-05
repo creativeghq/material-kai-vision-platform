@@ -425,7 +425,7 @@ async function sendOneStatement(
         <th style="text-align:right;padding:8px;font-size:12px;">Due</th>
         <th style="text-align:right;padding:8px;font-size:12px;">Pay by card</th></tr></thead><tbody>
         ${open.map((i: any) => `<tr>
-          <td style="padding:8px;font-family:monospace;font-size:12px;">${i.internal_number}</td>
+          <td style="padding:8px;font-family:monospace;font-size:12px;">${String(i.internal_number ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))}</td>
           <td style="padding:8px;text-align:right;font-size:12px;">${fmtMoney(Number(i.amount_due || 0), i.currency, opts.lang)}</td>
           <td style="padding:8px;text-align:right;">${links.get(i.id) ? `<a href="${links.get(i.id)}" style="background:#883366;color:white;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:12px;">Pay now</a>` : '—'}</td>
         </tr>`).join('')}</tbody></table>`;
@@ -434,9 +434,13 @@ async function sendOneStatement(
 
   const subject = settings.statement_email_subject ?? 'Your account statement';
   const bodyText = settings.statement_email_body ?? `Please find your account statement attached. Closing balance: ${fmtMoney(closing, ledger.currency, opts.lang)}.`;
+  // Pentest #250 J2: escape party name + the tenant-configured statement body before
+  // interpolating into HTML (escape first, THEN turn newlines into <br>).
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
   const html = `<div style="font-family:'Open Sans',Arial,sans-serif;max-width:600px;">
-      <p>${party.display_name ?? ''},</p>
-      <p>${String(bodyText).replace(/\n/g, '<br>')}</p>
+      <p>${esc(party.display_name)},</p>
+      <p>${esc(bodyText).replace(/\n/g, '<br>')}</p>
       ${payLinksHtml}
       <p><a href="${pdfUrl}">Download full PDF statement</a></p>
       <p style="color:#666;font-size:12px;margin-top:32px;">Generated on ${fmtDate(new Date().toISOString(), opts.lang)}. Pay links expire after 90 days.</p>
