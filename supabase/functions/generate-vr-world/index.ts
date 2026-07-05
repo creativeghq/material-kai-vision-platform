@@ -16,6 +16,7 @@ import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -344,8 +345,11 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
 // --- WorldLabs API helpers ---
 
 async function uploadImageToWorldLabs(imageUrl: string): Promise<{ id: string }> {
+  // #250 C23: source_image_url is user-supplied and we download it server-side —
+  // guard against SSRF to cloud metadata / internal hosts, and don't follow redirects.
+  const safeImageUrl = await assertSafeUrl(imageUrl);
   // First, download the image
-  const imageResponse = await fetch(imageUrl);
+  const imageResponse = await fetch(safeImageUrl, { redirect: 'error' });
   if (!imageResponse.ok) {
     throw new Error(`Failed to download source image: ${imageResponse.status}`);
   }

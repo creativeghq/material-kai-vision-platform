@@ -11,6 +11,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -90,15 +91,29 @@ async function fetchText(url: string, timeoutMs = 15_000): Promise<string | null
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
-      signal: ctl.signal,
-      headers: { 'User-Agent': USER_AGENT, Accept: 'application/xml,text/xml,*/*' },
-      redirect: 'follow',
-    });
-    if (!res.ok) return null;
-    return await res.text();
+    // #250 C24: every URL fetched here is user-derived (site base, robots, and
+    // sitemap <loc> values parsed from fetched XML). Guard the initial host AND
+    // re-guard every redirect hop so a public URL can't 302 us into cloud metadata
+    // / internal services. We follow redirects manually to re-check each hop.
+    let current = await assertSafeUrl(url);
+    for (let hop = 0; hop < 5; hop++) {
+      const res = await fetch(current, {
+        signal: ctl.signal,
+        headers: { 'User-Agent': USER_AGENT, Accept: 'application/xml,text/xml,*/*' },
+        redirect: 'manual',
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get('location');
+        if (!loc) return null;
+        current = await assertSafeUrl(new URL(loc, current).toString());
+        continue;
+      }
+      if (!res.ok) return null;
+      return await res.text();
+    }
+    return null; // too many redirects
   } catch {
-    return null;
+    return null; // includes SSRFError — treat blocked URLs as unfetchable
   } finally {
     clearTimeout(t);
   }
