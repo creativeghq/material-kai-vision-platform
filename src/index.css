@@ -1,8 +1,19 @@
-/* Open Sans — body/UI text. Bricolage Grotesque — display face (headings, numbers, brand). display=swap prevents FOIT. */
+/* Open Sans — body/UI text (Google Fonts). Bricolage Grotesque (display face)
+   is SELF-HOSTED + preloaded (see index.html + @font-face below) so it's ready
+   before first paint and doesn't reflow headings/numbers on font-swap. */
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap');
 /* GrapesJS editor styles — loaded globally so they are available when the lazy chunk mounts */
 @import 'grapesjs/dist/css/grapes.min.css';
+
+/* Bricolage Grotesque — self-hosted variable display face (latin subset). Loaded
+   once, preloaded in index.html, so headings/numbers don't reflow on swap. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/bricolage-latin.woff2') format('woff2');
+}
 
 @tailwind base;
 @tailwind components;
