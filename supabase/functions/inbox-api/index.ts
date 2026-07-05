@@ -1551,6 +1551,19 @@ async function handler(req: Request): Promise<Response> {
     return json({ ok: true });
   }
 
+  // Pentest #250 C17: token_claim is the POST-signup conversion handshake — it enrolls a
+  // user into the dealer workspace and links their account to the CRM contact. It must be
+  // AUTHENTICATED and adopt the caller's OWN id; previously it took user_id from the body
+  // on the unauthenticated token path, letting anyone with the invite token force-enroll an
+  // arbitrary victim. Require a JWT and override any body user_id with the verified caller.
+  if (action === 'token_claim') {
+    const claimAuth = await authenticate(req, { requireUser: true });
+    if (!claimAuth.success || !claimAuth.userId) {
+      return json({ error: claimAuth.error || 'Unauthorized' }, 401);
+    }
+    return handleTokenAction(db, action, { ...payload, user_id: claimAuth.userId });
+  }
+
   // Token branch — unauthenticated customer, service-role only.
   if (TOKEN_ACTIONS.has(action)) {
     return handleTokenAction(db, action, payload);
