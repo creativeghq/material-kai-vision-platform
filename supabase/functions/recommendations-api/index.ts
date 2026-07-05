@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -48,6 +48,22 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
     const user = auth.user;
     const userId = auth.userId;
 
+    // Pentest #250 M11: this fn uses the service-role client (RLS bypassed) and trusts
+    // workspace_id from the body / path / query on every route. Bind the caller to any
+    // workspace_id it supplies (admin-secret backend callers exempt). Returns a 403
+    // Response to short-circuit, or null when access is OK.
+    const isAdmin = isAdminAccess(auth);
+    const assertWs = async (wsId: string | null | undefined): Promise<Response | null> => {
+      if (isAdmin) return null;
+      if (!wsId || !(await userCanAccessWorkspace(supabase, userId, wsId))) {
+        return new Response(
+          JSON.stringify({ error: 'Not authorized for this workspace' }),
+          { status: 403, headers: corsHeaders },
+        );
+      }
+      return null;
+    };
+
     // ========================================================================
     // POST /track-interaction - Track user interaction with material
     // ========================================================================
@@ -68,6 +84,9 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
           { status: 400, headers: corsHeaders },
         );
       }
+
+      const wsErr = await assertWs(workspace_id);
+      if (wsErr) return wsErr;
 
       // Validate interaction type
       const validTypes = ['view', 'click', 'save', 'purchase', 'rate', 'add_to_quote', 'share'];
@@ -121,6 +140,9 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
       const limit = parseInt(url.searchParams.get('limit') || '20');
       const algorithm = url.searchParams.get('algorithm') || 'user_user';
 
+      const wsErr = await assertWs(workspace_id);
+      if (wsErr) return wsErr;
+
       if (!workspace_id) {
         return new Response(
           JSON.stringify({ error: 'Missing workspace_id parameter' }),
@@ -166,6 +188,9 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
       const material_id = path[1];
       const workspace_id = url.searchParams.get('workspace_id');
       const limit = parseInt(url.searchParams.get('limit') || '10');
+
+      const wsErr = await assertWs(workspace_id);
+      if (wsErr) return wsErr;
 
       if (!workspace_id) {
         return new Response(
@@ -254,6 +279,9 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
     if (method === 'GET' && path[0] === 'analytics' && path[1]) {
       const workspace_id = path[1];
       const days = parseInt(url.searchParams.get('days') || '30');
+
+      const wsErr = await assertWs(workspace_id);
+      if (wsErr) return wsErr;
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);

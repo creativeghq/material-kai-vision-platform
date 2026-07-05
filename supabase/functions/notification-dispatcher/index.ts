@@ -7,7 +7,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
@@ -247,6 +247,10 @@ serve(withApiLogging('notification-dispatcher', async (req) => {
 
     switch (action) {
       case 'send-push': {
+        // Pentest #250 C19: send-push/send-webhook POST to caller-supplied endpoints
+        // (SSRF) — restrict to trusted backend (service-role/admin-secret). The only
+        // caller is flow-engine (service-role). get-vapid-key stays open for the frontend.
+        if (!isAdminAccess(auth)) throw new HttpError(403, 'Forbidden');
         const { subscriptions, notification } = body;
         if (!Array.isArray(subscriptions)) {
           throw new HttpError(400, 'subscriptions must be an array');
@@ -258,6 +262,7 @@ serve(withApiLogging('notification-dispatcher', async (req) => {
       }
 
       case 'send-webhook': {
+        if (!isAdminAccess(auth)) throw new HttpError(403, 'Forbidden');
         const { webhooks, payload } = body;
         if (!Array.isArray(webhooks)) {
           throw new HttpError(400, 'webhooks must be an array');
