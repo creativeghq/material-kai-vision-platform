@@ -33,6 +33,8 @@ export interface ChatConversation {
   isArchived: boolean;
   /** Toolkit IDs active in this conversation. Always contains 'core'. */
   toolkits: string[];
+  /** When set, the conversation is pinned to the top of the Studio conversation manager. */
+  pinnedAt: string | null;
 }
 
 export interface CreateConversationOptions {
@@ -96,6 +98,7 @@ export class AgentChatHistoryService {
         .select('*')
         .eq('user_id', userId)
         .eq('is_archived', false)
+        .order('pinned_at', { ascending: false, nullsFirst: false })
         .order('last_message_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
 
@@ -277,6 +280,24 @@ export class AgentChatHistoryService {
   }
 
   /**
+   * Pin or unpin a conversation. Pinned conversations sort to the top of the
+   * Studio conversation manager (issue #253). Passing `pinned=false` clears it.
+   */
+  async togglePin(conversationId: string, pinned: boolean): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('agent_chat_conversations')
+        .update({ pinned_at: pinned ? new Date().toISOString() : null })
+        .eq('id', conversationId);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error toggling conversation pin:', error);
+      return false;
+    }
+  }
+
+  /**
    * Delete a conversation and all its messages.
    *
    * The FK on agent_chat_messages.conversation_id is ON DELETE CASCADE, so the
@@ -413,6 +434,7 @@ export class AgentChatHistoryService {
       updatedAt: data.updated_at,
       isArchived: data.is_archived || false,
       toolkits: Array.isArray(data.toolkits) && data.toolkits.length > 0 ? data.toolkits : ['core'],
+      pinnedAt: data.pinned_at ?? null,
     };
   }
 

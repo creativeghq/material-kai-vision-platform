@@ -31,6 +31,7 @@ import {
   Camera,
   ChevronDown,
   Check,
+  Plus,
   Globe,
   ListChecks,
   GripVertical,
@@ -59,13 +60,12 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveUploadPath } from '@/utils/storagePaths';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/core/ui/sheet';
 import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
+import { ConversationManagerModal } from './ConversationManagerModal';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
@@ -565,7 +565,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   onConversationChange,
 }) => {
   const { toast } = useToast();
-  const isMobile = useIsMobile();
   const [activeMoodboard, setActiveMoodboard] = useState<ActiveMoodboard | null>(null);
 
   // Resolve the moodboard passed via `?moodboard=<id>` so products added from the
@@ -581,7 +580,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }).catch(() => { /* non-fatal — fall back to no context */ });
     return () => { cancelled = true; };
   }, [initialMoodboardId]);
-  const [mobileConvOpen, setMobileConvOpen] = useState(false);
+  const [convManagerOpen, setConvManagerOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
@@ -624,8 +623,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [sheetWizardType, setSheetWizardType] = useState<string | undefined>(undefined);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
-  const [editingConvoId, setEditingConvoId] = useState<string | null>(null);
-  const [editingConvoTitle, setEditingConvoTitle] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   // showPromptLibrary removed — Interior-only legacy duplicate. Prompts now in PromptBuilderModal "Prompt Library" tab.
@@ -3247,9 +3244,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [onConversationChange]);
 
-  const handleDeleteConversation = useCallback(async (e: React.MouseEvent, conversationId: string) => {
-    e.stopPropagation(); // Prevent loading the conversation when clicking delete
-
+  const handleDeleteConversation = useCallback(async (conversationId: string) => {
     const confirmed = window.confirm('Are you sure you want to delete this conversation? This cannot be undone.');
     if (!confirmed) return;
 
@@ -3282,20 +3277,34 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [currentConversationId, toast]);
 
-  const handleStartRename = useCallback((e: React.MouseEvent, convo: ChatConversation) => {
-    e.stopPropagation();
-    setEditingConvoId(convo.id);
-    setEditingConvoTitle(convo.title);
+  const handleRenameConversation = useCallback(async (conversationId: string, title: string) => {
+    const next = title.trim();
+    if (!next) return;
+    const success = await agentChatHistoryService.renameConversation(conversationId, next);
+    if (success) {
+      setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, title: next } : c));
+    }
   }, []);
 
-  const handleConfirmRename = useCallback(async (conversationId: string) => {
-    if (!editingConvoTitle.trim()) { setEditingConvoId(null); return; }
-    const success = await agentChatHistoryService.renameConversation(conversationId, editingConvoTitle);
+  const handleTogglePin = useCallback(async (conversationId: string, pinned: boolean) => {
+    const success = await agentChatHistoryService.togglePin(conversationId, pinned);
     if (success) {
-      setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, title: editingConvoTitle.trim() } : c));
+      const stamp = pinned ? new Date().toISOString() : null;
+      setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, pinnedAt: stamp } : c));
     }
-    setEditingConvoId(null);
-  }, [editingConvoTitle]);
+  }, []);
+
+  // ⌘K / Ctrl-K toggles the conversation manager from anywhere in the Studio.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setConvManagerOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const handleExportConversation = useCallback(async () => {
     if (!currentConversationId) {
@@ -3408,253 +3417,60 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
   const AgentIcon = currentAgent?.icon || Bot;
+  const currentConversationTitle = conversations.find((c) => c.id === currentConversationId)?.title;
 
   return (
     <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
     <div className="flex flex-1 min-h-0">
-      {/* Middle Panel - Conversation List (desktop only) */}
-      <div className="hidden md:flex w-72 flex-col bg-sidebar border-r border-white/8 overflow-hidden flex-shrink-0">
-        {/* Header */}
-        <div className="p-5 border-b border-white/10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
-              <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-base font-bold tracking-tight leading-tight">{currentAgent?.name}</h3>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              style={{ background: 'rgba(255, 255, 255, 0.1)', borderColor: 'var(--glass-border)' }}
-            />
-          </div>
-        </div>
-
-        {/* Conversations List */}
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-          {conversations.length === 0 ? (
-            <div className="p-6 text-center">
-              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">No conversations yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Start a new chat to begin</p>
-            </div>
-          ) : (
-            <div className="p-2 space-y-1">
-              {conversations.map((convo) => (
-                <div
-                  key={convo.id}
-                  className={`group w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors cursor-pointer ${
-                    currentConversationId === convo.id
-                      ? 'bg-primary/10 border-l-2 border-primary'
-                      : 'hover:bg-white/5'
-                  }`}
-                  onClick={() => editingConvoId !== convo.id && handleLoadConversation(convo.id)}
-                >
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 text-left min-w-0">
-                    {editingConvoId === convo.id ? (
-                      <input
-                        autoFocus
-                        value={editingConvoTitle}
-                        onChange={(e) => setEditingConvoTitle(e.target.value)}
-                        onBlur={() => handleConfirmRename(convo.id)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmRename(convo.id); if (e.key === 'Escape') setEditingConvoId(null); }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full text-sm font-medium bg-white/10 text-foreground border border-white/15 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    ) : (
-                      <div className="font-medium text-sm truncate">{convo.title}</div>
-                    )}
-                    <div className="text-xs text-muted-foreground truncate">
-                      {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
-                    </div>
-                    {/* Toolkit chips: which capability clusters this convo uses.
-                        Skip Core (always-on, low signal). Show up to 3, with a
-                        "+N" badge for the rest. */}
-                    {convo.toolkits && convo.toolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length > 0 && (
-                      <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        {convo.toolkits
-                          .filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id))
-                          .slice(0, 3)
-                          .map((id) => {
-                            const tk = TOOLKITS.find((t) => t.id === id);
-                            if (!tk) return null;
-                            return (
-                              <span
-                                key={id}
-                                className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 text-primary px-1.5 py-0 text-[9px] leading-relaxed"
-                                title={tk.name}
-                              >
-                                <Layers className="h-2 w-2" /> {tk.name}
-                              </span>
-                            );
-                          })}
-                        {convo.toolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length > 3 && (
-                          <span className="text-[9px] text-muted-foreground">
-                            +{convo.toolkits.filter((id) => !ALWAYS_ON_TOOLKIT_IDS.includes(id)).length - 3}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
-                    <button
-                      onClick={(e) => handleStartRename(e, convo)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
-                      title="Rename conversation"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteConversation(e, convo.id)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-900/20 transition-all"
-                      title="Delete conversation"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* New Conversation Button */}
-        <div className="p-3 border-t border-white/10">
-          <Button
-            variant="outline"
-            className="w-full hover:bg-white/10"
-            onClick={handleNewConversation}
-            style={{ borderColor: 'var(--glass-border)' }}
-          >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            New Conversation
-          </Button>
-        </div>
-      </div>
+      <ConversationManagerModal
+        open={convManagerOpen}
+        onOpenChange={setConvManagerOpen}
+        conversations={conversations}
+        currentConversationId={currentConversationId}
+        agentName={currentAgent?.name}
+        onSelect={handleLoadConversation}
+        onNew={handleNewConversation}
+        onDelete={handleDeleteConversation}
+        onRename={handleRenameConversation}
+        onTogglePin={handleTogglePin}
+      />
 
       {/* Main Chat Area */}
       <div className="flex-1 min-h-0 flex flex-col">
-        {/* Mobile conversation header */}
-        {isMobile && (
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border/50 shrink-0">
-            <Sheet open={mobileConvOpen} onOpenChange={setMobileConvOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
-                  <MessageSquare className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0 bg-sidebar border-r border-white/8" aria-describedby={undefined}>
-                <SheetTitle className="sr-only">Chat History</SheetTitle>
-                <div className="flex flex-col h-full">
-                  <div className="p-5 border-b border-white/10">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
-                        <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-base font-bold tracking-tight leading-tight">{currentAgent?.name}</h3>
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        placeholder="Search conversations..."
-                        className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        style={{ background: 'rgba(255, 255, 255, 0.1)', borderColor: 'var(--glass-border)' }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                    {conversations.length === 0 ? (
-                      <div className="p-6 text-center">
-                        <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                        <p className="text-sm text-muted-foreground">No conversations yet</p>
-                        <p className="text-xs text-muted-foreground mt-1">Start a new chat to begin</p>
-                      </div>
-                    ) : (
-                      <div className="p-2 space-y-1">
-                        {conversations.map((convo) => (
-                          <div
-                            key={convo.id}
-                            className={`group w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors cursor-pointer ${
-                              currentConversationId === convo.id
-                                ? 'bg-primary/10 border-l-2 border-primary'
-                                : 'hover:bg-white/5'
-                            }`}
-                            onClick={() => { if (editingConvoId !== convo.id) { handleLoadConversation(convo.id); setMobileConvOpen(false); } }}
-                          >
-                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                              <MessageSquare className="h-5 w-5 text-primary" />
-                            </div>
-                            <div className="flex-1 text-left min-w-0">
-                              {editingConvoId === convo.id ? (
-                                <input
-                                  autoFocus
-                                  value={editingConvoTitle}
-                                  onChange={(e) => setEditingConvoTitle(e.target.value)}
-                                  onBlur={() => handleConfirmRename(convo.id)}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmRename(convo.id); if (e.key === 'Escape') setEditingConvoId(null); }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="w-full text-sm font-medium bg-white/10 text-foreground border border-white/15 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
-                                />
-                              ) : (
-                                <div className="font-medium text-sm truncate">{convo.title}</div>
-                              )}
-                              <div className="text-xs text-muted-foreground truncate">
-                                {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
-                              <button
-                                onClick={(e) => handleStartRename(e, convo)}
-                                className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
-                                title="Rename conversation"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={(e) => handleDeleteConversation(e, convo.id)}
-                                className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-900/20 transition-all"
-                                title="Delete conversation"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3 border-t border-white/10">
-                    <Button
-                      variant="outline"
-                      className="w-full hover:bg-white/10"
-                      onClick={() => { handleNewConversation(); setMobileConvOpen(false); }}
-                      style={{ borderColor: 'var(--glass-border)' }}
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      New Conversation
-                    </Button>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-            <span className="text-sm font-medium truncate flex-1">
-              {currentAgent?.name}
-            </span>
+        {/* Studio header — agent identity + conversation manager launcher (replaces the old left sidebar + mobile drawer) */}
+        <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5 border-b border-white/8 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
+            <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
           </div>
-        )}
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-bold tracking-tight leading-tight truncate">{currentAgent?.name}</h3>
+            {currentConversationTitle && (
+              <p className="text-xs text-muted-foreground truncate">{currentConversationTitle}</p>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setConvManagerOpen(true)}
+            className="gap-2 rounded-full"
+            title="Conversations (⌘K)"
+          >
+            <MessageSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">Conversations</span>
+            <kbd className="hidden md:inline rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNewConversation}
+            className="gap-1.5 rounded-full"
+            style={{ borderColor: 'var(--glass-border)' }}
+            title="New conversation"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New</span>
+          </Button>
+        </div>
         {/* Active moodboard context — products added from the agent land here */}
         {activeMoodboard && (
           <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-primary/10 border-b border-primary/20 text-sm">
