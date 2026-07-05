@@ -188,7 +188,11 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           // first send-email path that doesn't pre-render a fallback).
           subject = renderTemplateWithVariables(template.subject_template || body.subject, variables);
 
-          if (template.react_code) {
+          // Pentest #250 C11: react_code is executed via import() in the edge worker
+          // (arbitrary JS + all platform secrets). Only ever run it for platform-authored
+          // SYSTEM templates — never tenant-authored ones. The DB trigger already blocks
+          // non-operators from writing react_code/is_system; this is defense-in-depth.
+          if (template.react_code && template.is_system === true) {
             try {
               htmlBody = await renderReactEmailTemplate(template.react_code, variables);
               if (!textBody) {
