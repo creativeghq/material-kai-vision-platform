@@ -8,7 +8,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -26,16 +26,23 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
   const internalKey = req.headers.get('x-internal-key') || '';
   const isInternalCall = supabaseServiceKey && internalKey === supabaseServiceKey;
 
+  // Pentest #250 C20: capture whether the caller is a trusted backend (pg_net trigger /
+  // service-role / admin-secret) vs a specific user, so a user caller can be bound to the
+  // doc's workspace below (otherwise any authenticated user could re-embed/overwrite any
+  // tenant's KB doc by id — integrity + Voyage cost).
+  let callerUserId: string | null = null;
+  let isTrustedBackend = isInternalCall;
   if (!isInternalCall) {
-    try {
-      const auth = await authenticate(req);
-      if (!auth.success) {
-        throw new Error(auth.error || 'Unauthorized');
-      }
-    } catch {
+    const auth = await authenticate(req);
+    if (auth.success) {
+      callerUserId = auth.userId;
+      isTrustedBackend = auth.level === 'secret';
+    } else {
       // Also accept service-role Bearer (edge-function-to-edge-function calls)
       const authHeader = req.headers.get('Authorization') || '';
-      if (!authHeader.includes(supabaseServiceKey)) {
+      if (authHeader.includes(supabaseServiceKey)) {
+        isTrustedBackend = true;
+      } else {
         return new Response(
           JSON.stringify({ error: 'Unauthorized' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -63,13 +70,21 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
     // Fetch the document
     const { data: doc, error: fetchError } = await supabaseAdmin
       .from('kb_docs')
-      .select('id, title, content, content_markdown')
+      .select('id, title, content, content_markdown, workspace_id')
       .eq('id', doc_id)
       .single();
 
     if (fetchError || !doc) {
       return new Response(
         JSON.stringify({ error: fetchError?.message || 'Document not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Pentest #250 C20: a user caller may only re-embed docs in their own workspace.
+    if (!isTrustedBackend && !(await userCanAccessWorkspace(supabaseAdmin, callerUserId, doc.workspace_id))) {
+      return new Response(
+        JSON.stringify({ error: 'Document not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
