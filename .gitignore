@@ -56,3 +56,6 @@ playwright-report/
 # agent-browser saved session (never commit)
 mkai-auth.json
 *.auth.json
+
+# Stray Next.js build output — this is a Vite project (pentest #250 K1)
+.next/
