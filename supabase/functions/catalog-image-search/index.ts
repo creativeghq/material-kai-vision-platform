@@ -53,7 +53,10 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
 
   await bootstrapForFunction();
 
-  const auth = await authenticate(req);
+  // Pentest #250 C22: this spends DataForSEO SERP credits per call. It was open to ANY
+  // authenticated user (cost-abuse via looping). Restrict to business roles (secret /
+  // service-role backend callers bypass the role check); a full rate limit is a Wave-3 item.
+  const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
   if (!auth.success) {
     return jsonResponse({ success: false, error: auth.error ?? 'Unauthorized' }, 401);
   }
