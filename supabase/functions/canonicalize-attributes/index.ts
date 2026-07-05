@@ -29,6 +29,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isCronAuthorized } from '../_shared/auth.ts';
 
 const MIVAA_LOCAL_URL = Deno.env.get('MIVAA_LOCAL_URL') || 'http://127.0.0.1:8000';
 const MIVAA_EXTERNAL_URL = 'https://v1api.materialshub.gr';
@@ -81,6 +82,17 @@ serve(withApiLogging('canonicalize-attributes', async (req) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'method not allowed' }), {
       status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Pentest #250 C21: this proxy forwards to MIVAA's admin /facets/canonicalize under
+  // the platform mk_ key and previously had NO caller auth — anyone could canonicalize
+  // arbitrary attributes (Voyage embedding cost + open admin proxy). All real callers
+  // (material-tagger / product-enrichment agents, catalog-tools) invoke it with the
+  // service-role key. Gate on isCronAuthorized (service-role OR x-cron-secret).
+  if (!isCronAuthorized(req)) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
