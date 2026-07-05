@@ -171,6 +171,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (result.success) {
             await supabaseClient.from('messaging_logs').insert({
               created_by: user.id,
+              workspace_id: channel.workspace_id ?? auth.workspace_id, // #250 B6: tenant scope
               channel_id: channel.id,
               channel_type: 'whatsapp',
               template_id: template?.id ?? null,
@@ -231,6 +232,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (result.success) {
             await supabaseClient.from('messaging_logs').insert({
               created_by: user.id,
+              workspace_id: channel.workspace_id ?? auth.workspace_id, // #250 B6: tenant scope
               channel_id: channel.id,
               channel_type: 'whatsapp',
               template_id: template?.id ?? null,
@@ -312,6 +314,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           const { data, error } = await supabaseClient
             .from('messaging_channels')
             .insert({
+              workspace_id: wsId, // #250 B6: bind the channel to the caller's workspace
               channel_type: 'whatsapp',
               provider: 'zernio',
               sender_id: senderId,
@@ -361,6 +364,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               .from('messaging_channels').select('*', { count: 'exact', head: true })
               .eq('channel_type', 'whatsapp');
             await supabaseClient.from('messaging_channels').insert({
+              workspace_id: auth.workspace_id, // #250 B6: bind to the caller's workspace
               channel_type: 'whatsapp',
               provider: 'zernio',
               sender_id: senderId,

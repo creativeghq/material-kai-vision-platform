@@ -160,6 +160,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
 
           const { data: messageLog } = await supabase.from('messaging_logs').insert({
             channel_type: 'whatsapp',
+            workspace_id: channel.workspace_id, // #250 B6: tenant scope
             template_id: template.id,
             channel_id: channel.id,
             provider_message_id: result.messageId,
