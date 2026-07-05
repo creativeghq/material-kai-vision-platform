@@ -135,7 +135,13 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
         });
       }
     } else {
-      console.warn('RESEND_WEBHOOK_SECRET not set — skipping signature verification');
+      // #250 C14: fail CLOSED — an unset secret must never fall through to processing
+      // an unsigned webhook (mirror stripe-webhooks, not the old fail-open behaviour).
+      console.error('RESEND_WEBHOOK_SECRET not set — refusing to process unsigned webhook');
+      return new Response(
+        JSON.stringify({ error: 'Webhook signature verification not configured' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     let event: ResendWebhookEvent;

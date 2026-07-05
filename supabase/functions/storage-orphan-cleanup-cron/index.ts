@@ -228,9 +228,12 @@ serve(withApiLogging('storage-orphan-cleanup-cron', async (req) => {
   // once the secrets-bootstrap started injecting CRON_SECRET the nightly cron
   // (which sends no x-cron-secret) 401'd and stopped cleaning storage entirely.
   const cronSecret = () => Deno.env.get('CRON_SECRET') || '';
-  if (!isServiceRoleRequest(req) && cronSecret()) {
+  // #250 C25: fail CLOSED. The nightly cron authenticates as service-role; any other
+  // caller MUST present a matching x-cron-secret. Previously the secret check was
+  // skipped when CRON_SECRET was unset, leaving the endpoint open to anyone.
+  if (!isServiceRoleRequest(req)) {
     const provided = req.headers.get('x-cron-secret');
-    if (provided !== cronSecret()) {
+    if (!cronSecret() || provided !== cronSecret()) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

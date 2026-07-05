@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -404,6 +404,10 @@ Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
 
   try {
     if (body.mode === 'cron') {
+      // #250 C16: the cron branch dispatches digests to EVERY workspace's recipients —
+      // gate it so only the scheduler (service-role) or a caller with the cron secret
+      // can trigger it. Fails closed.
+      if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
       // Invoked by the flow-engine via run_edge_function. Runs both finance
       // notification jobs (digest + follow-ups) unless `job` narrows it.
       const job = (body as CronBody).job;
