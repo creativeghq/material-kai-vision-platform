@@ -1299,10 +1299,13 @@ html.light .app-aurora {
    the plum-black command center. background-attachment:fixed so the gradient
    stays put while content scrolls over it (cards tint as they pass). */
 html.light body {
+  /* Airy off-white canvas with a darker WARM glow anchored at the bottom-left,
+     fading up-and-out — so the gradient reads clearly while the top/right stay
+     light. Glass panels near the bottom-left tint warmer. */
   background:
-    radial-gradient(680px 480px at 8% 112%, rgba(150, 140, 80, 0.18), transparent 60%),
-    radial-gradient(540px 400px at 96% 116%, rgba(212, 156, 106, 0.12), transparent 60%),
-    linear-gradient(160deg, #f7f5ef 0%, #f1ece0 42%, #ece5d5 78%, #e7e0cf 100%);
+    radial-gradient(1200px 860px at -8% 110%, rgba(140, 128, 68, 0.34), transparent 58%),
+    radial-gradient(760px 560px at 106% 112%, rgba(208, 152, 104, 0.14), transparent 60%),
+    linear-gradient(180deg, #f8f6f0 0%, #f3efe4 58%, #ede7d7 100%);
   background-attachment: fixed;
 }
 
