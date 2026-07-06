@@ -7,46 +7,28 @@ import React, { useState, useCallback, useRef, useEffect, useMemo, memo } from '
 import { getErrorMessage } from '@/core/errors/utils';
 import {
   Bot,
-  Search,
   Palette,
   Package,
-  Settings,
   Send,
   Mic,
   Paperclip,
   MessageSquare,
   User,
   Download,
-  Upload,
   Sparkles,
   ThumbsUp,
   ThumbsDown,
-  Trash2,
-  Video,
   Pin,
   X,
-  BookmarkPlus,
   LayoutTemplate,
   Layers,
-  Camera,
-  ChevronDown,
-  Check,
   Plus,
   Globe,
-  ListChecks,
   GripVertical,
   Pencil,
   FileText,
   Loader2,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/core/ui/dropdown-menu';
 import { logger } from '@/config';
 
 import { Button } from '@/components/core/ui/button';
@@ -67,7 +49,7 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import { CanvasPanel, ArtifactChip, type CanvasArtifact } from './CanvasPanel';
-import { SheetInspector, StagingInspector, ProductsInspector } from './ArtifactInspector';
+import { SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector } from './ArtifactInspector';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
@@ -100,9 +82,7 @@ import { WorkflowTracker } from './workflows/WorkflowTracker';
 import { WorkflowInlineForm } from './workflows/WorkflowInlineForm';
 import { CommandPalette } from './workflows/CommandPalette';
 import { getWorkflow as getWorkflowDefinition } from './workflows/workflowRegistry';
-import type {
-  WorkflowRuntimeState, WorkflowDefinition, WorkflowFieldSchema,
-} from './workflows/types';
+import type { WorkflowRuntimeState } from './workflows/types';
 import { useUserRole } from '@/hooks/useUserRole';
 import { InspirationCard } from './InspirationCard';
 import { HeatPumpResultCard } from './HeatPumpResultCard';
@@ -121,7 +101,7 @@ import type { SheetType } from '@/services/moodboardSheetsService';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 import { WorldViewer } from './WorldViewer';
-import { vrWorldService, VR_CREDIT_COSTS } from '@/services/vrWorldService';
+import { vrWorldService } from '@/services/vrWorldService';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 import { moodboardAPI } from '@/services/moodboardAPI';
 import { ActiveMoodboardProvider, type ActiveMoodboard } from '@/contexts/ActiveMoodboardContext';
@@ -3322,6 +3302,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.materialData?.products && m.materialData.products.length > 0) {
       return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products` };
     }
+    if (m.worldData) return { id: m.id, kind: 'world', title: m.worldData.caption || m.worldData.prompt || 'VR world' };
+    if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board' };
+    if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image' };
+    if (m.videoData) return { id: m.id, kind: 'video', title: 'Generated video' };
     return null;
   }, []);
 
@@ -3354,81 +3338,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setActiveCanvasId(id);
     setCanvasOpen(true);
   }, []);
-
-  const handleExportConversation = useCallback(async () => {
-    if (!currentConversationId) {
-      toast({
-        title: 'No Conversation',
-        description: 'Please select a conversation to export',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const jsonData = await agentChatHistoryService.exportConversation(currentConversationId);
-    if (!jsonData) {
-      toast({
-        title: 'Export Failed',
-        description: 'Failed to export conversation',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Download as JSON file
-    const blob = new Blob([jsonData], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `conversation-${currentConversationId}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: 'Export Successful',
-      description: 'Conversation exported successfully',
-    });
-  }, [currentConversationId, toast]);
-
-  const handleImportConversation = useCallback(async () => {
-    if (!userId) return;
-
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const jsonData = event.target?.result as string;
-        const conversation = await agentChatHistoryService.importConversation(jsonData, userId);
-
-        if (!conversation) {
-          toast({
-            title: 'Import Failed',
-            description: 'Failed to import conversation',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        // Reload conversations
-        const convos = await agentChatHistoryService.getUserConversations(userId, selectedAgent);
-        setConversations(convos);
-
-        toast({
-          title: 'Import Successful',
-          description: 'Conversation imported successfully',
-        });
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  }, [userId, selectedAgent, toast]);
 
   // Attach a temporary catalog source PDF straight from chat. Reuses the exact
   // same upload path as the admin builder (catalogsService.uploadSourcePdf →
@@ -3513,6 +3422,101 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         />
       );
     }
+    if (message.worldData) {
+      return (
+        <div className="space-y-4">
+          <WorldViewer
+            vrWorldId={message.worldData.vrWorldId}
+            initialStatus={message.worldData.status}
+            splatUrls={{
+              draft: message.worldData.splatUrl100k,
+              standard: message.worldData.splatUrl500k,
+              full: message.worldData.splatUrlFull,
+            }}
+            colliderUrl={message.worldData.colliderGlbUrl}
+            caption={message.worldData.caption}
+            onRetry={() => {
+              if (message.worldData?.sourceImageUrl) {
+                handleGenerateVR(message.worldData.sourceImageUrl, { prompt: message.worldData.prompt }, message);
+              }
+            }}
+          />
+          {message.worldData.splatUrl100k && (
+            <div className="flex justify-end">
+              <MoodboardSavePopover
+                mediaUrl={message.worldData.splatUrl100k}
+                mediaType="vr_world"
+                mediaTitle={message.worldData.caption || message.worldData.prompt || 'VR World'}
+              />
+            </div>
+          )}
+        </div>
+      );
+    }
+    if (message.materialsBoardData) {
+      return (
+        <div className="space-y-3">
+          <img
+            src={message.materialsBoardData.image_url}
+            alt={`Materials Selection Board — ${message.materialsBoardData.board_mode}`}
+            className="w-full rounded-xl border border-white/20 object-contain shadow-md"
+            loading="lazy"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <MoodboardSavePopover
+              mediaUrl={message.materialsBoardData.image_url}
+              mediaType="image"
+              mediaTitle={`Materials Selection Board — ${message.materialsBoardData.board_mode.replace(/-/g, ' ')}`}
+            />
+            <a href={message.materialsBoardData.image_url} download title="Download board">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            </a>
+          </div>
+        </div>
+      );
+    }
+    if (message.geminiImageData) {
+      return message.videoData ? (
+        <video src={message.videoData.video_url} controls className="w-full rounded-xl border border-white/20 shadow-md" />
+      ) : (
+        <div
+          className="group relative cursor-pointer"
+          onClick={() => setGeminiModalImage(message.geminiImageData!.image_url)}
+        >
+          <img
+            src={message.geminiImageData.image_url}
+            alt="Gemini interior design"
+            className="w-full rounded-xl border border-white/20 shadow-md transition-opacity group-hover:opacity-90"
+            loading="lazy"
+          />
+        </div>
+      );
+    }
+    if (message.videoData) {
+      return (
+        <div className="space-y-3">
+          <video
+            src={message.videoData.video_url}
+            controls
+            autoPlay
+            loop
+            className="w-full rounded-xl border border-white/20 shadow-md"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <MoodboardSavePopover mediaUrl={message.videoData.video_url} mediaType="video" mediaTitle="Generated Video" />
+            <a href={message.videoData.video_url} download title="Download video">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            </a>
+          </div>
+        </div>
+      );
+    }
     return null;
   };
 
@@ -3523,6 +3527,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (message.materialData?.products && message.materialData.products.length > 0) {
       return <ProductsInspector data={message.materialData} />;
     }
+    if (message.worldData) return <WorldInspector data={message.worldData} />;
+    if (message.materialsBoardData) return <BoardInspector data={message.materialsBoardData} />;
     return null;
   };
   const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
@@ -4246,7 +4252,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.geminiImageData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content).replace(/!\[.*?\]\(https?:\/\/[^)]+\)/g, '').trim()} className="text-sm" />
-                        {message.videoData ? (
+                        {canvasOpen ? (
+                          <ArtifactChip kind="image" title="Generated image" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : message.videoData ? (
                           <video
                             src={message.videoData.video_url}
                             controls
@@ -4271,6 +4279,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.materialsBoardData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        {canvasOpen ? (
+                          <ArtifactChip kind="board" title="Materials board" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : (<>
                         <img
                           src={message.materialsBoardData.image_url}
                           alt={`Materials Selection Board — ${message.materialsBoardData.board_mode}`}
@@ -4300,6 +4311,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             </Button>
                           </a>
                         </div>
+                        </>)}
                       </div>
                     ) : message.sheetCanvasData ? (
                       <div className="space-y-3">
@@ -4382,6 +4394,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.videoData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        {canvasOpen ? (
+                          <ArtifactChip kind="video" title="Generated video" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : (<>
                         <video
                           src={message.videoData.video_url}
                           controls
@@ -4406,10 +4421,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             Download
                           </a>
                         </div>
+                        </>)}
                       </div>
                     ) : message.worldData ? (
                       <div className="space-y-4">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        {canvasOpen ? (
+                          <ArtifactChip kind="world" title={message.worldData.caption || message.worldData.prompt || 'VR world'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : (<>
                         <WorldViewer
                           vrWorldId={message.worldData.vrWorldId}
                           initialStatus={message.worldData.status}
@@ -4439,6 +4458,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             />
                           </div>
                         )}
+                        </>)}
                       </div>
                     ) : (
                       <div className="space-y-2">

@@ -11,10 +11,14 @@
  * `ArtifactChip` (below) so the artifact lives in exactly one place.
  */
 import React from 'react';
-import { FileText, Package, Camera, PanelRightClose, ArrowUpRight, LayoutPanelLeft } from 'lucide-react';
+import {
+  FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video,
+  PanelRightClose, ArrowUpRight, LayoutPanelLeft,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type CanvasArtifactKind = 'sheet' | 'staging' | 'products';
+export type CanvasArtifactKind =
+  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video';
 
 export interface CanvasArtifact {
   id: string;
@@ -26,12 +30,20 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   sheet: FileText,
   staging: Camera,
   products: Package,
+  world: Globe,
+  board: LayoutGrid,
+  image: ImageIcon,
+  video: Video,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   sheet: 'Presentation sheet',
   staging: 'Virtual staging',
   products: 'Product results',
+  world: '3D / VR world',
+  board: 'Materials board',
+  image: 'Generated image',
+  video: 'Generated video',
 };
 
 interface CanvasPanelProps {
