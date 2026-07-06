@@ -155,24 +155,6 @@ const AGENTS: AgentDefinition[] = [
   },
 ];
 
-// AI Models available (format: provider/model-name for Mastra)
-const AI_MODELS = [
-  // Language Models — Claude only (canonical 3 latest-tier)
-  { id: 'anthropic/claude-opus-4-8',           name: 'Claude Opus 4.8',   provider: 'anthropic', type: 'language' },
-  { id: 'anthropic/claude-haiku-4-5', name: 'Claude Haiku 4.5',  provider: 'anthropic', type: 'language' },
-
-  // Vision Models — Qwen3-VL was removed 2026-05-01 (vision is Anthropic-only
-  // via Claude Opus 4.8). The Anthropic entry above is the active vision path.
-
-  // Visual Embedding Models
-  { id: 'google/siglip-so400m-patch14-384', name: 'SigLIP-SO400M', provider: 'google', type: 'visual-embedding' },
-  { id: 'openai/clip-vit-base-patch32', name: 'CLIP-ViT-Base', provider: 'openai', type: 'visual-embedding' },
-
-  // Text Embedding Models
-  { id: 'voyage/voyage-4', name: 'Voyage AI 4', provider: 'voyage', type: 'text-embedding' },
-  { id: 'openai/text-embedding-3-small', name: 'OpenAI Embedding 3 Small', provider: 'openai', type: 'text-embedding' },
-];
-
 // #245 E — chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
