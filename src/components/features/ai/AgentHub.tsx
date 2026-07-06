@@ -22,6 +22,8 @@ import {
   X,
   LayoutTemplate,
   Layers,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   Globe,
   GripVertical,
@@ -567,7 +569,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // virtual staging) render full-width in a left-docked panel; the chat sits on
   // the right. Off by default — opening it collapses the matching chat cards to
   // chips so each artifact lives in exactly one place.
-  const [canvasOpen, setCanvasOpen] = useState(false);
+  // Canvas is shown automatically whenever the conversation has an artifact, so
+  // the chat auto-docks to a right rail while you work. `canvasHidden` lets the
+  // user reclaim a full-width chat; `chatCollapsed` hides the chat to focus the canvas.
+  const [canvasHidden, setCanvasHidden] = useState(false);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'kai');
   // Initialize with JARVIS agent's default model
@@ -3316,7 +3322,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Reset the canvas when switching conversations.
   useEffect(() => {
-    setCanvasOpen(false);
+    setCanvasHidden(false);
+    setChatCollapsed(false);
     setActiveCanvasId(null);
   }, [currentConversationId]);
 
@@ -3336,7 +3343,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Bring a specific artifact into focus in the canvas (from a chat chip).
   const focusCanvas = useCallback((id: string) => {
     setActiveCanvasId(id);
-    setCanvasOpen(true);
+    setCanvasHidden(false);
+    setChatCollapsed(false);
   }, []);
 
   // Attach a temporary catalog source PDF straight from chat. Reuses the exact
@@ -3532,7 +3540,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return null;
   };
   const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
-  const showCanvas = canvasOpen && canvasArtifacts.length > 0;
+  const canvasShown = canvasArtifacts.length > 0 && !canvasHidden;
 
   return (
     <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
@@ -3551,20 +3559,39 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       />
 
       {/* Studio canvas — full-width artifact workspace, docked left of the chat */}
-      {showCanvas && (
+      {canvasShown && (
         <CanvasPanel
           artifacts={canvasArtifacts}
           activeId={activeCanvasId}
           onSelect={setActiveCanvasId}
-          onClose={() => setCanvasOpen(false)}
+          onClose={() => setCanvasHidden(true)}
           inspector={activeCanvasMessage ? renderCanvasInspector(activeCanvasMessage) : null}
         >
           {activeCanvasMessage ? renderCanvasArtifact(activeCanvasMessage) : null}
         </CanvasPanel>
       )}
 
-      {/* Main Chat Area — full width, or a right rail when the canvas is open */}
-      <div className={cn('min-h-0 flex flex-col', showCanvas ? 'w-full max-w-[460px] shrink-0 border-l border-white/8' : 'flex-1')}>
+      {/* Collapsed-chat handle — re-dock the chat when the canvas is full-screen */}
+      {canvasShown && chatCollapsed && (
+        <button
+          onClick={() => setChatCollapsed(false)}
+          title="Show chat"
+          className="flex w-10 shrink-0 flex-col items-center gap-2 border-l border-white/8 bg-sidebar py-4 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <PanelRightOpen className="h-5 w-5" />
+          <span className="[writing-mode:vertical-rl] text-[11px] font-medium uppercase tracking-wider">Chat</span>
+        </button>
+      )}
+
+      {/* Main Chat Area — full width, or a collapsible right rail when the canvas is shown */}
+      <div
+        className={cn(
+          'min-h-0 flex flex-col',
+          canvasShown
+            ? (chatCollapsed ? 'hidden' : 'w-full max-w-[400px] shrink-0 border-l border-white/8')
+            : 'flex-1',
+        )}
+      >
         {/* Studio header — agent identity + conversation manager launcher (replaces the old left sidebar + mobile drawer) */}
         <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5 border-b border-white/8 shrink-0">
           <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
@@ -3578,17 +3605,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           </div>
           {canvasArtifacts.length > 0 && (
             <Button
-              variant={canvasOpen ? 'default' : 'ghost'}
+              variant={canvasShown ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setCanvasOpen((v) => !v)}
+              onClick={() => setCanvasHidden((v) => !v)}
               className="gap-2 rounded-full"
-              title="Toggle canvas"
+              title={canvasShown ? 'Hide canvas' : 'Show canvas'}
             >
               <LayoutTemplate className="h-4 w-4" />
               <span className="hidden sm:inline">Canvas</span>
               <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/20 px-1 text-[10px] font-semibold">
                 {canvasArtifacts.length}
               </span>
+            </Button>
+          )}
+          {canvasShown && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setChatCollapsed(true)}
+              className="rounded-full"
+              title="Collapse chat"
+            >
+              <PanelRightClose className="h-4 w-4" />
             </Button>
           )}
           <Button
@@ -3854,7 +3892,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-primary text-white shadow-sm'
@@ -4252,7 +4290,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.geminiImageData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content).replace(/!\[.*?\]\(https?:\/\/[^)]+\)/g, '').trim()} className="text-sm" />
-                        {canvasOpen ? (
+                        {canvasShown ? (
                           <ArtifactChip kind="image" title="Generated image" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
                         ) : message.videoData ? (
                           <video
@@ -4279,7 +4317,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.materialsBoardData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasOpen ? (
+                        {canvasShown ? (
                           <ArtifactChip kind="board" title="Materials board" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
                         ) : (<>
                         <img
@@ -4327,7 +4365,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.sheetPdfData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasOpen ? (
+                        {canvasShown ? (
                           <ArtifactChip
                             kind="sheet"
                             title={message.sheetPdfData.title || 'Presentation sheet'}
@@ -4368,7 +4406,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.virtualStagingData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasOpen ? (
+                        {canvasShown ? (
                           <ArtifactChip
                             kind="staging"
                             title="Virtual staging"
@@ -4394,7 +4432,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.videoData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasOpen ? (
+                        {canvasShown ? (
                           <ArtifactChip kind="video" title="Generated video" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
                         ) : (<>
                         <video
@@ -4426,7 +4464,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.worldData ? (
                       <div className="space-y-4">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasOpen ? (
+                        {canvasShown ? (
                           <ArtifactChip kind="world" title={message.worldData.caption || message.worldData.prompt || 'VR world'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
                         ) : (<>
                         <WorldViewer
@@ -4504,7 +4542,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
                         {/* Show ProductStrip for messages with material data (chip when canvas is open) */}
                         {message.role === 'assistant' && message.materialData?.products && message.materialData.products.length > 0 && (
-                          canvasOpen ? (
+                          canvasShown ? (
                             <ArtifactChip
                               kind="products"
                               title={message.materialData.title || `${message.materialData.products.length} products`}
