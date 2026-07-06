@@ -406,7 +406,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
       description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge. Optional category filters scope the search (e.g. categorySlug="pricing" to search only pricing docs).',
       schema: z.object({
         query: z.string().describe('Search query - describe what information the user is looking for'),
-        searchTypes: z.array(z.string()).default(['chunks', 'products']).describe('Types to search: chunks (articles/text), products'),
+        searchTypes: z.array(z.string()).default(['kb_docs', 'chunks', 'products']).describe('Types to search: kb_docs (authored Knowledge Base articles/docs), chunks (text extracted from ingested PDFs), products. Keep the default unless the user is clearly asking only about PDFs or products.'),
         topK: z.number().default(5).describe('Maximum number of results to return'),
         categorySlug: z.string().optional().describe('Restrict search to a category by slug (e.g. "pricing")'),
         categoryId: z.string().optional().describe('Restrict search to a category by UUID'),
