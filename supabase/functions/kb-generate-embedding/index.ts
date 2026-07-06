@@ -156,6 +156,21 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
       throw new Error(`Failed to save embedding: ${updateError.message}`);
     }
 
+    // Section-level chunking: (re)build kb_doc_chunks so large docs are retrievable by
+    // SECTION (not truncated to a head) and match per-section. Runs on MIVAA server-side;
+    // fire-and-forget so doc save isn't blocked. Non-fatal — the backfill re-chunks on miss.
+    try {
+      const rechunk = fetch(`${MIVAA_URL}/api/rag/kb-docs/rechunk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+        body: JSON.stringify({ doc_id }),
+      }).catch((e) => console.warn('kb rechunk trigger failed:', e));
+      // Keep it alive past the response when the runtime supports it.
+      (globalThis as any).EdgeRuntime?.waitUntil?.(rechunk);
+    } catch (e) {
+      console.warn('kb rechunk dispatch error:', e);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
