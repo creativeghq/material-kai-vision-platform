@@ -89,11 +89,6 @@ const AgentHubPage: React.FC = () => {
     setSearchParams(next, { replace: true });
   };
 
-  const handleMaterialSelect = (materialId: string) => {
-    console.log('Material selected:', materialId);
-    navigate(`/compare?ids=${materialId}`);
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -110,7 +105,6 @@ const AgentHubPage: React.FC = () => {
       {/* Agent Hub Component - Full Screen */}
       <AgentHubComponent
         userRole={userRole}
-        onMaterialSelect={handleMaterialSelect}
         initialPrompt={initialPrompt}
         initialConversationId={initialConversationId}
         initialMoodboardId={initialMoodboardId}

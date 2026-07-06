@@ -85,7 +85,6 @@ import { WorkflowInlineForm } from './workflows/WorkflowInlineForm';
 import { CommandPalette } from './workflows/CommandPalette';
 import { getWorkflow as getWorkflowDefinition } from './workflows/workflowRegistry';
 import type { WorkflowRuntimeState } from './workflows/types';
-import { useUserRole } from '@/hooks/useUserRole';
 import { InspirationCard } from './InspirationCard';
 import { HeatPumpResultCard } from './HeatPumpResultCard';
 import { HeatingCostResultCard } from './HeatingCostResultCard';
@@ -446,7 +445,6 @@ interface Message {
 
 interface AgentHubProps {
   userRole?: 'viewer' | 'member' | 'admin' | 'owner';
-  onMaterialSelect?: (materialId: string) => void;
   initialPrompt?: string;
   initialConversationId?: string;
   /** When arriving from a moodboard, products added from the agent go here. */
@@ -519,7 +517,6 @@ ThinkingTimer.displayName = 'ThinkingTimer';
 
 export const AgentHub: React.FC<AgentHubProps> = ({
   userRole = 'member',
-  onMaterialSelect,
   initialPrompt,
   initialConversationId,
   initialMoodboardId,
@@ -563,7 +560,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-opus-4-8',
   );
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
+  const [, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
   // v0.3.2 — modal form triggered by manage_job_sites agent tool when user is vague
   const [jobSitesFormState, setJobSitesFormState] = useState<JobSitesFormState>(null);
   const [techRadarFormState, setTechRadarFormState] = useState<TechRadarFormState>(null);
@@ -1016,14 +1013,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Command palette — opens when the user types `/` at the start of an empty input
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
-  const { isAdmin } = useUserRole();
   // Enabled modules from public.modules — drives module-gated toolkit visibility
   // (Catalogs needs `presentation-catalogs`, Mentions needs `mention-monitoring`, etc.)
   const { enabledSlugs: enabledModuleSlugs } = useEnabledModules();
   const enabledModulesArray = useMemo(() => Array.from(enabledModuleSlugs), [enabledModuleSlugs]);
 
   const [virtualStagingImageUrl, setVirtualStagingImageUrl] = useState<string | null>(null);
-  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
+  const [, setThinkingStartTime] = useState<number | null>(null);
   // Elapsed time tracked by ThinkingTimer component; ref avoids re-renders in parent
   const elapsedTimeRef = useRef(0);
   const [messageRatings, setMessageRatings] = useState<Record<string, 'up' | 'down' | null>>({});
@@ -1082,12 +1078,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Voice input hook
   const {
     isRecording,
-    transcript,
     interimTranscript,
     isSupported: isVoiceSupported,
-    error: voiceError,
     toggleRecording,
-    resetTranscript,
   } = useVoiceInput({
     onTranscript: (text) => {
       setInput((prev) => prev + ' ' + text);
@@ -1407,7 +1400,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const handleGenerateVR = useCallback(async (
     imageUrl: string,
     context: { prompt?: string; roomType?: string; style?: string },
-    sourceMessage: Message,
+    _sourceMessage: Message,
   ) => {
     try {
       // Trigger VR generation via edge function (synchronous — awaits full WorldLabs generation)
@@ -1543,29 +1536,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [workspaceId, currentConversationId, toast]);
 
-  const VIDEO_TYPES = [
-    { value: 'walkthrough',        label: 'Walkthrough',        description: 'Cinematic camera walk through the space', credits: 30 },
-    { value: 'product_spotlight',  label: 'Product Spotlight',  description: 'Zoom focus on a featured material or element', credits: 30 },
-    { value: 'before_after',       label: 'Before / After',     description: 'Transition between original and new design', credits: 30 },
-    { value: 'floorplan_flythrough', label: 'Floorplan Flythrough', description: 'Aerial perspective from floor plan', credits: 30 },
-    { value: 'social_reel',        label: 'Social Reel 9:16',   description: 'Vertical clip optimized for social media', credits: 30 },
-  ] as const;
-
-  const VIDEO_MODELS = [
-    { value: 'auto',               label: 'Auto',               description: 'Best model selected automatically' },
-    { value: 'veo-2',              label: 'Veo 2',              description: 'Google Veo 2 — high quality',         credits: 30 },
-    { value: 'kling-v3.0',         label: 'Kling v3.0 Pro',     description: 'Kling v3.0 — latest & cinematic',     credits: 20 },
-    { value: 'wan2.1-i2v-720p',    label: 'Wan 2.1 720p',       description: 'Wan2.1 720p — open-source quality',   credits: 12 },
-    { value: 'runway-gen4-turbo',  label: 'Runway Gen-4',       description: 'Runway Gen-4 — premium output',       credits: 40 },
-  ] as const;
-
-  const [videoModel, setVideoModel] = useState<string>('auto');
+  const [videoModel] = useState<string>('auto');
 
   // Generate a Materials Selection Board from a Gemini-generated image
   const handleGenerateMaterialsBoard = useCallback(async (
     imageUrl: string,
     boardMode: 'presentation-board' | 'selection-board' | 'photorealistic-render',
-    sourceMessage: Message,
+    _sourceMessage: Message,
   ) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -1942,12 +1919,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         const decoder = new TextDecoder();
         let buffer = '';
         let finalResult: any = null;
-        let chunkCount = 0;
-        let lastChunkTime = Date.now();
 
         while (true) {
           const { done, value } = await reader.read();
-          lastChunkTime = Date.now();
 
           if (done) {
             break;
@@ -1963,7 +1937,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
             try {
               const chunk = JSON.parse(line);
-              chunkCount++;
 
               // Capture reasoning steps for Jarvis-style display
               if (chunk.type === 'status') {
@@ -3886,8 +3859,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                                 // The agent picks up the next message and resumes the workflow.
                                 // We package the form values as a structured continuation hint
                                 // so the agent prompt addendum can parse it deterministically.
-                                const def = getWorkflowDefinition(wf.definition_id);
-                                const stepDef = def?.steps.find((s) => s.id === awaitingId);
                                 const continuation = `[workflow:${wf.definition_id}/${awaitingId}] continue with input: ${JSON.stringify(values)}`;
                                 setWorkflows((prev) => ({
                                   ...prev,
@@ -3920,7 +3891,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     })}
                 </div>
               )}
-              {messages.map((message, msgIdx) => (
+              {messages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
