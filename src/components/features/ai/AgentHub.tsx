@@ -66,6 +66,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
 import { ConversationManagerModal } from './ConversationManagerModal';
+import { CanvasPanel, ArtifactChip, type CanvasArtifact } from './CanvasPanel';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
@@ -581,6 +582,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return () => { cancelled = true; };
   }, [initialMoodboardId]);
   const [convManagerOpen, setConvManagerOpen] = useState(false);
+  // Studio canvas (issue #253 P2): artifacts (moodboard sheet / products /
+  // virtual staging) render full-width in a left-docked panel; the chat sits on
+  // the right. Off by default — opening it collapses the matching chat cards to
+  // chips so each artifact lives in exactly one place.
+  const [canvasOpen, setCanvasOpen] = useState(false);
+  const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'kai');
   // Initialize with JARVIS agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
@@ -3306,6 +3313,47 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Which messages carry a canvas-eligible artifact (the P2 pilot set).
+  const getCanvasArtifact = useCallback((m: Message): CanvasArtifact | null => {
+    if (m.role !== 'assistant') return null;
+    if (m.sheetPdfData) return { id: m.id, kind: 'sheet', title: m.sheetPdfData.title || 'Presentation sheet' };
+    if (m.virtualStagingData) return { id: m.id, kind: 'staging', title: 'Virtual staging' };
+    if (m.materialData?.products && m.materialData.products.length > 0) {
+      return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products` };
+    }
+    return null;
+  }, []);
+
+  const canvasArtifacts = useMemo(
+    () => messages.map(getCanvasArtifact).filter(Boolean) as CanvasArtifact[],
+    [messages, getCanvasArtifact],
+  );
+
+  // Reset the canvas when switching conversations.
+  useEffect(() => {
+    setCanvasOpen(false);
+    setActiveCanvasId(null);
+  }, [currentConversationId]);
+
+  // Keep the active tab valid; default to the newest artifact.
+  useEffect(() => {
+    if (canvasArtifacts.length === 0) {
+      setActiveCanvasId(null);
+      return;
+    }
+    setActiveCanvasId((prev) =>
+      prev && canvasArtifacts.some((a) => a.id === prev)
+        ? prev
+        : canvasArtifacts[canvasArtifacts.length - 1].id,
+    );
+  }, [canvasArtifacts]);
+
+  // Bring a specific artifact into focus in the canvas (from a chat chip).
+  const focusCanvas = useCallback((id: string) => {
+    setActiveCanvasId(id);
+    setCanvasOpen(true);
+  }, []);
+
   const handleExportConversation = useCallback(async () => {
     if (!currentConversationId) {
       toast({
@@ -3419,6 +3467,56 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const AgentIcon = currentAgent?.icon || Bot;
   const currentConversationTitle = conversations.find((c) => c.id === currentConversationId)?.title;
 
+  // Full-size render of a canvas artifact — reuses the exact same self-contained
+  // card components as the chat, so there is one implementation, not two.
+  const renderCanvasArtifact = (message: Message): React.ReactNode => {
+    if (message.sheetPdfData) {
+      return (
+        <SheetPreviewCard
+          sheetId={message.sheetPdfData.sheet_id}
+          sheetType={message.sheetPdfData.sheet_type}
+          title={message.sheetPdfData.title}
+          pdfUrl={message.sheetPdfData.pdf_url}
+          pageCount={message.sheetPdfData.page_count}
+          creditsUsed={message.sheetPdfData.credits_used}
+        />
+      );
+    }
+    if (message.virtualStagingData) {
+      return (
+        <VirtualStagingViewer
+          resultImageUrl={message.virtualStagingData.image_url}
+          sourceImageUrl={message.virtualStagingData.source_image_url}
+          room={message.virtualStagingData.room}
+          furnitureStyle={message.virtualStagingData.furniture_style}
+          creditsUsed={message.virtualStagingData.credits_used}
+          onAnalyzeQuality={() => {
+            setInput('Analyze the quality of this virtual staging result. Compare the original empty room with the staged version. Assess: lighting consistency, perspective accuracy, furniture scale vs room size, material realism, and edge blending. Score each dimension 1-10.');
+            if (message.virtualStagingData?.image_url) {
+              setAttachedImages([message.virtualStagingData.image_url]);
+            }
+          }}
+        />
+      );
+    }
+    if (message.materialData?.products && message.materialData.products.length > 0) {
+      return (
+        <ProductStrip
+          products={message.materialData.products}
+          title={`Found ${message.materialData.products.length} products`}
+          onReplaceInImage={(product) => {
+            const primaryImage = product.images?.find((img: any) => img.isPrimary) || product.images?.[0];
+            setPendingReplacement({ id: product.id, name: product.name, imageUrl: primaryImage?.url });
+          }}
+          onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
+        />
+      );
+    }
+    return null;
+  };
+  const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
+  const showCanvas = canvasOpen && canvasArtifacts.length > 0;
+
   return (
     <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
     <div className="flex flex-1 min-h-0">
@@ -3435,8 +3533,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         onTogglePin={handleTogglePin}
       />
 
-      {/* Main Chat Area */}
-      <div className="flex-1 min-h-0 flex flex-col">
+      {/* Studio canvas — full-width artifact workspace, docked left of the chat */}
+      {showCanvas && (
+        <CanvasPanel
+          artifacts={canvasArtifacts}
+          activeId={activeCanvasId}
+          onSelect={setActiveCanvasId}
+          onClose={() => setCanvasOpen(false)}
+        >
+          {activeCanvasMessage ? renderCanvasArtifact(activeCanvasMessage) : null}
+        </CanvasPanel>
+      )}
+
+      {/* Main Chat Area — full width, or a right rail when the canvas is open */}
+      <div className={cn('min-h-0 flex flex-col', showCanvas ? 'w-full max-w-[460px] shrink-0 border-l border-white/8' : 'flex-1')}>
         {/* Studio header — agent identity + conversation manager launcher (replaces the old left sidebar + mobile drawer) */}
         <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5 border-b border-white/8 shrink-0">
           <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
@@ -3448,6 +3558,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               <p className="text-xs text-muted-foreground truncate">{currentConversationTitle}</p>
             )}
           </div>
+          {canvasArtifacts.length > 0 && (
+            <Button
+              variant={canvasOpen ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setCanvasOpen((v) => !v)}
+              className="gap-2 rounded-full"
+              title="Toggle canvas"
+            >
+              <LayoutTemplate className="h-4 w-4" />
+              <span className="hidden sm:inline">Canvas</span>
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/20 px-1 text-[10px] font-semibold">
+                {canvasArtifacts.length}
+              </span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -4178,14 +4303,23 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.sheetPdfData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        <SheetPreviewCard
-                          sheetId={message.sheetPdfData.sheet_id}
-                          sheetType={message.sheetPdfData.sheet_type}
-                          title={message.sheetPdfData.title}
-                          pdfUrl={message.sheetPdfData.pdf_url}
-                          pageCount={message.sheetPdfData.page_count}
-                          creditsUsed={message.sheetPdfData.credits_used}
-                        />
+                        {canvasOpen ? (
+                          <ArtifactChip
+                            kind="sheet"
+                            title={message.sheetPdfData.title || 'Presentation sheet'}
+                            active={activeCanvasId === message.id}
+                            onOpen={() => focusCanvas(message.id)}
+                          />
+                        ) : (
+                          <SheetPreviewCard
+                            sheetId={message.sheetPdfData.sheet_id}
+                            sheetType={message.sheetPdfData.sheet_type}
+                            title={message.sheetPdfData.title}
+                            pdfUrl={message.sheetPdfData.pdf_url}
+                            pageCount={message.sheetPdfData.page_count}
+                            creditsUsed={message.sheetPdfData.credits_used}
+                          />
+                        )}
                       </div>
                     ) : message.catalogExtractionData ? (
                       <div className="space-y-3">
@@ -4210,6 +4344,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.virtualStagingData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        {canvasOpen ? (
+                          <ArtifactChip
+                            kind="staging"
+                            title="Virtual staging"
+                            active={activeCanvasId === message.id}
+                            onOpen={() => focusCanvas(message.id)}
+                          />
+                        ) : (
                         <VirtualStagingViewer
                           resultImageUrl={message.virtualStagingData.image_url}
                           sourceImageUrl={message.virtualStagingData.source_image_url}
@@ -4223,6 +4365,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             }
                           }}
                         />
+                        )}
                       </div>
                     ) : message.videoData ? (
                       <div className="space-y-3">
@@ -4327,21 +4470,30 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           </div>
                         )}
 
-                        {/* Show ProductStrip for messages with material data */}
+                        {/* Show ProductStrip for messages with material data (chip when canvas is open) */}
                         {message.role === 'assistant' && message.materialData?.products && message.materialData.products.length > 0 && (
-                          <ProductStrip
-                            products={message.materialData.products}
-                            title={`Found ${message.materialData.products.length} products`}
-                            onReplaceInImage={(product) => {
-                              const primaryImage = product.images?.find((img: any) => img.isPrimary) || product.images?.[0];
-                              setPendingReplacement({
-                                id: product.id,
-                                name: product.name,
-                                imageUrl: primaryImage?.url,
-                              });
-                            }}
-                            onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
-                          />
+                          canvasOpen ? (
+                            <ArtifactChip
+                              kind="products"
+                              title={message.materialData.title || `${message.materialData.products.length} products`}
+                              active={activeCanvasId === message.id}
+                              onOpen={() => focusCanvas(message.id)}
+                            />
+                          ) : (
+                            <ProductStrip
+                              products={message.materialData.products}
+                              title={`Found ${message.materialData.products.length} products`}
+                              onReplaceInImage={(product) => {
+                                const primaryImage = product.images?.find((img: any) => img.isPrimary) || product.images?.[0];
+                                setPendingReplacement({
+                                  id: product.id,
+                                  name: product.name,
+                                  imageUrl: primaryImage?.url,
+                                });
+                              }}
+                              onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
+                            />
+                          )
                         )}
 
                         {/* Show ProgressiveImageGrid for async 3D generation jobs */}
