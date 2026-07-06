@@ -13,8 +13,6 @@ export {
   type SaveMessageOptions,
 } from './agentChatHistoryService';
 
-// Chat Cache
-export {
-  getCachedResponse,
-  cacheResponse,
-} from './agentChatCache';
+// NOTE: the agent response cache (agentChatCache) was removed 2026-07-06 — it replayed
+// stale full-text answers and short-circuited the live agent. Do not reintroduce
+// full-response caching for the KAI agent.
