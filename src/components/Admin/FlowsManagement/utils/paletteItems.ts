@@ -218,6 +218,10 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'invoice_paid', group: 'Finance',
     label: 'Invoice Paid (card)', description: 'A Stripe card payment settled an invoice', icon: 'CheckCircle2', color: 'emerald',
     defaultData: { label: 'Invoice Paid (card)', category: 'trigger', triggerType: 'invoice_paid', config: {} } as TriggerNodeData },
+  // #251 — a workspace member requested activation of a module; the owner is notified.
+  { type: 'triggerNode', category: 'trigger', subType: 'module_access_requested', group: 'Modules',
+    label: 'Module Activation Requested', description: 'A member asked the workspace owner to activate a module', icon: 'LayoutGrid', color: 'violet',
+    defaultData: { label: 'Module Activation Requested', category: 'trigger', triggerType: 'module_access_requested', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'finance_follow_up', group: 'Finance',
     label: 'Finance Follow-up Due', description: 'A quote is due for follow-up or has gone stale', icon: 'Bell', color: 'blue',
     defaultData: { label: 'Finance Follow-up Due', category: 'trigger', triggerType: 'finance_follow_up', config: {} } as TriggerNodeData },

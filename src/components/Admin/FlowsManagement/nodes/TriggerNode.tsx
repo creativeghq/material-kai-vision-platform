@@ -72,6 +72,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   material_alert: Zap,
   finance_follow_up: Zap,
   invoice_paid: CheckCircle2,
+  module_access_requested: LayoutGrid,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,
   pricing_change_requested: ClipboardCheck,

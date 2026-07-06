@@ -136,6 +136,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   expense_card_requested: FileText,
   pricing_change_requested: ClipboardCheck,
   pricing_change_decided: CheckCircle2,
+  module_access_requested: Package,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -204,6 +205,7 @@ const triggerLabels: Record<TriggerType, string> = {
   expense_card_reviewed: 'Expense Card Reviewed',
   expense_card_requested: 'Expense Card Requested',
   pricing_change_requested: 'Discount Approval Requested',
+  module_access_requested: 'Module Activation Requested',
   pricing_change_decided: 'Discount Approval Decided',
 };
 

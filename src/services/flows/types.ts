@@ -83,9 +83,11 @@ export type TriggerType =
   // Flows governance — automated paths routed through Flows (#245 D)
   | 'material_alert'
   | 'finance_follow_up'
-  | 'invoice_paid';
+  | 'invoice_paid'
+  | 'module_access_requested';
 
 export interface ManualTriggerConfig {}
+export interface ModuleAccessRequestedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
@@ -280,6 +282,7 @@ export type TriggerConfigMap = {
   material_alert: MaterialAlertTriggerConfig;
   finance_follow_up: FinanceFollowUpTriggerConfig;
   invoice_paid: InvoicePaidTriggerConfig;
+  module_access_requested: ModuleAccessRequestedTriggerConfig;
 };
 
 // =====================================================
