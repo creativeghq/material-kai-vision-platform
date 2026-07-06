@@ -109,9 +109,11 @@ export const ModulesActivationTab: React.FC = () => {
       setRequested((prev) => new Set(prev).add(m.slug));
       toast({
         title: 'Request sent',
-        description: res.notified > 0
-          ? `The workspace owner has been notified about ${m.name}.`
-          : `No workspace owner is available to notify.`,
+        description: res.deduped
+          ? `You've already requested ${m.name} recently — the owner has been notified.`
+          : res.notified > 0
+            ? `The workspace owner has been notified about ${m.name}.`
+            : `Request recorded, but no workspace owner is available to notify.`,
       });
     } catch (e) {
       toast({ title: 'Could not send request', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });

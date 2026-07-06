@@ -82,12 +82,12 @@ export async function activateModule(workspaceId: string, moduleSlug: string): P
 export async function requestModule(
   workspaceId: string,
   moduleSlug: string,
-): Promise<{ requested: boolean; notified: number }> {
+): Promise<{ requested: boolean; notified: number; deduped?: boolean }> {
   const { data, error } = await supabase.functions.invoke('stripe-api', {
     body: { action: 'request-module', workspace_id: workspaceId, module_slug: moduleSlug },
   });
   if (error) throw new Error(await edgeErrorMessage(error));
-  return (data ?? { requested: false, notified: 0 }) as { requested: boolean; notified: number };
+  return (data ?? { requested: false, notified: 0 }) as { requested: boolean; notified: number; deduped?: boolean };
 }
 
 /** Deactivate a module. Cancels the Stripe add-on at period end, or turns off a free entitlement. */

@@ -240,6 +240,19 @@ async function requestModule(auth: AuthResult, body: Record<string, unknown>): P
     .maybeSingle();
   if (!mod || !mod.enabled) return json({ error: 'Module is not available', code: 'not_published' }, 400);
 
+  // 24h dedupe — don't spam the owner's bell across sessions or scripted repeats.
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent } = await service
+    .from('module_access_requests')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('module_slug', moduleSlug)
+    .eq('requested_by', userId)
+    .gte('created_at', since)
+    .limit(1)
+    .maybeSingle();
+  if (recent) return json({ requested: true, deduped: true, notified: 0 });
+
   const { data: owners } = await service
     .from('workspace_members')
     .select('user_id')
@@ -250,21 +263,33 @@ async function requestModule(auth: AuthResult, body: Record<string, unknown>): P
   const ownerIds = (owners || []).map((o: { user_id: string }) => o.user_id).filter((id) => id && id !== userId);
   const requesterEmail = auth.user?.email || 'A workspace member';
 
+  // Best-effort per owner: one failing notification must not fail the whole request.
+  let notified = 0;
   for (const ownerId of ownerIds) {
-    await emitFlowEvent('module_access_requested', {
-      user_id: ownerId,
-      type: 'module_access_requested',
-      title: `Module requested: ${mod.name}`,
-      body: `${requesterEmail} asked you to activate the ${mod.name} module for the workspace.`,
-      action_url: '/profile?tab=modules',
-      module_slug: moduleSlug,
-      module_name: mod.name,
-      requested_by: userId ?? '',
-      workspace_id: workspaceId,
-    });
+    try {
+      await emitFlowEvent('module_access_requested', {
+        user_id: ownerId,
+        type: 'module_access_requested',
+        title: `Module requested: ${mod.name}`,
+        body: `${requesterEmail} asked you to activate the ${mod.name} module for the workspace.`,
+        action_url: '/profile?tab=modules',
+        module_slug: moduleSlug,
+        module_name: mod.name,
+        requested_by: userId ?? '',
+        workspace_id: workspaceId,
+      });
+      notified++;
+    } catch (e) {
+      console.error(`[request-module] notify failed for owner ${ownerId}:`, e);
+    }
   }
 
-  return json({ requested: true, notified: ownerIds.length });
+  // Record the request (drives the dedupe window + gives the owner an audit trail).
+  await service
+    .from('module_access_requests')
+    .insert({ workspace_id: workspaceId, module_slug: moduleSlug, requested_by: userId });
+
+  return json({ requested: true, notified });
 }
 
 /** Operator-only: list Stripe products/prices so the admin can wire add-on pricing. */
