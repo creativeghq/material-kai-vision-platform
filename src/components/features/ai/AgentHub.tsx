@@ -4271,17 +4271,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
                         )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {/* Display real materials using DemoAgentResults format */}
-                        <DemoAgentResults
-                          result={{
-                            type: 'product_list',
-                            data: message.materialData.products,
-                            message: message.materialData.title || 'Material Results',
-                          }}
-                          onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-                          onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                          onUseIn3DScene={handleUseProductIn3DScene}
-                        />
+                        {/* Products open in the canvas; the chip below stands in when it's shown */}
+                        {!canvasShown && (
+                          <DemoAgentResults
+                            result={{
+                              type: 'product_list',
+                              data: message.materialData.products,
+                              message: message.materialData.title || 'Material Results',
+                            }}
+                            onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                            onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
+                            onUseIn3DScene={handleUseProductIn3DScene}
+                          />
+                        )}
                       </div>
                     ) : message.designData ? (
                       <div className="space-y-4">
