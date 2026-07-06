@@ -75,6 +75,21 @@ export async function activateModule(workspaceId: string, moduleSlug: string): P
   return (data ?? {}) as ActivateResult;
 }
 
+/**
+ * A non-owner member asks the workspace owner to activate a module. Notifies the owner via
+ * the Flows engine (bell). Owner resolution + delivery happen server-side.
+ */
+export async function requestModule(
+  workspaceId: string,
+  moduleSlug: string,
+): Promise<{ requested: boolean; notified: number }> {
+  const { data, error } = await supabase.functions.invoke('stripe-api', {
+    body: { action: 'request-module', workspace_id: workspaceId, module_slug: moduleSlug },
+  });
+  if (error) throw new Error(await edgeErrorMessage(error));
+  return (data ?? { requested: false, notified: 0 }) as { requested: boolean; notified: number };
+}
+
 /** Deactivate a module. Cancels the Stripe add-on at period end, or turns off a free entitlement. */
 export async function deactivateModule(
   workspaceId: string,

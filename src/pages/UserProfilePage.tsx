@@ -24,8 +24,9 @@ export const UserProfilePage: React.FC = () => {
   const { user } = useAuth();
   const { can } = usePermissions();
   const { workspaceRole, isPlatformOperator } = useWorkspace();
-  // Module activation is a workspace-owner surface (the operator can manage any workspace).
-  const showModules = workspaceRole === 'owner' || isPlatformOperator;
+  // Modules tab is visible to every workspace member: owners activate/purchase; non-owners
+  // see the catalog and can request activation from the owner (#251).
+  const showModules = !!workspaceRole || isPlatformOperator;
   // Supplier-only participation: a workspace can claim a (VAT, country) supplier identity
   // and receive purchase orders WITHOUT enabling the Finance module. Finance-enabled workspaces
   // reach the Supplier Portal under Finance → Payables instead, so we only surface it here for

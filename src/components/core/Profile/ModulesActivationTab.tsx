@@ -1,7 +1,7 @@
 // #251 — Profile → Modules. The workspace OWNER activates / purchases optional modules here.
 // Free (plan-covered) modules activate instantly; add-ons redirect to Stripe checkout.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Check, Sparkles } from 'lucide-react';
+import { Loader2, Check, Sparkles, Send } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -15,6 +15,7 @@ import {
   fetchActivatedSlugs,
   activateModule,
   deactivateModule,
+  requestModule,
   formatAddonPrice,
   tierRank,
   type ModuleCatalogRow,
@@ -37,6 +38,7 @@ export const ModulesActivationTab: React.FC = () => {
   const [activated, setActivated] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [requested, setRequested] = useState<Set<string>>(new Set());
 
   const isOwner = workspaceRole === 'owner' || isPlatformOperator;
 
@@ -99,6 +101,25 @@ export const ModulesActivationTab: React.FC = () => {
     }
   };
 
+  const handleRequest = async (m: ModuleCatalogRow) => {
+    if (!activeWorkspaceId) return;
+    setBusy(m.slug);
+    try {
+      const res = await requestModule(activeWorkspaceId, m.slug);
+      setRequested((prev) => new Set(prev).add(m.slug));
+      toast({
+        title: 'Request sent',
+        description: res.notified > 0
+          ? `The workspace owner has been notified about ${m.name}.`
+          : `No workspace owner is available to notify.`,
+      });
+    } catch (e) {
+      toast({ title: 'Could not send request', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const handleDeactivate = async (m: ModuleCatalogRow) => {
     if (!activeWorkspaceId) return;
     setBusy(m.slug);
@@ -122,17 +143,18 @@ export const ModulesActivationTab: React.FC = () => {
   if (!activeWorkspaceId) {
     return <p className="text-sm text-muted-foreground">Select a workspace to manage its modules.</p>;
   }
-  if (!isOwner) {
-    return <p className="text-sm text-muted-foreground">Only the workspace owner can activate modules.</p>;
-  }
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold mb-1">Modules</h2>
         <p className="text-sm text-muted-foreground">
-          Activate optional modules for this workspace. Your plan is <span className="font-medium">{planName}</span> —
-          modules it includes activate for free; others are available as monthly add-ons.
+          {isOwner ? (
+            <>Activate optional modules for this workspace. Your plan is <span className="font-medium">{planName}</span> —
+            modules it includes activate for free; others are available as monthly add-ons.</>
+          ) : (
+            <>Optional modules for this workspace. You can request activation — the workspace owner is notified and decides.</>
+          )}
         </p>
       </div>
 
@@ -149,34 +171,50 @@ export const ModulesActivationTab: React.FC = () => {
           {rows.map((m) => {
             const covered = planLevel >= tierRank(m.price_tier);
             const isActivated = activated.has(m.slug) || availableSlugs.has(m.slug);
+            const hasIt = covered || isActivated;
             const price = formatAddonPrice(m.addon_price_cents, m.addon_currency);
 
             let badge: React.ReactNode;
             let action: React.ReactNode = null;
 
+            // Status badge is the same regardless of role.
             if (covered) {
               badge = <Badge variant="secondary">Included in {planName}</Badge>;
-              action = <Badge className="gap-1"><Check className="h-3 w-3" /> Active</Badge>;
-            } else if (isActivated && m.is_addon) {
+            } else if (hasIt) {
               badge = <Badge className="gap-1"><Check className="h-3 w-3" /> Active</Badge>;
-              action = (
-                <Button size="sm" variant="outline" disabled={busy === m.slug} onClick={() => handleDeactivate(m)}>
-                  {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cancel'}
-                </Button>
-              );
             } else if (m.is_addon && m.addon_stripe_price_id) {
               badge = price ? <Badge variant="outline">{price}</Badge> : <Badge variant="outline">Add-on</Badge>;
-              action = (
-                <Button size="sm" disabled={busy === m.slug} onClick={() => handleActivate(m)}>
-                  {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="h-4 w-4 mr-1" /> Activate</>}
-                </Button>
-              );
             } else {
               const tierLabel = (m.price_tier || 'a higher').replace(/^\w/, (c) => c.toUpperCase());
               badge = <Badge variant="outline">Requires {tierLabel} plan</Badge>;
-              action = (
+            }
+
+            if (hasIt) {
+              // Owner of an active add-on can cancel; everyone else just sees it's active.
+              action = isOwner && isActivated && m.is_addon && !covered ? (
+                <Button size="sm" variant="outline" disabled={busy === m.slug} onClick={() => handleDeactivate(m)}>
+                  {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cancel'}
+                </Button>
+              ) : (
+                <Badge className="gap-1"><Check className="h-3 w-3" /> Active</Badge>
+              );
+            } else if (isOwner) {
+              action = m.is_addon && m.addon_stripe_price_id ? (
+                <Button size="sm" disabled={busy === m.slug} onClick={() => handleActivate(m)}>
+                  {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="h-4 w-4 mr-1" /> Activate</>}
+                </Button>
+              ) : (
                 <Button size="sm" variant="outline" asChild>
                   <a href="/profile?tab=subscription">Upgrade</a>
+                </Button>
+              );
+            } else {
+              // Non-owner: request activation from the workspace owner.
+              action = requested.has(m.slug) ? (
+                <Badge variant="secondary" className="gap-1"><Check className="h-3 w-3" /> Requested</Badge>
+              ) : (
+                <Button size="sm" variant="outline" disabled={busy === m.slug} onClick={() => handleRequest(m)}>
+                  {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="h-4 w-4 mr-1" /> Request from Workspace Owner</>}
                 </Button>
               );
             }

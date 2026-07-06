@@ -16,7 +16,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, isAdminAccess, type AuthResult } from '../../_shared/auth.ts';
+import { authenticate, isAdminAccess, userCanAccessWorkspace, type AuthResult } from '../../_shared/auth.ts';
+import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import {
   getPlatformBillingStripe,
   getSupabase,
@@ -76,6 +77,8 @@ export async function handleModuleAction(req: Request, body: Record<string, unkn
       return activateModule(auth, body);
     case 'deactivate-module':
       return deactivateModule(auth, body);
+    case 'request-module':
+      return requestModule(auth, body);
     case 'list-stripe-products':
     case 'list-stripe-prices':
       return listStripeCatalog(auth, action);
@@ -213,6 +216,55 @@ async function deactivateModule(auth: AuthResult, body: Record<string, unknown>)
     .eq('workspace_id', workspaceId)
     .eq('module_slug', moduleSlug);
   return json({ deactivated: true, module: moduleSlug });
+}
+
+// #251 — a NON-owner member requests activation → notify the workspace owner(s). Uses the
+// Flows engine (emitFlowEvent → seeded `module_access_requested` flow → bell), never a
+// hardcoded notification insert. Caller must be a member of the workspace.
+async function requestModule(auth: AuthResult, body: Record<string, unknown>): Promise<Response> {
+  const service = auth.supabase;
+  const userId = auth.userId;
+  const workspaceId = typeof body.workspace_id === 'string' ? body.workspace_id : null;
+  const moduleSlug = typeof body.module_slug === 'string' ? body.module_slug : null;
+  if (!workspaceId || !moduleSlug) return json({ error: 'workspace_id and module_slug are required' }, 400);
+
+  // Caller must belong to the workspace (bind to caller — never trust the body alone).
+  if (!(await userCanAccessWorkspace(service, userId, workspaceId))) {
+    return json({ error: 'Not a member of this workspace', code: 'not_member' }, 403);
+  }
+
+  const { data: mod } = await service
+    .from('modules')
+    .select('name, enabled')
+    .eq('slug', moduleSlug)
+    .maybeSingle();
+  if (!mod || !mod.enabled) return json({ error: 'Module is not available', code: 'not_published' }, 400);
+
+  const { data: owners } = await service
+    .from('workspace_members')
+    .select('user_id')
+    .eq('workspace_id', workspaceId)
+    .eq('role', 'owner')
+    .eq('status', 'active');
+
+  const ownerIds = (owners || []).map((o: { user_id: string }) => o.user_id).filter((id) => id && id !== userId);
+  const requesterEmail = auth.user?.email || 'A workspace member';
+
+  for (const ownerId of ownerIds) {
+    await emitFlowEvent('module_access_requested', {
+      user_id: ownerId,
+      type: 'module_access_requested',
+      title: `Module requested: ${mod.name}`,
+      body: `${requesterEmail} asked you to activate the ${mod.name} module for the workspace.`,
+      action_url: '/profile?tab=modules',
+      module_slug: moduleSlug,
+      module_name: mod.name,
+      requested_by: userId ?? '',
+      workspace_id: workspaceId,
+    });
+  }
+
+  return json({ requested: true, notified: ownerIds.length });
 }
 
 /** Operator-only: list Stripe products/prices so the admin can wire add-on pricing. */
