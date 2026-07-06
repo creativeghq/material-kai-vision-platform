@@ -19,13 +19,22 @@ export interface SessionPathCtx {
   conversationId: string;
 }
 
+/**
+ * #250 I4: strip path separators / `..` traversal from a caller-supplied filename so it
+ * can't escape its intended prefix in the storage key. Keeps the base name only.
+ */
+export function safeStorageName(filename: string): string {
+  const base = String(filename ?? '').split(/[/\\]/).pop() ?? '';
+  return base.replace(/\.\.+/g, '.').replace(/^\.+/, '') || 'file';
+}
+
 /** Per-session key. `kind` = 'gen' for outputs, 'uploads' for user inputs. */
 export function sessionPath(
   ctx: SessionPathCtx,
   kind: 'gen' | 'uploads',
   filename: string,
 ): string {
-  return `u/${ctx.userId}/sessions/${ctx.conversationId}/${kind}/${filename}`;
+  return `u/${ctx.userId}/sessions/${ctx.conversationId}/${kind}/${safeStorageName(filename)}`;
 }
 
 /** Moodboard copy-on-promote key (lives OUTSIDE the session prefix so it survives chat deletion). */
@@ -34,7 +43,7 @@ export function moodboardPath(
   moodboardId: string,
   filename: string,
 ): string {
-  return `u/${userId}/moodboards/${moodboardId}/${filename}`;
+  return `u/${userId}/moodboards/${moodboardId}/${safeStorageName(filename)}`;
 }
 
 /**
@@ -51,7 +60,7 @@ export function resolveUploadPath(
   if (ctx.userId && ctx.conversationId) {
     return sessionPath({ userId: ctx.userId, conversationId: ctx.conversationId }, kind, filename);
   }
-  return `${legacyPrefix}/${filename}`;
+  return `${legacyPrefix}/${safeStorageName(filename)}`;
 }
 
 /** Extract the storage object path from a generation-images public URL. */
