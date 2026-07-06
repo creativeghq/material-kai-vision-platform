@@ -40,9 +40,11 @@ interface CanvasPanelProps {
   onSelect: (id: string) => void;
   onClose: () => void;
   children?: React.ReactNode;
+  /** Contextual detail panel for the active artifact (issue #253 P3). */
+  inspector?: React.ReactNode;
 }
 
-export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, onSelect, onClose, children }) => {
+export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, onSelect, onClose, children, inspector }) => {
   return (
     <div className="flex min-w-0 flex-1 flex-col border-r border-white/8 bg-background">
       {/* Tab strip + close */}
@@ -79,13 +81,20 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
         </button>
       </div>
 
-      {/* Active artifact */}
-      <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
-        {children ?? (
-          <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
-            <LayoutPanelLeft className="mb-3 h-10 w-10 opacity-40" />
-            <p className="text-sm">Select an artifact to open it here.</p>
-          </div>
+      {/* Active artifact + contextual inspector */}
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
+          {children ?? (
+            <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
+              <LayoutPanelLeft className="mb-3 h-10 w-10 opacity-40" />
+              <p className="text-sm">Select an artifact to open it here.</p>
+            </div>
+          )}
+        </div>
+        {inspector && (
+          <aside className="hidden w-[288px] shrink-0 overflow-auto border-l border-white/8 bg-white/[0.015] custom-scrollbar lg:block">
+            {inspector}
+          </aside>
         )}
       </div>
     </div>

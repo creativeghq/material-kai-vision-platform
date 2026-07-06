@@ -67,6 +67,7 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import { CanvasPanel, ArtifactChip, type CanvasArtifact } from './CanvasPanel';
+import { SheetInspector, StagingInspector, ProductsInspector } from './ArtifactInspector';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
@@ -3514,6 +3515,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     return null;
   };
+
+  // Contextual inspector for the active canvas artifact (issue #253 P3).
+  const renderCanvasInspector = (message: Message): React.ReactNode => {
+    if (message.sheetPdfData) return <SheetInspector data={message.sheetPdfData} />;
+    if (message.virtualStagingData) return <StagingInspector data={message.virtualStagingData} />;
+    if (message.materialData?.products && message.materialData.products.length > 0) {
+      return <ProductsInspector data={message.materialData} />;
+    }
+    return null;
+  };
   const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
   const showCanvas = canvasOpen && canvasArtifacts.length > 0;
 
@@ -3540,6 +3551,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           activeId={activeCanvasId}
           onSelect={setActiveCanvasId}
           onClose={() => setCanvasOpen(false)}
+          inspector={activeCanvasMessage ? renderCanvasInspector(activeCanvasMessage) : null}
         >
           {activeCanvasMessage ? renderCanvasArtifact(activeCanvasMessage) : null}
         </CanvasPanel>
