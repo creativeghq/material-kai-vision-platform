@@ -99,7 +99,8 @@ import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 import { SheetPreviewCard } from '@/components/features/sheets/SheetPreviewCard';
 import { SheetWizardModal, type SheetWizardResult } from '@/components/features/sheets/SheetWizardModal';
 import type { SheetType } from '@/services/moodboardSheetsService';
-import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
+// Agent response caching removed 2026-07-06 (see the send handler) — it replayed stale
+// full-text answers and short-circuited the live agent. Do not reintroduce for KAI.
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 import { WorldViewer } from './WorldViewer';
 import { vrWorldService } from '@/services/vrWorldService';
@@ -1813,26 +1814,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
       }
 
-      // Check cache for similar queries (only for search-type queries without images)
       const workspaceId = session.user?.user_metadata?.workspace_id;
-      const canUseCache = !directRun && userAttachedImages.length === 0 && selectedAgent === 'kai';
+      // The client-side agent response cache was REMOVED 2026-07-06. It replayed a 30-min-old
+      // full-text answer for a repeated question (keyed on query+agent+workspace, NOT the
+      // conversation) WITHOUT ever calling agent-chat — so it served stale answers, ignored
+      // fresh KB / live data, and short-circuited the agent entirely (even in a new
+      // conversation). A live-data agent MUST run every time. This directly caused the
+      // repeated "the KB has no Materials Hub content" replies that persisted after the KB
+      // was actually fixed. Do not reintroduce full-response caching for KAI.
       let data: any = null;
       let pendingGeminiData: Message['geminiImageData'] | null = null;
       let pendingSearchSpec: Message['searchSpec'] | null = null;
 
-      if (canUseCache) {
-        const cachedResponse = getCachedResponse(userInput, selectedAgent, workspaceId);
-        if (cachedResponse) {
-          data = {
-            text: cachedResponse.text,
-            agentId: cachedResponse.agentId,
-            model: cachedResponse.model,
-            materialResults: cachedResponse.products ? { products: cachedResponse.products } : undefined,
-          };
-        }
-      }
-
-      // If no cache hit, make API call
+      // Always call the agent (no response cache).
       if (!data) {
         // Prepare request body
         const requestBody: any = {
@@ -2831,15 +2825,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
 
         data = finalResult;
-
-          // Cache the response for future use
-          if (canUseCache && data) {
-            cacheResponse(userInput, selectedAgent, {
-              text: data.text,
-              model: data.model,
-              products: data.materialResults?.products,
-            }, workspaceId);
-          }
         } // End of streaming response handling
 
       // Parse demo data if this is from DemoAgent
@@ -2970,7 +2955,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             model: data.model || selectedModel,
             responseTimeMs, // Time taken to respond
             productsCount: materialData?.products?.length || 0,
-            cachedResponse: !!getCachedResponse(userInput, selectedAgent, workspaceId),
+            cachedResponse: false,
             demoData, // Save demo data for DemoAgent
             materialData, // Save material data for Search Agent
             designData, // Save design data for Interior Designer Agent (includes spatial analysis)
