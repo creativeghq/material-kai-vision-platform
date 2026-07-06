@@ -3161,6 +3161,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setMessages([]);
     onConversationChange?.(null);
     setJustEnabledToolkitId(null);
+    // Clear transient per-turn state so a new conversation starts truly blank — no
+    // leftover attached image, pinned materials, generation mode, or reasoning steps
+    // bleeding in from the previous chat. (There is no response cache; every send calls
+    // the agent fresh regardless — this is just UI hygiene.)
+    setAttachedImages([]);
+    setPinnedMaterials([]);
+    setSelectedGenerationMode(null);
+    setReasoningSteps([]);
     // Reset to the localStorage default toolkit set (Core + whatever the user
     // last picked in the picker). Doesn't trigger the onboarding card —
     // there's nothing "just enabled".
