@@ -121,7 +121,20 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
 
       // Where Zernio sends the browser after OAuth completes. Default to the app's
       // profile page; the frontend passes its own URL so it can process the callback.
-      const appRedirect = redirect_url || `${publicAppUrl()}/profile`;
+      // #250 C30: a caller-supplied redirect_url is an open-redirect/phishing vector —
+      // require it to be same-origin as the app before forwarding it to Zernio.
+      let appRedirect = `${publicAppUrl()}/profile`;
+      if (redirect_url) {
+        try {
+          if (new URL(redirect_url).origin === new URL(publicAppUrl()).origin) {
+            appRedirect = redirect_url;
+          } else {
+            return jsonResponse({ success: false, error: 'redirect_url must be same-origin as the app' }, 400);
+          }
+        } catch {
+          return jsonResponse({ success: false, error: 'invalid redirect_url' }, 400);
+        }
+      }
 
       // Zernio: GET /v1/connect/{platform}?profileId=&redirect_url= → { authUrl, state }
       const qs = new URLSearchParams({ profileId, redirect_url: appRedirect });

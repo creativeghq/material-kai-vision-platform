@@ -64,10 +64,19 @@ async function verifySignature(rawBody: ArrayBuffer, signature: string): Promise
 
     // Support both "sha256=xxx" and plain hex formats
     const receivedHex = signature.startsWith('sha256=') ? signature.slice(7) : signature;
-    return expectedHex === receivedHex;
+    // #250 C29: constant-time comparison — a plain `===` on the HMAC leaks timing.
+    return timingSafeEqualHex(expectedHex, receivedHex);
   } catch {
     return false;
   }
+}
+
+/** Constant-time hex string comparison (#250 C29). */
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 /** Pull the first per-platform error out of a Zernio post payload, if any. */

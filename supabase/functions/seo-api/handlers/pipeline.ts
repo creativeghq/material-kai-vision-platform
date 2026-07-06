@@ -89,7 +89,8 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
   }
 
   // Secret/service callers (agent-chat) auth at 'secret' level (userId null) + pass user_id in body.
-  const userId = auth.userId ?? body.user_id;
+  // #250 C31: only a secret-level caller may specify user_id in the body.
+  const userId = auth.userId ?? (auth.level === 'secret' ? body.user_id : null);
   if (!userId) {
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
   }

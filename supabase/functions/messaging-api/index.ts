@@ -269,6 +269,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
         const wsId = workspaceId || auth.workspace_id;
         if (!wsId) throw new Error('No workspace context to attach the WhatsApp account to');
+        // #250 C27: operator roles are workspace-scoped — verify the caller belongs to the
+        // target workspace before attaching a WhatsApp account (else operator-of-A could
+        // connect an account to workspace-B by passing its id). Platform-secret callers pass.
+        if (!isAdminAccess(auth)) {
+          const { data: _mem } = await supabaseClient.from('workspace_members')
+            .select('id').eq('user_id', auth.userId).eq('workspace_id', wsId)
+            .eq('status', 'active').limit(1).maybeSingle();
+          if (!_mem) return jsonResponse({ error: 'Not a member of the target workspace' }, 403);
+        }
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
 
         // Zernio: POST /v1/connect/whatsapp/credentials → { account: { accountId, username, displayName, selectedPhoneNumber } }
