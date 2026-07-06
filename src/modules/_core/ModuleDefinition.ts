@@ -5,7 +5,15 @@ export interface ModuleNavItem {
   label: string;
   path: string;
   icon: LucideIcon;
-  location: 'sidebar' | 'admin-dashboard';
+  /**
+   * Where this nav item surfaces:
+   * - `'admin-dashboard'` → a card on `/admin` (operator surface).
+   * - `'workspace'` → the tenant **App Launcher** + `/apps` hub (#251). Shown only when the
+   *   module is globally enabled AND entitled to the active workspace. This is how optional
+   *   modules (HR, Docs, Real Estate, …) appear WITHOUT cluttering the top nav.
+   * - `'sidebar'` → legacy/unused; kept for back-compat.
+   */
+  location: 'sidebar' | 'admin-dashboard' | 'workspace';
   adminCategory?: string;
   adminDescription?: string;
   adminCount?: string;

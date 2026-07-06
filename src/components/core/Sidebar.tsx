@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Menu, LogOut, Wrench, Eye, EyeOff, LayoutDashboard } from 'lucide-react';
+import { User, Menu, LogOut, Wrench, Eye, EyeOff, LayoutDashboard, Settings } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useShowPrices } from '@/hooks/useShowPrices';
 
@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
+import { AppLauncher } from '@/components/core/AppLauncher';
 
 /** #227 — header toggle to hide/show all prices across browse surfaces (demos / material research). */
 const ShowPricesToggle: React.FC = () => {
@@ -97,6 +98,13 @@ export const Sidebar: React.FC = () => {
           <Wrench className="mr-3 h-4 w-4" />
           <span className="text-sm">Tools</span>
         </DropdownMenuItem>
+        {/* Operator-only: Admin moved off the top nav into the profile menu (#251). */}
+        {isPlatformOperator && (
+          <DropdownMenuItem onClick={() => navigate('/admin')} className="py-3">
+            <Settings className="mr-3 h-4 w-4" />
+            <span className="text-sm">Admin</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => signOut()}
@@ -178,6 +186,7 @@ export const Sidebar: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-0.5 shrink-0">
+            <AppLauncher />
             <WorkspaceSwitcher />
             <ModuleHeaderActions />
             {profileMenu}
@@ -219,6 +228,7 @@ export const Sidebar: React.FC = () => {
 
       <div className="flex items-center gap-2 shrink-0 pl-2">
         <ShowPricesToggle />
+        <AppLauncher />
         <WorkspaceSwitcher />
         <ModuleHeaderActions />
         {profileMenu}

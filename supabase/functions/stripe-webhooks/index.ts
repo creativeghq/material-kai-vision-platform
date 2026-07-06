@@ -172,6 +172,13 @@ async function handleCustomerUpdated(customer: Stripe.Customer) {
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  // #251 — per-module add-on subscriptions carry kind='module_addon' metadata. They grant a
+  // per-workspace entitlement, NOT a platform plan tier, so branch out before the tier logic.
+  if (subscription.metadata?.kind === 'module_addon') {
+    await handleModuleAddonSubscription(subscription);
+    return;
+  }
+
   const customerId = subscription.customer as string;
 
   // Find user by Stripe customer ID (either account — default or platform-billing)
@@ -210,6 +217,12 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  // #251 — module add-on cancellation → revoke the workspace entitlement.
+  if (subscription.metadata?.kind === 'module_addon') {
+    await handleModuleAddonDeleted(subscription);
+    return;
+  }
+
   const customerId = subscription.customer as string;
 
   const { data: profile } = await profileByCustomer(customerId, 'user_id') as { data: any };
@@ -227,6 +240,68 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .eq('user_id', profile.user_id);
 
   console.log(`Subscription canceled for user ${profile.user_id}`);
+}
+
+// #251 — a per-workspace module add-on subscription was created/updated. This is the ONLY
+// place a paid entitlement is granted (never trust the client). Grants on active/trialing;
+// keeps the entitlement through past_due (dunning grace) and only revokes on deletion.
+async function handleModuleAddonSubscription(subscription: Stripe.Subscription) {
+  const meta = subscription.metadata || {};
+  const workspaceId = meta.workspace_id;
+  const moduleSlug = meta.module_slug;
+  if (!workspaceId || !moduleSlug) {
+    console.warn('module_addon subscription missing workspace_id/module_slug', subscription.id);
+    return;
+  }
+
+  await supabase.from('workspace_module_subscriptions').upsert(
+    {
+      workspace_id: workspaceId,
+      module_slug: moduleSlug,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: subscription.customer as string,
+      status: subscription.status,
+      current_period_end: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
+        : null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'workspace_id,module_slug' },
+  );
+
+  if (subscription.status === 'active' || subscription.status === 'trialing') {
+    const { error } = await supabase.from('workspace_module_entitlements').upsert(
+      { workspace_id: workspaceId, module_slug: moduleSlug, enabled: true, granted_by: meta.user_id || null },
+      { onConflict: 'workspace_id,module_slug' },
+    );
+    if (error) {
+      // Throw → non-2xx → Stripe retries. Upsert is idempotent so retry is safe.
+      throw new Error(`module entitlement grant failed for ${workspaceId}/${moduleSlug}: ${error.message}`);
+    }
+    console.log(`Granted module '${moduleSlug}' to workspace ${workspaceId} (sub ${subscription.id})`);
+  }
+}
+
+// #251 — module add-on subscription deleted → revoke the entitlement + mark the sub row.
+async function handleModuleAddonDeleted(subscription: Stripe.Subscription) {
+  const meta = subscription.metadata || {};
+  const workspaceId = meta.workspace_id;
+  const moduleSlug = meta.module_slug;
+  if (!workspaceId || !moduleSlug) return;
+
+  await supabase
+    .from('workspace_module_entitlements')
+    .update({ enabled: false, granted_at: new Date().toISOString() })
+    .eq('workspace_id', workspaceId)
+    .eq('module_slug', moduleSlug);
+
+  await supabase
+    .from('workspace_module_subscriptions')
+    .update({ status: 'canceled', updated_at: new Date().toISOString() })
+    .eq('workspace_id', workspaceId)
+    .eq('module_slug', moduleSlug);
+
+  console.log(`Revoked module '${moduleSlug}' from workspace ${workspaceId} (sub ${subscription.id} deleted)`);
 }
 
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {

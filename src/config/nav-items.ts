@@ -5,7 +5,6 @@ import {
   Users,
   FileText,
   BarChart3,
-  Settings,
   FolderKanban,
   Wallet,
   Contact,
@@ -72,7 +71,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     icon: BarChart3,
     requireRole: 'factory',
   },
-  { id: 'admin', label: 'Admin', path: '/admin', icon: Settings, requirePlatform: true },
+  // Admin was moved off the top nav into the profile menu (operator-only) — see Sidebar.tsx (#251).
 ];
 
 /** Context the nav gates resolve against. Computed from hooks by the consuming component. */
@@ -128,5 +127,4 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'finance',
   'sales',
   'factory-analytics',
-  'admin',
 ];

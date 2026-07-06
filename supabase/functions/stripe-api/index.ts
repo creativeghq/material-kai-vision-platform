@@ -11,6 +11,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { handleCheckout } from './handlers/checkout.ts';
 import { handleCustomerPortal } from './handlers/customer-portal.ts';
+import { handleModuleAction } from './handlers/modules.ts';
 
 Deno.serve(withApiLogging('stripe-api', async (req) => {
   // Populate Deno.env from platform_secrets BEFORE dispatching — handlers
@@ -41,9 +42,14 @@ Deno.serve(withApiLogging('stripe-api', async (req) => {
       return handleCheckout(req, body);
     case 'customer_portal':
       return handleCustomerPortal(req, body);
+    case 'activate-module':
+    case 'deactivate-module':
+    case 'list-stripe-products':
+    case 'list-stripe-prices':
+      return handleModuleAction(req, body);
     default:
       return new Response(JSON.stringify({
-        error: `Unknown action '${action}'. Available: checkout, customer_portal`,
+        error: `Unknown action '${action}'. Available: checkout, customer_portal, activate-module, deactivate-module, list-stripe-products, list-stripe-prices`,
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

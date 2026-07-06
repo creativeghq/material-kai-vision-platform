@@ -30,3 +30,8 @@ export {
 } from './useAdminDashboardCards';
 
 export { ModuleHeaderActions } from './ModuleHeaderActions';
+
+export {
+  useWorkspaceModuleNav,
+  type WorkspaceModuleNavEntry,
+} from './useWorkspaceModuleNav';

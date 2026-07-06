@@ -33,6 +33,7 @@ import HealthPage from './pages/Health';
 // Core user pages
 const Index = lazy(() => import('./pages/Index'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
+const AppsPage = lazy(() => import('./pages/AppsPage'));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
@@ -213,6 +214,18 @@ const App = () => (
                       <AuthGuard>
                         <Layout>
                           <UserProfilePage />
+                        </Layout>
+                      </AuthGuard>
+                    </PageErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/apps"
+                  element={
+                    <PageErrorBoundary name="Apps">
+                      <AuthGuard>
+                        <Layout>
+                          <AppsPage />
                         </Layout>
                       </AuthGuard>
                     </PageErrorBoundary>
