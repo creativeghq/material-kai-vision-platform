@@ -272,7 +272,7 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
  */
 export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = false, agentId?: string) => {
   return tool(
-    async ({ query, searchTypes = ['chunks', 'products', 'kb_docs'], topK = 5, categorySlug, categoryId, priceDocType }) => {
+    async ({ query, searchTypes = ['kb_docs', 'chunks', 'products'], topK = 5, categorySlug, categoryId, priceDocType }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
