@@ -51,7 +51,7 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import { CanvasPanel, ArtifactChip, type CanvasArtifact } from './CanvasPanel';
-import { SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector } from './ArtifactInspector';
+import { SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector, RenderInspector } from './ArtifactInspector';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
@@ -1814,7 +1814,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
       }
 
-      const workspaceId = session.user?.user_metadata?.workspace_id;
       // The client-side agent response cache was REMOVED 2026-07-06. It replayed a 30-min-old
       // full-text answer for a repeated question (keyed on query+agent+workspace, NOT the
       // conversation) WITHOUT ever calling agent-chat — so it served stale answers, ignored
@@ -3256,6 +3255,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.materialData?.products && m.materialData.products.length > 0) {
       return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products` };
     }
+    if (m.generation_job) return { id: m.id, kind: 'render', title: m.generation_job.room_type ? `Room · ${m.generation_job.room_type}` : 'Room generation' };
     if (m.designData) return { id: m.id, kind: 'design', title: m.designData.parsedRequest?.room_type ? `Interior · ${m.designData.parsedRequest.room_type}` : 'Interior design' };
     if (m.worldData) return { id: m.id, kind: 'world', title: m.worldData.caption || m.worldData.prompt || 'VR world' };
     if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board' };
@@ -3399,7 +3399,58 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     </>
   );
 
+  // Async multi-model room-generation grid (ProgressiveImageGrid, self-polling).
+  // Shared verbatim by the inline chat branch and the canvas so the full grid +
+  // all its per-image actions (VR / video / staging / lighting / materials board /
+  // save to moodboard / find materials / edit) render identically in both places.
+  const renderGenerationGrid = (message: Message): React.ReactNode => (
+    <ProgressiveImageGrid
+      jobId={message.generation_job.job_id}
+      modelCount={message.generation_job.model_count}
+      models={message.generation_job.models}
+      workspaceId={workspaceId}
+      roomType={message.generation_job.room_type}
+      onImageClick={(url, name) => setLightboxImage({ url, name })}
+      onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+      onGenerateVideo={(imageUrl, videoType, vm) => handleGenerateVideo(imageUrl, message, videoType, vm ?? videoModel)}
+      onGenerateMaterialsBoard={(imageUrl, boardMode) => handleGenerateMaterialsBoard(imageUrl, boardMode, message)}
+      onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
+      onEditImage={(imageUrl) => {
+        if (imageUrl.includes('|LIGHTING|')) {
+          const idx = imageUrl.indexOf('|LIGHTING|');
+          const imgUrl = imageUrl.slice(0, idx);
+          const prompt = imageUrl.slice(idx + '|LIGHTING|'.length);
+          setAttachedImages([imgUrl]);
+          setSelectedGenerationMode('image-edit');
+          setInput(prompt);
+          setTimeout(() => { handleSendMessageRef.current(); }, 100);
+          return;
+        }
+        setAttachedImages([imageUrl]);
+        setSelectedGenerationMode('image-edit');
+        setGeminiEditRoomType(message.generation_job?.room_type || null);
+        setGeminiEditStyle(message.generation_job?.style || null);
+        setShowGeminiEditModal(true);
+      }}
+      onAskJARVIS={(segment) => {
+        const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
+        setInput(prompt);
+        setTimeout(async () => { await handleSendMessage(); }, 100);
+      }}
+      onFindMaterial={(segment) => {
+        const cropUrl = segment.crop_data_url || segment.crop_storage_url;
+        if (cropUrl) setAttachedImages([cropUrl]);
+        const prompt = `Find this exact material using all available search methods. Zone analysis: ${segment.label} — material type: ${segment.material_type}, finish: ${segment.finish}, dominant color: ${segment.dominant_color}, confidence: ${Math.round((segment.confidence ?? 0) * 100)}%. Identify and return matching products from our catalog with full similarity scoring across all dimensions.`;
+        setInput(prompt);
+        setTimeout(async () => { await handleSendMessage(); }, 100);
+      }}
+      pendingReplacement={pendingReplacement}
+      onZoneSelectedForReplacement={() => setPendingReplacement(null)}
+    />
+  );
+
   const renderCanvasArtifact = (message: Message): React.ReactNode => {
+    if (message.generation_job) return renderGenerationGrid(message);
     if (message.designData) return renderDesignResults(message);
     if (message.sheetPdfData) {
       return (
@@ -3543,6 +3594,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Contextual inspector for the active canvas artifact (issue #253 P3).
   const renderCanvasInspector = (message: Message): React.ReactNode => {
+    if (message.generation_job) return <RenderInspector data={message.generation_job} />;
     if (message.sheetPdfData) return <SheetInspector data={message.sheetPdfData} />;
     if (message.virtualStagingData) return <StagingInspector data={message.virtualStagingData} />;
     if (message.materialData?.products && message.materialData.products.length > 0) {
@@ -3553,7 +3605,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return null;
   };
   const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
-  const canvasShown = canvasArtifacts.length > 0 && !canvasHidden;
+  // The canvas is the permanent middle workspace for every agent; the chat is a
+  // right rail. `canvasHidden` is an escape hatch to reclaim a full-width chat.
+  const canvasShown = !canvasHidden;
 
   return (
     <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
@@ -3616,21 +3670,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               <p className="text-xs text-muted-foreground truncate">{currentConversationTitle}</p>
             )}
           </div>
-          {canvasArtifacts.length > 0 && (
-            <Button
-              variant={canvasShown ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setCanvasHidden((v) => !v)}
-              className="gap-2 rounded-full"
-              title={canvasShown ? 'Hide canvas' : 'Show canvas'}
-            >
-              <LayoutTemplate className="h-4 w-4" />
-              <span className="hidden sm:inline">Canvas</span>
+          <Button
+            variant={canvasShown ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setCanvasHidden((v) => !v)}
+            className="gap-2 rounded-full"
+            title={canvasShown ? 'Hide canvas' : 'Show canvas'}
+          >
+            <LayoutTemplate className="h-4 w-4" />
+            <span className="hidden sm:inline">Canvas</span>
+            {canvasArtifacts.length > 0 && (
               <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/20 px-1 text-[10px] font-semibold">
                 {canvasArtifacts.length}
               </span>
-            </Button>
-          )}
+            )}
+          </Button>
           {canvasShown && (
             <Button
               variant="ghost"
@@ -4522,58 +4576,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           )
                         )}
 
-                        {/* Show ProgressiveImageGrid for async 3D generation jobs */}
+                        {/* Async 3D room-generation grid — full grid opens in the canvas (chip in chat) */}
                         {message.role === 'assistant' && message.generation_job && (
-                          <div className="mt-4">
-                            <ProgressiveImageGrid
-                              jobId={message.generation_job.job_id}
-                              modelCount={message.generation_job.model_count}
-                              models={message.generation_job.models}
-                              workspaceId={workspaceId}
-                              roomType={message.generation_job.room_type}
-                              onImageClick={(url, name) => {
-                                setLightboxImage({ url, name });
-                              }}
-                              onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-                              onGenerateVideo={(imageUrl, videoType, vm) => handleGenerateVideo(imageUrl, message, videoType, vm ?? videoModel)}
-                              onGenerateMaterialsBoard={(imageUrl, boardMode) => handleGenerateMaterialsBoard(imageUrl, boardMode, message)}
-                              onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
-                              onEditImage={(imageUrl) => {
-                                // Auto-submit lighting edits directly (skip modal)
-                                if (imageUrl.includes('|LIGHTING|')) {
-                                  const idx = imageUrl.indexOf('|LIGHTING|');
-                                  const imgUrl = imageUrl.slice(0, idx);
-                                  const prompt = imageUrl.slice(idx + '|LIGHTING|'.length);
-                                  setAttachedImages([imgUrl]);
-                                  setSelectedGenerationMode('image-edit');
-                                  setInput(prompt);
-                                  setTimeout(() => { handleSendMessageRef.current(); }, 100);
-                                  return;
-                                }
-                                setAttachedImages([imageUrl]);
-                                setSelectedGenerationMode('image-edit');
-                                setGeminiEditRoomType(message.generation_job?.room_type || null);
-                                setGeminiEditStyle(message.generation_job?.style || null);
-                                setShowGeminiEditModal(true);
-                              }}
-                              onAskJARVIS={(segment) => {
-                                const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
-                                setInput(prompt);
-                                setTimeout(async () => { await handleSendMessage(); }, 100);
-                              }}
-                              onFindMaterial={(segment) => {
-                                const cropUrl = segment.crop_data_url || segment.crop_storage_url;
-                                if (cropUrl) setAttachedImages([cropUrl]);
-                                const prompt = `Find this exact material using all available search methods. Zone analysis: ${segment.label} — material type: ${segment.material_type}, finish: ${segment.finish}, dominant color: ${segment.dominant_color}, confidence: ${Math.round((segment.confidence ?? 0) * 100)}%. Identify and return matching products from our catalog with full similarity scoring across all dimensions.`;
-                                setInput(prompt);
-                                setTimeout(async () => { await handleSendMessage(); }, 100);
-                              }}
-                              pendingReplacement={pendingReplacement}
-                              onZoneSelectedForReplacement={() => {
-                                setPendingReplacement(null);
-                              }}
+                          canvasShown ? (
+                            <ArtifactChip
+                              kind="render"
+                              title={message.generation_job.room_type ? `Room · ${message.generation_job.room_type}` : 'Room generation'}
+                              active={activeCanvasId === message.id}
+                              onOpen={() => focusCanvas(message.id)}
                             />
-                          </div>
+                          ) : (
+                            <div className="mt-4">{renderGenerationGrid(message)}</div>
+                          )
                         )}
 
                         {/* Show SEOArticleViewer for async SEO article pipeline */}

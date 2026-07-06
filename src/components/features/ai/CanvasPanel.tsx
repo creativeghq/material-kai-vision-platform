@@ -18,7 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
-  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design';
+  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design' | 'render';
 
 export interface CanvasArtifact {
   id: string;
@@ -35,6 +35,7 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   image: ImageIcon,
   video: Video,
   design: Sofa,
+  render: LayoutGrid,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -46,6 +47,7 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   image: 'Generated image',
   video: 'Generated video',
   design: 'Interior design',
+  render: 'Room generation',
 };
 
 interface CanvasPanelProps {
@@ -65,6 +67,9 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
       <div className="flex h-[52px] shrink-0 items-center gap-1 border-b border-white/8 px-2">
         <LayoutPanelLeft className="mx-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto custom-scrollbar">
+          {artifacts.length === 0 && (
+            <span className="px-1.5 text-sm font-medium text-muted-foreground">Canvas</span>
+          )}
           {artifacts.map((a) => {
             const Icon = KIND_ICON[a.kind];
             const active = a.id === activeId;
@@ -99,9 +104,12 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
           {children ?? (
-            <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
+            <div className="flex h-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
               <LayoutPanelLeft className="mb-3 h-10 w-10 opacity-40" />
-              <p className="text-sm">Select an artifact to open it here.</p>
+              <p className="max-w-sm text-sm">
+                Your workspace. Generate a room, search materials, stage a photo, or build a sheet —
+                it opens here full-size, with its details and actions alongside.
+              </p>
             </div>
           )}
         </div>

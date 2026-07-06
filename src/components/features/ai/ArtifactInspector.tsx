@@ -102,6 +102,39 @@ export const WorldInspector: React.FC<{ data: any }> = ({ data }) => (
   </Shell>
 );
 
+export const RenderInspector: React.FC<{ data: any }> = ({ data }) => {
+  const models: any[] = Array.isArray(data?.models) ? data.models : [];
+  return (
+    <Shell kicker="Room generation" title={data?.room_type ? humanize(data.room_type) : 'Room generation'}>
+      <div>
+        <SectionH>Details</SectionH>
+        {data?.room_type && <Field k="Room" v={humanize(data.room_type)} />}
+        {data?.style && <Field k="Style" v={humanize(data.style)} />}
+        <Field k="Models" v={data?.model_count ?? models.length} />
+      </div>
+      {models.length > 0 && (
+        <div>
+          <SectionH>Models</SectionH>
+          <div className="flex flex-wrap gap-1.5">
+            {models.map((m, i) => (
+              <span key={m?.id || i} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-muted-foreground">
+                {m?.name || m?.id || 'model'}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div>
+        <SectionH>Per-image actions</SectionH>
+        <p className="text-[12px] leading-relaxed text-muted-foreground">
+          Click any image in the grid to save to a moodboard, find materials, edit, or generate a
+          VR world, video, or virtual staging from it.
+        </p>
+      </div>
+    </Shell>
+  );
+};
+
 export const BoardInspector: React.FC<{ data: any }> = ({ data }) => (
   <Shell kicker="Materials board" title={humanize(data.board_mode) || 'Materials board'}>
     <div>
