@@ -3308,6 +3308,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.materialData?.products && m.materialData.products.length > 0) {
       return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products` };
     }
+    if (m.designData) return { id: m.id, kind: 'design', title: m.designData.parsedRequest?.room_type ? `Interior · ${m.designData.parsedRequest.room_type}` : 'Interior design' };
     if (m.worldData) return { id: m.id, kind: 'world', title: m.worldData.caption || m.worldData.prompt || 'VR world' };
     if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board' };
     if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image' };
@@ -3387,7 +3388,71 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Full-size render of a canvas artifact — reuses the exact same self-contained
   // card components as the chat, so there is one implementation, not two.
+  // Interior design results (DesignCanvas + cost estimate). Shared verbatim by
+  // the inline chat branch and the canvas so there is one implementation.
+  const renderDesignResults = (message: Message): React.ReactNode => (
+    <>
+      <DesignCanvas
+        images={message.designData.images}
+        modelResults={message.designData.modelResults}
+        totalModels={message.designData.totalModels}
+        successfulModels={message.designData.successfulModels}
+        spatialAnalysis={message.designData.spatialAnalysis}
+        matchedMaterials={message.designData.matchedMaterials}
+        parsedRequest={message.designData.parsedRequest}
+        qualityAssessment={message.designData.qualityAssessment}
+        processingTimeMs={message.designData.processingTimeMs}
+        onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+        onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
+        onMaterialClick={(materialId) => {
+          const all = message.designData.matchedMaterials || [];
+          const single = all.filter((m: any) => m?.id === materialId || m?.material_id === materialId);
+          setSelectedMaterialsData({
+            materials: single.length > 0 ? single : all,
+            spatialAnalysis: message.designData.spatialAnalysis,
+            roomType: message.designData.parsedRequest?.room_type,
+            style: message.designData.parsedRequest?.style,
+          });
+          setShowMaterialModal(true);
+        }}
+        onFindMaterials={async (imageUrl) => {
+          setInput(`Find materials and products that match this interior design image: ${imageUrl}`);
+          setTimeout(async () => { await handleSendMessage(); }, 100);
+        }}
+        onViewAllMaterials={() => {
+          setSelectedMaterialsData({
+            materials: message.designData.matchedMaterials || [],
+            spatialAnalysis: message.designData.spatialAnalysis,
+            roomType: message.designData.parsedRequest?.room_type,
+            style: message.designData.parsedRequest?.style,
+          });
+          setShowMaterialModal(true);
+        }}
+      />
+      {message.designData.costEstimate && (
+        <div className="rounded-lg bg-blue-50 p-4 text-gray-900">
+          <h4 className="mb-2 font-semibold">Cost Estimate</h4>
+          <div className="space-y-2">
+            {message.designData.costEstimate.materials.map((material: any) => (
+              <div key={material.name} className="flex justify-between text-sm">
+                <span>{material.name}</span>
+                <span className="font-medium">${material.subtotal.toFixed(2)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between border-t border-gray-300 pt-2 font-bold">
+              <span>Total</span>
+              <span className="text-blue-600">
+                ${message.designData.costEstimate.total_cost.toFixed(2)} {message.designData.costEstimate.currency}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   const renderCanvasArtifact = (message: Message): React.ReactNode => {
+    if (message.designData) return renderDesignResults(message);
     if (message.sheetPdfData) {
       return (
         <SheetPreviewCard
@@ -4221,70 +4286,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.designData ? (
                       <div className="space-y-4">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {/* Display design results with DesignCanvas */}
-                        <DesignCanvas
-                          images={message.designData.images}
-                          modelResults={message.designData.modelResults}
-                          totalModels={message.designData.totalModels}
-                          successfulModels={message.designData.successfulModels}
-                          spatialAnalysis={message.designData.spatialAnalysis}
-                          matchedMaterials={message.designData.matchedMaterials}
-                          parsedRequest={message.designData.parsedRequest}
-                          qualityAssessment={message.designData.qualityAssessment}
-                          processingTimeMs={message.designData.processingTimeMs}
-                          onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-                          onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                          onMaterialClick={(materialId) => {
-                            // Open the same materials modal pre-scoped to the clicked material.
-                            // If the id doesn't match (user clicked stale data), fall back to the full list.
-                            const all = message.designData.matchedMaterials || [];
-                            const single = all.filter((m: any) => m?.id === materialId || m?.material_id === materialId);
-                            setSelectedMaterialsData({
-                              materials: single.length > 0 ? single : all,
-                              spatialAnalysis: message.designData.spatialAnalysis,
-                              roomType: message.designData.parsedRequest?.room_type,
-                              style: message.designData.parsedRequest?.style,
-                            });
-                            setShowMaterialModal(true);
-                          }}
-                          onFindMaterials={async (imageUrl) => {
-                            const findMaterialsPrompt = `Find materials and products that match this interior design image: ${imageUrl}`;
-                            setInput(findMaterialsPrompt);
-                            setTimeout(async () => {
-                              await handleSendMessage();
-                            }, 100);
-                          }}
-                          onViewAllMaterials={() => {
-                            setSelectedMaterialsData({
-                              materials: message.designData.matchedMaterials || [],
-                              spatialAnalysis: message.designData.spatialAnalysis,
-                              roomType: message.designData.parsedRequest?.room_type,
-                              style: message.designData.parsedRequest?.style,
-                            });
-                            setShowMaterialModal(true);
-                          }}
-                        />
-                        {/* Display cost estimate if available */}
-                        {message.designData.costEstimate && (
-                          <div className="bg-blue-50 rounded-lg p-4 text-gray-900">
-                            <h4 className="font-semibold mb-2">Cost Estimate</h4>
-                            <div className="space-y-2">
-                              {message.designData.costEstimate.materials.map((material: any) => (
-                                <div key={material.name} className="flex justify-between text-sm">
-                                  <span>{material.name}</span>
-                                  <span className="font-medium">
-                                    ${material.subtotal.toFixed(2)}
-                                  </span>
-                                </div>
-                              ))}
-                              <div className="border-t border-gray-300 pt-2 flex justify-between font-bold">
-                                <span>Total</span>
-                                <span className="text-blue-600">
-                                  ${message.designData.costEstimate.total_cost.toFixed(2)} {message.designData.costEstimate.currency}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                        {canvasShown ? (
+                          <ArtifactChip
+                            kind="design"
+                            title="Interior design"
+                            active={activeCanvasId === message.id}
+                            onOpen={() => focusCanvas(message.id)}
+                          />
+                        ) : (
+                          renderDesignResults(message)
                         )}
                       </div>
                     ) : message.geminiImageData ? (

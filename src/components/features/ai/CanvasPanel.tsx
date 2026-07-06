@@ -12,13 +12,13 @@
  */
 import React from 'react';
 import {
-  FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video,
+  FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video, Sofa,
   PanelRightClose, ArrowUpRight, LayoutPanelLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
-  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video';
+  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design';
 
 export interface CanvasArtifact {
   id: string;
@@ -34,6 +34,7 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   board: LayoutGrid,
   image: ImageIcon,
   video: Video,
+  design: Sofa,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -44,6 +45,7 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   board: 'Materials board',
   image: 'Generated image',
   video: 'Generated video',
+  design: 'Interior design',
 };
 
 interface CanvasPanelProps {
