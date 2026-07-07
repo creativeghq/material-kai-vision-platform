@@ -1,0 +1,9 @@
+{
+  "slug": "docs",
+  "name": "Docs",
+  "description": "Internal team documentation the KAI agent can search. No embeddings — kept out of the vector store.",
+  "category": "productivity",
+  "priceTier": "free",
+  "icon": "BookText",
+  "version": "0.1.0"
+}

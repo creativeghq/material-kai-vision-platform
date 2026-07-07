@@ -813,6 +813,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       // Core tools (all users)
       'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
+      // Docs module (#254) — internal workspace docs FTS. Tool is only pushed when the
+      // 'docs' module is active for the workspace (see push site below).
+      'search_workspace_docs',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
@@ -1240,6 +1243,7 @@ async function executeAgent(
   // Each module does top-level await for @langchain/core + zod.
   // Loading them at boot exceeds the 2s Supabase Edge Runtime limit.
   const needsSearch = config.tools.some((t: string) => ['knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t));
+  const needsDocs = config.tools.includes('search_workspace_docs');
   const needsGen = config.tools.some((t: string) => ['generate_3d'].includes(t));
   const needsOps = config.tools.some((t: string) => ['check_server_health', 'query_sentry', 'cost_estimation'].includes(t));
   const needsDb = config.tools.includes('query_database');
@@ -1283,7 +1287,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1301,8 +1305,10 @@ async function executeAgent(
     needsProjects     ? import('../_shared/tools/project-tools.ts') : null,
     needsTechRadar    ? import('../_shared/tools/tech-radar-tools.ts') : null,
     needsSourcing     ? import('../_shared/tools/sourcing-tools.ts') : null,
+    needsDocs         ? import('../_shared/tools/docs-tools.ts') : null,
   ]);
 
+  const createDocsSearchTool = docsMod?.createDocsSearchTool;
   const createSearchTool = searchMod?.createSearchTool;
   const createVisualSearchTool = searchMod?.createVisualSearchTool;
   const createKnowledgeBaseSearchTool = searchMod?.createKnowledgeBaseSearchTool;
@@ -1441,6 +1447,13 @@ async function executeAgent(
   if (config.tools.includes('knowledge_base_search')) {
     // agentId is passed so MIVAA can enforce per-doc allowed_agents allow-lists.
     tools.push(createKnowledgeBaseSearchTool(workspaceId, isAdmin, agentId));
+  }
+
+  // Docs module (#254) — internal workspace docs via Postgres FTS (no embeddings). The tool is
+  // workspace-scoped + RLS-safe; docs is a free module available to all workspaces. For a future
+  // paid/gated module, add an is_workspace_entitled check here.
+  if (config.tools.includes('search_workspace_docs') && createDocsSearchTool) {
+    tools.push(createDocsSearchTool(workspaceId));
   }
 
   // Material search (text-based 7-vector fusion) — now with search_spec support

@@ -22984,6 +22984,59 @@ export type Database = {
           },
         ]
       }
+      workspace_docs: {
+        Row: {
+          category: string | null
+          content_markdown: string
+          content_tsv: unknown
+          created_at: string
+          created_by: string | null
+          id: string
+          status: string
+          tags: string[]
+          title: string
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          category?: string | null
+          content_markdown?: string
+          content_tsv?: unknown
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          status?: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          category?: string | null
+          content_markdown?: string
+          content_tsv?: unknown
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          status?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_docs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_email_config: {
         Row: {
           created_at: string
@@ -26636,6 +26689,15 @@ export type Database = {
           name: string
           product_id: string
           similarity_score: number
+        }[]
+      }
+      search_workspace_docs_fts: {
+        Args: { p_limit?: number; p_query: string; p_workspace_id: string }
+        Returns: {
+          id: string
+          rank: number
+          snippet: string
+          title: string
         }[]
       }
       seed_workspace_user_levels: {
