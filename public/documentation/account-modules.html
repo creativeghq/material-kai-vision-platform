@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account: Modules | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="account.html">Account &amp; Billing</a> / Modules</div>
+  <h1>Account · Modules</h1>
+  <div class="routes"><span class="badge route">/profile</span></div>
+  <p class="lead">MaterialsHub is built from <strong>modules</strong> — self-contained capabilities (finance, monitoring, social publishing, and more). The <strong>Modules</strong> tab is where you turn optional modules <strong>on for your workspace</strong>: some come with your plan, others are purchasable add-ons. If you're not the owner, you can <strong>request</strong> a module and the owner is notified to enable it. This keeps each workspace to exactly the capabilities it needs (and pays for).</p>
+
+  <div class="callout"><p><strong>Where:</strong> open your <strong>Profile</strong> menu (top-right) → the <strong>Modules</strong> tab. Modules are enabled <strong>per workspace</strong> — <em>“Activate optional modules for this workspace”</em> — so if you belong to several, pick the one you're configuring.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/modules.png" alt="The Modules tab — activate optional modules for the workspace">
+    <figcaption>Profile → Modules — the optional modules available to your workspace, with their activation state.</figcaption>
+  </figure>
+
+  <h2>What it is &amp; why it matters</h2>
+  <p><strong>What it is —</strong> a per-workspace catalogue of optional modules with an on/off (or purchase) control for each. <strong>Why it matters —</strong> you only carry — and pay for — what you use: a design studio might enable moodboards and sheets but not finance; a retailer enables finance and POS. Your <strong>plan</strong> sets what's included; add-ons extend beyond it.</p>
+
+  <h2>Included vs purchasable</h2>
+  <ul class="feat">
+    <li><strong>Included modules</strong> — the ones your current plan already covers; switch them on directly.</li>
+    <li><strong>Purchasable add-ons</strong> — modules beyond your plan. Each add-on is tied to a <strong>Stripe product</strong>, so activating it goes through checkout/billing and then unlocks the capability for the workspace.</li>
+  </ul>
+
+  <h2>How to activate a module</h2>
+  <ol>
+    <li>Open <strong>Profile → Modules</strong> and (if prompted) pick the <strong>workspace</strong>.</li>
+    <li>Find the module you want. If it's included in your plan, switch it <strong>on</strong>; if it's a paid add-on, use its <strong>activate / purchase</strong> action and complete checkout.</li>
+    <li>Once active, the module's features appear across the app for that workspace (its tab, tools and settings switch on).</li>
+  </ol>
+
+  <h2>Requesting a module (non-owners)</h2>
+  <p><strong>What it is —</strong> if you're a member (not the workspace owner), you can't enable a paid module yourself — but you can <strong>request activation</strong>. <strong>Why it matters —</strong> the person who needs a capability and the person who authorises the spend are often different; the request routes cleanly to the owner instead of a side conversation. When you request one, the owner is <strong>notified</strong> (a <em>module-access-requested</em> event flows through the platform's notification/Flows engine) and can approve it. You'll get access once they enable it.</p>
+
+  <div class="callout tip"><p><strong>Related:</strong> your <strong>plan</strong> and credit allowance are on the <a href="account-subscription.html">Subscription</a> tab; the outside services a workspace connects to (social, WhatsApp, Stripe payouts, bring-your-own-key) are on the <a href="account-keys.html">Keys &amp; Connections</a> tab.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

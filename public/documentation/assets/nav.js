@@ -109,6 +109,7 @@
         { file: "account-credits.html", title: "Credits" },
         { file: "account-billing.html", title: "Billing" },
         { file: "account-keys.html", title: "Keys & Connections" },
+        { file: "account-modules.html", title: "Modules" },
         { file: "account-social.html", title: "Social Accounts" },
         { file: "account-appointments-reviews.html", title: "Appointments & Reviews" },
       ]},

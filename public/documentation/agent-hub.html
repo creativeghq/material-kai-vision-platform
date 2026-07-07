@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Agent Hub</div>
   <h1>Agent Hub (JARVIS)</h1>
   <div class="routes"><span class="badge route">/agent-hub</span></div>
-  <p class="lead">The Agent Hub is the conversational AI workspace at the centre of the platform. Instead of clicking through menus, you describe what you want in plain language and the assistant searches, creates and automates across every module — returning rich, interactive results inline in the chat. This guide teaches each part: starting a conversation, choosing an agent, using the composer, and turning the results into real artefacts you can keep.</p>
+  <p class="lead">The Agent Hub is the conversational AI <strong>studio</strong> at the centre of the platform. Instead of clicking through menus, you describe what you want in plain language and the assistant searches, creates and automates across every module. Substantial results — products, renders, sheets, staged rooms, VR worlds — open as <strong>artifacts on a canvas</strong> with the chat docked to a collapsible right rail, so you can <em>work</em> on results, not just read them. This guide teaches each part: starting a conversation, choosing an agent, using the composer, the studio canvas, and turning results into real artefacts you can keep.</p>
 
   <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Agent Hub</strong>.</p></div>
 
@@ -33,7 +33,7 @@
     <li>Type your request in plain language and send it.</li>
     <li>To return to earlier work, reopen any past conversation from the list on the left — it picks up exactly where you left off.</li>
   </ol>
-  <p>The <strong>conversation list</strong> on the left holds every chat you've had, with a <em>Search conversations…</em> box to find old ones. Each item can be <strong>renamed</strong> or <strong>deleted</strong>, and shows the topic and tools it used so you can spot the right thread at a glance.</p>
+  <p>Your past chats live in a <strong>conversation manager</strong> you open with <strong>⌘K</strong> (a command-palette style modal) — search, reopen, rename or delete any thread from there. Moving conversations into ⌘K keeps the main screen clear for the canvas and the current chat.</p>
   <p><strong>What it affects elsewhere:</strong> start a <strong>new conversation</strong> for a new topic so contexts don't bleed into each other; keep one thread going when you're iterating on the same task.</p>
 
   <!-- 2 -->
@@ -52,7 +52,7 @@
   <p><strong>What it is —</strong> the message box and its toolbar, where you write requests and attach context. <strong>Why it matters —</strong> the toolbar is how you give the assistant more than words — a room photo, a document, your voice, or a web page to learn a style from — which makes its answers far more precise.</p>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/agent-hub/conversation.png" alt="An open Agent Hub conversation">
-    <figcaption>Results stream into the thread as interactive cards you can click, save or act on.</figcaption>
+    <figcaption>Substantial results open as artifacts on the canvas with the chat docked to the right rail; simple answers stay inline.</figcaption>
   </figure>
   <h3>What the toolbar offers</h3>
   <ul class="feat">
@@ -73,13 +73,21 @@
   <p><strong>What it affects elsewhere:</strong> the full catalogue of what the assistant can do — and how to enable additional toolkits — is documented in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p>
 
   <!-- 4 -->
-  <h2>4. Reading the results</h2>
-  <p><strong>What it is —</strong> the chat panel is the active conversation, where the assistant's answers render as interactive cards rather than plain text. <strong>Why it matters —</strong> cards are clickable and actionable: products you can open, images you can save, a search spec you can refine, price/mention data, sheets, and more.</p>
-  <h3>How to work through them</h3>
+  <h2>4. The Studio canvas, inspector &amp; right-rail chat</h2>
+  <p><strong>What it is —</strong> the Agent Hub works like a <strong>studio</strong>: when the assistant produces something substantial — a set of products, a moodboard sheet, an interior render, a staging result, a VR world — it opens as an <strong>artifact on a canvas</strong>, and the chat automatically <strong>docks to a collapsible right rail</strong>. <strong>Why it matters —</strong> your work has room to breathe: the render/products/sheet gets the main stage while the conversation that's driving it stays alongside, instead of everything scrolling away up a chat log.</p>
+  <h3>How it lays out</h3>
+  <ul class="feat">
+    <li><strong>Canvas</strong> — the main area, holding the current artifact. Multiple artifacts from a conversation appear as <strong>chips</strong> you switch between, so each result lives in exactly one place (no more triplicated cards).</li>
+    <li><strong>Contextual inspector</strong> — a panel <em>beside</em> the artifact whose controls match what's selected: a products inspector for a product set, a sheet inspector for a moodboard sheet, a staging / render / world / board inspector for those. It's where you act on the artifact (refine, save, tweak).</li>
+    <li><strong>Right-rail chat</strong> — the conversation docks to the right while you work. You can <strong>collapse the chat</strong> to focus the canvas, or <strong>hide the canvas</strong> to reclaim a full-width chat — whichever the moment needs.</li>
+    <li><strong>Design canvas</strong> — starting a new design or a virtual staging opens a guided <strong>design canvas</strong> for that flow.</li>
+  </ul>
+  <h3>How to work through it</h3>
   <ol>
-    <li>Send your message and watch the result cards stream into the thread — products, the search spec, images, and other rich output.</li>
-    <li>Open a product to inspect it, save it to a <a href="moodboards.html">moodboard</a>, or act on it directly from the card.</li>
-    <li>Chain follow-ups in the same thread to refine — the assistant keeps the context of the conversation.</li>
+    <li>Send your message; substantial results open on the <strong>canvas</strong> (simple answers stay inline in the chat).</li>
+    <li>Use the <strong>inspector</strong> beside the artifact to act on it — open a product, save an image to a <a href="moodboards.html">moodboard</a>, adjust a sheet.</li>
+    <li>Switch between a conversation's artifacts with the <strong>chips</strong>; collapse the chat or hide the canvas as needed.</li>
+    <li>Chain follow-ups in the same thread to refine — the assistant keeps the conversation's context, and new results land on the canvas.</li>
   </ol>
 
   <!-- 5 -->
