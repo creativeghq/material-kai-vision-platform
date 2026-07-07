@@ -184,7 +184,7 @@ export const ModulesActivationTab: React.FC = () => {
               badge = <Badge variant="secondary">Included in {planName}</Badge>;
             } else if (hasIt) {
               badge = <Badge className="gap-1"><Check className="h-3 w-3" /> Active</Badge>;
-            } else if (m.is_addon && m.addon_stripe_price_id) {
+            } else if (m.is_addon && m.addon_stripe_product_id) {
               badge = price ? <Badge variant="outline">{price}</Badge> : <Badge variant="outline">Add-on</Badge>;
             } else {
               const tierLabel = (m.price_tier || 'a higher').replace(/^\w/, (c) => c.toUpperCase());
@@ -201,7 +201,7 @@ export const ModulesActivationTab: React.FC = () => {
                 <Badge className="gap-1"><Check className="h-3 w-3" /> Active</Badge>
               );
             } else if (isOwner) {
-              action = m.is_addon && m.addon_stripe_price_id ? (
+              action = m.is_addon && m.addon_stripe_product_id ? (
                 <Button size="sm" disabled={busy === m.slug} onClick={() => handleActivate(m)}>
                   {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="h-4 w-4 mr-1" /> Activate</>}
                 </Button>

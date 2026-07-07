@@ -46,11 +46,10 @@ Deno.serve(withApiLogging('stripe-api', async (req) => {
     case 'deactivate-module':
     case 'request-module':
     case 'list-stripe-products':
-    case 'list-stripe-prices':
       return handleModuleAction(req, body);
     default:
       return new Response(JSON.stringify({
-        error: `Unknown action '${action}'. Available: checkout, customer_portal, activate-module, deactivate-module, request-module, list-stripe-products, list-stripe-prices`,
+        error: `Unknown action '${action}'. Available: checkout, customer_portal, activate-module, deactivate-module, request-module, list-stripe-products`,
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

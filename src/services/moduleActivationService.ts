@@ -26,7 +26,7 @@ export interface ModuleCatalogRow {
   is_addon: boolean;
   addon_price_cents: number | null;
   addon_currency: string | null;
-  addon_stripe_price_id: string | null;
+  addon_stripe_product_id: string | null;
   screenshot_url: string | null;
 }
 

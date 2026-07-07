@@ -1,8 +1,8 @@
-// #251 A2 — operator sets a module's add-on billing: mark it purchasable and bind a recurring
-// Stripe price (fetched live from Stripe). The plan tier that INCLUDES it is set separately on
-// /admin/plans (modules.price_tier). Price + currency are derived from the chosen Stripe price.
+// #251 A2 — operator binds a module 1:1 to a Stripe PRODUCT (not a bare price). The charge uses
+// the product's default_price (resolved at activation), so two modules can never collide on a
+// shared price id. The plan tier that INCLUDES a module for free is set separately on /admin/plans.
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -16,13 +16,17 @@ import {
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-interface StripePrice {
+interface StripeProductPrice {
   id: string;
-  nickname: string | null;
   unit_amount: number | null;
   currency: string;
-  interval?: string;
-  product_name?: string;
+  interval: string;
+}
+interface StripeProduct {
+  id: string;
+  name: string;
+  description: string | null;
+  price: StripeProductPrice | null; // null when the product has no recurring default price
 }
 
 interface Props {
@@ -33,13 +37,18 @@ interface Props {
   onSaved: () => void;
 }
 
+function priceLabel(p: StripeProductPrice): string {
+  const amt = p.unit_amount != null ? (p.unit_amount / 100).toFixed(2) : '—';
+  return `${amt} ${p.currency.toUpperCase()}/${p.interval}`;
+}
+
 export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenChange, onSaved }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [prices, setPrices] = useState<StripePrice[]>([]);
+  const [products, setProducts] = useState<StripeProduct[]>([]);
   const [isAddon, setIsAddon] = useState(false);
-  const [priceId, setPriceId] = useState<string>('');
+  const [productId, setProductId] = useState<string>('');
   const [summary, setSummary] = useState('');
 
   useEffect(() => {
@@ -47,37 +56,35 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
     let cancelled = false;
     (async () => {
       setLoading(true);
-      // Current billing config on the module row (new #251 columns not yet in generated types).
       const modReq = supabase.from('modules').select('*').eq('slug', slug).maybeSingle();
-      // Live Stripe recurring prices (operator-gated edge action).
-      const pricesReq = supabase.functions.invoke('stripe-api', { body: { action: 'list-stripe-prices' } });
-      const [{ data: mod }, { data: pr, error: prErr }] = await Promise.all([modReq, pricesReq]);
+      const prodReq = supabase.functions.invoke('stripe-api', { body: { action: 'list-stripe-products' } });
+      const [{ data: mod }, { data: pr, error: prErr }] = await Promise.all([modReq, prodReq]);
       if (cancelled) return;
-      const m = mod as unknown as { is_addon?: boolean; addon_stripe_price_id?: string | null; summary?: string | null } | null;
+      const m = mod as unknown as { is_addon?: boolean; addon_stripe_product_id?: string | null; summary?: string | null } | null;
       setIsAddon(!!m?.is_addon);
-      setPriceId(m?.addon_stripe_price_id ?? '');
+      setProductId(m?.addon_stripe_product_id ?? '');
       setSummary(m?.summary ?? '');
       if (prErr) {
-        toast({ title: 'Could not load Stripe prices', description: 'Check the Stripe key at Payments → Keys.', variant: 'destructive' });
-        setPrices([]);
+        toast({ title: 'Could not load Stripe products', description: 'Check the Stripe key at Payments → Keys.', variant: 'destructive' });
+        setProducts([]);
       } else {
-        setPrices(((pr as { prices?: StripePrice[] })?.prices) ?? []);
+        setProducts(((pr as { products?: StripeProduct[] })?.products) ?? []);
       }
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [open, slug, toast]);
 
-  const selected = prices.find((p) => p.id === priceId);
+  const selected = products.find((p) => p.id === productId);
+  const priceMissing = isAddon && !!selected && !selected.price;
 
   const save = async () => {
     setSaving(true);
-    // Derive display price + currency from the chosen Stripe price (authoritative).
     const payload = {
       is_addon: isAddon,
-      addon_stripe_price_id: isAddon ? (priceId || null) : null,
-      addon_price_cents: isAddon ? (selected?.unit_amount ?? null) : null,
-      addon_currency: isAddon ? (selected?.currency ?? 'eur') : 'eur',
+      addon_stripe_product_id: isAddon ? (productId || null) : null,
+      addon_price_cents: isAddon ? (selected?.price?.unit_amount ?? null) : null,
+      addon_currency: isAddon ? (selected?.price?.currency ?? 'eur') : 'eur',
       summary: summary || null,
     };
     // `modules` add-on columns aren't in the generated Database type yet — cast the builder.
@@ -86,7 +93,13 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
     }).update(payload).eq('slug', slug);
     setSaving(false);
     if (error) {
-      toast({ title: 'Could not save billing', description: error.message, variant: 'destructive' });
+      // A duplicate Stripe product on another module trips the unique index → friendly message.
+      const dup = /modules_addon_product_uniq|duplicate key/i.test(error.message);
+      toast({
+        title: 'Could not save billing',
+        description: dup ? 'That Stripe product is already bound to another module. Use one product per module.' : error.message,
+        variant: 'destructive',
+      });
       return;
     }
     toast({ title: 'Billing updated', description: name });
@@ -114,22 +127,27 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
 
             {isAddon && (
               <div className="space-y-2">
-                <Label>Recurring Stripe price</Label>
-                <Select value={priceId} onValueChange={setPriceId}>
-                  <SelectTrigger><SelectValue placeholder="Select a Stripe price…" /></SelectTrigger>
+                <Label>Stripe product</Label>
+                <Select value={productId} onValueChange={setProductId}>
+                  <SelectTrigger><SelectValue placeholder="Select a Stripe product…" /></SelectTrigger>
                   <SelectContent>
-                    {prices.length === 0 && <SelectItem value="none" disabled>No recurring prices found</SelectItem>}
-                    {prices.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {(p.product_name || p.nickname || p.id)}
-                        {p.unit_amount != null ? ` — ${(p.unit_amount / 100).toFixed(2)} ${p.currency.toUpperCase()}/${p.interval ?? 'mo'}` : ''}
+                    {products.length === 0 && <SelectItem value="none" disabled>No active products found</SelectItem>}
+                    {products.map((p) => (
+                      <SelectItem key={p.id} value={p.id} disabled={!p.price}>
+                        {p.name}{p.price ? ` — ${priceLabel(p.price)}` : ' — no recurring price'}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Create the price in Stripe (recurring), then pick it here. Price &amp; currency are read from Stripe.
-                </p>
+                {priceMissing ? (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> This product has no recurring default price in Stripe — set one before binding.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    One product per module. The charge uses the product's <strong>default price</strong> (set it in Stripe).
+                  </p>
+                )}
               </div>
             )}
 
@@ -141,7 +159,7 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save} disabled={saving || loading || (isAddon && !priceId)}>
+          <Button onClick={save} disabled={saving || loading || (isAddon && (!productId || priceMissing))}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
           </Button>
         </DialogFooter>

@@ -3,8 +3,12 @@
 // Actions (dispatched from stripe-api/index.ts):
 //   activate-module    { workspace_id, module_slug, successUrl?, cancelUrl? }
 //   deactivate-module  { workspace_id, module_slug }
-//   list-stripe-products                     (operator only)
-//   list-stripe-prices                       (operator only)
+//   request-module     { workspace_id, module_slug }   (non-owner → notify owner)
+//   list-stripe-products                               (operator only)
+//
+// An add-on module binds to a Stripe PRODUCT (1:1). The charge uses that product's
+// default_price, resolved fresh at activation — so it's always the current price and two
+// modules can never collide on a shared price id.
 //
 // Security baseline (#250 / #251):
 //   - authenticate() returns a service-role client (RLS bypassed) → we bind every
@@ -80,8 +84,7 @@ export async function handleModuleAction(req: Request, body: Record<string, unkn
     case 'request-module':
       return requestModule(auth, body);
     case 'list-stripe-products':
-    case 'list-stripe-prices':
-      return listStripeCatalog(auth, action);
+      return listStripeProducts(auth);
     default:
       return json({ error: `Unknown module action '${action}'` }, 400);
   }
@@ -101,7 +104,7 @@ async function activateModule(auth: AuthResult, body: Record<string, unknown>): 
 
   const { data: mod } = await service
     .from('modules')
-    .select('slug, name, enabled, is_addon, addon_stripe_price_id, price_tier')
+    .select('slug, name, enabled, is_addon, addon_stripe_product_id, price_tier')
     .eq('slug', moduleSlug)
     .maybeSingle();
   if (!mod) return json({ error: `Unknown module '${moduleSlug}'`, code: 'unknown_module' }, 404);
@@ -129,7 +132,7 @@ async function activateModule(auth: AuthResult, body: Record<string, unknown>): 
   }
 
   // PAID path: create a recurring Stripe checkout. The webhook grants the entitlement.
-  if (!mod.is_addon || !mod.addon_stripe_price_id) {
+  if (!mod.is_addon || !mod.addon_stripe_product_id) {
     return json(
       { error: 'This module is not included in your plan and is not available as an add-on.', code: 'not_available_on_plan' },
       400,
@@ -139,6 +142,17 @@ async function activateModule(auth: AuthResult, body: Record<string, unknown>): 
   const stripe = getPlatformBillingStripe();
   const supabase = getSupabase();
   if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);
+
+  // Resolve the bound product's CURRENT default price (always fresh — never a cached id).
+  const product = await stripe.products.retrieve(mod.addon_stripe_product_id as string, { expand: ['default_price'] });
+  const dp = product.default_price;
+  const priceObj = dp && typeof dp === 'object' ? dp : null;
+  if (!priceObj || !priceObj.recurring || priceObj.active === false) {
+    return json(
+      { error: 'This add-on has no active recurring price set as the product default in Stripe.', code: 'no_recurring_price' },
+      400,
+    );
+  }
 
   // Resolve/create the Stripe customer on the platform-billing account (mirrors checkout.ts).
   const distinct = hasDistinctBillingAccount();
@@ -167,7 +181,7 @@ async function activateModule(auth: AuthResult, body: Record<string, unknown>): 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
-    line_items: [{ price: mod.addon_stripe_price_id as string, quantity: 1 }],
+    line_items: [{ price: priceObj.id, quantity: 1 }],
     subscription_data: { metadata: meta },
     metadata: meta,
     success_url: (body.successUrl as string) || `${req.headers.get('origin') || ''}/profile?tab=modules&activated=${moduleSlug}`,
@@ -292,35 +306,26 @@ async function requestModule(auth: AuthResult, body: Record<string, unknown>): P
   return json({ requested: true, notified });
 }
 
-/** Operator-only: list Stripe products/prices so the admin can wire add-on pricing. */
-async function listStripeCatalog(auth: AuthResult, action: string): Promise<Response> {
+/**
+ * Operator-only: list active Stripe products (with each product's default_price) so the admin
+ * can bind a module 1:1 to a product. Products whose default_price isn't a recurring price are
+ * returned with `price: null` so the admin UI can flag them as not subscription-ready.
+ */
+async function listStripeProducts(auth: AuthResult): Promise<Response> {
   if (!isAdminAccess(auth) && !(await isOperator(auth.supabase, auth.userId))) {
     return json({ error: 'Operator access required', code: 'not_operator' }, 403);
   }
   const stripe = getPlatformBillingStripe();
   if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
-  if (action === 'list-stripe-products') {
-    const products = await stripe.products.list({ active: true, limit: 100 });
-    return json({
-      products: products.data.map((p) => ({ id: p.id, name: p.name, description: p.description })),
-    });
-  }
-
-  // list-stripe-prices — recurring prices only (add-ons are subscriptions).
-  const prices = await stripe.prices.list({ active: true, limit: 100, expand: ['data.product'] });
+  const products = await stripe.products.list({ active: true, limit: 100, expand: ['data.default_price'] });
   return json({
-    prices: prices.data
-      .filter((pr) => pr.recurring)
-      .map((pr) => ({
-        id: pr.id,
-        nickname: pr.nickname,
-        unit_amount: pr.unit_amount,
-        currency: pr.currency,
-        interval: pr.recurring?.interval,
-        product_name: typeof pr.product === 'object' && pr.product && 'name' in pr.product
-          ? (pr.product as { name?: string }).name
-          : undefined,
-      })),
+    products: products.data.map((p) => {
+      const dp = p.default_price;
+      const price = dp && typeof dp === 'object' && dp.recurring
+        ? { id: dp.id, unit_amount: dp.unit_amount, currency: dp.currency, interval: dp.recurring.interval }
+        : null;
+      return { id: p.id, name: p.name, description: p.description, price };
+    }),
   });
 }
