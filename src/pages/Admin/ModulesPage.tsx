@@ -47,7 +47,7 @@ const ModulesPage: React.FC = () => {
   const loadBilling = React.useCallback(async () => {
     const { data } = await supabase.from('modules').select('*');
     const map = new Map<string, BillingInfo>();
-    for (const r of (data ?? []) as unknown as (BillingInfo & { slug: string })[]) {
+    for (const r of (data ?? []) as (BillingInfo & { slug: string })[]) {
       map.set(r.slug, { is_addon: !!r.is_addon, addon_price_cents: r.addon_price_cents, addon_currency: r.addon_currency });
     }
     setBilling(map);

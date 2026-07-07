@@ -16,6 +16,10 @@ let supabase!: SupabaseClient;
 // with STRIPE_BILLING_WEBHOOK_SECRET). Drives which customer-id column we persist/lookup.
 let eventIsBilling = false;
 
+// #251 — module add-on plan-tier reconciliation.
+const MODULE_TIER_RANK: Record<string, number> = { free: 0, pro: 1, enterprise: 2 };
+const moduleTierRank = (t?: string | null) => MODULE_TIER_RANK[(t || '').toLowerCase()] ?? 999;
+
 /** Match a user profile by a Stripe customer id from EITHER account (default or billing). */
 function profileByCustomer(customerId: string, columns: string) {
   return supabase.from('user_profiles').select(columns)
@@ -214,6 +218,48 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     .eq('user_id', profile.user_id);
 
   console.log(`Subscription updated for user ${profile.user_id}: ${tier}`);
+
+  // #251 — if the new plan tier now INCLUDES a module this owner is paying for as an add-on,
+  // cancel the redundant add-on so they aren't double-billed. Access is preserved because the
+  // tier now covers it (and handleModuleAddonDeleted won't revoke a plan-covered module).
+  await reconcileModuleAddonsForOwner(profile.user_id, tier).catch((e) =>
+    console.error('[modules] add-on reconcile failed:', e));
+}
+
+// #251 — cancel (at period end) any add-on subscriptions for workspaces this user owns whose
+// module is now covered by the given plan tier.
+async function reconcileModuleAddonsForOwner(userId: string, planTier: string) {
+  const rank = moduleTierRank(planTier);
+  const { data: ws } = await supabase
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('user_id', userId)
+    .eq('role', 'owner')
+    .eq('status', 'active');
+  const wsIds = (ws || []).map((w: { workspace_id: string }) => w.workspace_id);
+  if (!wsIds.length) return;
+
+  const { data: subs } = await supabase
+    .from('workspace_module_subscriptions')
+    .select('workspace_id, module_slug, stripe_subscription_id, status, modules!inner(price_tier)')
+    .in('workspace_id', wsIds)
+    .in('status', ['active', 'canceling']);
+
+  for (const s of (subs || []) as Array<{ workspace_id: string; module_slug: string; stripe_subscription_id: string | null; modules?: { price_tier?: string | null } }>) {
+    if (!s.stripe_subscription_id) continue;
+    if (moduleTierRank(s.modules?.price_tier) > rank) continue; // not covered by the new tier
+    try {
+      await stripe.subscriptions.update(s.stripe_subscription_id, { cancel_at_period_end: true });
+      await supabase
+        .from('workspace_module_subscriptions')
+        .update({ status: 'canceling', updated_at: new Date().toISOString() })
+        .eq('workspace_id', s.workspace_id)
+        .eq('module_slug', s.module_slug);
+      console.log(`[modules] canceling add-on '${s.module_slug}' for ws ${s.workspace_id} — now included in ${planTier} plan`);
+    } catch (e) {
+      console.error(`[modules] failed to cancel add-on '${s.module_slug}':`, e);
+    }
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -282,18 +328,28 @@ async function handleModuleAddonSubscription(subscription: Stripe.Subscription) 
   }
 }
 
-// #251 — module add-on subscription deleted → revoke the entitlement + mark the sub row.
+// #251 — module add-on subscription deleted → mark the sub row and revoke the entitlement,
+// UNLESS the workspace's plan tier now covers the module (e.g. after a plan upgrade the add-on
+// was cancelled). In that case access must persist even though the add-on ended.
 async function handleModuleAddonDeleted(subscription: Stripe.Subscription) {
   const meta = subscription.metadata || {};
   const workspaceId = meta.workspace_id;
   const moduleSlug = meta.module_slug;
   if (!workspaceId || !moduleSlug) return;
 
-  await supabase
-    .from('workspace_module_entitlements')
-    .update({ enabled: false, granted_at: new Date().toISOString() })
-    .eq('workspace_id', workspaceId)
-    .eq('module_slug', moduleSlug);
+  const [{ data: planLevel }, { data: mod }] = await Promise.all([
+    supabase.rpc('workspace_plan_level', { p_workspace_id: workspaceId }),
+    supabase.from('modules').select('price_tier').eq('slug', moduleSlug).maybeSingle(),
+  ]);
+  const covered = moduleTierRank((mod as { price_tier?: string | null } | null)?.price_tier) <= (Number(planLevel) || 0);
+
+  if (!covered) {
+    await supabase
+      .from('workspace_module_entitlements')
+      .update({ enabled: false, granted_at: new Date().toISOString() })
+      .eq('workspace_id', workspaceId)
+      .eq('module_slug', moduleSlug);
+  }
 
   await supabase
     .from('workspace_module_subscriptions')
@@ -301,7 +357,7 @@ async function handleModuleAddonDeleted(subscription: Stripe.Subscription) {
     .eq('workspace_id', workspaceId)
     .eq('module_slug', moduleSlug);
 
-  console.log(`Revoked module '${moduleSlug}' from workspace ${workspaceId} (sub ${subscription.id} deleted)`);
+  console.log(`Module add-on '${moduleSlug}' ended for ws ${workspaceId} (covered_by_plan=${covered}; sub ${subscription.id} deleted)`);
 }
 
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {

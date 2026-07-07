@@ -60,10 +60,9 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
       const prodReq = supabase.functions.invoke('stripe-api', { body: { action: 'list-stripe-products' } });
       const [{ data: mod }, { data: pr, error: prErr }] = await Promise.all([modReq, prodReq]);
       if (cancelled) return;
-      const m = mod as unknown as { is_addon?: boolean; addon_stripe_product_id?: string | null; summary?: string | null } | null;
-      setIsAddon(!!m?.is_addon);
-      setProductId(m?.addon_stripe_product_id ?? '');
-      setSummary(m?.summary ?? '');
+      setIsAddon(!!mod?.is_addon);
+      setProductId(mod?.addon_stripe_product_id ?? '');
+      setSummary(mod?.summary ?? '');
       if (prErr) {
         toast({ title: 'Could not load Stripe products', description: 'Check the Stripe key at Payments → Keys.', variant: 'destructive' });
         setProducts([]);
@@ -87,10 +86,7 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
       addon_currency: isAddon ? (selected?.price?.currency ?? 'eur') : 'eur',
       summary: summary || null,
     };
-    // `modules` add-on columns aren't in the generated Database type yet — cast the builder.
-    const { error } = await (supabase.from('modules') as unknown as {
-      update: (v: Record<string, unknown>) => { eq: (c: string, v: string) => Promise<{ error: { message: string } | null }> };
-    }).update(payload).eq('slug', slug);
+    const { error } = await supabase.from('modules').update(payload).eq('slug', slug);
     setSaving(false);
     if (error) {
       // A duplicate Stripe product on another module trips the unique index → friendly message.

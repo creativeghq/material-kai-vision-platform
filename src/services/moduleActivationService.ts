@@ -42,7 +42,7 @@ export interface ActivateResult {
 export async function fetchModuleCatalog(): Promise<ModuleCatalogRow[]> {
   const { data, error } = await supabase.from('modules').select('*').eq('enabled', true);
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as ModuleCatalogRow[];
+  return (data ?? []) as ModuleCatalogRow[];
 }
 
 /** Slugs the active workspace has an explicit ENABLED entitlement row for. */

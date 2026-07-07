@@ -75,6 +75,7 @@ import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboard';
 import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
+import { ModuleSubscribersPanel } from './ModuleSubscribersPanel';
 
 import type {
   UsageAnalytics,
@@ -98,7 +99,7 @@ import { StatCard } from './components/StatCard';
 const VALID_OPERATIONS_TABS = new Set([
   'system-health', 'data-processing', 'ai-performance', 'performance', 'agent-chat',
   'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
-  'seo-toolkit', 'factory-onboarding', 'keys',
+  'seo-toolkit', 'factory-onboarding', 'keys', 'modules',
 ]);
 
 const OperationsDashboardInner: React.FC = () => {
@@ -889,6 +890,10 @@ const OperationsDashboardInner: React.FC = () => {
               <KeyRound className="h-4 w-4 mr-2" />
               Keys
             </TabsTrigger>
+            <TabsTrigger value="modules">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Modules
+            </TabsTrigger>
           </TabsList>
 
           {/* System Health Tab */}
@@ -896,6 +901,11 @@ const OperationsDashboardInner: React.FC = () => {
             <SystemHealthMonitor />
             {/* Storage audit — orphan objects per bucket + run cleanup, across all buckets (PDFs, images, sheets, quotes, etc.) */}
             <StorageAuditPanel />
+          </TabsContent>
+
+          {/* Module add-ons — #251 per-workspace activation + add-on MRR (operator view). */}
+          <TabsContent value="modules" className="space-y-4">
+            <ModuleSubscribersPanel />
           </TabsContent>
 
           {/* Performance Tab — relocated from /admin/performance (job processing + per-document timelines). */}

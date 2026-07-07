@@ -103,6 +103,7 @@ export type Database = {
           last_message_at: string | null
           message_count: number | null
           messages: Json | null
+          pinned_at: string | null
           title: string
           toolkits: string[]
           updated_at: string | null
@@ -117,6 +118,7 @@ export type Database = {
           last_message_at?: string | null
           message_count?: number | null
           messages?: Json | null
+          pinned_at?: string | null
           title: string
           toolkits?: string[]
           updated_at?: string | null
@@ -131,6 +133,7 @@ export type Database = {
           last_message_at?: string | null
           message_count?: number | null
           messages?: Json | null
+          pinned_at?: string | null
           title?: string
           toolkits?: string[]
           updated_at?: string | null
@@ -9006,6 +9009,42 @@ export type Database = {
           },
         ]
       }
+      job_board_index: {
+        Row: {
+          distinct_employers: number
+          domain: string
+          first_seen_at: string
+          last_seen_at: string
+          promoted_at: string | null
+          refresh_runs: number
+          sample_employers: string[]
+          status: string
+          verified_matches: number
+        }
+        Insert: {
+          distinct_employers?: number
+          domain: string
+          first_seen_at?: string
+          last_seen_at?: string
+          promoted_at?: string | null
+          refresh_runs?: number
+          sample_employers?: string[]
+          status?: string
+          verified_matches?: number
+        }
+        Update: {
+          distinct_employers?: number
+          domain?: string
+          first_seen_at?: string
+          last_seen_at?: string
+          promoted_at?: string | null
+          refresh_runs?: number
+          sample_employers?: string[]
+          status?: string
+          verified_matches?: number
+        }
+        Relationships: []
+      }
       job_classifier_verdict_cache: {
         Row: {
           cache_key: string
@@ -9270,43 +9309,103 @@ export type Database = {
       }
       job_research_sites: {
         Row: {
+          auto_added: boolean
+          auto_disabled_at: string | null
+          browse_url: string | null
           category: string | null
           country_code: string | null
           created_at: string
           created_by: string | null
+          discovered_via: string | null
           display_name: string | null
           id: string
           is_enabled: boolean
+          last_yield_at: string | null
+          lifetime_verified: number
+          manual_review: boolean
+          manual_review_reason: string | null
           notes: string | null
           site_type: string
           updated_at: string
           url_or_domain: string
         }
         Insert: {
+          auto_added?: boolean
+          auto_disabled_at?: string | null
+          browse_url?: string | null
           category?: string | null
           country_code?: string | null
           created_at?: string
           created_by?: string | null
+          discovered_via?: string | null
           display_name?: string | null
           id?: string
           is_enabled?: boolean
+          last_yield_at?: string | null
+          lifetime_verified?: number
+          manual_review?: boolean
+          manual_review_reason?: string | null
           notes?: string | null
           site_type: string
           updated_at?: string
           url_or_domain: string
         }
         Update: {
+          auto_added?: boolean
+          auto_disabled_at?: string | null
+          browse_url?: string | null
           category?: string | null
           country_code?: string | null
           created_at?: string
           created_by?: string | null
+          discovered_via?: string | null
           display_name?: string | null
           id?: string
           is_enabled?: boolean
+          last_yield_at?: string | null
+          lifetime_verified?: number
+          manual_review?: boolean
+          manual_review_reason?: string | null
           notes?: string | null
           site_type?: string
           updated_at?: string
           url_or_domain?: string
+        }
+        Relationships: []
+      }
+      job_source_review: {
+        Row: {
+          created_at: string
+          disabled: string[] | null
+          flagged: string[] | null
+          id: string
+          per_domain: Json | null
+          promoted: string[] | null
+          refresh_run_id: string | null
+          summary: string | null
+          tracked_job_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          disabled?: string[] | null
+          flagged?: string[] | null
+          id?: string
+          per_domain?: Json | null
+          promoted?: string[] | null
+          refresh_run_id?: string | null
+          summary?: string | null
+          tracked_job_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          disabled?: string[] | null
+          flagged?: string[] | null
+          id?: string
+          per_domain?: Json | null
+          promoted?: string[] | null
+          refresh_run_id?: string | null
+          summary?: string | null
+          tracked_job_id?: string | null
         }
         Relationships: []
       }
@@ -9503,6 +9602,62 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_doc_chunks: {
+        Row: {
+          char_end: number
+          char_start: number
+          chunk_index: number
+          content: string
+          created_at: string | null
+          embedding_model: string | null
+          heading: string | null
+          id: string
+          kb_doc_id: string
+          schema_version: number | null
+          text_embedding: unknown
+          token_count: number | null
+          workspace_id: string
+        }
+        Insert: {
+          char_end: number
+          char_start: number
+          chunk_index: number
+          content: string
+          created_at?: string | null
+          embedding_model?: string | null
+          heading?: string | null
+          id?: string
+          kb_doc_id: string
+          schema_version?: number | null
+          text_embedding?: unknown
+          token_count?: number | null
+          workspace_id: string
+        }
+        Update: {
+          char_end?: number
+          char_start?: number
+          chunk_index?: number
+          content?: string
+          created_at?: string | null
+          embedding_model?: string | null
+          heading?: string | null
+          id?: string
+          kb_doc_id?: string
+          schema_version?: number | null
+          text_embedding?: unknown
+          token_count?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_doc_chunks_kb_doc_id_fkey"
+            columns: ["kb_doc_id"]
+            isOneToOne: false
+            referencedRelation: "kb_docs"
             referencedColumns: ["id"]
           },
         ]
@@ -11521,6 +11676,7 @@ export type Database = {
           sent_at: string | null
           status: string | null
           variables: Json | null
+          workspace_id: string | null
         }
         Insert: {
           campaign_id: string
@@ -11538,6 +11694,7 @@ export type Database = {
           sent_at?: string | null
           status?: string | null
           variables?: Json | null
+          workspace_id?: string | null
         }
         Update: {
           campaign_id?: string
@@ -11555,6 +11712,7 @@ export type Database = {
           sent_at?: string | null
           status?: string | null
           variables?: Json | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -11562,6 +11720,13 @@ export type Database = {
             columns: ["message_log_id"]
             isOneToOne: false
             referencedRelation: "messaging_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messaging_campaign_recipients_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -11580,6 +11745,7 @@ export type Database = {
           provider: string | null
           sender_id: string
           updated_at: string | null
+          workspace_id: string | null
           zernio_account_id: string | null
         }
         Insert: {
@@ -11595,6 +11761,7 @@ export type Database = {
           provider?: string | null
           sender_id: string
           updated_at?: string | null
+          workspace_id?: string | null
           zernio_account_id?: string | null
         }
         Update: {
@@ -11610,9 +11777,18 @@ export type Database = {
           provider?: string | null
           sender_id?: string
           updated_at?: string | null
+          workspace_id?: string | null
           zernio_account_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "messaging_channels_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messaging_logs: {
         Row: {
@@ -11644,6 +11820,7 @@ export type Database = {
           template_id: string | null
           to_number: string
           variables: Json | null
+          workspace_id: string | null
         }
         Insert: {
           agent_run_id?: string | null
@@ -11674,6 +11851,7 @@ export type Database = {
           template_id?: string | null
           to_number: string
           variables?: Json | null
+          workspace_id?: string | null
         }
         Update: {
           agent_run_id?: string | null
@@ -11704,6 +11882,7 @@ export type Database = {
           template_id?: string | null
           to_number?: string
           variables?: Json | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -11725,6 +11904,13 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "messaging_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messaging_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -11918,40 +12104,100 @@ export type Database = {
         }
         Relationships: []
       }
+      module_access_requests: {
+        Row: {
+          created_at: string
+          id: string
+          module_slug: string
+          requested_by: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          module_slug: string
+          requested_by: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          module_slug?: string
+          requested_by?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_access_requests_module_slug_fkey"
+            columns: ["module_slug"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "module_access_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modules: {
         Row: {
+          addon_currency: string
+          addon_price_cents: number | null
+          addon_stripe_product_id: string | null
           category: string | null
           created_at: string | null
           description: string | null
           enabled: boolean
           icon: string | null
+          is_addon: boolean
+          long_description: string | null
           name: string
           price_tier: string | null
+          screenshot_url: string | null
           slug: string
+          summary: string | null
           updated_at: string | null
           version: string | null
         }
         Insert: {
+          addon_currency?: string
+          addon_price_cents?: number | null
+          addon_stripe_product_id?: string | null
           category?: string | null
           created_at?: string | null
           description?: string | null
           enabled?: boolean
           icon?: string | null
+          is_addon?: boolean
+          long_description?: string | null
           name: string
           price_tier?: string | null
+          screenshot_url?: string | null
           slug: string
+          summary?: string | null
           updated_at?: string | null
           version?: string | null
         }
         Update: {
+          addon_currency?: string
+          addon_price_cents?: number | null
+          addon_stripe_product_id?: string | null
           category?: string | null
           created_at?: string | null
           description?: string | null
           enabled?: boolean
           icon?: string | null
+          is_addon?: boolean
+          long_description?: string | null
           name?: string
           price_tier?: string | null
+          screenshot_url?: string | null
           slug?: string
+          summary?: string | null
           updated_at?: string | null
           version?: string | null
         }
@@ -22979,6 +23225,57 @@ export type Database = {
           },
         ]
       }
+      workspace_module_subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          id: string
+          module_slug: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          module_slug: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          module_slug?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_module_subscriptions_module_slug_fkey"
+            columns: ["module_slug"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "workspace_module_subscriptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_payment_config: {
         Row: {
           charges_enabled: boolean
@@ -23854,6 +24151,7 @@ export type Database = {
         Args: { p_request_id: string; p_reviewer_id: string }
         Returns: undefined
       }
+      admin_module_subscription_overview: { Args: never; Returns: Json }
       admin_reject_factory_registration: {
         Args: { p_reason?: string; p_request_id: string; p_reviewer_id: string }
         Returns: undefined
@@ -23912,23 +24210,11 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      auto_adjust_vector_index_lists: { Args: never; Returns: undefined }
       backfill_brand_company_ids: {
         Args: { p_limit?: number; p_workspace_id: string }
         Returns: Json
       }
-      claim_brand_for_company: {
-        Args: { p_company_id: string; p_names: string[]; p_workspace_id: string }
-        Returns: Json
-      }
-      list_workspace_makers: {
-        Args: { p_workspace_id: string }
-        Returns: {
-          brand_company_id: string
-          factory_name: string
-          product_count: number
-        }[]
-      }
-      auto_adjust_vector_index_lists: { Args: never; Returns: undefined }
       backfill_factory_from_document_filename: { Args: never; Returns: number }
       backfill_pending_kb_embeddings: {
         Args: { limit_rows?: number }
@@ -23977,6 +24263,23 @@ export type Database = {
       catalog_increment_view_count: {
         Args: { p_catalog_id: string }
         Returns: number
+      }
+      check_security_invariants: {
+        Args: never
+        Returns: {
+          detail: string
+          invariant: string
+          object_name: string
+          severity: string
+        }[]
+      }
+      claim_brand_for_company: {
+        Args: {
+          p_company_id: string
+          p_names: string[]
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       cleanup_expired_similarity_cache: { Args: never; Returns: number }
       cleanup_invalid_stage_history: {
@@ -24808,6 +25111,19 @@ export type Database = {
         Args: { p_product_id: string; p_workspace_id: string }
         Returns: Json
       }
+      get_provider_health: {
+        Args: { p_window_minutes?: number }
+        Returns: {
+          calls: number
+          failed: number
+          failure_rate: number
+          last_error: string
+          last_fail: string
+          last_ok: string
+          provider: string
+          status: string
+        }[]
+      }
       get_query_cache_stats: { Args: never; Returns: Json }
       get_quote_expiration_days: { Args: never; Returns: number }
       get_rate_limit: {
@@ -25302,6 +25618,36 @@ export type Database = {
           slug: string
         }[]
       }
+      kb_match_doc_chunks: {
+        Args: {
+          allowed_access_levels?: string[]
+          include_private?: boolean
+          match_agent_id?: string
+          match_category_id?: string
+          match_category_slug?: string
+          match_count?: number
+          match_price_doc_type?: string
+          match_threshold?: number
+          match_workspace_id: string
+          query_embedding: string
+          require_published?: boolean
+        }
+        Returns: {
+          category_id: string
+          category_name: string
+          category_slug: string
+          chunk_id: string
+          chunk_index: number
+          content: string
+          document_title: string
+          heading: string
+          kb_doc_id: string
+          price_doc_type: string
+          similarity: number
+          status: string
+          visibility: string
+        }[]
+      }
       kb_match_docs: {
         Args: {
           allowed_access_levels?: string[]
@@ -25418,6 +25764,14 @@ export type Database = {
           email: string
           name: string
           user_id: string
+        }[]
+      }
+      list_workspace_makers: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          brand_company_id: string
+          factory_name: string
+          product_count: number
         }[]
       }
       log_agent_usage: {
@@ -25854,6 +26208,10 @@ export type Database = {
       recompute_order_payment_status: {
         Args: { p_order: string }
         Returns: undefined
+      }
+      reconcile_brand_company_ids_all: {
+        Args: { p_max_makers?: number }
+        Returns: Json
       }
       record_embedding_backfill_attempts: {
         Args: {
