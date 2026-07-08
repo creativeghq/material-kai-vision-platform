@@ -2,7 +2,7 @@
 // owner can edit; other members read (and, as a follow-up, will propose edits). The KAI agent
 // searches published docs via FTS (no embeddings).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookText, Plus, Save, Trash2, Loader2, Search } from 'lucide-react';
+import { BookText, Plus, Save, Trash2, Loader2, Search, Pencil } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -14,7 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { listDocs, createDoc, updateDoc, deleteDoc, type WorkspaceDoc } from '../services/docsService';
+import {
+  listDocs, createDoc, updateDoc, deleteDoc,
+  listPendingSuggestions, createSuggestion, reviewSuggestion,
+  type WorkspaceDoc, type DocSuggestion,
+} from '../services/docsService';
 
 const NEW = '__new__';
 
@@ -36,6 +40,12 @@ const DocsPage: React.FC = () => {
   const [status, setStatus] = useState('published');
 
   const isOwner = workspaceRole === 'owner' || isPlatformOperator;
+
+  // suggestions (members propose; creator/owner reviews)
+  const [suggestions, setSuggestions] = useState<DocSuggestion[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestBody, setSuggestBody] = useState('');
+  const [suggestReason, setSuggestReason] = useState('');
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
@@ -111,6 +121,48 @@ const DocsPage: React.FC = () => {
     }
   };
 
+  // Load pending suggestions for reviewers (creator / workspace owner) of the open doc.
+  useEffect(() => {
+    if (selected && canEdit && selectedId !== NEW) {
+      listPendingSuggestions(selected.id).then(setSuggestions).catch(() => setSuggestions([]));
+    } else {
+      setSuggestions([]);
+    }
+    setSuggesting(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, canEdit]);
+
+  const submitSuggest = async () => {
+    if (!activeWorkspaceId || !user?.id || !selected) return;
+    setBusy(true);
+    try {
+      await createSuggestion(activeWorkspaceId, selected.id, user.id, suggestBody, suggestReason);
+      toast({ title: 'Suggestion sent', description: 'The document owner will review it.' });
+      setSuggesting(false);
+    } catch (e) {
+      toast({ title: 'Could not send suggestion', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doReview = async (id: string, action: 'accept' | 'reject') => {
+    setBusy(true);
+    try {
+      await reviewSuggestion(id, action);
+      toast({ title: action === 'accept' ? 'Suggestion accepted' : 'Suggestion rejected' });
+      const fresh = await listDocs(activeWorkspaceId!);
+      setDocs(fresh);
+      const updated = selected ? fresh.find((d) => d.id === selected.id) : null;
+      if (updated) openDoc(updated);
+      if (selected) setSuggestions(await listPendingSuggestions(selected.id));
+    } catch (e) {
+      toast({ title: 'Review failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return docs;
@@ -170,6 +222,7 @@ const DocsPage: React.FC = () => {
                 Select a doc to read, or create a new one.
               </CardContent></Card>
             ) : canEdit ? (
+              <div className="space-y-4">
               <Card>
                 <CardContent className="p-4 space-y-3">
                   <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document title" className="text-lg font-medium" />
@@ -198,6 +251,30 @@ const DocsPage: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {suggestions.length > 0 && (
+                <Card>
+                  <CardContent className="p-4 space-y-3">
+                    <h3 className="font-medium">Suggested edits ({suggestions.length})</h3>
+                    {suggestions.map((s) => (
+                      <div key={s.id} className="rounded-lg border p-3 space-y-2">
+                        {s.rationale && (
+                          <p className="text-sm"><span className="text-muted-foreground">Reason:</span> {s.rationale}</p>
+                        )}
+                        <details>
+                          <summary className="text-sm cursor-pointer text-muted-foreground">View proposed content</summary>
+                          <pre className="mt-2 text-xs bg-muted rounded p-2 whitespace-pre-wrap max-h-64 overflow-auto">{s.proposed_content_markdown}</pre>
+                        </details>
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => doReview(s.id, 'reject')} disabled={busy}>Reject</Button>
+                          <Button size="sm" onClick={() => doReview(s.id, 'accept')} disabled={busy}>Accept</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+              </div>
             ) : (
               // Read-only view for members who don't own the doc.
               <Card>
@@ -209,9 +286,29 @@ const DocsPage: React.FC = () => {
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown>{selected?.content_markdown || '_This document is empty._'}</ReactMarkdown>
                   </div>
-                  <p className="text-xs text-muted-foreground pt-2 border-t">
-                    Only the document owner or the workspace owner can edit this. (Suggesting edits — coming soon.)
-                  </p>
+                  {!suggesting ? (
+                    <div className="pt-2 border-t flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">Only the doc owner or workspace owner can edit directly.</span>
+                      <Button
+                        size="sm" variant="outline" className="gap-1"
+                        onClick={() => { setSuggestBody(selected?.content_markdown || ''); setSuggestReason(''); setSuggesting(true); }}
+                      >
+                        <Pencil className="h-4 w-4" /> Suggest an edit
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="pt-3 border-t space-y-2">
+                      <p className="text-sm font-medium">Propose changes</p>
+                      <Textarea value={suggestBody} onChange={(e) => setSuggestBody(e.target.value)} className="min-h-[240px] font-mono text-sm" />
+                      <Input value={suggestReason} onChange={(e) => setSuggestReason(e.target.value)} placeholder="Why this change? (optional)" />
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setSuggesting(false)}>Cancel</Button>
+                        <Button size="sm" onClick={submitSuggest} disabled={busy}>
+                          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send suggestion'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

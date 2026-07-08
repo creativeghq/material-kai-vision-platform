@@ -22949,6 +22949,60 @@ export type Database = {
           },
         ]
       }
+      workspace_doc_suggestions: {
+        Row: {
+          created_at: string
+          doc_id: string
+          id: string
+          proposed_content_markdown: string
+          proposer_user_id: string
+          rationale: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          doc_id: string
+          id?: string
+          proposed_content_markdown: string
+          proposer_user_id: string
+          rationale?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          doc_id?: string
+          id?: string
+          proposed_content_markdown?: string
+          proposer_user_id?: string
+          rationale?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_doc_suggestions_doc_id_fkey"
+            columns: ["doc_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_docs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_doc_suggestions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_doc_type: {
         Row: {
           code: string
@@ -26626,6 +26680,10 @@ export type Database = {
       return_priced_request: {
         Args: { p_note?: string; p_request_id: string }
         Returns: undefined
+      }
+      review_doc_suggestion: {
+        Args: { p_action: string; p_suggestion_id: string }
+        Returns: Json
       }
       review_factory_access_request: {
         Args: { p_decision: string; p_reason?: string; p_request_id: string }
