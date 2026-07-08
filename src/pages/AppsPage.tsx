@@ -6,11 +6,11 @@ import { LayoutGrid, Plus, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { useWorkspaceModuleNav } from '@/modules/_core';
+import { useAppNavItems } from '@/hooks/useAppNavItems';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 const AppsPage: React.FC = () => {
-  const { entries, loading } = useWorkspaceModuleNav();
+  const { entries, loading } = useAppNavItems();
   const { workspaceRole, isPlatformOperator } = useWorkspace();
   const isOwner = workspaceRole === 'owner' || isPlatformOperator;
 
@@ -23,7 +23,7 @@ const AppsPage: React.FC = () => {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {entries.map((e) => (
-              <Link key={e.slug} to={e.path}>
+              <Link key={e.id} to={e.path}>
                 <Card className="h-full transition-colors hover:border-primary/50">
                   <CardContent className="p-4 flex items-start gap-3">
                     <div className="rounded-lg bg-primary/10 p-2 text-primary shrink-0">

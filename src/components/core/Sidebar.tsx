@@ -54,6 +54,8 @@ export const Sidebar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isModuleAvailable, can });
+  // #251 — items marked surface:'app' render in the App Launcher, not the top bar / drawer.
+  const topNav = navigationItems.filter((item) => item.surface !== 'app');
 
   useEffect(() => {
     setMobileOpen(false);
@@ -147,7 +149,7 @@ export const Sidebar: React.FC = () => {
                   <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-8 w-auto hidden dark:block" />
                 </div>
                 <nav className="flex-1 flex flex-col space-y-1">
-                  {navigationItems.map((item) => (
+                  {topNav.map((item) => (
                     <Link
                       key={item.id}
                       to={item.path}
@@ -210,7 +212,7 @@ export const Sidebar: React.FC = () => {
           operator's full set on a 1280 laptop) so the right-side controls below
           are never pushed off-screen and clipped by Layout's overflow-hidden. */}
       <nav className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        {navigationItems.map((item) => (
+        {topNav.map((item) => (
           <Link
             key={item.id}
             to={item.path}

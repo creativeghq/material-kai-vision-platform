@@ -49,7 +49,9 @@ export const MobileBottomNav: React.FC = () => {
         isSalesRep,
         isModuleAvailable,
         can,
-      }),
+      })
+        // #251 — surface:'app' items live in the App Launcher (mobile top bar), not the bottom bar.
+        .filter((i) => i.surface !== 'app'),
     [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isModuleAvailable, can],
   );
 

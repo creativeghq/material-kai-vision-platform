@@ -29,6 +29,14 @@ export interface SidebarNavItem {
   requireCapability?: Capability;
   /** Optional module gate. When set, item is only shown if the referenced module is enabled. */
   moduleSlug?: string;
+  /**
+   * Where the item renders (#251 App Launcher IA):
+   * - `'top'` (default) → the lean top nav bar (universal surfaces).
+   * - `'app'` → the workspace **App Launcher** + `/apps` hub, alongside optional modules.
+   *   Keeps the top bar uncluttered as the platform grows to many modules. Routes/guards
+   *   are unchanged — only the entry point moves.
+   */
+  surface?: 'top' | 'app';
 }
 
 /**
@@ -38,40 +46,34 @@ export interface SidebarNavItem {
  * To add a role-gated entry: set `requireRole` to 'factory' or 'admin'.
  */
 export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
+  // ── Top bar: universal surfaces every user relies on ──
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
-  // #209 — Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
-  { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox' },
-  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects' },
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireCapability: 'marketplace.browse' },
-  { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes' },
-  // Blueprints (#242) are reached from under Projects (Projects list → Blueprints,
-  // and each project's Plan tab), not as a top-level nav item.
-  // #201 — Sales portal for invited reps (persona 'sales'). Gated on sales.portal so only
-  // sales reps see it; managers use the full Quotes/Finance surfaces.
-  { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal' },
-  // #247 F — supplier portal is NOT a top-level nav item. It lives under Finance → Payables
-  // (for finance-enabled workspaces) and under My Profile → Supplier Portal (for supplier-only,
-  // non-finance workspaces). Route /supplier-portal still resolves for deep-links.
+
+  // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251) ──
+  // #209 — Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
+  { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app' },
+  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app' },
+  { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app' },
+  // #201 — Sales portal for invited reps (persona 'sales').
+  { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app' },
   // Business-workspace surfaces — gated through the #195 capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance. Part of #174.
-  { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm' },
-  { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance' },
-  // #177 — "Requests" (master-request procurement inbox) is now a tab inside Quotes
-  // (/quotes?tab=requests), not a top-nav item. The Inbox icon is freed for the upcoming
-  // INBOX feature.
-  // Workspace Settings was removed from the top nav — branding lives in Finance → Settings →
-  // Business identity, members in Finance → Settings → Team, and credits under User Profile.
-  // Network is reached from the workspace switcher ("Manage network"), not the top nav.
+  { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app' },
+  { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',
     path: '/factory-analytics',
     icon: BarChart3,
     requireRole: 'factory',
+    surface: 'app',
   },
-  // Admin was moved off the top nav into the profile menu (operator-only) — see Sidebar.tsx (#251).
+  // Blueprints (#242) live under Projects. Supplier portal (#247) lives under Finance → Payables /
+  // Profile → Supplier Portal. Admin moved to the profile menu (operator-only). Network is on the
+  // workspace switcher.
 ];
 
 /** Context the nav gates resolve against. Computed from hooks by the consuming component. */
@@ -119,12 +121,5 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'dashboard',
   'agent-hub',
   'moodboard',
-  'projects',
-  'quotes',
-  'inbox',
-  'crm',
   'discover',
-  'finance',
-  'sales',
-  'factory-analytics',
 ];

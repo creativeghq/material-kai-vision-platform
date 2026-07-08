@@ -11,11 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
-import { useWorkspaceModuleNav } from '@/modules/_core';
+import { useAppNavItems } from '@/hooks/useAppNavItems';
 
 export const AppLauncher: React.FC = () => {
   const navigate = useNavigate();
-  const { entries } = useWorkspaceModuleNav();
+  const { entries } = useAppNavItems();
 
   return (
     <DropdownMenu>
@@ -35,7 +35,7 @@ export const AppLauncher: React.FC = () => {
           <div className="px-2 py-3 text-sm text-muted-foreground">No modules active yet.</div>
         ) : (
           entries.map((e) => (
-            <DropdownMenuItem key={e.slug} onClick={() => navigate(e.path)} className="py-2.5">
+            <DropdownMenuItem key={e.id} onClick={() => navigate(e.path)} className="py-2.5">
               <e.icon className="mr-3 h-4 w-4" />
               <span className="text-sm">{e.label}</span>
             </DropdownMenuItem>
