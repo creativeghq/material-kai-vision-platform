@@ -1,0 +1,9 @@
+{
+  "slug": "hr",
+  "name": "HR",
+  "description": "Manage the people working at your company as CRM contacts tagged as employees, and track attendance — vacation, sick, unpaid and other absences — with per-employee leave balances and total days of absence. First paid add-on built on the module framework.",
+  "category": "operations",
+  "priceTier": "pro",
+  "icon": "Users",
+  "version": "0.1.0"
+}

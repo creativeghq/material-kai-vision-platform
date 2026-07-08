@@ -99,6 +99,11 @@ verify_jwt = false
 [functions.finance-storefront]
 verify_jwt = false
 
+# #252 — HR module API (employees as CRM contacts + absence tracking). Does its own auth
+# (authenticate + userCanAccessWorkspace + assertEntitled('hr') + hr.view/hr.manage RBAC).
+[functions.hr-api]
+verify_jwt = false
+
 [functions.finance-send-statement]
 verify_jwt = false
 

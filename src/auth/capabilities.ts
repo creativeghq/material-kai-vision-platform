@@ -41,12 +41,18 @@ export type Capability =
   | 'projects.use'          // projects + client views
   | 'moodboards.use'        // moodboards / design surfaces
   | 'agent.use'             // KAI agent / chat
-  | 'inbox.use';            // #209 multi-tenant inbox (directional messaging)
+  | 'inbox.use'             // #209 multi-tenant inbox (directional messaging)
+  | 'hr.view'               // #252 HR module: see employees + absences (sensitive PII)
+  | 'hr.manage';            // #252 HR module: create/edit employees, approve/reject absences
 
 const ALL_BUSINESS: Capability[] = [
   'network.manage', 'pricing.manage', 'finance.manage', 'invoice.issue', 'crm.view',
   'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use',
   'inbox.use',
+  // HR data (salary/absence) is owner/admin-only — in ALL_BUSINESS (dealer/architect/operator),
+  // deliberately NOT in the `staff` list below, so plain members don't see HR. Module ENTITLEMENT
+  // (workspace owns 'hr') is enforced separately by EntitlementGuard + assertEntitled.
+  'hr.view', 'hr.manage',
 ];
 
 /** Persona → granted capabilities. The ONE place gating policy lives. */

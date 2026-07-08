@@ -63,6 +63,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // (project clients / referral members) never see CRM or Finance. Part of #174.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app' },
+  // #252 — HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
+  // hr.view (owner/admin, not plain members — employee salary/absence data is sensitive).
+  { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',
