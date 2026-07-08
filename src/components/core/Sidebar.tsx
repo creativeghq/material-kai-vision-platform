@@ -226,11 +226,13 @@ export const Sidebar: React.FC = () => {
             <span className="font-light">{item.label}</span>
           </Link>
         ))}
+        {/* #251 — App Launcher sits at the end of the nav row (after Discover), not in the
+            right-side controls, so optional workspace apps read as part of navigation. */}
+        <AppLauncher />
       </nav>
 
       <div className="flex items-center gap-2 shrink-0 pl-2">
         <ShowPricesToggle />
-        <AppLauncher />
         <WorkspaceSwitcher />
         <ModuleHeaderActions />
         {profileMenu}
