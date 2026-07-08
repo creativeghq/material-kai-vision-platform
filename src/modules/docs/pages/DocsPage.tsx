@@ -180,17 +180,19 @@ const DocsPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader icon={BookText} title="Docs" subtitle="Internal team documentation — searchable by the KAI agent" />
+      <PageHeader
+        icon={BookText}
+        title="Docs"
+        subtitle="Internal team documentation — searchable by the KAI agent"
+        actions={<Button size="sm" onClick={openNew} className="gap-1 rounded-full"><Plus className="h-4 w-4" /> New doc</Button>}
+      />
       <div className="px-3 sm:px-6 py-4 sm:py-6">
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
           {/* List */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search docs…" className="pl-8" />
-              </div>
-              <Button size="sm" onClick={openNew} className="gap-1"><Plus className="h-4 w-4" /> New</Button>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search docs…" className="pl-8" />
             </div>
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-6"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>

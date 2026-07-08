@@ -31,7 +31,7 @@ export const AppLauncher: React.FC = () => {
           type="button"
           aria-label="Apps"
           title="Apps"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap shrink-0 text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-200"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap shrink-0 text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-200 cursor-pointer"
         >
           <LayoutGrid className="w-4 h-4 flex-shrink-0" />
           <span className="font-light hidden sm:inline">Apps</span>
@@ -55,7 +55,7 @@ export const AppLauncher: React.FC = () => {
           </div>
           <button
             onClick={() => go('/apps')}
-            className="shrink-0 inline-flex items-center gap-1 text-sm text-primary hover:opacity-80 transition-opacity"
+            className="shrink-0 inline-flex items-center gap-1 text-sm text-primary hover:opacity-80 transition-opacity cursor-pointer"
           >
             manage <ArrowRight className="h-3.5 w-3.5" />
           </button>
@@ -73,7 +73,7 @@ export const AppLauncher: React.FC = () => {
                 <button
                   key={app.id}
                   onClick={() => go(app.path)}
-                  className="group w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/60 transition-colors"
+                  className="group w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/60 transition-colors cursor-pointer"
                 >
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
                     <app.icon className="h-4 w-4" />
@@ -115,7 +115,7 @@ export const AppLauncher: React.FC = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="shrink-0 h-7 px-2.5"
+                        className="shrink-0 h-7 px-2.5 cursor-pointer"
                         disabled={enabling === app.moduleSlug}
                         onClick={(e) => onEnable(e, app)}
                       >
