@@ -313,9 +313,17 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         if (!emp) return json({ error: 'employee not found in this workspace' }, 404);
 
         // working_days is server-computed (weekends excluded) unless an explicit override is passed.
-        const workingDays = body?.working_days !== undefined && body?.working_days !== null
-          ? Number(body.working_days)
-          : businessDaysInclusive(startDate, endDate);
+        // Validate the override so a non-numeric/negative value can't silently corrupt the totals
+        // the summary view derives (total_absence_days / remaining_leave_days).
+        let workingDays: number;
+        if (body?.working_days !== undefined && body?.working_days !== null) {
+          workingDays = Number(body.working_days);
+          if (!Number.isFinite(workingDays) || workingDays < 0) {
+            return json({ error: 'working_days must be a non-negative number' }, 400);
+          }
+        } else {
+          workingDays = businessDaysInclusive(startDate, endDate);
+        }
 
         const { data, error } = await supabase
           .from('hr_absences')

@@ -49,10 +49,12 @@ export default function HRPage() {
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [overview, setOverview] = useState<HrOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const load = useCallback(async () => {
-    if (!activeWorkspaceId) return;
+    if (!activeWorkspaceId) { setLoading(false); return; }
     setLoading(true);
+    setAccessDenied(false);
     try {
       const [emp, abs, ov] = await Promise.all([
         hrService.listEmployees(activeWorkspaceId),
@@ -63,7 +65,14 @@ export default function HRPage() {
       setAbsences(abs.absences);
       setOverview(ov.overview);
     } catch (e) {
-      toast({ title: 'Failed to load HR data', description: (e as Error).message, variant: 'destructive' });
+      // A user may hold the hr.view capability by persona yet only be a plain member of the
+      // ACTIVE workspace (hr-api gates on owner/admin) → 403. Show a calm empty state, not an error.
+      const msg = (e as Error).message || '';
+      if (/access to HR|manage permission|403/i.test(msg)) {
+        setAccessDenied(true);
+      } else {
+        toast({ title: 'Failed to load HR data', description: msg, variant: 'destructive' });
+      }
     } finally {
       setLoading(false);
     }
@@ -72,6 +81,19 @@ export default function HRPage() {
   useEffect(() => { void load(); }, [load]);
 
   if (wsLoading) return <div className="p-6"><Skeleton className="h-64 w-full" /></div>;
+
+  if (accessDenied) {
+    return (
+      <div className="container mx-auto max-w-2xl px-4 py-16 text-center space-y-3">
+        <div className="mx-auto w-fit rounded-full bg-muted p-3 text-muted-foreground"><Users className="h-6 w-6" /></div>
+        <h1 className="text-xl font-display font-semibold">HR is limited to workspace owners &amp; admins</h1>
+        <p className="text-sm text-muted-foreground">
+          Employee and absence data is sensitive, so it&apos;s visible only to the owner or an admin of this workspace.
+          Ask a workspace admin if you need access.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-6 space-y-6">
