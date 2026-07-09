@@ -4,6 +4,7 @@
 // caller is bound to the workspace + entitlement + hr.view is confirmed. Writes require hr.manage.
 import { corsHeaders } from '../_shared/cors.ts';
 import { HttpError } from '../_shared/api-logger.ts';
+import { fileWorkcardPunch } from './ergani.ts';
 
 export interface Ctx {
   supabase: any;
@@ -641,6 +642,26 @@ export async function handleSelfService(action: string, ctx: SelfCtx): Promise<R
     case 'self-documents': {
       const { data } = await supabase.from('hr_documents').select('id, name, doc_type, size_bytes, created_at').eq('workspace_id', workspaceId).eq('employee_id', employeeId).order('created_at', { ascending: false });
       return json({ documents: data ?? [] });
+    }
+    // Employee self clock-in/out → Work Card (WRKCardSE), scoped hard to the caller's OWN record.
+    // Records the punch locally and files it to Εργάνη when the workspace has credentials configured.
+    case 'self-clock': {
+      const punchType = String(body?.punch_type ?? '');
+      if (!['arrival', 'departure'].includes(punchType)) return json({ error: "punch_type must be 'arrival' or 'departure'" }, 400);
+      const r = await fileWorkcardPunch(supabase, workspaceId, ctx.userId, {
+        employeeId, punchType: punchType as 'arrival' | 'departure',
+        comments: body?.comments ? String(body.comments) : undefined,
+      }, { requireErgani: false });
+      return json({ ok: true, punch: r.punch, filed: r.filed, reason: r.reason ?? null, protocol: r.result?.protocol ?? null });
+    }
+    case 'self-punches': {
+      const days = Math.min(Math.max(Number(body?.days ?? 14), 1), 90);
+      const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+      const { data } = await supabase.from('hr_time_punches')
+        .select('id, punch_type, reference_date, punched_at, status, ergani_protocol')
+        .eq('workspace_id', workspaceId).eq('employee_id', employeeId)
+        .gte('reference_date', since).order('punched_at', { ascending: false });
+      return json({ punches: data ?? [] });
     }
     case 'self-sign-document': {
       const id = String(body?.document_id ?? '');

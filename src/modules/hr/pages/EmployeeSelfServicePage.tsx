@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { UserCircle, ClipboardCheck, CalendarDays, FolderOpen, Plus, Loader2, Circle, CheckCircle2, Download } from 'lucide-react';
+import { UserCircle, ClipboardCheck, CalendarDays, FolderOpen, Plus, Loader2, Circle, CheckCircle2, Download, Clock, LogIn, LogOut } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/core/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import {
-  hrService, type SelfProfile, type SelfTask, type SelfAbsence, type SelfDocument, type AbsenceType,
+  hrService, type SelfProfile, type SelfTask, type SelfAbsence, type SelfDocument, type SelfPunch, type AbsenceType,
   ABSENCE_TYPE_LABELS, EMPLOYMENT_TYPE_LABELS, DOC_TYPE_LABELS,
 } from '../services/hrService';
 import { HrStat, EmptyState } from '../components/_shared';
@@ -30,6 +30,7 @@ export default function EmployeeSelfServicePage() {
   const [tasks, setTasks] = useState<SelfTask[]>([]);
   const [absences, setAbsences] = useState<SelfAbsence[]>([]);
   const [docs, setDocs] = useState<SelfDocument[]>([]);
+  const [punches, setPunches] = useState<SelfPunch[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -37,12 +38,28 @@ export default function EmployeeSelfServicePage() {
     if (!ws) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [p, o, t, d] = await Promise.all([hrService.selfProfile(ws), hrService.selfOnboarding(ws), hrService.selfTimeoff(ws), hrService.selfDocuments(ws)]);
-      setProfile(p.profile); setTasks(o.tasks); setAbsences(t.absences); setDocs(d.documents);
+      const [p, o, t, d, pu] = await Promise.all([hrService.selfProfile(ws), hrService.selfOnboarding(ws), hrService.selfTimeoff(ws), hrService.selfDocuments(ws), hrService.selfPunches(ws).catch(() => ({ punches: [] as SelfPunch[] }))]);
+      setProfile(p.profile); setTasks(o.tasks); setAbsences(t.absences); setDocs(d.documents); setPunches(pu.punches);
     } catch (e) { toast({ title: 'Could not load your HR info', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [ws, toast]);
   useEffect(() => { void load(); }, [load]);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayPunches = punches.filter((p) => p.reference_date === today);
+  const currentlyIn = todayPunches[0]?.punch_type === 'arrival'; // punches are newest-first
+  const clock = async (punch_type: 'arrival' | 'departure') => {
+    if (!ws) return; setBusy('clock');
+    try {
+      const r = await hrService.selfClock(ws, { punch_type });
+      toast({
+        title: punch_type === 'arrival' ? 'Clocked in' : 'Clocked out',
+        description: r.filed ? `Filed to Εργάνη · protocol ${r.protocol}` : `Recorded${r.reason ? ` · not filed to Εργάνη (${r.reason})` : ''}`,
+      });
+      load();
+    } catch (e) { toast({ title: 'Clock failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
 
   const toggleTask = async (id: string) => {
     if (!ws) return; setBusy(id);
@@ -66,13 +83,59 @@ export default function EmployeeSelfServicePage() {
     <div className="min-h-screen">
       <PageHeader icon={UserCircle} title="My HR" subtitle={activeWorkspace?.name ? `Your record at ${activeWorkspace.name}` : 'Your employee self-service'} />
       <div className="p-3 sm:p-6 max-w-4xl">
-        <Tabs defaultValue="profile">
+        <Tabs defaultValue="clock">
           <TabsList className="mb-4">
+            <TabsTrigger value="clock"><Clock className="h-4 w-4 mr-2" />Clock</TabsTrigger>
             <TabsTrigger value="profile"><UserCircle className="h-4 w-4 mr-2" />Profile</TabsTrigger>
             <TabsTrigger value="onboarding"><ClipboardCheck className="h-4 w-4 mr-2" />Onboarding</TabsTrigger>
             <TabsTrigger value="timeoff"><CalendarDays className="h-4 w-4 mr-2" />Time Off</TabsTrigger>
             <TabsTrigger value="documents"><FolderOpen className="h-4 w-4 mr-2" />Documents</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="clock" className="space-y-4">
+            <Card>
+              <CardContent className="flex flex-col items-center gap-4 py-8">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className={`h-2.5 w-2.5 rounded-full ${currentlyIn ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
+                  {currentlyIn ? 'You are clocked in' : 'You are clocked out'}
+                </div>
+                <Button
+                  size="lg"
+                  className="rounded-full h-16 w-56 text-base"
+                  variant={currentlyIn ? 'destructive' : 'default'}
+                  disabled={busy === 'clock'}
+                  onClick={() => clock(currentlyIn ? 'departure' : 'arrival')}
+                >
+                  {busy === 'clock' ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : currentlyIn ? <LogOut className="h-5 w-5 mr-2" /> : <LogIn className="h-5 w-5 mr-2" />}
+                  {currentlyIn ? 'Clock out' : 'Clock in'}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center max-w-xs">
+                  Records your arrival/departure and files the Digital Work Card to Εργάνη when your employer has it configured.
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Recent punches</CardTitle></CardHeader>
+              <CardContent className="p-0">
+                {punches.length === 0 ? <EmptyState icon={Clock} title="No punches yet" hint="Clock in above to start." /> : (
+                  <div className="divide-y divide-border/40">
+                    {punches.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                        <div className="flex items-center gap-2">
+                          {p.punch_type === 'arrival' ? <LogIn className="h-4 w-4 text-emerald-500" /> : <LogOut className="h-4 w-4 text-muted-foreground" />}
+                          <span className="font-medium capitalize">{p.punch_type === 'arrival' ? 'In' : 'Out'}</span>
+                          <span className="text-muted-foreground">{new Date(p.punched_at).toLocaleString()}</span>
+                        </div>
+                        <Badge variant={p.status === 'submitted' ? 'default' : p.status === 'failed' ? 'destructive' : 'secondary'} title={p.ergani_protocol ?? ''}>
+                          {p.status === 'submitted' ? `Εργάνη · ${p.ergani_protocol ?? 'filed'}` : p.status === 'failed' ? 'Εργάνη failed' : 'Recorded'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="profile" className="space-y-4">
             {!profile ? <EmptyState title="No profile found" /> : (

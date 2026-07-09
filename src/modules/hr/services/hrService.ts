@@ -187,6 +187,8 @@ export interface SelfProfile {
 export interface SelfTask { id: string; title: string; description: string | null; due_date: string | null; status: 'pending' | 'done'; completed_at: string | null; sort_order: number; }
 export interface SelfAbsence { id: string; absence_type: AbsenceType; start_date: string; end_date: string; working_days: number | null; status: AbsenceStatus; note: string | null; created_at: string; }
 export interface SelfDocument { id: string; name: string; doc_type: DocType; size_bytes: number | null; created_at: string; }
+export interface SelfPunch { id: string; punch_type: 'arrival' | 'departure'; reference_date: string; punched_at: string; status: 'pending' | 'submitted' | 'failed'; ergani_protocol: string | null; }
+export interface SelfClockResult { ok: boolean; punch: SelfPunch; filed: boolean; reason: string | null; protocol: string | null; }
 
 export const POSTING_STATUS_LABELS: Record<PostingStatus, string> = { draft: 'Draft', open: 'Open', closed: 'Closed' };
 export const APP_STAGE_LABELS: Record<AppStage, string> = { applied: 'Applied', screening: 'Screening', interview: 'Interview', offer: 'Offer', hired: 'Hired', rejected: 'Rejected' };
@@ -305,6 +307,9 @@ class HrService {
   requestSelfTimeoff(ws: string, input: { absence_type: AbsenceType; start_date: string; end_date: string; note?: string }): Promise<{ absence: SelfAbsence }> { return call(ws, 'self-request-timeoff', input); }
   selfDocuments(ws: string): Promise<{ documents: SelfDocument[] }> { return call(ws, 'self-documents'); }
   signSelfDocument(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'self-sign-document', { document_id }); }
+  // Employee self clock-in/out (Work Card). Records the punch and files to Εργάνη when configured.
+  selfClock(ws: string, input: { punch_type: 'arrival' | 'departure'; comments?: string }): Promise<SelfClockResult> { return call(ws, 'self-clock', input); }
+  selfPunches(ws: string, days = 14): Promise<{ punches: SelfPunch[] }> { return call(ws, 'self-punches', { days }); }
 
   // ── Ergani II (ΠΣ Εργάνη) integration ──────────────────────────────────────
   // Credentials are stored per-workspace in workspace_ergani_credentials (RLS: workspace admin).
