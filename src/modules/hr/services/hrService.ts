@@ -22,6 +22,7 @@ export interface EmployeeContact {
   position: string | null;
   department: string | null;
   date_of_birth: string | null;
+  vat_number?: string | null; // ΑΦΜ — used for Εργάνη filings
 }
 
 export interface Employee {
@@ -40,6 +41,7 @@ export interface Employee {
   monthly_salary: number | null;
   hourly_rate: number | null;
   salary_currency: string | null;
+  amka: string | null; // ΑΜΚΑ — social-security number, for Εργάνη filings
   created_at: string;
   updated_at: string;
   contact: EmployeeContact | null;
@@ -62,6 +64,7 @@ export interface Absence {
   status: AbsenceStatus;
   approved_by: string | null;
   note: string | null;
+  ergani_leave_code: string | null;
   created_at: string;
   employee?: { id: string; crm_contact_id: string; contact: { id: string; name: string } | null } | null;
 }
@@ -78,7 +81,7 @@ export interface CreateEmployeeInput {
   // Provide either an existing contact to attach…
   crm_contact_id?: string;
   // …or the fields to create a new one.
-  contact?: Partial<Pick<EmployeeContact, 'name' | 'first_name' | 'last_name' | 'email' | 'phone' | 'mobile' | 'position' | 'department' | 'date_of_birth'>>;
+  contact?: Partial<Pick<EmployeeContact, 'name' | 'first_name' | 'last_name' | 'email' | 'phone' | 'mobile' | 'position' | 'department' | 'date_of_birth' | 'vat_number'>>;
   employment_type?: EmploymentType;
   start_date?: string | null;
   weekly_hours?: number | null;
@@ -89,6 +92,7 @@ export interface CreateEmployeeInput {
   pay_basis?: PayBasis;
   monthly_salary?: number | null;
   hourly_rate?: number | null;
+  amka?: string | null;
 }
 
 export interface UpdateEmployeeInput {
@@ -104,7 +108,8 @@ export interface UpdateEmployeeInput {
   pay_basis?: PayBasis;
   monthly_salary?: number | null;
   hourly_rate?: number | null;
-  contact?: Partial<Pick<EmployeeContact, 'name' | 'email' | 'phone' | 'mobile' | 'position' | 'department' | 'date_of_birth'>>;
+  amka?: string | null;
+  contact?: Partial<Pick<EmployeeContact, 'name' | 'email' | 'phone' | 'mobile' | 'position' | 'department' | 'date_of_birth' | 'vat_number'>>;
 }
 
 export interface RecordAbsenceInput {
@@ -187,6 +192,29 @@ export const POSTING_STATUS_LABELS: Record<PostingStatus, string> = { draft: 'Dr
 export const APP_STAGE_LABELS: Record<AppStage, string> = { applied: 'Applied', screening: 'Screening', interview: 'Interview', offer: 'Offer', hired: 'Hired', rejected: 'Rejected' };
 export const APP_STAGES: AppStage[] = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
 export const DOC_TYPE_LABELS: Record<DocType, string> = { contract: 'Contract', id: 'ID / Tax', certificate: 'Certificate', payslip: 'Payslip', review: 'Review', other: 'Other' };
+
+// ── Ergani II (ΠΣ Εργάνη) integration types ──
+export type ErganiEnv = 'trial' | 'production';
+export interface ErganiCredsStatus {
+  username: string | null; employer_afm: string | null; branch_aa: string; usertype: string;
+  environment: ErganiEnv; enabled: boolean; has_password: boolean;
+}
+export interface SaveErganiInput {
+  username: string; password?: string; employer_afm?: string | null; branch_aa?: string;
+  usertype?: string; environment: ErganiEnv; enabled: boolean;
+}
+export interface ErganiLeaveType { code: string; description_el: string; category: string; subcategory: string; is_hourly: boolean; sort_order: number; }
+export interface ErganiSubmissionType { id: number; code: string; description: string; }
+export interface ErganiSubmitResult { id: string; protocol: string; submitDate: string; }
+export interface SubmitWorkcardInput { employee_id: string; punch_type: 'arrival' | 'departure'; reference_date?: string; at?: string; late_reason?: string; comments?: string; }
+export interface SubmitLeaveInput { absence_id: string; ergani_leave_code: string; document?: unknown; }
+export interface SaveScheduleInput { employee_id: string; schedule_type: 'weekly' | 'daily'; effective_from: string; effective_to?: string | null; details?: unknown; }
+export interface WorkSchedule { id: string; workspace_id: string; employee_id: string; schedule_type: 'weekly' | 'daily'; effective_from: string; effective_to: string | null; details: unknown; status: 'draft' | 'submitted' | 'failed'; created_at: string; }
+export interface ErganiSubmission {
+  id: string; workspace_id: string; submission_type: string; entity_type: string | null; entity_id: string | null;
+  employee_id: string | null; environment: string; status: 'submitted' | 'failed' | 'cancelled';
+  protocol: string | null; ergani_id: string | null; submit_date: string | null; error: string | null; created_at: string;
+}
 
 async function call<T>(workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke('hr-api', {
@@ -277,6 +305,56 @@ class HrService {
   requestSelfTimeoff(ws: string, input: { absence_type: AbsenceType; start_date: string; end_date: string; note?: string }): Promise<{ absence: SelfAbsence }> { return call(ws, 'self-request-timeoff', input); }
   selfDocuments(ws: string): Promise<{ documents: SelfDocument[] }> { return call(ws, 'self-documents'); }
   signSelfDocument(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'self-sign-document', { document_id }); }
+
+  // ── Ergani II (ΠΣ Εργάνη) integration ──────────────────────────────────────
+  // Credentials are stored per-workspace in workspace_ergani_credentials (RLS: workspace admin).
+  // Config status comes from the masked get_ergani_creds_status RPC (never returns the password).
+  async getErganiStatus(ws: string): Promise<ErganiCredsStatus | null> {
+    const { data, error } = await supabase.rpc('get_ergani_creds_status', { p_workspace_id: ws });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return null;
+    return {
+      username: row.username ?? null,
+      employer_afm: row.employer_afm ?? null,
+      branch_aa: row.branch_aa ?? '0',
+      usertype: row.usertype ?? '02',
+      environment: (row.environment ?? 'trial') as ErganiEnv,
+      enabled: row.enabled ?? true,
+      has_password: !!row.has_password,
+    };
+  }
+  async saveErganiCredentials(ws: string, input: SaveErganiInput): Promise<void> {
+    const payload: Record<string, unknown> = {
+      workspace_id: ws,
+      username: input.username || null,
+      employer_afm: input.employer_afm || null,
+      branch_aa: input.branch_aa || '0',
+      usertype: input.usertype || '02',
+      environment: input.environment,
+      enabled: input.enabled,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.password && input.password.trim()) payload.password = input.password.trim();
+    const { error } = await supabase.from('workspace_ergani_credentials').upsert(payload, { onConflict: 'workspace_id' });
+    if (error) throw error;
+  }
+  async listErganiLeaveTypes(): Promise<ErganiLeaveType[]> {
+    const { data, error } = await supabase.from('ergani_leave_types').select('*').order('sort_order');
+    if (error) throw error;
+    return (data ?? []) as ErganiLeaveType[];
+  }
+
+  erganiSubmissionTypes(ws: string): Promise<{ submission_types: ErganiSubmissionType[] }> { return call(ws, 'ergani-submission-types'); }
+  erganiDocumentSchema(ws: string, code: string): Promise<{ code: string; schema: unknown }> { return call(ws, 'ergani-document-schema', { code }); }
+  erganiEmployerInfo(ws: string): Promise<{ info: unknown }> { return call(ws, 'ergani-employer-info'); }
+  submitWorkcard(ws: string, input: SubmitWorkcardInput): Promise<{ ok: boolean; result: ErganiSubmitResult; punch: unknown }> { return call(ws, 'ergani-submit-workcard', input as unknown as Record<string, unknown>); }
+  submitLeave(ws: string, input: SubmitLeaveInput): Promise<{ ok: boolean; result: ErganiSubmitResult }> { return call(ws, 'ergani-submit-leave', input as unknown as Record<string, unknown>); }
+  saveSchedule(ws: string, input: SaveScheduleInput): Promise<{ schedule: WorkSchedule }> { return call(ws, 'ergani-save-schedule', input as unknown as Record<string, unknown>); }
+  erganiSubmit(ws: string, input: { code: string; document: unknown; entity_type?: string; entity_id?: string; employee_id?: string; schedule_id?: string }): Promise<{ ok: boolean; result: ErganiSubmitResult }> { return call(ws, 'ergani-submit', input); }
+  erganiCancel(ws: string, input: { type_of_document: string; protocol: string; submitted_date: string }): Promise<{ ok: boolean; message: string }> { return call(ws, 'ergani-cancel', input); }
+  erganiDownloadPdf(ws: string, input: { code: string; protocol: string; submitted_date: string }): Promise<{ pdf_base64: string }> { return call(ws, 'ergani-download-pdf', input); }
+  erganiSubmissionsLog(ws: string, filters: { employee_id?: string; submission_type?: string; limit?: number } = {}): Promise<{ submissions: ErganiSubmission[] }> { return call(ws, 'ergani-submissions-log', filters); }
 }
 
 export const hrService = new HrService();

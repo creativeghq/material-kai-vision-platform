@@ -90,21 +90,22 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '' });
+  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', vat: '', amka: '' });
   const upd = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
-  const reset = () => setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '' });
+  const reset = () => setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', vat: '', amka: '' });
 
   const submit = async () => {
     if (!f.name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
     setSaving(true);
     try {
       await hrService.createEmployee(workspaceId, {
-        contact: { name: f.name.trim(), email: f.email.trim() || undefined, position: f.position.trim() || undefined },
+        contact: { name: f.name.trim(), email: f.email.trim() || undefined, position: f.position.trim() || undefined, vat_number: f.vat.trim() || undefined },
         employment_type: f.employment_type, start_date: f.start_date || null,
         annual_leave_allowance_days: Number(f.allowance) || 0,
         department_id: f.department_id || null, pay_basis: f.pay_basis,
         monthly_salary: f.pay_basis === 'monthly' && f.salary ? Number(f.salary) : null,
         hourly_rate: f.pay_basis === 'hourly' && f.hourly ? Number(f.hourly) : null,
+        amka: f.amka.trim() || null,
       });
       toast({ title: 'Employee added' }); setOpen(false); reset(); onDone();
     } catch (e) { toast({ title: 'Could not add employee', description: (e as Error).message, variant: 'destructive' }); }
@@ -141,6 +142,10 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Start date</Label><Input type="date" value={f.start_date} onChange={(e) => upd('start_date', e.target.value)} /></div>
             <div className="space-y-1"><Label>Leave (days)</Label><Input type="number" min={0} value={f.allowance} onChange={(e) => upd('allowance', e.target.value)} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Εργάνη)</span></Label><Input value={f.vat} onChange={(e) => upd('vat', e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
+            <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Εργάνη)</span></Label><Input value={f.amka} onChange={(e) => upd('amka', e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -208,6 +213,8 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
   const [salary, setSalary] = useState(employee.monthly_salary != null ? String(employee.monthly_salary) : '');
   const [hourly, setHourly] = useState(employee.hourly_rate != null ? String(employee.hourly_rate) : '');
   const [allowance, setAllowance] = useState(String(employee.annual_leave_allowance_days ?? 0));
+  const [vat, setVat] = useState(employee.contact?.vat_number ?? '');
+  const [amka, setAmka] = useState(employee.amka ?? '');
 
   const submit = async () => {
     setSaving(true);
@@ -217,6 +224,8 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
         monthly_salary: payBasis === 'monthly' && salary ? Number(salary) : null,
         hourly_rate: payBasis === 'hourly' && hourly ? Number(hourly) : null,
         annual_leave_allowance_days: Number(allowance) || 0,
+        amka: amka.trim() || null,
+        contact: { vat_number: vat.trim() || null },
       });
       toast({ title: 'Employee updated' }); onDone();
     } catch (e) { toast({ title: 'Update failed', description: (e as Error).message, variant: 'destructive' }); }
@@ -257,6 +266,10 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
               : <div className="space-y-1"><Label>Hourly rate</Label><Input type="number" min={0} value={hourly} onChange={(e) => setHourly(e.target.value)} /></div>}
           </div>
           <div className="space-y-1 w-1/2"><Label>Annual leave (days)</Label><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Εργάνη)</span></Label><Input value={vat} onChange={(e) => setVat(e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
+            <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Εργάνη)</span></Label><Input value={amka} onChange={(e) => setAmka(e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={onClose} disabled={saving}>Cancel</Button>

@@ -20,6 +20,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
+import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentialsCard';
 import { paymentRoutingService } from '@/services/paymentRoutingService';
 
 interface ConnState {
@@ -88,6 +89,7 @@ export const WorkspaceKeysTab: React.FC = () => {
         <AadeCredentialsCard workspaceId={activeWorkspaceId} />
         <WorkspaceEmailConfigCard workspaceId={activeWorkspaceId} />
         <InboundSetupCard workspaceId={activeWorkspaceId} />
+        <ErganiCredentialsCard workspaceId={activeWorkspaceId} />
       </section>
 
       {/* Connections */}

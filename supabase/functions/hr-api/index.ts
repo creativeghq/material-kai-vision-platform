@@ -17,6 +17,7 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { handleExpansion, handleSelfService } from './expansion.ts';
+import { handleErgani } from './ergani.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -30,7 +31,7 @@ const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'];
  * CONTACT_WRITABLE_COLUMNS, HR-relevant subset). Identity/trust fields are never accepted here. */
 const CONTACT_WRITABLE = [
   'name', 'email', 'phone', 'mobile', 'first_name', 'last_name',
-  'position', 'department', 'date_of_birth',
+  'position', 'department', 'date_of_birth', 'vat_number', // vat_number = ΑΦΜ (required for Εργάνη filings)
   'address', 'city', 'state', 'postal_code', 'country', 'country_code', 'street', 'street_number',
 ] as const;
 
@@ -39,6 +40,7 @@ const EMPLOYEE_WRITABLE = [
   'employment_type', 'start_date', 'end_date', 'weekly_hours',
   'annual_leave_allowance_days', 'manager_contact_id', 'status',
   'department_id', 'monthly_salary', 'salary_currency', 'pay_basis', 'hourly_rate',
+  'amka', // ΑΜΚΑ — social-security number, required for Εργάνη submissions
 ] as const;
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {
@@ -111,7 +113,7 @@ async function tagEmployeeCategory(supabase: any, contactId: string, userId: str
 const EMPLOYEE_SELECT = `
   *,
   contact:crm_contacts!hr_employees_crm_contact_id_fkey (
-    id, name, first_name, last_name, email, phone, mobile, position, department, date_of_birth
+    id, name, first_name, last_name, email, phone, mobile, position, department, date_of_birth, vat_number
   ),
   manager:crm_contacts!hr_employees_manager_contact_id_fkey ( id, name )
 `;
@@ -397,6 +399,9 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
       }
 
       default: {
+        // Ergani II (ΠΣ Εργάνη) submissions — work card, leaves, E3, schedules, audit.
+        const erganiHandled = await handleErgani(action, { supabase, workspaceId, userId, body, access });
+        if (erganiHandled) return erganiHandled;
         // Expanded areas (org, recruitment/ATS, onboarding, documents, payroll, analytics).
         const handled = await handleExpansion(action, { supabase, workspaceId, userId, body, access });
         if (handled) return handled;
