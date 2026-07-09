@@ -5,6 +5,8 @@ import { edgeError } from '@/utils/edgeError';
 // edge function re-derives access from the caller (JWT) and enforces entitlement + hr.view/hr.manage.
 
 export type EmploymentType = 'full_time' | 'part_time' | 'contractor';
+export type PayBasis = 'monthly' | 'hourly';
+export const PAY_BASIS_LABELS: Record<PayBasis, string> = { monthly: 'Monthly salary', hourly: 'Hourly rate' };
 export type EmployeeStatus = 'active' | 'on_leave' | 'terminated';
 export type AbsenceType = 'vacation' | 'sick' | 'unpaid' | 'other';
 export type AbsenceStatus = 'pending' | 'approved' | 'rejected';
@@ -34,7 +36,9 @@ export interface Employee {
   manager_contact_id: string | null;
   status: EmployeeStatus;
   department_id: string | null;
+  pay_basis: PayBasis;
   monthly_salary: number | null;
+  hourly_rate: number | null;
   salary_currency: string | null;
   created_at: string;
   updated_at: string;
@@ -82,7 +86,9 @@ export interface CreateEmployeeInput {
   manager_contact_id?: string | null;
   status?: EmployeeStatus;
   department_id?: string | null;
+  pay_basis?: PayBasis;
   monthly_salary?: number | null;
+  hourly_rate?: number | null;
 }
 
 export interface UpdateEmployeeInput {
@@ -95,7 +101,9 @@ export interface UpdateEmployeeInput {
   manager_contact_id?: string | null;
   status?: EmployeeStatus;
   department_id?: string | null;
+  pay_basis?: PayBasis;
   monthly_salary?: number | null;
+  hourly_rate?: number | null;
   contact?: Partial<Pick<EmployeeContact, 'name' | 'email' | 'phone' | 'mobile' | 'position' | 'department' | 'date_of_birth'>>;
 }
 
@@ -155,7 +163,7 @@ export interface HrDocument {
 }
 export type PayrollStatus = 'draft' | 'approved' | 'paid';
 export interface PayrollRun { id: string; period: string; status: PayrollStatus; currency: string; total_gross: number; total_net: number; notes: string | null; posted_finance_ref: unknown | null; created_at: string; approved_at: string | null; paid_at: string | null; }
-export interface PayrollItem { id: string; run_id: string; employee_id: string; gross: number; deductions: number; net: number; currency: string; note: string | null; employee?: { id: string; contact: { id: string; name: string } | null } | null; }
+export interface PayrollItem { id: string; run_id: string; employee_id: string; gross: number; deductions: number; net: number; currency: string; note: string | null; basis: PayBasis | null; days_worked: number | null; hours_per_day: number | null; rate: number | null; employee?: { id: string; contact: { id: string; name: string } | null } | null; }
 export interface HrAnalytics {
   headcount: number; active: number; on_leave_today: number; total_absence_days: number;
   absence_by_type: Record<string, number>; headcount_by_department: Record<string, number>;

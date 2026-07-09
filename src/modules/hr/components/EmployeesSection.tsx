@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
-  hrService, type Employee, type Department, type EmploymentType, type EmployeeStatus,
-  EMPLOYMENT_TYPE_LABELS, EMPLOYEE_STATUS_LABELS,
+  hrService, type Employee, type Department, type EmploymentType, type EmployeeStatus, type PayBasis,
+  EMPLOYMENT_TYPE_LABELS, EMPLOYEE_STATUS_LABELS, PAY_BASIS_LABELS,
 } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
 
@@ -89,9 +89,9 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', salary: '' });
+  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '' });
   const upd = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
-  const reset = () => setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', salary: '' });
+  const reset = () => setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '' });
 
   const submit = async () => {
     if (!f.name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
@@ -101,7 +101,9 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
         contact: { name: f.name.trim(), email: f.email.trim() || undefined, position: f.position.trim() || undefined },
         employment_type: f.employment_type, start_date: f.start_date || null,
         annual_leave_allowance_days: Number(f.allowance) || 0,
-        department_id: f.department_id || null, monthly_salary: f.salary ? Number(f.salary) : null,
+        department_id: f.department_id || null, pay_basis: f.pay_basis,
+        monthly_salary: f.pay_basis === 'monthly' && f.salary ? Number(f.salary) : null,
+        hourly_rate: f.pay_basis === 'hourly' && f.hourly ? Number(f.hourly) : null,
       });
       toast({ title: 'Employee added' }); setOpen(false); reset(); onDone();
     } catch (e) { toast({ title: 'Could not add employee', description: (e as Error).message, variant: 'destructive' }); }
@@ -135,10 +137,21 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Start date</Label><Input type="date" value={f.start_date} onChange={(e) => upd('start_date', e.target.value)} /></div>
             <div className="space-y-1"><Label>Leave (days)</Label><Input type="number" min={0} value={f.allowance} onChange={(e) => upd('allowance', e.target.value)} /></div>
-            <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" min={0} value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Pay basis</Label>
+              <Select value={f.pay_basis} onValueChange={(v) => upd('pay_basis', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{(Object.keys(PAY_BASIS_LABELS) as PayBasis[]).map((b) => <SelectItem key={b} value={b}>{PAY_BASIS_LABELS[b]}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {f.pay_basis === 'monthly'
+              ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" min={0} value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></div>
+              : <div className="space-y-1"><Label>Hourly rate</Label><Input type="number" min={0} value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></div>}
           </div>
         </div>
         <DialogFooter>
@@ -155,15 +168,19 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<EmployeeStatus>(employee.status);
   const [deptId, setDeptId] = useState(employee.department_id ?? '');
+  const [payBasis, setPayBasis] = useState<PayBasis>(employee.pay_basis ?? 'monthly');
   const [salary, setSalary] = useState(employee.monthly_salary != null ? String(employee.monthly_salary) : '');
+  const [hourly, setHourly] = useState(employee.hourly_rate != null ? String(employee.hourly_rate) : '');
   const [allowance, setAllowance] = useState(String(employee.annual_leave_allowance_days ?? 0));
 
   const submit = async () => {
     setSaving(true);
     try {
       await hrService.updateEmployee(workspaceId, {
-        employee_id: employee.id, status, department_id: deptId || null,
-        monthly_salary: salary ? Number(salary) : null, annual_leave_allowance_days: Number(allowance) || 0,
+        employee_id: employee.id, status, department_id: deptId || null, pay_basis: payBasis,
+        monthly_salary: payBasis === 'monthly' && salary ? Number(salary) : null,
+        hourly_rate: payBasis === 'hourly' && hourly ? Number(hourly) : null,
+        annual_leave_allowance_days: Number(allowance) || 0,
       });
       toast({ title: 'Employee updated' }); onDone();
     } catch (e) { toast({ title: 'Update failed', description: (e as Error).message, variant: 'destructive' }); }
@@ -192,9 +209,18 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Annual leave (days)</Label><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
+            <div className="space-y-1">
+              <Label>Pay basis</Label>
+              <Select value={payBasis} onValueChange={(v) => setPayBasis(v as PayBasis)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{(Object.keys(PAY_BASIS_LABELS) as PayBasis[]).map((b) => <SelectItem key={b} value={b}>{PAY_BASIS_LABELS[b]}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {payBasis === 'monthly'
+              ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} /></div>
+              : <div className="space-y-1"><Label>Hourly rate</Label><Input type="number" min={0} value={hourly} onChange={(e) => setHourly(e.target.value)} /></div>}
           </div>
+          <div className="space-y-1 w-1/2"><Label>Annual leave (days)</Label><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={onClose} disabled={saving}>Cancel</Button>

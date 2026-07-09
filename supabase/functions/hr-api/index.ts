@@ -38,7 +38,7 @@ const CONTACT_WRITABLE = [
 const EMPLOYEE_WRITABLE = [
   'employment_type', 'start_date', 'end_date', 'weekly_hours',
   'annual_leave_allowance_days', 'manager_contact_id', 'status',
-  'department_id', 'monthly_salary', 'salary_currency',
+  'department_id', 'monthly_salary', 'salary_currency', 'pay_basis', 'hourly_rate',
 ] as const;
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {

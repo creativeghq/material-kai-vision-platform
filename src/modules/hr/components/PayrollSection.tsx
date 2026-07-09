@@ -104,7 +104,7 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
           <Button variant="ghost" size="sm" onClick={onBack}><ChevronLeft className="h-4 w-4 mr-1" />Payroll</Button>
           <div>
             <h2 className="text-base font-display font-semibold">Payroll {run.period}</h2>
-            <p className="text-xs text-muted-foreground">Gross {money(run.total_gross, run.currency)} · Net {money(run.total_net, run.currency)}</p>
+            <p className="text-xs text-muted-foreground">Gross {money(run.total_gross, run.currency)} · Net {money(run.total_net, run.currency)}{items[0]?.days_worked != null ? ` · ${items[0].days_worked} working days` : ''}</p>
           </div>
           <Badge variant={statusVariant[run.status]}>{run.status}</Badge>
         </div>
@@ -122,7 +122,7 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
         <CardContent className="p-0">
           {items.length === 0 ? <EmptyState title="No active employees to pay" /> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead className="text-right">Gross</TableHead><TableHead className="text-right">Deductions</TableHead><TableHead className="text-right">Net</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Basis</TableHead><TableHead className="text-right">Gross</TableHead><TableHead className="text-right">Deductions</TableHead><TableHead className="text-right">Net</TableHead></TableRow></TableHeader>
               <TableBody>
                 {items.map((it) => <PayrollItemRow key={it.id} item={it} editable={editable} currency={run.currency} onSave={saveItem} />)}
               </TableBody>
@@ -139,9 +139,13 @@ function PayrollItemRow({ item, editable, currency, onSave }: { item: PayrollIte
   const [ded, setDed] = useState(String(item.deductions));
   const net = Math.max(0, (Number(gross) || 0) - (Number(ded) || 0));
   const commit = () => { if (Number(gross) !== item.gross || Number(ded) !== item.deductions) onSave(item, Number(gross) || 0, Number(ded) || 0); };
+  const basisLabel = item.basis === 'hourly'
+    ? `${money(item.rate ?? 0, currency)}/h × ${item.hours_per_day ?? 8}h × ${item.days_worked ?? 0}d`
+    : 'Monthly';
   return (
     <TableRow>
       <TableCell className="font-medium">{item.employee?.contact?.name || 'Employee'}</TableCell>
+      <TableCell className="text-xs text-muted-foreground">{basisLabel}</TableCell>
       <TableCell className="text-right">{editable ? <Input type="number" min={0} value={gross} onChange={(e) => setGross(e.target.value)} onBlur={commit} className="h-8 w-28 ml-auto text-right" /> : money(item.gross, currency)}</TableCell>
       <TableCell className="text-right">{editable ? <Input type="number" min={0} value={ded} onChange={(e) => setDed(e.target.value)} onBlur={commit} className="h-8 w-28 ml-auto text-right" /> : money(item.deductions, currency)}</TableCell>
       <TableCell className="text-right font-medium">{money(editable ? net : item.net, currency)}</TableCell>

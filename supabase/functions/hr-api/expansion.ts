@@ -27,6 +27,20 @@ const APP_STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'reje
 const DOC_TYPES = ['contract', 'id', 'certificate', 'payslip', 'review', 'other'];
 const HR_DOC_BUCKET = 'pdf-documents';
 
+/** Working (Mon–Fri) days in a 'YYYY-MM' month. */
+function businessDaysInMonth(period: string): number {
+  const [y, m] = period.split('-').map(Number);
+  if (!y || !m) return 0;
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  let count = 0;
+  for (let d = 1; d <= last; d++) {
+    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
+}
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 const DEFAULT_ONBOARDING = [
   'Sign employment contract', 'Collect ID & tax documents', 'Set up email & system accounts',
   'Assign equipment (laptop, access card)', 'Team & workplace introduction', 'Benefits & payroll enrollment',
@@ -401,12 +415,30 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const { data: run, error } = await supabase.from('hr_payroll_runs')
         .insert({ workspace_id: workspaceId, period, status: 'draft', currency: body?.currency ?? 'EUR', created_by: userId }).select('*').single();
       if (error) { if ((error as any).code === '23505') return json({ error: `A payroll run for ${period} already exists.` }, 409); throw new HttpError(400, error.message); }
-      // Auto-populate items from active employees using their monthly_salary.
+      // Auto-populate items from active employees. Gross depends on pay basis:
+      //  • monthly → the fixed monthly_salary
+      //  • hourly  → hourly_rate × hours/day × working days in the run month
+      //             (hours/day derived from weekly_hours ÷ 5, default 8)
+      const workingDays = businessDaysInMonth(period);
       const { data: emps } = await supabase.from('hr_employees')
-        .select('id, monthly_salary, salary_currency').eq('workspace_id', workspaceId).eq('status', 'active');
+        .select('id, monthly_salary, salary_currency, pay_basis, hourly_rate, weekly_hours')
+        .eq('workspace_id', workspaceId).eq('status', 'active');
       const items = (emps ?? []).map((e: any) => {
-        const gross = Number(e.monthly_salary ?? 0);
-        return { workspace_id: workspaceId, run_id: run.id, employee_id: e.id, gross, deductions: 0, net: gross, currency: e.salary_currency ?? run.currency };
+        const basis = e.pay_basis === 'hourly' ? 'hourly' : 'monthly';
+        let gross = 0, rate = 0;
+        let hoursPerDay: number | null = null;
+        if (basis === 'hourly') {
+          hoursPerDay = e.weekly_hours ? round2(Number(e.weekly_hours) / 5) : 8;
+          rate = Number(e.hourly_rate ?? 0);
+          gross = round2(rate * hoursPerDay * workingDays);
+        } else {
+          rate = Number(e.monthly_salary ?? 0);
+          gross = rate;
+        }
+        return {
+          workspace_id: workspaceId, run_id: run.id, employee_id: e.id, gross, deductions: 0, net: gross,
+          currency: e.salary_currency ?? run.currency, basis, days_worked: workingDays, hours_per_day: hoursPerDay, rate,
+        };
       });
       if (items.length) await supabase.from('hr_payroll_items').insert(items);
       const totalGross = items.reduce((s: number, i: any) => s + i.gross, 0);
