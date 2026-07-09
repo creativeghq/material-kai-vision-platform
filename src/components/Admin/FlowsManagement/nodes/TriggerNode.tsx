@@ -77,6 +77,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   expense_card_requested: FileText,
   pricing_change_requested: ClipboardCheck,
   pricing_change_decided: CheckCircle2,
+  hr_late_checkin: Clock,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

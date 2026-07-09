@@ -228,6 +228,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'material_alert', group: 'Users',
     label: 'Saved-Search Material Alert', description: 'A new material matches a saved search', icon: 'Bell', color: 'blue',
     defaultData: { label: 'Saved-Search Material Alert', category: 'trigger', triggerType: 'material_alert', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'hr_late_checkin', group: 'Users',
+    label: 'HR — Late Check-in', description: 'An employee has not clocked in past their start time + grace', icon: 'Clock', color: 'amber',
+    defaultData: { label: 'HR — Late Check-in', category: 'trigger', triggerType: 'hr_late_checkin', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

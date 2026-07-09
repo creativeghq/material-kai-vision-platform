@@ -137,6 +137,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   pricing_change_requested: ClipboardCheck,
   pricing_change_decided: CheckCircle2,
   module_access_requested: Package,
+  hr_late_checkin: Clock,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -207,6 +208,7 @@ const triggerLabels: Record<TriggerType, string> = {
   pricing_change_requested: 'Discount Approval Requested',
   module_access_requested: 'Module Activation Requested',
   pricing_change_decided: 'Discount Approval Decided',
+  hr_late_checkin: 'HR — Late Check-in',
 };
 
 const statusColors: Record<FlowStatus, string> = {

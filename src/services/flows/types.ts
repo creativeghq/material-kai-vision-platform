@@ -84,10 +84,13 @@ export type TriggerType =
   | 'material_alert'
   | 'finance_follow_up'
   | 'invoice_paid'
-  | 'module_access_requested';
+  | 'module_access_requested'
+  // #252 — HR: an employee has not clocked in past their start time + grace (payload-only)
+  | 'hr_late_checkin';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
+export interface HrLateCheckinTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
@@ -283,6 +286,7 @@ export type TriggerConfigMap = {
   finance_follow_up: FinanceFollowUpTriggerConfig;
   invoice_paid: InvoicePaidTriggerConfig;
   module_access_requested: ModuleAccessRequestedTriggerConfig;
+  hr_late_checkin: HrLateCheckinTriggerConfig;
 };
 
 // =====================================================

@@ -6,6 +6,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { generatePayslips } from './payslip.ts';
 
 export interface Ctx {
   supabase: any;
@@ -157,6 +159,32 @@ async function anthropicTool(prompt: string, tool: any): Promise<any> {
   const block = (data.content || []).find((b: any) => b.type === 'tool_use');
   if (!block?.input) throw new HttpError(502, 'AI returned no structured result');
   return block.input;
+}
+
+/** Emit the recruitment Flows trigger (best-effort) so admins can automate interviews / updates. */
+async function emitApplicantStage(supabase: any, workspaceId: string, applicationId: string, fromStage: string | null, toStage: string) {
+  try {
+    const { data: a } = await supabase.from('hr_applications')
+      .select('candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email ), posting:hr_job_postings!hr_applications_job_posting_id_fkey ( id, title )')
+      .eq('id', applicationId).maybeSingle();
+    const cand = (a as any)?.candidate, post = (a as any)?.posting;
+    await emitFlowEvent('hr.applicant_stage_changed', {
+      workspace_id: workspaceId, application_id: applicationId, from_stage: fromStage, to_stage: toStage,
+      candidate_id: cand?.id ?? null, candidate_name: cand?.name ?? null, candidate_email: cand?.email ?? null,
+      job_posting_id: post?.id ?? null, job_title: post?.title ?? null,
+      title: `Applicant: ${cand?.name ?? 'candidate'} → ${toStage}`,
+      body: `${cand?.name ?? 'A candidate'} moved to "${toStage}"${post?.title ? ` for ${post.title}` : ''}.`,
+      action_url: '/hr?tab=recruitment', type: 'hr.applicant_stage_changed',
+    });
+  } catch { /* flow emit is best-effort — never block the stage change */ }
+}
+
+/** Base64-encode bytes in chunks (avoids call-stack overflow on large CVs). */
+function base64FromBytes(bytes: Uint8Array): string {
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+  return btoa(bin);
 }
 
 /**
@@ -342,6 +370,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
         .insert({ workspace_id: workspaceId, job_posting_id: jobId, candidate_id: candidateId, stage: 'applied', notes: body?.notes ?? null })
         .select('*').single();
       if (error) { if ((error as any).code === '23505') return json({ error: 'This candidate already applied to this job.' }, 409); throw new HttpError(400, error.message); }
+      await emitApplicantStage(supabase, workspaceId, data.id, null, 'applied');
       return json({ application: data }, 201);
     }
     case 'update-application': {
@@ -350,10 +379,91 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       if (!id) return json({ error: 'application_id is required' }, 400);
       const fields = pick(body, ['stage', 'rating', 'notes']);
       if (fields.stage && !APP_STAGES.includes(String(fields.stage))) return json({ error: 'invalid stage' }, 400);
+      const { data: prev } = await supabase.from('hr_applications').select('stage').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       const { data, error } = await supabase.from('hr_applications').update(fields).eq('id', id).eq('workspace_id', workspaceId).select('*').maybeSingle();
       if (error) throw new HttpError(400, error.message);
       if (!data) return json({ error: 'not found' }, 404);
+      if (fields.stage && prev && prev.stage !== fields.stage) await emitApplicantStage(supabase, workspaceId, id, prev.stage, String(fields.stage));
       return json({ application: data });
+    }
+    // Candidate CV: client uploads to this private path, then calls set-application-cv.
+    case 'application-cv-upload-path': {
+      requireManage();
+      const cid = String(body?.candidate_id ?? '');
+      if (!cid) return json({ error: 'candidate_id is required' }, 400);
+      const safe = String(body?.filename ?? 'cv.pdf').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+      return json({ bucket: HR_DOC_BUCKET, path: `hr/${workspaceId}/candidates/${cid}/${Date.now()}-${safe}` });
+    }
+    case 'set-application-cv': {
+      requireManage();
+      const cid = String(body?.candidate_id ?? '');
+      const path = String(body?.storage_path ?? '');
+      if (!cid || !path) return json({ error: 'candidate_id and storage_path are required' }, 400);
+      const { error } = await supabase.from('hr_candidates')
+        .update({ resume_bucket: body?.storage_bucket || HR_DOC_BUCKET, resume_path: path })
+        .eq('id', cid).eq('workspace_id', workspaceId);
+      if (error) throw new HttpError(400, error.message);
+      return json({ ok: true });
+    }
+    case 'application-cv-url': {
+      const cid = String(body?.candidate_id ?? '');
+      const { data: c } = await supabase.from('hr_candidates').select('resume_bucket, resume_path').eq('id', cid).eq('workspace_id', workspaceId).maybeSingle();
+      if (!c?.resume_path) return json({ error: 'no CV on file' }, 404);
+      const { data: signed, error } = await supabase.storage.from(c.resume_bucket || HR_DOC_BUCKET).createSignedUrl(c.resume_path, 300);
+      if (error) throw new HttpError(400, error.message);
+      return json({ url: signed?.signedUrl });
+    }
+    // AI CV screening — Claude reads the CV (PDF) against the job and returns a 0–100 fit score.
+    case 'screen-application': {
+      requireManage();
+      const id = String(body?.application_id ?? '');
+      if (!id) return json({ error: 'application_id is required' }, 400);
+      const { data: app } = await supabase.from('hr_applications')
+        .select('candidate:hr_candidates!hr_applications_candidate_id_fkey ( name, headline, resume_bucket, resume_path ), posting:hr_job_postings!hr_applications_job_posting_id_fkey ( title, description, requirements )')
+        .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!app) return json({ error: 'application not found' }, 404);
+      const cand = (app as any).candidate, post = (app as any).posting;
+      if (!cand?.resume_path) return json({ error: 'Upload the candidate’s CV first.' }, 400);
+      const key = Deno.env.get('ANTHROPIC_API_KEY');
+      if (!key) return json({ error: 'AI is not configured.' }, 400);
+      const { data: blob } = await supabase.storage.from(cand.resume_bucket || HR_DOC_BUCKET).download(cand.resume_path);
+      if (!blob) return json({ error: 'Could not read the CV.' }, 400);
+      const b64 = base64FromBytes(new Uint8Array(await (blob as Blob).arrayBuffer()));
+      const tool = {
+        name: 'cv_assessment',
+        description: 'Assess a candidate CV against a specific job.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            score: { type: 'integer', minimum: 0, maximum: 100, description: 'Overall fit 0–100 for THIS role.' },
+            summary: { type: 'string', description: '2–4 sentences: fit verdict, key strengths, and gaps vs the requirements.' },
+          },
+          required: ['score', 'summary'],
+        },
+      };
+      const prompt = `You are a hiring assistant. Rate how well this CV fits the role below and be specific about matches and gaps. Do not invent experience.\n\nROLE: ${post?.title ?? ''}\n\nDESCRIPTION:\n${post?.description ?? ''}\n\nREQUIREMENTS:\n${post?.requirements ?? ''}`;
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: Deno.env.get('HR_JOB_AI_MODEL') || 'claude-sonnet-4-6', max_tokens: 800,
+          tools: [tool], tool_choice: { type: 'tool', name: tool.name },
+          messages: [{ role: 'user', content: [
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+            { type: 'text', text: prompt },
+          ] }],
+        }),
+      });
+      if (!res.ok) return json({ error: `AI request failed (${res.status})` }, 502);
+      const out = await res.json();
+      const block = (out.content || []).find((b: any) => b.type === 'tool_use');
+      const score = Math.max(0, Math.min(100, Math.round(Number(block?.input?.score ?? 0))));
+      const summary = String(block?.input?.summary ?? '').slice(0, 2000);
+      const { data: upd, error } = await supabase.from('hr_applications')
+        .update({ ai_score: score, ai_summary: summary, ai_rated_at: new Date().toISOString() })
+        .eq('id', id).eq('workspace_id', workspaceId).select('id, ai_score, ai_summary, ai_rated_at').single();
+      if (error) throw new HttpError(400, error.message);
+      return json({ application: upd });
     }
     case 'hire-application': {
       requireManage();
@@ -575,6 +685,12 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const tn = round2((all ?? []).reduce((s: number, i: any) => s + Number(i.net), 0));
       await supabase.from('hr_payroll_runs').update({ total_gross: tg, total_net: tn }).eq('id', (cur as any).run_id);
       return json({ ok: true, total_gross: tg, total_net: tn });
+    }
+    case 'generate-payslips': {
+      requireManage();
+      const rid = String(body?.run_id ?? '');
+      if (!rid) return json({ error: 'run_id is required' }, 400);
+      return await generatePayslips(supabase, workspaceId, userId, rid);
     }
     case 'get-payroll-settings': {
       const s = await getPayrollSettings(supabase, workspaceId);
