@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap } from 'lucide-react';
+import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap, ExternalLink } from 'lucide-react';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -20,6 +21,8 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'outline'> = { ope
 
 export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: string | null; canManage: boolean }) {
   const { toast } = useToast();
+  const { activeWorkspace } = useWorkspace();
+  const careersUrl = activeWorkspace?.slug ? `${window.location.origin}/careers/${activeWorkspace.slug}` : null;
   const [postings, setPostings] = useState<JobPosting[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +46,20 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
 
   return (
     <div className="space-y-4">
-      <SectionHeader title="Jobs & Applicants" subtitle={`${postings.filter((p) => p.status === 'open').length} open`} actions={canManage ? <JobDialog workspaceId={workspaceId} departments={departments} onDone={load} /> : undefined} />
+      <SectionHeader
+        title="Jobs & Applicants"
+        subtitle={`${postings.filter((p) => p.status === 'open').length} open`}
+        actions={
+          <div className="flex items-center gap-2">
+            {careersUrl && (
+              <Button variant="outline" size="sm" className="rounded-full" onClick={() => window.open(careersUrl, '_blank')} title={careersUrl}>
+                <ExternalLink className="h-4 w-4 mr-1" />Careers page
+              </Button>
+            )}
+            {canManage && <JobDialog workspaceId={workspaceId} departments={departments} onDone={load} />}
+          </div>
+        }
+      />
       {postings.length === 0 ? (
         <Card><CardContent><EmptyState icon={Briefcase} title="No job postings yet" hint={canManage ? 'Create a job — the AI can draft the description for you.' : undefined} /></CardContent></Card>
       ) : (

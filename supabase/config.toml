@@ -104,6 +104,10 @@ verify_jwt = false
 [functions.hr-api]
 verify_jwt = false
 
+# #252 — PUBLIC careers page (anonymous): list open jobs by workspace slug + accept applications.
+[functions.hr-careers]
+verify_jwt = false
+
 [functions.finance-send-statement]
 verify_jwt = false
 

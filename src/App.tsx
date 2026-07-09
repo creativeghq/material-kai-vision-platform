@@ -103,6 +103,7 @@ const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const ToolsHubPage = lazy(() => import('./pages/Tools/ToolsHubPage'));
+const PublicCareersPage = lazy(() => import('./pages/Careers/PublicCareersPage'));
 const PriceScanPage = lazy(() => import('./pages/Tools/PriceScanPage'));
 const MentionScanPage = lazy(() => import('./pages/Tools/MentionScanPage'));
 const ProjectPlanPage = lazy(() => import('./pages/Tools/ProjectPlanPage'));
@@ -177,6 +178,7 @@ const App = () => (
                 <Route path="/cv/:token" element={<PageErrorBoundary name="Client View"><PublicClientViewPage /></PageErrorBoundary>} />
                 {/* #209 — public customer inbox thread (tokenized, no auth) */}
                 <Route path="/i/:token" element={<PageErrorBoundary name="Inbox Thread"><PublicInboxThreadPage /></PageErrorBoundary>} />
+                <Route path="/careers/:slug" element={<PageErrorBoundary name="Careers"><PublicCareersPage /></PageErrorBoundary>} />
                 <Route path="/tools" element={<PageErrorBoundary name="Tools Hub"><ToolsHubPage /></PageErrorBoundary>} />
                 <Route path="/tools/price-scan" element={<PageErrorBoundary name="Price Scan"><PriceScanPage /></PageErrorBoundary>} />
                 <Route path="/tools/mention-scan" element={<PageErrorBoundary name="Mention Scan"><MentionScanPage /></PageErrorBoundary>} />
