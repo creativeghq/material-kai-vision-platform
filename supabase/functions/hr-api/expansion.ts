@@ -465,7 +465,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const scheduled = `${run.period}-28`;
       const { data: pp, error } = await supabase.from('planned_payments').insert({
         workspace_id: workspaceId, direction: 'out', amount: Number(run.total_net), currency: run.currency,
-        scheduled_for: scheduled, category: 'payroll', title: `Payroll ${run.period}`,
+        scheduled_for: scheduled, category: 'salary', title: `Payroll ${run.period}`,
         notes: `HR payroll run ${run.period} (${run.total_net} ${run.currency} net)`, created_by: userId,
       }).select('id').single();
       if (error) throw new HttpError(400, `Finance posting failed: ${error.message}`);
