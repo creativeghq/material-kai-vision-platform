@@ -160,11 +160,12 @@ export interface JobPosting {
   currency: string | null; status: PostingStatus; created_at: string; published_at: string | null;
   applicant_count: number; active_applicants: number;
 }
-export interface Candidate { id: string; name: string; email: string | null; phone: string | null; headline: string | null; source: string | null; created_at: string; }
+export interface Candidate { id: string; name: string; email: string | null; phone: string | null; headline: string | null; source: string | null; resume_path?: string | null; created_at: string; }
 export type AppStage = 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
 export interface Application {
   id: string; job_posting_id: string; candidate_id: string; stage: AppStage; rating: number | null; notes: string | null;
   applied_at: string; hired_employee_id: string | null;
+  ai_score: number | null; ai_summary: string | null; ai_rated_at: string | null;
   candidate: Candidate | null; posting: { id: string; title: string } | null;
 }
 export interface OnboardingTask {
@@ -309,6 +310,10 @@ class HrService {
   createApplication(ws: string, input: { job_posting_id: string; candidate_id?: string; candidate?: { name: string; email?: string; phone?: string; headline?: string; source?: string }; notes?: string }): Promise<{ application: Application }> { return call(ws, 'create-application', input); }
   updateApplication(ws: string, application_id: string, input: { stage?: AppStage; rating?: number; notes?: string }): Promise<{ application: Application }> { return call(ws, 'update-application', { application_id, ...input }); }
   hireApplication(ws: string, application_id: string, input: { start_date?: string; department_id?: string } = {}): Promise<{ employee_id: string; onboarding_seeded: number }> { return call(ws, 'hire-application', { application_id, ...input }); }
+  applicationCvUploadPath(ws: string, candidate_id: string, filename: string): Promise<{ bucket: string; path: string }> { return call(ws, 'application-cv-upload-path', { candidate_id, filename }); }
+  setApplicationCv(ws: string, candidate_id: string, storage_bucket: string, storage_path: string): Promise<{ ok: boolean }> { return call(ws, 'set-application-cv', { candidate_id, storage_bucket, storage_path }); }
+  applicationCvUrl(ws: string, candidate_id: string): Promise<{ url: string }> { return call(ws, 'application-cv-url', { candidate_id }); }
+  screenApplication(ws: string, application_id: string): Promise<{ application: { id: string; ai_score: number; ai_summary: string; ai_rated_at: string } }> { return call(ws, 'screen-application', { application_id }); }
 
   // ── Onboarding ──
   listOnboarding(ws: string, filters: { employee_id?: string; pending_only?: boolean } = {}): Promise<{ tasks: OnboardingTask[] }> { return call(ws, 'list-onboarding', filters); }
@@ -330,6 +335,7 @@ class HrService {
   updatePayrollItem(ws: string, item_id: string, input: { gross: number; deductions?: number; note?: string }): Promise<{ ok: boolean; total_gross: number; total_net: number }> { return call(ws, 'update-payroll-item', { item_id, ...input }); }
   setPayrollStatus(ws: string, run_id: string, status: PayrollStatus): Promise<{ run: PayrollRun }> { return call(ws, 'set-payroll-status', { run_id, status }); }
   postPayrollToFinance(ws: string, run_id: string): Promise<{ ok: boolean; posted: { net_payment_ids: string[]; income_tax_payment_id: string | null; efka_payment_id: string | null; totals: { net: number; income_tax: number; employee_efka: number; employer_efka: number } } }> { return call(ws, 'post-payroll-to-finance', { run_id }); }
+  generatePayslips(ws: string, run_id: string): Promise<{ ok: boolean; payslips: number }> { return call(ws, 'generate-payslips', { run_id }); }
   getPayrollSettings(ws: string): Promise<{ settings: PayrollSettings }> { return call(ws, 'get-payroll-settings'); }
   updatePayrollSettings(ws: string, input: Partial<PayrollSettings>): Promise<{ settings: PayrollSettings }> { return call(ws, 'update-payroll-settings', input as Record<string, unknown>); }
 

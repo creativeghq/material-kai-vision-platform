@@ -78,6 +78,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   pricing_change_requested: ClipboardCheck,
   pricing_change_decided: CheckCircle2,
   hr_late_checkin: Clock,
+  'hr.applicant_stage_changed': UserPlus,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

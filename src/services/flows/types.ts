@@ -86,11 +86,14 @@ export type TriggerType =
   | 'invoice_paid'
   | 'module_access_requested'
   // #252 — HR: an employee has not clocked in past their start time + grace (payload-only)
-  | 'hr_late_checkin';
+  | 'hr_late_checkin'
+  // #252 — HR recruiting: a job applicant moved through the pipeline (payload-only, dotted key)
+  | 'hr.applicant_stage_changed';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
 export interface HrLateCheckinTriggerConfig {}
+export interface HrApplicantStageChangedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
@@ -287,6 +290,7 @@ export type TriggerConfigMap = {
   invoice_paid: InvoicePaidTriggerConfig;
   module_access_requested: ModuleAccessRequestedTriggerConfig;
   hr_late_checkin: HrLateCheckinTriggerConfig;
+  'hr.applicant_stage_changed': HrApplicantStageChangedTriggerConfig;
 };
 
 // =====================================================

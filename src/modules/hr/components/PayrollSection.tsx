@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Loader2, Wallet, ChevronLeft, CheckCircle2, Banknote, ArrowUpRight, Settings2 } from 'lucide-react';
+import { Plus, Loader2, Wallet, ChevronLeft, CheckCircle2, Banknote, ArrowUpRight, Settings2, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -107,6 +107,12 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
     } catch (e) { toast({ title: 'Posting failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
+  const makePayslips = async () => {
+    setBusy(true);
+    try { const r = await hrService.generatePayslips(workspaceId, runId); toast({ title: 'Payslips generated', description: `${r.payslips} payslip(s) filed — employees can see them in My HR → Documents.` }); }
+    catch (e) { toast({ title: 'Payslip generation failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
 
   if (loading || !run) return <Skeleton className="h-64 w-full" />;
   const editable = run.status === 'draft' && canManage;
@@ -129,6 +135,7 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
             {run.status === 'approved' && <Button size="sm" className="rounded-full" disabled={busy} onClick={() => setStatus('paid')}><Banknote className="h-4 w-4 mr-1" />Mark paid</Button>}
             {run.status !== 'draft' && !run.posted_finance_ref && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={postFinance}><ArrowUpRight className="h-4 w-4 mr-1" />Post to Finance</Button>}
             {run.posted_finance_ref && <Badge variant="outline" className="gap-1"><ArrowUpRight className="h-3 w-3" />In Finance</Badge>}
+            {run.status !== 'draft' && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={makePayslips}><FileText className="h-4 w-4 mr-1" />Payslips</Button>}
           </div>
         )}
       </div>

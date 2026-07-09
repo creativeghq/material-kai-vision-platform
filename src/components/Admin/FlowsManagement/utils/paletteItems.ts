@@ -231,6 +231,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'hr_late_checkin', group: 'Users',
     label: 'HR — Late Check-in', description: 'An employee has not clocked in past their start time + grace', icon: 'Clock', color: 'amber',
     defaultData: { label: 'HR — Late Check-in', category: 'trigger', triggerType: 'hr_late_checkin', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'hr.applicant_stage_changed', group: 'Users',
+    label: 'HR — Applicant Stage Changed', description: 'A job applicant moved through the pipeline (applied → interview → offer → hired…)', icon: 'UserPlus', color: 'violet',
+    defaultData: { label: 'HR — Applicant Stage Changed', category: 'trigger', triggerType: 'hr.applicant_stage_changed', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

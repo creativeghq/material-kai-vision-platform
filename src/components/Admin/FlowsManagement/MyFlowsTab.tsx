@@ -138,6 +138,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   pricing_change_decided: CheckCircle2,
   module_access_requested: Package,
   hr_late_checkin: Clock,
+  'hr.applicant_stage_changed': UserPlus,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -209,6 +210,7 @@ const triggerLabels: Record<TriggerType, string> = {
   module_access_requested: 'Module Activation Requested',
   pricing_change_decided: 'Discount Approval Decided',
   hr_late_checkin: 'HR — Late Check-in',
+  'hr.applicant_stage_changed': 'HR — Applicant Stage Changed',
 };
 
 const statusColors: Record<FlowStatus, string> = {

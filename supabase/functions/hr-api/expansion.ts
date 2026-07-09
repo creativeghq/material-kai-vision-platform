@@ -339,7 +339,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     case 'list-applications': {
       let q = supabase.from('hr_applications')
         .select(`*,
-          candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email, phone, headline ),
+          candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email, phone, headline, resume_path ),
           posting:hr_job_postings!hr_applications_job_posting_id_fkey ( id, title )`)
         .eq('workspace_id', workspaceId).order('applied_at', { ascending: false });
       if (body?.job_posting_id) q = q.eq('job_posting_id', String(body.job_posting_id));
