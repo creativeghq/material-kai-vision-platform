@@ -43,6 +43,9 @@ export interface Employee {
   salary_currency: string | null;
   amka: string | null; // ΑΜΚΑ — social-security number, for Εργάνη filings
   dependent_children: number; // drives the payroll income-tax credit
+  work_start_time: string | null;
+  work_end_time: string | null;
+  work_days: number[] | null; // ISO weekdays 1=Mon..7=Sun
   created_at: string;
   updated_at: string;
   contact: EmployeeContact | null;
@@ -95,6 +98,9 @@ export interface CreateEmployeeInput {
   hourly_rate?: number | null;
   amka?: string | null;
   dependent_children?: number;
+  work_start_time?: string | null;
+  work_end_time?: string | null;
+  work_days?: number[] | null;
 }
 
 export interface UpdateEmployeeInput {
@@ -112,6 +118,9 @@ export interface UpdateEmployeeInput {
   hourly_rate?: number | null;
   amka?: string | null;
   dependent_children?: number;
+  work_start_time?: string | null;
+  work_end_time?: string | null;
+  work_days?: number[] | null;
   contact?: Partial<Pick<EmployeeContact, 'name' | 'email' | 'phone' | 'mobile' | 'position' | 'department' | 'date_of_birth' | 'vat_number'>>;
 }
 
@@ -199,7 +208,22 @@ export interface SelfTask { id: string; title: string; description: string | nul
 export interface SelfAbsence { id: string; absence_type: AbsenceType; start_date: string; end_date: string; working_days: number | null; status: AbsenceStatus; note: string | null; created_at: string; }
 export interface SelfDocument { id: string; name: string; doc_type: DocType; size_bytes: number | null; created_at: string; }
 export interface SelfPunch { id: string; punch_type: 'arrival' | 'departure'; reference_date: string; punched_at: string; status: 'pending' | 'submitted' | 'failed'; ergani_protocol: string | null; }
-export interface SelfClockResult { ok: boolean; punch: SelfPunch; filed: boolean; reason: string | null; protocol: string | null; }
+export interface SelfClockResult { ok: boolean; punch: SelfPunch; filed: boolean; reason: string | null; protocol: string | null; is_late?: boolean | null; }
+
+// ── Attendance / kiosk / HR settings ──
+export interface AttendanceRow {
+  employee_id: string; name: string; status: EmployeeStatus;
+  work_today: boolean; work_start_time: string | null; work_end_time: string | null; has_pin: boolean;
+  clocked_in: boolean; last_punch_type: 'arrival' | 'departure' | null; last_at: string | null;
+  last_is_late: boolean | null; last_status: 'pending' | 'submitted' | 'failed' | null;
+}
+export interface HrSettings {
+  workspace_id?: string; timezone: string; kiosk_enabled: boolean; kiosk_require_pin: boolean;
+  late_alert_enabled: boolean; late_grace_minutes: number; notify_owner: boolean; notify_finance: boolean;
+  notify_user_ids: string[]; notify_emails: string[]; is_default?: boolean;
+}
+export interface ClockEmployeeResult { ok: boolean; punch: unknown; filed: boolean; reason: string | null; is_late: boolean | null; protocol: string | null; }
+export interface NotifyCandidate { user_id: string; name: string; email: string | null; role: string | null; }
 
 export const POSTING_STATUS_LABELS: Record<PostingStatus, string> = { draft: 'Draft', open: 'Open', closed: 'Closed' };
 export const APP_STAGE_LABELS: Record<AppStage, string> = { applied: 'Applied', screening: 'Screening', interview: 'Interview', offer: 'Offer', hired: 'Hired', rejected: 'Rejected' };
@@ -323,6 +347,14 @@ class HrService {
   // Employee self clock-in/out (Work Card). Records the punch and files to Εργάνη when configured.
   selfClock(ws: string, input: { punch_type: 'arrival' | 'departure'; comments?: string }): Promise<SelfClockResult> { return call(ws, 'self-clock', input); }
   selfPunches(ws: string, days = 14): Promise<{ punches: SelfPunch[] }> { return call(ws, 'self-punches', { days }); }
+
+  // ── Admin attendance + kiosk/notification settings ──
+  clockEmployee(ws: string, employee_id: string, punch_type: 'arrival' | 'departure'): Promise<ClockEmployeeResult> { return call(ws, 'clock-employee', { employee_id, punch_type }); }
+  setEmployeePin(ws: string, employee_id: string, pin: string): Promise<{ ok: boolean; pin_set: boolean }> { return call(ws, 'set-employee-pin', { employee_id, pin }); }
+  attendanceToday(ws: string): Promise<{ date: string; attendance: AttendanceRow[] }> { return call(ws, 'attendance-today'); }
+  getHrSettings(ws: string): Promise<{ settings: HrSettings }> { return call(ws, 'get-hr-settings'); }
+  saveHrSettings(ws: string, settings: Partial<HrSettings>): Promise<{ settings: HrSettings }> { return call(ws, 'save-hr-settings', settings as Record<string, unknown>); }
+  listNotifyCandidates(ws: string): Promise<{ candidates: NotifyCandidate[] }> { return call(ws, 'list-notify-candidates'); }
 
   // ── Ergani II (ΠΣ Εργάνη) integration ──────────────────────────────────────
   // Credentials are stored per-workspace in workspace_ergani_credentials (RLS: workspace admin).

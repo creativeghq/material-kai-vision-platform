@@ -42,6 +42,7 @@ const EMPLOYEE_WRITABLE = [
   'department_id', 'monthly_salary', 'salary_currency', 'pay_basis', 'hourly_rate',
   'amka', // ΑΜΚΑ — social-security number, required for Εργάνη submissions
   'dependent_children', // drives the payroll income-tax credit
+  'work_start_time', 'work_end_time', 'work_days', // working-time window (lateness + kiosk expected)
 ] as const;
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {

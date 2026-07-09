@@ -4,7 +4,8 @@
 // caller is bound to the workspace + entitlement + hr.view is confirmed. Writes require hr.manage.
 import { corsHeaders } from '../_shared/cors.ts';
 import { HttpError } from '../_shared/api-logger.ts';
-import { fileWorkcardPunch } from './ergani.ts';
+import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
+import { sha256hex } from '../_shared/hash.ts';
 
 export interface Ctx {
   supabase: any;
@@ -741,6 +742,88 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       });
     }
 
+    // ── Attendance: admin clock, PIN, today's board, settings ─────────────────
+    case 'clock-employee': {
+      requireManage();
+      const employeeId = String(body?.employee_id ?? '');
+      const punchType = String(body?.punch_type ?? '');
+      if (!employeeId) return json({ error: 'employee_id is required' }, 400);
+      if (!['arrival', 'departure'].includes(punchType)) return json({ error: "punch_type must be 'arrival' or 'departure'" }, 400);
+      const r = await fileWorkcardPunch(supabase, workspaceId, userId, {
+        employeeId, punchType: punchType as 'arrival' | 'departure',
+        comments: body?.comments ? String(body.comments) : undefined, source: 'admin',
+      }, { requireErgani: false });
+      return json({ ok: true, punch: r.punch, filed: r.filed, reason: r.reason ?? null, is_late: r.isLate ?? null, protocol: r.result?.protocol ?? null });
+    }
+    case 'set-employee-pin': {
+      requireManage();
+      const employeeId = String(body?.employee_id ?? '');
+      const pin = String(body?.pin ?? '');
+      if (!employeeId) return json({ error: 'employee_id is required' }, 400);
+      let hash: string | null = null;
+      if (pin) {
+        if (!/^\d{4,8}$/.test(pin)) return json({ error: 'PIN must be 4–8 digits' }, 400);
+        hash = await sha256hex(`${workspaceId}:${pin}`);
+      }
+      const { error } = await supabase.from('hr_employees').update({ clock_pin_hash: hash }).eq('id', employeeId).eq('workspace_id', workspaceId);
+      if (error) throw new HttpError(400, error.message);
+      return json({ ok: true, pin_set: !!hash });
+    }
+    case 'attendance-today': {
+      const { data: settings } = await supabase.from('hr_settings').select('timezone').eq('workspace_id', workspaceId).maybeSingle();
+      const tz = settings?.timezone || 'Europe/Athens';
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const isodow = ((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7) + 1; // 1=Mon..7=Sun
+      const { data: emps } = await supabase.from('hr_employees')
+        .select('id, work_start_time, work_end_time, work_days, status, clock_pin_hash, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name )')
+        .eq('workspace_id', workspaceId);
+      const { data: punches } = await supabase.from('hr_time_punches')
+        .select('employee_id, punch_type, punched_at, is_late, status, ergani_protocol')
+        .eq('workspace_id', workspaceId).eq('reference_date', today).order('punched_at', { ascending: false });
+      const latest = new Map<string, any>();
+      for (const p of (punches ?? [])) if (!latest.has(p.employee_id)) latest.set(p.employee_id, p);
+      const rows = (emps ?? []).map((e: any) => {
+        const last = latest.get(e.id) ?? null;
+        return {
+          employee_id: e.id, name: e.contact?.name ?? '', status: e.status,
+          work_today: Array.isArray(e.work_days) ? e.work_days.includes(isodow) : true,
+          work_start_time: e.work_start_time, work_end_time: e.work_end_time,
+          has_pin: !!e.clock_pin_hash,
+          clocked_in: last?.punch_type === 'arrival',
+          last_punch_type: last?.punch_type ?? null, last_at: last?.punched_at ?? null,
+          last_is_late: last?.is_late ?? null, last_status: last?.status ?? null,
+        };
+      });
+      return json({ date: today, attendance: rows });
+    }
+    case 'list-notify-candidates': {
+      // Workspace members that can be picked as extra late-alert recipients (bell + email).
+      const { data: mems } = await supabase.from('workspace_members')
+        .select('user_id, role').eq('workspace_id', workspaceId).eq('status', 'active');
+      const ids = (mems ?? []).map((m: any) => m.user_id).filter(Boolean);
+      const roleByUid = new Map((mems ?? []).map((m: any) => [m.user_id, m.role]));
+      let profs: any[] = [];
+      if (ids.length) {
+        const { data } = await supabase.from('user_profiles').select('user_id, full_name, email').in('user_id', ids);
+        profs = data ?? [];
+      }
+      const candidates = profs.map((p: any) => ({ user_id: p.user_id, name: p.full_name || p.email || 'User', email: p.email ?? null, role: roleByUid.get(p.user_id) ?? null }));
+      return json({ candidates });
+    }
+    case 'get-hr-settings': {
+      const { data } = await supabase.from('hr_settings').select('*').eq('workspace_id', workspaceId).maybeSingle();
+      return json({ settings: data ?? { workspace_id: workspaceId, timezone: 'Europe/Athens', kiosk_enabled: false, kiosk_require_pin: false, late_alert_enabled: true, late_grace_minutes: 15, notify_owner: true, notify_finance: true, notify_user_ids: [], notify_emails: [], is_default: true } });
+    }
+    case 'save-hr-settings': {
+      requireManage();
+      const s = pick(body, ['timezone', 'kiosk_enabled', 'kiosk_require_pin', 'late_alert_enabled', 'late_grace_minutes', 'notify_owner', 'notify_finance', 'notify_user_ids', 'notify_emails']);
+      const { data, error } = await supabase.from('hr_settings')
+        .upsert({ workspace_id: workspaceId, ...s, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id' })
+        .select('*').single();
+      if (error) throw new HttpError(400, error.message);
+      return json({ settings: data });
+    }
+
     default:
       return null; // not an expansion action
   }
@@ -803,9 +886,9 @@ export async function handleSelfService(action: string, ctx: SelfCtx): Promise<R
       if (!['arrival', 'departure'].includes(punchType)) return json({ error: "punch_type must be 'arrival' or 'departure'" }, 400);
       const r = await fileWorkcardPunch(supabase, workspaceId, ctx.userId, {
         employeeId, punchType: punchType as 'arrival' | 'departure',
-        comments: body?.comments ? String(body.comments) : undefined,
+        comments: body?.comments ? String(body.comments) : undefined, source: 'self',
       }, { requireErgani: false });
-      return json({ ok: true, punch: r.punch, filed: r.filed, reason: r.reason ?? null, protocol: r.result?.protocol ?? null });
+      return json({ ok: true, punch: r.punch, filed: r.filed, reason: r.reason ?? null, protocol: r.result?.protocol ?? null, is_late: r.isLate ?? null });
     }
     case 'self-punches': {
       const days = Math.min(Math.max(Number(body?.days ?? 14), 1), 90);

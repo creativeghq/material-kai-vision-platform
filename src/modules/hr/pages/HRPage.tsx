@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet,
+  Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -12,6 +12,7 @@ import { OverviewSection } from '../components/OverviewSection';
 import { EmployeesSection } from '../components/EmployeesSection';
 import { DepartmentsSection } from '../components/DepartmentsSection';
 import { TimeOffSection } from '../components/TimeOffSection';
+import { AttendanceSection } from '../components/AttendanceSection';
 import { RecruitmentSection } from '../components/RecruitmentSection';
 import { OnboardingSection } from '../components/OnboardingSection';
 import { DocumentsSection } from '../components/DocumentsSection';
@@ -54,6 +55,7 @@ export default function HRPage() {
             <TabsTrigger value="employees" className="w-full justify-start"><Users className="h-4 w-4 mr-2" /> Employees</TabsTrigger>
             <TabsTrigger value="departments" className="w-full justify-start"><Network className="h-4 w-4 mr-2" /> Departments</TabsTrigger>
             <TabsTrigger value="timeoff" className="w-full justify-start"><CalendarDays className="h-4 w-4 mr-2" /> Time Off</TabsTrigger>
+            <TabsTrigger value="attendance" className="w-full justify-start"><Clock className="h-4 w-4 mr-2" /> Attendance</TabsTrigger>
 
             <SectionLabel>Recruiting</SectionLabel>
             <TabsTrigger value="recruitment" className="w-full justify-start"><Briefcase className="h-4 w-4 mr-2" /> Jobs &amp; Applicants</TabsTrigger>
@@ -69,6 +71,7 @@ export default function HRPage() {
             <TabsContent value="employees" className="mt-0 space-y-4"><EmployeesSection {...sectionProps} /></TabsContent>
             <TabsContent value="departments" className="mt-0 space-y-4"><DepartmentsSection {...sectionProps} /></TabsContent>
             <TabsContent value="timeoff" className="mt-0 space-y-4"><TimeOffSection {...sectionProps} /></TabsContent>
+            <TabsContent value="attendance" className="mt-0 space-y-4"><AttendanceSection {...sectionProps} /></TabsContent>
             <TabsContent value="recruitment" className="mt-0 space-y-4"><RecruitmentSection {...sectionProps} /></TabsContent>
             <TabsContent value="onboarding" className="mt-0 space-y-4"><OnboardingSection {...sectionProps} /></TabsContent>
             <TabsContent value="documents" className="mt-0 space-y-4"><DocumentsSection {...sectionProps} /></TabsContent>

@@ -90,9 +90,10 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', vat: '', amka: '', children: '0' });
+  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', vat: '', amka: '', children: '0', workStart: '', workEnd: '' });
+  const [workDays, setWorkDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const upd = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
-  const reset = () => setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', vat: '', amka: '', children: '0' });
+  const reset = () => { setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', vat: '', amka: '', children: '0', workStart: '', workEnd: '' }); setWorkDays([1, 2, 3, 4, 5]); };
 
   const submit = async () => {
     if (!f.name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
@@ -106,6 +107,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
         monthly_salary: f.pay_basis === 'monthly' && f.salary ? Number(f.salary) : null,
         hourly_rate: f.pay_basis === 'hourly' && f.hourly ? Number(f.hourly) : null,
         amka: f.amka.trim() || null, dependent_children: Number(f.children) || 0,
+        work_start_time: f.workStart || null, work_end_time: f.workEnd || null, work_days: workDays,
       });
       toast({ title: 'Employee added' }); setOpen(false); reset(); onDone();
     } catch (e) { toast({ title: 'Could not add employee', description: (e as Error).message, variant: 'destructive' }); }
@@ -147,6 +149,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
             <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Εργάνη)</span></Label><Input value={f.vat} onChange={(e) => upd('vat', e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
             <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Εργάνη)</span></Label><Input value={f.amka} onChange={(e) => upd('amka', e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
           </div>
+          <WorkingTimeFields start={f.workStart} end={f.workEnd} days={workDays} onStart={(v) => upd('workStart', v)} onEnd={(v) => upd('workEnd', v)} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Pay basis</Label>
@@ -217,6 +220,10 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
   const [vat, setVat] = useState(employee.contact?.vat_number ?? '');
   const [amka, setAmka] = useState(employee.amka ?? '');
   const [children, setChildren] = useState(String(employee.dependent_children ?? 0));
+  const [workStart, setWorkStart] = useState(employee.work_start_time ? String(employee.work_start_time).slice(0, 5) : '');
+  const [workEnd, setWorkEnd] = useState(employee.work_end_time ? String(employee.work_end_time).slice(0, 5) : '');
+  const [workDays, setWorkDays] = useState<number[]>(employee.work_days ?? [1, 2, 3, 4, 5]);
+  const [pin, setPin] = useState('');
 
   const submit = async () => {
     setSaving(true);
@@ -227,8 +234,10 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
         hourly_rate: payBasis === 'hourly' && hourly ? Number(hourly) : null,
         annual_leave_allowance_days: Number(allowance) || 0,
         amka: amka.trim() || null, dependent_children: Number(children) || 0,
+        work_start_time: workStart || null, work_end_time: workEnd || null, work_days: workDays,
         contact: { vat_number: vat.trim() || null },
       });
+      if (pin.trim()) await hrService.setEmployeePin(workspaceId, employee.id, pin.trim());
       toast({ title: 'Employee updated' }); onDone();
     } catch (e) { toast({ title: 'Update failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setSaving(false); }
@@ -275,6 +284,8 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
             <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Εργάνη)</span></Label><Input value={vat} onChange={(e) => setVat(e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
             <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Εργάνη)</span></Label><Input value={amka} onChange={(e) => setAmka(e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
           </div>
+          <WorkingTimeFields start={workStart} end={workEnd} days={workDays} onStart={setWorkStart} onEnd={setWorkEnd} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
+          <div className="space-y-1"><Label>Kiosk PIN <span className="text-muted-foreground text-xs">(optional 4–8 digits; blank = unchanged)</span></Label><Input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} className="font-mono" maxLength={8} placeholder="••••" inputMode="numeric" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={onClose} disabled={saving}>Cancel</Button>
@@ -282,5 +293,28 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const WEEKDAYS: [string, number][] = [['Mon', 1], ['Tue', 2], ['Wed', 3], ['Thu', 4], ['Fri', 5], ['Sat', 6], ['Sun', 7]];
+function WorkingTimeFields({ start, end, days, onStart, onEnd, onToggleDay }: {
+  start: string; end: string; days: number[]; onStart: (v: string) => void; onEnd: (v: string) => void; onToggleDay: (n: number) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-md border border-border/60 p-3">
+      <Label className="text-xs text-muted-foreground">Working time <span className="normal-case">(drives lateness alerts + kiosk)</span></Label>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1"><Label className="text-xs">Start</Label><Input type="time" value={start} onChange={(e) => onStart(e.target.value)} /></div>
+        <div className="space-y-1"><Label className="text-xs">End</Label><Input type="time" value={end} onChange={(e) => onEnd(e.target.value)} /></div>
+      </div>
+      <div className="flex gap-1 flex-wrap">
+        {WEEKDAYS.map(([lbl, n]) => (
+          <button type="button" key={n} onClick={() => onToggleDay(n)}
+            className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${days.includes(n) ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

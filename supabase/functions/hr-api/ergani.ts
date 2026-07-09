@@ -18,6 +18,7 @@ import {
   resolveErganiCredentials, listSubmissions, getDocumentSchema, submitDocument,
   cancelDocument, getSubmittedPdf, executeService, ErganiApiError, type ErganiCredentials,
 } from '../_shared/ergani/client.ts';
+import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 
 export interface ErganiCtx {
   supabase: any;
@@ -141,95 +142,6 @@ function toHttp(e: unknown): HttpError {
   return new HttpError(502, (e as Error)?.message || 'Ergani request failed');
 }
 
-export interface WorkcardArgs {
-  employeeId: string; punchType: 'arrival' | 'departure';
-  referenceDate?: string; at?: string; comments?: string; lateReason?: string;
-}
-export interface WorkcardResult {
-  punch: any; filed: boolean; result?: { id: string; protocol: string; submitDate: string }; reason?: string;
-}
-
-/**
- * Record a Work Card punch and (when Εργάνη is configured for the workspace) file it as WRKCardSE.
- * Shared by the admin action and the employee self-service clock-in.
- *
- * The punch row is ALWAYS written (so it works as internal attendance even before Εργάνη is set up):
- *   - Εργάνη configured + employee has ΑΦΜ → filed to Εργάνη, punch.status='submitted' + protocol.
- *   - otherwise → punch.status='pending', filed=false, `reason` explains why it wasn't filed.
- * With opts.requireErgani (admin explicitly clicked "file"), a missing config / ΑΦΜ / Εργάνη error
- * throws instead of degrading to a local-only punch.
- */
-export async function fileWorkcardPunch(
-  supabase: any, workspaceId: string, userId: string, args: WorkcardArgs, opts: { requireErgani: boolean },
-): Promise<WorkcardResult> {
-  const { data: e } = await supabase
-    .from('hr_employees')
-    .select('id, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name, vat_number )')
-    .eq('id', args.employeeId).eq('workspace_id', workspaceId).maybeSingle();
-  if (!e) throw new HttpError(404, 'employee not found in this workspace');
-  const afm: string | null = e.contact?.vat_number ?? null;
-  const name: string = e.contact?.name ?? '';
-
-  const now = new Date();
-  const referenceDate = args.referenceDate || now.toISOString().slice(0, 10);
-  const eventAt = args.at ? new Date(String(args.at)) : now;
-
-  const creds = await resolveErganiCredentials(supabase, workspaceId);
-  if (opts.requireErgani) {
-    if (!creds) throw new HttpError(400, 'ergani_not_configured: add your Εργάνη credentials in Profile → Keys first.');
-    if (!creds.employerAfm) throw new HttpError(400, 'employer_afm is not set in your Εργάνη credentials.');
-    if (!afm) throw new HttpError(400, 'Employee has no ΑΦΜ (set the contact VAT number first).');
-  }
-
-  const insertPunch = async (status: string, protocol?: string | null) => {
-    const { data } = await supabase.from('hr_time_punches').insert({
-      workspace_id: workspaceId, employee_id: args.employeeId, punch_type: args.punchType,
-      reference_date: referenceDate, punched_at: eventAt.toISOString(),
-      late_reason: args.lateReason ?? null, status, ergani_protocol: protocol ?? null, created_by: userId,
-    }).select('*').single();
-    return data;
-  };
-
-  const canFile = !!(creds && creds.employerAfm && afm);
-  if (!canFile) {
-    const punch = await insertPunch('pending');
-    const reason = !creds ? 'ergani_not_configured' : !creds.employerAfm ? 'missing_employer_afm' : 'missing_employee_afm';
-    return { punch, filed: false, reason };
-  }
-
-  const [lastName, ...rest] = name.split(' ');
-  const payload = {
-    Cards: { Card: [{
-      f_afm_ergodoti: creds!.employerAfm, f_aa: creds!.branchAa, f_comments: args.comments ?? '',
-      Details: { CardDetails: [{
-        f_afm: afm, f_eponymo: lastName || name, f_onoma: rest.join(' '),
-        f_type: args.punchType === 'arrival' ? '0' : '1',
-        f_reference_date: referenceDate, f_date: eventAt.toISOString(),
-        f_aitiologia: args.lateReason ?? null,
-      }] },
-    }] },
-  };
-  try {
-    const res = await submitDocument(creds!, workspaceId, 'WRKCardSE', payload);
-    const punch = await insertPunch('submitted', res.protocol);
-    await recordAudit(supabase, workspaceId, userId, {
-      submission_type: 'WRKCardSE', entity_type: 'punch', entity_id: punch?.id ?? null, employee_id: args.employeeId,
-      environment: creds!.environment, status: 'submitted', protocol: res.protocol, ergani_id: res.id,
-      submit_date: res.submitDate, request: payload, response: res,
-    });
-    return { punch, filed: true, result: res };
-  } catch (err) {
-    const he = toHttp(err);
-    const punch = await insertPunch('failed');
-    await recordAudit(supabase, workspaceId, userId, {
-      submission_type: 'WRKCardSE', entity_type: 'punch', entity_id: punch?.id ?? null, employee_id: args.employeeId,
-      environment: creds!.environment, status: 'failed', request: payload, error: he.message,
-    });
-    if (opts.requireErgani) throw he;
-    return { punch, filed: false, reason: he.message };
-  }
-}
-
 /**
  * Handle an ergani-* action. Returns a Response, or null if the action isn't ours.
  */
@@ -291,10 +203,10 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       if (!['arrival', 'departure'].includes(punchType)) return json({ error: "punch_type must be 'arrival' or 'departure'" }, 400);
       const r = await fileWorkcardPunch(supabase, workspaceId, ctx.userId, {
         employeeId, punchType: punchType as 'arrival' | 'departure',
-        referenceDate: body?.reference_date ? String(body.reference_date) : undefined,
         at: body?.at ? String(body.at) : undefined,
         comments: body?.comments ? String(body.comments) : undefined,
         lateReason: body?.late_reason ? String(body.late_reason) : undefined,
+        source: 'admin',
       }, { requireErgani: true });
       return json({ ok: true, result: r.result, punch: r.punch });
     }

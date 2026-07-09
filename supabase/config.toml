@@ -108,6 +108,14 @@ verify_jwt = false
 [functions.hr-careers]
 verify_jwt = false
 
+# #252 — PUBLIC clock-in kiosk (anonymous): employee punches by ΑΦΜ (+ optional PIN) at /{slug}/clockin.
+[functions.hr-kiosk]
+verify_jwt = false
+
+# #252 — lateness check-in cron: emits hr.late_checkin flow events for employees who haven't clocked in.
+[functions.hr-checkin-cron]
+verify_jwt = false
+
 [functions.finance-send-statement]
 verify_jwt = false
 
