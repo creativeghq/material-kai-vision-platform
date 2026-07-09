@@ -24,6 +24,7 @@ function pick(body: any, cols: readonly string[]): Record<string, unknown> {
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contractor'];
 const POSTING_STATUS = ['draft', 'open', 'closed'];
 const APP_STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
+const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'];
 const DOC_TYPES = ['contract', 'id', 'certificate', 'payslip', 'review', 'other'];
 const HR_DOC_BUCKET = 'pdf-documents';
 
