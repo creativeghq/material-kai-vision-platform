@@ -8,8 +8,7 @@ import { Label } from '@/components/core/ui/label';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
-  hrService, type AccountingDoc, type Reconciliation,
-  ACCT_ANALYZE_CREDITS, ACCT_PREPARE_CREDITS, ACCT_DOC_KIND_LABELS,
+  hrService, type AccountingDoc, type Reconciliation, ACCT_KIND_GROUP_LABELS,
 } from '../services/hrService';
 import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
 
@@ -100,12 +99,12 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
                     <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium truncate">{d.name}</div>
-                      <div className="text-xs text-muted-foreground">{d.doc_kind ? ACCT_DOC_KIND_LABELS[d.doc_kind] ?? d.doc_kind : 'Not analyzed'}{d.status === 'analyzed' && d.ai_confidence != null ? ` · ${Math.round((d.ai_confidence || 0) * 100)}% confidence` : ''}</div>
+                      <div className="text-xs text-muted-foreground">{d.doc_kind || 'Not analyzed'}{d.extracted?.kind_group ? ` · ${ACCT_KIND_GROUP_LABELS[d.extracted.kind_group] ?? d.extracted.kind_group}` : ''}{d.status === 'analyzed' && d.ai_confidence != null ? ` · ${Math.round((d.ai_confidence || 0) * 100)}% confidence` : ''}</div>
                     </div>
                     <Badge variant={statusVariant[d.status]}>{d.status}</Badge>
                     {canManage && d.status !== 'analyzed' && (
-                      <Button size="sm" variant="outline" className="rounded-full h-8" disabled={busy === d.id} onClick={() => analyze(d)} title={`Uses ${ACCT_ANALYZE_CREDITS} credits`}>
-                        {busy === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ScanLine className="h-4 w-4 mr-1" />Analyze · {ACCT_ANALYZE_CREDITS}cr</>}
+                      <Button size="sm" variant="outline" className="rounded-full h-8" disabled={busy === d.id} onClick={() => analyze(d)} title="AI OCR — credits charged by actual usage">
+                        {busy === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ScanLine className="h-4 w-4 mr-1" />Analyze</>}
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" className="h-8" disabled={busy === d.id + ':v'} onClick={() => view(d)} title="View"><Download className="h-4 w-4" /></Button>
@@ -131,8 +130,8 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
       {canManage && analyzedCount > 0 && (
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-xs text-muted-foreground">Reconcile the analyzed documents against the {period} payroll run — the AI matches each obligation to its payment and stamps the Payment IDs onto Finance.</p>
-          <Button size="sm" variant="outline" className="rounded-full" disabled={busy === 'prepare'} onClick={prepare} title={`Uses ${ACCT_PREPARE_CREDITS} credits`}>
-            {busy === 'prepare' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}Prepare &amp; reconcile · {ACCT_PREPARE_CREDITS}cr
+          <Button size="sm" variant="outline" className="rounded-full" disabled={busy === 'prepare'} onClick={prepare} title="AI reconciliation — credits charged by actual usage">
+            {busy === 'prepare' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}Prepare &amp; reconcile
           </Button>
         </div>
       )}

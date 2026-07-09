@@ -198,14 +198,18 @@ export interface HrAnalytics {
 }
 
 // Accounting documents (monthly statutory docs → Claude OCR → reconcile; credit-metered)
-export interface AccountingExtract { payment_id: string | null; payment_number: string | null; amount: number; currency: string; payee: string | null; due_date: string | null; issued_at: string | null; line_items: { label: string; amount: number }[]; }
+export interface AccountingExtract { kind_group?: string | null; payment_id: string | null; payment_number: string | null; amount: number; currency: string; payee: string | null; period_covered?: string | null; due_date: string | null; issued_at: string | null; entries?: { kind_group?: string; label?: string; payment_id?: string; amount?: number }[]; line_items: { label: string; amount: number }[]; }
 export type AcctStatus = 'uploaded' | 'analyzed' | 'error';
 export interface AccountingDoc { id: string; period: string; payroll_run_id: string | null; name: string; mime: string | null; size_bytes: number | null; status: AcctStatus; doc_kind: string | null; extracted: AccountingExtract | null; ai_confidence: number | null; ai_notes: string | null; credits_spent: number; analyzed_at: string | null; created_at: string; }
 export interface ReconMatch { obligation: string; expected_amount?: number; document_name?: string; payment_id?: string; found_amount?: number; status: string; }
 export interface Reconciliation { matches: ReconMatch[]; discrepancies?: string[]; summary: string; ready_to_pay?: boolean; }
-export const ACCT_ANALYZE_CREDITS = 3;
-export const ACCT_PREPARE_CREDITS = 3;
-export const ACCT_DOC_KIND_LABELS: Record<string, string> = { efka_payment: 'EFKA payment', tax_payment: 'Tax payment (ΦΜΥ)', apd: 'APD statement', payslip: 'Payslip', other: 'Other' };
+// Credits for HR AI ops are usage-based (charged on real token consumption, not a fixed number) —
+// the actual amount is returned as `credits_used` on each response. Labels below are for the
+// routing group only; `doc_kind` itself is a free-text label the AI names per document.
+export const ACCT_KIND_GROUP_LABELS: Record<string, string> = {
+  efka_payment: 'EFKA', tax_payment: 'Tax (ΦΜΥ)', apd: 'APD', payslip: 'Payslip',
+  bonus: 'Bonus (Δώρο)', allowance: 'Allowance', auxiliary_fund: 'Auxiliary fund', other: 'Other',
+};
 
 // Employee self-service (the caller's OWN record only)
 export interface SelfProfile {
@@ -315,14 +319,14 @@ class HrService {
   createJobPosting(ws: string, input: Record<string, unknown>): Promise<{ posting: JobPosting }> { return call(ws, 'create-job-posting', input); }
   updateJobPosting(ws: string, job_posting_id: string, input: Record<string, unknown>): Promise<{ posting: JobPosting }> { return call(ws, 'update-job-posting', { job_posting_id, ...input }); }
   deleteJobPosting(ws: string, job_posting_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-job-posting', { job_posting_id }); }
-  generateJobDescription(ws: string, input: { title: string; seniority?: string; department?: string; employment_type?: string; location?: string; keywords?: string; company?: string }): Promise<{ generated: { description: string; requirements: string; suggested_salary_min?: number; suggested_salary_max?: number } }> { return call(ws, 'generate-job-description', input); }
+  generateJobDescription(ws: string, input: { title: string; seniority?: string; department?: string; employment_type?: string; location?: string; keywords?: string; company?: string }): Promise<{ generated: { description: string; requirements: string; suggested_salary_min?: number; suggested_salary_max?: number }; credits_used: number }> { return call(ws, 'generate-job-description', input); }
   listApplications(ws: string, filters: { job_posting_id?: string; stage?: AppStage } = {}): Promise<{ applications: Application[] }> { return call(ws, 'list-applications', filters); }
   createApplication(ws: string, input: { job_posting_id: string; candidate_id?: string; candidate?: { name: string; email?: string; phone?: string; headline?: string; source?: string }; notes?: string }): Promise<{ application: Application }> { return call(ws, 'create-application', input); }
   updateApplication(ws: string, application_id: string, input: { stage?: AppStage; rating?: number; notes?: string }): Promise<{ application: Application }> { return call(ws, 'update-application', { application_id, ...input }); }
   hireApplication(ws: string, application_id: string, input: { start_date?: string; department_id?: string } = {}): Promise<{ employee_id: string; onboarding_seeded: number }> { return call(ws, 'hire-application', { application_id, ...input }); }
   uploadApplicationCv(ws: string, candidate_id: string, filename: string, content_base64: string): Promise<{ ok: boolean }> { return call(ws, 'upload-application-cv', { candidate_id, filename, content_base64 }); }
   applicationCvUrl(ws: string, candidate_id: string): Promise<{ url: string }> { return call(ws, 'application-cv-url', { candidate_id }); }
-  screenApplication(ws: string, application_id: string): Promise<{ application: { id: string; ai_score: number; ai_summary: string; ai_rated_at: string } }> { return call(ws, 'screen-application', { application_id }); }
+  screenApplication(ws: string, application_id: string): Promise<{ application: { id: string; ai_score: number; ai_summary: string; ai_rated_at: string }; credits_used: number }> { return call(ws, 'screen-application', { application_id }); }
 
   // ── Onboarding ──
   listOnboarding(ws: string, filters: { employee_id?: string; pending_only?: boolean } = {}): Promise<{ tasks: OnboardingTask[] }> { return call(ws, 'list-onboarding', filters); }

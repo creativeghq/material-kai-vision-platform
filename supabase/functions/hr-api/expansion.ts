@@ -8,6 +8,11 @@ import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { generatePayslips } from './payslip.ts';
+import { callClaudeTool, meterHrAi, creditBalance } from './ai-meter.ts';
+
+// Conservative pre-check ceilings ONLY — the ACTUAL charge is usage-based (see ./ai-meter.ts).
+const JOBDESC_MAX_CREDITS = 12;
+const SCREEN_MAX_CREDITS = 20;
 
 export interface Ctx {
   supabase: any;
@@ -141,24 +146,9 @@ async function tagEmployee(supabase: any, contactId: string, userId: string) {
 }
 
 /** Anthropic tool-use call → returns the tool input object. Used for AI job descriptions. */
-async function anthropicTool(prompt: string, tool: any): Promise<any> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!key) throw new HttpError(400, 'AI is not configured (ANTHROPIC_API_KEY missing)');
-  const model = Deno.env.get('HR_JOB_AI_MODEL') || 'claude-sonnet-4-6';
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({
-      model, max_tokens: 1500,
-      tools: [tool], tool_choice: { type: 'tool', name: tool.name },
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
-  const data = await res.json();
-  const block = (data.content || []).find((b: any) => b.type === 'tool_use');
-  if (!block?.input) throw new HttpError(502, 'AI returned no structured result');
-  return block.input;
+// Thin wrapper — Claude with a forced tool, returning structured input + token usage for metering.
+function anthropicTool(prompt: string, tool: any) {
+  return callClaudeTool([{ type: 'text', text: prompt }], tool, 1500);
 }
 
 /** Emit the recruitment Flows trigger (best-effort) so admins can automate interviews / updates. */
@@ -315,11 +305,16 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
           required: ['description', 'requirements'],
         },
       };
-      const out = await anthropicTool(
+      if (await creditBalance(supabase, userId) < JOBDESC_MAX_CREDITS) return json({ error: `Not enough credits (need up to ${JOBDESC_MAX_CREDITS}).`, code: 'insufficient_credits' }, 402);
+      const res = await anthropicTool(
         `Write a compelling, inclusive job description. Be concrete and avoid clichés. Use British/International English.\n\n${ctxBits}`,
         tool,
       );
-      return json({ generated: out });
+      const creditsUsed = await meterHrAi(supabase, {
+        userId, workspaceId, operationType: 'hr_generate_job_description', model: res.model, usage: res.usage,
+        description: `HR job description (${title})`, metadata: { title },
+      });
+      return json({ generated: res.input, credits_used: creditsUsed });
     }
 
     case 'list-candidates': {
@@ -425,8 +420,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       if (!app) return json({ error: 'application not found' }, 404);
       const cand = (app as any).candidate, post = (app as any).posting;
       if (!cand?.resume_path) return json({ error: 'Upload the candidate’s CV first.' }, 400);
-      const key = Deno.env.get('ANTHROPIC_API_KEY');
-      if (!key) return json({ error: 'AI is not configured.' }, 400);
+      if (await creditBalance(supabase, userId) < SCREEN_MAX_CREDITS) return json({ error: `Not enough credits (need up to ${SCREEN_MAX_CREDITS}).`, code: 'insufficient_credits' }, 402);
       const { data: blob } = await supabase.storage.from(cand.resume_bucket || HR_DOC_BUCKET).download(cand.resume_path);
       if (!blob) return json({ error: 'Could not read the CV.' }, 400);
       const b64 = base64FromBytes(new Uint8Array(await (blob as Blob).arrayBuffer()));
@@ -443,28 +437,21 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
         },
       };
       const prompt = `You are a hiring assistant. Rate how well this CV fits the role below and be specific about matches and gaps. Do not invent experience.\n\nROLE: ${post?.title ?? ''}\n\nDESCRIPTION:\n${post?.description ?? ''}\n\nREQUIREMENTS:\n${post?.requirements ?? ''}`;
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model: Deno.env.get('HR_JOB_AI_MODEL') || 'claude-sonnet-4-6', max_tokens: 800,
-          tools: [tool], tool_choice: { type: 'tool', name: tool.name },
-          messages: [{ role: 'user', content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
-            { type: 'text', text: prompt },
-          ] }],
-        }),
+      const res = await callClaudeTool([
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+        { type: 'text', text: prompt },
+      ], tool, 800);
+      const creditsUsed = await meterHrAi(supabase, {
+        userId, workspaceId, operationType: 'hr_screen_application', model: res.model, usage: res.usage,
+        description: `HR CV screening (${cand?.name ?? 'candidate'})`, metadata: { application_id: id },
       });
-      if (!res.ok) return json({ error: `AI request failed (${res.status})` }, 502);
-      const out = await res.json();
-      const block = (out.content || []).find((b: any) => b.type === 'tool_use');
-      const score = Math.max(0, Math.min(100, Math.round(Number(block?.input?.score ?? 0))));
-      const summary = String(block?.input?.summary ?? '').slice(0, 2000);
+      const score = Math.max(0, Math.min(100, Math.round(Number(res.input?.score ?? 0))));
+      const summary = String(res.input?.summary ?? '').slice(0, 2000);
       const { data: upd, error } = await supabase.from('hr_applications')
         .update({ ai_score: score, ai_summary: summary, ai_rated_at: new Date().toISOString() })
         .eq('id', id).eq('workspace_id', workspaceId).select('id, ai_score, ai_summary, ai_rated_at').single();
       if (error) throw new HttpError(400, error.message);
-      return json({ application: upd });
+      return json({ application: upd, credits_used: creditsUsed });
     }
     case 'hire-application': {
       requireManage();

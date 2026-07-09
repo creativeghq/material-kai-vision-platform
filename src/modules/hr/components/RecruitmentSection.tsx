@@ -180,7 +180,7 @@ function ApplicantRow({ app, workspaceId, canManage, onChanged }: { app: Applica
   };
   const screen = async () => {
     setBusy('ai');
-    try { await hrService.screenApplication(workspaceId, app.id); toast({ title: 'AI screening done' }); onChanged(); }
+    try { const r = await hrService.screenApplication(workspaceId, app.id); toast({ title: 'AI screening done', description: `${r.credits_used} credit(s) used.` }); onChanged(); }
     catch (e) { toast({ title: 'AI screening failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
@@ -275,11 +275,11 @@ function JobDialog({ workspaceId, departments, onDone }: { workspaceId: string; 
     if (!f.title.trim()) { toast({ title: 'Enter a job title first', variant: 'destructive' }); return; }
     setAiBusy(true);
     try {
-      const { generated } = await hrService.generateJobDescription(workspaceId, {
+      const { generated, credits_used } = await hrService.generateJobDescription(workspaceId, {
         title: f.title.trim(), department: departments.find((d) => d.id === f.department_id)?.name, employment_type: f.employment_type, location: f.location, keywords: f.keywords,
       });
       setF((p) => ({ ...p, description: generated.description, requirements: generated.requirements, salary_min: generated.suggested_salary_min ? String(generated.suggested_salary_min) : p.salary_min, salary_max: generated.suggested_salary_max ? String(generated.suggested_salary_max) : p.salary_max }));
-      toast({ title: 'Draft generated', description: 'Review & edit before publishing.' });
+      toast({ title: 'Draft generated', description: `Review & edit before publishing. ${credits_used} credit(s) used.` });
     } catch (e) { toast({ title: 'AI generation failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setAiBusy(false); }
   };
