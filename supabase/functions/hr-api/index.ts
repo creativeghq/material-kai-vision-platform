@@ -16,6 +16,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
+import { handleExpansion } from './expansion.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -37,6 +38,7 @@ const CONTACT_WRITABLE = [
 const EMPLOYEE_WRITABLE = [
   'employment_type', 'start_date', 'end_date', 'weekly_hours',
   'annual_leave_allowance_days', 'manager_contact_id', 'status',
+  'department_id', 'monthly_salary', 'salary_currency',
 ] as const;
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {
@@ -381,8 +383,12 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         });
       }
 
-      default:
+      default: {
+        // Expanded areas (org, recruitment/ATS, onboarding, documents, payroll, analytics).
+        const handled = await handleExpansion(action, { supabase, workspaceId, userId, body, access });
+        if (handled) return handled;
         return json({ error: `Unknown action: ${action}` }, 400);
+      }
     }
   } catch (e) {
     if (e instanceof HttpError) throw e; // handled by withApiLogging (correct status, no false Sentry)
