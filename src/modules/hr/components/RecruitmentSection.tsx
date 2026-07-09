@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap, ExternalLink, FileUp, FileText, Wand2, Zap } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -17,7 +16,7 @@ import {
   hrService, type JobPosting, type Application, type Department, type AppStage, type EmploymentType, type PostingStatus,
   APP_STAGE_LABELS, APP_STAGES, POSTING_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS,
 } from '../services/hrService';
-import { SectionHeader, EmptyState } from './_shared';
+import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'outline'> = { open: 'default', draft: 'secondary', closed: 'outline' };
 
@@ -173,10 +172,8 @@ function ApplicantRow({ app, workspaceId, canManage, onChanged }: { app: Applica
   const onFile = async (file: File | null) => {
     if (!file || !app.candidate) return; setBusy('cv');
     try {
-      const { bucket, path } = await hrService.applicationCvUploadPath(workspaceId, app.candidate.id, file.name);
-      const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
-      if (error) throw new Error(error.message);
-      await hrService.setApplicationCv(workspaceId, app.candidate.id, bucket, path);
+      const b64 = await fileToBase64(file);
+      await hrService.uploadApplicationCv(workspaceId, app.candidate.id, file.name, b64);
       toast({ title: 'CV uploaded' }); onChanged();
     } catch (e) { toast({ title: 'Upload failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(null); if (fileRef.current) fileRef.current.value = ''; }

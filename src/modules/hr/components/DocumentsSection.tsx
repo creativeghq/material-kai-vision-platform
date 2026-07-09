@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Loader2, FolderOpen, FileText, Download, Trash2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -11,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type HrDocument, type Employee, type DocType, DOC_TYPE_LABELS } from '../services/hrService';
-import { SectionHeader, EmptyState } from './_shared';
+import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
 
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
 
@@ -92,10 +91,8 @@ function UploadDialog({ workspaceId, employees, onDone }: { workspaceId: string;
     if (!file) { toast({ title: 'Choose a file', variant: 'destructive' }); return; }
     setSaving(true);
     try {
-      const { bucket, path } = await hrService.documentUploadPath(workspaceId, { filename: file.name, employee_id: employeeId || undefined });
-      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { upsert: false });
-      if (upErr) throw new Error(upErr.message);
-      await hrService.recordDocument(workspaceId, { name: file.name, doc_type: docType, storage_bucket: bucket, storage_object_path: path, size_bytes: file.size, employee_id: employeeId || undefined });
+      const b64 = await fileToBase64(file);
+      await hrService.uploadDocument(workspaceId, { name: file.name, doc_type: docType, content_base64: b64, content_type: file.type || undefined, employee_id: employeeId || undefined });
       toast({ title: 'Document uploaded' }); setOpen(false); reset(); onDone();
     } catch (e) { toast({ title: 'Upload failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setSaving(false); }

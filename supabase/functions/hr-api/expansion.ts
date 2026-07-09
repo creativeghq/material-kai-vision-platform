@@ -386,23 +386,24 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       if (fields.stage && prev && prev.stage !== fields.stage) await emitApplicantStage(supabase, workspaceId, id, prev.stage, String(fields.stage));
       return json({ application: data });
     }
-    // Candidate CV: client uploads to this private path, then calls set-application-cv.
-    case 'application-cv-upload-path': {
+    // Candidate CV: uploaded THROUGH the function (service role) — the pdf-documents bucket only
+    // allows an authenticated user to write under their own uid/ prefix, so a direct client upload
+    // to hr/{workspace}/… is refused. Client sends the PDF as base64.
+    case 'upload-application-cv': {
       requireManage();
       const cid = String(body?.candidate_id ?? '');
-      if (!cid) return json({ error: 'candidate_id is required' }, 400);
+      const b64 = String(body?.content_base64 ?? '');
+      if (!cid || !b64) return json({ error: 'candidate_id and content_base64 are required' }, 400);
+      const { data: c } = await supabase.from('hr_candidates').select('id').eq('id', cid).eq('workspace_id', workspaceId).maybeSingle();
+      if (!c) return json({ error: 'candidate not found' }, 404);
+      let bytes: Uint8Array;
+      try { bytes = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0)); } catch { return json({ error: 'invalid file data' }, 400); }
+      if (bytes.length > 10_000_000) return json({ error: 'CV too large (max 10MB)' }, 400);
       const safe = String(body?.filename ?? 'cv.pdf').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
-      return json({ bucket: HR_DOC_BUCKET, path: `hr/${workspaceId}/candidates/${cid}/${Date.now()}-${safe}` });
-    }
-    case 'set-application-cv': {
-      requireManage();
-      const cid = String(body?.candidate_id ?? '');
-      const path = String(body?.storage_path ?? '');
-      if (!cid || !path) return json({ error: 'candidate_id and storage_path are required' }, 400);
-      const { error } = await supabase.from('hr_candidates')
-        .update({ resume_bucket: body?.storage_bucket || HR_DOC_BUCKET, resume_path: path })
-        .eq('id', cid).eq('workspace_id', workspaceId);
-      if (error) throw new HttpError(400, error.message);
+      const path = `hr/${workspaceId}/candidates/${cid}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from(HR_DOC_BUCKET).upload(path, bytes, { contentType: 'application/pdf', upsert: true });
+      if (upErr) throw new HttpError(400, upErr.message);
+      await supabase.from('hr_candidates').update({ resume_bucket: HR_DOC_BUCKET, resume_path: path }).eq('id', cid).eq('workspace_id', workspaceId);
       return json({ ok: true });
     }
     case 'application-cv-url': {
@@ -568,6 +569,33 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       }
       const { data, error } = await supabase.from('hr_documents')
         .insert({ ...fields, storage_bucket: fields.storage_bucket || HR_DOC_BUCKET, workspace_id: workspaceId, uploaded_by: userId }).select('*').single();
+      if (error) throw new HttpError(400, error.message);
+      return json({ document: data }, 201);
+    }
+    // Upload a document THROUGH the function (service role) — pdf-documents refuses client writes
+    // outside the caller's own uid/ prefix, so send the file as base64 and we store + record it.
+    case 'upload-document': {
+      requireManage();
+      const b64 = String(body?.content_base64 ?? '');
+      const name = String(body?.name ?? '').trim();
+      const docType = String(body?.doc_type ?? 'other');
+      if (!b64 || !name) return json({ error: 'name and content_base64 are required' }, 400);
+      if (!DOC_TYPES.includes(docType)) return json({ error: 'invalid doc_type' }, 400);
+      const employeeId = body?.employee_id ? String(body.employee_id) : null;
+      if (employeeId) {
+        const { data: emp } = await supabase.from('hr_employees').select('id').eq('id', employeeId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!emp) return json({ error: 'employee not found in this workspace' }, 404);
+      }
+      let bytes: Uint8Array;
+      try { bytes = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0)); } catch { return json({ error: 'invalid file data' }, 400); }
+      if (bytes.length > 20_000_000) return json({ error: 'file too large (max 20MB)' }, 400);
+      const safe = name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+      const path = `hr/${workspaceId}/${employeeId ?? 'general'}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from(HR_DOC_BUCKET).upload(path, bytes, { contentType: String(body?.content_type ?? 'application/octet-stream'), upsert: true });
+      if (upErr) throw new HttpError(400, upErr.message);
+      const { data, error } = await supabase.from('hr_documents')
+        .insert({ workspace_id: workspaceId, employee_id: employeeId, name, doc_type: docType, storage_bucket: HR_DOC_BUCKET, storage_object_path: path, size_bytes: bytes.length, uploaded_by: userId })
+        .select('*').single();
       if (error) throw new HttpError(400, error.message);
       return json({ document: data }, 201);
     }

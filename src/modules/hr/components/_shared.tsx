@@ -29,6 +29,17 @@ export function SectionHeader({ title, subtitle, actions }: { title: string; sub
   );
 }
 
+/** Read a File as base64 (no data: prefix) — HR uploads go through hr-api (service role), since the
+ *  pdf-documents bucket refuses client writes outside the caller's own uid/ prefix. */
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+    r.onerror = () => reject(new Error('Could not read file'));
+    r.readAsDataURL(file);
+  });
+}
+
 export function EmptyState({ icon: Icon, title, hint }: { icon?: LucideIcon; title: string; hint?: string }) {
   return (
     <div className="py-12 text-center text-muted-foreground">

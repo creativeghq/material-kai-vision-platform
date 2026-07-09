@@ -310,8 +310,7 @@ class HrService {
   createApplication(ws: string, input: { job_posting_id: string; candidate_id?: string; candidate?: { name: string; email?: string; phone?: string; headline?: string; source?: string }; notes?: string }): Promise<{ application: Application }> { return call(ws, 'create-application', input); }
   updateApplication(ws: string, application_id: string, input: { stage?: AppStage; rating?: number; notes?: string }): Promise<{ application: Application }> { return call(ws, 'update-application', { application_id, ...input }); }
   hireApplication(ws: string, application_id: string, input: { start_date?: string; department_id?: string } = {}): Promise<{ employee_id: string; onboarding_seeded: number }> { return call(ws, 'hire-application', { application_id, ...input }); }
-  applicationCvUploadPath(ws: string, candidate_id: string, filename: string): Promise<{ bucket: string; path: string }> { return call(ws, 'application-cv-upload-path', { candidate_id, filename }); }
-  setApplicationCv(ws: string, candidate_id: string, storage_bucket: string, storage_path: string): Promise<{ ok: boolean }> { return call(ws, 'set-application-cv', { candidate_id, storage_bucket, storage_path }); }
+  uploadApplicationCv(ws: string, candidate_id: string, filename: string, content_base64: string): Promise<{ ok: boolean }> { return call(ws, 'upload-application-cv', { candidate_id, filename, content_base64 }); }
   applicationCvUrl(ws: string, candidate_id: string): Promise<{ url: string }> { return call(ws, 'application-cv-url', { candidate_id }); }
   screenApplication(ws: string, application_id: string): Promise<{ application: { id: string; ai_score: number; ai_summary: string; ai_rated_at: string } }> { return call(ws, 'screen-application', { application_id }); }
 
@@ -323,8 +322,7 @@ class HrService {
 
   // ── Documents ──
   listDocuments(ws: string, filters: { employee_id?: string } = {}): Promise<{ documents: HrDocument[] }> { return call(ws, 'list-documents', filters); }
-  documentUploadPath(ws: string, input: { filename: string; employee_id?: string }): Promise<{ bucket: string; path: string }> { return call(ws, 'document-upload-path', input); }
-  recordDocument(ws: string, input: { name: string; doc_type: DocType; storage_bucket: string; storage_object_path: string; size_bytes?: number; employee_id?: string }): Promise<{ document: HrDocument }> { return call(ws, 'record-document', input); }
+  uploadDocument(ws: string, input: { name: string; doc_type: DocType; content_base64: string; content_type?: string; employee_id?: string }): Promise<{ document: HrDocument }> { return call(ws, 'upload-document', input); }
   signDocument(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'sign-document', { document_id }); }
   deleteDocument(ws: string, document_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-document', { document_id }); }
 
