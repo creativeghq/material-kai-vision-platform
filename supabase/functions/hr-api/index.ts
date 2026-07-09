@@ -18,6 +18,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { handleExpansion, handleSelfService } from './expansion.ts';
 import { handleErgani } from './ergani.ts';
+import { handleAccounting } from './accounting.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -404,6 +405,9 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         // Ergani II (ΠΣ Εργάνη) submissions — work card, leaves, E3, schedules, audit.
         const erganiHandled = await handleErgani(action, { supabase, workspaceId, userId, body, access });
         if (erganiHandled) return erganiHandled;
+        // Accounting documents (credit-metered Claude OCR + reconciliation).
+        const acctHandled = await handleAccounting(action, { supabase, workspaceId, userId, body, access });
+        if (acctHandled) return acctHandled;
         // Expanded areas (org, recruitment/ATS, onboarding, documents, payroll, analytics).
         const handled = await handleExpansion(action, { supabase, workspaceId, userId, body, access });
         if (handled) return handled;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock,
+  Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock, Receipt,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -17,6 +17,7 @@ import { RecruitmentSection } from '../components/RecruitmentSection';
 import { OnboardingSection } from '../components/OnboardingSection';
 import { DocumentsSection } from '../components/DocumentsSection';
 import { PayrollSection } from '../components/PayrollSection';
+import { AccountingSection } from '../components/AccountingSection';
 
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
@@ -64,6 +65,7 @@ export default function HRPage() {
             <SectionLabel>Records</SectionLabel>
             <TabsTrigger value="documents" className="w-full justify-start"><FolderOpen className="h-4 w-4 mr-2" /> Documents</TabsTrigger>
             <TabsTrigger value="payroll" className="w-full justify-start"><Wallet className="h-4 w-4 mr-2" /> Payroll</TabsTrigger>
+            <TabsTrigger value="accounting" className="w-full justify-start"><Receipt className="h-4 w-4 mr-2" /> Accounting</TabsTrigger>
           </TabsList>
 
           <div className="min-w-0 flex-1 space-y-4">
@@ -76,6 +78,7 @@ export default function HRPage() {
             <TabsContent value="onboarding" className="mt-0 space-y-4"><OnboardingSection {...sectionProps} /></TabsContent>
             <TabsContent value="documents" className="mt-0 space-y-4"><DocumentsSection {...sectionProps} /></TabsContent>
             <TabsContent value="payroll" className="mt-0 space-y-4"><PayrollSection {...sectionProps} /></TabsContent>
+            <TabsContent value="accounting" className="mt-0 space-y-4"><AccountingSection {...sectionProps} /></TabsContent>
           </div>
         </Tabs>
       </div>

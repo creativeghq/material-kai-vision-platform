@@ -197,6 +197,16 @@ export interface HrAnalytics {
   onboarding_pending: number; last_payroll: { period: string; total_net: number; currency: string; status: string } | null;
 }
 
+// Accounting documents (monthly statutory docs → Claude OCR → reconcile; credit-metered)
+export interface AccountingExtract { payment_id: string | null; payment_number: string | null; amount: number; currency: string; payee: string | null; due_date: string | null; issued_at: string | null; line_items: { label: string; amount: number }[]; }
+export type AcctStatus = 'uploaded' | 'analyzed' | 'error';
+export interface AccountingDoc { id: string; period: string; payroll_run_id: string | null; name: string; mime: string | null; size_bytes: number | null; status: AcctStatus; doc_kind: string | null; extracted: AccountingExtract | null; ai_confidence: number | null; ai_notes: string | null; credits_spent: number; analyzed_at: string | null; created_at: string; }
+export interface ReconMatch { obligation: string; expected_amount?: number; document_name?: string; payment_id?: string; found_amount?: number; status: string; }
+export interface Reconciliation { matches: ReconMatch[]; discrepancies?: string[]; summary: string; ready_to_pay?: boolean; }
+export const ACCT_ANALYZE_CREDITS = 3;
+export const ACCT_PREPARE_CREDITS = 3;
+export const ACCT_DOC_KIND_LABELS: Record<string, string> = { efka_payment: 'EFKA payment', tax_payment: 'Tax payment (ΦΜΥ)', apd: 'APD statement', payslip: 'Payslip', other: 'Other' };
+
 // Employee self-service (the caller's OWN record only)
 export interface SelfProfile {
   id: string; employment_type: EmploymentType | null; start_date: string | null; weekly_hours: number | null;
@@ -334,6 +344,14 @@ class HrService {
   setPayrollStatus(ws: string, run_id: string, status: PayrollStatus): Promise<{ run: PayrollRun }> { return call(ws, 'set-payroll-status', { run_id, status }); }
   postPayrollToFinance(ws: string, run_id: string): Promise<{ ok: boolean; posted: { net_payment_ids: string[]; income_tax_payment_id: string | null; efka_payment_id: string | null; totals: { net: number; income_tax: number; employee_efka: number; employer_efka: number } } }> { return call(ws, 'post-payroll-to-finance', { run_id }); }
   generatePayslips(ws: string, run_id: string): Promise<{ ok: boolean; payslips: number }> { return call(ws, 'generate-payslips', { run_id }); }
+
+  // ── Accounting documents (Claude OCR + reconcile, credit-metered) ──
+  listAccountingDocs(ws: string, period?: string): Promise<{ documents: AccountingDoc[] }> { return call(ws, 'list-accounting-docs', period ? { period } : {}); }
+  uploadAccountingDoc(ws: string, input: { period: string; name: string; content_base64: string; content_type?: string; payroll_run_id?: string }): Promise<{ document: AccountingDoc }> { return call(ws, 'upload-accounting-doc', input); }
+  analyzeAccountingDoc(ws: string, document_id: string): Promise<{ document: AccountingDoc; credits_used: number }> { return call(ws, 'analyze-accounting-doc', { document_id }); }
+  signAccountingDoc(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'sign-accounting-doc', { document_id }); }
+  deleteAccountingDoc(ws: string, document_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-accounting-doc', { document_id }); }
+  prepareAccountingPeriod(ws: string, period: string): Promise<{ reconciliation: Reconciliation; stamped_finance_lines: number; credits_used: number }> { return call(ws, 'prepare-accounting-period', { period }); }
   getPayrollSettings(ws: string): Promise<{ settings: PayrollSettings }> { return call(ws, 'get-payroll-settings'); }
   updatePayrollSettings(ws: string, input: Partial<PayrollSettings>): Promise<{ settings: PayrollSettings }> { return call(ws, 'update-payroll-settings', input as Record<string, unknown>); }
 
