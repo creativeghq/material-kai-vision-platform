@@ -90,9 +90,9 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', vat: '', amka: '' });
+  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', vat: '', amka: '', children: '0' });
   const upd = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
-  const reset = () => setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', vat: '', amka: '' });
+  const reset = () => setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', vat: '', amka: '', children: '0' });
 
   const submit = async () => {
     if (!f.name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
@@ -105,7 +105,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
         department_id: f.department_id || null, pay_basis: f.pay_basis,
         monthly_salary: f.pay_basis === 'monthly' && f.salary ? Number(f.salary) : null,
         hourly_rate: f.pay_basis === 'hourly' && f.hourly ? Number(f.hourly) : null,
-        amka: f.amka.trim() || null,
+        amka: f.amka.trim() || null, dependent_children: Number(f.children) || 0,
       });
       toast({ title: 'Employee added' }); setOpen(false); reset(); onDone();
     } catch (e) { toast({ title: 'Could not add employee', description: (e as Error).message, variant: 'destructive' }); }
@@ -159,6 +159,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
               ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" min={0} value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></div>
               : <div className="space-y-1"><Label>Hourly rate</Label><Input type="number" min={0} value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></div>}
           </div>
+          <div className="space-y-1 w-1/2"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={f.children} onChange={(e) => upd('children', e.target.value)} /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
@@ -215,6 +216,7 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
   const [allowance, setAllowance] = useState(String(employee.annual_leave_allowance_days ?? 0));
   const [vat, setVat] = useState(employee.contact?.vat_number ?? '');
   const [amka, setAmka] = useState(employee.amka ?? '');
+  const [children, setChildren] = useState(String(employee.dependent_children ?? 0));
 
   const submit = async () => {
     setSaving(true);
@@ -224,7 +226,7 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
         monthly_salary: payBasis === 'monthly' && salary ? Number(salary) : null,
         hourly_rate: payBasis === 'hourly' && hourly ? Number(hourly) : null,
         annual_leave_allowance_days: Number(allowance) || 0,
-        amka: amka.trim() || null,
+        amka: amka.trim() || null, dependent_children: Number(children) || 0,
         contact: { vat_number: vat.trim() || null },
       });
       toast({ title: 'Employee updated' }); onDone();
@@ -265,7 +267,10 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
               ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} /></div>
               : <div className="space-y-1"><Label>Hourly rate</Label><Input type="number" min={0} value={hourly} onChange={(e) => setHourly(e.target.value)} /></div>}
           </div>
-          <div className="space-y-1 w-1/2"><Label>Annual leave (days)</Label><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Annual leave (days)</Label><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={children} onChange={(e) => setChildren(e.target.value)} /></div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Εργάνη)</span></Label><Input value={vat} onChange={(e) => setVat(e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
             <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Εργάνη)</span></Label><Input value={amka} onChange={(e) => setAmka(e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>

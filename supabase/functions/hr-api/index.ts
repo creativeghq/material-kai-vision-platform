@@ -41,6 +41,7 @@ const EMPLOYEE_WRITABLE = [
   'annual_leave_allowance_days', 'manager_contact_id', 'status',
   'department_id', 'monthly_salary', 'salary_currency', 'pay_basis', 'hourly_rate',
   'amka', // ΑΜΚΑ — social-security number, required for Εργάνη submissions
+  'dependent_children', // drives the payroll income-tax credit
 ] as const;
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {

@@ -42,6 +42,7 @@ export interface Employee {
   hourly_rate: number | null;
   salary_currency: string | null;
   amka: string | null; // ΑΜΚΑ — social-security number, for Εργάνη filings
+  dependent_children: number; // drives the payroll income-tax credit
   created_at: string;
   updated_at: string;
   contact: EmployeeContact | null;
@@ -93,6 +94,7 @@ export interface CreateEmployeeInput {
   monthly_salary?: number | null;
   hourly_rate?: number | null;
   amka?: string | null;
+  dependent_children?: number;
 }
 
 export interface UpdateEmployeeInput {
@@ -109,6 +111,7 @@ export interface UpdateEmployeeInput {
   monthly_salary?: number | null;
   hourly_rate?: number | null;
   amka?: string | null;
+  dependent_children?: number;
   contact?: Partial<Pick<EmployeeContact, 'name' | 'email' | 'phone' | 'mobile' | 'position' | 'department' | 'date_of_birth' | 'vat_number'>>;
 }
 
@@ -168,7 +171,15 @@ export interface HrDocument {
 }
 export type PayrollStatus = 'draft' | 'approved' | 'paid';
 export interface PayrollRun { id: string; period: string; status: PayrollStatus; currency: string; total_gross: number; total_net: number; notes: string | null; posted_finance_ref: unknown | null; created_at: string; approved_at: string | null; paid_at: string | null; }
-export interface PayrollItem { id: string; run_id: string; employee_id: string; gross: number; deductions: number; net: number; currency: string; note: string | null; basis: PayBasis | null; days_worked: number | null; hours_per_day: number | null; rate: number | null; employee?: { id: string; contact: { id: string; name: string } | null } | null; }
+export interface PayrollItem { id: string; run_id: string; employee_id: string; gross: number; deductions: number; net: number; employee_contributions: number; income_tax: number; employer_contributions: number; employer_cost: number; currency: string; note: string | null; basis: PayBasis | null; days_worked: number | null; hours_per_day: number | null; rate: number | null; employee?: { id: string; contact: { id: string; name: string } | null } | null; }
+export interface PayrollSummary { total_gross: number; total_net: number; total_income_tax: number; total_employee_contributions: number; total_employer_contributions: number; total_employer_cost: number; }
+export interface TaxBracket { up_to: number | null; rate: number; }
+export interface PayrollSettings {
+  workspace_id?: string; country_code: string; currency: string; salaries_per_year: number;
+  employee_contribution_rate: number; employer_contribution_rate: number; contribution_monthly_ceiling: number | null;
+  income_tax_brackets: TaxBracket[]; tax_credit_base: number; tax_credit_per_child: Record<string, number>;
+  tax_credit_taper_per_1000: number; tax_credit_taper_floor: number; is_default?: boolean;
+}
 export interface HrAnalytics {
   headcount: number; active: number; on_leave_today: number; total_absence_days: number;
   absence_by_type: Record<string, number>; headcount_by_department: Record<string, number>;
@@ -291,10 +302,12 @@ class HrService {
   // ── Payroll ──
   listPayrollRuns(ws: string): Promise<{ runs: PayrollRun[] }> { return call(ws, 'list-payroll-runs'); }
   createPayrollRun(ws: string, input: { period: string; currency?: string }): Promise<{ run: PayrollRun; items: number }> { return call(ws, 'create-payroll-run', input); }
-  getPayrollRun(ws: string, run_id: string): Promise<{ run: PayrollRun; items: PayrollItem[] }> { return call(ws, 'get-payroll-run', { run_id }); }
-  updatePayrollItem(ws: string, item_id: string, input: { gross: number; deductions: number; note?: string }): Promise<{ ok: boolean; total_gross: number; total_net: number }> { return call(ws, 'update-payroll-item', { item_id, ...input }); }
+  getPayrollRun(ws: string, run_id: string): Promise<{ run: PayrollRun; items: PayrollItem[]; summary: PayrollSummary }> { return call(ws, 'get-payroll-run', { run_id }); }
+  updatePayrollItem(ws: string, item_id: string, input: { gross: number; deductions?: number; note?: string }): Promise<{ ok: boolean; total_gross: number; total_net: number }> { return call(ws, 'update-payroll-item', { item_id, ...input }); }
   setPayrollStatus(ws: string, run_id: string, status: PayrollStatus): Promise<{ run: PayrollRun }> { return call(ws, 'set-payroll-status', { run_id, status }); }
-  postPayrollToFinance(ws: string, run_id: string): Promise<{ ok: boolean; planned_payment_id: string }> { return call(ws, 'post-payroll-to-finance', { run_id }); }
+  postPayrollToFinance(ws: string, run_id: string): Promise<{ ok: boolean; posted: { net_payment_ids: string[]; income_tax_payment_id: string | null; efka_payment_id: string | null; totals: { net: number; income_tax: number; employee_efka: number; employer_efka: number } } }> { return call(ws, 'post-payroll-to-finance', { run_id }); }
+  getPayrollSettings(ws: string): Promise<{ settings: PayrollSettings }> { return call(ws, 'get-payroll-settings'); }
+  updatePayrollSettings(ws: string, input: Partial<PayrollSettings>): Promise<{ settings: PayrollSettings }> { return call(ws, 'update-payroll-settings', input as Record<string, unknown>); }
 
   // ── Employee portal invite (admin) ──
   inviteEmployee(ws: string, employee_id: string, email: string): Promise<{ ok: boolean; invited: boolean; role_note: string | null }> { return call(ws, 'invite-employee', { employee_id, email }); }

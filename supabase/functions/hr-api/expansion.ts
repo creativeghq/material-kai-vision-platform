@@ -52,6 +52,74 @@ function businessDaysInclusive(startISO: string, endISO: string): number {
   return n;
 }
 
+// ── Payroll rules engine (configurable per workspace; Greek 2026 defaults) ──────────────
+// tax_credit_per_child holds the ADD-ON over the base credit: base 777 (0 kids) → 900/1120/1340/1580/1780.
+const GREEK_PAYROLL_DEFAULTS = {
+  country_code: 'GR', currency: 'EUR', salaries_per_year: 14,
+  employee_contribution_rate: 0.1387, employer_contribution_rate: 0.2179,
+  contribution_monthly_ceiling: 7761.94,
+  income_tax_brackets: [
+    { up_to: 10000, rate: 0.09 }, { up_to: 20000, rate: 0.20 }, { up_to: 30000, rate: 0.26 },
+    { up_to: 40000, rate: 0.34 }, { up_to: 60000, rate: 0.39 }, { up_to: null, rate: 0.44 },
+  ],
+  tax_credit_base: 777,
+  tax_credit_per_child: { '1': 123, '2': 343, '3': 563, '4': 803, '5': 1003 },
+  tax_credit_taper_per_1000: 20, tax_credit_taper_floor: 12000,
+};
+
+async function getPayrollSettings(supabase: any, workspaceId: string): Promise<any> {
+  const { data } = await supabase.from('hr_payroll_settings').select('*').eq('workspace_id', workspaceId).maybeSingle();
+  if (data) {
+    if (!Array.isArray(data.income_tax_brackets) || data.income_tax_brackets.length === 0) data.income_tax_brackets = GREEK_PAYROLL_DEFAULTS.income_tax_brackets;
+    return data;
+  }
+  return { workspace_id: workspaceId, ...GREEK_PAYROLL_DEFAULTS, updated_at: null, is_default: true };
+}
+
+function progressiveTax(annual: number, brackets: any[]): number {
+  let tax = 0, prev = 0;
+  for (const b of brackets) {
+    const cap = b.up_to == null ? Infinity : Number(b.up_to);
+    if (annual > prev) { tax += (Math.min(annual, cap) - prev) * Number(b.rate); prev = cap; if (annual <= cap) break; }
+    else break;
+  }
+  return tax;
+}
+
+interface PayrollBreakdown { employee_contributions: number; income_tax: number; employer_contributions: number; net: number; employer_cost: number; deductions: number; }
+/** gross → statutory breakdown. country_code='none' ⇒ zeros (manual deductions preserved by caller). */
+function computePayroll(grossIn: number, children: number, s: any): PayrollBreakdown {
+  const gross = Number(grossIn) || 0;
+  if (s.country_code === 'none') return { employee_contributions: 0, income_tax: 0, employer_contributions: 0, net: round2(gross), employer_cost: round2(gross), deductions: 0 };
+  const spy = Number(s.salaries_per_year) || 12;
+  const ceil = s.contribution_monthly_ceiling != null ? Number(s.contribution_monthly_ceiling) : Infinity;
+  const capBase = Math.min(gross, ceil);
+  const eeEfka = round2(capBase * Number(s.employee_contribution_rate || 0));
+  const erEfka = round2(capBase * Number(s.employer_contribution_rate || 0));
+  const taxable = Math.max(0, gross - eeEfka);
+  const annualTaxable = taxable * spy;
+  const grossTax = progressiveTax(annualTaxable, s.income_tax_brackets || []);
+  const perChild = s.tax_credit_per_child || {};
+  const childKeys = Object.keys(perChild).map(Number).filter((n) => !isNaN(n)).sort((a, b) => a - b);
+  const maxKey = childKeys.length ? childKeys[childKeys.length - 1] : 0;
+  const childAdd = children > 0 ? Number(perChild[String(Math.min(children, maxKey))] ?? 0) : 0;
+  let credit = Number(s.tax_credit_base || 0) + childAdd;
+  const floor = Number(s.tax_credit_taper_floor || 0);
+  if (floor > 0 && annualTaxable > floor) credit = Math.max(0, credit - Number(s.tax_credit_taper_per_1000 || 0) * ((annualTaxable - floor) / 1000));
+  const incomeTax = round2(Math.max(0, grossTax - credit) / spy);
+  return {
+    employee_contributions: eeEfka, income_tax: incomeTax, employer_contributions: erEfka,
+    net: round2(gross - eeEfka - incomeTax), employer_cost: round2(gross + erEfka), deductions: round2(eeEfka + incomeTax),
+  };
+}
+
+/** Last calendar day of the month AFTER a 'YYYY-MM' period (statutory remittance due date, GR convention). */
+function nextMonthEnd(period: string): string {
+  const [y, m] = period.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m + 1, 0)); // day 0 of month m+2 = last day of m+1 (1-based m)
+  return d.toISOString().slice(0, 10);
+}
+
 const DEFAULT_ONBOARDING = [
   'Sign employment contract', 'Collect ID & tax documents', 'Set up email & system accounts',
   'Assign equipment (laptop, access card)', 'Team & workplace introduction', 'Benefits & payroll enrollment',
@@ -431,8 +499,9 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       //  • hourly  → hourly_rate × hours/day × working days in the run month
       //             (hours/day derived from weekly_hours ÷ 5, default 8)
       const workingDays = businessDaysInMonth(period);
+      const settings = await getPayrollSettings(supabase, workspaceId);
       const { data: emps } = await supabase.from('hr_employees')
-        .select('id, monthly_salary, salary_currency, pay_basis, hourly_rate, weekly_hours')
+        .select('id, monthly_salary, salary_currency, pay_basis, hourly_rate, weekly_hours, dependent_children')
         .eq('workspace_id', workspaceId).eq('status', 'active');
       const items = (emps ?? []).map((e: any) => {
         const basis = e.pay_basis === 'hourly' ? 'hourly' : 'monthly';
@@ -446,15 +515,19 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
           rate = Number(e.monthly_salary ?? 0);
           gross = rate;
         }
+        const b = computePayroll(gross, Number(e.dependent_children ?? 0), settings);
         return {
-          workspace_id: workspaceId, run_id: run.id, employee_id: e.id, gross, deductions: 0, net: gross,
+          workspace_id: workspaceId, run_id: run.id, employee_id: e.id, gross,
+          deductions: b.deductions, net: b.net, employee_contributions: b.employee_contributions,
+          income_tax: b.income_tax, employer_contributions: b.employer_contributions, employer_cost: b.employer_cost,
           currency: e.salary_currency ?? run.currency, basis, days_worked: workingDays, hours_per_day: hoursPerDay, rate,
         };
       });
       if (items.length) await supabase.from('hr_payroll_items').insert(items);
-      const totalGross = items.reduce((s: number, i: any) => s + i.gross, 0);
-      await supabase.from('hr_payroll_runs').update({ total_gross: totalGross, total_net: totalGross }).eq('id', run.id);
-      return json({ run: { ...run, total_gross: totalGross, total_net: totalGross }, items: items.length }, 201);
+      const totalGross = round2(items.reduce((s: number, i: any) => s + i.gross, 0));
+      const totalNet = round2(items.reduce((s: number, i: any) => s + i.net, 0));
+      await supabase.from('hr_payroll_runs').update({ total_gross: totalGross, total_net: totalNet }).eq('id', run.id);
+      return json({ run: { ...run, total_gross: totalGross, total_net: totalNet }, items: items.length }, 201);
     }
     case 'get-payroll-run': {
       const id = String(body?.run_id ?? '');
@@ -464,25 +537,56 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const { data: items } = await supabase.from('hr_payroll_items')
         .select('*, employee:hr_employees!hr_payroll_items_employee_id_fkey ( id, crm_contact_id, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name ) )')
         .eq('run_id', id).order('id');
-      return json({ run, items: items ?? [] });
+      const sum = (k: string) => round2((items ?? []).reduce((s: number, i: any) => s + Number(i[k] ?? 0), 0));
+      const summary = {
+        total_gross: sum('gross'), total_net: sum('net'), total_income_tax: sum('income_tax'),
+        total_employee_contributions: sum('employee_contributions'), total_employer_contributions: sum('employer_contributions'),
+        total_employer_cost: sum('employer_cost'),
+      };
+      return json({ run, items: items ?? [], summary });
     }
     case 'update-payroll-item': {
       requireManage();
       const id = String(body?.item_id ?? '');
       if (!id) return json({ error: 'item_id is required' }, 400);
-      const gross = Number(body?.gross ?? 0), deductions = Number(body?.deductions ?? 0);
-      if (!Number.isFinite(gross) || !Number.isFinite(deductions) || gross < 0 || deductions < 0) return json({ error: 'gross/deductions must be non-negative numbers' }, 400);
-      const net = Math.max(0, gross - deductions);
-      const { data: item, error } = await supabase.from('hr_payroll_items')
-        .update({ gross, deductions, net, note: body?.note ?? null }).eq('id', id).eq('workspace_id', workspaceId).select('run_id').maybeSingle();
+      const gross = Number(body?.gross ?? 0);
+      if (!Number.isFinite(gross) || gross < 0) return json({ error: 'gross must be a non-negative number' }, 400);
+      // Recompute the statutory breakdown from the rules on the new gross (rules-driven). A manual
+      // `deductions` override wins only when auto-rules are off (country_code='none').
+      const { data: cur } = await supabase.from('hr_payroll_items')
+        .select('run_id, employee:hr_employees!hr_payroll_items_employee_id_fkey ( dependent_children )')
+        .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!cur) return json({ error: 'not found' }, 404);
+      const settings = await getPayrollSettings(supabase, workspaceId);
+      let patch: any;
+      if (settings.country_code === 'none' && body?.deductions !== undefined) {
+        const ded = Number(body.deductions);
+        if (!Number.isFinite(ded) || ded < 0) return json({ error: 'deductions must be a non-negative number' }, 400);
+        patch = { gross, deductions: ded, net: round2(Math.max(0, gross - ded)), employee_contributions: 0, income_tax: 0, employer_contributions: 0, employer_cost: round2(gross), note: body?.note ?? null };
+      } else {
+        const b = computePayroll(gross, Number((cur as any).employee?.dependent_children ?? 0), settings);
+        patch = { gross, deductions: b.deductions, net: b.net, employee_contributions: b.employee_contributions, income_tax: b.income_tax, employer_contributions: b.employer_contributions, employer_cost: b.employer_cost, note: body?.note ?? null };
+      }
+      const { error } = await supabase.from('hr_payroll_items').update(patch).eq('id', id).eq('workspace_id', workspaceId);
       if (error) throw new HttpError(400, error.message);
-      if (!item) return json({ error: 'not found' }, 404);
-      // Recompute run totals.
-      const { data: all } = await supabase.from('hr_payroll_items').select('gross, net').eq('run_id', item.run_id);
-      const tg = (all ?? []).reduce((s: number, i: any) => s + Number(i.gross), 0);
-      const tn = (all ?? []).reduce((s: number, i: any) => s + Number(i.net), 0);
-      await supabase.from('hr_payroll_runs').update({ total_gross: tg, total_net: tn }).eq('id', item.run_id);
+      const { data: all } = await supabase.from('hr_payroll_items').select('gross, net').eq('run_id', (cur as any).run_id);
+      const tg = round2((all ?? []).reduce((s: number, i: any) => s + Number(i.gross), 0));
+      const tn = round2((all ?? []).reduce((s: number, i: any) => s + Number(i.net), 0));
+      await supabase.from('hr_payroll_runs').update({ total_gross: tg, total_net: tn }).eq('id', (cur as any).run_id);
       return json({ ok: true, total_gross: tg, total_net: tn });
+    }
+    case 'get-payroll-settings': {
+      const s = await getPayrollSettings(supabase, workspaceId);
+      return json({ settings: s });
+    }
+    case 'update-payroll-settings': {
+      requireManage();
+      const fields = pick(body, ['country_code', 'currency', 'salaries_per_year', 'employee_contribution_rate', 'employer_contribution_rate', 'contribution_monthly_ceiling', 'income_tax_brackets', 'tax_credit_base', 'tax_credit_per_child', 'tax_credit_taper_per_1000', 'tax_credit_taper_floor']);
+      const { data, error } = await supabase.from('hr_payroll_settings')
+        .upsert({ workspace_id: workspaceId, ...fields, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id' })
+        .select('*').single();
+      if (error) throw new HttpError(400, error.message);
+      return json({ settings: data });
     }
     case 'set-payroll-status': {
       requireManage();
@@ -504,16 +608,65 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const { data: run } = await supabase.from('hr_payroll_runs').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!run) return json({ error: 'not found' }, 404);
       if (run.posted_finance_ref) return json({ error: 'This run is already posted to Finance.' }, 409);
-      // Create a planned outgoing payment in Finance for the net payroll.
-      const scheduled = `${run.period}-28`;
-      const { data: pp, error } = await supabase.from('planned_payments').insert({
-        workspace_id: workspaceId, direction: 'out', amount: Number(run.total_net), currency: run.currency,
-        scheduled_for: scheduled, category: 'salary', title: `Payroll ${run.period}`,
-        notes: `HR payroll run ${run.period} (${run.total_net} ${run.currency} net)`, created_by: userId,
-      }).select('id').single();
-      if (error) throw new HttpError(400, `Finance posting failed: ${error.message}`);
-      await supabase.from('hr_payroll_runs').update({ posted_finance_ref: { planned_payment_id: pp.id, posted_at: new Date().toISOString() } }).eq('id', id);
-      return json({ ok: true, planned_payment_id: pp.id });
+      const { data: items } = await supabase.from('hr_payroll_items')
+        .select('net, income_tax, employee_contributions, employer_contributions, employee:hr_employees!hr_payroll_items_employee_id_fkey ( crm_contact_id, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name ) )')
+        .eq('run_id', id);
+      const rows = items ?? [];
+      const cur = run.currency;
+      const payday = `${run.period}-28`;
+      const statutoryDue = nextMonthEnd(run.period);
+      const sum = (k: string) => round2(rows.reduce((s: number, i: any) => s + Number(i[k] ?? 0), 0));
+      const totalTax = sum('income_tax');
+      const eeEfka = sum('employee_contributions');
+      const erEfka = sum('employer_contributions');
+      const totalEfka = round2(eeEfka + erEfka);
+
+      // 1) Net wages — one scheduled payment PER EMPLOYEE (counterparty = the employee's contact).
+      const netPaymentIds: string[] = [];
+      for (const it of rows) {
+        const net = Number(it.net ?? 0);
+        if (net <= 0) continue;
+        const nm = (it as any).employee?.contact?.name || 'Employee';
+        const { data: np, error } = await supabase.from('planned_payments').insert({
+          workspace_id: workspaceId, direction: 'out', amount: net, currency: cur, scheduled_for: payday,
+          category: 'salary', title: `Net pay — ${nm} — ${run.period}`,
+          counterparty_contact_id: (it as any).employee?.crm_contact_id ?? null,
+          notes: `Payroll ${run.period} net wages`, created_by: userId,
+        }).select('id').single();
+        if (error) throw new HttpError(400, `Finance posting failed (net): ${error.message}`);
+        netPaymentIds.push(np.id);
+      }
+      // 2) Income tax (ΦΜΥ) → tax authority.
+      let incomeTaxPaymentId: string | null = null;
+      if (totalTax > 0) {
+        const { data: tp, error } = await supabase.from('planned_payments').insert({
+          workspace_id: workspaceId, direction: 'out', amount: totalTax, currency: cur, scheduled_for: statutoryDue,
+          category: 'tax', title: `Payroll income tax (ΦΜΥ) — ${run.period}`,
+          notes: `Employee income tax withheld for payroll ${run.period}, remitted to the tax authority`, created_by: userId,
+        }).select('id').single();
+        if (error) throw new HttpError(400, `Finance posting failed (tax): ${error.message}`);
+        incomeTaxPaymentId = tp.id;
+      }
+      // 3) EFKA → one remittance, employer/employee split recorded so the employer's own cost is visible.
+      let efkaPaymentId: string | null = null;
+      if (totalEfka > 0) {
+        const { data: ep, error } = await supabase.from('planned_payments').insert({
+          workspace_id: workspaceId, direction: 'out', amount: totalEfka, currency: cur, scheduled_for: statutoryDue,
+          category: 'social_security', title: `Payroll EFKA — ${run.period}`,
+          notes: `EFKA contributions for payroll ${run.period}: employer ${erEfka} ${cur} + employee (withheld) ${eeEfka} ${cur}`,
+          created_by: userId,
+        }).select('id').single();
+        if (error) throw new HttpError(400, `Finance posting failed (EFKA): ${error.message}`);
+        efkaPaymentId = ep.id;
+      }
+
+      const ref = {
+        posted_at: new Date().toISOString(),
+        net_payment_ids: netPaymentIds, income_tax_payment_id: incomeTaxPaymentId, efka_payment_id: efkaPaymentId,
+        totals: { net: round2(run.total_net), income_tax: totalTax, employee_efka: eeEfka, employer_efka: erEfka },
+      };
+      await supabase.from('hr_payroll_runs').update({ posted_finance_ref: ref }).eq('id', id);
+      return json({ ok: true, posted: ref });
     }
 
     // ─────────────────────────── ANALYTICS ───────────────────────────
