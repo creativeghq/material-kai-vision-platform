@@ -22,6 +22,7 @@ export type Persona =
   | 'staff'      // team member of a business node (member role)
   | 'accountant' // invited external accountant — Finance surface only (#202)
   | 'sales'      // invited sales rep — Sales portal only: build quotes/orders for customers (#201)
+  | 'employee'   // invited staff member — HR self-service ONLY (#252): their own record, nothing else
   | 'end_user';  // project client / referral-joined member — restricted surface
 
 /** Every gateable capability on the platform. Keep verbs coarse + surface-oriented. */
@@ -43,7 +44,8 @@ export type Capability =
   | 'agent.use'             // KAI agent / chat
   | 'inbox.use'             // #209 multi-tenant inbox (directional messaging)
   | 'hr.view'               // #252 HR module: see employees + absences (sensitive PII)
-  | 'hr.manage';            // #252 HR module: create/edit employees, approve/reject absences
+  | 'hr.manage'             // #252 HR module: create/edit employees, approve/reject absences
+  | 'hr.self';              // #252 HR self-service: an employee sees/acts on ONLY their own record
 
 const ALL_BUSINESS: Capability[] = [
   'network.manage', 'pricing.manage', 'finance.manage', 'invoice.issue', 'crm.view',
@@ -75,6 +77,11 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // settings/issuing, pricing, network, or warehouse. Reps see only their OWN quotes (RLS on
   // user_id); customer financials are workspace-scoped reads.
   sales: ['sales.portal', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
+  // Invited employee (#252): HR self-service ONLY — their own profile, onboarding, time off and
+  // documents. Deliberately NO crm.view / sales.portal / finance / anything else, so an employee
+  // can never see another person's (e.g. a sales rep's) details. Data is further self-scoped in
+  // hr-api's self- endpoints (the caller's own linked hr_employees row).
+  employee: ['hr.self'],
   // Project clients / referral end-users: their own work only, no business back-office.
   end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
 };
@@ -111,6 +118,9 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
   const role = workspaceRole ?? '';
   if (role === 'client') return 'end_user';
   if (role === 'accountant') return 'accountant';
+  // Invited employee (#252) — HR self-service only. Must precede the member/staff fallback so an
+  // 'employee' role never inherits staff finance/CRM/warehouse capabilities.
+  if (role === 'employee') return 'employee';
   // Invited sales rep (#201) — Sales portal only. Must come BEFORE the member/staff fallback,
   // otherwise a 'sales' role falls through to 'staff' and wrongly inherits finance/CRM/invoice.
   if (role === 'sales') return 'sales';

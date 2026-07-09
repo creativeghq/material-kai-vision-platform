@@ -51,6 +51,7 @@ const CrmCompanyDetailPage = lazy(() => import('./modules/crm/pages/CompanyDetai
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
 const PosPage = lazy(() => import('./modules/finance/pages/PosPage'));
 const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
+const EmployeeSelfServicePage = lazy(() => import('./modules/hr/pages/EmployeeSelfServicePage'));
 const BlueprintLibraryPage = lazy(() => import('./pages/Blueprints/BlueprintLibraryPage').then(m => ({ default: m.BlueprintLibraryPage })));
 const BlueprintEditorPage = lazy(() => import('./pages/Blueprints/BlueprintEditorPage').then(m => ({ default: m.BlueprintEditorPage })));
 
@@ -299,6 +300,20 @@ const App = () => (
                       <CapabilityGuard capability="crm.view">
                         <Layout>
                           <CRMPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* #252 — employee HR self-service. Gated by hr.self (persona 'employee' only),
+                    so an invited employee sees ONLY their own record and never CRM/sales/finance. */}
+                <Route
+                  path="/my-hr"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="hr.self">
+                        <Layout>
+                          <EmployeeSelfServicePage />
                         </Layout>
                       </CapabilityGuard>
                     </AuthGuard>

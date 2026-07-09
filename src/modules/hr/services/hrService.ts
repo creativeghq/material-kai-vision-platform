@@ -171,6 +171,18 @@ export interface HrAnalytics {
   onboarding_pending: number; last_payroll: { period: string; total_net: number; currency: string; status: string } | null;
 }
 
+// Employee self-service (the caller's OWN record only)
+export interface SelfProfile {
+  id: string; employment_type: EmploymentType | null; start_date: string | null; weekly_hours: number | null;
+  annual_leave_allowance_days: number; status: EmployeeStatus; pay_basis: PayBasis;
+  monthly_salary: number | null; hourly_rate: number | null; salary_currency: string | null;
+  contact: EmployeeContact | null; department: { id: string; name: string } | null;
+  summary: { total_absence_days: number; days_by_type: Record<string, number>; remaining_leave_days: number; annual_leave_allowance_days: number } | null;
+}
+export interface SelfTask { id: string; title: string; description: string | null; due_date: string | null; status: 'pending' | 'done'; completed_at: string | null; sort_order: number; }
+export interface SelfAbsence { id: string; absence_type: AbsenceType; start_date: string; end_date: string; working_days: number | null; status: AbsenceStatus; note: string | null; created_at: string; }
+export interface SelfDocument { id: string; name: string; doc_type: DocType; size_bytes: number | null; created_at: string; }
+
 export const POSTING_STATUS_LABELS: Record<PostingStatus, string> = { draft: 'Draft', open: 'Open', closed: 'Closed' };
 export const APP_STAGE_LABELS: Record<AppStage, string> = { applied: 'Applied', screening: 'Screening', interview: 'Interview', offer: 'Offer', hired: 'Hired', rejected: 'Rejected' };
 export const APP_STAGES: AppStage[] = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
@@ -253,6 +265,18 @@ class HrService {
   updatePayrollItem(ws: string, item_id: string, input: { gross: number; deductions: number; note?: string }): Promise<{ ok: boolean; total_gross: number; total_net: number }> { return call(ws, 'update-payroll-item', { item_id, ...input }); }
   setPayrollStatus(ws: string, run_id: string, status: PayrollStatus): Promise<{ run: PayrollRun }> { return call(ws, 'set-payroll-status', { run_id, status }); }
   postPayrollToFinance(ws: string, run_id: string): Promise<{ ok: boolean; planned_payment_id: string }> { return call(ws, 'post-payroll-to-finance', { run_id }); }
+
+  // ── Employee portal invite (admin) ──
+  inviteEmployee(ws: string, employee_id: string, email: string): Promise<{ ok: boolean; invited: boolean; role_note: string | null }> { return call(ws, 'invite-employee', { employee_id, email }); }
+
+  // ── Employee self-service (caller's own record) ──
+  selfProfile(ws: string): Promise<{ profile: SelfProfile }> { return call(ws, 'self-profile'); }
+  selfOnboarding(ws: string): Promise<{ tasks: SelfTask[] }> { return call(ws, 'self-onboarding'); }
+  toggleSelfOnboarding(ws: string, task_id: string): Promise<{ task: SelfTask }> { return call(ws, 'self-toggle-onboarding', { task_id }); }
+  selfTimeoff(ws: string): Promise<{ absences: SelfAbsence[] }> { return call(ws, 'self-timeoff'); }
+  requestSelfTimeoff(ws: string, input: { absence_type: AbsenceType; start_date: string; end_date: string; note?: string }): Promise<{ absence: SelfAbsence }> { return call(ws, 'self-request-timeoff', input); }
+  selfDocuments(ws: string): Promise<{ documents: SelfDocument[] }> { return call(ws, 'self-documents'); }
+  signSelfDocument(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'self-sign-document', { document_id }); }
 }
 
 export const hrService = new HrService();

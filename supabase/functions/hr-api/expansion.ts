@@ -41,6 +41,15 @@ function businessDaysInMonth(period: string): number {
 }
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Working (Mon–Fri) days between two ISO dates inclusive. */
+function businessDaysInclusive(startISO: string, endISO: string): number {
+  const s = new Date(startISO + 'T00:00:00Z'), e = new Date(endISO + 'T00:00:00Z');
+  if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return 0;
+  let n = 0;
+  for (const d = new Date(s); d <= e; d.setUTCDate(d.getUTCDate() + 1)) { const w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; }
+  return n;
+}
+
 const DEFAULT_ONBOARDING = [
   'Sign employment contract', 'Collect ID & tax documents', 'Set up email & system accounts',
   'Assign equipment (laptop, access card)', 'Team & workplace introduction', 'Benefits & payroll enrollment',
@@ -506,6 +515,42 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     }
 
     // ─────────────────────────── ANALYTICS ───────────────────────────
+    // ─────────────────────────── EMPLOYEE PORTAL INVITE ───────────────────────────
+    case 'invite-employee': {
+      requireManage();
+      const id = String(body?.employee_id ?? '');
+      const email = String(body?.email ?? '').trim().toLowerCase();
+      if (!id || !email) return json({ error: 'employee_id and email are required' }, 400);
+      const { data: emp } = await supabase.from('hr_employees').select('id, crm_contact_id, user_id').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!emp) return json({ error: 'employee not found' }, 404);
+      if (emp.user_id) return json({ error: 'This employee already has portal access.' }, 409);
+
+      const appUrl = Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
+      let newUserId = '';
+      let invited = false;
+      const { data: inv, error: invErr } = await supabase.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/my-hr` });
+      if (inv?.user?.id) { newUserId = inv.user.id; invited = true; }
+      else {
+        // Likely already registered — find the existing auth user and link them instead.
+        const { data: list } = await supabase.auth.admin.listUsers();
+        const found = (list?.users ?? []).find((u: any) => String(u.email ?? '').toLowerCase() === email);
+        if (found) newUserId = found.id;
+        else return json({ error: invErr?.message || 'Could not invite this email.' }, 400);
+      }
+
+      // Membership: add 'employee' ONLY if they aren't already a member (never demote an existing
+      // owner/admin/sales member — their role stays, and the linked record still enables self-service).
+      const { data: mem } = await supabase.from('workspace_members').select('id, role').eq('workspace_id', workspaceId).eq('user_id', newUserId).maybeSingle();
+      let roleNote: string | null = null;
+      if (!mem) await supabase.from('workspace_members').insert({ workspace_id: workspaceId, user_id: newUserId, role: 'employee', status: 'active' });
+      else if (mem.role !== 'employee') roleNote = `Existing ${mem.role} member linked; their role was left unchanged.`;
+
+      await supabase.from('hr_employees').update({ user_id: newUserId }).eq('id', id).eq('workspace_id', workspaceId);
+      if (emp.crm_contact_id) await supabase.from('crm_contacts').update({ user_id: newUserId, linked_at: new Date().toISOString(), linked_by: userId }).eq('id', emp.crm_contact_id).eq('workspace_id', workspaceId);
+      return json({ ok: true, invited, role_note: roleNote });
+    }
+
+    // ─────────────────────────── ANALYTICS ───────────────────────────
     case 'analytics': {
       const [{ data: emps }, { data: summaries }, { data: depts }, { data: apps }, { data: posts }, { data: onb }, { data: lastRun }] = await Promise.all([
         supabase.from('hr_employees').select('id, status, department_id').eq('workspace_id', workspaceId),
@@ -543,5 +588,68 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
 
     default:
       return null; // not an expansion action
+  }
+}
+
+/**
+ * Employee SELF-SERVICE (prefix 'self-'). The caller is an invited employee (workspace role
+ * 'employee') with NO hr.view/hr.manage. Every query is hard-scoped to their OWN employee record
+ * (employeeId, already resolved from hr_employees.user_id = caller in index.ts) — so an employee
+ * can only ever see/act on their own profile, onboarding, time off and documents, never anyone
+ * else's (e.g. a sales rep's) data.
+ */
+export interface SelfCtx { supabase: any; workspaceId: string; userId: string; employeeId: string; body: any; }
+export async function handleSelfService(action: string, ctx: SelfCtx): Promise<Response | null> {
+  const { supabase, workspaceId, employeeId, body } = ctx;
+  switch (action) {
+    case 'self-profile': {
+      const { data } = await supabase.from('hr_employees')
+        .select('id, employment_type, start_date, weekly_hours, annual_leave_allowance_days, status, department_id, pay_basis, monthly_salary, hourly_rate, salary_currency, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name, email, phone, mobile, position, department, date_of_birth ), department:hr_departments!hr_employees_department_id_fkey ( id, name )')
+        .eq('id', employeeId).maybeSingle();
+      const { data: sum } = await supabase.from('vw_hr_employee_absence_summary').select('total_absence_days, days_by_type, remaining_leave_days, annual_leave_allowance_days').eq('employee_id', employeeId).maybeSingle();
+      return json({ profile: { ...(data ?? {}), summary: sum ?? null } });
+    }
+    case 'self-onboarding': {
+      const { data } = await supabase.from('hr_onboarding_tasks').select('id, title, description, due_date, status, completed_at, sort_order').eq('workspace_id', workspaceId).eq('employee_id', employeeId).order('sort_order');
+      return json({ tasks: data ?? [] });
+    }
+    case 'self-toggle-onboarding': {
+      const id = String(body?.task_id ?? '');
+      const { data: t } = await supabase.from('hr_onboarding_tasks').select('status').eq('id', id).eq('employee_id', employeeId).maybeSingle();
+      if (!t) return json({ error: 'not found' }, 404);
+      const next = t.status === 'done' ? 'pending' : 'done';
+      const { data } = await supabase.from('hr_onboarding_tasks').update({ status: next, completed_at: next === 'done' ? new Date().toISOString() : null }).eq('id', id).eq('employee_id', employeeId).select('id, title, status, completed_at, sort_order').single();
+      return json({ task: data });
+    }
+    case 'self-timeoff': {
+      const { data } = await supabase.from('hr_absences').select('id, absence_type, start_date, end_date, working_days, status, note, created_at').eq('workspace_id', workspaceId).eq('employee_id', employeeId).order('start_date', { ascending: false });
+      return json({ absences: data ?? [] });
+    }
+    case 'self-request-timeoff': {
+      const startDate = String(body?.start_date ?? ''), endDate = String(body?.end_date ?? ''), type = String(body?.absence_type ?? 'other');
+      if (!startDate || !endDate) return json({ error: 'start_date and end_date are required' }, 400);
+      if (!ABSENCE_TYPES.includes(type)) return json({ error: 'invalid absence_type' }, 400);
+      if (endDate < startDate) return json({ error: 'end_date must be on or after start_date' }, 400);
+      const { data, error } = await supabase.from('hr_absences').insert({
+        workspace_id: workspaceId, employee_id: employeeId, absence_type: type, start_date: startDate, end_date: endDate,
+        working_days: businessDaysInclusive(startDate, endDate), status: 'pending', note: body?.note ? String(body.note) : null,
+      }).select('id, absence_type, start_date, end_date, working_days, status').single();
+      if (error) throw new HttpError(400, error.message);
+      return json({ absence: data }, 201);
+    }
+    case 'self-documents': {
+      const { data } = await supabase.from('hr_documents').select('id, name, doc_type, size_bytes, created_at').eq('workspace_id', workspaceId).eq('employee_id', employeeId).order('created_at', { ascending: false });
+      return json({ documents: data ?? [] });
+    }
+    case 'self-sign-document': {
+      const id = String(body?.document_id ?? '');
+      const { data: doc } = await supabase.from('hr_documents').select('storage_bucket, storage_object_path').eq('id', id).eq('employee_id', employeeId).maybeSingle();
+      if (!doc) return json({ error: 'not found' }, 404);
+      const { data: signed, error } = await supabase.storage.from(doc.storage_bucket).createSignedUrl(doc.storage_object_path, 300);
+      if (error) throw new HttpError(400, error.message);
+      return json({ url: signed?.signedUrl });
+    }
+    default:
+      return null;
   }
 }

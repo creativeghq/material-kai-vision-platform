@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, ExternalLink, Loader2, Pencil, Users } from 'lucide-react';
+import { Plus, ExternalLink, Loader2, Pencil, Users, Mail } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -66,6 +66,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
                     <TableCell className="text-right">{e.remaining_leave_days}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {canManage && workspaceId && <InviteButton workspaceId={workspaceId} employee={e} onDone={load} />}
                         {canManage && <Button variant="ghost" size="sm" onClick={() => setEditing(e)} title="Edit"><Pencil className="h-4 w-4" /></Button>}
                         {e.crm_contact_id && <Button asChild variant="ghost" size="sm"><Link to={`/crm/contacts/${e.crm_contact_id}`} title="Open CRM contact"><ExternalLink className="h-4 w-4" /></Link></Button>}
                       </div>
@@ -157,6 +158,41 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
           <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add employee</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InviteButton({ workspaceId, employee, onDone }: { workspaceId: string; employee: Employee; onDone: () => void }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [email, setEmail] = useState(employee.contact?.email ?? '');
+
+  const submit = async () => {
+    if (!email.trim()) { toast({ title: 'Email is required', variant: 'destructive' }); return; }
+    setSaving(true);
+    try {
+      const r = await hrService.inviteEmployee(workspaceId, employee.id, email.trim());
+      toast({ title: r.invited ? 'Portal invite sent' : 'Employee linked to portal', description: r.role_note || (r.invited ? 'They’ll get an email to set a password.' : undefined) });
+      setOpen(false); onDone();
+    } catch (e) { toast({ title: 'Invite failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button variant="ghost" size="sm" title="Invite to employee portal"><Mail className="h-4 w-4" /></Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Invite {empName(employee)} to the portal</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">They’ll get a login limited to their own HR self-service — their profile, onboarding, time-off requests and documents. They cannot see other employees, sales, finance or CRM.</p>
+          <div className="space-y-1"><Label>Work email *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Send invite</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

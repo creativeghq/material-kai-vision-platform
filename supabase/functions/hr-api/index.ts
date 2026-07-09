@@ -16,7 +16,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
-import { handleExpansion } from './expansion.ts';
+import { handleExpansion, handleSelfService } from './expansion.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -167,7 +167,20 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
   if (!(await isModuleEnabled(supabase, 'hr'))) throw new HttpError(404, 'HR module is not available');
   const ent = await assertEntitled(supabase, workspaceId, 'hr');
   if (!ent.ok) return ent.response;
-  // 3) RBAC.
+
+  // 2.5) Employee SELF-SERVICE (prefix 'self-'). An invited employee (workspace role 'employee')
+  // has neither hr.view nor hr.manage, so this path must precede the admin RBAC gate. Access is
+  // granted purely by having a linked hr_employees row (user_id = caller); every self- handler is
+  // hard-scoped to that one employee, so an employee can never read another person's data.
+  if (action.startsWith('self-')) {
+    const { data: me } = await supabase
+      .from('hr_employees').select('id').eq('workspace_id', workspaceId).eq('user_id', userId).maybeSingle();
+    if (!me) return json({ error: 'You do not have an employee record in this workspace.' }, 403);
+    const res = await handleSelfService(action, { supabase, workspaceId, userId, employeeId: me.id, body });
+    return res ?? json({ error: `Unknown action: ${action}` }, 400);
+  }
+
+  // 3) Admin RBAC (owner/admin only) for everything else.
   const access = await resolveHrAccess(supabase, userId, workspaceId);
   if (!access.canView) return json({ error: 'You do not have access to HR in this workspace.' }, 403);
   const requireManage = () => {

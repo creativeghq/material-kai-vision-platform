@@ -10,6 +10,7 @@ import {
   Contact,
   Briefcase,
   Inbox,
+  UserCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -66,6 +67,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // #252 — HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
   // hr.view (owner/admin, not plain members — employee salary/absence data is sensitive).
   { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app' },
+  // #252 — employee self-service. hr.self is held ONLY by the 'employee' persona, so this shows
+  // for invited employees (never owners/admins, who use the full HR above).
+  { id: 'my-hr', label: 'My HR', path: '/my-hr', icon: UserCircle, requireCapability: 'hr.self', surface: 'app' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',
