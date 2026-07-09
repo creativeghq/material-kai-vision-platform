@@ -5,7 +5,7 @@
 // the extracted payments against the payroll run and stamps the payment IDs onto its Finance lines.
 import { corsHeaders } from '../_shared/cors.ts';
 import { HttpError } from '../_shared/api-logger.ts';
-import { callClaudeTool, meterHrAi, creditBalance } from './ai-meter.ts';
+import { callClaudeTool, meterHrAi, creditBalance, base64FromBytes } from './ai-meter.ts';
 
 export interface AcctCtx { supabase: any; workspaceId: string; userId: string; body: any; access: { canView: boolean; canManage: boolean }; }
 
@@ -18,13 +18,6 @@ const PREPARE_MAX_CREDITS = 25;   // reconciling a big headcount + many docs
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
-
-function base64FromBytes(bytes: Uint8Array): string {
-  let bin = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
-  return btoa(bin);
 }
 
 /** Returns a Response, or null if `action` isn't ours. Caller already bound to workspace + entitled. */

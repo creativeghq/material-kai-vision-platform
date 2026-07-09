@@ -8,7 +8,7 @@ import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { generatePayslips } from './payslip.ts';
-import { callClaudeTool, meterHrAi, creditBalance } from './ai-meter.ts';
+import { callClaudeTool, meterHrAi, creditBalance, base64FromBytes } from './ai-meter.ts';
 
 // Conservative pre-check ceilings ONLY — the ACTUAL charge is usage-based (see ./ai-meter.ts).
 const JOBDESC_MAX_CREDITS = 12;
@@ -167,14 +167,6 @@ async function emitApplicantStage(supabase: any, workspaceId: string, applicatio
       action_url: '/hr?tab=recruitment', type: 'hr.applicant_stage_changed',
     });
   } catch { /* flow emit is best-effort — never block the stage change */ }
-}
-
-/** Base64-encode bytes in chunks (avoids call-stack overflow on large CVs). */
-function base64FromBytes(bytes: Uint8Array): string {
-  let bin = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
-  return btoa(bin);
 }
 
 /**

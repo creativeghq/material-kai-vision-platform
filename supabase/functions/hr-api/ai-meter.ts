@@ -107,3 +107,11 @@ export async function creditBalance(supabase: any, userId: string): Promise<numb
   const { data } = await supabase.from('user_credits').select('balance').eq('user_id', userId).maybeSingle();
   return Number(data?.balance ?? 0);
 }
+
+/** Base64-encode bytes in chunks (avoids call-stack blowups on large files). */
+export function base64FromBytes(bytes: Uint8Array): string {
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+  return btoa(bin);
+}
