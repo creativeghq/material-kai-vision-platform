@@ -12,6 +12,7 @@ import type {
   FiscalInvoiceInput,
   FiscalSubmissionResult,
 } from './types.ts';
+import { isUnnamedLineName } from './types.ts';
 
 export const NOVUS_SANDBOX_BASE = 'https://provider-dev.timologisi.online';
 export const NOVUS_PRODUCTION_BASE = 'https://provider.timologisi.online';
@@ -26,6 +27,17 @@ function parseCredits(v: unknown): number | undefined {
 /** Map our normalized invoice into the Novus `{ invoice: [ … ] }` request body. */
 export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unknown> {
   const { issuer, counterpart, header, lines, summary } = input;
+
+  // Refuse to transmit a legal document whose line carries no real product name — one of our
+  // synthetic fallbacks ('(line item)' / 'Item') or an empty description. Better to block with
+  // an actionable error than to file "Item" as the item name on an AADE-registered document.
+  const unnamed = lines.filter((l) => isUnnamedLineName(l.description)).map((l) => l.lineNumber);
+  if (unnamed.length) {
+    throw new Error(
+      `Refusing to transmit to myDATA: line(s) ${unnamed.join(', ')} have no product name ` +
+        `(placeholder). Set a real description on each line before transmitting.`,
+    );
+  }
 
   const invoiceDetails = lines.map((l) => ({
     lineNumber: l.lineNumber,

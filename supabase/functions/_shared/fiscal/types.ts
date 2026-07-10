@@ -32,6 +32,17 @@ export interface FiscalParty {
   code?: string;
 }
 
+/** Our synthetic "no real product name" fallbacks. A line whose description is empty or
+ *  equals one of these is treated as UNNAMED — we skip variant-folding it and REFUSE to
+ *  transmit it (a legal document must carry the real item name). `'credit'` is deliberately
+ *  NOT here: an amount-only credit note legitimately has a single reason-labelled line.
+ *  Caveat: a line a human literally names "Item" is a false positive — the transmission
+ *  error names the offending line so the fix (rename it) is obvious. */
+export const UNNAMED_LINE_SENTINELS = new Set(['', '(line item)', 'item']);
+export function isUnnamedLineName(desc: string | null | undefined): boolean {
+  return UNNAMED_LINE_SENTINELS.has(String(desc ?? '').trim().toLowerCase());
+}
+
 export interface FiscalLine {
   lineNumber: number;
   code?: string;

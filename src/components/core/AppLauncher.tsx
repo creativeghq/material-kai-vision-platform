@@ -41,7 +41,7 @@ export const AppLauncher: React.FC = () => {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="w-[24rem] sm:w-[27rem] p-0 rounded-2xl shadow-xl border-border/60"
+        className="w-[26rem] sm:w-[32rem] p-0 rounded-2xl shadow-xl border-border/60"
       >
         {/* Radix caret pointing at the trigger — must sit outside the clipped wrapper below. */}
         <PopoverPrimitive.Arrow className="fill-popover" width={16} height={8} />
@@ -70,21 +70,21 @@ export const AppLauncher: React.FC = () => {
           ) : (
             <>
               {active.length > 0 && (
-                <div className="grid grid-cols-2 gap-1 p-2">
+                <div className="grid grid-cols-3 gap-2 p-3">
                   {active.map((app) => (
                     <button
                       key={app.id}
                       onClick={() => go(app.path)}
                       title={app.description || app.label}
-                      className="group flex items-start gap-2.5 rounded-xl p-2.5 text-left hover:bg-muted/60 transition-colors cursor-pointer"
+                      className="group flex flex-col items-center text-center gap-2 rounded-xl px-2 py-3 hover:bg-muted/60 transition-colors cursor-pointer"
                     >
-                      <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
-                        <app.icon className="h-4 w-4" />
-                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-popover" title="Active" />
+                      <span className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                        <app.icon className="h-[1.15rem] w-[1.15rem]" />
+                        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-popover" title="Active" />
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium leading-tight truncate">{app.label}</span>
-                        <span className="block text-xs text-muted-foreground leading-snug line-clamp-2">
+                      <span className="flex flex-col items-center gap-0.5 w-full">
+                        <span className="block w-full text-[13px] font-medium leading-tight truncate">{app.label}</span>
+                        <span className="block w-full text-[11px] text-muted-foreground leading-snug line-clamp-2 min-h-[1.9rem]">
                           {app.description || 'Open'}
                         </span>
                       </span>
