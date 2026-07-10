@@ -70,26 +70,37 @@ export const AppLauncher: React.FC = () => {
           ) : (
             <>
               {active.length > 0 && (
-                <div className="grid grid-cols-3 gap-2.5 p-3">
-                  {active.map((app) => (
-                    <button
-                      key={app.id}
-                      onClick={() => go(app.path)}
-                      title={app.description || app.label}
-                      className="group relative flex flex-col gap-2.5 rounded-2xl border border-border/50 bg-muted/25 p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg cursor-pointer"
-                    >
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary ring-1 ring-inset ring-border/50 transition-colors group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary">
-                        <app.icon className="h-[1.15rem] w-[1.15rem]" />
-                      </span>
-                      <span className="space-y-0.5">
-                        <span className="block text-[13px] font-medium leading-tight truncate">{app.label}</span>
-                        <span className="block text-[11px] text-muted-foreground leading-snug line-clamp-2 min-h-[1.9rem]">
-                          {app.description || 'Open'}
+                <div className="px-3 pt-3">
+                  <div className="flex items-center gap-2 px-1 pb-2">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success))]" />
+                      Active
+                    </span>
+                    <span className="h-px flex-1 bg-border/60" />
+                    <span className="text-[11px] text-muted-foreground tabular-nums">{active.length}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {active.map((app) => (
+                      <button
+                        key={app.id}
+                        onClick={() => go(app.path)}
+                        title={app.description || app.label}
+                        className="group relative flex flex-col gap-2.5 rounded-2xl border border-border/50 bg-muted/25 p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg cursor-pointer"
+                      >
+                        <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary ring-1 ring-inset ring-border/50 transition-colors group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary">
+                          <app.icon className="h-[1.15rem] w-[1.15rem]" />
+                          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[hsl(var(--success))] ring-2 ring-popover" title="Active" />
                         </span>
-                      </span>
-                      <ArrowUpRight className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
-                    </button>
-                  ))}
+                        <span className="space-y-0.5">
+                          <span className="block text-[13px] font-medium leading-tight truncate">{app.label}</span>
+                          <span className="block text-[11px] text-muted-foreground leading-snug line-clamp-2 min-h-[1.9rem]">
+                            {app.description || 'Open'}
+                          </span>
+                        </span>
+                        <ArrowUpRight className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
