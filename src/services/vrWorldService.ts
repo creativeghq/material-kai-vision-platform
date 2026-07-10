@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 
 export interface VRWorld {
   id: string;
@@ -78,6 +79,9 @@ export const vrWorldService = {
     panoramaUrl?: string;
     caption?: string;
   }> {
+    const { data: { user } } = await supabase.auth.getUser();
+    const workspaceId = getActiveWorkspaceId(user?.id);
+
     const { data, error } = await supabase.functions.invoke('generate-vr-world', {
       body: {
         source_image_url: params.sourceImageUrl,
@@ -86,6 +90,7 @@ export const vrWorldService = {
         style: params.style,
         model: params.model || 'marble-1.0-draft',
         is_pano: params.isPano,
+        workspace_id: workspaceId,
       },
     });
 

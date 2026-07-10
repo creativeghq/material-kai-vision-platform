@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { edgeError } from '@/utils/edgeError';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 
 // =====================================================
 // TYPES
@@ -1215,6 +1216,7 @@ class ProjectsService {
       .single();
     if (readErr) throw readErr;
 
+    const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase.functions.invoke('generate-interior-gemini', {
       body: {
         mode: 'product-shot',
@@ -1222,6 +1224,7 @@ class ProjectsService {
         item_name: item.name,
         spec: item.details || {},
         prompt: opts.extraPrompt || undefined,
+        workspace_id: getActiveWorkspaceId(user?.id),
       },
     });
     if (error) throw await edgeError(error, 'Image generation failed');

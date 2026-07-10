@@ -44,6 +44,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveUploadPath } from '@/utils/storagePaths';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
@@ -55,6 +56,7 @@ import { SheetInspector, StagingInspector, ProductsInspector, WorldInspector, Bo
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
+import { FlowFormModal, type FlowFormState } from './FlowFormModal';
 import { TechRadarFindingsCard, type TechRadarFindingsData } from './TechRadarFindingsCard';
 import { TechRadarReviewModal, type TechRadarFormState } from './TechRadarReviewModal';
 import { ToolkitFormModal, type ToolkitFormModalState } from './ToolkitFormModal';
@@ -564,6 +566,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
   // v0.3.2 — modal form triggered by manage_job_sites agent tool when user is vague
   const [jobSitesFormState, setJobSitesFormState] = useState<JobSitesFormState>(null);
+  const [flowFormState, setFlowFormState] = useState<FlowFormState>(null);
   const [techRadarFormState, setTechRadarFormState] = useState<TechRadarFormState>(null);
   // Generic collect-then-send form for toolkit quick-starts that declare a `form`.
   const [toolkitFormState, setToolkitFormState] = useState<ToolkitFormModalState>(null);
@@ -2509,6 +2512,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 // Surface as a tool-progress log entry — the agent's text reply summarizes the change.
                 // (No rich card needed; a list of domains is concise enough as prose.)
                 console.debug('[agent-hub] job_sites chunk', chunk);
+              } else if (chunk.type === 'flow_form_open') {
+                // #256 — agent asked us to open the guided automation form. No thread message;
+                // on submit the modal posts a follow-up that re-invokes manage_flows(create).
+                setFlowFormState({
+                  default_trigger_type: chunk.default_trigger_type || 'invoice_paid',
+                  prefill: chunk.prefill || undefined,
+                });
+              } else if (chunk.type === 'flow_created' || chunk.type === 'flow_updated' || chunk.type === 'flows_list' || chunk.type === 'flow_removed') {
+                // The agent's text reply summarizes the change; no rich card needed.
+                console.debug('[agent-hub] flows chunk', chunk);
               } else if (chunk.type === 'tech_radar_findings') {
                 // Pepper's Tech Radar review → render a ring-grouped findings card.
                 const m: Message = {
@@ -5477,7 +5490,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   image_url: result.imageUrl,
                   mask_data_url: result.maskDataUrl,
                   prompt: result.prompt,
-                  workspace_id: session.user?.user_metadata?.workspace_id,
+                  workspace_id: getActiveWorkspaceId(session.user?.id) ?? session.user?.user_metadata?.workspace_id,
                   conversation_id: conversationIdRef.current ?? undefined,
                 }),
               });
@@ -5596,6 +5609,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           toast({
             title: 'Form ready',
             description: 'Review the message in the input box and hit Send to apply.',
+          });
+        }}
+      />
+
+      {/* Flows toolkit setup modal (#256) — triggered by manage_flows' flow_form_open chunk */}
+      <FlowFormModal
+        state={flowFormState}
+        onClose={() => setFlowFormState(null)}
+        onSubmit={(followupMessage) => {
+          setInput(followupMessage);
+          toast({
+            title: 'Automation ready',
+            description: 'Review the message in the input box and hit Send to create it.',
           });
         }}
       />
