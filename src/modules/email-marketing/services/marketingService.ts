@@ -7,6 +7,7 @@
  * calls Resend directly.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 
 export type CampaignStatus =
   | 'draft' | 'scheduled' | 'sending' | 'sent' | 'partial_failure' | 'paused' | 'cancelled';
@@ -219,21 +220,42 @@ class MarketingService {
     if (error) throw error;
   }
 
-  async getStats(campaignId: string) {
+  /** Pull fresh delivery/open/click/bounce status from the workspace's OWN Resend account and
+   *  update campaign_recipients. Returns how many rows were refreshed. */
+  async syncStats(campaignId: string, workspaceId: string): Promise<{ updated: number; synced: number; by_status: Record<string, number> }> {
+    const { data, error } = await supabase.functions.invoke('email-api', {
+      body: { action: 'sync-campaign-stats', campaign_id: campaignId, workspace_id: workspaceId },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.success) throw new Error(data?.error || 'Failed to sync stats');
+    return { updated: data.updated ?? 0, synced: data.synced ?? 0, by_status: data.by_status ?? {} };
+  }
+
+  async getStats(campaignId: string): Promise<CampaignStats> {
     const { data, error } = await supabase
       .from('campaign_recipients')
-      .select('status, opened_at, clicked_at, bounced_at')
+      .select('status, delivered_at, opened_at, clicked_at, bounced_at, complained_at')
       .eq('campaign_id', campaignId);
     if (error) throw error;
     const rows = data || [];
-    const total = rows.length;
-    const sent = rows.filter((r) => ['sent', 'sending'].includes(r.status as string)).length;
-    const failed = rows.filter((r) => r.status === 'failed').length;
-    const pending = rows.filter((r) => r.status === 'pending').length;
-    const opened = rows.filter((r) => r.opened_at).length;
-    const clicked = rows.filter((r) => r.clicked_at).length;
-    return { total, sent, failed, pending, opened, clicked };
+    const is = (r: any, s: string) => r.status === s;
+    return {
+      total: rows.length,
+      pending: rows.filter((r) => is(r, 'pending')).length,
+      sent: rows.filter((r) => ['sent', 'sending', 'bounced', 'complained'].includes(r.status as string)).length,
+      delivered: rows.filter((r) => r.delivered_at).length,
+      opened: rows.filter((r) => r.opened_at).length,
+      clicked: rows.filter((r) => r.clicked_at).length,
+      bounced: rows.filter((r) => is(r, 'bounced') || r.bounced_at).length,
+      complained: rows.filter((r) => is(r, 'complained') || r.complained_at).length,
+      failed: rows.filter((r) => is(r, 'failed')).length,
+    };
   }
+}
+
+export interface CampaignStats {
+  total: number; pending: number; sent: number; delivered: number;
+  opened: number; clicked: number; bounced: number; complained: number; failed: number;
 }
 
 export const marketingService = new MarketingService();

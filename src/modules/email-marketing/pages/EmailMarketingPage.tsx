@@ -4,13 +4,12 @@
  *   Templates — workspace-scoped GrapesJS templates.
  *   Campaigns — bulk email campaigns to CRM audiences, BYOK-only.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Megaphone, Settings, FileText, Send } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { Badge } from '@/components/core/ui/badge';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { emailService } from '@/modules/email/services/emailService';
 import { MarketingSetupCard } from '../components/MarketingSetupCard';
@@ -30,6 +29,12 @@ export default function EmailMarketingPage() {
     setSearchParams(p, { replace: true });
   };
 
+  const recheckByok = useCallback(async () => {
+    if (!activeWorkspaceId) return;
+    const cfg = await emailService.getWorkspaceConfig(activeWorkspaceId).catch(() => null);
+    setByokReady(cfg?.source === 'workspace');
+  }, [activeWorkspaceId]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -48,6 +53,27 @@ export default function EmailMarketingPage() {
   const ws = activeWorkspaceId;
   if (!ws) return <div className="p-6 text-sm text-muted-foreground">No active workspace.</div>;
 
+  // BYOK is a HARD prerequisite (#255): Email Marketing sends only from the workspace's own Resend.
+  // Until it's configured, show ONLY the setup prompt — no campaigns/templates surface — so
+  // activating the module lands the owner straight in "add your Resend keys".
+  if (!byokReady) {
+    return (
+      <div className="min-h-screen">
+        <PageHeader icon={Megaphone} title="Email Marketing" subtitle="Connect your Resend account to start sending" />
+        <div className="p-3 sm:p-6 max-w-2xl space-y-4">
+          <div className="dashboard-card">
+            <h3 className="text-lg font-semibold mb-1">One step to activate</h3>
+            <p className="text-sm text-muted-foreground">
+              Email Marketing sends from <strong>your own</strong> verified Resend domain — there's no shared platform
+              sender. Add your Resend API key and a verified sender below, then your Templates and Campaigns unlock.
+            </p>
+          </div>
+          <MarketingSetupCard workspaceId={ws} byokReady={false} onConfigured={async () => { await recheckByok(); setTab('campaigns'); }} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <PageHeader icon={Megaphone} title="Email Marketing" subtitle="Design templates and send bulk campaigns from your own Resend domain" />
@@ -57,10 +83,7 @@ export default function EmailMarketingPage() {
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="campaigns"><Send className="h-4 w-4 mr-2" /> Campaigns</TabsTrigger>
             <TabsTrigger value="templates"><FileText className="h-4 w-4 mr-2" /> Templates</TabsTrigger>
-            <TabsTrigger value="setup">
-              <Settings className="h-4 w-4 mr-2" /> Setup
-              {!byokReady && <Badge className="ml-2 bg-amber-500 text-white">Action needed</Badge>}
-            </TabsTrigger>
+            <TabsTrigger value="setup"><Settings className="h-4 w-4 mr-2" /> Setup</TabsTrigger>
           </TabsList>
 
           <TabsContent value="campaigns" className="mt-0"><MarketingCampaignsTab workspaceId={ws} byokReady={byokReady} /></TabsContent>

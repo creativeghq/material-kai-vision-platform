@@ -18,7 +18,7 @@ import { Loader2, Save, Mail, ExternalLink, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { emailService } from '@/modules/email/services/emailService';
 
-export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
+export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?: () => void }> = ({ workspaceId, onSaved }) => {
   const { toast } = useToast();
   const [apiKey, setApiKey] = useState('');
   const [fromEmail, setFromEmail] = useState('');
@@ -67,6 +67,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string }> = ({ wo
       if (apiKey.trim()) setHasKey(true);
       setApiKey('');
       toast({ title: 'Email settings saved' });
+      onSaved?.();
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }

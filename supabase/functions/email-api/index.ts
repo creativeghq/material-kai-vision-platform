@@ -78,6 +78,28 @@ async function sendViaResend(apiKey: string, payload: {
   return data.id as string;
 }
 
+/**
+ * #255 — map a Resend `last_event` (from GET /emails/{id}) onto the timestamp/status columns shared
+ * by campaign_recipients + email_logs. `last_event` is the LATEST event only, so a click implies the
+ * prior open+delivery — we backfill those. Existing timestamps are preserved (COALESCE-style) by the
+ * caller. Returns null for events that don't change our stored state.
+ */
+type StatsPatch = { status?: string; delivered_at?: string; opened_at?: string; clicked_at?: string; bounced_at?: string; complained_at?: string };
+function mapResendEventToPatch(lastEvent: string, nowISO: string): StatsPatch | null {
+  switch (lastEvent) {
+    case 'delivered':       return { status: 'sent', delivered_at: nowISO };
+    case 'opened':          return { status: 'sent', delivered_at: nowISO, opened_at: nowISO };
+    case 'clicked':         return { status: 'sent', delivered_at: nowISO, opened_at: nowISO, clicked_at: nowISO };
+    case 'bounced':         return { status: 'bounced', bounced_at: nowISO };
+    case 'complained':      return { status: 'complained', complained_at: nowISO };
+    case 'failed':
+    case 'suppressed':
+    case 'canceled':        return { status: 'failed' };
+    case 'sent':            return { status: 'sent' };
+    default:                return null; // queued / scheduled / delivery_delayed → no terminal change
+  }
+}
+
 Deno.serve(withApiLogging('email-api', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -330,6 +352,86 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         return new Response(
           JSON.stringify({ success: true, messageId, logId: logData.id }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'sync-campaign-stats': {
+        // #255 — pull delivery/open/click/bounce status for a workspace's campaign from its OWN
+        // Resend account (GET /emails/{id}). Marketing sends go out under the tenant's Resend, so
+        // their events never reach our webhook — this on-demand poll backfills the stats.
+        if (req.method !== 'POST') throw new Error('Method not allowed');
+        const campaignId = String(requestBody.campaign_id ?? '');
+        const wsId = String(requestBody.workspace_id ?? '');
+        if (!campaignId || !wsId) throw new HttpError(400, 'campaign_id and workspace_id are required');
+
+        // Tenancy: caller must belong to the workspace (admin-secret server callers exempt). 404 on
+        // mismatch to avoid id enumeration.
+        if (!isAdminAccess(auth)) {
+          if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) {
+            throw new HttpError(404, 'not found');
+          }
+        }
+
+        // The campaign must belong to the workspace.
+        const { data: campaign } = await supabaseClient
+          .from('campaigns').select('id, workspace_id').eq('id', campaignId).maybeSingle();
+        if (!campaign || campaign.workspace_id !== wsId) throw new HttpError(404, 'not found');
+
+        // Strict BYOK — we poll the workspace's OWN Resend, never the platform key.
+        const statsSender = await resolveWorkspaceEmailSender(supabaseClient, wsId);
+        if (statsSender.source !== 'workspace' || !statsSender.apiKey) {
+          return new Response(
+            JSON.stringify({ success: false, code: 'workspace_sender_required', error: 'Configure your workspace Resend account to sync stats.' }),
+            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        // Most-recent 150 recipients that were actually dispatched (have an email_log with a Resend id).
+        const { data: recips } = await supabaseClient
+          .from('campaign_recipients')
+          .select('id, email_log_id, delivered_at, opened_at, clicked_at, bounced_at, complained_at')
+          .eq('campaign_id', campaignId)
+          .not('email_log_id', 'is', null)
+          .order('sent_at', { ascending: false, nullsFirst: false })
+          .limit(150);
+        const logIds = [...new Set((recips ?? []).map((r: any) => r.email_log_id).filter(Boolean))];
+        const { data: logs } = logIds.length
+          ? await supabaseClient.from('email_logs').select('id, message_id').in('id', logIds)
+          : { data: [] as any[] };
+        const msgByLog = new Map((logs ?? []).map((l: any) => [l.id, l.message_id]));
+
+        const nowISO = new Date().toISOString();
+        let updated = 0;
+        const byStatus: Record<string, number> = {};
+        for (const r of recips ?? []) {
+          const messageId = msgByLog.get(r.email_log_id);
+          if (!messageId) continue;
+          let ev = '';
+          try {
+            const res = await fetch(`https://api.resend.com/emails/${messageId}`, {
+              headers: { 'Authorization': `Bearer ${statsSender.apiKey}` },
+            });
+            if (!res.ok) continue;
+            const data = await res.json();
+            ev = String(data?.last_event ?? '');
+          } catch (_) { continue; }
+          const patch = mapResendEventToPatch(ev, nowISO);
+          if (!patch) continue;
+          // Preserve existing timestamps (first-seen wins) so repeated syncs don't shift them.
+          const recipPatch: Record<string, unknown> = { ...patch };
+          for (const k of ['delivered_at', 'opened_at', 'clicked_at', 'bounced_at', 'complained_at'] as const) {
+            if ((recipPatch as any)[k] && (r as any)[k]) (recipPatch as any)[k] = (r as any)[k];
+          }
+          await supabaseClient.from('campaign_recipients').update(recipPatch).eq('id', r.id);
+          // Mirror to email_logs so the admin analytics surface reflects it too.
+          await supabaseClient.from('email_logs').update(patch).eq('id', r.email_log_id);
+          updated++;
+          byStatus[ev] = (byStatus[ev] ?? 0) + 1;
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, updated, synced: (recips ?? []).length, by_status: byStatus }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
 

@@ -5,13 +5,14 @@
  * surfaces the "configure Resend" state.
  */
 import React, { useEffect, useState } from 'react';
-import { Plus, Send, Calendar, Users, Play, Pause, Ban, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Send, Calendar, Users, Play, Pause, Ban, Trash2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { marketingService, type MarketingCampaign, type CampaignStatus } from '../services/marketingService';
 import { CreateMarketingCampaignModal } from './CreateMarketingCampaignModal';
+import { CampaignStatsDialog } from './CampaignStatsDialog';
 
 const STATUS_COLORS: Record<CampaignStatus, string> = {
   draft: 'bg-gray-500',
@@ -28,6 +29,7 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [statsFor, setStatsFor] = useState<MarketingCampaign | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -105,6 +107,11 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-1">
+                        {['sending', 'sent', 'partial_failure', 'paused'].includes(c.status) && (
+                          <Button variant="ghost" size="sm" title="Delivery stats" onClick={() => setStatsFor(c)}>
+                            <BarChart3 className="h-4 w-4" />
+                          </Button>
+                        )}
                         {(c.status === 'draft' || c.status === 'paused') && (
                           <Button variant="ghost" size="sm" title={byokReady ? 'Send' : 'Configure Resend first'} disabled={!byokReady}
                             onClick={() => act(() => marketingService.startCampaign(c.id), 'Campaign started')}>
@@ -143,6 +150,15 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
           byokReady={byokReady}
           onClose={() => setShowCreate(false)}
           onSuccess={() => { setShowCreate(false); load(); }}
+        />
+      )}
+
+      {statsFor && (
+        <CampaignStatsDialog
+          campaignId={statsFor.id}
+          campaignName={statsFor.name}
+          workspaceId={workspaceId}
+          onClose={() => setStatsFor(null)}
         />
       )}
     </div>

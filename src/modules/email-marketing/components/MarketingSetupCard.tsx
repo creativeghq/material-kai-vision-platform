@@ -8,7 +8,7 @@ import React from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 
-export const MarketingSetupCard: React.FC<{ workspaceId: string; byokReady: boolean }> = ({ workspaceId, byokReady }) => (
+export const MarketingSetupCard: React.FC<{ workspaceId: string; byokReady: boolean; onConfigured?: () => void }> = ({ workspaceId, byokReady, onConfigured }) => (
   <div className="space-y-4">
     {byokReady ? (
       <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 flex items-start gap-2">
@@ -30,6 +30,6 @@ export const MarketingSetupCard: React.FC<{ workspaceId: string; byokReady: bool
         </div>
       </div>
     )}
-    <WorkspaceEmailConfigCard workspaceId={workspaceId} />
+    <WorkspaceEmailConfigCard workspaceId={workspaceId} onSaved={onConfigured} />
   </div>
 );
