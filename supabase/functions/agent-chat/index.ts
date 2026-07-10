@@ -865,6 +865,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
       // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
       'manage_job_sites',
+      // Flows toolkit (#256; module-gated flows-toolkit + workspace entitlement; workspace-scoped)
+      'manage_flows',
       // Sourcing / fulfillment (#237; RPC-gated — resolve=member, create_po=finance-manager; 0 cr)
       'source_product', 'create_purchase_order', 'send_purchase_order',
       // Presentation catalogs (admin/owner only — gated at injection time)
@@ -1027,6 +1029,9 @@ async function executeAgent(
     },
     'job-research': {
       tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
+    },
+    'flows-toolkit': {
+      tool_ids: ['manage_flows'],
     },
     'projects': {
       tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'],
@@ -1277,6 +1282,7 @@ async function executeAgent(
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
   const needsSourcing = config.tools.some((t: string) => ['source_product', 'create_purchase_order', 'send_purchase_order'].includes(t));
+  const needsFlows = config.tools.includes('manage_flows');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
   // (internal ops capability) — gate to admin/owner like price_lookup.
   const needsTechRadar = isAdmin && config.tools.some((t: string) => ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'].includes(t));
@@ -1287,7 +1293,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1306,6 +1312,7 @@ async function executeAgent(
     needsTechRadar    ? import('../_shared/tools/tech-radar-tools.ts') : null,
     needsSourcing     ? import('../_shared/tools/sourcing-tools.ts') : null,
     needsDocs         ? import('../_shared/tools/docs-tools.ts') : null,
+    needsFlows        ? import('../_shared/tools/flow-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -1384,6 +1391,7 @@ async function executeAgent(
   const createGetMentionSummaryTool = mentionMod?.createGetMentionSummaryTool;
   const createCheckLlmVisibilityTool = mentionMod?.createCheckLlmVisibilityTool;
   const createFindNegativeMentionsTool = mentionMod?.createFindNegativeMentionsTool;
+  const createManageFlowsTool = flowsMod?.createManageFlowsTool;
   const createTrackJobSearchTool = jobResearchMod?.createTrackJobSearchTool;
   const createListMyJobSearchesTool = jobResearchMod?.createListMyJobSearchesTool;
   const createFindJobsTool = jobResearchMod?.createFindJobsTool;
@@ -1624,6 +1632,10 @@ async function executeAgent(
   }
   if (config.tools.includes('manage_job_sites') && createManageJobSitesTool) {
     tools.push(createManageJobSitesTool(userId, userJwt, onChunk));
+  }
+  // Flows toolkit (#256; module-gated flows-toolkit + workspace entitlement enforced inside the tool)
+  if (config.tools.includes('manage_flows') && createManageFlowsTool) {
+    tools.push(createManageFlowsTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Sourcing tools (#237; RPC-gated at the DB layer — resolve=member, create_po=finance-manager; 0 cr)

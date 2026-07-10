@@ -7684,6 +7684,7 @@ export type Database = {
           description: string | null
           graph_definition: Json
           id: string
+          is_global: boolean
           is_locked: boolean
           last_run_at: string | null
           name: string
@@ -7695,6 +7696,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           version: number
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string
@@ -7702,6 +7704,7 @@ export type Database = {
           description?: string | null
           graph_definition?: Json
           id?: string
+          is_global?: boolean
           is_locked?: boolean
           last_run_at?: string | null
           name: string
@@ -7713,6 +7716,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           version?: number
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string
@@ -7720,6 +7724,7 @@ export type Database = {
           description?: string | null
           graph_definition?: Json
           id?: string
+          is_global?: boolean
           is_locked?: boolean
           last_run_at?: string | null
           name?: string
@@ -7731,6 +7736,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           version?: number
+          workspace_id?: string | null
         }
         Relationships: []
       }

@@ -67,6 +67,10 @@ class FlowService {
         trigger_type: flow.trigger_type || 'manual',
         trigger_config: {},
         graph_definition: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+        // #256 — flows built through this admin surface are OPERATOR flows: global by default
+        // (fire across all workspaces, today's behavior). Tenant flows are created only via the
+        // agent's create_simple_flow RPC, never here. The editor exposes the global toggle.
+        is_global: true,
         created_by: user?.id,
         updated_by: user?.id,
       })
@@ -77,7 +81,7 @@ class FlowService {
     return data as unknown as Flow;
   }
 
-  async updateFlow(id: string, updates: Partial<Pick<Flow, 'name' | 'description' | 'status' | 'trigger_type' | 'trigger_config' | 'tags'>>): Promise<Flow> {
+  async updateFlow(id: string, updates: Partial<Pick<Flow, 'name' | 'description' | 'status' | 'trigger_type' | 'trigger_config' | 'tags' | 'is_global'>>): Promise<Flow> {
     const { data: { user } } = await supabase.auth.getUser();
 
     const { data, error } = await supabase
@@ -267,6 +271,7 @@ class FlowService {
         trigger_type: triggerType,
         trigger_config: {},
         graph_definition: graph as unknown as Record<string, unknown>,
+        is_global: true, // #256 — duplicating an operator flow stays operator/global
         created_by: user?.id,
         updated_by: user?.id,
       })

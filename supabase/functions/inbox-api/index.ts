@@ -651,6 +651,8 @@ async function insertMessageAndNotify(
         body: preview,
         action_url: `/inbox?thread=${threadId}`,
         thread_id: threadId,
+        // #256 — carry the thread's workspace so tenant flows can scope to it.
+        workspace_id: (thread as { workspace_id?: string }).workspace_id,
       }).catch(() => {});
     }
   }

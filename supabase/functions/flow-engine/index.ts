@@ -10,7 +10,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
@@ -54,6 +54,17 @@ interface FlowGraph {
 interface ExecutionContext {
   trigger: { data: Record<string, unknown> };
   [nodeId: string]: unknown;
+}
+
+/**
+ * #256 — the owning scope of the flow currently executing. Threaded from the flow row down
+ * to each action so tenant flows resolve the workspace's OWN Resend (BYOK) sender and the
+ * per-workspace daily cap, while operator/global flows send as the platform (unmetered),
+ * exactly as system/transactional mail does today.
+ */
+interface FlowScope {
+  workspaceId: string | null;
+  isGlobal: boolean;
 }
 
 // =====================================================
@@ -213,6 +224,7 @@ async function executeAction(
   context: ExecutionContext,
   isTestRun: boolean,
   userId?: string,
+  scope?: FlowScope,
 ): Promise<{ output: Record<string, unknown> }> {
   const { actionType, config } = node.data;
   const resolved = resolveAllTemplates(
@@ -271,6 +283,12 @@ async function executeAction(
         }
       }
 
+      // #256 — sender resolution depends on flow scope. A TENANT flow (workspace_id set,
+      // is_global=false) sends strictly from that workspace's OWN Resend (BYOK): pass
+      // workspace_id + requireWorkspaceSender so email-api 503s rather than falling back to
+      // the platform domain (mirrors campaign-processor). An operator/global flow (or a
+      // legacy flow with no scope) keeps sending as the platform, unmetered.
+      const emailIsTenant = !!scope?.workspaceId && !scope?.isGlobal;
       const { data, error } = await supabase.functions.invoke('email-api', {
         body: {
           action: 'send',
@@ -282,10 +300,48 @@ async function executeAction(
           // (subject/body) are rendered from `variables` server-side.
           templateSlug: resolved.template_id || resolved.template_slug || undefined,
           variables: emailVariables,
+          ...(emailIsTenant
+            ? { workspace_id: scope!.workspaceId, requireWorkspaceSender: true, emailType: 'marketing' }
+            : {}),
         },
       });
       if (error) throw new Error(`Email failed: ${error.message}`);
       return { output: { sent: true, ...(data || {}) } };
+    }
+
+    case 'send_campaign': {
+      // #256 — bridge a flow to the Email Marketing module (#255). The action names an
+      // existing email campaign owned by THIS flow's workspace; we flip it to 'sending' so
+      // campaign-processor fans it out via the workspace's BYOK Resend. Tenant-only: refuse
+      // when the flow has no workspace scope, and only ever touch a campaign that belongs to
+      // the flow's own workspace (no cross-tenant dispatch).
+      const campaignId = String(resolved.campaign_id ?? '');
+      if (!campaignId || campaignId.includes('{{')) {
+        return { output: { skipped: true, reason: 'unresolved_campaign_id' } };
+      }
+      if (!scope?.workspaceId || scope.isGlobal) {
+        return { output: { skipped: true, reason: 'send_campaign_requires_tenant_scope' } };
+      }
+      const { data: campaign, error: campErr } = await supabase
+        .from('campaigns')
+        .select('id, workspace_id, status, channel_type')
+        .eq('id', campaignId)
+        .maybeSingle();
+      if (campErr) throw new Error(`send_campaign lookup failed: ${campErr.message}`);
+      if (!campaign || campaign.workspace_id !== scope.workspaceId) {
+        // 404-style: never reveal another tenant's campaign existence.
+        return { output: { skipped: true, reason: 'campaign_not_found_in_workspace' } };
+      }
+      if (!['draft', 'paused', 'scheduled'].includes(String(campaign.status))) {
+        return { output: { skipped: true, reason: `campaign_not_dispatchable (${campaign.status})` } };
+      }
+      const { error: updErr } = await supabase
+        .from('campaigns')
+        .update({ status: 'sending' })
+        .eq('id', campaignId)
+        .eq('workspace_id', scope.workspaceId);
+      if (updErr) throw new Error(`send_campaign failed: ${updErr.message}`);
+      return { output: { dispatched: true, campaign_id: campaignId } };
     }
 
     case 'http_request': {
@@ -920,6 +976,7 @@ async function executeFlowGraph(
   triggerData: Record<string, unknown>,
   isTestRun: boolean,
   userId?: string,
+  scope?: FlowScope,
 ): Promise<void> {
   const { nodes, edges } = graph;
   const context: ExecutionContext = { trigger: { data: triggerData } };
@@ -1012,7 +1069,7 @@ async function executeFlowGraph(
             const child = nodes.find((n) => n.id === cid);
             if (!child || child.type !== 'actionNode') continue;
             const iterStart = Date.now();
-            const res = await executeAction(supabase, child, context, isTestRun, userId);
+            const res = await executeAction(supabase, child, context, isTestRun, userId, scope);
             await supabase.from('flow_run_steps').insert({
               flow_run_id: runId,
               node_id: child.id,
@@ -1053,7 +1110,7 @@ async function executeFlowGraph(
           continue;
         }
       } else if (node.type === 'actionNode') {
-        const result = await executeAction(supabase, node, context, isTestRun, userId);
+        const result = await executeAction(supabase, node, context, isTestRun, userId, scope);
         output = result.output;
       }
 
@@ -1189,9 +1246,15 @@ async function handleExecuteFlow(
     return jsonResponse({ success: false, error: `Failed to create run: ${runError.message}` }, 500);
   }
 
+  // #256 — the flow's own scope drives BYOK sender resolution for its actions.
+  const scope: FlowScope = {
+    workspaceId: (flow.workspace_id as string | null) ?? null,
+    isGlobal: flow.is_global === true,
+  };
+
   try {
     // Execute the graph
-    await executeFlowGraph(supabase, graph, run.id, trigger_data, isTestRun, initiatedBy);
+    await executeFlowGraph(supabase, graph, run.id, trigger_data, isTestRun, initiatedBy, scope);
 
     // Update run as completed
     const durationMs = Date.now() - runStartTime;
@@ -1248,18 +1311,47 @@ async function handleExecuteFlow(
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function handleTriggerEvent(
   supabase: SupabaseClient,
   body: { event_type: string; data: Record<string, unknown> },
+  auth: AuthResult,
+  req: Request,
 ): Promise<Response> {
   const { event_type, data } = body;
 
-  // Find all active flows with matching trigger type
-  const { data: flows, error } = await supabase
+  // #256 — resolve the AUTHORITATIVE workspace for this event. Trust the payload's
+  // workspace_id ONLY from a trusted server emitter (service-role bearer or the cron
+  // secret — how emitFlowEvent / DB triggers dispatch). A plain authenticated user may
+  // only scope to a workspace they actually belong to (verified via userCanAccessWorkspace),
+  // so a caller can never spoof another tenant's context. When no trustworthy workspace is
+  // established, only is_global flows run (today's behavior) — never another tenant's flow.
+  const bodyWs = typeof data?.workspace_id === 'string' && UUID_RE.test(data.workspace_id)
+    ? data.workspace_id
+    : null;
+  const trustedServer = auth.level === 'secret' || isCronAuthorized(req);
+  let workspaceId: string | null = null;
+  if (bodyWs) {
+    if (trustedServer) {
+      workspaceId = bodyWs;
+    } else if (auth.userId && await userCanAccessWorkspace(supabase, auth.userId, bodyWs)) {
+      workspaceId = bodyWs;
+    }
+  }
+
+  // Match active flows on trigger_type, scoped: all is_global flows PLUS this workspace's
+  // own non-global flows. Never another tenant's rows.
+  let query = supabase
     .from('flows')
-    .select('id')
+    .select('id, workspace_id, is_global')
     .eq('trigger_type', event_type)
     .eq('status', 'active');
+  query = workspaceId
+    ? query.or(`is_global.eq.true,and(is_global.eq.false,workspace_id.eq.${workspaceId})`)
+    : query.eq('is_global', true);
+
+  const { data: flows, error } = await query;
 
   if (error) {
     return jsonResponse({ success: false, error: error.message }, 500);
@@ -1326,8 +1418,9 @@ Deno.serve(withApiLogging('flow-engine', async (req) => {
         return handleExecuteFlow(supabase, body, true, auth.userId);
 
       case 'trigger-event':
-        // Allow both server-to-server (secret) and authenticated user calls
-        return handleTriggerEvent(supabase, body);
+        // Allow both server-to-server (secret) and authenticated user calls. The workspace
+        // scope is resolved authoritatively inside (never trusts a spoofable body id).
+        return handleTriggerEvent(supabase, body, auth, req);
 
       default:
         return jsonResponse({ success: false, error: `Unknown action: ${action}` }, 400);

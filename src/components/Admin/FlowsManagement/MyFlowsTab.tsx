@@ -36,6 +36,7 @@ import {
   Lock,
   Unlock,
   Inbox,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -272,6 +273,36 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
     }
   };
 
+  // #256 — operator "Global action" toggle. Global flows fire for ALL workspaces; turning it
+  // off scopes a flow to its own workspace_id (tenant flows are created off, via the agent).
+  const handleToggleGlobal = async (flow: Flow) => {
+    const nextGlobal = !flow.is_global;
+    if (!nextGlobal && !flow.workspace_id) {
+      toast({
+        title: 'Cannot scope this flow',
+        description: 'This flow has no workspace, so turning off "Global action" would stop it from ever firing. Leave it global.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      await flowService.updateFlow(flow.id, { is_global: nextGlobal });
+      toast({
+        title: nextGlobal ? 'Now a global action' : 'Now workspace-scoped',
+        description: nextGlobal
+          ? `"${flow.name}" will run for all workspaces.`
+          : `"${flow.name}" will run only for its own workspace.`,
+      });
+      onRefresh();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update scope',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleCreate = async () => {
     if (!newFlow.name.trim()) {
       toast({ title: 'Error', description: 'Flow name is required', variant: 'destructive' });
@@ -408,6 +439,17 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
                             Locked
                           </Badge>
                         )}
+                        {flow.is_global ? (
+                          <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-500">
+                            <Globe className="h-3 w-3" />
+                            Global
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="gap-1 bg-violet-500/10 text-violet-500">
+                            <Building2 className="h-3 w-3" />
+                            Workspace
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span>Trigger: {triggerLabels[flow.trigger_type] || flow.trigger_type}</span>
@@ -473,6 +515,19 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
                         <DropdownMenuItem onClick={() => handleDuplicate(flow)}>
                           <Copy className="h-4 w-4 mr-2" />
                           Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleToggleGlobal(flow)}>
+                          {flow.is_global ? (
+                            <>
+                              <Building2 className="h-4 w-4 mr-2" />
+                              Make workspace-only
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="h-4 w-4 mr-2" />
+                              Make global action
+                            </>
+                          )}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleToggleLock(flow)}>
                           {flow.is_locked ? (

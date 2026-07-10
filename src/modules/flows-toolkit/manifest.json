@@ -1,0 +1,9 @@
+{
+  "slug": "flows-toolkit",
+  "name": "Flows",
+  "description": "Create simple workspace automations through chat: pick a trigger (invoice paid, payment received, quote approved, product added, inbox message, appointment booked, or a cron schedule) and an action (send email, WhatsApp, in-app notification, agent message, or dispatch an email-marketing campaign). Runs on the platform automation engine, scoped to your workspace only.",
+  "category": "automation",
+  "priceTier": "pro",
+  "icon": "Workflow",
+  "version": "0.1.0"
+}

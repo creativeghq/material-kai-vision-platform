@@ -611,6 +611,11 @@ export interface Flow {
   tags: string[];
   /** When true, the flow cannot be deleted (also enforced by a DB trigger). */
   is_locked?: boolean;
+  /** #256 — owning workspace of a tenant flow; NULL for a platform/operator flow. */
+  workspace_id?: string | null;
+  /** #256 — true = operator flow that fires across ALL workspaces (operator-only toggle);
+   *  false = tenant flow scoped to workspace_id. */
+  is_global?: boolean;
   created_by: string | null;
   updated_by: string | null;
   last_run_at: string | null;
