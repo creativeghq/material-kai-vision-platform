@@ -1223,6 +1223,7 @@ async function handleExecuteFlow(
   body: { flow_id: string; trigger_data?: Record<string, unknown> },
   isTestRun: boolean,
   initiatedBy: string,
+  access?: { trusted: boolean; callerUserId: string | null },
 ): Promise<Response> {
   const { flow_id, trigger_data = {} } = body;
 
@@ -1235,6 +1236,19 @@ async function handleExecuteFlow(
 
   if (flowError || !flow) {
     return jsonResponse({ success: false, error: 'Flow not found' }, 404);
+  }
+
+  // #256 SECURITY (BOLA): the direct execute-flow / test-flow entrypoints run under the service role,
+  // so without this check any authenticated user could run ANOTHER tenant's flow by id — billing their
+  // credit pool and sending mail/WhatsApp from their BYOK sender. Require the caller to own the flow's
+  // workspace; never let a normal caller run a global/operator flow on demand. Internal trigger-event
+  // dispatch passes no `access` (it already scoped the match), so it is unaffected.
+  if (access && !access.trusted) {
+    const denied = flow.is_global === true
+      || !flow.workspace_id
+      || !access.callerUserId
+      || !(await userCanAccessWorkspace(supabase, access.callerUserId, flow.workspace_id as string));
+    if (denied) return jsonResponse({ success: false, error: 'Flow not found' }, 404);
   }
 
   if (!isTestRun && flow.status !== 'active' && flow.status !== 'draft') {
@@ -1375,6 +1389,26 @@ async function handleExecuteFlow(
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// #256 SECURITY: these events assert a financial/trust/system fact (payment settled, role approved,
+// invoice issued, a backend job finished). They are emitted ONLY by trusted server code
+// (emitFlowEvent from edge functions / DB triggers), NEVER by the browser. A plain authenticated
+// user must not be able to POST trigger-event with one of these and drive a global notification/email
+// flow with attacker-chosen data (e.g. fake "invoice_paid" / "role_upgrade_approved" to any recipient).
+// The frontend's own event set (profile_followed, moodboard_commented, review_submitted, …) is
+// intentionally NOT here, so legitimate user-initiated notifications keep working.
+const SERVER_ONLY_EVENTS = new Set<string>([
+  'invoice_paid', 'invoice_issued', 'receipt_issued',
+  'stripe_payment_succeeded', 'stripe_payment_failed',
+  'role_upgrade_approved', 'role_upgrade_rejected', 'role_upgrade_request_submitted',
+  'finance_follow_up', 'finance_document_requested', 'module_access_requested',
+  'hr_late_checkin', 'hr.applicant_stage_changed', 'background_agent_failed',
+  'material_alert', 'inventory_low_stock', 'marketplace_want_match',
+  'purchase_order.sent', 'quote_pdf_generated',
+  'video_generation_completed', 'video_generation_failed',
+  'vr_world_created', 'vr_world_failed', 'virtual_staging_completed', 'svbrdf_extraction_complete',
+  'agent_search_completed', 'inbox.message_received', 'inbox.thread_assigned',
+]);
+
 async function handleTriggerEvent(
   supabase: SupabaseClient,
   body: { event_type: string; data: Record<string, unknown> },
@@ -1393,6 +1427,11 @@ async function handleTriggerEvent(
     ? data.workspace_id
     : null;
   const trustedServer = auth.level === 'secret' || isCronAuthorized(req);
+
+  // A browser/user caller may not forge server-asserted trust/financial events (see SERVER_ONLY_EVENTS).
+  if (!trustedServer && SERVER_ONLY_EVENTS.has(event_type)) {
+    return jsonResponse({ success: false, error: 'This event can only be emitted by the server.' }, 403);
+  }
   let workspaceId: string | null = null;
   if (bodyWs) {
     if (trustedServer) {
@@ -1471,13 +1510,15 @@ Deno.serve(withApiLogging('flow-engine', async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const callerTrusted = auth.level === 'secret' || isCronAuthorized(req);
+
     switch (action) {
       case 'execute-flow':
-        return handleExecuteFlow(supabase, body, false, auth.userId || 'system');
+        return handleExecuteFlow(supabase, body, false, auth.userId || 'system', { trusted: callerTrusted, callerUserId: auth.userId ?? null });
 
       case 'test-flow':
         if (!auth.userId) return jsonResponse({ success: false, error: 'User auth required' }, 401);
-        return handleExecuteFlow(supabase, body, true, auth.userId);
+        return handleExecuteFlow(supabase, body, true, auth.userId, { trusted: callerTrusted, callerUserId: auth.userId });
 
       case 'trigger-event':
         // Allow both server-to-server (secret) and authenticated user calls. The workspace
