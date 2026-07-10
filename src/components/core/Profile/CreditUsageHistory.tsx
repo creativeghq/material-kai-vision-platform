@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { History, Loader2, TrendingDown, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { History, Loader2, TrendingDown, ArrowDownRight, ArrowUpRight, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   CreditsService,
   creditOperationCategory,
   type CreditTransaction,
   type CreditSpendSummary,
 } from '@/services/credits.service';
+import { workspaceCreditsService, type WorkspaceCreditStatus } from '@/services/workspaceCreditsService';
 
 const creditsService = new CreditsService();
 
@@ -47,6 +49,8 @@ const formatDate = (dateString: string) =>
 
 export const CreditUsageHistory: React.FC = () => {
   const { user } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
+  const [pool, setPool] = useState<WorkspaceCreditStatus | null>(null);
   const [windowDays, setWindowDays] = useState(30);
   const [summary, setSummary] = useState<CreditSpendSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -99,6 +103,20 @@ export const CreditUsageHistory: React.FC = () => {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!activeWorkspaceId) { setPool(null); return; }
+      try {
+        const s = await workspaceCreditsService.getStatus(activeWorkspaceId);
+        if (!cancelled) setPool(s?.has_pool ? s : null);
+      } catch {
+        if (!cancelled) setPool(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
     loadSummary();
   }, [loadSummary]);
 
@@ -111,6 +129,31 @@ export const CreditUsageHistory: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Workspace shared-pool banner — shown when the active workspace is on shared credits */}
+      {pool && (
+        <Card className="rounded-2xl border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-primary" />
+              <div>
+                <div className="text-sm font-medium">You're spending from your workspace pool</div>
+                <div className="text-xs text-muted-foreground">
+                  Pool balance <span className="font-semibold text-foreground">{pool.pool_balance.toFixed(2)}</span> credits
+                  {pool.monthly_limit != null && (
+                    <> · your monthly limit {pool.monthly_limit.toFixed(0)} ({pool.spent_this_month.toFixed(2)} used)</>
+                  )}
+                </div>
+              </div>
+            </div>
+            {pool.monthly_limit != null && (
+              <Badge variant="secondary">
+                {Math.max(0, (pool.remaining_allowance ?? 0)).toFixed(2)} left this month
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Spend summary */}
       <Card className="rounded-2xl">
         <CardHeader>

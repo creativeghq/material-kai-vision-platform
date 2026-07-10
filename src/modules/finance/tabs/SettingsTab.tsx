@@ -30,6 +30,7 @@ import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
 import { StorefrontCard } from '@/modules/finance/components/StorefrontCard';
 import { MembersCard } from '@/modules/finance/components/MembersCard';
+import { WorkspaceCreditsCard } from '@/modules/finance/components/WorkspaceCreditsCard';
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 
@@ -243,6 +244,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="team" className="mt-0 space-y-4">
           <MembersCard workspaceId={workspaceId} />
+          <WorkspaceCreditsCard workspaceId={workspaceId} />
           <TeamInviteCard workspaceId={workspaceId} />
         </TabsContent>
 

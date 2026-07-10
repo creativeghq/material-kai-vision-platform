@@ -378,6 +378,49 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   const creditAmount = paymentIntent.metadata?.credit_amount;
 
   if (creditAmount) {
+    // Shared-credits path: an owner/admin funded a WORKSPACE pool (stripe-api tagged the
+    // payment intent with a verified workspace_id). Credit the pool, not the personal wallet.
+    const poolWorkspaceId = paymentIntent.metadata?.workspace_id;
+    if (poolWorkspaceId) {
+      const { data: existingPoolGrant } = await supabase
+        .from('workspace_credit_transactions')
+        .select('id')
+        .eq('workspace_id', poolWorkspaceId)
+        .eq('metadata->>stripe_payment_intent_id', paymentIntent.id)
+        .maybeSingle();
+      if (existingPoolGrant) {
+        console.log(`Pool credits already granted for payment_intent ${paymentIntent.id}, skipping`);
+        return;
+      }
+      const { error: poolErr } = await supabase.rpc('credit_workspace_credits', {
+        p_workspace_id: poolWorkspaceId,
+        p_amount: parseFloat(creditAmount),
+        p_transaction_type: 'purchase',
+        p_actor_user_id: profile.user_id,
+        p_operation_type: 'credit_purchase',
+        p_description: 'Workspace credit purchase via Stripe',
+        p_metadata: {
+          stripe_payment_intent_id: paymentIntent.id,
+          amount_paid: paymentIntent.amount / 100,
+          currency: paymentIntent.currency,
+        },
+      });
+      if (poolErr) {
+        console.error('Error granting workspace pool credits:', poolErr);
+        throw new Error(`credit_workspace_credits failed for payment_intent ${paymentIntent.id}: ${poolErr.message}`);
+      }
+      console.log(`Granted ${creditAmount} credits to workspace pool ${poolWorkspaceId}`);
+      emitFlowEvent('stripe_payment_succeeded', {
+        user_id: profile.user_id,
+        type: 'payment_success',
+        title: 'Workspace credits added',
+        body: `${creditAmount} credits have been added to your workspace pool.`,
+        action_url: '/profile?tab=credits',
+        credit_amount: parseFloat(creditAmount),
+      });
+      return;
+    }
+
     // Idempotency: check if we already granted credits for this payment intent
     const { data: existingGrant } = await supabase
       .from('credit_transactions')

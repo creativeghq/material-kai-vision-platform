@@ -34,7 +34,33 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
     const user = auth.user;
     const userId = auth.userId;
 
-    const { type, priceId, credits, price, successUrl, cancelUrl } = body;
+    const { type, priceId, credits, price, successUrl, cancelUrl, workspaceId } = body;
+
+    // Optional: a credit purchase can top up a WORKSPACE pool (shared credits) instead of the
+    // buyer's personal wallet. Only an owner/admin of that workspace may fund it — verify before
+    // trusting the body-supplied id (never trust workspace_id from the client, invariant #1).
+    let poolWorkspaceId: string | null = null;
+    if (type === 'credit_purchase' && workspaceId) {
+      const { data: mem } = await supabase
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      const { data: ws } = await supabase
+        .from('workspaces')
+        .select('created_by')
+        .eq('id', workspaceId)
+        .maybeSingle();
+      const isManager = ['owner', 'admin'].includes((mem?.role as string) ?? '') || ws?.created_by === userId;
+      if (!isManager) {
+        return new Response(
+          JSON.stringify({ error: 'Only a workspace owner/admin can fund the workspace credit pool' }),
+          { status: 403, headers: corsHeaders },
+        );
+      }
+      poolWorkspaceId = workspaceId;
+    }
 
     // The customer must live on the SAME account we charge. When a distinct billing account is
     // configured, use a separate customer id (stripe_billing_customer_id) — a customer created
@@ -92,6 +118,8 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
             type: 'credit_purchase',
             user_id: userId,
             credit_amount: serverCredits.toString(),
+            // Present only for a verified owner/admin funding the shared pool.
+            ...(poolWorkspaceId ? { workspace_id: poolWorkspaceId } : {}),
           },
         },
         success_url: successUrl,

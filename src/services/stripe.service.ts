@@ -67,6 +67,7 @@ export const stripeAPI = {
   async createCreditCheckoutSession(
     credits: number,
     price: number,
+    workspaceId?: string,
   ): Promise<{ url: string }> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
@@ -82,6 +83,8 @@ export const stripeAPI = {
         type: 'credit_purchase',
         credits,
         price,
+        // When set, tops up the workspace shared pool (owner/admin only, verified server-side).
+        ...(workspaceId ? { workspaceId } : {}),
         successUrl: `${window.location.origin}/profile?tab=credits&success=true`,
         cancelUrl: `${window.location.origin}/profile?tab=credits&canceled=true`,
       }),
@@ -214,8 +217,8 @@ export const stripeAPI = {
  * StripeService class wrapper for compatibility
  */
 export class StripeService {
-  async createCreditCheckoutSession(credits: number, price: number) {
-    return stripeAPI.createCreditCheckoutSession(credits, price);
+  async createCreditCheckoutSession(credits: number, price: number, workspaceId?: string) {
+    return stripeAPI.createCreditCheckoutSession(credits, price, workspaceId);
   }
 
   async createSubscriptionCheckoutSession(priceId: string) {
