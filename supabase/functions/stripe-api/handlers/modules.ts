@@ -119,6 +119,18 @@ async function activateModule(auth: AuthResult, body: Record<string, unknown>): 
     .maybeSingle();
   if (existing?.enabled) return json({ activated: true, already: true, module: moduleSlug });
 
+  // Guard against a duplicate subscription: a reload / double-click / stale tab would otherwise
+  // create a SECOND Stripe subscription whose webhook upsert overwrites the first's tracking row
+  // (unique on workspace_id+module_slug), leaving the first billing forever with no way to cancel it.
+  const { data: liveSub } = await service
+    .from('workspace_module_subscriptions')
+    .select('status')
+    .eq('workspace_id', workspaceId)
+    .eq('module_slug', moduleSlug)
+    .in('status', ['active', 'trialing', 'past_due', 'canceling'])
+    .maybeSingle();
+  if (liveSub) return json({ activated: true, already: true, module: moduleSlug, status: liveSub.status });
+
   // FREE path: the workspace's plan tier already covers this module → grant now.
   const { data: planLevel } = await service.rpc('workspace_plan_level', { p_workspace_id: workspaceId });
   const covered = tierRank(mod.price_tier as string) <= (Number(planLevel) || 0);

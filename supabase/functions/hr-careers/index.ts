@@ -27,6 +27,9 @@ function clientIp(req: Request): string {
   return xff.split(',')[0].trim() || '0.0.0.0';
 }
 
+const CAREERS_MAX_PER_WINDOW = 8;              // applications per IP per window
+const CAREERS_WINDOW_MS = 10 * 60_000;
+
 Deno.serve(withApiLogging('hr-careers', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -111,7 +114,7 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
     }
     const { error: aErr } = await supabase.from('hr_applications').insert({
       workspace_id: ws.id, job_posting_id: jobId, candidate_id: candidateId, stage: 'applied',
-      notes: String(body?.cover_letter ?? '').trim() || null,
+      notes: String(body?.cover_letter ?? '').trim().slice(0, 5000) || null,
     });
     if (aErr) {
       if ((aErr as any).code === '23505') return json({ ok: true, already: true, message: "You've already applied to this role." });

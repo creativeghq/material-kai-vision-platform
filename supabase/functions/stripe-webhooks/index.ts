@@ -245,11 +245,16 @@ async function reconcileModuleAddonsForOwner(userId: string, planTier: string) {
     .in('workspace_id', wsIds)
     .in('status', ['active', 'canceling']);
 
+  // Module add-on subscriptions are created on the platform-BILLING account (getPlatformBillingStripe
+  // in modules.ts). A plan-tier event arrives on the DEFAULT account, so cancelling through the
+  // event's `stripe` client would hit "No such subscription" and silently leave the add-on billing.
+  const billingStripe = getPlatformBillingStripe() ?? stripe;
+
   for (const s of (subs || []) as Array<{ workspace_id: string; module_slug: string; stripe_subscription_id: string | null; modules?: { price_tier?: string | null } }>) {
     if (!s.stripe_subscription_id) continue;
     if (moduleTierRank(s.modules?.price_tier) > rank) continue; // not covered by the new tier
     try {
-      await stripe.subscriptions.update(s.stripe_subscription_id, { cancel_at_period_end: true });
+      await billingStripe.subscriptions.update(s.stripe_subscription_id, { cancel_at_period_end: true });
       await supabase
         .from('workspace_module_subscriptions')
         .update({ status: 'canceling', updated_at: new Date().toISOString() })
@@ -300,13 +305,20 @@ async function handleModuleAddonSubscription(subscription: Stripe.Subscription) 
     return;
   }
 
+  // A subscription scheduled to cancel still reports status 'active' with cancel_at_period_end=true;
+  // persist that as 'canceling' so a later plain 'updated' event doesn't clobber the indicator that
+  // deactivateModule/reconcile set (access still runs to period end via the entitlement below).
+  const persistedStatus = (subscription.status === 'active' || subscription.status === 'trialing') && subscription.cancel_at_period_end
+    ? 'canceling'
+    : subscription.status;
+
   await supabase.from('workspace_module_subscriptions').upsert(
     {
       workspace_id: workspaceId,
       module_slug: moduleSlug,
       stripe_subscription_id: subscription.id,
       stripe_customer_id: subscription.customer as string,
-      status: subscription.status,
+      status: persistedStatus,
       current_period_end: subscription.current_period_end
         ? new Date(subscription.current_period_end * 1000).toISOString()
         : null,
