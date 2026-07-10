@@ -117,12 +117,13 @@ export async function createSheet(
   // 2. Debit credits
   const creditCost = SHEET_CREDITS[sheet_type] ?? 0;
   if (creditCost > 0) {
-    const { data: debitResult, error: debitError } = await supabase.rpc('debit_user_credits', {
+    const { data: debitResult, error: debitError } = await supabase.rpc('debit_credits', {
       p_user_id: userId,
       p_amount: creditCost,
       p_operation_type: `presentation_sheet_${sheet_type}`,
       p_description: `Presentation sheet: ${sheet_type} (${title})`,
       p_metadata: { moodboard_id, sheet_type, title },
+      p_workspace_id: null,  // moodboards are user-scoped (no workspace_id) → personal wallet
     });
     const result = Array.isArray(debitResult) ? debitResult[0] : debitResult;
     if (debitError || !(result as any)?.success) {
@@ -157,11 +158,12 @@ export async function createSheet(
 
   if (insertError || !sheet) {
     if (creditCost > 0) {
-      await supabase.rpc('credit_user_credits', {
+      await supabase.rpc('refund_credits', {
         p_user_id: userId, p_amount: creditCost,
         p_operation_type: `presentation_sheet_${sheet_type}_refund`,
         p_description: 'Refund: sheet creation failed',
         p_metadata: { moodboard_id, sheet_type, reason: insertError?.message },
+        p_workspace_id: null,
       });
     }
     return { ok: false, status: 500, error: insertError?.message || 'Failed to create sheet' };
@@ -188,11 +190,12 @@ export async function refundSheetCredits(
 ): Promise<void> {
   if (creditCost <= 0) return;
   try {
-    await supabase.rpc('credit_user_credits', {
+    await supabase.rpc('refund_credits', {
       p_user_id: userId, p_amount: creditCost,
       p_operation_type: `presentation_sheet_${sheet_type}_refund`,
       p_description: 'Refund: PDF generation failed',
       p_metadata: { sheet_type, reason },
+      p_workspace_id: null,
     });
   } catch (err) {
     console.error('[createSheet] refund failed:', err);

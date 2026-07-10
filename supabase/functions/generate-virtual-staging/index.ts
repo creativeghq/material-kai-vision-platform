@@ -68,12 +68,14 @@ async function deductCredits(
   userId: string,
   credits: number,
   description: string,
+  workspaceId?: string | null,
 ): Promise<void> {
-  const { data, error } = await supabase.rpc('debit_user_credits', {
+  const { data, error } = await supabase.rpc('debit_credits', {
     p_user_id: userId,
     p_amount: credits,
     p_operation_type: 'virtual_staging',
     p_description: description,
+    p_workspace_id: workspaceId ?? null,
   });
   if (error) throw new Error(`Credit deduction failed: ${error.message}`);
   const row = Array.isArray(data) ? data[0] : data;
@@ -235,6 +237,7 @@ async function handleRequest(
       userId,
       CREDIT_COST,
       `Virtual staging (${room}, ${furnitureStyle})`,
+      body.workspace_id,
     );
 
     await supabase.from('ai_usage_logs').insert({
