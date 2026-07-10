@@ -153,12 +153,13 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
     // Debit credits — check the RPC's success flag, otherwise a transient
     // race (balance drained between the upfront check and now) silently
     // delivers the result without charging the user.
-    const { data: debitData, error: debitErr } = await supabase.rpc('debit_user_credits', {
+    const { data: debitData, error: debitErr } = await supabase.rpc('debit_credits', {
       p_user_id: userId,
       p_amount: CREDITS_REQUIRED,
       p_operation_type: 'region_edit',
       p_description: `Region edit (Grok Aurora inpainting)`,
       p_metadata: { workspace_id: body.workspace_id, job_id: jobId },
+      p_workspace_id: body.workspace_id ?? null,
     });
     {
       const row = Array.isArray(debitData) ? debitData[0] : debitData;

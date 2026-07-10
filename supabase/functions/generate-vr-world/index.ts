@@ -48,6 +48,7 @@ interface GenerateVRRequest {
   model?: string;
   is_pano?: boolean;  // Set true for panoramic source images
   user_id?: string;   // Required when called server-to-server with the service role key
+  workspace_id?: string;  // Active workspace — routes the debit to the shared pool when funded
 }
 
 Deno.serve(withApiLogging('generate-vr-world', async (req) => {
@@ -97,6 +98,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
     }
   }
 
+  const wsId = body.workspace_id ?? null;
   let vrWorldId: string | null = null;
 
   try {
@@ -112,12 +114,13 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
     const creditCost = CREDIT_COSTS[model] || CREDIT_COSTS['marble-1.0-draft'];
 
     // Check and debit credits
-    const { data: debitResult, error: debitError } = await supabase.rpc('debit_user_credits', {
+    const { data: debitResult, error: debitError } = await supabase.rpc('debit_credits', {
       p_user_id: userId,
       p_amount: creditCost,
       p_operation_type: 'vr_generation',
       p_description: `VR World generation (${model})`,
       p_metadata: { model, source_image_url: body.source_image_url },
+      p_workspace_id: wsId,
     });
 
     if (debitError || !debitResult?.[0]?.success) {
@@ -163,12 +166,13 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       // because the catch block's refund relies on `vrWorldId` (which is null
       // here — the insert that would have set it just failed).
       try {
-        await supabase.rpc('credit_user_credits', {
+        await supabase.rpc('refund_credits', {
           p_user_id: userId,
           p_amount: creditCost,
           p_operation_type: 'vr_generation_refund',
           p_description: 'VR World generation refund (insert_failed)',
           p_metadata: { model, reason: 'vr_worlds insert failed', error: insertError?.message },
+          p_workspace_id: wsId,
         });
       } catch (refundErr) {
         console.error('[generate-vr-world] insert-stage refund failed:', refundErr);
@@ -298,12 +302,13 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
           .single();
 
         if (vrRecord?.credits_charged > 0) {
-          await supabase.rpc('credit_user_credits', {
+          await supabase.rpc('refund_credits', {
             p_user_id: userId,
             p_amount: vrRecord.credits_charged,
             p_operation_type: 'vr_generation_refund',
             p_description: `VR World generation refund (failed)`,
             p_metadata: { vr_world_id: vrWorldId },
+            p_workspace_id: wsId,
           });
           console.log(`[generate-vr-world] Refunded ${vrRecord.credits_charged} credits to user ${userId}`);
         }
@@ -318,12 +323,13 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       try {
         const creditCost = (typeof body !== 'undefined' && body?.model && CREDIT_COSTS[body.model])
           || CREDIT_COSTS['marble-1.0-draft'];
-        await supabase.rpc('credit_user_credits', {
+        await supabase.rpc('refund_credits', {
           p_user_id: userId,
           p_amount: creditCost,
           p_operation_type: 'vr_generation_refund',
           p_description: 'VR World generation refund (record creation failed)',
           p_metadata: { failure_stage: 'pre_record_insert' },
+          p_workspace_id: wsId,
         });
         console.log(`[generate-vr-world] Refunded ${creditCost} credits (no vr_world record) to user ${userId}`);
       } catch (refundError) {

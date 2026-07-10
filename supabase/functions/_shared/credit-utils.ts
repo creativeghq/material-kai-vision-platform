@@ -123,6 +123,7 @@ export async function debitExternalServiceCredits(
   operationType: string,
   units: number = 1,
   metadata?: Record<string, unknown>,
+  workspaceId?: string | null,
 ): Promise<CreditDebitResult> {
   try {
     const pricingMap = await getPricingMap(supabase);
@@ -140,12 +141,13 @@ export async function debitExternalServiceCredits(
       return { success: true, credits_debited: 0, raw_cost_usd: 0, billed_cost_usd: 0 };
     }
 
-    const { data: debitData, error: debitError } = await supabase.rpc('debit_user_credits', {
+    const { data: debitData, error: debitError } = await supabase.rpc('debit_credits', {
       p_user_id: userId,
       p_amount: creditsToDebit,
       p_operation_type: operationType,
       p_description: `${serviceName} ${operationType} (${units} ${pricing.unit}${units !== 1 ? 's' : ''})`,
       p_metadata: { ...metadata, service: serviceName, units, unit_type: pricing.unit },
+      p_workspace_id: workspaceId ?? null,
     });
 
     if (debitError) {
@@ -229,6 +231,7 @@ export async function checkCreditBalance(
   userId: string,
   serviceName: string,
   units: number = 1,
+  workspaceId?: string | null,
 ): Promise<{ sufficient: boolean; balance: number; required_credits: number }> {
   const pricingMap = await getPricingMap(supabase);
   const pricing = pricingMap[serviceName];
@@ -238,13 +241,23 @@ export async function checkCreditBalance(
   const billedCost = rawCost * pricing.markup_multiplier;
   const requiredCredits = Math.round(billedCost * 100 * 100) / 100;
 
-  const { data } = await supabase
-    .from('user_credits')
-    .select('balance')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  const balance = data?.balance ?? 0;
+  // Fail-fast against the workspace pool when funded, else the personal wallet.
+  let balance = 0;
+  if (workspaceId) {
+    const { data: pool } = await supabase
+      .from('workspace_credits')
+      .select('balance')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (pool) balance = pool.balance ?? 0;
+    else {
+      const { data } = await supabase.from('user_credits').select('balance').eq('user_id', userId).maybeSingle();
+      balance = data?.balance ?? 0;
+    }
+  } else {
+    const { data } = await supabase.from('user_credits').select('balance').eq('user_id', userId).maybeSingle();
+    balance = data?.balance ?? 0;
+  }
   return { sufficient: balance >= requiredCredits, balance, required_credits: requiredCredits };
 }
 

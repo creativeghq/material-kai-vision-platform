@@ -101,12 +101,14 @@ async function deductCredits(
   userId: string,
   credits: number,
   description: string,
+  workspaceId?: string | null,
 ): Promise<void> {
-  const { data, error } = await supabase.rpc('debit_user_credits', {
+  const { data, error } = await supabase.rpc('debit_credits', {
     p_user_id: userId,
     p_amount: credits,
     p_operation_type: 'pbr_generation',
     p_description: description,
+    p_workspace_id: workspaceId ?? null,
   });
   if (error) throw new Error(`Credit deduction failed: ${error.message}`);
   const row = Array.isArray(data) ? data[0] : data;
@@ -116,7 +118,17 @@ async function deductCredits(
 async function checkCredits(
   supabase: ReturnType<typeof createClient>,
   userId: string,
+  workspaceId?: string | null,
 ): Promise<number> {
+  // When the workspace runs a funded pool, that balance is the fail-fast gate; else personal.
+  if (workspaceId) {
+    const { data: pool } = await supabase
+      .from('workspace_credits')
+      .select('balance')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (pool) return pool.balance ?? 0;
+  }
   // maybeSingle: no user_credits row means 0 balance, not a 500.
   const { data, error } = await supabase
     .from('user_credits')
@@ -377,20 +389,23 @@ async function handleRequest(
   // authenticated user could read another tenant's product metadata and corrupt its PBR maps
   // (and write images under generation-images/pbr-maps/{product_id}/). Internal service-role
   // calls (isService) are dispatched server-to-server and already trusted.
+  // Fetch the product's workspace once — it's both the tenant-check target and the
+  // billing workspace (PBR maps are entity-scoped, so the pool that pays is the product's).
+  const { data: prod } = await supabase
+    .from('products')
+    .select('workspace_id')
+    .eq('id', product_id)
+    .maybeSingle();
+  if (!prod) {
+    return jsonResponse({ success: false, error: 'Product not found' }, 404);
+  }
+  const prodWorkspaceId = ((prod as any).workspace_id ?? null) as string | null;
   if (!isService) {
-    const { data: prod } = await supabase
-      .from('products')
-      .select('workspace_id')
-      .eq('id', product_id)
-      .maybeSingle();
-    if (!prod) {
-      return jsonResponse({ success: false, error: 'Product not found' }, 404);
-    }
     const { data: mem } = await supabase
       .from('workspace_members')
       .select('user_id')
       .eq('user_id', userId)
-      .eq('workspace_id', (prod as any).workspace_id)
+      .eq('workspace_id', prodWorkspaceId)
       .maybeSingle();
     if (!mem) {
       return jsonResponse({ success: false, error: 'Not authorized for this product' }, 403);
@@ -417,7 +432,7 @@ async function handleRequest(
 
   // ── Check credits ──────────────────────────────────────────────────────────
   try {
-    const balance = await checkCredits(supabase, userId);
+    const balance = await checkCredits(supabase, userId, prodWorkspaceId);
     if (balance < CREDIT_COST) {
       return jsonResponse({
         success: false,
@@ -531,6 +546,7 @@ async function handleRequest(
       userId,
       CREDIT_COST,
       `PBR map generation for product ${product_id} (status: ${pbrMaps.status})`,
+      prodWorkspaceId,
     );
 
     console.log(`[generate-pbr-maps] Complete. Status: ${pbrMaps.status}`);

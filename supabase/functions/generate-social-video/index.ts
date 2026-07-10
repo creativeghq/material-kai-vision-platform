@@ -112,12 +112,13 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     if (!creditsDebited) return;
     creditsDebited = false; // guard against double refund
     try {
-      await supabase.rpc('credit_user_credits', {
+      await supabase.rpc('refund_credits', {
         p_user_id: userId,
         p_amount: creditCost,
         p_operation_type: 'social_video_generation.refund',
         p_description: `Refund: social video generation failed (${model})`,
         p_metadata: { model, aspect_ratio, duration_seconds, workspace_id },
+        p_workspace_id: workspace_id ?? null,
       });
     } catch (e) {
       console.error('[generate-social-video] Refund failed (non-fatal):', e);
@@ -168,19 +169,20 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     }
 
     // ① Pre-flight check (kling only — veo-2 handled above)
-    const { sufficient, balance } = await checkCreditBalance(supabase, userId, 'kling-3.0');
+    const { sufficient, balance } = await checkCreditBalance(supabase, userId, 'kling-3.0', 1, workspace_id ?? null);
     if (!sufficient) {
       return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
     }
 
     // ② Debit upfront — REFUNDED on any failure path (see refundCredits + creditsDebited
     // guard below; audit #217 H4). The earlier "non-refundable" note was stale.
-    const { data: debitData, error: debitError } = await supabase.rpc('debit_user_credits', {
+    const { data: debitData, error: debitError } = await supabase.rpc('debit_credits', {
       p_user_id: userId,
       p_amount: creditCost,
       p_operation_type: 'social_video_generation',
       p_description: `Social video generation (${model}, ${duration_seconds}s)`,
       p_metadata: { model, aspect_ratio, duration_seconds, workspace_id },
+      p_workspace_id: workspace_id ?? null,
     });
 
     const debit = Array.isArray(debitData) ? debitData[0] : debitData;

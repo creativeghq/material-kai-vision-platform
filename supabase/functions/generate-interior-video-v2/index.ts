@@ -175,12 +175,13 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   const creditCost = CREDIT_COSTS[resolvedModel];
 
   // ① Debit credits upfront
-  const { data: debitData, error: debitError } = await supabase.rpc('debit_user_credits', {
+  const { data: debitData, error: debitError } = await supabase.rpc('debit_credits', {
     p_user_id: userId,
     p_amount: creditCost,
     p_operation_type: 'interior_video_generation_v2',
     p_description: `Interior video v2 (${resolvedModel}, ${video_type})`,
     p_metadata: { model: resolvedModel, video_type, duration_seconds, aspect_ratio, workspace_id },
+    p_workspace_id: workspace_id ?? null,
   });
 
   const debit = Array.isArray(debitData) ? debitData[0] : debitData;
@@ -208,11 +209,12 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     .single();
 
   if (recordErr || !videoRecord) {
-    await supabase.rpc('credit_user_credits', {
+    await supabase.rpc('refund_credits', {
       p_user_id: userId,
       p_amount: creditCost,
       p_operation_type: 'interior_video_generation_v2_refund',
       p_description: 'Refund: failed to create generation record',
+      p_workspace_id: workspace_id ?? null,
     });
     return jsonResponse({ success: false, error: 'Failed to create generation record' }, 500);
   }
@@ -387,11 +389,12 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
   } catch (err) {
     // Refund and mark failed
-    await supabase.rpc('credit_user_credits', {
+    await supabase.rpc('refund_credits', {
       p_user_id: userId,
       p_amount: creditCost,
       p_operation_type: 'interior_video_generation_v2_refund',
       p_description: `Refund: ${resolvedModel} generation failed`,
+      p_workspace_id: workspace_id ?? null,
     });
 
     await supabase.from('generation_videos').update({

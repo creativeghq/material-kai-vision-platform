@@ -71,6 +71,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
   const debitResult = await debitExternalServiceCredits(
     supabase, userId, 'social-caption', 'social_content_generation', 1,
     { platform, topic: topic.substring(0, 100), workspace_id },
+    workspace_id ?? null,
   );
 
   if (!debitResult.success) {
@@ -218,12 +219,13 @@ Return exactly this JSON structure:
 async function refundCredits(supabase: any, userId: string, amount: number, workspace_id?: string): Promise<void> {
   if (!amount || amount <= 0) return;
   try {
-    await supabase.rpc('credit_user_credits', {
+    await supabase.rpc('refund_credits', {
       p_user_id: userId,
       p_amount: amount,
       p_operation_type: 'social_content_generation_refund',
       p_description: 'Refund: social content generation failed',
       p_metadata: { workspace_id },
+      p_workspace_id: workspace_id ?? null,
     });
   } catch (refundErr) {
     console.error('[generate-social-content] Refund failed:', refundErr);
