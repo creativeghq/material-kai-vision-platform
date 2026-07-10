@@ -43,9 +43,13 @@ export interface LauncherApi {
 
 export function useLauncherApps(): LauncherApi {
   const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
-  const { can, isAccountant, isSalesRep, isWorkspaceManager } = usePermissions();
+  const { can, isAccountant, isSalesRep } = usePermissions();
   const { isModuleAvailable, loading: entLoading } = useEntitlements();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, workspaceRole } = useWorkspace();
+  // Only a workspace OWNER (or platform operator) can activate/purchase a module server-side
+  // (isOwnerOrOperator in stripe-api/handlers/modules.ts). Gate the launcher's Enable action to match,
+  // so a non-owner manager gets the "request activation" path instead of a server 403.
+  const canActivateModules = workspaceRole === 'owner' || isPlatformOperator;
   const { entries: moduleEntries } = useWorkspaceModuleNav();
 
   const [catalog, setCatalog] = useState<Map<string, ModuleCatalogRow>>(new Map());
@@ -66,7 +70,7 @@ export function useLauncherApps(): LauncherApi {
     if (!activeWorkspaceId || !app.moduleSlug) return { ok: false, message: 'No workspace selected' };
     setEnabling(app.moduleSlug);
     try {
-      if (isWorkspaceManager) {
+      if (canActivateModules) {
         const res = await activateModule(activeWorkspaceId, app.moduleSlug);
         if (res.checkout_url) { window.location.href = res.checkout_url; return { ok: true, checkout: true, message: 'Redirecting to checkout…' }; }
         setLocalActivated((prev) => new Set(prev).add(app.moduleSlug!));
@@ -79,7 +83,7 @@ export function useLauncherApps(): LauncherApi {
     } finally {
       setEnabling(null);
     }
-  }, [activeWorkspaceId, isWorkspaceManager]);
+  }, [activeWorkspaceId, canActivateModules]);
 
   const api = useMemo(() => {
     const base = { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, can };
@@ -124,12 +128,12 @@ export function useLauncherApps(): LauncherApi {
     return {
       active, available,
       loading: entLoading || !catalogLoaded,
-      canManage: isWorkspaceManager,
+      canManage: canActivateModules,
       enabling,
       enable,
     };
   }, [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, can, isModuleAvailable,
-      moduleEntries, catalog, catalogLoaded, entLoading, localActivated, isWorkspaceManager, enabling, enable]);
+      moduleEntries, catalog, catalogLoaded, entLoading, localActivated, canActivateModules, enabling, enable]);
 
   return api;
 }

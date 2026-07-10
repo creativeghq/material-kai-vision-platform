@@ -133,7 +133,14 @@ async function activateModule(auth: AuthResult, body: Record<string, unknown>): 
 
   // FREE path: the workspace's plan tier already covers this module → grant now.
   const { data: planLevel } = await service.rpc('workspace_plan_level', { p_workspace_id: workspaceId });
-  const covered = tierRank(mod.price_tier as string) <= (Number(planLevel) || 0);
+  // A paid add-on bound to a Stripe product must NOT be free-granted just because its price_tier was
+  // left at the free tier (rank 0) — that would give the add-on away to everyone. `price_tier` on an
+  // add-on means "the plan tier that INCLUDES it for free"; a free-tier value on a product-bound add-on
+  // is a misconfiguration, so route it to the paid path instead. (Legit "included in Pro, add-on on
+  // Free" modules carry a non-free price_tier, so a Pro workspace still gets them free here.)
+  const isPaidAddon = mod.is_addon === true && !!mod.addon_stripe_product_id;
+  const covered = tierRank(mod.price_tier as string) <= (Number(planLevel) || 0)
+    && !(isPaidAddon && tierRank(mod.price_tier as string) <= 0);
   if (covered) {
     const { error } = await service.from('workspace_module_entitlements').upsert(
       { workspace_id: workspaceId, module_slug: moduleSlug, enabled: true, granted_by: userId },

@@ -241,24 +241,18 @@ export async function checkCreditBalance(
   const billedCost = rawCost * pricing.markup_multiplier;
   const requiredCredits = Math.round(billedCost * 100 * 100) / 100;
 
-  // Fail-fast against the workspace pool when funded, else the personal wallet.
-  let balance = 0;
-  if (workspaceId) {
-    const { data: pool } = await supabase
-      .from('workspace_credits')
-      .select('balance')
-      .eq('workspace_id', workspaceId)
-      .maybeSingle();
-    if (pool) balance = pool.balance ?? 0;
-    else {
-      const { data } = await supabase.from('user_credits').select('balance').eq('user_id', userId).maybeSingle();
-      balance = data?.balance ?? 0;
-    }
-  } else {
-    const { data } = await supabase.from('user_credits').select('balance').eq('user_id', userId).maybeSingle();
-    balance = data?.balance ?? 0;
-  }
-  return { sufficient: balance >= requiredCredits, balance, required_credits: requiredCredits };
+  // Fail-fast via preflight_credits — mirrors the debit decision (pool-if-member-else-personal) AND
+  // enforces the member monthly cap, so a capped member is rejected BEFORE the paid upstream call
+  // rather than after (previously the pre-check read only the pool balance, missing the cap).
+  const { data: pf } = await supabase.rpc('preflight_credits', {
+    p_user_id: userId, p_amount: requiredCredits, p_workspace_id: workspaceId ?? null,
+  });
+  const row = Array.isArray(pf) ? pf[0] : pf;
+  return {
+    sufficient: !!row?.sufficient,
+    balance: Number(row?.balance ?? 0),
+    required_credits: requiredCredits,
+  };
 }
 
 /**

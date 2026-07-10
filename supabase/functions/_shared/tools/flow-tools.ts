@@ -37,8 +37,14 @@ function svcClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 }
 
-/** JWT-scoped client so the RPCs' auth.uid()-based assert_workspace_member enforces and RLS
- *  applies. Falls back to service role only when no JWT is present. */
+/**
+ * Prefer a JWT-scoped client so the create/toggle/delete RPCs' `auth.uid()`-based
+ * `assert_workspace_member` and RLS actually enforce. When no JWT is present (partner `kai_` keys and
+ * the admin-secret on-behalf paths), this falls back to the service role — and under service role
+ * `auth.uid()` is null, so `assert_workspace_member` becomes a NO-OP. On those paths the only real
+ * tenancy control is that `p_workspace_id` is SERVER-DERIVED from the resolved membership / api-key
+ * workspace (never client-supplied) — so never pass a caller-influenced workspace id into these RPCs.
+ */
 function callerClient(jwt?: string) {
   if (jwt) {
     return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

@@ -431,32 +431,16 @@ async function checkCredits(
   required: number,
   workspaceId?: string | null,
 ): Promise<void> {
-  // If the active workspace runs on shared credits (a funded pool), fail-fast against the
-  // pool balance; otherwise fall back to the user's personal balance. The authoritative
-  // check (incl. per-member monthly cap) happens at debit time in debit_credits.
-  if (workspaceId) {
-    const { data: pool } = await supabase
-      .from('workspace_credits')
-      .select('balance')
-      .eq('workspace_id', workspaceId)
-      .maybeSingle();
-    if (pool) {
-      if ((pool.balance ?? 0) < required) {
-        throw new Error(`Insufficient workspace credits. Required: ${required}, Available: ${pool.balance ?? 0}`);
-      }
-      return;
-    }
-  }
-  // maybeSingle: a user with no user_credits row is a legitimate "0 balance" case,
-  // not a 500 — let the explicit insufficient-credits branch handle it.
-  const { data, error } = await supabase
-    .from('user_credits')
-    .select('balance')
-    .eq('user_id', userId)
-    .maybeSingle();
+  // Fail-fast via preflight_credits — mirrors the debit decision (pool-if-member-else-personal) AND
+  // enforces the per-member monthly cap, so a capped member is rejected BEFORE the paid Gemini call
+  // rather than after. Don't echo a foreign pool's balance back to the caller (info leak).
+  const { data: pf, error } = await supabase.rpc('preflight_credits', {
+    p_user_id: userId, p_amount: required, p_workspace_id: workspaceId ?? null,
+  });
   if (error) throw new Error(`Credit check failed: ${error.message}`);
-  if (!data || (data.balance ?? 0) < required) {
-    throw new Error(`Insufficient credits. Required: ${required}, Available: ${data?.balance ?? 0}`);
+  const row = Array.isArray(pf) ? pf[0] : pf;
+  if (!row?.sufficient) {
+    throw new Error(`Insufficient credits. This operation needs ${required} credits.`);
   }
 }
 
@@ -478,6 +462,24 @@ async function deductCredits(
   if (error) throw new Error(`Credit deduction failed: ${error.message}`);
   const row = Array.isArray(data) ? data[0] : data;
   if (row && !row.success) throw new Error(`Credit deduction failed: ${row.error_message}`);
+}
+
+/** Refund a prior debit — to the same wallet the debit came from (refund_credits mirrors the decision). */
+async function refundCredits(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  credits: number,
+  description: string,
+  workspaceId?: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('refund_credits', {
+    p_user_id: userId,
+    p_amount: credits,
+    p_operation_type: 'interior_generation_refund',
+    p_description: description,
+    p_workspace_id: workspaceId ?? null,
+  });
+  if (error) console.warn(`[generate-interior-gemini] refund failed: ${error.message}`);
 }
 
 function buildMaterialsBoardPrompt(boardMode: BoardMode, roomType?: string, style?: string, extraPrompt?: string): string {
@@ -602,9 +604,15 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     : CREDIT_COSTS[model];
   const modelLabel = isFluxMode ? 'flux-depth-pro' : useGrok ? 'grok-aurora' : model;
 
+  let debited = false;
   try {
     // Fail fast before spending 20-30s on generation
     await checkCredits(supabase, resolvedUserId, credits, body.workspace_id);
+    // Debit BEFORE the paid Gemini call (invariant #10): the per-member cap is enforced atomically
+    // at debit time, so concurrent over-cap requests can't all run paid compute before a debit lands.
+    // Refunded in the catch below if generation fails.
+    await deductCredits(supabase, resolvedUserId, credits, `Interior design generation (${model}, ${mode})`, body.workspace_id);
+    debited = true;
 
     let imageUrl: string;
 
@@ -910,14 +918,6 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
       return jsonResponse({ success: false, error: `Unknown mode: ${mode}` }, 400);
     }
 
-    await deductCredits(
-      supabase,
-      resolvedUserId,
-      credits,
-      `Interior design generation (${model}, ${mode})`,
-      body.workspace_id,
-    );
-
     await supabase.from('ai_usage_logs').insert({
       user_id: resolvedUserId,
       operation_type: 'interior_design_generation',
@@ -960,6 +960,10 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[generate-interior-gemini] Error (mode=${mode}):`, message);
+    // Generation failed after we debited → refund so the user isn't charged for nothing.
+    if (debited) {
+      await refundCredits(supabase, resolvedUserId, credits, `Interior generation failed (${mode})`, body.workspace_id);
+    }
     // Insufficient credits is a client-state condition → 402, not a server error.
     const status = message.startsWith('Insufficient credits') ? 402 : 500;
     return jsonResponse({ success: false, error: message }, status);
