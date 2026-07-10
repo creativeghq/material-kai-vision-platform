@@ -8,7 +8,7 @@
 //  • Identity = ΑΦΜ (the employee must already exist as an active employee of THIS workspace).
 //  • Optional second factor: hr_settings.kiosk_require_pin → a per-employee 4–8 digit PIN.
 //  • Returns minimal data (name + in/out state); never other employees, salary, or ids.
-//  • The punch is recorded and filed to Εργάνη (WRKCardSE) when the workspace has it configured.
+//  • The punch is recorded and filed to Ergani (WRKCardSE) when the workspace has it configured.
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';

@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { registeredModules, refreshModuleRegistry } from '@/modules/_core';
+import { SIDEBAR_NAV_ITEMS } from '@/config/nav-items';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -21,12 +22,18 @@ import {
   type ModuleCatalogRow,
 } from '@/services/moduleActivationService';
 
-/** Slugs of registered modules that surface in the workspace (App Launcher). */
-const workspaceModuleSlugs = new Set(
-  registeredModules
+// Tenant-facing modules to list here: registered modules that expose a workspace launcher entry
+// (Docs, …), the business surfaces moved into the App Launcher (surface:'app' with a moduleSlug —
+// CRM, Finance, Quotes, Projects, Inbox, HR), plus any purchasable add-on. This is what makes
+// ALL active modules show up, not only add-ons.
+const tenantFacingSlugs = new Set<string>([
+  ...registeredModules
     .filter((m) => m.navItems.some((n) => n.location === 'workspace'))
     .map((m) => m.manifest.slug),
-);
+  ...SIDEBAR_NAV_ITEMS
+    .filter((i) => i.surface === 'app' && i.moduleSlug)
+    .map((i) => i.moduleSlug as string),
+]);
 
 export const ModulesActivationTab: React.FC = () => {
   const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
@@ -78,7 +85,7 @@ export const ModulesActivationTab: React.FC = () => {
   // Modules the owner can activate: published add-ons + published modules that surface a
   // workspace launcher entry.
   const rows = useMemo(
-    () => catalog.filter((m) => m.is_addon || workspaceModuleSlugs.has(m.slug)),
+    () => catalog.filter((m) => m.is_addon || tenantFacingSlugs.has(m.slug)),
     [catalog],
   );
 

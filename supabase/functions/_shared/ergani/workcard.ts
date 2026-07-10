@@ -1,11 +1,11 @@
 // Shared Work Card punch logic — records an arrival/departure punch and (when the workspace has
-// Εργάνη configured) files it as WRKCardSE. Extracted to _shared so BOTH the authenticated hr-api
+// Ergani configured) files it as WRKCardSE. Extracted to _shared so BOTH the authenticated hr-api
 // (admin action + employee self-service) and the PUBLIC hr-kiosk function use one implementation.
 //
-// The punch row is ALWAYS written (works as internal attendance even before Εργάνη is set up):
-//   - Εργάνη configured + employee has ΑΦΜ → filed, punch.status='submitted' + protocol.
+// The punch row is ALWAYS written (works as internal attendance even before Ergani is set up):
+//   - Ergani configured + employee has ΑΦΜ → filed, punch.status='submitted' + protocol.
 //   - otherwise → punch.status='pending', filed=false, `reason` explains why.
-// opts.requireErgani (admin explicitly clicked "file") makes a missing config / ΑΦΜ / Εργάνη error
+// opts.requireErgani (admin explicitly clicked "file") makes a missing config / ΑΦΜ / Ergani error
 // throw instead of degrading to a local-only punch.
 
 import { HttpError } from '../api-logger.ts';
@@ -103,8 +103,8 @@ export async function fileWorkcardPunch(
 
   const creds = await resolveErganiCredentials(supabase, workspaceId);
   if (opts.requireErgani) {
-    if (!creds) throw new HttpError(400, 'ergani_not_configured: add your Εργάνη credentials in Profile → Keys first.');
-    if (!creds.employerAfm) throw new HttpError(400, 'employer_afm is not set in your Εργάνη credentials.');
+    if (!creds) throw new HttpError(400, 'ergani_not_configured: add your Ergani credentials in Profile → Keys first.');
+    if (!creds.employerAfm) throw new HttpError(400, 'employer_afm is not set in your Ergani credentials.');
     if (!afm) throw new HttpError(400, 'Employee has no ΑΦΜ (set the contact VAT number first).');
   }
 

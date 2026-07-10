@@ -41,7 +41,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
     if (!workspaceId) return; setBusyId(r.employee_id);
     try {
       const res = await hrService.clockEmployee(workspaceId, r.employee_id, r.clocked_in ? 'departure' : 'arrival');
-      toast({ title: r.clocked_in ? 'Clocked out' : 'Clocked in', description: res.filed ? `Filed to Εργάνη · ${res.protocol}` : `Recorded${res.reason ? ` (${res.reason})` : ''}` });
+      toast({ title: r.clocked_in ? 'Clocked out' : 'Clocked in', description: res.filed ? `Filed to Ergani · ${res.protocol}` : `Recorded${res.reason ? ` (${res.reason})` : ''}` });
       load();
     } catch (e) { toast({ title: 'Clock failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusyId(null); }
@@ -103,7 +103,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {r.last_at ? new Date(r.last_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
-                      {r.last_status === 'submitted' && <span className="ml-1 text-emerald-500" title="Filed to Εργάνη">✓</span>}
+                      {r.last_status === 'submitted' && <span className="ml-1 text-emerald-500" title="Filed to Ergani">✓</span>}
                     </TableCell>
                     {canManage && (
                       <TableCell className="text-right">

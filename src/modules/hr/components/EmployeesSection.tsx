@@ -146,8 +146,8 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
             <div className="space-y-1"><Label>Leave (days)</Label><Input type="number" min={0} value={f.allowance} onChange={(e) => upd('allowance', e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Εργάνη)</span></Label><Input value={f.vat} onChange={(e) => upd('vat', e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
-            <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Εργάνη)</span></Label><Input value={f.amka} onChange={(e) => upd('amka', e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
+            <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Ergani)</span></Label><Input value={f.vat} onChange={(e) => upd('vat', e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
+            <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Ergani)</span></Label><Input value={f.amka} onChange={(e) => upd('amka', e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
           </div>
           <WorkingTimeFields start={f.workStart} end={f.workEnd} days={workDays} onStart={(v) => upd('workStart', v)} onEnd={(v) => upd('workEnd', v)} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
           <div className="grid grid-cols-2 gap-3">
@@ -281,8 +281,8 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
             <div className="space-y-1"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={children} onChange={(e) => setChildren(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Εργάνη)</span></Label><Input value={vat} onChange={(e) => setVat(e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
-            <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Εργάνη)</span></Label><Input value={amka} onChange={(e) => setAmka(e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
+            <div className="space-y-1"><Label>ΑΦΜ <span className="text-muted-foreground text-xs">(VAT — for Ergani)</span></Label><Input value={vat} onChange={(e) => setVat(e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></div>
+            <div className="space-y-1"><Label>ΑΜΚΑ <span className="text-muted-foreground text-xs">(SSN — for Ergani)</span></Label><Input value={amka} onChange={(e) => setAmka(e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></div>
           </div>
           <WorkingTimeFields start={workStart} end={workEnd} days={workDays} onStart={setWorkStart} onEnd={setWorkEnd} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
           <div className="space-y-1"><Label>Kiosk PIN <span className="text-muted-foreground text-xs">(optional 4–8 digits; blank = unchanged)</span></Label><Input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} className="font-mono" maxLength={8} placeholder="••••" inputMode="numeric" /></div>

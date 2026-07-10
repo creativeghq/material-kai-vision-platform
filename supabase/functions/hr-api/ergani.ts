@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — Ergani II (ΠΣ Εργάνη) integration actions for the HR module. Dispatched from index.ts
+// #252 — Ergani II (ΠΣ Ergani) integration actions for the HR module. Dispatched from index.ts
 // after the caller is bound to the workspace + entitlement + hr.view. Every submission requires
-// hr.manage. All calls run under the workspace's OWN Εργάνη credentials (workspace_ergani_credentials).
+// hr.manage. All calls run under the workspace's OWN Ergani credentials (workspace_ergani_credentials).
 //
 // Coverage vs the API guide (§6):
 //  • Work Card (WRKCardSE) — fully modelled (the guide documents its exact JSON schema).
@@ -35,7 +35,7 @@ function json(body: any, status = 200): Response {
 /** Resolve the workspace's Ergani credentials or fail with a clear "not configured". */
 async function client(ctx: ErganiCtx): Promise<ErganiCredentials> {
   const creds = await resolveErganiCredentials(ctx.supabase, ctx.workspaceId);
-  if (!creds) throw new HttpError(400, 'ergani_not_configured: add your Εργάνη credentials in Profile → Keys first.');
+  if (!creds) throw new HttpError(400, 'ergani_not_configured: add your Ergani credentials in Profile → Keys first.');
   return creds;
 }
 
@@ -96,7 +96,7 @@ async function resolveCode(creds: ErganiCredentials, ws: string, kind: string): 
   if (kind === 'leave') {
     const hit = subs.find((s) => /άδει/i.test(s.description) || /leave/i.test(s.description));
     if (hit) return hit.code;
-    throw new HttpError(400, 'Could not find an active Leave submission type for this employer in Εργάνη.');
+    throw new HttpError(400, 'Could not find an active Leave submission type for this employer in Ergani.');
   }
   throw new HttpError(400, `Unknown submission kind: ${kind}`);
 }
@@ -226,11 +226,11 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       if (!abs) return json({ error: 'absence not found in this workspace' }, 404);
 
       const leaveCode = String(body?.ergani_leave_code ?? abs.ergani_leave_code ?? '').trim();
-      if (!leaveCode) return json({ error: 'ergani_leave_code is required (pick the Εργάνη leave type).' }, 400);
+      if (!leaveCode) return json({ error: 'ergani_leave_code is required (pick the Ergani leave type).' }, 400);
       const emp = await loadEmployee(ctx, abs.employee_id);
       if (!emp.afm) return json({ error: 'Employee has no ΑΦΜ (set the contact VAT number first).' }, 400);
       const creds = await client(ctx);
-      if (!creds.employerAfm) return json({ error: 'employer_afm is not set in your Εργάνη credentials.' }, 400);
+      if (!creds.employerAfm) return json({ error: 'employer_afm is not set in your Ergani credentials.' }, 400);
       const code = await resolveCode(creds, workspaceId, 'leave');
 
       const [lastName, ...rest] = emp.name.split(' ');

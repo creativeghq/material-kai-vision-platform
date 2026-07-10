@@ -30,6 +30,8 @@ export interface SidebarNavItem {
   requireCapability?: Capability;
   /** Optional module gate. When set, item is only shown if the referenced module is enabled. */
   moduleSlug?: string;
+  /** One-line description shown on the App Launcher / /apps cards (for surface:'app' items). */
+  description?: string;
   /**
    * Where the item renders (#251 App Launcher IA):
    * - `'top'` (default) → the lean top nav bar (universal surfaces).
@@ -55,21 +57,21 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
 
   // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251) ──
   // #209 — Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
-  { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app' },
-  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app' },
-  { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app' },
+  { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', description: 'Shared inbox for customer conversations.' },
+  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app', description: 'Plan and manage design projects.' },
+  { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', description: 'Build and send client quotes.' },
   // #201 — Sales portal for invited reps (persona 'sales').
-  { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app' },
+  { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', description: 'Sales-rep portal for quotes.' },
   // Business-workspace surfaces — gated through the #195 capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance. Part of #174.
-  { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app' },
-  { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app' },
+  { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', description: 'Contacts, companies, and leads.' },
+  { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', description: 'Invoices, payments, and reports.' },
   // #252 — HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
   // hr.view (owner/admin, not plain members — employee salary/absence data is sensitive).
-  { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app' },
+  { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app', description: 'Employees, absences, and HR documents.' },
   // #252 — employee self-service. hr.self is held ONLY by the 'employee' persona, so this shows
   // for invited employees (never owners/admins, who use the full HR above).
-  { id: 'my-hr', label: 'My HR', path: '/my-hr', icon: UserCircle, requireCapability: 'hr.self', surface: 'app' },
+  { id: 'my-hr', label: 'My HR', path: '/my-hr', icon: UserCircle, requireCapability: 'hr.self', surface: 'app', description: 'Your payslips, absences, and requests.' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',
@@ -77,6 +79,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     icon: BarChart3,
     requireRole: 'factory',
     surface: 'app',
+    description: 'Supplier demand and engagement analytics.',
   },
   // Blueprints (#242) live under Projects. Supplier portal (#247) lives under Finance → Payables /
   // Profile → Supplier Portal. Admin moved to the profile menu (operator-only). Network is on the

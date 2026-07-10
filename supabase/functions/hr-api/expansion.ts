@@ -1005,7 +1005,7 @@ export async function handleSelfService(action: string, ctx: SelfCtx): Promise<R
       return json({ documents: data ?? [] });
     }
     // Employee self clock-in/out → Work Card (WRKCardSE), scoped hard to the caller's OWN record.
-    // Records the punch locally and files it to Εργάνη when the workspace has credentials configured.
+    // Records the punch locally and files it to Ergani when the workspace has credentials configured.
     case 'self-clock': {
       const punchType = String(body?.punch_type ?? '');
       if (!['arrival', 'departure'].includes(punchType)) return json({ error: "punch_type must be 'arrival' or 'departure'" }, 400);

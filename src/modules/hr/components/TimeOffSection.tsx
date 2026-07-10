@@ -17,7 +17,7 @@ import { SectionHeader, EmptyState } from './_shared';
 const absVariant: Record<AbsenceStatus, 'default' | 'secondary' | 'destructive'> = { approved: 'default', pending: 'secondary', rejected: 'destructive' };
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
 
-/** Sensible default Εργάνη leave code per our absence type (operator can change it before filing). */
+/** Sensible default Ergani leave code per our absence type (operator can change it before filing). */
 const DEFAULT_LEAVE_CODE: Record<AbsenceType, string> = { vacation: 'ΑΔΚΑΝ', sick: 'ΑΔΑΣ', unpaid: 'ΑΔΑΑ', other: 'ΑΔΑΛ' };
 
 export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string | null; canManage: boolean }) {
@@ -26,7 +26,7 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
-  // Εργάνη: whether this workspace has configured credentials + the leave-code catalog + filed rows.
+  // Ergani: whether this workspace has configured credentials + the leave-code catalog + filed rows.
   const [erganiOn, setErganiOn] = useState(false);
   const [leaveTypes, setLeaveTypes] = useState<ErganiLeaveType[]>([]);
   const [erganiByAbsence, setErganiByAbsence] = useState<Map<string, ErganiSubmission>>(new Map());
@@ -77,7 +77,7 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
         <CardContent className="p-0">
           {absences.length === 0 ? <EmptyState icon={CalendarDays} title="No time off recorded" /> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Type</TableHead><TableHead>From</TableHead><TableHead>To</TableHead><TableHead className="text-right">Days</TableHead><TableHead>Status</TableHead>{erganiOn && <TableHead>Εργάνη</TableHead>}<TableHead /></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Type</TableHead><TableHead>From</TableHead><TableHead>To</TableHead><TableHead className="text-right">Days</TableHead><TableHead>Status</TableHead>{erganiOn && <TableHead>Ergani</TableHead>}<TableHead /></TableRow></TableHeader>
               <TableBody>
                 {absences.map((a) => {
                   const filing = erganiByAbsence.get(a.id);
@@ -175,7 +175,7 @@ function LogAbsenceDialog({ workspaceId, employees, onDone }: { workspaceId: str
   );
 }
 
-/** File an approved absence to ΠΣ Εργάνη as a leave declaration (picks the exact Εργάνη leave code). */
+/** File an approved absence to ΠΣ Ergani as a leave declaration (picks the exact Ergani leave code). */
 function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspaceId: string; absence: Absence; leaveTypes: ErganiLeaveType[]; onDone: () => void }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -187,10 +187,10 @@ function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspa
     setSaving(true);
     try {
       const res = await hrService.submitLeave(workspaceId, { absence_id: absence.id, ergani_leave_code: code });
-      toast({ title: 'Filed to Εργάνη', description: `Protocol ${res.result.protocol}` });
+      toast({ title: 'Filed to Ergani', description: `Protocol ${res.result.protocol}` });
       setOpen(false); onDone();
     } catch (e) {
-      toast({ title: 'Εργάνη filing failed', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Ergani filing failed', description: (e as Error).message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -200,14 +200,14 @@ function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspa
         <Button size="sm" variant="outline" className="rounded-full h-7 text-xs"><Send className="h-3.5 w-3.5 mr-1" />File</Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>File leave to Εργάνη</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>File leave to Ergani</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
             Files this approved absence ({absence.start_date} → {absence.end_date}) as an official leave declaration
-            under your workspace's Εργάνη account. Pick the exact ministry leave type.
+            under your workspace's Ergani account. Pick the exact ministry leave type.
           </p>
           <div className="space-y-1">
-            <Label>Εργάνη leave type *</Label>
+            <Label>Ergani leave type *</Label>
             <Select value={code} onValueChange={setCode}>
               <SelectTrigger><SelectValue placeholder="Select leave code" /></SelectTrigger>
               <SelectContent className="max-h-72">
@@ -216,12 +216,12 @@ function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspa
             </Select>
           </div>
           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-            <ExternalLink className="h-3 w-3" /> A protocol number is returned and stored on success; Εργάνη validation errors are shown here.
+            <ExternalLink className="h-3 w-3" /> A protocol number is returned and stored on success; Ergani validation errors are shown here.
           </p>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}File to Εργάνη</Button>
+          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}File to Ergani</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

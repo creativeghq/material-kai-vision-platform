@@ -1,6 +1,6 @@
 /**
- * Per-workspace ΠΣ Εργάνη ΙΙ (Ergani) Web API credentials. Admin-gated; each tenant submits
- * workforce declarations (work card, leaves, E3 hires, schedules) under its OWN e-ΕΦΚΑ "Εργάνη"
+ * Per-workspace ΠΣ Ergani ΙΙ (Ergani) Web API credentials. Admin-gated; each tenant submits
+ * workforce declarations (work card, leaves, E3 hires, schedules) under its OWN e-ΕΦΚΑ "Ergani"
  * account. The password is stored in workspace_ergani_credentials (RLS: workspace admin) and never
  * returned to the browser — only `has_password` via the masked get_ergani_creds_status RPC.
  *
@@ -51,7 +51,7 @@ export const ErganiCredentialsCard: React.FC<{ workspaceId: string }> = ({ works
 
   const save = async () => {
     if (!username.trim()) {
-      toast({ title: 'Username required', description: 'Enter your Εργάνη Web API username.', variant: 'destructive' });
+      toast({ title: 'Username required', description: 'Enter your Ergani Web API username.', variant: 'destructive' });
       return;
     }
     setSaving(true);
@@ -67,7 +67,7 @@ export const ErganiCredentialsCard: React.FC<{ workspaceId: string }> = ({ works
       });
       if (password.trim()) setHasPassword(true);
       setPassword('');
-      toast({ title: 'Εργάνη credentials saved' });
+      toast({ title: 'Ergani credentials saved' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
@@ -78,25 +78,25 @@ export const ErganiCredentialsCard: React.FC<{ workspaceId: string }> = ({ works
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><KeyRound className="h-4 w-4" /> Εργάνη — Ministry of Labour (HR filings)</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><KeyRound className="h-4 w-4" /> Ergani — Ministry of Labour (HR filings)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">
-          Enter your business's <strong>ΠΣ Εργάνη Web API</strong> credentials so the platform can file
+          Enter your business's <strong>ΠΣ Ergani Web API</strong> credentials so the platform can file
           work-card punches, leaves, E3 hires and work-time schedules on your behalf. Managed via the{' '}
           <a href={ERGANI_PORTAL} target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">
-            Εργάνη portal <ExternalLink className="h-3 w-3" />
+            Ergani portal <ExternalLink className="h-3 w-3" />
           </a>. Every filing runs under <strong>your</strong> e-ΕΦΚΑ account. Use <strong>Trial</strong> first —
           those submissions are stamped «ΑΚΥΡΟ» and carry no legal effect.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Username</Label>
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Εργάνη username" autoComplete="off" />
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ergani username" autoComplete="off" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Password</Label>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder={hasPassword ? '•••••••• (configured — blank keeps it)' : 'Εργάνη password'} />
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder={hasPassword ? '•••••••• (configured — blank keeps it)' : 'Ergani password'} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Employer ΑΦΜ <span className="text-muted-foreground">(f_afm_ergodoti)</span></Label>

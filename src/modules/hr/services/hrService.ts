@@ -22,7 +22,7 @@ export interface EmployeeContact {
   position: string | null;
   department: string | null;
   date_of_birth: string | null;
-  vat_number?: string | null; // ΑΦΜ — used for Εργάνη filings
+  vat_number?: string | null; // ΑΦΜ — used for Ergani filings
 }
 
 export interface Employee {
@@ -41,7 +41,7 @@ export interface Employee {
   monthly_salary: number | null;
   hourly_rate: number | null;
   salary_currency: string | null;
-  amka: string | null; // ΑΜΚΑ — social-security number, for Εργάνη filings
+  amka: string | null; // ΑΜΚΑ — social-security number, for Ergani filings
   dependent_children: number; // drives the payroll income-tax credit
   work_start_time: string | null;
   work_end_time: string | null;
@@ -245,7 +245,7 @@ export const APP_STAGE_LABELS: Record<AppStage, string> = { applied: 'Applied', 
 export const APP_STAGES: AppStage[] = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
 export const DOC_TYPE_LABELS: Record<DocType, string> = { contract: 'Contract', id: 'ID / Tax', certificate: 'Certificate', payslip: 'Payslip', review: 'Review', other: 'Other' };
 
-// ── Ergani II (ΠΣ Εργάνη) integration types ──
+// ── Ergani II (ΠΣ Ergani) integration types ──
 export type ErganiEnv = 'trial' | 'production';
 export interface ErganiCredsStatus {
   username: string | null; employer_afm: string | null; branch_aa: string; usertype: string;
@@ -370,7 +370,7 @@ class HrService {
   requestSelfTimeoff(ws: string, input: { absence_type: AbsenceType; start_date: string; end_date: string; note?: string }): Promise<{ absence: SelfAbsence }> { return call(ws, 'self-request-timeoff', input); }
   selfDocuments(ws: string): Promise<{ documents: SelfDocument[] }> { return call(ws, 'self-documents'); }
   signSelfDocument(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'self-sign-document', { document_id }); }
-  // Employee self clock-in/out (Work Card). Records the punch and files to Εργάνη when configured.
+  // Employee self clock-in/out (Work Card). Records the punch and files to Ergani when configured.
   selfClock(ws: string, input: { punch_type: 'arrival' | 'departure'; comments?: string }): Promise<SelfClockResult> { return call(ws, 'self-clock', input); }
   selfPunches(ws: string, days = 14): Promise<{ punches: SelfPunch[] }> { return call(ws, 'self-punches', { days }); }
 
@@ -382,7 +382,7 @@ class HrService {
   saveHrSettings(ws: string, settings: Partial<HrSettings>): Promise<{ settings: HrSettings }> { return call(ws, 'save-hr-settings', settings as Record<string, unknown>); }
   listNotifyCandidates(ws: string): Promise<{ candidates: NotifyCandidate[] }> { return call(ws, 'list-notify-candidates'); }
 
-  // ── Ergani II (ΠΣ Εργάνη) integration ──────────────────────────────────────
+  // ── Ergani II (ΠΣ Ergani) integration ──────────────────────────────────────
   // Credentials are stored per-workspace in workspace_ergani_credentials (RLS: workspace admin).
   // Config status comes from the masked get_ergani_creds_status RPC (never returns the password).
   async getErganiStatus(ws: string): Promise<ErganiCredsStatus | null> {

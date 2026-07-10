@@ -97,7 +97,7 @@ export function useLauncherApps(): LauncherApi {
         label: i.label,
         icon: i.icon,
         path: i.path,
-        description: cat?.summary || cat?.description || undefined,
+        description: cat?.summary || cat?.description || i.description || undefined,
         active,
         isAddon: cat?.is_addon,
         priceLabel: cat?.is_addon ? (formatAddonPrice(cat.addon_price_cents, cat.addon_currency) || undefined) : undefined,

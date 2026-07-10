@@ -54,7 +54,7 @@ export default function EmployeeSelfServicePage() {
       const r = await hrService.selfClock(ws, { punch_type });
       toast({
         title: punch_type === 'arrival' ? 'Clocked in' : 'Clocked out',
-        description: r.filed ? `Filed to Εργάνη · protocol ${r.protocol}` : `Recorded${r.reason ? ` · not filed to Εργάνη (${r.reason})` : ''}`,
+        description: r.filed ? `Filed to Ergani · protocol ${r.protocol}` : `Recorded${r.reason ? ` · not filed to Ergani (${r.reason})` : ''}`,
       });
       load();
     } catch (e) { toast({ title: 'Clock failed', description: (e as Error).message, variant: 'destructive' }); }
@@ -110,7 +110,7 @@ export default function EmployeeSelfServicePage() {
                   {currentlyIn ? 'Clock out' : 'Clock in'}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center max-w-xs">
-                  Records your arrival/departure and files the Digital Work Card to Εργάνη when your employer has it configured.
+                  Records your arrival/departure and files the Digital Work Card to Ergani when your employer has it configured.
                 </p>
               </CardContent>
             </Card>
@@ -127,7 +127,7 @@ export default function EmployeeSelfServicePage() {
                           <span className="text-muted-foreground">{new Date(p.punched_at).toLocaleString()}</span>
                         </div>
                         <Badge variant={p.status === 'submitted' ? 'default' : p.status === 'failed' ? 'destructive' : 'secondary'} title={p.ergani_protocol ?? ''}>
-                          {p.status === 'submitted' ? `Εργάνη · ${p.ergani_protocol ?? 'filed'}` : p.status === 'failed' ? 'Εργάνη failed' : 'Recorded'}
+                          {p.status === 'submitted' ? `Ergani · ${p.ergani_protocol ?? 'filed'}` : p.status === 'failed' ? 'Ergani failed' : 'Recorded'}
                         </Badge>
                       </div>
                     ))}

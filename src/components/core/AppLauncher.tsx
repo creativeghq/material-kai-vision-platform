@@ -41,7 +41,7 @@ export const AppLauncher: React.FC = () => {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="w-[22rem] p-0 rounded-2xl shadow-xl border-border/60"
+        className="w-[24rem] sm:w-[27rem] p-0 rounded-2xl shadow-xl border-border/60"
       >
         {/* Radix caret pointing at the trigger — must sit outside the clipped wrapper below. */}
         <PopoverPrimitive.Arrow className="fill-popover" width={16} height={8} />
@@ -69,29 +69,24 @@ export const AppLauncher: React.FC = () => {
             </div>
           ) : (
             <>
-              {active.map((app) => (
-                <button
-                  key={app.id}
-                  onClick={() => go(app.path)}
-                  className="group w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/60 transition-colors cursor-pointer"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
-                    <app.icon className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="text-sm font-medium truncate">{app.label}</span>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
+              {active.length > 0 && (
+                <div className="grid grid-cols-3 gap-1 p-2">
+                  {active.map((app) => (
+                    <button
+                      key={app.id}
+                      onClick={() => go(app.path)}
+                      title={app.description || app.label}
+                      className="group flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center hover:bg-muted/60 transition-colors cursor-pointer"
+                    >
+                      <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
+                        <app.icon className="h-5 w-5" />
+                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-popover" title="Active" />
                       </span>
-                    </span>
-                    {app.description && (
-                      <span className="block text-xs text-muted-foreground truncate">{app.description}</span>
-                    )}
-                  </span>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                </button>
-              ))}
+                      <span className="text-xs font-medium leading-tight line-clamp-2 w-full">{app.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {available.length > 0 && (
                 <>
