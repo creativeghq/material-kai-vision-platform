@@ -73,13 +73,6 @@ export interface Absence {
   employee?: { id: string; crm_contact_id: string; contact: { id: string; name: string } | null } | null;
 }
 
-export interface HrOverview {
-  headcount: number;
-  active_count: number;
-  on_leave_today: number;
-  total_absence_days: number;
-  days_by_type: Record<string, number>;
-}
 
 export interface CreateEmployeeInput {
   // Provide either an existing contact to attach…
@@ -287,9 +280,6 @@ class HrService {
   listEmployees(workspaceId: string): Promise<{ employees: Employee[] }> {
     return call(workspaceId, 'list-employees');
   }
-  getEmployee(workspaceId: string, employeeId: string): Promise<{ employee: Employee }> {
-    return call(workspaceId, 'get-employee', { employee_id: employeeId });
-  }
   createEmployee(workspaceId: string, input: CreateEmployeeInput): Promise<{ employee: Employee }> {
     return call(workspaceId, 'create-employee', input as unknown as Record<string, unknown>);
   }
@@ -307,9 +297,6 @@ class HrService {
   }
   rejectAbsence(workspaceId: string, absenceId: string): Promise<{ absence: Absence }> {
     return call(workspaceId, 'reject-absence', { absence_id: absenceId });
-  }
-  overview(workspaceId: string): Promise<{ overview: HrOverview }> {
-    return call(workspaceId, 'overview');
   }
   analytics(workspaceId: string): Promise<{ analytics: HrAnalytics }> {
     return call(workspaceId, 'analytics');

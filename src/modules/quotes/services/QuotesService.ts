@@ -379,6 +379,9 @@ export class QuotesService {
         flowEventService.emit(eventName, {
           quote_id: quote.id,
           user_id: quote.user_id,
+          // Without workspace_id the flow-engine can only match GLOBAL flows for a user caller, so a
+          // tenant's own quote_approved/rejected automation would silently never fire. (#256)
+          workspace_id: quote.workspace_id,
           admin_ids: adminIds,
           type: accepted ? 'quote_accepted' : 'quote_rejected',
           title: accepted ? `Quote ${quoteRef} accepted` : `Quote ${quoteRef} declined`,

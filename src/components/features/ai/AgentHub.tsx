@@ -167,6 +167,12 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   product_price_history_result: 'Price history',
   projects_using_product_result: 'Projects using this product',
   products_in_project_result: 'Products in project',
+  products_by_brand_result: 'Products by brand',
+  brand_overview_result: 'Brand overview',
+  related_products_result: 'Related products',
+  find_products_by_spec_result: 'Products by spec',
+  // Purchase sheet
+  purchase_sheet_ready: 'Purchase sheet ready',
   // Trip / expense cards
   trip_card_created: 'Trip card created',
   trip_expense_added: 'Expense added',
@@ -1991,6 +1997,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     timestamp: Date.now(),
                     tool: chunk.tool,
                   },
+                ]);
+              } else if (chunk.type === 'tool_progress' && chunk.status) {
+                // Mid-tool progress lines (~60 emit sites across job/mention/price/project/sourcing/seo
+                // tools) were previously dropped on the floor in chat. Surface them as reasoning steps.
+                setReasoningSteps((prev) => [
+                  ...prev,
+                  { type: 'tool_call', message: String(chunk.status), timestamp: Date.now() },
                 ]);
               }
 

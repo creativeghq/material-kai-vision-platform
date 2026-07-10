@@ -251,5 +251,3 @@ export async function executeService(
   if (!resp.ok) throw new ErganiApiError({ status: resp.status, message: extractErrorMessage(body, resp.status) });
   return body;
 }
-
-export const ERGANI_ENDPOINTS = ENDPOINTS;

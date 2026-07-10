@@ -813,8 +813,10 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       // Core tools (all users)
       'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
-      // Docs module (#254) — internal workspace docs FTS. Tool is only pushed when the
-      // 'docs' module is active for the workspace (see push site below).
+      // Docs module (#254) — internal workspace docs FTS. Currently a free tool for all workspaces
+      // (the push site has NO entitlement gate); the docs UI is entitlement-gated but the agent tool
+      // is not. If Docs becomes a paid/gated module, add an is_workspace_entitled('docs') check at
+      // the push site. Tenancy is safe either way: workspaceId is server-derived + the FTS is scoped.
       'search_workspace_docs',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',

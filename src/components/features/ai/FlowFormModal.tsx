@@ -91,7 +91,9 @@ export function FlowFormModal({ state, onClose, onSubmit }: Props) {
     if (actionType === 'send_email') config = { to: to.trim(), subject: subject.trim(), body: body.trim() };
     else if (actionType === 'create_notification') config = { user_id: userIdField.trim(), title: title.trim(), body: body.trim(), type: 'info' };
     else if (actionType === 'send_whatsapp') config = { to: to.trim(), message: message.trim() };
-    else if (actionType === 'send_agent_message') config = { use_active_conversation: true, message: message.trim(), role: 'system' };
+    // target_user_id is REQUIRED for the engine to resolve a conversation (else it throws at runtime);
+    // default it to the user the trigger is about so the message posts to their active thread.
+    else if (actionType === 'send_agent_message') config = { use_active_conversation: true, target_user_id: '{{trigger.data.user_id}}', message: message.trim(), role: 'system' };
     else if (actionType === 'send_campaign') config = { campaign_id: campaignId.trim() };
 
     const triggerConfig = triggerType === 'scheduled' ? { cron: cron.trim(), timezone: 'UTC' } : {};
@@ -110,7 +112,7 @@ export function FlowFormModal({ state, onClose, onSubmit }: Props) {
 
   const submitDisabled =
     (actionType === 'send_email' && (!to.trim() || (!subject.trim() && !body.trim()))) ||
-    (actionType === 'create_notification' && !userIdField.trim() && !title.trim()) ||
+    (actionType === 'create_notification' && (!userIdField.trim() || !title.trim())) ||
     (actionType === 'send_whatsapp' && (!to.trim() || !message.trim())) ||
     (actionType === 'send_agent_message' && !message.trim()) ||
     (actionType === 'send_campaign' && !campaignId.trim());

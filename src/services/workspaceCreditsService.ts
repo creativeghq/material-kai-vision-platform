@@ -71,9 +71,8 @@ export const workspaceCreditsService = {
       supabase.from('workspace_member_credit_limits').select('user_id, monthly_limit').eq('workspace_id', workspaceId),
       supabase
         .from('workspace_credit_transactions')
-        .select('actor_user_id, amount')
+        .select('actor_user_id, amount, transaction_type')
         .eq('workspace_id', workspaceId)
-        .lt('amount', 0)
         .gte('created_at', monthStart()),
     ]);
     if (mErr) throw mErr;
@@ -88,10 +87,14 @@ export const workspaceCreditsService = {
       profiles = Object.fromEntries((profs ?? []).map((p) => [p.user_id, { full_name: p.full_name, email: p.email }]));
     }
     const limitByUser = Object.fromEntries((limits ?? []).map((l) => [l.user_id, l.monthly_limit]));
+    // Net spend = debits − refunds (ignore topups), floored at 0 — matches the enforcement in
+    // debit_workspace_credits / get_workspace_member_credit_status so display and cap agree.
     const spentByUser: Record<string, number> = {};
     for (const t of txns ?? []) {
       if (!t.actor_user_id) continue;
-      spentByUser[t.actor_user_id] = (spentByUser[t.actor_user_id] ?? 0) + -Number(t.amount);
+      const amt = Number(t.amount);
+      const delta = t.transaction_type === 'refund' ? -amt : amt < 0 ? -amt : 0;
+      spentByUser[t.actor_user_id] = (spentByUser[t.actor_user_id] ?? 0) + delta;
     }
 
     return (members ?? []).map((m) => ({
@@ -100,7 +103,7 @@ export const workspaceCreditsService = {
       name: profiles[m.user_id]?.full_name ?? null,
       email: profiles[m.user_id]?.email ?? null,
       monthly_limit: (limitByUser[m.user_id] as number | null) ?? null,
-      spent_this_month: spentByUser[m.user_id] ?? 0,
+      spent_this_month: Math.max(0, spentByUser[m.user_id] ?? 0),
     }));
   },
 

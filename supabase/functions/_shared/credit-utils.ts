@@ -323,10 +323,14 @@ export async function debitAgentChatTurn(
 
   const result = Array.isArray(data) ? data[0] : data;
   if (!result?.success) {
+    // debit_credits surfaces 'Insufficient credits…' (personal) / 'insufficient_pool_balance' /
+    // 'member_limit_exceeded' (pool) — normalise any of them to the clean 402 code the caller expects.
+    const raw = String(result?.error_message ?? '');
+    const isInsufficient = /insufficient|member_limit_exceeded/i.test(raw);
     return {
       success: false,
       credits_debited: 0,
-      error: result?.error_message === 'Insufficient balance' ? 'insufficient_credits' : (result?.error_message || 'debit_failed'),
+      error: isInsufficient ? 'insufficient_credits' : (raw || 'debit_failed'),
     };
   }
 

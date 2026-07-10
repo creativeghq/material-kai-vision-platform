@@ -56,14 +56,6 @@ export async function callClaudeTool(contentBlocks: any[], tool: any, maxTokens 
   };
 }
 
-/** How many whole credits a given token usage costs (usage-based, min 1). */
-export function creditsForUsage(model: string, usage: ClaudeUsage): number {
-  const p = priceFor(model);
-  const rawUsd = (usage.input_tokens / 1_000_000) * p.input + (usage.output_tokens / 1_000_000) * p.output;
-  const billedUsd = rawUsd * MARKUP_MULTIPLIER;
-  return Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
-}
-
 /**
  * Reserve (debit up front) a conservative credit ceiling BEFORE the upstream LLM call, per security
  * invariant #10 ("debit + rate-limit BEFORE the upstream call, not after"). An unlocked balance

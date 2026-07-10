@@ -99,6 +99,22 @@ serve(withApiLogging('campaign-processor', async (req) => {
     let totalProcessed = 0;
 
     for (const campaign of sendingCampaigns || []) {
+      // Server-side paywall: email-marketing is a paid add-on. The route/UI is entitlement-gated on
+      // the client, but the cron must enforce it too — otherwise a workspace with an operator + BYOK
+      // could drive sends without owning the module. Skip (don't burn recipients) if not entitled.
+      if (campaign.workspace_id) {
+        const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
+          p_workspace_id: campaign.workspace_id, p_module_slug: 'email-marketing',
+        });
+        if (entitled !== true) {
+          await blockCampaign(
+            supabase, campaign, 'not_entitled',
+            'The Email Marketing add-on is not active for this workspace.',
+          );
+          continue;
+        }
+      }
+
       // BYOK is mandatory for marketing. Short-circuit before touching recipients so a
       // mis-configured workspace doesn't churn the whole list into `failed`.
       if (!(await workspaceHasByok(supabase, campaign.workspace_id))) {
