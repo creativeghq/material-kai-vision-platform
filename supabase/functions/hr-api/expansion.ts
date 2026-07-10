@@ -7,8 +7,9 @@ import { HttpError } from '../_shared/api-logger.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
-import { generatePayslips } from './payslip.ts';
 import { callClaudeTool, meterHrAi, creditBalance, base64FromBytes } from './ai-meter.ts';
+// NOTE: payslip.ts (→ pdf-lib + fontkit, heavy) is imported LAZILY inside the generate-payslips
+// case so the common read paths (analytics, lists) don't pay its cold-start cost on every call.
 
 // Conservative pre-check ceilings ONLY — the ACTUAL charge is usage-based (see ./ai-meter.ts).
 const JOBDESC_MAX_CREDITS = 12;
@@ -697,6 +698,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       requireManage();
       const rid = String(body?.run_id ?? '');
       if (!rid) return json({ error: 'run_id is required' }, 400);
+      const { generatePayslips } = await import('./payslip.ts'); // lazy: pulls pdf-lib only when needed
       return await generatePayslips(supabase, workspaceId, userId, rid);
     }
     case 'get-payroll-settings': {

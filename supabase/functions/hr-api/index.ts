@@ -73,21 +73,14 @@ function businessDaysInclusive(startISO: string, endISO: string): number {
 async function resolveHrAccess(
   supabase: any, userId: string, workspaceId: string,
 ): Promise<{ canView: boolean; canManage: boolean }> {
-  const { data: prof } = await supabase
-    .from('user_profiles')
-    .select('roles!user_profiles_role_id_fkey(name)')
-    .eq('user_id', userId)
-    .maybeSingle();
+  // Both lookups are independent — run concurrently (the global-role short-circuit is applied on the
+  // resolved results, so a global admin just wastes one cheap membership read rather than a round-trip).
+  const [{ data: prof }, { data: mem }] = await Promise.all([
+    supabase.from('user_profiles').select('roles!user_profiles_role_id_fkey(name)').eq('user_id', userId).maybeSingle(),
+    supabase.from('workspace_members').select('role').eq('workspace_id', workspaceId).eq('user_id', userId).eq('status', 'active').maybeSingle(),
+  ]);
   const globalRole = (prof as any)?.roles?.name;
   if (globalRole && ['admin', 'super_admin'].includes(globalRole)) return { canView: true, canManage: true };
-
-  const { data: mem } = await supabase
-    .from('workspace_members')
-    .select('role')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .maybeSingle();
   const role = (mem as any)?.role;
   if (role === 'owner' || role === 'admin') return { canView: true, canManage: true };
   return { canView: false, canManage: false };
@@ -163,14 +156,22 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
   if (!action) return json({ error: 'action is required' }, 400);
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
 
+  // Gates 1–2 are mutually independent DB checks — fire them concurrently, but EVALUATE in strict
+  // priority order (access 404 → module 404 → entitlement 402) so responses/enumeration-safety are
+  // identical to the sequential version. All three helpers resolve (never throw), so no unhandled
+  // rejection when we short-circuit before awaiting a later one.
+  const accessP = userCanAccessWorkspace(supabase, userId, workspaceId);
+  const moduleP = isModuleEnabled(supabase, 'hr');
+  const entP = assertEntitled(supabase, workspaceId, 'hr');
+
   // 1) Bind caller ↔ workspace (service-role client bypasses RLS — this is the real tenancy gate).
-  if (!(await userCanAccessWorkspace(supabase, userId, workspaceId))) {
+  if (!(await accessP)) {
     // 404 (not 403) to avoid workspace-id enumeration.
     return json({ error: 'not found' }, 404);
   }
   // 2) Module gates: global publish switch + per-workspace entitlement (402 upsell).
-  if (!(await isModuleEnabled(supabase, 'hr'))) throw new HttpError(404, 'HR module is not available');
-  const ent = await assertEntitled(supabase, workspaceId, 'hr');
+  if (!(await moduleP)) throw new HttpError(404, 'HR module is not available');
+  const ent = await entP;
   if (!ent.ok) return ent.response;
 
   // 2.5) Employee SELF-SERVICE (prefix 'self-'). An invited employee (workspace role 'employee')
