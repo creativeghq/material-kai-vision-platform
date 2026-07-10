@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { CreditsService } from '@/services/credits.service';
 import { StripeService, calculateCreditsForAmount } from '@/services/stripe.service';
+import { CreditUsageHistory } from './CreditUsageHistory';
 
 const creditsService = new CreditsService();
 const stripeService = new StripeService();
@@ -98,6 +99,9 @@ export const CreditsTab: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Usage & spend history */}
+      <CreditUsageHistory />
 
       {/* Buy Credits */}
       <Card className="rounded-2xl" id="buy-credits-card">

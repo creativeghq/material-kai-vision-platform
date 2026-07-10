@@ -41,6 +41,20 @@ export interface AIUsageLog {
   created_at: string;
 }
 
+export interface CreditSpendCategory {
+  operation_type: string;
+  total_spent: number;
+  txn_count: number;
+}
+
+export interface CreditSpendSummary {
+  window_days: number;
+  total_spent: number;
+  total_added: number;
+  txn_count: number;
+  by_category: CreditSpendCategory[];
+}
+
 export interface DebitResult {
   success: boolean;
   new_balance: number;
@@ -53,6 +67,31 @@ export interface GrantResult {
   new_balance: number;
   transaction_id?: string;
   error_message?: string;
+}
+
+/**
+ * Maps a raw operation_type / transaction_type token into a human-friendly
+ * category label for the usage-history UI. Prefix-matched so new sub-operations
+ * (e.g. job_research.*) group without a code change.
+ */
+export function creditOperationCategory(op: string | null | undefined): string {
+  const key = (op ?? '').toLowerCase();
+  if (!key) return 'Other';
+
+  const startsWith = (...prefixes: string[]) => prefixes.some((p) => key.startsWith(p));
+
+  if (startsWith('agent_chat')) return 'AI Assistant';
+  if (startsWith('interior_video', 'veo_')) return 'Video Generation';
+  if (startsWith('interior_')) return 'Interior Design';
+  if (startsWith('gemini_')) return 'Image Generation';
+  if (startsWith('vr_', 'worldlabs')) return '3D / VR Worlds';
+  if (startsWith('image_segment', 'sam-segment', 'pbr', 'generate-pbr')) return 'Image & Material Tools';
+  if (startsWith('presentation_sheet')) return 'Presentation Sheets';
+  if (startsWith('job_research')) return 'Job Research';
+  if (startsWith('mention_monitoring')) return 'Mention Monitoring';
+  if (startsWith('price', 'public_price', 'market')) return 'Price Monitoring';
+  if (startsWith('seo')) return 'SEO Toolkit';
+  return 'Other';
 }
 
 export const creditsAPI = {
@@ -104,6 +143,26 @@ export const creditsAPI = {
     if (error) throw error;
 
     return { data: data || [], count: count || 0 };
+  },
+
+  /**
+   * Get a categorized spend summary for the authenticated user over a rolling window.
+   * Backed by the get_my_credit_spend_summary RPC (scoped to auth.uid()).
+   */
+  async getSpendSummary(days = 30): Promise<CreditSpendSummary> {
+    const { data, error } = await supabase.rpc('get_my_credit_spend_summary', {
+      p_days: days,
+    });
+
+    if (error) throw error;
+
+    return (data as CreditSpendSummary) ?? {
+      window_days: days,
+      total_spent: 0,
+      total_added: 0,
+      txn_count: 0,
+      by_category: [],
+    };
   },
 
   /**
@@ -221,8 +280,12 @@ export class CreditsService {
     return creditsAPI.getBalance();
   }
 
-  async getTransactions(limit?: number) {
-    return creditsAPI.getTransactions(limit);
+  async getTransactions(limit?: number, offset?: number) {
+    return creditsAPI.getTransactions(limit, offset);
+  }
+
+  async getSpendSummary(days?: number) {
+    return creditsAPI.getSpendSummary(days);
   }
 
   async getUsageLogs(limit?: number) {
