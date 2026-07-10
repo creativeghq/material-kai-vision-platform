@@ -67,9 +67,10 @@ async function reserveTransmission(
   const { data: ws } = await supabase.from('workspaces').select('is_root').eq('id', workspaceId).single();
   if (ws?.is_root || !userId) return { ok: true, refund: async () => {} }; // operator root transmits free
 
-  const { data, error } = await supabase.rpc('debit_user_credits', {
+  const { data, error } = await supabase.rpc('debit_credits', {
     p_user_id: userId, p_amount: TRANSMISSION_CREDITS,
     p_operation_type: 'einvoice_transmission', p_description: description,
+    p_workspace_id: workspaceId ?? null,
   });
   const row = Array.isArray(data) ? data[0] : data;
   if (error || !row?.success) {
@@ -83,10 +84,11 @@ async function reserveTransmission(
   return {
     ok: true,
     refund: async () => {
-      const { error: rErr } = await supabase.rpc('credit_user_credits', {
+      const { error: rErr } = await supabase.rpc('refund_credits', {
         p_user_id: userId, p_amount: TRANSMISSION_CREDITS,
         p_operation_type: 'einvoice_transmission_refund',
         p_description: `Refund — ${description} (transmission not completed)`,
+        p_workspace_id: workspaceId ?? null,
       });
       // A failed refund credits the USER's favour, never the platform's — log loudly for
       // manual reconciliation but do not fail the request over it.

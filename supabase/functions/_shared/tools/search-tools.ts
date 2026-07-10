@@ -513,12 +513,13 @@ ${scrapeResult.markdown.substring(0, 8000)}
             const billedCost = rawCost * 1.50;
             const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
 
-            await supabase.rpc('debit_user_credits', {
+            await supabase.rpc('debit_credits', {
               p_user_id: userId,
               p_amount: creditsToDebit,
               p_operation_type: 'analyze_inspiration_url_haiku',
               p_description: 'Claude Haiku design-token extraction',
               p_metadata: { url, focus },
+              p_workspace_id: null,
             });
             await supabase.from('ai_usage_logs').insert({
               user_id: userId,

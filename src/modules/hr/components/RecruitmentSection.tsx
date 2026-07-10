@@ -17,6 +17,7 @@ import {
   APP_STAGE_LABELS, APP_STAGES, POSTING_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS,
 } from '../services/hrService';
 import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
+import { parseDecimal } from '@/utils/decimal';
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'outline'> = { open: 'default', draft: 'secondary', closed: 'outline' };
 
@@ -291,7 +292,7 @@ function JobDialog({ workspaceId, departments, onDone }: { workspaceId: string; 
       await hrService.createJobPosting(workspaceId, {
         title: f.title.trim(), department_id: f.department_id || null, employment_type: f.employment_type, location: f.location.trim() || null, remote: f.remote,
         description: f.description || null, requirements: f.requirements || null,
-        salary_min: f.salary_min ? Number(f.salary_min) : null, salary_max: f.salary_max ? Number(f.salary_max) : null, status,
+        salary_min: parseDecimal(f.salary_min), salary_max: parseDecimal(f.salary_max), status,
       });
       toast({ title: status === 'open' ? 'Job published' : 'Draft saved' }); setOpen(false); reset(); onDone();
     } catch (e) { toast({ title: 'Could not save', description: (e as Error).message, variant: 'destructive' }); }
@@ -337,8 +338,8 @@ function JobDialog({ workspaceId, departments, onDone }: { workspaceId: string; 
           <div className="space-y-1"><Label>Description</Label><Textarea rows={6} value={f.description} onChange={(e) => upd('description', e.target.value)} placeholder="Role overview & responsibilities (markdown)" /></div>
           <div className="space-y-1"><Label>Requirements</Label><Textarea rows={4} value={f.requirements} onChange={(e) => upd('requirements', e.target.value)} /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Salary min</Label><Input type="number" value={f.salary_min} onChange={(e) => upd('salary_min', e.target.value)} /></div>
-            <div className="space-y-1"><Label>Salary max</Label><Input type="number" value={f.salary_max} onChange={(e) => upd('salary_max', e.target.value)} /></div>
+            <div className="space-y-1"><Label>Salary min</Label><Input type="text" inputMode="decimal" value={f.salary_min} onChange={(e) => upd('salary_min', e.target.value)} /></div>
+            <div className="space-y-1"><Label>Salary max</Label><Input type="text" inputMode="decimal" value={f.salary_max} onChange={(e) => upd('salary_max', e.target.value)} /></div>
           </div>
         </div>
         <DialogFooter>

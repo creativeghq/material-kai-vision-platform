@@ -139,12 +139,13 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
   } catch (error: any) {
     console.error('[seo-write] Error:', error);
     try {
-      await supabase.rpc('credit_user_credits', {
+      await supabase.rpc('refund_credits', {
         p_user_id: userId,
         p_amount: CREDIT_COST,
         p_operation_type: 'seo_write_refund',
         p_description: 'Refund: SEO writing failed',
         p_metadata: { error: error.message },
+        p_workspace_id: null,
       });
       console.log('[seo-write] Credits refunded');
     } catch (refundErr) {

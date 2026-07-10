@@ -73,13 +73,24 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
 
   if (action === 'apply') {
     const jobId = String(body?.job_id ?? '');
-    const name = String(body?.name ?? '').trim();
-    const email = String(body?.email ?? '').trim();
+    // Cap every field so a public caller can't store arbitrarily large rows (spam / storage abuse).
+    const name = String(body?.name ?? '').trim().slice(0, 200);
+    const email = String(body?.email ?? '').trim().slice(0, 200);
     if (!jobId || !name) return json({ error: 'Name is required.' }, 400);
     // Bot check (only enforced when configured).
     if (Deno.env.get('TURNSTILE_SECRET_KEY') && !(await verifyTurnstile(String(body?.turnstile_token ?? ''), clientIp(req)))) {
       return json({ error: 'Bot check failed — please retry.' }, 400);
     }
+    // Per-IP throttle (works even when Turnstile isn't configured): cap applications per IP per window.
+    const ip = clientIp(req);
+    const rlSince = new Date(Date.now() - CAREERS_WINDOW_MS).toISOString();
+    const { count: recent } = await supabase.from('hr_kiosk_attempts')
+      .select('*', { count: 'exact', head: true }).eq('ip', ip).eq('outcome', 'careers_apply').gte('created_at', rlSince);
+    if ((recent ?? 0) >= CAREERS_MAX_PER_WINDOW) {
+      await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'careers_rl' });
+      return json({ error: 'Too many applications from this network. Please try again later.' }, 429);
+    }
+    await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'careers_apply' });
     // Job must be open + in this workspace.
     const { data: job } = await supabase.from('hr_job_postings').select('id, status').eq('id', jobId).eq('workspace_id', ws.id).maybeSingle();
     if (!job || job.status !== 'open') return json({ error: 'This position is no longer open.' }, 404);
@@ -93,7 +104,7 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
     if (!candidateId) {
       const { data: c, error: cErr } = await supabase.from('hr_candidates').insert({
         workspace_id: ws.id, name, email: email || null,
-        phone: String(body?.phone ?? '').trim() || null, headline: String(body?.headline ?? '').trim() || null, source: 'careers_page',
+        phone: String(body?.phone ?? '').trim().slice(0, 50) || null, headline: String(body?.headline ?? '').trim().slice(0, 300) || null, source: 'careers_page',
       }).select('id').single();
       if (cErr) return json({ error: 'Could not submit application.' }, 400);
       candidateId = c.id;

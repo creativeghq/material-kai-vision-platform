@@ -410,7 +410,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
   }
 
   // Tracks a successful credit debit so the catch path can refund on downstream failure.
-  let debitInfo: { userId: string; amount: number; action: string } | null = null;
+  let debitInfo: { userId: string; amount: number; action: string; workspaceId: string | null } | null = null;
 
   try {
     const url = new URL(req.url);
@@ -516,12 +516,14 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       if (!isAdmin && auth.userId) {
         const supabaseAdmin = createClient(SUPABASE_URL(), SUPABASE_SERVICE_ROLE_KEY());
 
-        const { data: debitData, error: debitError } = await supabaseAdmin.rpc('debit_user_credits', {
+        const { data: debitData, error: debitError } = await supabaseAdmin.rpc('debit_credits', {
           p_user_id: auth.userId,
           p_amount: pricing.creditCost,
           p_operation_type: pricing.operationType,
           p_description: pricing.description,
           p_metadata: { action, gateway: 'mivaa' },
+          // Router verifies membership, so a non-member workspace_id safely falls back to personal.
+          p_workspace_id: (payload && typeof payload.workspace_id === 'string' ? payload.workspace_id : null),
         });
 
         if (debitError) {
@@ -544,7 +546,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
         console.log(`[mivaa-gateway] Debited ${pricing.creditCost} credits from user ${auth.userId} for: ${action}`);
 
         // Remember the debit so the catch / non-OK path can refund on downstream failure.
-        debitInfo = { userId: auth.userId, amount: pricing.creditCost, action };
+        debitInfo = { userId: auth.userId, amount: pricing.creditCost, action, workspaceId: (payload && typeof payload.workspace_id === 'string' ? payload.workspace_id : null) };
 
         // Log to ai_usage_logs (non-blocking)
         supabaseAdmin.from('ai_usage_logs').insert({
@@ -753,12 +755,13 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     if (debitInfo) {
       try {
         const supabaseAdmin = createClient(SUPABASE_URL(), SUPABASE_SERVICE_ROLE_KEY());
-        const { error: refundError } = await supabaseAdmin.rpc('credit_user_credits', {
+        const { error: refundError } = await supabaseAdmin.rpc('refund_credits', {
           p_user_id: debitInfo.userId,
           p_amount: debitInfo.amount,
           p_operation_type: 'refund',
           p_description: `Refund for failed MIVAA action: ${debitInfo.action}`,
           p_metadata: { action: debitInfo.action, gateway: 'mivaa', reason: 'downstream_failure' },
+          p_workspace_id: debitInfo.workspaceId,
         });
         if (refundError) {
           console.error(`[mivaa-gateway] Refund failed for user ${debitInfo.userId}:`, refundError);

@@ -164,12 +164,13 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     console.error('[seo-analyze] Error:', error);
     try {
       // Refund the analysis credit AND any auto-fix iteration credits already debited.
-      await supabase.rpc('credit_user_credits', {
+      await supabase.rpc('refund_credits', {
         p_user_id: userId,
         p_amount: ANALYSIS_CREDIT_COST + fixCreditsDebited,
         p_operation_type: 'seo_analyze_refund',
         p_description: 'Refund: SEO analysis failed',
         p_metadata: { error: error.message, fix_credits_refunded: fixCreditsDebited },
+        p_workspace_id: null,
       });
     } catch (refundErr) {
       console.error('[seo-analyze] Refund failed:', refundErr);

@@ -16,6 +16,7 @@ import {
   EMPLOYMENT_TYPE_LABELS, EMPLOYEE_STATUS_LABELS, PAY_BASIS_LABELS,
 } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { parseDecimal } from '@/utils/decimal';
 
 const statusVariant: Record<EmployeeStatus, 'default' | 'secondary' | 'outline'> = { active: 'default', on_leave: 'secondary', terminated: 'outline' };
 const empName = (e: Employee) => e.contact?.name || [e.contact?.first_name, e.contact?.last_name].filter(Boolean).join(' ') || 'Unnamed';
@@ -104,8 +105,8 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
         employment_type: f.employment_type, start_date: f.start_date || null,
         annual_leave_allowance_days: Number(f.allowance) || 0,
         department_id: f.department_id || null, pay_basis: f.pay_basis,
-        monthly_salary: f.pay_basis === 'monthly' && f.salary ? Number(f.salary) : null,
-        hourly_rate: f.pay_basis === 'hourly' && f.hourly ? Number(f.hourly) : null,
+        monthly_salary: f.pay_basis === 'monthly' ? parseDecimal(f.salary) : null,
+        hourly_rate: f.pay_basis === 'hourly' ? parseDecimal(f.hourly) : null,
         amka: f.amka.trim() || null, dependent_children: Number(f.children) || 0,
         work_start_time: f.workStart || null, work_end_time: f.workEnd || null, work_days: workDays,
       });
@@ -159,8 +160,8 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
               </Select>
             </div>
             {f.pay_basis === 'monthly'
-              ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" min={0} value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></div>
-              : <div className="space-y-1"><Label>Hourly rate</Label><Input type="number" min={0} value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></div>}
+              ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="text" inputMode="decimal" value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></div>
+              : <div className="space-y-1"><Label>Hourly rate</Label><Input type="text" inputMode="decimal" value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></div>}
           </div>
           <div className="space-y-1 w-1/2"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={f.children} onChange={(e) => upd('children', e.target.value)} /></div>
         </div>
@@ -230,8 +231,8 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
     try {
       await hrService.updateEmployee(workspaceId, {
         employee_id: employee.id, status, department_id: deptId || null, pay_basis: payBasis,
-        monthly_salary: payBasis === 'monthly' && salary ? Number(salary) : null,
-        hourly_rate: payBasis === 'hourly' && hourly ? Number(hourly) : null,
+        monthly_salary: payBasis === 'monthly' ? parseDecimal(salary) : null,
+        hourly_rate: payBasis === 'hourly' ? parseDecimal(hourly) : null,
         annual_leave_allowance_days: Number(allowance) || 0,
         amka: amka.trim() || null, dependent_children: Number(children) || 0,
         work_start_time: workStart || null, work_end_time: workEnd || null, work_days: workDays,
@@ -273,8 +274,8 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
               </Select>
             </div>
             {payBasis === 'monthly'
-              ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} /></div>
-              : <div className="space-y-1"><Label>Hourly rate</Label><Input type="number" min={0} value={hourly} onChange={(e) => setHourly(e.target.value)} /></div>}
+              ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="text" inputMode="decimal" value={salary} onChange={(e) => setSalary(e.target.value)} /></div>
+              : <div className="space-y-1"><Label>Hourly rate</Label><Input type="text" inputMode="decimal" value={hourly} onChange={(e) => setHourly(e.target.value)} /></div>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Annual leave (days)</Label><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>

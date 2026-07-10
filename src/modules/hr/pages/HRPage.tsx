@@ -46,6 +46,21 @@ export default function HRPage() {
 
   if (wsLoading) return <div className="p-6"><Skeleton className="h-64 w-full" /></div>;
 
+  // The nav link is hidden for non-HR users, but direct navigation would otherwise render the full
+  // admin console (which fires PII-laden loads the server then 403s). Gate the page on hr.view.
+  if (!can('hr.view')) {
+    return (
+      <div className="min-h-screen">
+        <PageHeader icon={Users} title="HR" subtitle="Human resources" />
+        <div className="p-6">
+          <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">
+            You don’t have access to HR for this workspace. Ask a workspace owner or admin for the HR role.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <PageHeader icon={Users} title="HR" subtitle="Employees, org, recruiting, onboarding, documents & payroll" />

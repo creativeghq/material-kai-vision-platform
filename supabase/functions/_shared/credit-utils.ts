@@ -314,12 +314,13 @@ export async function debitAgentChatTurn(
     return { success: true, credits_debited: 0 };
   }
 
-  const { data, error } = await supabase.rpc('debit_user_credits', {
+  const { data, error } = await supabase.rpc('debit_credits', {
     p_user_id: userId,
     p_amount: credits,
     p_operation_type: 'agent_chat_turn',
     p_description: `agent-chat ${agentId} (1 turn)`,
     p_metadata: { ...metadata, agent_id: agentId, billing_type: 'agent_chat_turn' },
+    p_workspace_id: null,  // partner (kai_*) per-turn fee → partner's personal balance
   });
 
   if (error) {
@@ -379,12 +380,13 @@ export async function refundAgentChatTurn(
   const credits = getAgentTurnCost(agentId);
   if (credits <= 0) return;
 
-  const { error } = await supabase.rpc('credit_user_credits', {
+  const { error } = await supabase.rpc('refund_credits', {
     p_user_id: userId,
     p_amount: credits,
     p_operation_type: 'agent_chat_turn_refund',
     p_description: `agent-chat ${agentId} refund: ${reason}`,
     p_metadata: { ...metadata, agent_id: agentId, refund_reason: reason },
+    p_workspace_id: null,
   });
   if (error) {
     console.warn(`[credit-utils] Refund failed for ${userId} agent=${agentId}: ${error.message}`);

@@ -53,12 +53,13 @@ async function debit(userId: string, amount: number, op: string, productId?: str
   if (amount <= 0) return true;
   try {
     const sb = svcClient();
-    const { data, error } = await sb.rpc('debit_user_credits', {
+    const { data, error } = await sb.rpc('debit_credits', {
       p_user_id: userId,
       p_amount: amount,
       p_operation_type: op,
       p_description: `${op} (mention monitoring agent tool)`,
       p_metadata: { feature: 'mention_monitoring_agent_tool', product_id: productId },
+      p_workspace_id: null,
     });
     if (error) {
       console.warn(`mention-tools: debit error: ${error.message}`);
@@ -106,12 +107,13 @@ async function refund(userId: string, amount: number, op: string, productId?: st
   if (amount <= 0) return;
   try {
     const sb = svcClient();
-    await sb.rpc('credit_user_credits', {
+    await sb.rpc('refund_credits', {
       p_user_id: userId,
       p_amount: amount,
       p_operation_type: `${op}.refund`,
       p_description: `${op}.refund (mention monitoring agent tool)`,
       p_metadata: { feature: 'mention_monitoring_agent_tool', product_id: productId, reason: 'tool_call_failed' },
+      p_workspace_id: null,
     });
 
     // Mirror refund as a negative-credit row so dashboard nets out correctly.

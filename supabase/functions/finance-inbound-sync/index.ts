@@ -111,10 +111,11 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
 
     // The pull succeeded — now charge (automated path only).
     if (mustBill) {
-      const { data: debit, error: debitErr } = await supabase.rpc('debit_user_credits', {
+      const { data: debit, error: debitErr } = await supabase.rpc('debit_credits', {
         p_user_id: meta.created_by, p_amount: INBOUND_SYNC_CREDIT_COST,
         p_operation_type: 'mydata_inbound_sync',
         p_description: `Daily myDATA inbound pull (workspace ${workspaceId})`,
+        p_workspace_id: workspaceId ?? null,
       });
       const row = Array.isArray(debit) ? debit[0] : debit;
       if (debitErr || (row && !row.success)) {
@@ -186,10 +187,11 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           .select('id', { count: 'exact', head: true }).eq('inbound_document_id', d.id);
         if ((count ?? 0) > 0) continue; // already extracted
 
-        const { data: debit } = await supabase.rpc('debit_user_credits', {
+        const { data: debit } = await supabase.rpc('debit_credits', {
           p_user_id: meta?.created_by, p_amount: EXTRACT_CREDIT_COST,
           p_operation_type: 'expense_product_extraction',
           p_description: `AI product extraction (inbound doc ${d.id})`,
+          p_workspace_id: workspaceId ?? null,
         });
         const drow = Array.isArray(debit) ? debit[0] : debit;
         if (!drow?.success) break; // out of credits — stop extracting for this workspace
@@ -220,10 +222,11 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           console.error('[inbound-sync] extraction failed for doc', d.id, String(docErr));
           // Refund the credit for this doc — nothing was queued.
           try {
-            await supabase.rpc('credit_user_credits', {
+            await supabase.rpc('refund_credits', {
               p_user_id: meta?.created_by, p_amount: EXTRACT_CREDIT_COST,
               p_operation_type: 'expense_product_extraction.refund',
               p_description: `Refund: extraction failed (inbound doc ${d.id})`,
+              p_workspace_id: workspaceId ?? null,
             });
           } catch (refundErr) { console.error('[inbound-sync] refund failed (non-fatal)', String(refundErr)); }
           // continue with the next doc

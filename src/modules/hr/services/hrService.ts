@@ -379,7 +379,7 @@ class HrService {
   signSelfDocument(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'self-sign-document', { document_id }); }
   // Employee self clock-in/out (Work Card). Records the punch and files to Ergani when configured.
   selfClock(ws: string, input: { punch_type: 'arrival' | 'departure'; comments?: string }): Promise<SelfClockResult> { return call(ws, 'self-clock', input); }
-  selfPunches(ws: string, days = 14): Promise<{ punches: SelfPunch[] }> { return call(ws, 'self-punches', { days }); }
+  selfPunches(ws: string, days = 14): Promise<{ punches: SelfPunch[]; clocked_in: boolean }> { return call(ws, 'self-punches', { days }); }
 
   // ── Admin attendance + kiosk/notification settings ──
   clockEmployee(ws: string, employee_id: string, punch_type: 'arrival' | 'departure'): Promise<ClockEmployeeResult> { return call(ws, 'clock-employee', { employee_id, punch_type }); }

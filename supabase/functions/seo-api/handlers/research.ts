@@ -204,12 +204,13 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
 
     // Attempt credit refund on failure
     try {
-      await supabase.rpc('credit_user_credits', {
+      await supabase.rpc('refund_credits', {
         p_user_id: userId,
         p_amount: CREDIT_COST,
         p_operation_type: 'seo_research_refund',
         p_description: `Refund: SEO research failed`,
         p_metadata: { error: error.message },
+        p_workspace_id: null,
       });
       console.log('[seo-research] Credits refunded');
     } catch (refundErr) {

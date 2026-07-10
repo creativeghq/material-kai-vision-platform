@@ -195,12 +195,13 @@ export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (st
           const rawCost = inputCost + outputCost + webSearchSurcharge;
           const billedCost = rawCost * 1.50; // platform markup
 
-          await supabase.rpc('debit_user_credits', {
+          await supabase.rpc('debit_credits', {
             p_user_id: userId,
             p_amount: Math.round(billedCost * 100 * 100) / 100, // 1 credit = $0.01
             p_operation_type: 'b2b_manufacturer_search',
             p_description: `B2B manufacturer web search (${category})`,
             p_metadata: { country, region, category, limit, web_search_max_uses: 5 },
+            p_workspace_id: null,
           });
 
           await supabase.from('ai_usage_logs').insert({
@@ -404,12 +405,13 @@ ${markdown.substring(0, 15000)}`;
               const billedCost = rawCost * 1.50;
               const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
 
-              await supabase.rpc('debit_user_credits', {
+              await supabase.rpc('debit_credits', {
                 p_user_id: userId,
                 p_amount: creditsToDebit,
                 p_operation_type: 'company_website_scrape_analysis',
                 p_description: 'Claude Opus website analysis',
                 p_metadata: { url, sections: extractSections },
+                p_workspace_id: null,
               });
               await supabase.from('ai_usage_logs').insert({
                 user_id: userId,

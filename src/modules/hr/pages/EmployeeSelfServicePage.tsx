@@ -31,6 +31,7 @@ export default function EmployeeSelfServicePage() {
   const [absences, setAbsences] = useState<SelfAbsence[]>([]);
   const [docs, setDocs] = useState<SelfDocument[]>([]);
   const [punches, setPunches] = useState<SelfPunch[]>([]);
+  const [currentlyIn, setCurrentlyIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -38,16 +39,13 @@ export default function EmployeeSelfServicePage() {
     if (!ws) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [p, o, t, d, pu] = await Promise.all([hrService.selfProfile(ws), hrService.selfOnboarding(ws), hrService.selfTimeoff(ws), hrService.selfDocuments(ws), hrService.selfPunches(ws).catch(() => ({ punches: [] as SelfPunch[] }))]);
-      setProfile(p.profile); setTasks(o.tasks); setAbsences(t.absences); setDocs(d.documents); setPunches(pu.punches);
+      const [p, o, t, d, pu] = await Promise.all([hrService.selfProfile(ws), hrService.selfOnboarding(ws), hrService.selfTimeoff(ws), hrService.selfDocuments(ws), hrService.selfPunches(ws).catch(() => ({ punches: [] as SelfPunch[], clocked_in: false }))]);
+      setProfile(p.profile); setTasks(o.tasks); setAbsences(t.absences); setDocs(d.documents); setPunches(pu.punches); setCurrentlyIn(pu.clocked_in);
     } catch (e) { toast({ title: 'Could not load your HR info', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [ws, toast]);
   useEffect(() => { void load(); }, [load]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todayPunches = punches.filter((p) => p.reference_date === today);
-  const currentlyIn = todayPunches[0]?.punch_type === 'arrival'; // punches are newest-first
   const clock = async (punch_type: 'arrival' | 'departure') => {
     if (!ws) return; setBusy('clock');
     try {

@@ -65,13 +65,43 @@ export function creditsForUsage(model: string, usage: ClaudeUsage): number {
 }
 
 /**
- * Log the call to `ai_usage_logs` (dashboard/Operations) AND debit usage-based credits from the
- * user's wallet. Returns the whole number of credits charged. Throws 402 if the debit fails
- * (insufficient balance) — callers pre-check with a conservative ceiling so this is rare.
+ * Reserve (debit up front) a conservative credit ceiling BEFORE the upstream LLM call, per security
+ * invariant #10 ("debit + rate-limit BEFORE the upstream call, not after"). An unlocked balance
+ * pre-check does NOT reserve, so N concurrent requests could all pass it and each spend real provider
+ * money; debiting the ceiling first serialises that. Throws 402 when the balance/pool can't cover the
+ * ceiling. `meterHrAi(..., reservedCredits)` later refunds the difference vs the actual usage cost.
+ */
+export async function reserveHrCredits(supabase: any, userId: string, workspaceId: string, credits: number, operationType: string, description: string): Promise<void> {
+  if (!(credits > 0)) return;
+  const { data, error } = await supabase.rpc('debit_credits', {
+    p_user_id: userId, p_amount: credits, p_operation_type: `${operationType}_reserve`,
+    p_description: `Reserve — ${description}`, p_metadata: { reserve: true }, p_workspace_id: workspaceId ?? null,
+  });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || (row && row.success === false)) throw new HttpError(402, row?.error_message || error?.message || 'Not enough credits');
+}
+
+/** Credit credits back (reservation refund). Best-effort — never throws. */
+export async function refundHrCredits(supabase: any, userId: string, workspaceId: string, credits: number, operationType: string, description: string, metadata?: any): Promise<void> {
+  if (!(credits > 0)) return;
+  try {
+    await supabase.rpc('refund_credits', {
+      p_user_id: userId, p_amount: credits, p_operation_type: `${operationType}_refund`,
+      p_description: `Refund — ${description}`, p_metadata: metadata ?? { refund: true }, p_workspace_id: workspaceId ?? null,
+    });
+  } catch (e) { console.warn('[hr-ai-meter] credit refund failed (non-fatal):', e); }
+}
+
+/**
+ * Log the call to `ai_usage_logs` (dashboard/Operations) AND settle usage-based credits, returning
+ * the whole number actually charged. When `reservedCredits` is supplied (the debit-first path), the
+ * caller has already debited that ceiling via {@link reserveHrCredits}, so this only refunds
+ * `reserved − actual` (or debits the small remainder if actual exceeded the ceiling). Without it, it
+ * debits the actual usage directly (legacy path). Throws 402 only on the legacy direct-debit path.
  */
 export async function meterHrAi(supabase: any, opts: {
   userId: string; workspaceId: string; operationType: string; model: string;
-  usage: ClaudeUsage; description: string; metadata?: any;
+  usage: ClaudeUsage; description: string; metadata?: any; reservedCredits?: number;
 }): Promise<number> {
   const p = priceFor(opts.model);
   const inTok = opts.usage.input_tokens, outTok = opts.usage.output_tokens;
@@ -93,10 +123,29 @@ export async function meterHrAi(supabase: any, opts: {
     });
   } catch (e) { console.warn('[hr-ai-meter] ai_usage_logs insert failed (non-fatal):', e); }
 
-  // 2) Wallet debit — usage-based whole credits.
-  const { data, error } = await supabase.rpc('debit_user_credits', {
+  const meta = { ...(opts.metadata ?? {}), model: opts.model, input_tokens: inTok, output_tokens: outTok, billed_cost_usd: billedUsd };
+
+  if (opts.reservedCredits !== undefined) {
+    // Debit-first path: the ceiling was already reserved. Reconcile the difference.
+    const delta = opts.reservedCredits - credits;
+    if (delta > 0) {
+      await refundHrCredits(supabase, opts.userId, opts.workspaceId, delta, opts.operationType, opts.description, meta);
+    } else if (delta < 0) {
+      // Actual exceeded the ceiling (rare). Charge the small remainder; don't fail the completed op.
+      const { data, error } = await supabase.rpc('debit_credits', {
+        p_user_id: opts.userId, p_amount: -delta, p_operation_type: opts.operationType,
+        p_description: opts.description, p_metadata: meta, p_workspace_id: opts.workspaceId ?? null,
+      });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || (row && row.success === false)) console.warn('[hr-ai-meter] over-ceiling remainder debit failed (non-fatal):', row?.error_message || error?.message);
+    }
+    return credits;
+  }
+
+  // Legacy path: debit the actual usage directly.
+  const { data, error } = await supabase.rpc('debit_credits', {
     p_user_id: opts.userId, p_amount: credits, p_operation_type: opts.operationType,
-    p_description: opts.description, p_metadata: { ...(opts.metadata ?? {}), model: opts.model, input_tokens: inTok, output_tokens: outTok, billed_cost_usd: billedUsd },
+    p_description: opts.description, p_metadata: meta, p_workspace_id: opts.workspaceId ?? null,
   });
   const row = Array.isArray(data) ? data[0] : data;
   if (error || (row && row.success === false)) throw new HttpError(402, row?.error_message || error?.message || 'Credit deduction failed');

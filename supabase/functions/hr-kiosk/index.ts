@@ -24,6 +24,8 @@ function clientIp(req: Request): string {
   return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || '0.0.0.0';
 }
 const KIOSK_RATE_LIMIT_PER_MIN = 20; // lookups + clocks per IP per minute
+const PIN_MAX_FAILS = 8;             // wrong-PIN attempts per (workspace, VAT) before lockout
+const PIN_LOCKOUT_WINDOW_MS = 15 * 60_000;
 
 interface KioskEmployee { id: string; name: string; work_start_time: string | null; clock_pin_hash: string | null; }
 
@@ -97,8 +99,18 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   if (!emp) return json({ error: 'not_recognized', message: 'VAT number not recognized for this workspace.' }, 404);
   if (requirePin) {
     if (!pin) return json({ error: 'pin_required', message: 'A PIN is required.' }, 401);
+    // Per-(workspace, VAT) PIN lockout: blunts distributed brute-force that the per-IP limit misses
+    // (a 4-digit PIN is only 10⁴). Lock the subject after PIN_MAX_FAILS failures in the window.
+    const subject = await sha256hex(`vat:${ws.id}:${vat}`);
+    const pinSince = new Date(Date.now() - PIN_LOCKOUT_WINDOW_MS).toISOString();
+    const { count: failCount } = await supabase.from('hr_kiosk_attempts')
+      .select('*', { count: 'exact', head: true }).eq('subject', subject).eq('outcome', 'pin_fail').gte('created_at', pinSince);
+    if ((failCount ?? 0) >= PIN_MAX_FAILS) return json({ error: 'locked_out', message: 'Too many PIN attempts. Please wait and try again later.' }, 429);
     const ok = emp.clock_pin_hash && (await sha256hex(`${ws.id}:${pin}`)) === emp.clock_pin_hash;
-    if (!ok) return json({ error: 'not_recognized', message: 'VAT number or PIN not recognized.' }, 401);
+    if (!ok) {
+      await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'pin_fail', subject });
+      return json({ error: 'not_recognized', message: 'VAT number or PIN not recognized.' }, 401);
+    }
   }
 
   if (action === 'lookup') {

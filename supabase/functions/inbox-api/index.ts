@@ -386,12 +386,13 @@ async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise
     const settings = await inboxAgentSettings(db, workspaceId);
 
     // Bill the owner only now that we've committed to replying; skip (leave for a human) if unpaid.
-    const { data: debit } = await db.rpc('debit_user_credits', {
+    const { data: debit } = await db.rpc('debit_credits', {
       p_user_id: owner,
       p_amount: INBOX_AGENT_REPLY_COST,
       p_operation_type: 'inbox_agent_reply',
       p_description: 'Inbox agent auto-reply (1 turn)',
       p_metadata: { thread_id: threadId, billing_type: 'inbox_agent_reply' },
+      p_workspace_id: workspaceId,  // draw from the workspace pool when funded, else owner personal
     });
     const debitRes = Array.isArray(debit) ? debit[0] : debit;
     if (!debitRes?.success) return;

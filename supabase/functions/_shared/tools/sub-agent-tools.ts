@@ -36,12 +36,13 @@ async function logSubAgentUsage(opName: string, response: any, userId: string | 
     const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
 
     if (userId) {
-      await supabase.rpc('debit_user_credits', {
+      await supabase.rpc('debit_credits', {
         p_user_id: userId,
         p_amount: creditsToDebit,
         p_operation_type: opName,
         p_description: `Sub-agent: ${opName}`,
         p_metadata: { ...extra, workspace_id: workspaceId },
+        p_workspace_id: workspaceId ?? null,
       });
     }
     await supabase.from('ai_usage_logs').insert({

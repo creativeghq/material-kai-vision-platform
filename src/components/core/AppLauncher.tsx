@@ -2,7 +2,7 @@
 // active (click to open) plus any the persona can add (click to enable / request). Rich rows with
 // an icon, title, and subheading — see useLauncherApps for the data model.
 import React, { useState } from 'react';
-import { LayoutGrid, ArrowRight, Loader2, Plus } from 'lucide-react';
+import { LayoutGrid, ArrowRight, ArrowUpRight, Loader2, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/popover';
@@ -48,21 +48,21 @@ export const AppLauncher: React.FC = () => {
 
         <div className="rounded-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/60 bg-muted/30">
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5 border-b border-border/60">
           <div className="min-w-0">
-            <div className="font-display font-semibold text-base leading-tight">Apps</div>
-            <div className="text-xs text-muted-foreground">Tools active in this workspace</div>
+            <div className="font-display text-[15px] font-semibold leading-tight tracking-tight">Apps</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Everything active in this workspace</div>
           </div>
           <button
             onClick={() => go('/apps')}
-            className="shrink-0 inline-flex items-center gap-1 text-sm text-primary hover:opacity-80 transition-opacity cursor-pointer"
+            className="shrink-0 inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer"
           >
-            manage <ArrowRight className="h-3.5 w-3.5" />
+            Manage <ArrowRight className="h-3 w-3" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="max-h-[60vh] overflow-y-auto py-1">
+        <div className="max-h-[62vh] overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -70,67 +70,75 @@ export const AppLauncher: React.FC = () => {
           ) : (
             <>
               {active.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 p-3">
+                <div className="grid grid-cols-3 gap-2.5 p-3">
                   {active.map((app) => (
                     <button
                       key={app.id}
                       onClick={() => go(app.path)}
                       title={app.description || app.label}
-                      className="group flex flex-col items-center text-center gap-2 rounded-xl px-2 py-3 hover:bg-muted/60 transition-colors cursor-pointer"
+                      className="group relative flex flex-col gap-2.5 rounded-2xl border border-border/50 bg-muted/25 p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg cursor-pointer"
                     >
-                      <span className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary ring-1 ring-inset ring-border/50 transition-colors group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary">
                         <app.icon className="h-[1.15rem] w-[1.15rem]" />
-                        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-popover" title="Active" />
                       </span>
-                      <span className="flex flex-col items-center gap-0.5 w-full">
-                        <span className="block w-full text-[13px] font-medium leading-tight truncate">{app.label}</span>
-                        <span className="block w-full text-[11px] text-muted-foreground leading-snug line-clamp-2 min-h-[1.9rem]">
+                      <span className="space-y-0.5">
+                        <span className="block text-[13px] font-medium leading-tight truncate">{app.label}</span>
+                        <span className="block text-[11px] text-muted-foreground leading-snug line-clamp-2 min-h-[1.9rem]">
                           {app.description || 'Open'}
                         </span>
                       </span>
+                      <ArrowUpRight className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
                   ))}
                 </div>
               )}
 
               {available.length > 0 && (
-                <>
-                  <div className="px-4 pt-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Available to add
+                <div className="px-3 pb-3">
+                  <div className="flex items-center gap-2 px-1 pb-2 pt-1">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Available to add</span>
+                    <span className="h-px flex-1 bg-border/60" />
                   </div>
-                  {available.map((app) => (
-                    <div key={app.id} className="w-full flex items-center gap-3 px-4 py-2.5">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground shrink-0">
-                        <app.icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="text-sm font-medium truncate block">
-                          {app.label}
-                          {app.priceLabel && <span className="ml-1 font-normal text-xs text-muted-foreground">· {app.priceLabel}</span>}
+                  <div className="space-y-1">
+                    {available.map((app) => (
+                      <div key={app.id} className="flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-accent/30 transition-colors">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground ring-1 ring-inset ring-border/50 shrink-0">
+                          <app.icon className="h-4 w-4" />
                         </span>
-                        {app.description && (
-                          <span className="block text-xs text-muted-foreground truncate">{app.description}</span>
-                        )}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 h-7 px-2.5 cursor-pointer"
-                        disabled={enabling === app.moduleSlug}
-                        onClick={(e) => onEnable(e, app)}
-                      >
-                        {enabling === app.moduleSlug
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : (<><Plus className="h-3.5 w-3.5 mr-1" />{canManage ? 'Enable' : 'Request'}</>)}
-                      </Button>
-                    </div>
-                  ))}
-                </>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium truncate">{app.label}</span>
+                            {app.priceLabel && (
+                              <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{app.priceLabel}</span>
+                            )}
+                          </span>
+                          {app.description && (
+                            <span className="block text-xs text-muted-foreground truncate">{app.description}</span>
+                          )}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 h-7 px-2.5 cursor-pointer"
+                          disabled={enabling === app.moduleSlug}
+                          onClick={(e) => onEnable(e, app)}
+                        >
+                          {enabling === app.moduleSlug
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : (<><Plus className="h-3.5 w-3.5 mr-1" />{canManage ? 'Enable' : 'Request'}</>)}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {active.length === 0 && available.length === 0 && (
-                <div className="px-4 py-8 text-sm text-muted-foreground text-center">
-                  No apps available yet.
+                <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                    <LayoutGrid className="h-6 w-6" />
+                  </span>
+                  <p className="text-sm text-muted-foreground">No apps here yet.</p>
                 </div>
               )}
             </>

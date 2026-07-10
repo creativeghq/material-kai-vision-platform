@@ -7,7 +7,7 @@ import { HttpError } from '../_shared/api-logger.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
-import { callClaudeTool, meterHrAi, creditBalance, base64FromBytes } from './ai-meter.ts';
+import { callClaudeTool, meterHrAi, creditBalance, reserveHrCredits, refundHrCredits, base64FromBytes } from './ai-meter.ts';
 // NOTE: payslip.ts (→ pdf-lib + fontkit, heavy) is imported LAZILY inside the generate-payslips
 // case so the common read paths (analytics, lists) don't pay its cold-start cost on every call.
 
@@ -37,6 +37,21 @@ const APP_STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'reje
 const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'];
 const DOC_TYPES = ['contract', 'id', 'certificate', 'payslip', 'review', 'other'];
 const HR_DOC_BUCKET = 'pdf-documents';
+
+/**
+ * Guard a client-supplied storage path (#252 BOLA fix). `pdf-documents` is a single shared
+ * private bucket, and these routes run under the RLS-bypassing service role — so a body-supplied
+ * bucket/path could otherwise sign or delete ANY tenant's object. Force the HR bucket and require
+ * the object live under this workspace's own `hr/{workspaceId}/` prefix.
+ */
+function assertHrObjectPath(path: unknown, workspaceId: string): string {
+  const p = String(path ?? '');
+  const prefix = `hr/${workspaceId}/`;
+  if (!p.startsWith(prefix) || p.includes('..')) {
+    throw new HttpError(400, 'storage_object_path must be under this workspace’s hr/ prefix');
+  }
+  return p;
+}
 
 /** Working (Mon–Fri) days in a 'YYYY-MM' month. */
 function businessDaysInMonth(period: string): number {
@@ -299,13 +314,20 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
         },
       };
       if (await creditBalance(supabase, userId) < JOBDESC_MAX_CREDITS) return json({ error: `Not enough credits (need up to ${JOBDESC_MAX_CREDITS}).`, code: 'insufficient_credits' }, 402);
-      const res = await anthropicTool(
-        `Write a compelling, inclusive job description. Be concrete and avoid clichés. Use British/International English.\n\n${ctxBits}`,
-        tool,
-      );
+      await reserveHrCredits(supabase, userId, workspaceId, JOBDESC_MAX_CREDITS, 'hr_generate_job_description', `HR job description (${title})`);
+      let res;
+      try {
+        res = await anthropicTool(
+          `Write a compelling, inclusive job description. Be concrete and avoid clichés. Use British/International English.\n\n${ctxBits}`,
+          tool,
+        );
+      } catch (e) {
+        await refundHrCredits(supabase, userId, workspaceId, JOBDESC_MAX_CREDITS, 'hr_generate_job_description', 'AI failed');
+        throw e;
+      }
       const creditsUsed = await meterHrAi(supabase, {
         userId, workspaceId, operationType: 'hr_generate_job_description', model: res.model, usage: res.usage,
-        description: `HR job description (${title})`, metadata: { title },
+        description: `HR job description (${title})`, metadata: { title }, reservedCredits: JOBDESC_MAX_CREDITS,
       });
       return json({ generated: res.input, credits_used: creditsUsed });
     }
@@ -317,7 +339,10 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     }
     case 'create-candidate': {
       requireManage();
-      const fields = pick(body, ['name', 'email', 'phone', 'headline', 'source', 'resume_bucket', 'resume_path']);
+      // resume_bucket/resume_path are NEVER accepted from the client — they are set server-side only
+      // by `upload-application-cv` (which pins the hr/{workspaceId}/ prefix). Accepting them here would
+      // let an admin point a candidate's CV at another tenant's private object. (#252 BOLA fix)
+      const fields = pick(body, ['name', 'email', 'phone', 'headline', 'source']);
       if (!fields.name) return json({ error: 'name is required' }, 400);
       const { data, error } = await supabase.from('hr_candidates').insert({ ...fields, workspace_id: workspaceId }).select('*').single();
       if (error) throw new HttpError(400, error.message);
@@ -396,9 +421,10 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     }
     case 'application-cv-url': {
       const cid = String(body?.candidate_id ?? '');
-      const { data: c } = await supabase.from('hr_candidates').select('resume_bucket, resume_path').eq('id', cid).eq('workspace_id', workspaceId).maybeSingle();
+      const { data: c } = await supabase.from('hr_candidates').select('resume_path').eq('id', cid).eq('workspace_id', workspaceId).maybeSingle();
       if (!c?.resume_path) return json({ error: 'no CV on file' }, 404);
-      const { data: signed, error } = await supabase.storage.from(c.resume_bucket || HR_DOC_BUCKET).createSignedUrl(c.resume_path, 300);
+      const objectPath = assertHrObjectPath(c.resume_path, workspaceId);
+      const { data: signed, error } = await supabase.storage.from(HR_DOC_BUCKET).createSignedUrl(objectPath, 300);
       if (error) throw new HttpError(400, error.message);
       return json({ url: signed?.signedUrl });
     }
@@ -408,14 +434,16 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const id = String(body?.application_id ?? '');
       if (!id) return json({ error: 'application_id is required' }, 400);
       const { data: app } = await supabase.from('hr_applications')
-        .select('candidate:hr_candidates!hr_applications_candidate_id_fkey ( name, headline, resume_bucket, resume_path ), posting:hr_job_postings!hr_applications_job_posting_id_fkey ( title, description, requirements )')
+        .select('candidate:hr_candidates!hr_applications_candidate_id_fkey ( name, headline, resume_path ), posting:hr_job_postings!hr_applications_job_posting_id_fkey ( title, description, requirements )')
         .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!app) return json({ error: 'application not found' }, 404);
       const cand = (app as any).candidate, post = (app as any).posting;
       if (!cand?.resume_path) return json({ error: 'Upload the candidate’s CV first.' }, 400);
+      const cvPath = assertHrObjectPath(cand.resume_path, workspaceId);
       if (await creditBalance(supabase, userId) < SCREEN_MAX_CREDITS) return json({ error: `Not enough credits (need up to ${SCREEN_MAX_CREDITS}).`, code: 'insufficient_credits' }, 402);
-      const { data: blob } = await supabase.storage.from(cand.resume_bucket || HR_DOC_BUCKET).download(cand.resume_path);
-      if (!blob) return json({ error: 'Could not read the CV.' }, 400);
+      await reserveHrCredits(supabase, userId, workspaceId, SCREEN_MAX_CREDITS, 'hr_screen_application', `HR CV screening (${cand?.name ?? 'candidate'})`);
+      const { data: blob } = await supabase.storage.from(HR_DOC_BUCKET).download(cvPath);
+      if (!blob) { await refundHrCredits(supabase, userId, workspaceId, SCREEN_MAX_CREDITS, 'hr_screen_application', 'read failed'); return json({ error: 'Could not read the CV.' }, 400); }
       const b64 = base64FromBytes(new Uint8Array(await (blob as Blob).arrayBuffer()));
       const tool = {
         name: 'cv_assessment',
@@ -430,13 +458,19 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
         },
       };
       const prompt = `You are a hiring assistant. Rate how well this CV fits the role below and be specific about matches and gaps. Do not invent experience.\n\nROLE: ${post?.title ?? ''}\n\nDESCRIPTION:\n${post?.description ?? ''}\n\nREQUIREMENTS:\n${post?.requirements ?? ''}`;
-      const res = await callClaudeTool([
-        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
-        { type: 'text', text: prompt },
-      ], tool, 800);
+      let res;
+      try {
+        res = await callClaudeTool([
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+          { type: 'text', text: prompt },
+        ], tool, 800);
+      } catch (e) {
+        await refundHrCredits(supabase, userId, workspaceId, SCREEN_MAX_CREDITS, 'hr_screen_application', 'AI failed');
+        throw e;
+      }
       const creditsUsed = await meterHrAi(supabase, {
         userId, workspaceId, operationType: 'hr_screen_application', model: res.model, usage: res.usage,
-        description: `HR CV screening (${cand?.name ?? 'candidate'})`, metadata: { application_id: id },
+        description: `HR CV screening (${cand?.name ?? 'candidate'})`, metadata: { application_id: id }, reservedCredits: SCREEN_MAX_CREDITS,
       });
       const score = Math.max(0, Math.min(100, Math.round(Number(res.input?.score ?? 0))));
       const summary = String(res.input?.summary ?? '').slice(0, 2000);
@@ -540,15 +574,17 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     }
     case 'record-document': {
       requireManage();
-      const fields = pick(body, ['employee_id', 'name', 'doc_type', 'storage_bucket', 'storage_object_path', 'size_bytes']);
+      const fields = pick(body, ['employee_id', 'name', 'doc_type', 'storage_object_path', 'size_bytes']);
       if (!fields.name || !fields.storage_object_path) return json({ error: 'name and storage_object_path are required' }, 400);
       if (fields.doc_type && !DOC_TYPES.includes(String(fields.doc_type))) return json({ error: 'invalid doc_type' }, 400);
+      // Bucket is fixed server-side and the path must live under this workspace's hr/ prefix (#252 BOLA fix).
+      const objectPath = assertHrObjectPath(fields.storage_object_path, workspaceId);
       if (fields.employee_id) {
         const { data: emp } = await supabase.from('hr_employees').select('id').eq('id', String(fields.employee_id)).eq('workspace_id', workspaceId).maybeSingle();
         if (!emp) return json({ error: 'employee not found in this workspace' }, 404);
       }
       const { data, error } = await supabase.from('hr_documents')
-        .insert({ ...fields, storage_bucket: fields.storage_bucket || HR_DOC_BUCKET, workspace_id: workspaceId, uploaded_by: userId }).select('*').single();
+        .insert({ ...fields, storage_object_path: objectPath, storage_bucket: HR_DOC_BUCKET, workspace_id: workspaceId, uploaded_by: userId }).select('*').single();
       if (error) throw new HttpError(400, error.message);
       return json({ document: data }, 201);
     }
@@ -582,9 +618,10 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     case 'sign-document': {
       const id = String(body?.document_id ?? '');
       if (!id) return json({ error: 'document_id is required' }, 400);
-      const { data: doc } = await supabase.from('hr_documents').select('storage_bucket, storage_object_path').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      const { data: doc } = await supabase.from('hr_documents').select('storage_object_path').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!doc) return json({ error: 'not found' }, 404);
-      const { data: signed, error } = await supabase.storage.from(doc.storage_bucket).createSignedUrl(doc.storage_object_path, 300);
+      const objectPath = assertHrObjectPath(doc.storage_object_path, workspaceId);
+      const { data: signed, error } = await supabase.storage.from(HR_DOC_BUCKET).createSignedUrl(objectPath, 300);
       if (error) throw new HttpError(400, error.message);
       return json({ url: signed?.signedUrl });
     }
@@ -592,9 +629,10 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       requireManage();
       const id = String(body?.document_id ?? '');
       if (!id) return json({ error: 'document_id is required' }, 400);
-      const { data: doc } = await supabase.from('hr_documents').select('storage_bucket, storage_object_path').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      const { data: doc } = await supabase.from('hr_documents').select('storage_object_path').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!doc) return json({ error: 'not found' }, 404);
-      await supabase.storage.from(doc.storage_bucket).remove([doc.storage_object_path]); // best-effort
+      const objectPath = assertHrObjectPath(doc.storage_object_path, workspaceId);
+      await supabase.storage.from(HR_DOC_BUCKET).remove([objectPath]); // best-effort
       const { error } = await supabase.from('hr_documents').delete().eq('id', id).eq('workspace_id', workspaceId);
       if (error) throw new HttpError(400, error.message);
       return json({ ok: true });
@@ -812,9 +850,15 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const { data: inv, error: invErr } = await supabase.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/my-hr` });
       if (inv?.user?.id) { newUserId = inv.user.id; invited = true; }
       else {
-        // Likely already registered — find the existing auth user and link them instead.
-        const { data: list } = await supabase.auth.admin.listUsers();
-        const found = (list?.users ?? []).find((u: any) => String(u.email ?? '').toLowerCase() === email);
+        // Likely already registered — find the existing auth user and link them instead. listUsers()
+        // is paginated (default ~50), so a naive first-page scan misses anyone further in; page through.
+        let found: any = null;
+        for (let page = 1; page <= 25 && !found; page++) {
+          const { data: list } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+          const users = list?.users ?? [];
+          found = users.find((u: any) => String(u.email ?? '').toLowerCase() === email);
+          if (users.length < 200) break; // reached the last page
+        }
         if (found) newUserId = found.id;
         else return json({ error: invErr?.message || 'Could not invite this email.' }, 400);
       }
@@ -1126,13 +1170,17 @@ export async function handleSelfService(action: string, ctx: SelfCtx): Promise<R
         .select('id, punch_type, reference_date, punched_at, status, ergani_protocol')
         .eq('workspace_id', workspaceId).eq('employee_id', employeeId)
         .gte('reference_date', since).order('punched_at', { ascending: false });
-      return json({ punches: data ?? [] });
+      // Authoritative in/out state derived server-side from the most recent punch — the client must
+      // not reconstruct it from UTC date math (breaks around timezone midnight / punch ordering).
+      const clockedIn = (data ?? [])[0]?.punch_type === 'arrival';
+      return json({ punches: data ?? [], clocked_in: clockedIn });
     }
     case 'self-sign-document': {
       const id = String(body?.document_id ?? '');
-      const { data: doc } = await supabase.from('hr_documents').select('storage_bucket, storage_object_path').eq('id', id).eq('employee_id', employeeId).maybeSingle();
+      const { data: doc } = await supabase.from('hr_documents').select('storage_object_path').eq('id', id).eq('employee_id', employeeId).eq('workspace_id', workspaceId).maybeSingle();
       if (!doc) return json({ error: 'not found' }, 404);
-      const { data: signed, error } = await supabase.storage.from(doc.storage_bucket).createSignedUrl(doc.storage_object_path, 300);
+      const objectPath = assertHrObjectPath(doc.storage_object_path, workspaceId);
+      const { data: signed, error } = await supabase.storage.from(HR_DOC_BUCKET).createSignedUrl(objectPath, 300);
       if (error) throw new HttpError(400, error.message);
       return json({ url: signed?.signedUrl });
     }

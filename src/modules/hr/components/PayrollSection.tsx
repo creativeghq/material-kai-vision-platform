@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ComponentProps } from 'react';
 import { Plus, Loader2, Wallet, ChevronLeft, CheckCircle2, Banknote, ArrowUpRight, Settings2, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -12,9 +12,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type PayrollRun, type PayrollItem, type PayrollStatus, type PayrollSummary, type PayrollSettings } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 
 const statusVariant: Record<PayrollStatus, 'secondary' | 'default' | 'outline'> = { draft: 'secondary', approved: 'default', paid: 'outline' };
 const money = (n: number | null | undefined, c: string) => `${Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${c}`;
+
+/**
+ * Locale-tolerant numeric field for number-backed state (EU decimals like `13,87` / `7.572,00`).
+ * Keeps a free-text draft while focused so `parseDecimal` can normalise any format on blur without
+ * cursor-jumping. `scale` handles percentage state (store 0.1387, show 13.87 with scale=100).
+ */
+function NumField({ value, onChange, scale = 1, decimals = 2, allowNull = false, ...rest }: {
+  value: number | null | undefined; onChange: (n: number | null) => void;
+  scale?: number; decimals?: number | null; allowNull?: boolean;
+} & Omit<ComponentProps<typeof Input>, 'value' | 'onChange' | 'type'>) {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState('');
+  const shown = value == null || Number.isNaN(value) ? null : (value as number) * scale;
+  const display = focused ? draft : shown == null ? '' : decimals == null ? String(shown) : shown.toFixed(decimals);
+  return (
+    <Input
+      {...rest} type="text" inputMode="decimal" value={display}
+      onFocus={(e) => { setFocused(true); setDraft(shown == null ? '' : String(shown)); rest.onFocus?.(e); }}
+      onChange={(e) => { setDraft(e.target.value); const p = parseDecimal(e.target.value); onChange(p == null ? (allowNull ? null : 0) : p / scale); }}
+      onBlur={(e) => { setFocused(false); rest.onBlur?.(e); }}
+    />
+  );
+}
 
 export function PayrollSection({ workspaceId, canManage }: { workspaceId: string | null; canManage: boolean }) {
   const { toast } = useToast();
@@ -190,7 +214,7 @@ function SummaryTile({ label, value, strong }: { label: string; value: string; s
 
 function PayrollItemRow({ item, editable, currency, onSaveGross }: { item: PayrollItem; editable: boolean; currency: string; onSaveGross: (i: PayrollItem, gross: number) => void }) {
   const [gross, setGross] = useState(String(item.gross));
-  const commit = () => { if (Number(gross) !== item.gross && Number.isFinite(Number(gross))) onSaveGross(item, Number(gross) || 0); };
+  const commit = () => { const g = parseDecimal(gross); if (g !== null && g !== item.gross) onSaveGross(item, g); };
   const basisLabel = item.basis === 'hourly'
     ? `${money(item.rate ?? 0, currency)}/h × ${item.hours_per_day ?? 8}h × ${item.days_worked ?? 0}d`
     : 'Monthly';
@@ -200,7 +224,7 @@ function PayrollItemRow({ item, editable, currency, onSaveGross }: { item: Payro
         {item.employee?.contact?.name || 'Employee'}
         <span className="block text-xs text-muted-foreground">{basisLabel}</span>
       </TableCell>
-      <TableCell className="text-right">{editable ? <Input type="number" min={0} value={gross} onChange={(e) => setGross(e.target.value)} onBlur={commit} className="h-8 w-28 ml-auto text-right" /> : money(item.gross, currency)}</TableCell>
+      <TableCell className="text-right">{editable ? <Input type="text" inputMode="decimal" value={gross} onChange={(e) => setGross(e.target.value)} onBlur={commit} className="h-8 w-28 ml-auto text-right" /> : money(item.gross, currency)}</TableCell>
       <TableCell className="text-right text-muted-foreground">{money(item.employee_contributions, currency)}</TableCell>
       <TableCell className="text-right text-muted-foreground">{money(item.income_tax, currency)}</TableCell>
       <TableCell className="text-right font-medium">{money(item.net, currency)}</TableCell>
@@ -262,18 +286,16 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
     try {
       await hrService.updatePayrollSettings(workspaceId, {
         country_code: s.country_code, currency: s.currency, salaries_per_year: Number(s.salaries_per_year),
-        employee_contribution_rate: Number(s.employee_contribution_rate), employer_contribution_rate: Number(s.employer_contribution_rate),
-        contribution_monthly_ceiling: s.contribution_monthly_ceiling == null || String(s.contribution_monthly_ceiling) === '' ? null : Number(s.contribution_monthly_ceiling),
-        income_tax_brackets: s.income_tax_brackets, tax_credit_base: Number(s.tax_credit_base),
-        tax_credit_per_child: s.tax_credit_per_child, tax_credit_taper_per_1000: Number(s.tax_credit_taper_per_1000), tax_credit_taper_floor: Number(s.tax_credit_taper_floor),
+        employee_contribution_rate: parseDecimalOr(s.employee_contribution_rate, 0), employer_contribution_rate: parseDecimalOr(s.employer_contribution_rate, 0),
+        contribution_monthly_ceiling: s.contribution_monthly_ceiling == null || String(s.contribution_monthly_ceiling) === '' ? null : parseDecimalOr(s.contribution_monthly_ceiling, 0),
+        income_tax_brackets: s.income_tax_brackets, tax_credit_base: parseDecimalOr(s.tax_credit_base, 0),
+        tax_credit_per_child: s.tax_credit_per_child, tax_credit_taper_per_1000: parseDecimalOr(s.tax_credit_taper_per_1000, 0), tax_credit_taper_floor: parseDecimalOr(s.tax_credit_taper_floor, 0),
       });
       toast({ title: 'Payroll settings saved' }); setOpen(false);
     } catch (e) { toast({ title: 'Save failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setSaving(false); }
   };
 
-  const pct = (r: number) => (r * 100).toFixed(2);
-  const fromPct = (v: string) => Number(v) / 100;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) loadSettings(); }}>
@@ -294,17 +316,17 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
               <div className="space-y-1"><Label>Salaries / year</Label><Input type="number" value={s.salaries_per_year} onChange={(e) => upd('salaries_per_year', Number(e.target.value))} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Employee EFKA %</Label><Input type="number" step="0.01" value={pct(s.employee_contribution_rate)} onChange={(e) => upd('employee_contribution_rate', fromPct(e.target.value))} /></div>
-              <div className="space-y-1"><Label>Employer EFKA %</Label><Input type="number" step="0.01" value={pct(s.employer_contribution_rate)} onChange={(e) => upd('employer_contribution_rate', fromPct(e.target.value))} /></div>
+              <div className="space-y-1"><Label>Employee EFKA %</Label><NumField scale={100} value={s.employee_contribution_rate} onChange={(n) => upd('employee_contribution_rate', n ?? 0)} /></div>
+              <div className="space-y-1"><Label>Employer EFKA %</Label><NumField scale={100} value={s.employer_contribution_rate} onChange={(n) => upd('employer_contribution_rate', n ?? 0)} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>EFKA monthly ceiling</Label><Input type="number" value={s.contribution_monthly_ceiling ?? ''} onChange={(e) => upd('contribution_monthly_ceiling', e.target.value === '' ? null : Number(e.target.value))} placeholder="none" /></div>
+              <div className="space-y-1"><Label>EFKA monthly ceiling</Label><NumField allowNull value={s.contribution_monthly_ceiling} onChange={(n) => upd('contribution_monthly_ceiling', n)} placeholder="none" /></div>
               <div className="space-y-1"><Label>Currency</Label><Input value={s.currency} onChange={(e) => upd('currency', e.target.value)} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1"><Label>Tax credit (base)</Label><Input type="number" value={s.tax_credit_base} onChange={(e) => upd('tax_credit_base', Number(e.target.value))} /></div>
-              <div className="space-y-1"><Label>Taper /€1,000</Label><Input type="number" value={s.tax_credit_taper_per_1000} onChange={(e) => upd('tax_credit_taper_per_1000', Number(e.target.value))} /></div>
-              <div className="space-y-1"><Label>Taper floor</Label><Input type="number" value={s.tax_credit_taper_floor} onChange={(e) => upd('tax_credit_taper_floor', Number(e.target.value))} /></div>
+              <div className="space-y-1"><Label>Tax credit (base)</Label><NumField value={s.tax_credit_base} onChange={(n) => upd('tax_credit_base', n ?? 0)} /></div>
+              <div className="space-y-1"><Label>Taper /€1,000</Label><NumField value={s.tax_credit_taper_per_1000} onChange={(n) => upd('tax_credit_taper_per_1000', n ?? 0)} /></div>
+              <div className="space-y-1"><Label>Taper floor</Label><NumField value={s.tax_credit_taper_floor} onChange={(n) => upd('tax_credit_taper_floor', n ?? 0)} /></div>
             </div>
             <div className="space-y-1">
               <Label>Income-tax brackets (annual) — JSON</Label>
