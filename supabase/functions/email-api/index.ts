@@ -25,6 +25,9 @@ interface SendEmailRequest {
   html?: string;
   text?: string;
   templateSlug?: string;
+  /** Overrides the template's subject_template when a templateSlug is used (variables still rendered).
+   *  Marketing campaigns pass the campaign's own subject_line here so it wins over the template subject. */
+  subjectOverride?: string;
   variables?: Record<string, string>;
   cc?: string[];
   bcc?: string[];
@@ -36,6 +39,10 @@ interface SendEmailRequest {
   /** When set, the send uses this workspace's BYOK Resend key + sender (workspace_email_config)
    *  and counts against its platform-controlled daily cap. Omit for platform/system sends. */
   workspace_id?: string;
+  /** #255 marketing sends: require the resolved sender to be the workspace's OWN Resend (BYOK) —
+   *  NO platform-key fallback. Returns 503 (code=workspace_sender_required) when the workspace has
+   *  no verified BYOK config, so the campaign never goes out from the platform domain. */
+  requireWorkspaceSender?: boolean;
 }
 
 async function sendViaResend(apiKey: string, payload: {
@@ -132,6 +139,20 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // otherwise the platform key + global email_settings sender.
         const sender = await resolveWorkspaceEmailSender(supabaseClient, body.workspace_id);
 
+        // #255 marketing BYOK-only gate: fail closed when strict and the resolved sender fell back
+        // to the platform key/domain. A workspace that hasn't configured its own verified Resend
+        // MUST NOT send marketing from the shared platform domain.
+        if (body.requireWorkspaceSender && sender.source !== 'workspace') {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'This workspace must configure its own Resend account (API key + verified sender) before sending marketing email.',
+              code: 'workspace_sender_required',
+            }),
+            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
         // Pre-flight: require a Resend API key. Without this, sendViaResend()
         // throws deep inside the send pipeline and surfaces as an opaque 500.
         // Returning 503 with code='provider_not_configured' lets the frontend
@@ -186,7 +207,8 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           // (this used to reference template.subject / .html_content / .text_content
           // which silently fell through to the caller-supplied html — confusing the
           // first send-email path that doesn't pre-render a fallback).
-          subject = renderTemplateWithVariables(template.subject_template || body.subject, variables);
+          // subjectOverride (campaign subject_line) wins over the template's own subject when supplied.
+          subject = renderTemplateWithVariables(body.subjectOverride || template.subject_template || body.subject, variables);
 
           // Pentest #250 C11: react_code is executed via import() in the edge worker
           // (arbitrary JS + all platform secrets). Only ever run it for platform-authored

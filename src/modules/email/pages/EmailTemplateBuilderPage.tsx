@@ -534,7 +534,16 @@ function TagInfoPanel({ open, onClose }: { open: boolean; onClose: () => void })
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export const EmailTemplateBuilder: React.FC = () => {
+interface EmailTemplateBuilderProps {
+  /** Where "Back" navigates. Defaults to the admin email tab (transactional builder). */
+  backPath?: string;
+  /** #255 — when set, Send Test goes out via the workspace's own Resend (BYOK, strict) as a
+   *  marketing send, matching how the campaign actually dispatches. */
+  workspaceId?: string;
+  marketing?: boolean;
+}
+
+export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ backPath, workspaceId, marketing }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -658,7 +667,10 @@ export const EmailTemplateBuilder: React.FC = () => {
           to: testEmail.trim(),
           subject: subject || `[Test] ${template?.name}`,
           html,
-          emailType: 'transactional',
+          emailType: marketing ? 'marketing' : 'transactional',
+          // #255 marketing test sends use the workspace's own Resend (BYOK), strictly — same path
+          // the campaign takes — so the test proves the real sender is configured.
+          ...(marketing ? { workspace_id: workspaceId, requireWorkspaceSender: true } : {}),
           tags: { test: 'true', template_id: id },
         },
       });
@@ -705,7 +717,7 @@ export const EmailTemplateBuilder: React.FC = () => {
         {/* Row 1: nav + actions */}
         <div className="flex items-center justify-between px-4 py-2.5 gap-4">
           <div className="flex items-center gap-3 shrink-0">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/admin?tab=email')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate(backPath || '/admin?tab=email')}>
               <ArrowLeft className="h-4 w-4 mr-1" />Back
             </Button>
             <div>

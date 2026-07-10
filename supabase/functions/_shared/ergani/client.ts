@@ -1,9 +1,9 @@
-// Shared REST client for the ΠΣ Ergani ΙΙ (Ergani II) Web API — the Ministry of Labour's
+// Shared REST client for the Ergani II Web API — the Greek Ministry of Labour's
 // interoperability service for digitally submitting workforce declarations (work card
 // clock-in/out, leaves, hire announcements E3, work-time schedules).
 //
-// Guide: "Ενιαίος Οδηγός Εφαρμογής Οργάνωσης Χρόνου Εργασίας & Ψηφιακής Κάρτας Εργασίας",
-// §6 (Web API REST). Every workspace runs under its OWN e-ΕΦΚΑ "Ergani" account
+// Guide: "Unified Application Guide for Work-Time Organization & the Digital Work Card",
+// §6 (Web API REST). Every workspace runs under its OWN e-EFKA "Ergani" account
 // (workspace_ergani_credentials), against either the trial or the production environment.
 //
 // Auth (§6.1.1): POST /Authentication {Username,Password,Usertype} → JWT accessToken (3h) +
@@ -23,7 +23,7 @@ export interface ErganiCredentials {
   password: string;
   usertype: string;      // '01' | '02' | '03' — default '02' (Ergani codes)
   employerAfm: string;   // f_afm_ergodoti
-  branchAa: string;      // f_aa (Παράρτημα Α/Α)
+  branchAa: string;      // f_aa (branch No.)
   environment: ErganiEnv;
 }
 

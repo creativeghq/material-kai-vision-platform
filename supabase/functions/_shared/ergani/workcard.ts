@@ -3,9 +3,9 @@
 // (admin action + employee self-service) and the PUBLIC hr-kiosk function use one implementation.
 //
 // The punch row is ALWAYS written (works as internal attendance even before Ergani is set up):
-//   - Ergani configured + employee has ΑΦΜ → filed, punch.status='submitted' + protocol.
+//   - Ergani configured + employee has VAT → filed, punch.status='submitted' + protocol.
 //   - otherwise → punch.status='pending', filed=false, `reason` explains why.
-// opts.requireErgani (admin explicitly clicked "file") makes a missing config / ΑΦΜ / Ergani error
+// opts.requireErgani (admin explicitly clicked "file") makes a missing config / VAT / Ergani error
 // throw instead of degrading to a local-only punch.
 
 import { HttpError } from '../api-logger.ts';
@@ -105,7 +105,7 @@ export async function fileWorkcardPunch(
   if (opts.requireErgani) {
     if (!creds) throw new HttpError(400, 'ergani_not_configured: add your Ergani credentials in Profile → Keys first.');
     if (!creds.employerAfm) throw new HttpError(400, 'employer_afm is not set in your Ergani credentials.');
-    if (!afm) throw new HttpError(400, 'Employee has no ΑΦΜ (set the contact VAT number first).');
+    if (!afm) throw new HttpError(400, 'Employee has no VAT number (set the contact VAT number first).');
   }
 
   const insertPunch = async (status: string, protocol?: string | null) => {

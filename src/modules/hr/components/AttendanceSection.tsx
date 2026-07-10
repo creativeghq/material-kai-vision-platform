@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { hrService, type AttendanceRow, type HrSettings, type NotifyCandidate } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { PunchHistoryDialog, TimesheetDialog } from './AttendanceExtras';
 
 const fmtTime = (t: string | null) => (t ? String(t).slice(0, 5) : '—');
 
@@ -63,7 +64,12 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
       <SectionHeader
         title="Attendance"
         subtitle={date ? `Today · ${date}` : 'Clock-in board'}
-        actions={canManage && settings ? <SettingsDialog workspaceId={workspaceId!} settings={settings} onSaved={load} /> : undefined}
+        actions={workspaceId ? (
+          <div className="flex gap-2">
+            <TimesheetDialog workspaceId={workspaceId} />
+            {canManage && settings && <SettingsDialog workspaceId={workspaceId} settings={settings} onSaved={load} />}
+          </div>
+        ) : undefined}
       />
 
       {settings?.kiosk_enabled && kioskUrl && (
@@ -107,10 +113,13 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
                     </TableCell>
                     {canManage && (
                       <TableCell className="text-right">
+                        <div className="flex justify-end gap-1 items-center">
+                        <PunchHistoryDialog workspaceId={workspaceId!} employeeId={r.employee_id} name={r.name} onChanged={load} />
                         <Button size="sm" variant={r.clocked_in ? 'outline' : 'default'} className="rounded-full h-8"
                           disabled={busyId === r.employee_id} onClick={() => clock(r)}>
                           {busyId === r.employee_id ? <Loader2 className="h-4 w-4 animate-spin" /> : r.clocked_in ? <><LogOut className="h-4 w-4 mr-1" />Out</> : <><LogIn className="h-4 w-4 mr-1" />In</>}
                         </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -159,8 +168,8 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
           {/* Kiosk */}
           <div className="space-y-3">
             <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1"><Smartphone className="h-3.5 w-3.5" /> Public kiosk</div>
-            <Row label="Enable public clock-in page" hint="Employees clock in by ΑΦΜ at /{workspace}/clockin"><Switch checked={s.kiosk_enabled} onCheckedChange={(v) => set('kiosk_enabled', v)} /></Row>
-            <Row label="Require a PIN" hint="Second factor on top of the ΑΦΜ (set per employee)"><Switch checked={s.kiosk_require_pin} onCheckedChange={(v) => set('kiosk_require_pin', v)} /></Row>
+            <Row label="Enable public clock-in page" hint="Employees clock in by VAT number at /{workspace}/clockin"><Switch checked={s.kiosk_enabled} onCheckedChange={(v) => set('kiosk_enabled', v)} /></Row>
+            <Row label="Require a PIN" hint="Second factor on top of the VAT number (set per employee)"><Switch checked={s.kiosk_require_pin} onCheckedChange={(v) => set('kiosk_require_pin', v)} /></Row>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label className="text-xs">Timezone</Label><Input value={s.timezone} onChange={(e) => set('timezone', e.target.value)} className="font-mono text-sm" /></div>
               <div className="space-y-1"><Label className="text-xs">Late grace (min)</Label><Input type="number" min={0} value={s.late_grace_minutes} onChange={(e) => set('late_grace_minutes', Number(e.target.value) || 0)} /></div>

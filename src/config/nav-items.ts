@@ -11,6 +11,7 @@ import {
   Briefcase,
   Inbox,
   UserCircle,
+  Megaphone,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -72,6 +73,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // #252 — employee self-service. hr.self is held ONLY by the 'employee' persona, so this shows
   // for invited employees (never owners/admins, who use the full HR above).
   { id: 'my-hr', label: 'My HR', path: '/my-hr', icon: UserCircle, requireCapability: 'hr.self', surface: 'app', description: 'Your payslips, absences, and requests.' },
+  // #255 — Email Marketing: appears only when the workspace is entitled to 'email-marketing' AND
+  // the persona holds marketing.email (owner/admin of a business node).
+  { id: 'email-marketing', label: 'Email Marketing', path: '/marketing/email', icon: Megaphone, requireCapability: 'marketing.email', moduleSlug: 'email-marketing', surface: 'app', description: 'Design templates and send bulk email campaigns.' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',

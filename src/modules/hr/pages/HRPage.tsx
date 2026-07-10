@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock, Receipt,
+  Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock, Receipt, Landmark,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -13,6 +13,7 @@ import { EmployeesSection } from '../components/EmployeesSection';
 import { DepartmentsSection } from '../components/DepartmentsSection';
 import { TimeOffSection } from '../components/TimeOffSection';
 import { AttendanceSection } from '../components/AttendanceSection';
+import { ErganiSection } from '../components/ErganiSection';
 import { RecruitmentSection } from '../components/RecruitmentSection';
 import { OnboardingSection } from '../components/OnboardingSection';
 import { DocumentsSection } from '../components/DocumentsSection';
@@ -66,6 +67,9 @@ export default function HRPage() {
             <TabsTrigger value="documents" className="w-full justify-start"><FolderOpen className="h-4 w-4 mr-2" /> Documents</TabsTrigger>
             <TabsTrigger value="payroll" className="w-full justify-start"><Wallet className="h-4 w-4 mr-2" /> Payroll</TabsTrigger>
             <TabsTrigger value="accounting" className="w-full justify-start"><Receipt className="h-4 w-4 mr-2" /> Accounting</TabsTrigger>
+
+            <SectionLabel>Compliance</SectionLabel>
+            <TabsTrigger value="ergani" className="w-full justify-start"><Landmark className="h-4 w-4 mr-2" /> Ergani</TabsTrigger>
           </TabsList>
 
           <div className="min-w-0 flex-1 space-y-4">
@@ -79,6 +83,7 @@ export default function HRPage() {
             <TabsContent value="documents" className="mt-0 space-y-4"><DocumentsSection {...sectionProps} /></TabsContent>
             <TabsContent value="payroll" className="mt-0 space-y-4"><PayrollSection {...sectionProps} /></TabsContent>
             <TabsContent value="accounting" className="mt-0 space-y-4"><AccountingSection {...sectionProps} /></TabsContent>
+            <TabsContent value="ergani" className="mt-0 space-y-4"><ErganiSection {...sectionProps} /></TabsContent>
           </div>
         </Tabs>
       </div>

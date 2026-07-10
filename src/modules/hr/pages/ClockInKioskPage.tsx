@@ -1,9 +1,10 @@
 /**
  * PUBLIC workspace clock-in kiosk — app.materialshub.gr/{workspace-slug}/clockin
  *
- * Mobile / tablet friendly. No login: the employee identifies by ΑΦΜ (VAT), optionally a PIN, and
- * taps Clock in / Clock out. Designed for a shared office device or a phone in the field. The
- * workspace must have enabled the kiosk (Profile/HR settings); otherwise this shows a disabled notice.
+ * Mobile / tablet friendly. No login: the employee identifies by VAT number (or by scanning their
+ * Ergani work-card QR), optionally a PIN, and taps Clock in / Clock out. Designed for a shared office
+ * device or a phone in the field. The workspace must have enabled the kiosk (HR → Attendance →
+ * Settings); otherwise this shows a disabled notice.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -12,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { kioskService, type KioskResolve, type KioskLookup } from '../services/kioskService';
+import { QrScanButton } from '../components/QrScanButton';
 
 type Phase = 'loading' | 'disabled' | 'entry' | 'confirm' | 'done';
 
@@ -41,15 +43,22 @@ export default function ClockInKioskPage() {
     setVat(''); setPin(''); setEmp(null); setError(null); setResult(null); setPhase('entry');
   }, []);
 
-  const lookup = async () => {
-    if (!vat.trim()) { setError('Enter your ΑΦΜ'); return; }
+  const lookup = async (vatOverride?: string) => {
+    const v = (vatOverride ?? vat).trim();
+    if (!v) { setError('Enter your VAT number'); return; }
     if (meta?.require_pin && !pin.trim()) { setError('Enter your PIN'); return; }
     setBusy(true); setError(null);
     try {
-      const e = await kioskService.lookup(slug, vat.trim(), pin.trim() || undefined);
+      const e = await kioskService.lookup(slug, v, pin.trim() || undefined);
       setEmp(e); setPhase('confirm');
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
+  };
+
+  // Scanned the Ergani work-card QR → fill the VAT; auto-continue unless a PIN is still needed.
+  const onScannedVat = (v: string) => {
+    setVat(v);
+    if (!meta?.require_pin) void lookup(v);
   };
 
   const doClock = async (punch_type: 'arrival' | 'departure') => {
@@ -85,9 +94,9 @@ export default function ClockInKioskPage() {
 
         {phase === 'entry' && (
           <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-4">
-            <h1 className="text-lg font-semibold text-center">Enter your ΑΦΜ</h1>
+            <h1 className="text-lg font-semibold text-center">Enter your VAT number</h1>
             <div className="space-y-2">
-              <Label className="text-xs">ΑΦΜ (VAT number)</Label>
+              <Label className="text-xs">VAT number</Label>
               <Input value={vat} onChange={(e) => setVat(e.target.value.replace(/\D/g, ''))} inputMode="numeric" autoFocus maxLength={9}
                 className="h-14 text-center text-2xl font-mono tracking-widest" placeholder="•••••••••"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !meta?.require_pin) lookup(); }} />
@@ -101,9 +110,10 @@ export default function ClockInKioskPage() {
               </div>
             )}
             {error && <p className="text-sm text-destructive text-center">{error}</p>}
-            <Button onClick={lookup} disabled={busy} className="w-full h-14 rounded-full text-base">
+            <Button onClick={() => lookup()} disabled={busy} className="w-full h-14 rounded-full text-base">
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Continue'}
             </Button>
+            <QrScanButton onVat={onScannedVat} />
           </div>
         )}
 

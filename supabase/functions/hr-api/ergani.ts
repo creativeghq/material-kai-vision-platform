@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — Ergani II (ΠΣ Ergani) integration actions for the HR module. Dispatched from index.ts
+// #252 — Ergani II (Ergani) integration actions for the HR module. Dispatched from index.ts
 // after the caller is bound to the workspace + entitlement + hr.view. Every submission requires
 // hr.manage. All calls run under the workspace's OWN Ergani credentials (workspace_ergani_credentials).
 //
@@ -228,7 +228,7 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       const leaveCode = String(body?.ergani_leave_code ?? abs.ergani_leave_code ?? '').trim();
       if (!leaveCode) return json({ error: 'ergani_leave_code is required (pick the Ergani leave type).' }, 400);
       const emp = await loadEmployee(ctx, abs.employee_id);
-      if (!emp.afm) return json({ error: 'Employee has no ΑΦΜ (set the contact VAT number first).' }, 400);
+      if (!emp.afm) return json({ error: 'Employee has no VAT number (set the contact VAT number first).' }, 400);
       const creds = await client(ctx);
       if (!creds.employerAfm) return json({ error: 'employer_afm is not set in your Ergani credentials.' }, 400);
       const code = await resolveCode(creds, workspaceId, 'leave');
@@ -339,6 +339,31 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       const creds = await client(ctx);
       try { return json({ pdf_base64: await getSubmittedPdf(creds, workspaceId, code, protocol, submittedDate) }); }
       catch (e) { throw toHttp(e); }
+    }
+
+    // ── Retry a failed submission using its stored request payload ────────────
+    case 'ergani-retry': {
+      requireManage();
+      const id = String(body?.submission_id ?? '');
+      if (!id) return json({ error: 'submission_id is required' }, 400);
+      const { data: row } = await supabase
+        .from('hr_ergani_submissions').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!row) return json({ error: 'submission not found' }, 404);
+      if (row.status !== 'failed') return json({ error: 'only failed submissions can be retried' }, 400);
+      if (!row.request) return json({ error: 'this submission has no stored payload to retry' }, 400);
+      const creds = await client(ctx);
+      try {
+        const res = await submitDocument(creds, workspaceId, row.submission_type, row.request);
+        await supabase.from('hr_ergani_submissions').update({
+          status: 'submitted', protocol: res.protocol, ergani_id: res.id, submit_date: res.submitDate,
+          response: res, error: null, environment: creds.environment,
+        }).eq('id', id).eq('workspace_id', workspaceId);
+        return json({ ok: true, result: res });
+      } catch (e) {
+        const he = toHttp(e);
+        await supabase.from('hr_ergani_submissions').update({ error: he.message }).eq('id', id).eq('workspace_id', workspaceId);
+        throw he;
+      }
     }
 
     // ── Audit log of our submissions ──────────────────────────────────────────

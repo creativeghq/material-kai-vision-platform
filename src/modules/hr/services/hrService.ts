@@ -22,7 +22,7 @@ export interface EmployeeContact {
   position: string | null;
   department: string | null;
   date_of_birth: string | null;
-  vat_number?: string | null; // ΑΦΜ — used for Ergani filings
+  vat_number?: string | null; // VAT — used for Ergani filings
 }
 
 export interface Employee {
@@ -41,7 +41,7 @@ export interface Employee {
   monthly_salary: number | null;
   hourly_rate: number | null;
   salary_currency: string | null;
-  amka: string | null; // ΑΜΚΑ — social-security number, for Ergani filings
+  amka: string | null; // AMKA — social-security number, for Ergani filings
   dependent_children: number; // drives the payroll income-tax credit
   work_start_time: string | null;
   work_end_time: string | null;
@@ -239,13 +239,20 @@ export interface HrSettings {
 }
 export interface ClockEmployeeResult { ok: boolean; punch: unknown; filed: boolean; reason: string | null; is_late: boolean | null; protocol: string | null; }
 export interface NotifyCandidate { user_id: string; name: string; email: string | null; role: string | null; }
+export interface Punch {
+  id: string; employee_id: string; punch_type: 'arrival' | 'departure'; reference_date: string; punched_at: string;
+  source: 'self' | 'kiosk' | 'admin' | 'api'; is_late: boolean | null; status: 'pending' | 'submitted' | 'failed';
+  ergani_protocol: string | null; late_reason: string | null;
+}
+export interface TimesheetDay { date: string; hours: number; first_in: string | null; last_out: string | null; }
+export interface TimesheetRow { employee_id: string; name: string; total_hours: number; open: boolean; days: TimesheetDay[]; }
 
 export const POSTING_STATUS_LABELS: Record<PostingStatus, string> = { draft: 'Draft', open: 'Open', closed: 'Closed' };
 export const APP_STAGE_LABELS: Record<AppStage, string> = { applied: 'Applied', screening: 'Screening', interview: 'Interview', offer: 'Offer', hired: 'Hired', rejected: 'Rejected' };
 export const APP_STAGES: AppStage[] = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
 export const DOC_TYPE_LABELS: Record<DocType, string> = { contract: 'Contract', id: 'ID / Tax', certificate: 'Certificate', payslip: 'Payslip', review: 'Review', other: 'Other' };
 
-// ── Ergani II (ΠΣ Ergani) integration types ──
+// ── Ergani II (Ergani) integration types ──
 export type ErganiEnv = 'trial' | 'production';
 export interface ErganiCredsStatus {
   username: string | null; employer_afm: string | null; branch_aa: string; usertype: string;
@@ -255,7 +262,7 @@ export interface SaveErganiInput {
   username: string; password?: string; employer_afm?: string | null; branch_aa?: string;
   usertype?: string; environment: ErganiEnv; enabled: boolean;
 }
-export interface ErganiLeaveType { code: string; description_el: string; category: string; subcategory: string; is_hourly: boolean; sort_order: number; }
+export interface ErganiLeaveType { code: string; description_el: string; description_en: string | null; category: string; subcategory: string; is_hourly: boolean; sort_order: number; }
 export interface ErganiSubmissionType { id: number; code: string; description: string; }
 export interface ErganiSubmitResult { id: string; protocol: string; submitDate: string; }
 export interface SubmitWorkcardInput { employee_id: string; punch_type: 'arrival' | 'departure'; reference_date?: string; at?: string; late_reason?: string; comments?: string; }
@@ -382,7 +389,7 @@ class HrService {
   saveHrSettings(ws: string, settings: Partial<HrSettings>): Promise<{ settings: HrSettings }> { return call(ws, 'save-hr-settings', settings as Record<string, unknown>); }
   listNotifyCandidates(ws: string): Promise<{ candidates: NotifyCandidate[] }> { return call(ws, 'list-notify-candidates'); }
 
-  // ── Ergani II (ΠΣ Ergani) integration ──────────────────────────────────────
+  // ── Ergani II (Ergani) integration ──────────────────────────────────────
   // Credentials are stored per-workspace in workspace_ergani_credentials (RLS: workspace admin).
   // Config status comes from the masked get_ergani_creds_status RPC (never returns the password).
   async getErganiStatus(ws: string): Promise<ErganiCredsStatus | null> {
@@ -431,6 +438,14 @@ class HrService {
   erganiCancel(ws: string, input: { type_of_document: string; protocol: string; submitted_date: string }): Promise<{ ok: boolean; message: string }> { return call(ws, 'ergani-cancel', input); }
   erganiDownloadPdf(ws: string, input: { code: string; protocol: string; submitted_date: string }): Promise<{ pdf_base64: string }> { return call(ws, 'ergani-download-pdf', input); }
   erganiSubmissionsLog(ws: string, filters: { employee_id?: string; submission_type?: string; limit?: number } = {}): Promise<{ submissions: ErganiSubmission[] }> { return call(ws, 'ergani-submissions-log', filters); }
+  erganiRetry(ws: string, submission_id: string): Promise<{ ok: boolean; result: ErganiSubmitResult }> { return call(ws, 'ergani-retry', { submission_id }); }
+
+  // ── Punch history + corrections + timesheet ──
+  listPunches(ws: string, filters: { employee_id?: string; from?: string; to?: string } = {}): Promise<{ punches: Punch[] }> { return call(ws, 'list-punches', filters); }
+  addManualPunch(ws: string, input: { employee_id: string; punch_type: 'arrival' | 'departure'; at: string; note?: string }): Promise<{ punch: Punch }> { return call(ws, 'add-manual-punch', input); }
+  updatePunch(ws: string, input: { punch_id: string; punched_at?: string; punch_type?: 'arrival' | 'departure'; is_late?: boolean }): Promise<{ punch: Punch }> { return call(ws, 'update-punch', input); }
+  deletePunch(ws: string, punch_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-punch', { punch_id }); }
+  timesheet(ws: string, from: string, to: string): Promise<{ from: string; to: string; timesheet: TimesheetRow[] }> { return call(ws, 'timesheet', { from, to }); }
 }
 
 export const hrService = new HrService();

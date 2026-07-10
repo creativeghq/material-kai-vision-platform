@@ -175,7 +175,7 @@ function LogAbsenceDialog({ workspaceId, employees, onDone }: { workspaceId: str
   );
 }
 
-/** File an approved absence to ΠΣ Ergani as a leave declaration (picks the exact Ergani leave code). */
+/** File an approved absence to Ergani as a leave declaration (picks the exact Ergani leave code). */
 function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspaceId: string; absence: Absence; leaveTypes: ErganiLeaveType[]; onDone: () => void }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -211,7 +211,7 @@ function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspa
             <Select value={code} onValueChange={setCode}>
               <SelectTrigger><SelectValue placeholder="Select leave code" /></SelectTrigger>
               <SelectContent className="max-h-72">
-                {leaveTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} · {t.description_el}</SelectItem>)}
+                {leaveTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} · {t.description_en || t.description_el}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

@@ -1,0 +1,9 @@
+{
+  "slug": "email-marketing",
+  "name": "Email Marketing",
+  "description": "Design email templates in a visual builder and send bulk campaigns to your CRM audiences from your own verified Resend account (bring-your-own-key).",
+  "category": "communications",
+  "priceTier": "pro",
+  "icon": "Megaphone",
+  "version": "0.1.0"
+}

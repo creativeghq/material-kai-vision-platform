@@ -1,10 +1,10 @@
 /**
- * Per-workspace ΠΣ Ergani ΙΙ (Ergani) Web API credentials. Admin-gated; each tenant submits
- * workforce declarations (work card, leaves, E3 hires, schedules) under its OWN e-ΕΦΚΑ "Ergani"
+ * Per-workspace Ergani II (Ergani) Web API credentials. Admin-gated; each tenant submits
+ * workforce declarations (work card, leaves, E3 hires, schedules) under its OWN e-EFKA "Ergani"
  * account. The password is stored in workspace_ergani_credentials (RLS: workspace admin) and never
  * returned to the browser — only `has_password` via the masked get_ergani_creds_status RPC.
  *
- * Trial vs Production: the trial environment (trialeservices.yeka.gr) stamps every submission «ΑΚΥΡΟ»
+ * Trial vs Production: the trial environment (trialeservices.yeka.gr) stamps every submission "VOID"
  * — use it to validate the wiring before switching to Production.
  */
 import React, { useEffect, useState } from 'react';
@@ -82,12 +82,12 @@ export const ErganiCredentialsCard: React.FC<{ workspaceId: string }> = ({ works
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">
-          Enter your business's <strong>ΠΣ Ergani Web API</strong> credentials so the platform can file
+          Enter your business's <strong>Ergani Web API</strong> credentials so the platform can file
           work-card punches, leaves, E3 hires and work-time schedules on your behalf. Managed via the{' '}
           <a href={ERGANI_PORTAL} target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">
             Ergani portal <ExternalLink className="h-3 w-3" />
-          </a>. Every filing runs under <strong>your</strong> e-ΕΦΚΑ account. Use <strong>Trial</strong> first —
-          those submissions are stamped «ΑΚΥΡΟ» and carry no legal effect.
+          </a>. Every filing runs under <strong>your</strong> e-EFKA account. Use <strong>Trial</strong> first —
+          those submissions are stamped "VOID" and carry no legal effect.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -99,18 +99,18 @@ export const ErganiCredentialsCard: React.FC<{ workspaceId: string }> = ({ works
             <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder={hasPassword ? '•••••••• (configured — blank keeps it)' : 'Ergani password'} />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Employer ΑΦΜ <span className="text-muted-foreground">(f_afm_ergodoti)</span></Label>
+            <Label className="text-xs">Employer VAT <span className="text-muted-foreground">(f_afm_ergodoti)</span></Label>
             <Input value={employerAfm} onChange={(e) => setEmployerAfm(e.target.value)} placeholder="e.g. 094187530" className="font-mono" maxLength={9} />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Branch Α/Α <span className="text-muted-foreground">(f_aa, Παράρτημα)</span></Label>
+            <Label className="text-xs">Branch No. <span className="text-muted-foreground">(f_aa, branch)</span></Label>
             <Input value={branchAa} onChange={(e) => setBranchAa(e.target.value)} placeholder="0" className="font-mono" />
           </div>
         </div>
         <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
           <div>
             <div className="text-sm">Environment</div>
-            <p className="text-xs text-muted-foreground">{environment === 'production' ? 'Production — filings are legally binding.' : 'Trial — filings stamped «ΑΚΥΡΟ».'}</p>
+            <p className="text-xs text-muted-foreground">{environment === 'production' ? 'Production — filings are legally binding.' : 'Trial — filings stamped "VOID".'}</p>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className={environment === 'trial' ? 'font-medium' : 'text-muted-foreground'}>Trial</span>

@@ -61,6 +61,9 @@ Deno.serve(withApiLogging('hr-checkin-cron', async (req) => {
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 
+  // Prune the kiosk rate-limit log (only the last minute matters; keep 1h for admin visibility).
+  await supabase.from('hr_kiosk_attempts').delete().lt('created_at', new Date(Date.now() - 3_600_000).toISOString());
+
   const { data: settingsRows } = await supabase.from('hr_settings').select('*').eq('late_alert_enabled', true);
   let checked = 0, alerted = 0;
   const now = new Date();

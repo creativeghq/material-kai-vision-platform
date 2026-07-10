@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
 // Public clock-in kiosk client — talks to the anonymous `hr-kiosk` edge function. No session; the
-// employee is identified by ΑΦΜ (+ optional PIN) against the workspace resolved from the URL slug.
+// employee is identified by VAT (+ optional PIN) against the workspace resolved from the URL slug.
 
 export interface KioskResolve { enabled: boolean; workspace_name: string; require_pin: boolean; }
 export interface KioskLookup { name: string; clocked_in: boolean; work_start_time: string | null; }

@@ -32,7 +32,7 @@ const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'];
  * CONTACT_WRITABLE_COLUMNS, HR-relevant subset). Identity/trust fields are never accepted here. */
 const CONTACT_WRITABLE = [
   'name', 'email', 'phone', 'mobile', 'first_name', 'last_name',
-  'position', 'department', 'date_of_birth', 'vat_number', // vat_number = ΑΦΜ (required for Ergani filings)
+  'position', 'department', 'date_of_birth', 'vat_number', // vat_number = VAT (required for Ergani filings)
   'address', 'city', 'state', 'postal_code', 'country', 'country_code', 'street', 'street_number',
 ] as const;
 
@@ -41,7 +41,7 @@ const EMPLOYEE_WRITABLE = [
   'employment_type', 'start_date', 'end_date', 'weekly_hours',
   'annual_leave_allowance_days', 'manager_contact_id', 'status',
   'department_id', 'monthly_salary', 'salary_currency', 'pay_basis', 'hourly_rate',
-  'amka', // ΑΜΚΑ — social-security number, required for Ergani submissions
+  'amka', // AMKA — social-security number, required for Ergani submissions
   'dependent_children', // drives the payroll income-tax credit
   'work_start_time', 'work_end_time', 'work_days', // working-time window (lateness + kiosk expected)
 ] as const;

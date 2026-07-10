@@ -45,7 +45,8 @@ export type Capability =
   | 'inbox.use'             // #209 multi-tenant inbox (directional messaging)
   | 'hr.view'               // #252 HR module: see employees + absences (sensitive PII)
   | 'hr.manage'             // #252 HR module: create/edit employees, approve/reject absences
-  | 'hr.self';              // #252 HR self-service: an employee sees/acts on ONLY their own record
+  | 'hr.self'               // #252 HR self-service: an employee sees/acts on ONLY their own record
+  | 'marketing.email';      // #255 Email Marketing module: design templates + send bulk campaigns
 
 const ALL_BUSINESS: Capability[] = [
   'network.manage', 'pricing.manage', 'finance.manage', 'invoice.issue', 'crm.view',
@@ -55,6 +56,9 @@ const ALL_BUSINESS: Capability[] = [
   // deliberately NOT in the `staff` list below, so plain members don't see HR. Module ENTITLEMENT
   // (workspace owns 'hr') is enforced separately by EntitlementGuard + assertEntitled.
   'hr.view', 'hr.manage',
+  // #255 Email Marketing — sending from the company's own verified domain is an owner/admin
+  // function (BYOK config is finance-manager-gated). Module entitlement gates it per-workspace.
+  'marketing.email',
 ];
 
 /** Persona → granted capabilities. The ONE place gating policy lives. */

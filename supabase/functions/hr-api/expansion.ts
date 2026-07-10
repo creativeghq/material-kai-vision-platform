@@ -949,6 +949,110 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       return json({ settings: data });
     }
 
+    // ── Punch history + corrections ───────────────────────────────────────────
+    case 'list-punches': {
+      let q = supabase.from('hr_time_punches')
+        .select('id, employee_id, punch_type, reference_date, punched_at, source, is_late, status, ergani_protocol, late_reason')
+        .eq('workspace_id', workspaceId).order('punched_at', { ascending: false }).limit(1000);
+      if (body?.employee_id) q = q.eq('employee_id', String(body.employee_id));
+      if (body?.from) q = q.gte('reference_date', String(body.from));
+      if (body?.to) q = q.lte('reference_date', String(body.to));
+      const { data, error } = await q;
+      if (error) throw new HttpError(400, error.message);
+      return json({ punches: data ?? [] });
+    }
+    // Add a manual (correction / backfill) punch — LOCAL only, never filed to Ergani.
+    case 'add-manual-punch': {
+      requireManage();
+      const employeeId = String(body?.employee_id ?? '');
+      const punchType = String(body?.punch_type ?? '');
+      const at = body?.at ? new Date(String(body.at)) : new Date();
+      if (!employeeId || !['arrival', 'departure'].includes(punchType) || isNaN(at.getTime()))
+        return json({ error: 'employee_id, punch_type (arrival|departure) and a valid at are required' }, 400);
+      const { data: emp } = await supabase.from('hr_employees').select('id').eq('id', employeeId).eq('workspace_id', workspaceId).maybeSingle();
+      if (!emp) return json({ error: 'employee not found in this workspace' }, 404);
+      const { data: settings } = await supabase.from('hr_settings').select('timezone').eq('workspace_id', workspaceId).maybeSingle();
+      const tz = settings?.timezone || 'Europe/Athens';
+      const refDate = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+      const { data, error } = await supabase.from('hr_time_punches').insert({
+        workspace_id: workspaceId, employee_id: employeeId, punch_type: punchType,
+        reference_date: refDate, punched_at: at.toISOString(), source: 'admin', status: 'pending',
+        late_reason: body?.note ? String(body.note) : null, created_by: userId,
+      }).select('*').single();
+      if (error) throw new HttpError(400, error.message);
+      return json({ punch: data }, 201);
+    }
+    // Edit a punch time/type (LOCAL correction; does not retract any Ergani filing).
+    case 'update-punch': {
+      requireManage();
+      const id = String(body?.punch_id ?? '');
+      if (!id) return json({ error: 'punch_id is required' }, 400);
+      const patch: Record<string, unknown> = {};
+      if (body?.punched_at !== undefined) {
+        const at = new Date(String(body.punched_at));
+        if (isNaN(at.getTime())) return json({ error: 'invalid punched_at' }, 400);
+        patch.punched_at = at.toISOString();
+      }
+      if (body?.punch_type !== undefined) {
+        if (!['arrival', 'departure'].includes(String(body.punch_type))) return json({ error: 'invalid punch_type' }, 400);
+        patch.punch_type = String(body.punch_type);
+      }
+      if (body?.is_late !== undefined) patch.is_late = !!body.is_late;
+      if (!Object.keys(patch).length) return json({ error: 'nothing to update' }, 400);
+      const { data, error } = await supabase.from('hr_time_punches').update(patch)
+        .eq('id', id).eq('workspace_id', workspaceId).select('*').maybeSingle();
+      if (error) throw new HttpError(400, error.message);
+      if (!data) return json({ error: 'not found' }, 404);
+      return json({ punch: data });
+    }
+    case 'delete-punch': {
+      requireManage();
+      const id = String(body?.punch_id ?? '');
+      if (!id) return json({ error: 'punch_id is required' }, 400);
+      const { error } = await supabase.from('hr_time_punches').delete().eq('id', id).eq('workspace_id', workspaceId);
+      if (error) throw new HttpError(400, error.message);
+      return json({ ok: true });
+    }
+    // ── Timesheet: pair arrivals/departures into worked hours per employee/day ──
+    case 'timesheet': {
+      const from = String(body?.from ?? '');
+      const to = String(body?.to ?? '');
+      if (!from || !to) return json({ error: 'from and to (YYYY-MM-DD) are required' }, 400);
+      const { data: emps } = await supabase.from('hr_employees')
+        .select('id, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name )')
+        .eq('workspace_id', workspaceId);
+      const { data: punches } = await supabase.from('hr_time_punches')
+        .select('employee_id, punch_type, reference_date, punched_at')
+        .eq('workspace_id', workspaceId).gte('reference_date', from).lte('reference_date', to)
+        .order('punched_at', { ascending: true });
+      const byEmp = new Map<string, any[]>();
+      for (const p of (punches ?? [])) { if (!byEmp.has(p.employee_id)) byEmp.set(p.employee_id, []); byEmp.get(p.employee_id)!.push(p); }
+      const rows = (emps ?? []).map((e: any) => {
+        const list = byEmp.get(e.id) ?? [];
+        const days = new Map<string, { hours: number; first_in: string | null; last_out: string | null }>();
+        let openAt: number | null = null, openDate = '';
+        let total = 0, openIntervals = 0;
+        for (const p of list) {
+          if (p.punch_type === 'arrival') { openAt = new Date(p.punched_at).getTime(); openDate = p.reference_date;
+            const d = days.get(p.reference_date) ?? { hours: 0, first_in: null, last_out: null }; if (!d.first_in) d.first_in = p.punched_at; days.set(p.reference_date, d);
+          } else if (p.punch_type === 'departure' && openAt != null) {
+            const hrs = Math.max(0, (new Date(p.punched_at).getTime() - openAt) / 3_600_000);
+            total += hrs;
+            const d = days.get(openDate) ?? { hours: 0, first_in: null, last_out: null }; d.hours += hrs; d.last_out = p.punched_at; days.set(openDate, d);
+            openAt = null;
+          }
+        }
+        if (openAt != null) openIntervals = 1; // an unmatched clock-in (still on the clock / missing out)
+        return {
+          employee_id: e.id, name: e.contact?.name ?? '',
+          total_hours: Math.round(total * 100) / 100,
+          open: openIntervals > 0,
+          days: Array.from(days.entries()).map(([date, d]) => ({ date, hours: Math.round(d.hours * 100) / 100, first_in: d.first_in, last_out: d.last_out })).sort((a, b) => a.date.localeCompare(b.date)),
+        };
+      });
+      return json({ from, to, timesheet: rows });
+    }
+
     default:
       return null; // not an expansion action
   }

@@ -1,11 +1,11 @@
 // deno-lint-ignore-file no-explicit-any
 // #252 — PUBLIC workspace clock-in kiosk (anonymous). A shared-device / mobile page at
-// /{workspace-slug}/clockin where an employee identifies by ΑΦΜ (VAT) — optionally a PIN —
+// /{workspace-slug}/clockin where an employee identifies by VAT (VAT) — optionally a PIN —
 // and clocks arrival/departure. No session; resolves the workspace from `slug`.
 //
 // SECURITY POSTURE (deliberate speed/security trade-off, opt-in):
 //  • Kiosk is OFF by default — a workspace must set hr_settings.kiosk_enabled=true.
-//  • Identity = ΑΦΜ (the employee must already exist as an active employee of THIS workspace).
+//  • Identity = VAT (the employee must already exist as an active employee of THIS workspace).
 //  • Optional second factor: hr_settings.kiosk_require_pin → a per-employee 4–8 digit PIN.
 //  • Returns minimal data (name + in/out state); never other employees, salary, or ids.
 //  • The punch is recorded and filed to Ergani (WRKCardSE) when the workspace has it configured.
@@ -19,9 +19,15 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
+/** Trusted-ish client IP from the proxy hop. */
+function clientIp(req: Request): string {
+  return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || '0.0.0.0';
+}
+const KIOSK_RATE_LIMIT_PER_MIN = 20; // lookups + clocks per IP per minute
+
 interface KioskEmployee { id: string; name: string; work_start_time: string | null; clock_pin_hash: string | null; }
 
-/** Resolve an active employee of `workspaceId` by ΑΦΜ, or null. */
+/** Resolve an active employee of `workspaceId` by VAT, or null. */
 async function findEmployeeByVat(supabase: any, workspaceId: string, vat: string): Promise<KioskEmployee | null> {
   const { data: contact } = await supabase
     .from('crm_contacts').select('id, name').eq('workspace_id', workspaceId).eq('vat_number', vat).maybeSingle();
@@ -73,17 +79,26 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   }
   if (!kioskEnabled) return json({ error: 'kiosk_disabled', message: 'Clock-in kiosk is not enabled for this workspace.' }, 403);
 
+  // Rate limit: cap lookups + clocks per IP per minute (blunts VAT/PIN probing + punch spam).
+  const ip = clientIp(req);
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabase.from('hr_kiosk_attempts')
+    .select('*', { count: 'exact', head: true }).eq('ip', ip).gte('created_at', since);
+  const limited = (count ?? 0) >= KIOSK_RATE_LIMIT_PER_MIN;
+  await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: limited ? 'rate_limited' : 'attempt' });
+  if (limited) return json({ error: 'rate_limited', message: 'Too many attempts. Please wait a minute and try again.' }, 429);
+
   const vat = String(body?.vat ?? '').trim();
   if (!vat) return json({ error: 'vat is required' }, 400);
   const pin = String(body?.pin ?? '').trim();
 
   const emp = await findEmployeeByVat(supabase, ws.id, vat);
   // Uniform "not found" so a wrong VAT and a wrong PIN look the same (no enumeration signal).
-  if (!emp) return json({ error: 'not_recognized', message: 'ΑΦΜ not recognized for this workspace.' }, 404);
+  if (!emp) return json({ error: 'not_recognized', message: 'VAT number not recognized for this workspace.' }, 404);
   if (requirePin) {
     if (!pin) return json({ error: 'pin_required', message: 'A PIN is required.' }, 401);
     const ok = emp.clock_pin_hash && (await sha256hex(`${ws.id}:${pin}`)) === emp.clock_pin_hash;
-    if (!ok) return json({ error: 'not_recognized', message: 'ΑΦΜ or PIN not recognized.' }, 401);
+    if (!ok) return json({ error: 'not_recognized', message: 'VAT number or PIN not recognized.' }, 401);
   }
 
   if (action === 'lookup') {
