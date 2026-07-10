@@ -429,7 +429,24 @@ async function checkCredits(
   supabase: ReturnType<typeof createClient>,
   userId: string,
   required: number,
+  workspaceId?: string | null,
 ): Promise<void> {
+  // If the active workspace runs on shared credits (a funded pool), fail-fast against the
+  // pool balance; otherwise fall back to the user's personal balance. The authoritative
+  // check (incl. per-member monthly cap) happens at debit time in debit_credits.
+  if (workspaceId) {
+    const { data: pool } = await supabase
+      .from('workspace_credits')
+      .select('balance')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (pool) {
+      if ((pool.balance ?? 0) < required) {
+        throw new Error(`Insufficient workspace credits. Required: ${required}, Available: ${pool.balance ?? 0}`);
+      }
+      return;
+    }
+  }
   // maybeSingle: a user with no user_credits row is a legitimate "0 balance" case,
   // not a 500 — let the explicit insufficient-credits branch handle it.
   const { data, error } = await supabase
@@ -443,18 +460,20 @@ async function checkCredits(
   }
 }
 
-/** Deduct credits from user balance */
+/** Deduct credits — from the workspace pool when funded (with per-member cap), else personal. */
 async function deductCredits(
   supabase: ReturnType<typeof createClient>,
   userId: string,
   credits: number,
   description: string,
+  workspaceId?: string | null,
 ): Promise<void> {
-  const { data, error } = await supabase.rpc('debit_user_credits', {
+  const { data, error } = await supabase.rpc('debit_credits', {
     p_user_id: userId,
     p_amount: credits,
     p_operation_type: 'interior_generation',
     p_description: description,
+    p_workspace_id: workspaceId ?? null,
   });
   if (error) throw new Error(`Credit deduction failed: ${error.message}`);
   const row = Array.isArray(data) ? data[0] : data;
@@ -585,7 +604,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
 
   try {
     // Fail fast before spending 20-30s on generation
-    await checkCredits(supabase, resolvedUserId, credits);
+    await checkCredits(supabase, resolvedUserId, credits, body.workspace_id);
 
     let imageUrl: string;
 
@@ -896,6 +915,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
       resolvedUserId,
       credits,
       `Interior design generation (${model}, ${mode})`,
+      body.workspace_id,
     );
 
     await supabase.from('ai_usage_logs').insert({
