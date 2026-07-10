@@ -2,7 +2,7 @@
 // active (click to open) plus any the persona can add (click to enable / request). Rich rows with
 // an icon, title, and subheading — see useLauncherApps for the data model.
 import React, { useState } from 'react';
-import { LayoutGrid, ArrowRight, ArrowUpRight, Loader2, Plus } from 'lucide-react';
+import { LayoutGrid, ArrowRight, Loader2, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/popover';
@@ -41,7 +41,7 @@ export const AppLauncher: React.FC = () => {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="w-[26rem] sm:w-[32rem] p-0 rounded-2xl shadow-xl border-border/60"
+        className="w-[min(38rem,calc(100vw-1.5rem))] p-0 rounded-2xl shadow-xl border-border/60"
       >
         {/* Radix caret pointing at the trigger — must sit outside the clipped wrapper below. */}
         <PopoverPrimitive.Arrow className="fill-popover" width={16} height={8} />
@@ -70,49 +70,39 @@ export const AppLauncher: React.FC = () => {
           ) : (
             <>
               {active.length > 0 && (
-                <div className="px-3 pt-3">
-                  <div className="flex items-center gap-2 px-1 pb-2">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success))]" />
-                      Active
-                    </span>
-                    <span className="h-px flex-1 bg-border/60" />
-                    <span className="text-[11px] text-muted-foreground tabular-nums">{active.length}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {active.map((app) => (
-                      <button
-                        key={app.id}
-                        onClick={() => go(app.path)}
-                        title={app.description || app.label}
-                        className="group relative flex flex-col gap-2.5 rounded-2xl border border-border/50 bg-muted/25 p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg cursor-pointer"
-                      >
-                        <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary ring-1 ring-inset ring-border/50 transition-colors group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary">
-                          <app.icon className="h-[1.15rem] w-[1.15rem]" />
-                          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[hsl(var(--success))] ring-2 ring-popover" title="Active" />
+                <div className="grid grid-cols-4 gap-2 p-3">
+                  {active.map((app) => (
+                    <button
+                      key={app.id}
+                      onClick={() => go(app.path)}
+                      title={app.description || app.label}
+                      className="group relative flex flex-col gap-2 rounded-2xl border border-border/50 bg-muted/25 p-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg cursor-pointer"
+                    >
+                      <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-primary ring-1 ring-inset ring-border/50 transition-colors group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary">
+                        <app.icon className="h-[1.05rem] w-[1.05rem]" />
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[hsl(var(--success))] ring-2 ring-popover" title="Active" />
+                      </span>
+                      <span className="space-y-0.5">
+                        <span className="block text-[12.5px] font-medium leading-tight truncate">{app.label}</span>
+                        <span className="block text-[11px] text-muted-foreground leading-snug line-clamp-2 min-h-[1.9rem]">
+                          {app.description || 'Open'}
                         </span>
-                        <span className="space-y-0.5">
-                          <span className="block text-[13px] font-medium leading-tight truncate">{app.label}</span>
-                          <span className="block text-[11px] text-muted-foreground leading-snug line-clamp-2 min-h-[1.9rem]">
-                            {app.description || 'Open'}
-                          </span>
-                        </span>
-                        <ArrowUpRight className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-primary opacity-0 transition-opacity group-hover:opacity-100" />
-                      </button>
-                    ))}
-                  </div>
+                      </span>
+                    </button>
+                  ))}
                 </div>
               )}
 
               {available.length > 0 && (
-                <div className="px-3 pb-3">
-                  <div className="flex items-center gap-2 px-1 pb-2 pt-1">
+                <div className="border-t border-border/60 px-3 pb-4 pt-3">
+                  <div className="flex items-center gap-2 px-1 pb-2.5">
                     <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Available to add</span>
                     <span className="h-px flex-1 bg-border/60" />
+                    <span className="text-[11px] text-muted-foreground tabular-nums">{available.length}</span>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     {available.map((app) => (
-                      <div key={app.id} className="flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-accent/30 transition-colors">
+                      <div key={app.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-accent/30 transition-colors">
                         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground ring-1 ring-inset ring-border/50 shrink-0">
                           <app.icon className="h-4 w-4" />
                         </span>
