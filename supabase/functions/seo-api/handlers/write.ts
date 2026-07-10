@@ -67,7 +67,7 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
 
     // Debit credits
     const { data: debitResult, error: debitError } = await supabase.rpc(
-      'debit_user_credits',
+      'debit_credits',
       {
         p_user_id: userId,
         p_amount: CREDIT_COST,
@@ -77,6 +77,7 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
           title: body.article_plan.title,
           target_keyword: body.article_plan.primaryKeyword,
         },
+        p_workspace_id: null,
       },
     );
 

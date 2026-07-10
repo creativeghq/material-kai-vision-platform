@@ -102,13 +102,14 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
 
     // Debit credits
     const { data: debitResult, error: debitError } = await supabase.rpc(
-      'debit_user_credits',
+      'debit_credits',
       {
         p_user_id: userId,
         p_amount: CREDIT_COST,
         p_operation_type: 'seo_plan',
         p_description: `SEO article planning: "${body.target_keyword}"`,
         p_metadata: { topic: body.topic, target_keyword: body.target_keyword },
+        p_workspace_id: null,
       },
     );
 

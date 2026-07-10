@@ -350,7 +350,7 @@ async function loadInboxAgentPersona(db: SupabaseClient): Promise<string> {
  * Phase-2 agent takeover (§9). When a thread is `agent_state='active'`, an inbound customer message
  * triggers an AI reply: it can look up THIS customer's own account (statement/aging, open invoices +
  * pay links, quotes & projects) via read-only thread-scoped tools, then posts the answer as
- * message_type='agent', billed to the workspace owner via debit_user_credits. Available to every
+ * message_type='agent', billed to the workspace pool (or owner personal) via debit_credits. Available to every
  * workspace (no module gate); every reply costs credits and is skipped (left for a human) when the
  * owner can't pay. Only fires on a fresh inbound CUSTOMER message (loop/takeover guard below).
  * Best-effort — any failure leaves the thread for a human, never throws.

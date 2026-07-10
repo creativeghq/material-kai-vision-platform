@@ -65,7 +65,7 @@ async function debit(userId: string, amount: number, op: string, productId?: str
       console.warn(`mention-tools: debit error: ${error.message}`);
       return false;
     }
-    // debit_user_credits returns a TABLE — first row carries .success + .error_message.
+    // debit_credits returns a TABLE — first row carries .success + .error_message.
     // Boolean(data) on the array would always be true, treating "Insufficient credits"
     // as a successful debit. We must inspect the first row.
     const result = Array.isArray(data) ? data[0] : data;

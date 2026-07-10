@@ -8,7 +8,7 @@
  * Admins manage these via the AIModelPricingTab; this module reads the live values via Supabase
  * and caches the result for 5 minutes to avoid hitting the DB on every credit debit.
  *
- * Uses the existing debit_user_credits RPC and ai_usage_logs table.
+ * Uses the shared debit_credits/refund_credits router (workspace pool → personal) and ai_usage_logs.
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -113,7 +113,7 @@ export interface CreditDebitResult {
  * 1. Looks up per-unit cost from DB-backed cache (ai_model_pricing)
  * 2. Applies platform markup (per-row markup_multiplier; defaults to 1.50)
  * 3. Converts to platform credits (1 credit = $0.01)
- * 4. Calls debit_user_credits RPC
+ * 4. Calls the debit_credits router RPC (pools when a workspaceId is passed + funded)
  * 5. Inserts a row into ai_usage_logs for tracking
  */
 export async function debitExternalServiceCredits(

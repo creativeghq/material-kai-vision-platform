@@ -75,13 +75,14 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
 
     // Debit credits for initial analysis
     const { data: debitResult, error: debitError } = await supabase.rpc(
-      'debit_user_credits',
+      'debit_credits',
       {
         p_user_id: userId,
         p_amount: ANALYSIS_CREDIT_COST,
         p_operation_type: 'seo_analyze',
         p_description: `SEO content analysis: "${body.article_plan.title}"`,
         p_metadata: { target_keyword: body.article_plan.primaryKeyword },
+        p_workspace_id: null,
       },
     );
 
@@ -115,13 +116,14 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
 
         // Debit fix credits
         const { data: fixDebit, error: fixDebitErr } = await supabase.rpc(
-          'debit_user_credits',
+          'debit_credits',
           {
             p_user_id: userId,
             p_amount: FIX_CREDIT_COST,
             p_operation_type: 'seo_fix',
             p_description: `SEO auto-fix iteration ${i + 1}`,
             p_metadata: { iteration: i + 1, fixes_count: autoFixableFixes.length },
+            p_workspace_id: null,
           },
         );
 

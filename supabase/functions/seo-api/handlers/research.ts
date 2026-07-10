@@ -90,7 +90,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
 
     // Debit credits
     const { data: debitResult, error: debitError } = await supabase.rpc(
-      'debit_user_credits',
+      'debit_credits',
       {
         p_user_id: userId,
         p_amount: CREDIT_COST,
@@ -101,6 +101,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
           target_keyword: body.target_keyword,
           location_code: locationCode,
         },
+        p_workspace_id: null,
       },
     );
 

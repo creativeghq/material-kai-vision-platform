@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Receipt, Download, ArrowUpDown } from 'lucide-react';
+import { Receipt, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -51,13 +51,15 @@ export const BillingHistoryTab: React.FC = () => {
     });
   };
 
-  const getTransactionBadge = (type: string) => {
-    return type === 'credit' ? (
-      <Badge variant="default" className="bg-green-500">
-        Credit
-      </Badge>
+  // Money-in (purchase / refund / bonus / monthly_grant) vs money-out (debit / deduction)
+  // is decided by the sign of the amount — the transaction_type is only the label.
+  const getTransactionBadge = (t: Transaction) => {
+    const isCredit = Number(t.amount ?? 0) >= 0;
+    const label = (t.transaction_type || (isCredit ? 'credit' : 'debit')).replace(/_/g, ' ');
+    return isCredit ? (
+      <Badge variant="default" className="bg-green-500 capitalize">{label}</Badge>
     ) : (
-      <Badge variant="secondary">Debit</Badge>
+      <Badge variant="secondary" className="capitalize">{label}</Badge>
     );
   };
 
@@ -92,7 +94,6 @@ export const BillingHistoryTab: React.FC = () => {
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Balance After</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -101,27 +102,22 @@ export const BillingHistoryTab: React.FC = () => {
                     <TableCell className="font-medium">
                       {formatDate(transaction.created_at)}
                     </TableCell>
-                    <TableCell>{getTransactionBadge(transaction.transaction_type)}</TableCell>
+                    <TableCell>{getTransactionBadge(transaction)}</TableCell>
                     <TableCell className="max-w-xs truncate">
                       {transaction.description}
                     </TableCell>
                     <TableCell
                       className={`text-right font-semibold ${
-                        transaction.transaction_type !== 'debit'
+                        Number(transaction.amount ?? 0) >= 0
                           ? 'text-green-600'
                           : 'text-red-600'
                       }`}
                     >
-                      {transaction.transaction_type !== 'debit' ? '+' : '-'}
-                      {Math.abs(transaction.amount ?? 0).toFixed(2)}
+                      {Number(transaction.amount ?? 0) >= 0 ? '+' : ''}
+                      {Number(transaction.amount ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
                       {(transaction.balance_after ?? 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        <Download className="h-4 w-4" />
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

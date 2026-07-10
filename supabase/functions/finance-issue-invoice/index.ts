@@ -55,7 +55,7 @@ type Reservation =
   | { ok: false; code: 'insufficient_credits'; error: string; balance: number };
 
 /** Atomically RESERVE (debit up-front) the transmission cost before we hand the document to
- *  the connector. `debit_user_credits` takes a row lock and returns success=false on
+ *  the connector. `debit_credits` (workspace pool → personal) takes a row lock and returns success=false on
  *  insufficient balance — the previous flow only pre-checked the balance then debited AFTER a
  *  successful (paid) submit while swallowing failures, so a debit that lost the race gave away
  *  a free myDATA transmission. Reserving first closes that race; the returned `refund()` gives
