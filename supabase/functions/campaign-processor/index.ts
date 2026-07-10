@@ -21,6 +21,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isCronAuthorized } from '../_shared/auth.ts';
 
 const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 
@@ -55,10 +56,9 @@ async function blockCampaign(supabase: Any, campaign: Any, reason: string, messa
 serve(withApiLogging('campaign-processor', async (req) => {
   await bootstrapForFunction();
   try {
-    // Verify this is a cron request
-    const authHeader = req.headers.get('Authorization');
-    const expectedKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
+    // Cron-only: accept the service-role bearer OR the shared x-cron-secret (the pattern the live
+    // pg_cron schedule uses — see isCronAuthorized). Rejects everything else.
+    if (!isCronAuthorized(req)) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
