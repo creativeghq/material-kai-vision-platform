@@ -161,6 +161,8 @@ export const createManageFlowsTool = (
         'Allowed actions: send_email, send_whatsapp, create_notification, send_agent_message,',
         '  send_campaign (dispatch an Email-Marketing campaign by campaign_id).',
         'Action config may use {{trigger.data.FIELD}} templates (e.g. {{trigger.data.user_id}}).',
+        'Cost: each time a flow RUNS it costs 20 credits ($0.20) from the workspace credit pool,',
+        'plus any per-action cost (e.g. WhatsApp). Creating/listing/toggling a flow is free.',
         '',
         'Actions:',
         '  list   → show this workspace\'s flows.',

@@ -65,6 +65,31 @@ interface ExecutionContext {
 interface FlowScope {
   workspaceId: string | null;
   isGlobal: boolean;
+  /** The flow owner (flows.created_by) — the acting user for workspace-pool debits when a
+   *  tenant flow runs off a 'system' trigger (no real acting user). */
+  ownerUserId: string | null;
+}
+
+// #256 — every TENANT flow RUN costs a base fee (billed to the workspace credit pool),
+// plus any per-action external/AI cost. Operator/global flows and test runs are free.
+// 1 credit = $0.01 in this system, so $0.20 = 20 credits.
+const FLOW_RUN_BASE_CREDITS = 20;
+
+/**
+ * Resolve who/what to bill for an action-level debit. Returns null when the run must not be
+ * charged (operator/global/system flows — same as today). For a real user run, bill that user
+ * (+ their workspace pool if known). For a tenant flow fired by a 'system' trigger, bill the
+ * flow owner against the flow's workspace pool.
+ */
+function resolveFlowDebit(
+  userId: string | undefined,
+  scope: FlowScope | undefined,
+): { userId: string; workspaceId: string | null } | null {
+  if (isRealUserId(userId)) return { userId: userId!, workspaceId: scope?.workspaceId ?? null };
+  if (scope && scope.workspaceId && !scope.isGlobal && scope.ownerUserId) {
+    return { userId: scope.ownerUserId, workspaceId: scope.workspaceId };
+  }
+  return null;
 }
 
 // =====================================================
@@ -257,7 +282,7 @@ async function executeAction(
         },
       });
       if (error) throw new Error(`WhatsApp send failed: ${error.message}`);
-      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'zernio-whatsapp', 'flow_send_whatsapp', 1, { to: resolved.to });
+      { const dt = resolveFlowDebit(userId, scope); if (dt) await debitExternalServiceCredits(supabase, dt.userId, 'zernio-whatsapp', 'flow_send_whatsapp', 1, { to: resolved.to }, dt.workspaceId); }
       return { output: { sent: true, ...(data || {}) } };
     }
 
@@ -674,7 +699,7 @@ async function executeAction(
         }
       });
 
-      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'firecrawl-scrape', 'flow_firecrawl_scrape', 1, { url });
+      { const dt = resolveFlowDebit(userId, scope); if (dt) await debitExternalServiceCredits(supabase, dt.userId, 'firecrawl-scrape', 'flow_firecrawl_scrape', 1, { url }, dt.workspaceId); }
 
       return {
         output: {
@@ -731,7 +756,7 @@ async function executeAction(
       });
 
       const org = apolloResult.organizations?.[0] || apolloResult.accounts?.[0];
-      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'apollo-enrich', 'flow_apollo_enrich', 1, { company_name: companyName });
+      { const dt = resolveFlowDebit(userId, scope); if (dt) await debitExternalServiceCredits(supabase, dt.userId, 'apollo-enrich', 'flow_apollo_enrich', 1, { company_name: companyName }, dt.workspaceId); }
 
       if (!org) {
         return { output: { success: true, found: false, company_name: companyName } };
@@ -786,7 +811,7 @@ async function executeAction(
           }
         });
 
-        if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'hunter-email-finder', 'flow_hunter_find_contacts', 1, { domain, person: `${firstName} ${lastName}`.trim() });
+        { const dt = resolveFlowDebit(userId, scope); if (dt) await debitExternalServiceCredits(supabase, dt.userId, 'hunter-email-finder', 'flow_hunter_find_contacts', 1, { domain, person: `${firstName} ${lastName}`.trim() }, dt.workspaceId); }
 
         return {
           output: {
@@ -830,7 +855,7 @@ async function executeAction(
         });
       }
 
-      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'hunter-domain-search', 'flow_hunter_find_contacts', 1, { domain });
+      { const dt = resolveFlowDebit(userId, scope); if (dt) await debitExternalServiceCredits(supabase, dt.userId, 'hunter-domain-search', 'flow_hunter_find_contacts', 1, { domain }, dt.workspaceId); }
 
       return {
         output: {
@@ -867,7 +892,7 @@ async function executeAction(
         }
       });
 
-      if (isRealUserId(userId)) await debitExternalServiceCredits(supabase, userId!, 'zerobounce-validate', 'flow_zerobounce_validate', 1, { email });
+      { const dt = resolveFlowDebit(userId, scope); if (dt) await debitExternalServiceCredits(supabase, dt.userId, 'zerobounce-validate', 'flow_zerobounce_validate', 1, { email }, dt.workspaceId); }
 
       return {
         output: {
@@ -1246,11 +1271,48 @@ async function handleExecuteFlow(
     return jsonResponse({ success: false, error: `Failed to create run: ${runError.message}` }, 500);
   }
 
-  // #256 — the flow's own scope drives BYOK sender resolution for its actions.
+  // #256 — the flow's own scope drives BYOK sender resolution AND per-run credit metering.
   const scope: FlowScope = {
     workspaceId: (flow.workspace_id as string | null) ?? null,
     isGlobal: flow.is_global === true,
+    ownerUserId: (flow.created_by as string | null) ?? null,
   };
+
+  // #256 — every TENANT flow RUN costs a base fee billed to the workspace credit pool
+  // (operator/global flows and test runs are free). Debit BEFORE running (invariant #10):
+  // if the workspace pool can't cover it, don't do the work — mark the run failed.
+  const isTenantRun = !isTestRun && !!scope.workspaceId && !scope.isGlobal;
+  if (isTenantRun && scope.ownerUserId) {
+    try {
+      const { data: debitRes } = await supabase.rpc('debit_credits', {
+        p_user_id: scope.ownerUserId,
+        p_amount: FLOW_RUN_BASE_CREDITS,
+        p_operation_type: 'flow_run',
+        p_description: `Automation "${flow.name}" run`,
+        p_metadata: { flow_id, run_id: run.id, trigger_type: flow.trigger_type },
+        p_workspace_id: scope.workspaceId,
+      });
+      const debit = Array.isArray(debitRes) ? debitRes[0] : debitRes;
+      if (!debit?.success) {
+        await supabase.from('flow_runs').update({
+          status: 'failed',
+          error_message: `insufficient_credits: ${debit?.error_message || 'workspace credit pool exhausted'}`,
+          completed_at: new Date().toISOString(),
+          duration_ms: Date.now() - runStartTime,
+        }).eq('id', run.id);
+        return jsonResponse({ success: false, error: 'insufficient_credits', data: { run_id: run.id } }, 402);
+      }
+    } catch (e) {
+      // A debit RPC failure is fail-closed for a paid run: don't perform the work uncharged.
+      await supabase.from('flow_runs').update({
+        status: 'failed',
+        error_message: `credit_debit_error: ${(e as Error).message}`,
+        completed_at: new Date().toISOString(),
+        duration_ms: Date.now() - runStartTime,
+      }).eq('id', run.id);
+      return jsonResponse({ success: false, error: 'credit_debit_error', data: { run_id: run.id } }, 402);
+    }
+  }
 
   try {
     // Execute the graph

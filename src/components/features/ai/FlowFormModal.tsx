@@ -121,7 +121,8 @@ export function FlowFormModal({ state, onClose, onSubmit }: Props) {
         <DialogHeader>
           <DialogTitle>New automation</DialogTitle>
           <DialogDescription>
-            Pick what starts it and what happens. It runs only for your workspace.
+            Pick what starts it and what happens. It runs only for your workspace. Each run costs
+            20 credits ($0.20) from your workspace pool, plus any per-action cost.
           </DialogDescription>
         </DialogHeader>
 
