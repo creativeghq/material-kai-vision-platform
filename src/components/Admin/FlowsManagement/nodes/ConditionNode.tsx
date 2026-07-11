@@ -2,11 +2,11 @@ import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   GitBranch, ArrowLeftRight, Filter, Timer,
-  FlaskConical, Repeat, CircleStop,
+  Repeat, CircleStop,
 } from 'lucide-react';
 import type {
   ConditionNodeData, ConditionType,
-  IfElseConfig, SwitchConfig, DelayConfig, ABSplitConfig, LoopConfig,
+  IfElseConfig, SwitchConfig, DelayConfig, LoopConfig,
 } from '@/services/flows/types';
 
 const conditionIcons: Record<ConditionType, React.ElementType> = {
@@ -14,7 +14,6 @@ const conditionIcons: Record<ConditionType, React.ElementType> = {
   switch: ArrowLeftRight,
   filter: Filter,
   delay: Timer,
-  ab_split: FlaskConical,
   loop: Repeat,
   stop: CircleStop,
 };
@@ -38,10 +37,6 @@ function getConditionSummary(data: ConditionNodeData): string {
       const cfg = data.config as DelayConfig;
       return `Wait ${cfg.duration} ${cfg.unit}`;
     }
-    case 'ab_split': {
-      const cfg = data.config as ABSplitConfig;
-      return `A: ${cfg.split_percentage}% / B: ${100 - (cfg.split_percentage || 50)}%`;
-    }
     case 'loop': {
       const cfg = data.config as LoopConfig;
       return cfg.collection_field ? `Loop over: ${cfg.collection_field}` : 'Configure loop...';
@@ -59,7 +54,6 @@ function ConditionNodeComponent({ data, selected }: NodeProps) {
   const summary = getConditionSummary(nodeData);
   const isIfElse = nodeData.conditionType === 'if_else';
   const isSwitch = nodeData.conditionType === 'switch';
-  const isABSplit = nodeData.conditionType === 'ab_split';
   const isStop = nodeData.conditionType === 'stop';
 
   return (
@@ -134,29 +128,6 @@ function ConditionNodeComponent({ data, selected }: NodeProps) {
               position={Position.Bottom}
               id="default"
               className="!w-3 !h-3 !bg-gray-400 !border-2 !border-background"
-              style={{ left: '50%' }}
-            />
-          </div>
-        </div>
-      ) : isABSplit ? (
-        <div className="flex justify-between px-3 pb-2">
-          <div className="relative">
-            <span className="text-[10px] text-blue-600 font-medium">A</span>
-            <Handle
-              type="source"
-              position={Position.Bottom}
-              id="a"
-              className="!w-3 !h-3 !bg-blue-500 !border-2 !border-background"
-              style={{ left: '50%' }}
-            />
-          </div>
-          <div className="relative">
-            <span className="text-[10px] text-purple-500 font-medium">B</span>
-            <Handle
-              type="source"
-              position={Position.Bottom}
-              id="b"
-              className="!w-3 !h-3 !bg-purple-500 !border-2 !border-background"
               style={{ left: '50%' }}
             />
           </div>

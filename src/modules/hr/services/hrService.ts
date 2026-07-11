@@ -295,8 +295,21 @@ class HrService {
   rejectAbsence(workspaceId: string, absenceId: string): Promise<{ absence: Absence }> {
     return call(workspaceId, 'reject-absence', { absence_id: absenceId });
   }
-  analytics(workspaceId: string): Promise<{ analytics: HrAnalytics }> {
-    return call(workspaceId, 'analytics');
+  // The Overview landing reads analytics via a direct (always-warm PostgREST) RPC rather than the
+  // hr-api edge function — the edge function pays a ~1.5-2.9s isolate cold-start on the first HR
+  // navigation, which is the entire "HR body loads slowly" symptom. The RPC enforces the identical
+  // three gates (access → module enabled → entitlement) in SQL. Mirrors Finance's direct-read pattern.
+  async analytics(workspaceId: string): Promise<{ analytics: HrAnalytics }> {
+    const { data, error } = await supabase.rpc('hr_overview_analytics', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return { analytics: data as unknown as HrAnalytics };
+  }
+
+  // Fire-and-forget on HR page mount: warms the hr-api isolate in the background (while the user is
+  // reading the instantly-rendered Overview) so the FIRST tab click — Employees, Departments, etc.,
+  // which do still go through the edge function — is warm rather than cold. Never throws.
+  warm(workspaceId: string): void {
+    void supabase.functions.invoke('hr-api', { body: { action: 'ping', workspace_id: workspaceId } }).catch(() => {});
   }
 
   // ── Departments ──

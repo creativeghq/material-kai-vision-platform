@@ -154,6 +154,12 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
   const action = String(body?.action ?? '').trim();
   const workspaceId = String(body?.workspace_id ?? '').trim();
   if (!action) return json({ error: 'action is required' }, 400);
+
+  // Isolate warm-up. The HR page fires this on mount so the first real tab read hits a warm isolate
+  // rather than paying a cold start. Does no work and touches no workspace data — returns immediately
+  // after auth so it's cheap and safe. Keep BEFORE the workspace_id requirement and the gates.
+  if (action === 'ping') return json({ ok: true });
+
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
 
   // Gates 1–2 are mutually independent DB checks — fire them concurrently, but EVALUATE in strict
