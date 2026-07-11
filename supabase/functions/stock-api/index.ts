@@ -529,12 +529,13 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
           containerType: body?.container_type ? String(body.container_type) : null,
           readyDate: body?.ready_date ? String(body.ready_date) : null,
         };
+        const quoteId = body?.quote_id ? String(body.quote_id) : null; // optional link to a customer quote
         const creds = await resolveSearatesCreds(svc, workspaceId);
 
         // No BYOK key → the request goes to the OPERATOR, who fulfils it and the answer flows back.
         if (!creds) {
           const { data, error } = await usr.from('freight_quotes').insert({
-            workspace_id: workspaceId, origin, destination, mode, container_type: params.containerType,
+            workspace_id: workspaceId, quote_id: quoteId, origin, destination, mode, container_type: params.containerType,
             ready_date: params.readyDate, offers: [], offer_count: 0,
             source: 'operator', status: 'pending', requested_by: userId, created_by: userId,
           }).select('*').single();
@@ -558,7 +559,7 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
 
         const cheapest = offers.find((o) => o.amount != null) ?? null;
         const { data, error } = await usr.from('freight_quotes').insert({
-          workspace_id: workspaceId, origin, destination, mode, container_type: params.containerType,
+          workspace_id: workspaceId, quote_id: quoteId, origin, destination, mode, container_type: params.containerType,
           ready_date: params.readyDate, offers, offer_count: offers.length,
           cheapest_amount: cheapest?.amount ?? null, cheapest_currency: cheapest?.currency ?? null,
           source: 'byok', status: 'quoted', created_by: userId,

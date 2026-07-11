@@ -12,7 +12,6 @@ import { MovementsSection } from '../components/MovementsSection';
 import { StockCountsSection } from '../components/StockCountsSection';
 import { ResupplySection } from '../components/ResupplySection';
 import { InboundSection } from '../components/InboundSection';
-import { FreightQuotesCard } from '../components/FreightQuotesCard';
 
 // Stock Management module page. Extracted from the Finance "Warehouse" tab into a first-class
 // entitlement-gated module (EntitlementGuard wraps this route). Plain Radix tabs (no forceMount) so
@@ -76,7 +75,6 @@ export default function StockPage() {
               <ResupplySection workspaceId={ws} />
             </TabsContent>
             <TabsContent value="inbound" className="mt-0 space-y-4">
-              <FreightQuotesCard workspaceId={ws} />
               <InboundSection workspaceId={ws} />
             </TabsContent>
             <TabsContent value="movements" className="mt-0 space-y-4">

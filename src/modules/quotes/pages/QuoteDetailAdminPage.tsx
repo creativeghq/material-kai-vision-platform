@@ -23,6 +23,7 @@ import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { QuoteItemsList } from '../components/QuoteItemsList';
 import { AddProductsSheet } from '../components/AddProductsSheet';
+import { QuoteShippingCard } from '../components/QuoteShippingCard';
 import {
   Select,
   SelectContent,
@@ -1149,6 +1150,13 @@ export const QuoteDetailPage: React.FC = () => {
 
           {/* Extras Tab */}
           <TabsContent value="extras" className="space-y-5 mt-5">
+            {/* Shipping — freight quote (SeaRates BYOK → instant; else operator) → add as a quote line */}
+            <QuoteShippingCard
+              quoteId={quote.id}
+              editable={quote.status !== 'accepted' && quote.status !== 'rejected'}
+              onAdded={loadQuoteDetails}
+            />
+
             {/* Add Upsell Dropdown Section */}
             <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
               <div className="mb-5">

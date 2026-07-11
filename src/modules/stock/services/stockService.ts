@@ -157,6 +157,7 @@ export interface FreightQuote {
   source: 'byok' | 'operator';
   status: 'pending' | 'quoted' | 'declined';
   operator_note: string | null;
+  quote_id: string | null;
   created_at: string;
 }
 
@@ -280,8 +281,15 @@ export const stockService = {
 
   // ── Freight quotes (SeaRates, BYOK) ─────────────────────────────────────────
   listFreightQuotes: (ws: string) => call<{ quotes: FreightQuote[] }>('shipping-quotes-list', ws).then((r) => r.quotes),
-  getFreightQuote: (ws: string, input: { origin: string; destination: string; mode: string; container_type?: string; ready_date?: string }) =>
+  getFreightQuote: (ws: string, input: { origin: string; destination: string; mode: string; container_type?: string; ready_date?: string; quote_id?: string }) =>
     call<{ quote: FreightQuote }>('shipping-quote', ws, input).then((r) => r.quote),
+  // Freight quotes tied to a specific customer quote (Quotes → Extras). RLS-gated direct read.
+  async listQuoteFreightQuotes(quoteId: string): Promise<FreightQuote[]> {
+    const { data, error } = await supabase.from('freight_quotes').select('*')
+      .eq('quote_id', quoteId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as FreightQuote[];
+  },
 
   // ── Operator freight-quote queue (cross-tenant; operator-only, RPC-gated) ────
   async listPendingQuotes(): Promise<PendingQuoteRequest[]> {
