@@ -364,7 +364,10 @@ export interface StopConfig {
 // =====================================================
 export type ActionType =
   | 'send_sms'
+  | 'send_whatsapp'
   | 'send_email'
+  | 'send_campaign'
+  | 'send_price_alert'
   | 'send_push'
   | 'send_quote'
   | 'build_quote'
@@ -391,6 +394,37 @@ export interface SendSmsConfig {
   to: string;
   message: string;
   channel_id?: string;
+}
+
+/** Messaging module — WhatsApp via Zernio (replaced Twilio/SMS 2026-06-08).
+ *  `send_sms` remains a legacy alias in the engine; new flows use this. */
+export interface SendWhatsAppConfig {
+  to: string;
+  message: string;
+  /** Meta-approved template name (required for cold/marketing sends outside the 24h window). */
+  template_id?: string;
+  from?: string;
+}
+
+/** Email Marketing module (#255) — flips an existing draft/paused/scheduled campaign
+ *  (owned by the flow's workspace) to 'sending' so campaign-processor fans it out via
+ *  the workspace's BYOK Resend. Tenant-scoped flows only. */
+export interface SendCampaignConfig {
+  campaign_id: string;
+}
+
+/** Price Monitoring module — module-gated price alert (bell + audit log). Required
+ *  fields resolve from trigger.data; product_id OR tracked_query_id identifies the subject. */
+export interface SendPriceAlertConfig {
+  user_id: string;
+  alert_type: 'price_drop' | 'new_retailer' | 'promo_started' | 'anomaly_detected';
+  title: string;
+  body: string;
+  product_id?: string;
+  tracked_query_id?: string;
+  retailer_name?: string;
+  retailer_domain?: string;
+  action_url?: string;
 }
 
 export interface SendEmailConfig {
@@ -564,7 +598,7 @@ export interface ConditionNodeData extends BaseNodeData {
 export interface ActionNodeData extends BaseNodeData {
   category: 'action';
   actionType: ActionType;
-  config: SendSmsConfig | SendEmailConfig | SendPushConfig | SendQuoteConfig | BuildQuoteConfig | ApproveQuoteConfig | CreateNotificationConfig | HttpRequestConfig | AssignUserConfig | AddTagConfig | AddNoteConfig | UpdateContactConfig | UpdateProductConfig | RunEdgeFunctionConfig | LogEventConfig | SendAgentMessageConfig | CreateMoodboardConfig | AddToMoodboardConfig | WebSearchConfig | FirecrawlScrapeConfig | ApolloEnrichConfig | HunterFindContactsConfig | ZeroBounceValidateConfig;
+  config: SendSmsConfig | SendWhatsAppConfig | SendEmailConfig | SendCampaignConfig | SendPriceAlertConfig | SendPushConfig | SendQuoteConfig | BuildQuoteConfig | ApproveQuoteConfig | CreateNotificationConfig | HttpRequestConfig | AssignUserConfig | AddTagConfig | AddNoteConfig | UpdateContactConfig | UpdateProductConfig | RunEdgeFunctionConfig | LogEventConfig | SendAgentMessageConfig | CreateMoodboardConfig | AddToMoodboardConfig | WebSearchConfig | FirecrawlScrapeConfig | ApolloEnrichConfig | HunterFindContactsConfig | ZeroBounceValidateConfig;
 }
 
 export type FlowNodeData = TriggerNodeData | ConditionNodeData | ActionNodeData;

@@ -271,12 +271,21 @@ export const paletteItems: NodePaletteItem[] = [
   // ════════════════════════════════════════════════════
 
   // ── Communications ──
-  { type: 'actionNode', category: 'action', subType: 'send_sms', group: 'Communications',
-    label: 'Send SMS', description: 'Send an SMS message', icon: 'MessageSquare', color: 'blue',
-    defaultData: { label: 'Send SMS', category: 'action', actionType: 'send_sms', config: { to: '', message: '' } } as ActionNodeData },
+  // Messaging module — WhatsApp via Zernio (Twilio/SMS removed 2026-06-08). The `send_sms`
+  // action type is kept as a legacy engine alias so old flows still render/run; new flows
+  // use send_whatsapp.
+  { type: 'actionNode', category: 'action', subType: 'send_whatsapp', group: 'Communications',
+    label: 'Send WhatsApp', description: 'Send a WhatsApp message via your connected number', icon: 'MessageCircle', color: 'blue',
+    defaultData: { label: 'Send WhatsApp', category: 'action', actionType: 'send_whatsapp', config: { to: '', message: '' } } as ActionNodeData },
   { type: 'actionNode', category: 'action', subType: 'send_email', group: 'Communications',
     label: 'Send Email', description: 'Send an email message', icon: 'Mail', color: 'blue',
     defaultData: { label: 'Send Email', category: 'action', actionType: 'send_email', config: { to: '', subject: '', body: '' } } as ActionNodeData },
+  { type: 'actionNode', category: 'action', subType: 'send_campaign', group: 'Communications',
+    label: 'Dispatch Email Campaign', description: 'Start an existing Email-Marketing campaign by id', icon: 'Megaphone', color: 'blue',
+    defaultData: { label: 'Dispatch Email Campaign', category: 'action', actionType: 'send_campaign', config: { campaign_id: '' } } as ActionNodeData },
+  { type: 'actionNode', category: 'action', subType: 'send_price_alert', group: 'Communications',
+    label: 'Send Price Alert', description: 'Module-gated price-monitoring alert (bell + audit log)', icon: 'TrendingDown', color: 'blue',
+    defaultData: { label: 'Send Price Alert', category: 'action', actionType: 'send_price_alert', config: { user_id: '', alert_type: 'price_drop', title: '', body: '' } } as ActionNodeData },
   { type: 'actionNode', category: 'action', subType: 'send_push', group: 'Communications',
     label: 'Push Notification', description: 'Send a push notification', icon: 'Smartphone', color: 'blue',
     defaultData: { label: 'Push Notification', category: 'action', actionType: 'send_push', config: { user_id: '', title: '', body: '' } } as ActionNodeData },

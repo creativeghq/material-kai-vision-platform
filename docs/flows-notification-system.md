@@ -139,15 +139,29 @@ Defined in `src/services/flows/types.ts` (`TriggerType`). Beyond the originals
 
 ### Action types (engine handlers in `flow-engine/index.ts`)
 - `create_notification` — insert into `user_notifications` (bell). Guarded.
-- `send_email` — invoke `email-api`. Guarded.
-- `send_sms` — invoke `messaging-api`.
+- `send_email` — invoke `email-api`. Guarded. Tenant-scoped flows send BYOK.
+- `send_whatsapp` — invoke `messaging-api` (WhatsApp via Zernio). `send_sms` is a
+  legacy alias kept for old flows; both route to the same handler.
+- `send_campaign` — flip an existing Email-Marketing campaign (#255) owned by the
+  flow's workspace to `sending`. Tenant-scoped only; never cross-tenant.
+- `send_price_alert` — module-gated (`price-monitoring-notifications`) bell + audit row.
 - `send_push` — resolve the user's `push_subscriptions` -> `notification-dispatcher`.
 - `log_event` — insert an audit/dedup-marker row (`{table, row}`).
 - `run_edge_function` — invoke any edge function with a JSON payload.
-- `send_price_alert`, `send_quote`, `build_quote`, `send_agent_message`,
-  `create_moodboard`, `add_to_moodboard`, `http_request`, plus the enrichment
-  actions (`web_search`, `firecrawl_scrape`, `apollo_enrich`,
+- `send_quote`, `build_quote`, `approve_quote`, `send_agent_message`,
+  `create_moodboard`, `add_to_moodboard`, `http_request`, CRM writes
+  (`assign_user`, `add_tag`, `add_note`, `update_contact`, `update_product`),
+  plus the enrichment actions (`web_search`, `firecrawl_scrape`, `apollo_enrich`,
   `hunter_find_contacts`, `zerobounce_validate`).
+
+> **Admin builder ↔ tenant modal are unified.** The admin Flow Builder palette
+> (`utils/paletteItems.ts`) now exposes the **full engine action vocabulary** —
+> including `send_whatsapp`, `send_campaign`, and `send_price_alert`. The tenant
+> chat modal (`FlowFormModal` + `create_simple_flow` allowlist) is a **curated
+> subset** of that same vocabulary (`create_notification`, `send_email`,
+> `send_whatsapp`, `send_agent_message`, `send_campaign`), so every action a tenant
+> can pick also exists in the admin builder. `send_sms`/`send_whatsapp` are one
+> handler; the palette offers WhatsApp (SMS was removed 2026-06-08).
 
 ### Conditions
 - `if_else`, `switch`, `filter`, `delay` — implemented.

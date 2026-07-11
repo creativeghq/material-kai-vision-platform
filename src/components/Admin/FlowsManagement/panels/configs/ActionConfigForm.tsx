@@ -13,6 +13,9 @@ import {
 import type {
   ActionNodeData,
   SendSmsConfig,
+  SendWhatsAppConfig,
+  SendCampaignConfig,
+  SendPriceAlertConfig,
   SendEmailConfig,
   SendQuoteConfig,
   BuildQuoteConfig,
@@ -103,6 +106,46 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               placeholder="Hello {{trigger.data.name}}!"
               rows={3}
               className="text-sm"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    case 'send_whatsapp': {
+      const cfg = config as SendWhatsAppConfig;
+      return (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Sends via your connected WhatsApp number (Zernio). Cold/marketing sends outside the
+            24h window require a Meta-approved template name.
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">To (phone number)</Label>
+            <Input
+              value={cfg.to || ''}
+              onChange={(e) => onChange({ ...cfg, to: e.target.value })}
+              placeholder="{{trigger.data.phone}}"
+              className="h-8 text-sm font-mono"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Message</Label>
+            <Textarea
+              value={cfg.message || ''}
+              onChange={(e) => onChange({ ...cfg, message: e.target.value })}
+              placeholder="Hi {{trigger.data.name}}, ..."
+              rows={3}
+              className="text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Template name (optional)</Label>
+            <Input
+              value={cfg.template_id || ''}
+              onChange={(e) => onChange({ ...cfg, template_id: e.target.value })}
+              placeholder="order_update"
+              className="h-8 text-sm"
             />
           </div>
         </div>
@@ -1016,6 +1059,111 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               value={cfg.email || ''}
               onChange={(e) => onChange({ ...cfg, email: e.target.value })}
               placeholder="{{trigger.data.email}}"
+              className="h-8 text-sm font-mono"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    case 'send_campaign': {
+      const cfg = config as SendCampaignConfig;
+      return (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Flips an existing Email-Marketing campaign (draft / paused / scheduled) owned by this
+            flow's workspace to <em>sending</em>. Tenant-scoped flows only.
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Campaign id</Label>
+            <Input
+              value={cfg.campaign_id || ''}
+              onChange={(e) => onChange({ ...cfg, campaign_id: e.target.value })}
+              placeholder="UUID of an existing email campaign"
+              className="h-8 text-sm font-mono"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    case 'send_price_alert': {
+      const cfg = config as SendPriceAlertConfig;
+      return (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Module-gated (<code>price-monitoring-notifications</code>). Writes a bell notification +
+            <code>price_alert_log</code> audit row. Identify the subject with a product or tracked-query id.
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Recipient user id</Label>
+            <Input
+              value={cfg.user_id || ''}
+              onChange={(e) => onChange({ ...cfg, user_id: e.target.value })}
+              placeholder="{{trigger.data.user_id}}"
+              className="h-8 text-sm font-mono"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Alert type</Label>
+            <Select
+              value={cfg.alert_type || 'price_drop'}
+              onValueChange={(v) => onChange({ ...cfg, alert_type: v })}
+            >
+              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="price_drop">Price drop</SelectItem>
+                <SelectItem value="new_retailer">New retailer</SelectItem>
+                <SelectItem value="promo_started">Promo started</SelectItem>
+                <SelectItem value="anomaly_detected">Anomaly detected</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Title</Label>
+            <Input
+              value={cfg.title || ''}
+              onChange={(e) => onChange({ ...cfg, title: e.target.value })}
+              placeholder="Price dropped on {{trigger.data.product_name}}"
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Body</Label>
+            <Textarea
+              value={cfg.body || ''}
+              onChange={(e) => onChange({ ...cfg, body: e.target.value })}
+              placeholder="Now {{trigger.data.new_price}} at {{trigger.data.retailer_name}}"
+              rows={2}
+              className="text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Product id (optional)</Label>
+              <Input
+                value={cfg.product_id || ''}
+                onChange={(e) => onChange({ ...cfg, product_id: e.target.value })}
+                placeholder="{{trigger.data.product_id}}"
+                className="h-8 text-sm font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tracked-query id (optional)</Label>
+              <Input
+                value={cfg.tracked_query_id || ''}
+                onChange={(e) => onChange({ ...cfg, tracked_query_id: e.target.value })}
+                placeholder="{{trigger.data.tracked_query_id}}"
+                className="h-8 text-sm font-mono"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Action URL (optional)</Label>
+            <Input
+              value={cfg.action_url || ''}
+              onChange={(e) => onChange({ ...cfg, action_url: e.target.value })}
+              placeholder="/monitoring/{{trigger.data.product_id}}"
               className="h-8 text-sm font-mono"
             />
           </div>

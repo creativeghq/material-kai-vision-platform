@@ -6,10 +6,12 @@ import {
   UserPen, PackageCheck, ScrollText,
   BotMessageSquare, LayoutGrid, ImagePlus,
   Compass, FileSearch, Building2, UserSearch, MailCheck,
+  MessageCircle, Megaphone, TrendingDown,
 } from 'lucide-react';
 import type {
   ActionNodeData, ActionType,
-  SendSmsConfig, SendEmailConfig, HttpRequestConfig,
+  SendSmsConfig, SendWhatsAppConfig, SendCampaignConfig, SendPriceAlertConfig,
+  SendEmailConfig, HttpRequestConfig,
   SendAgentMessageConfig, CreateMoodboardConfig, AddToMoodboardConfig,
   WebSearchConfig, FirecrawlScrapeConfig, ApolloEnrichConfig,
   HunterFindContactsConfig, ZeroBounceValidateConfig,
@@ -17,7 +19,10 @@ import type {
 
 const actionIcons: Record<ActionType, React.ElementType> = {
   send_sms: MessageSquare,
+  send_whatsapp: MessageCircle,
   send_email: Mail,
+  send_campaign: Megaphone,
+  send_price_alert: TrendingDown,
   send_push: Smartphone,
   create_notification: Bell,
   send_quote: Send,
@@ -47,9 +52,21 @@ function getActionSummary(data: ActionNodeData): string {
       const cfg = data.config as SendSmsConfig;
       return cfg.to ? `To: ${cfg.to}` : 'Configure SMS...';
     }
+    case 'send_whatsapp': {
+      const cfg = data.config as SendWhatsAppConfig;
+      return cfg.to ? `WhatsApp → ${cfg.to}` : 'Configure WhatsApp...';
+    }
     case 'send_email': {
       const cfg = data.config as SendEmailConfig;
       return cfg.to ? `To: ${cfg.to}` : 'Configure email...';
+    }
+    case 'send_campaign': {
+      const cfg = data.config as SendCampaignConfig;
+      return cfg.campaign_id ? `Dispatch campaign ${cfg.campaign_id.slice(0, 8)}…` : 'Configure campaign...';
+    }
+    case 'send_price_alert': {
+      const cfg = data.config as SendPriceAlertConfig;
+      return cfg.alert_type ? `Price alert: ${cfg.alert_type}` : 'Configure price alert...';
     }
     case 'http_request': {
       const cfg = data.config as HttpRequestConfig;
