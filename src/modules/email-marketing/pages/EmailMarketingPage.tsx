@@ -17,7 +17,7 @@ import { MarketingTemplatesTab } from '../components/MarketingTemplatesTab';
 import { MarketingCampaignsTab } from '../components/MarketingCampaignsTab';
 
 export default function EmailMarketingPage() {
-  const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
+  const { activeWorkspaceId, isRootWorkspace, loading: wsLoading } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || 'campaigns';
   const [byokReady, setByokReady] = useState(false);
@@ -29,11 +29,17 @@ export default function EmailMarketingPage() {
     setSearchParams(p, { replace: true });
   };
 
+  // "Ready to send" = the workspace has its OWN Resend (BYOK). The operator's ROOT workspace is
+  // exempt: it legitimately sends from the platform default sender, so a configured platform
+  // sender counts as ready there (BYOK-only is a TENANT rule, not an operator one).
+  const senderReady = (cfg: Awaited<ReturnType<typeof emailService.getWorkspaceConfig>>) =>
+    cfg?.source === 'workspace' || (isRootWorkspace && !!cfg?.platform_from_email);
+
   const recheckByok = useCallback(async () => {
     if (!activeWorkspaceId) return;
     const cfg = await emailService.getWorkspaceConfig(activeWorkspaceId).catch(() => null);
-    setByokReady(cfg?.source === 'workspace');
-  }, [activeWorkspaceId]);
+    setByokReady(senderReady(cfg));
+  }, [activeWorkspaceId, isRootWorkspace]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,11 +48,12 @@ export default function EmailMarketingPage() {
       setChecking(true);
       const cfg = await emailService.getWorkspaceConfig(activeWorkspaceId).catch(() => null);
       if (cancelled) return;
-      setByokReady(cfg?.source === 'workspace');
+      setByokReady(senderReady(cfg));
       setChecking(false);
     })();
     return () => { cancelled = true; };
-  }, [activeWorkspaceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId, isRootWorkspace]);
 
   if (wsLoading || checking) return <div className="p-6"><Skeleton className="h-64 w-full" /></div>;
 
@@ -60,7 +67,7 @@ export default function EmailMarketingPage() {
     return (
       <div className="min-h-screen">
         <PageHeader icon={Megaphone} title="Email Marketing" subtitle="Connect your Resend account to start sending" />
-        <div className="p-3 sm:p-6 max-w-2xl space-y-4">
+        <div className="p-3 sm:p-6 max-w-2xl mx-auto space-y-4">
           <div className="dashboard-card">
             <h3 className="text-lg font-semibold mb-1">One step to activate</h3>
             <p className="text-sm text-muted-foreground">

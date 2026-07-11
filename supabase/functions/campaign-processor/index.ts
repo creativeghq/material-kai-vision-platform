@@ -28,16 +28,17 @@ const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 // deno-lint-ignore no-explicit-any
 type Any = any;
 
-/** Does this workspace have a usable BYOK Resend sender? Mirrors resolveWorkspaceEmailSender's
- *  `source === 'workspace'` condition (enabled + api key + from_email). */
-async function workspaceHasByok(supabase: Any, workspaceId: string | null): Promise<boolean> {
+/** Can this workspace send marketing? BYOK configured (mirrors resolveWorkspaceEmailSender's
+ *  `source === 'workspace'`) OR the operator ROOT workspace, which sends from the platform default
+ *  sender (BYOK-only is a tenant rule; the operator is exempt — matches email-api's send gate). */
+async function canWorkspaceSendMarketing(supabase: Any, workspaceId: string | null): Promise<boolean> {
   if (!workspaceId) return false;
-  const { data: cfg } = await supabase
-    .from('workspace_email_config')
-    .select('resend_api_key, from_email, enabled')
-    .eq('workspace_id', workspaceId)
-    .maybeSingle();
-  return !!(cfg && cfg.enabled !== false && (cfg.resend_api_key ?? '').trim() && (cfg.from_email ?? '').trim());
+  const [{ data: cfg }, { data: ws }] = await Promise.all([
+    supabase.from('workspace_email_config').select('resend_api_key, from_email, enabled').eq('workspace_id', workspaceId).maybeSingle(),
+    supabase.from('workspaces').select('is_root').eq('id', workspaceId).maybeSingle(),
+  ]);
+  const hasByok = !!(cfg && cfg.enabled !== false && (cfg.resend_api_key ?? '').trim() && (cfg.from_email ?? '').trim());
+  return hasByok || ws?.is_root === true;
 }
 
 /** Mark a campaign as blocked (paused) with a reason, so the cron stops re-picking it and the UI
@@ -119,9 +120,9 @@ serve(withApiLogging('campaign-processor', async (req) => {
         }
       }
 
-      // BYOK is mandatory for marketing. Short-circuit before touching recipients so a
-      // mis-configured workspace doesn't churn the whole list into `failed`.
-      if (!(await workspaceHasByok(supabase, campaign.workspace_id))) {
+      // BYOK is mandatory for tenant marketing (root/operator sends via platform). Short-circuit
+      // before touching recipients so a mis-configured workspace doesn't churn the list into `failed`.
+      if (!(await canWorkspaceSendMarketing(supabase, campaign.workspace_id))) {
         await blockCampaign(
           supabase, campaign, 'workspace_sender_required',
           'Configure your workspace Resend account (API key + verified sender) to send this campaign.',

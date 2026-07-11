@@ -163,16 +163,25 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
         // #255 marketing BYOK-only gate: fail closed when strict and the resolved sender fell back
         // to the platform key/domain. A workspace that hasn't configured its own verified Resend
-        // MUST NOT send marketing from the shared platform domain.
+        // MUST NOT send marketing from the shared platform domain — EXCEPT the operator's ROOT
+        // workspace, which legitimately sends from the platform default (BYOK-only is a tenant rule).
         if (body.requireWorkspaceSender && sender.source !== 'workspace') {
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: 'This workspace must configure its own Resend account (API key + verified sender) before sending marketing email.',
-              code: 'workspace_sender_required',
-            }),
-            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-          );
+          let isRootWs = false;
+          if (body.workspace_id) {
+            const { data: ws } = await supabaseClient
+              .from('workspaces').select('is_root').eq('id', body.workspace_id).maybeSingle();
+            isRootWs = ws?.is_root === true;
+          }
+          if (!isRootWs) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: 'This workspace must configure its own Resend account (API key + verified sender) before sending marketing email.',
+                code: 'workspace_sender_required',
+              }),
+              { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
         }
 
         // Pre-flight: require a Resend API key. Without this, sendViaResend()
@@ -377,11 +386,21 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           .from('campaigns').select('id, workspace_id').eq('id', campaignId).maybeSingle();
         if (!campaign || campaign.workspace_id !== wsId) throw new HttpError(404, 'not found');
 
-        // Strict BYOK — we poll the workspace's OWN Resend, never the platform key.
+        // Poll the workspace's OWN Resend. The operator ROOT workspace is exempt from BYOK — it
+        // polls the platform Resend key (its campaigns went out under it).
         const statsSender = await resolveWorkspaceEmailSender(supabaseClient, wsId);
-        if (statsSender.source !== 'workspace' || !statsSender.apiKey) {
+        if (statsSender.source !== 'workspace') {
+          const { data: ws } = await supabaseClient.from('workspaces').select('is_root').eq('id', wsId).maybeSingle();
+          if (ws?.is_root !== true) {
+            return new Response(
+              JSON.stringify({ success: false, code: 'workspace_sender_required', error: 'Configure your workspace Resend account to sync stats.' }),
+              { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
+        }
+        if (!statsSender.apiKey) {
           return new Response(
-            JSON.stringify({ success: false, code: 'workspace_sender_required', error: 'Configure your workspace Resend account to sync stats.' }),
+            JSON.stringify({ success: false, code: 'provider_not_configured', error: 'No Resend API key configured.' }),
             { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
