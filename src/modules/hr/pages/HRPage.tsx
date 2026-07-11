@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { hrService } from '../services/hrService';
 import {
   Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock, Receipt, Landmark,
 } from 'lucide-react';
@@ -44,11 +43,6 @@ export default function HRPage() {
 
   const ws = activeWorkspaceId;
   const sectionProps = { workspaceId: ws, canManage };
-
-  // Warm the hr-api isolate in the background as soon as HR opens. The Overview renders instantly
-  // (direct RPC), and by the time the user clicks a tab that DOES hit the edge function, it's warm —
-  // so no tab pays the ~1.5-2.9s cold start. Fire-and-forget; never blocks or throws.
-  useEffect(() => { if (ws) hrService.warm(ws); }, [ws]);
 
   if (wsLoading) return <div className="p-6"><Skeleton className="h-64 w-full" /></div>;
 

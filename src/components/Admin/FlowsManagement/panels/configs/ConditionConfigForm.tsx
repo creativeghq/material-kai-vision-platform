@@ -14,6 +14,7 @@ import type {
   SwitchConfig,
   FilterConfig,
   DelayConfig,
+  ABSplitConfig,
   LoopConfig,
   ComparisonOperator,
 } from '@/services/flows/types';
@@ -246,6 +247,28 @@ export function ConditionConfigForm({ data, onChange }: ConditionConfigFormProps
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        </div>
+      );
+    }
+
+    case 'ab_split': {
+      const cfg = config as ABSplitConfig;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Split Percentage (A)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={99}
+              value={cfg.split_percentage || 50}
+              onChange={(e) => onChange({ ...cfg, split_percentage: parseInt(e.target.value) || 50 })}
+              className="h-8 text-sm"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              A: {cfg.split_percentage || 50}% / B: {100 - (cfg.split_percentage || 50)}%
+            </p>
           </div>
         </div>
       );

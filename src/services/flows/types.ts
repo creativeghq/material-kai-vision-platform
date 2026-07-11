@@ -301,6 +301,7 @@ export type ConditionType =
   | 'switch'
   | 'filter'
   | 'delay'
+  | 'ab_split'
   | 'loop'
   | 'stop';
 
@@ -367,8 +368,14 @@ export type ActionType =
   | 'send_push'
   | 'send_quote'
   | 'build_quote'
+  | 'approve_quote'
   | 'http_request'
   | 'create_notification'
+  | 'assign_user'
+  | 'add_tag'
+  | 'add_note'
+  | 'update_contact'
+  | 'update_product'
   | 'run_edge_function'
   | 'log_event'
   | 'send_agent_message'

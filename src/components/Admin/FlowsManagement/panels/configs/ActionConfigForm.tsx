@@ -19,6 +19,12 @@ import type {
   HttpRequestConfig,
   CreateNotificationConfig,
   SendPushConfig,
+  ApproveQuoteConfig,
+  AssignUserConfig,
+  AddTagConfig,
+  AddNoteConfig,
+  UpdateContactConfig,
+  UpdateProductConfig,
   RunEdgeFunctionConfig,
   LogEventConfig,
   SendAgentMessageConfig,
@@ -242,6 +248,23 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
       );
     }
 
+    case 'approve_quote': {
+      const cfg = config as ApproveQuoteConfig;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Quote</Label>
+            <EntityPicker
+              entityType="quote"
+              value={cfg.quote_id || ''}
+              onSelect={(id) => onChange({ ...cfg, quote_id: id })}
+              placeholder="Select quote..."
+            />
+          </div>
+        </div>
+      );
+    }
+
     case 'http_request': {
       const cfg = config as HttpRequestConfig;
       return (
@@ -344,6 +367,180 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
                 <SelectItem value="error">Error</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </div>
+      );
+    }
+
+    case 'assign_user': {
+      const cfg = config as AssignUserConfig;
+      const entityPickerType = cfg.entity_type === 'quote' ? 'quote' as const
+        : cfg.entity_type === 'contact' ? 'contact' as const
+        : 'product' as const;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Entity Type</Label>
+            <Select
+              value={cfg.entity_type || 'contact'}
+              onValueChange={(val) => onChange({ ...cfg, entity_type: val, entity_id: '' })}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contact">Contact</SelectItem>
+                <SelectItem value="quote">Quote</SelectItem>
+                <SelectItem value="product">Product</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Entity</Label>
+            <EntityPicker
+              entityType={entityPickerType}
+              value={cfg.entity_id || ''}
+              onSelect={(id) => onChange({ ...cfg, entity_id: id })}
+              placeholder={`Select ${cfg.entity_type || 'contact'}...`}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Assign To (Team Member)</Label>
+            <EntityPicker
+              entityType="user"
+              value={cfg.assign_to || ''}
+              onSelect={(id) => onChange({ ...cfg, assign_to: id })}
+              placeholder="Select team member..."
+            />
+          </div>
+        </div>
+      );
+    }
+
+    case 'add_tag': {
+      const cfg = config as AddTagConfig;
+      const tagEntityType = cfg.entity_type === 'product' ? 'product' as const
+        : cfg.entity_type === 'quote' ? 'quote' as const
+        : 'contact' as const;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Entity Type</Label>
+            <Select
+              value={cfg.entity_type || 'contact'}
+              onValueChange={(val) => onChange({ ...cfg, entity_type: val, entity_id: '' })}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contact">Contact</SelectItem>
+                <SelectItem value="product">Product</SelectItem>
+                <SelectItem value="quote">Quote</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Entity</Label>
+            <EntityPicker
+              entityType={tagEntityType}
+              value={cfg.entity_id || ''}
+              onSelect={(id) => onChange({ ...cfg, entity_id: id })}
+              placeholder={`Select ${cfg.entity_type || 'contact'}...`}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tag</Label>
+            <Input
+              value={cfg.tag || ''}
+              onChange={(e) => onChange({ ...cfg, tag: e.target.value })}
+              placeholder="e.g., vip, priority"
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    case 'add_note': {
+      const cfg = config as AddNoteConfig;
+      const noteEntityType = cfg.entity_type === 'quote' ? 'quote' as const
+        : 'contact' as const;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Entity Type</Label>
+            <Select
+              value={cfg.entity_type || 'contact'}
+              onValueChange={(val) => onChange({ ...cfg, entity_type: val, entity_id: '' })}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contact">Contact</SelectItem>
+                <SelectItem value="quote">Quote</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Entity</Label>
+            <EntityPicker
+              entityType={noteEntityType}
+              value={cfg.entity_id || ''}
+              onSelect={(id) => onChange({ ...cfg, entity_id: id })}
+              placeholder={`Select ${cfg.entity_type || 'contact'}...`}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Note</Label>
+            <Textarea
+              value={cfg.note || ''}
+              onChange={(e) => onChange({ ...cfg, note: e.target.value })}
+              placeholder="Auto-generated note..."
+              rows={3}
+              className="text-sm"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    case 'update_contact': {
+      const cfg = config as UpdateContactConfig;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Contact</Label>
+            <EntityPicker
+              entityType="contact"
+              value={cfg.contact_id || ''}
+              onSelect={(id) => onChange({ ...cfg, contact_id: id })}
+              placeholder="Select contact..."
+            />
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Fields to update will be resolved from the flow context at runtime.
+          </div>
+        </div>
+      );
+    }
+
+    case 'update_product': {
+      const cfg = config as UpdateProductConfig;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Product</Label>
+            <EntityPicker
+              entityType="product"
+              value={cfg.product_id || ''}
+              onSelect={(id) => onChange({ ...cfg, product_id: id })}
+              placeholder="Select product..."
+            />
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Fields to update will be resolved from the flow context at runtime.
           </div>
         </div>
       );
