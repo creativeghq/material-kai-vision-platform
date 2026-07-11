@@ -1,8 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Save, Eye, Code, Settings2, ExternalLink, Search as SearchIcon, Plus, Trash2 } from 'lucide-react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
+import { Save, Eye, Code, Settings2, ExternalLink, Search as SearchIcon, Plus, Trash2, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { MarkdownEditor } from '@/components/shared/MarkdownEditor';
+
+// #254 — lazy-load the Yoopta editor: it injects its own Tailwind-named utility classes into <head>
+// at module load (style-inject), which override the app's Tailwind and break responsive layouts.
+// Loading it only when the editor renders keeps that CSS off every other admin page.
+const MarkdownEditorLazy = lazy(() =>
+  import('@/components/shared/MarkdownEditor').then((m) => ({ default: m.MarkdownEditor })),
+);
+function MarkdownEditor(props: React.ComponentProps<typeof MarkdownEditorLazy>) {
+  return (
+    <Suspense fallback={<div className="flex items-center gap-2 text-sm text-muted-foreground py-8"><Loader2 className="h-4 w-4 animate-spin" /> Loading editor…</div>}>
+      <MarkdownEditorLazy {...props} />
+    </Suspense>
+  );
+}
 
 // Special-purpose inline editors mounted as extra tabs based on doc metadata.doc_kind
 import { JobResearchSitesEditor } from './JobResearchSitesEditor';

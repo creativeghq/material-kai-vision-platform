@@ -1,14 +1,28 @@
 // Docs module (#254) — internal documentation. List + editor. The doc creator and the workspace
 // owner can edit; other members read (and, as a follow-up, will propose edits). The KAI agent
 // searches published docs via FTS (no embeddings).
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { BookText, Plus, Save, Trash2, Loader2, Search, Pencil } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { MarkdownEditor } from '@/components/shared/MarkdownEditor';
+
+// #254 — the Yoopta editor injects its own Tailwind-named utility classes into <head> at runtime
+// (style-inject). Loaded eagerly, those override the app's Tailwind (they land later in the cascade),
+// forcing responsive layouts like PageHeader into a centered column app-wide. Lazy-load it so it only
+// loads when a doc is actually opened (also defers a ~13MB chunk off the list view).
+const MarkdownEditorLazy = lazy(() =>
+  import('@/components/shared/MarkdownEditor').then((m) => ({ default: m.MarkdownEditor })),
+);
+function MarkdownEditor(props: React.ComponentProps<typeof MarkdownEditorLazy>) {
+  return (
+    <Suspense fallback={<div className="flex items-center gap-2 text-sm text-muted-foreground py-8"><Loader2 className="h-4 w-4 animate-spin" /> Loading editor…</div>}>
+      <MarkdownEditorLazy {...props} />
+    </Suspense>
+  );
+}
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
