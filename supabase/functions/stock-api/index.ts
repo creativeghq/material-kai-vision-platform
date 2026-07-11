@@ -88,6 +88,11 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
         return json({ overview: data ?? {} });
       }
+      case 'valuation': {
+        const { data, error } = await usr.rpc('stock_valuation', { p_workspace_id: workspaceId });
+        if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
+        return json({ valuation: data ?? {} });
+      }
 
       // ── Warehouses ─────────────────────────────────────────────────────────
       case 'list-warehouses': {

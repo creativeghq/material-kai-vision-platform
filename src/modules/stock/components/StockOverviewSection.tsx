@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Package, AlertTriangle, PackageX, ArrowLeftRight, ClipboardList, Warehouse as WarehouseIcon, PackageCheck, Inbox } from 'lucide-react';
+import { Loader2, Package, AlertTriangle, PackageX, ArrowLeftRight, ClipboardList, Warehouse as WarehouseIcon, PackageCheck, Inbox, Coins } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { stockService, type StockOverview, type LowStockItem } from '../services/stockService';
+import { stockService, type StockOverview, type StockValuation, type LowStockItem } from '../services/stockService';
+
+const fmtMoney = (n: number, ccy?: string) => {
+  const sym = ccy === 'USD' ? '$' : ccy === 'GBP' ? '£' : '€';
+  return `${sym}${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+};
 
 const KPI: React.FC<{ icon: React.ElementType; label: string; value: React.ReactNode; tone?: 'default' | 'amber' | 'red' }> = ({ icon: Icon, label, value, tone = 'default' }) => (
   <div className="dashboard-card p-4 flex items-center gap-3">
@@ -20,6 +25,7 @@ const KPI: React.FC<{ icon: React.ElementType; label: string; value: React.React
 export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: (tab: string) => void }> = ({ workspaceId, onNavigate }) => {
   const { toast } = useToast();
   const [ov, setOv] = useState<StockOverview | null>(null);
+  const [val, setVal] = useState<StockValuation | null>(null);
   const [low, setLow] = useState<LowStockItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,9 +34,12 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
     (async () => {
       setLoading(true);
       try {
-        const [overview, lowRes] = await Promise.all([stockService.overview(workspaceId), stockService.lowStock(workspaceId)]);
+        const [overview, valuation, lowRes] = await Promise.all([
+          stockService.overview(workspaceId), stockService.valuation(workspaceId), stockService.lowStock(workspaceId),
+        ]);
         if (cancelled) return;
         setOv(overview);
+        setVal(valuation);
         setLow(lowRes.items);
       } catch (err: any) {
         if (!cancelled) toast({ title: 'Failed to load stock overview', description: err?.message, variant: 'destructive' });
@@ -47,6 +56,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <KPI icon={Coins} label={`Stock value${ov.items_missing_cost > 0 ? ` · ${ov.items_missing_cost} missing cost` : ''}`} value={fmtMoney(ov.total_value, val?.currencies?.[0])} />
         <KPI icon={Package} label="Stock items" value={ov.items} />
         <KPI icon={WarehouseIcon} label="Warehouses" value={ov.warehouses} />
         <KPI icon={PackageCheck} label="Units on hand" value={Number(ov.total_on_hand).toLocaleString()} />
@@ -56,6 +66,38 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
         <KPI icon={Inbox} label="Pending intake" value={ov.pending_intake} tone={ov.pending_intake > 0 ? 'amber' : 'default'} />
         <KPI icon={ClipboardList} label="Open counts" value={ov.open_counts} />
       </div>
+
+      {val && (val.by_warehouse.length > 1 || val.items_missing_cost > 0) && (
+        <Card>
+          <CardHeader className="border-b border-border/60 px-5 py-3">
+            <CardTitle className="text-sm flex items-center gap-2"><Coins className="h-4 w-4 text-primary" /> Stock valuation</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <tbody>
+                {val.by_warehouse.map((w) => (
+                  <tr key={w.warehouse_id} className="border-b border-border/30">
+                    <td className="px-4 py-2">{w.warehouse_name} <span className="text-xs text-muted-foreground">· {w.items} item{w.items === 1 ? '' : 's'}</span></td>
+                    <td className="px-4 py-2 text-right font-medium">{fmtMoney(w.value, val.currencies?.[0])}</td>
+                  </tr>
+                ))}
+                <tr className="font-medium">
+                  <td className="px-4 py-2">Total</td>
+                  <td className="px-4 py-2 text-right">{fmtMoney(val.total_value, val.currencies?.[0])}</td>
+                </tr>
+              </tbody>
+            </table>
+            {val.items_missing_cost > 0 && (
+              <div className="px-4 py-2 text-xs text-amber-500 border-t border-border/60 flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" /> {val.items_missing_cost} item{val.items_missing_cost === 1 ? '' : 's'} with stock have no product cost — set a cost on the product to value them.
+              </div>
+            )}
+            {val.currencies.length > 1 && (
+              <div className="px-4 py-2 text-xs text-muted-foreground border-t border-border/60">Mixed cost currencies ({val.currencies.join(', ')}) — totals are unconverted sums.</div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">

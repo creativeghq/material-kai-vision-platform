@@ -11,11 +11,21 @@ export interface StockOverview {
   items: number;
   total_on_hand: number;
   total_reserved: number;
+  total_value: number;
+  items_missing_cost: number;
   low_stock: number;
   out_of_stock: number;
   pending_intake: number;
   open_counts: number;
   movements_7d: number;
+}
+
+export interface StockValuation {
+  total_value: number;
+  valued_items: number;
+  items_missing_cost: number;
+  currencies: string[];
+  by_warehouse: { warehouse_id: string; warehouse_name: string; value: number; items: number }[];
 }
 
 export interface StockMovement {
@@ -85,6 +95,7 @@ async function call<T>(action: string, workspaceId: string, extra: Record<string
 
 export const stockService = {
   overview: (ws: string) => call<{ overview: StockOverview }>('overview', ws).then((r) => r.overview),
+  valuation: (ws: string) => call<{ valuation: StockValuation }>('valuation', ws).then((r) => r.valuation),
   lowStock: (ws: string) => call<{ items: LowStockItem[]; count: number }>('list-low-stock', ws),
   listMovements: (ws: string, opts: { item_id?: string; limit?: number } = {}) =>
     call<{ movements: StockMovement[] }>('list-movements', ws, opts).then((r) => r.movements),
