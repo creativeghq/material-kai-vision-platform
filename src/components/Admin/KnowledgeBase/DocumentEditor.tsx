@@ -3,9 +3,8 @@ import { Save, Eye, Code, Settings2, ExternalLink, Search as SearchIcon, Plus, T
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// #254 — lazy-load the Yoopta editor: it injects its own Tailwind-named utility classes into <head>
-// at module load (style-inject), which override the app's Tailwind and break responsive layouts.
-// Loading it only when the editor renders keeps that CSS off every other admin page.
+// #254 — lazy-load the MarkdownEditor (MDXEditor) so its ~400KB chunk loads only when the editor
+// actually renders, not on every admin page that imports this modal.
 const MarkdownEditorLazy = lazy(() =>
   import('@/components/shared/MarkdownEditor').then((m) => ({ default: m.MarkdownEditor })),
 );
@@ -232,7 +231,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             slug,
             content: document.content,
             content_markdown: document.content_markdown,
-            editor_json: (document.editor_json ?? null) as never,
             summary: document.summary,
             category_id: document.category_id,
             seo_keywords: document.seo_keywords,
@@ -263,7 +261,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             slug,
             content: document.content,
             content_markdown: document.content_markdown,
-            editor_json: (document.editor_json ?? null) as never,
             summary: document.summary,
             category_id: document.category_id,
             seo_keywords: document.seo_keywords,
@@ -649,12 +646,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   <div className="space-y-1.5">
                     <Label htmlFor="content">Content *</Label>
                     <MarkdownEditor
-                      seedKey={documentId ?? 'new'}
-                      value={(document.editor_json ?? null) as never}
-                      fallbackMarkdown={document.content ?? ''}
-                      onChange={(json, md) =>
-                        setDocument((d) => ({ ...d, editor_json: json, content: md, content_markdown: md }))
-                      }
+                      value={document.content ?? ''}
+                      onChange={(md) => setDocument((d) => ({ ...d, content: md, content_markdown: md }))}
                       placeholder="Write your document content…"
                       minHeight={360}
                     />

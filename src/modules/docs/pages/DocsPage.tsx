@@ -10,10 +10,8 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 
-// #254 — the Yoopta editor injects its own Tailwind-named utility classes into <head> at runtime
-// (style-inject). Loaded eagerly, those override the app's Tailwind (they land later in the cascade),
-// forcing responsive layouts like PageHeader into a centered column app-wide. Lazy-load it so it only
-// loads when a doc is actually opened (also defers a ~13MB chunk off the list view).
+// #254 — lazy-load the MarkdownEditor (MDXEditor) so its ~400KB chunk loads only when a doc is
+// actually opened, not on the docs list view.
 // lazyWithRetry (not raw React.lazy): after a frontend deploy, a client on the previous
 // build holds stale chunk URLs; the dynamic import then rejects / resolves undefined and
 // React throws "Cannot read properties of undefined (reading 'default')" (Sentry KAI-A2).
@@ -54,8 +52,7 @@ const DocsPage: React.FC = () => {
 
   // editor fields
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');                 // generated markdown (agent FTS + read view)
-  const [bodyJson, setBodyJson] = useState<unknown | null>(null); // Yoopta block-JSON source of truth
+  const [body, setBody] = useState('');
   const [tags, setTags] = useState('');
   const [status, setStatus] = useState('published');
 
@@ -88,13 +85,12 @@ const DocsPage: React.FC = () => {
     setSelectedId(d.id);
     setTitle(d.title);
     setBody(d.content_markdown);
-    setBodyJson(d.editor_json ?? null);
     setTags((d.tags ?? []).join(', '));
     setStatus(d.status);
   };
   const openNew = () => {
     setSelectedId(NEW);
-    setTitle(''); setBody(''); setBodyJson(null); setTags(''); setStatus('published');
+    setTitle(''); setBody(''); setTags(''); setStatus('published');
   };
 
   const save = async () => {
@@ -104,7 +100,6 @@ const DocsPage: React.FC = () => {
     const input = {
       title: title.trim(),
       content_markdown: body,
-      editor_json: bodyJson,
       tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       category: null,
       status,
@@ -260,14 +255,7 @@ const DocsPage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <MarkdownEditor
-                    seedKey={selectedId ?? 'new'}
-                    value={bodyJson as never}
-                    fallbackMarkdown={body}
-                    onChange={(json, md) => { setBodyJson(json); setBody(md); }}
-                    placeholder="Write your document…"
-                    minHeight={420}
-                  />
+                  <MarkdownEditor value={body} onChange={setBody} placeholder="Write your document…" minHeight={420} />
                   <div className="flex justify-between">
                     <div>
                       {selected && (
@@ -330,12 +318,7 @@ const DocsPage: React.FC = () => {
                   ) : (
                     <div className="pt-3 border-t space-y-2">
                       <p className="text-sm font-medium">Propose changes</p>
-                      <MarkdownEditor
-                        seedKey={`suggest-${selected?.id ?? 'new'}`}
-                        fallbackMarkdown={suggestBody}
-                        onChange={(_json, md) => setSuggestBody(md)}
-                        minHeight={240}
-                      />
+                      <MarkdownEditor value={suggestBody} onChange={setSuggestBody} minHeight={240} />
                       <Input value={suggestReason} onChange={(e) => setSuggestReason(e.target.value)} placeholder="Why this change? (optional)" />
                       <div className="flex justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => setSuggesting(false)}>Cancel</Button>

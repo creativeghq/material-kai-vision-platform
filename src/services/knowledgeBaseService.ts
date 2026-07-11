@@ -22,9 +22,6 @@ export interface KBDocument {
   slug?: string | null;
   content: string;
   content_markdown?: string;
-  // Yoopta block-JSON = editor source of truth. content/content_markdown are the
-  // generated markdown projection consumed by agents/embeddings/public KB.
-  editor_json?: unknown | null;
   summary?: string;
   category_id?: string;
   seo_keywords?: string[];
