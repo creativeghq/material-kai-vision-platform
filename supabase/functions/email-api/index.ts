@@ -100,6 +100,106 @@ function mapResendEventToPatch(lastEvent: string, nowISO: string): StatsPatch | 
   }
 }
 
+// ── #255 Resend Audience/Contacts sync ───────────────────────────────────────
+// deno-lint-ignore no-explicit-any
+type AnyClient = any;
+const RESEND = 'https://api.resend.com';
+const CONTACT_SYNC_CAP = 300; // max NEW contacts pushed per run (Resend rate-limit + edge time budget)
+
+/** Resolve which Resend key to use for CONTACTS ops: the workspace's own BYOK, or — only for the
+ *  operator ROOT workspace — the platform key. A non-root workspace without BYOK is NOT allowed
+ *  (we must never sync a tenant's CRM into the shared platform audience). */
+async function resolveContactsKey(supabase: AnyClient, workspaceId: string): Promise<{ apiKey: string | null; allowed: boolean }> {
+  const sender = await resolveWorkspaceEmailSender(supabase, workspaceId);
+  if (sender.source === 'workspace') return { apiKey: sender.apiKey || null, allowed: true };
+  const { data: ws } = await supabase.from('workspaces').select('is_root').eq('id', workspaceId).maybeSingle();
+  if (ws?.is_root === true) return { apiKey: sender.apiKey || null, allowed: true };
+  return { apiKey: null, allowed: false };
+}
+
+/** Get-or-create the workspace's Resend audience id (validated; recreated if stale). Persists it on
+ *  workspace_email_config (upsert — a root workspace may have no row yet). */
+async function ensureAudience(supabase: AnyClient, workspaceId: string, apiKey: string): Promise<string> {
+  const { data: cfg } = await supabase
+    .from('workspace_email_config').select('resend_audience_id').eq('workspace_id', workspaceId).maybeSingle();
+  let audienceId: string | null = cfg?.resend_audience_id || null;
+  if (audienceId) {
+    const check = await fetch(`${RESEND}/audiences/${audienceId}`, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+    if (check.ok) return audienceId;
+    audienceId = null; // stale (deleted in Resend) → recreate
+  }
+  const res = await fetch(`${RESEND}/audiences`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: `Materials Hub — ${workspaceId.slice(0, 8)}` }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.id) throw new HttpError(502, `Resend audience create failed: ${data?.message || res.status}`);
+  audienceId = data.id as string;
+  await supabase.from('workspace_email_config').upsert(
+    { workspace_id: workspaceId, resend_audience_id: audienceId, updated_at: new Date().toISOString() },
+    { onConflict: 'workspace_id' },
+  );
+  return audienceId;
+}
+
+async function listAudienceContacts(audienceId: string, apiKey: string): Promise<any[]> {
+  const res = await fetch(`${RESEND}/audiences/${audienceId}/contacts`, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new HttpError(502, `Resend contacts list failed: ${data?.message || res.status}`);
+  return (data?.data ?? []) as any[];
+}
+
+function splitName(name: string | null): { first?: string; last?: string } {
+  const n = (name ?? '').trim();
+  if (!n) return {};
+  const parts = n.split(/\s+/);
+  return { first: parts[0], last: parts.length > 1 ? parts.slice(1).join(' ') : undefined };
+}
+
+/** Push CRM contacts (workspace-scoped, with an email) into the Resend audience — additive only
+ *  (never deletes; never re-adds an existing/unsubscribed contact). Returns a summary + stamps
+ *  contacts_last_synced_at / count / error on workspace_email_config. */
+async function syncCrmContactsToResend(supabase: AnyClient, workspaceId: string): Promise<{ audience_id: string; added: number; already: number; total_crm: number; capped: boolean }> {
+  const { apiKey, allowed } = await resolveContactsKey(supabase, workspaceId);
+  if (!allowed || !apiKey) throw new HttpError(503, 'workspace_sender_required');
+  const audienceId = await ensureAudience(supabase, workspaceId, apiKey);
+
+  const existing = new Set<string>();
+  for (const c of await listAudienceContacts(audienceId, apiKey)) {
+    if (c?.email) existing.add(String(c.email).trim().toLowerCase());
+  }
+
+  const { data: crm } = await supabase
+    .from('crm_contacts').select('email, name')
+    .eq('workspace_id', workspaceId).not('email', 'is', null).neq('email', '').limit(5000);
+
+  const seen = new Set<string>();
+  let added = 0, already = 0, capped = false;
+  for (const c of crm ?? []) {
+    const email = String(c.email).trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    if (existing.has(email)) { already++; continue; }
+    if (added >= CONTACT_SYNC_CAP) { capped = true; break; }
+    const { first, last } = splitName(c.name);
+    const r = await fetch(`${RESEND}/audiences/${audienceId}/contacts`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, first_name: first, last_name: last, unsubscribed: false }),
+    });
+    if (r.ok) added++; else already++; // already-exists / transient → count as skipped, don't fail the run
+  }
+
+  await supabase.from('workspace_email_config').update({
+    contacts_last_synced_at: new Date().toISOString(),
+    contacts_last_sync_count: added,
+    contacts_last_sync_error: null,
+  }).eq('workspace_id', workspaceId);
+
+  return { audience_id: audienceId, added, already, total_crm: seen.size, capped };
+}
+
 Deno.serve(withApiLogging('email-api', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -452,6 +552,82 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           JSON.stringify({ success: true, updated, synced: (recips ?? []).length, by_status: byStatus }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
+      }
+
+      case 'resend-contacts': {
+        // List the workspace's Resend audience contacts + sync settings. Ensures the audience exists.
+        if (req.method !== 'POST') throw new Error('Method not allowed');
+        const wsId = String(requestBody.workspace_id ?? '');
+        if (!wsId) throw new HttpError(400, 'workspace_id is required');
+        if (!isAdminAccess(auth)) {
+          if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
+        }
+        const { apiKey, allowed } = await resolveContactsKey(supabaseClient, wsId);
+        const { data: cfg } = await supabaseClient
+          .from('workspace_email_config')
+          .select('contacts_auto_sync, contacts_last_synced_at, contacts_last_sync_count, contacts_last_sync_error, resend_audience_id')
+          .eq('workspace_id', wsId).maybeSingle();
+        if (!allowed || !apiKey) {
+          // Not configured to sync (non-root tenant without BYOK). Return settings so the UI can
+          // render the "configure Resend" state instead of erroring.
+          return new Response(
+            JSON.stringify({ success: true, allowed: false, contacts: [], auto_sync: cfg?.contacts_auto_sync ?? false, last_synced_at: cfg?.contacts_last_synced_at ?? null, last_sync_count: cfg?.contacts_last_sync_count ?? null }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+        const audienceId = await ensureAudience(supabaseClient, wsId, apiKey);
+        const contacts = (await listAudienceContacts(audienceId, apiKey)).map((c: any) => ({
+          id: c.id, email: c.email, first_name: c.first_name ?? null, last_name: c.last_name ?? null,
+          unsubscribed: !!c.unsubscribed, created_at: c.created_at ?? null,
+        }));
+        return new Response(
+          JSON.stringify({
+            success: true, allowed: true, audience_id: audienceId, contacts,
+            auto_sync: cfg?.contacts_auto_sync ?? false,
+            last_synced_at: cfg?.contacts_last_synced_at ?? null,
+            last_sync_count: cfg?.contacts_last_sync_count ?? null,
+            last_sync_error: cfg?.contacts_last_sync_error ?? null,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      case 'sync-resend-contacts': {
+        if (req.method !== 'POST') throw new Error('Method not allowed');
+        const wsId = String(requestBody.workspace_id ?? '');
+        if (!wsId) throw new HttpError(400, 'workspace_id is required');
+        if (!isAdminAccess(auth)) {
+          if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
+        }
+        try {
+          const summary = await syncCrmContactsToResend(supabaseClient, wsId);
+          return new Response(JSON.stringify({ success: true, ...summary }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        } catch (e) {
+          if (e instanceof HttpError && e.status === 503) {
+            return new Response(
+              JSON.stringify({ success: false, code: 'workspace_sender_required', error: 'Configure your workspace Resend account to sync contacts.' }),
+              { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
+          // Persist the error so the UI's "last sync" can surface it.
+          await supabaseClient.from('workspace_email_config').update({ contacts_last_sync_error: (e as Error).message?.slice(0, 500) ?? 'sync failed' }).eq('workspace_id', wsId);
+          throw e;
+        }
+      }
+
+      case 'set-resend-contact-sync': {
+        if (req.method !== 'POST') throw new Error('Method not allowed');
+        const wsId = String(requestBody.workspace_id ?? '');
+        if (!wsId) throw new HttpError(400, 'workspace_id is required');
+        if (typeof requestBody.auto_sync !== 'boolean') throw new HttpError(400, 'auto_sync (boolean) is required');
+        if (!isAdminAccess(auth)) {
+          if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
+        }
+        await supabaseClient.from('workspace_email_config').upsert(
+          { workspace_id: wsId, contacts_auto_sync: requestBody.auto_sync, updated_at: new Date().toISOString() },
+          { onConflict: 'workspace_id' },
+        );
+        return new Response(JSON.stringify({ success: true, auto_sync: requestBody.auto_sync }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       case 'domains': {

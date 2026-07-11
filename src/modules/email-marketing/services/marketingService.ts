@@ -251,6 +251,40 @@ class MarketingService {
     return { updated: data.updated ?? 0, synced: data.synced ?? 0, by_status: data.by_status ?? {} };
   }
 
+  // ── Resend audience / contacts sync ──────────────────────────────────────────
+  async listResendContacts(workspaceId: string): Promise<ResendContactsResult> {
+    const { data, error } = await supabase.functions.invoke('email-api', {
+      body: { action: 'resend-contacts', workspace_id: workspaceId },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.success) throw new Error(data?.error || 'Failed to load Resend contacts');
+    return {
+      allowed: !!data.allowed,
+      contacts: (data.contacts || []) as ResendContact[],
+      auto_sync: !!data.auto_sync,
+      last_synced_at: data.last_synced_at ?? null,
+      last_sync_count: data.last_sync_count ?? null,
+      last_sync_error: data.last_sync_error ?? null,
+    };
+  }
+
+  async syncResendContacts(workspaceId: string): Promise<{ added: number; already: number; total_crm: number; capped: boolean }> {
+    const { data, error } = await supabase.functions.invoke('email-api', {
+      body: { action: 'sync-resend-contacts', workspace_id: workspaceId },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.success) throw new Error(data?.error || 'Failed to sync contacts');
+    return { added: data.added ?? 0, already: data.already ?? 0, total_crm: data.total_crm ?? 0, capped: !!data.capped };
+  }
+
+  async setContactAutoSync(workspaceId: string, autoSync: boolean): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('email-api', {
+      body: { action: 'set-resend-contact-sync', workspace_id: workspaceId, auto_sync: autoSync },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.success) throw new Error(data?.error || 'Failed to update setting');
+  }
+
   async getStats(campaignId: string): Promise<CampaignStats> {
     const { data, error } = await supabase
       .from('campaign_recipients')
@@ -276,6 +310,24 @@ class MarketingService {
 export interface CampaignStats {
   total: number; pending: number; sent: number; delivered: number;
   opened: number; clicked: number; bounced: number; complained: number; failed: number;
+}
+
+export interface ResendContact {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  unsubscribed: boolean;
+  created_at: string | null;
+}
+
+export interface ResendContactsResult {
+  allowed: boolean;
+  contacts: ResendContact[];
+  auto_sync: boolean;
+  last_synced_at: string | null;
+  last_sync_count: number | null;
+  last_sync_error: string | null;
 }
 
 export const marketingService = new MarketingService();

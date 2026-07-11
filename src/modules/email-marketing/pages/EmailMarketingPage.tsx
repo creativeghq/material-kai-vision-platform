@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Megaphone, Settings, FileText, Send } from 'lucide-react';
+import { Megaphone, Settings, FileText, Send, Users } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
@@ -15,6 +15,7 @@ import { emailService } from '@/modules/email/services/emailService';
 import { MarketingSetupCard } from '../components/MarketingSetupCard';
 import { MarketingTemplatesTab } from '../components/MarketingTemplatesTab';
 import { MarketingCampaignsTab } from '../components/MarketingCampaignsTab';
+import { MarketingContactsTab } from '../components/MarketingContactsTab';
 
 export default function EmailMarketingPage() {
   const { activeWorkspaceId, isRootWorkspace, loading: wsLoading } = useWorkspace();
@@ -90,11 +91,13 @@ export default function EmailMarketingPage() {
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="campaigns"><Send className="h-4 w-4 mr-2" /> Campaigns</TabsTrigger>
             <TabsTrigger value="templates"><FileText className="h-4 w-4 mr-2" /> Templates</TabsTrigger>
+            <TabsTrigger value="contacts"><Users className="h-4 w-4 mr-2" /> Contacts</TabsTrigger>
             <TabsTrigger value="setup"><Settings className="h-4 w-4 mr-2" /> Setup</TabsTrigger>
           </TabsList>
 
           <TabsContent value="campaigns" className="mt-0"><MarketingCampaignsTab workspaceId={ws} byokReady={byokReady} /></TabsContent>
           <TabsContent value="templates" className="mt-0"><MarketingTemplatesTab workspaceId={ws} /></TabsContent>
+          <TabsContent value="contacts" className="mt-0"><MarketingContactsTab workspaceId={ws} /></TabsContent>
           <TabsContent value="setup" className="mt-0"><MarketingSetupCard workspaceId={ws} byokReady={byokReady} /></TabsContent>
         </Tabs>
       </div>
