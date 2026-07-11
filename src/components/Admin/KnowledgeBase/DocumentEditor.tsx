@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Save, Eye, Code, Bold, Italic, Heading1, Heading2, List, ListOrdered, Link, Quote, Minus, Table, Settings2, ExternalLink, Search as SearchIcon, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Eye, Code, Settings2, ExternalLink, Search as SearchIcon, Plus, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { MarkdownEditor } from '@/components/shared/MarkdownEditor';
 
 // Special-purpose inline editors mounted as extra tabs based on doc metadata.doc_kind
 import { JobResearchSitesEditor } from './JobResearchSitesEditor';
@@ -73,34 +74,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>('');
   const [activeTab, setActiveTab] = useState('edit');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { toast } = useToast();
-
-  // Insert markdown syntax around selection or at cursor
-  const insertMarkdown = (before: string, after = '', placeholder = '') => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const selected = ta.value.slice(start, end) || placeholder;
-    const newValue = ta.value.slice(0, start) + before + selected + after + ta.value.slice(end);
-    setDocument((d) => ({ ...d, content: newValue }));
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.setSelectionRange(start + before.length, start + before.length + selected.length);
-    });
-  };
-
-  const insertLine = (prefix: string) => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const lineStart = ta.value.lastIndexOf('\n', start - 1) + 1;
-    const newValue = ta.value.slice(0, lineStart) + prefix + ta.value.slice(lineStart);
-    setDocument((d) => ({ ...d, content: newValue }));
-    requestAnimationFrame(() => { ta.focus(); });
-  };
 
   // Load workspace + categories on mount
   useEffect(() => {
@@ -655,43 +630,14 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   (markdown toolbar) when you're viewing Preview or Manage, visibly
                   pushing the active tab's content down. */}
               <TabsContent value="edit" className="flex-1 m-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-                {/* Markdown toolbar */}
-                <div className="border-b px-4 py-1.5 flex flex-wrap gap-0.5 bg-muted/30">
-                  {[
-                    { icon: Heading1,     title: 'Heading 1',       action: () => insertLine('# ') },
-                    { icon: Heading2,     title: 'Heading 2',       action: () => insertLine('## ') },
-                    { icon: Bold,         title: 'Bold',             action: () => insertMarkdown('**', '**', 'bold text') },
-                    { icon: Italic,       title: 'Italic',           action: () => insertMarkdown('*', '*', 'italic text') },
-                    { icon: Quote,        title: 'Blockquote',       action: () => insertLine('> ') },
-                    { icon: List,         title: 'Bullet list',      action: () => insertLine('- ') },
-                    { icon: ListOrdered,  title: 'Numbered list',    action: () => insertLine('1. ') },
-                    { icon: Link,         title: 'Link',             action: () => insertMarkdown('[', '](url)', 'link text') },
-                    { icon: Code,         title: 'Code block',       action: () => insertMarkdown('```\n', '\n```', 'code') },
-                    { icon: Minus,        title: 'Horizontal rule',  action: () => insertLine('\n---\n') },
-                    { icon: Table,        title: 'Table',            action: () => insertLine('| Column 1 | Column 2 |\n| --- | --- |\n| Cell | Cell |\n') },
-                  ].map(({ icon: Icon, title, action }) => (
-                    <button
-                      key={title}
-                      type="button"
-                      title={title}
-                      onClick={action}
-                      className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                    </button>
-                  ))}
-                </div>
-
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="content">Content *</Label>
-                    <textarea
-                      ref={textareaRef}
-                      id="content"
-                      value={document.content}
-                      onChange={(e) => setDocument({ ...document, content: e.target.value })}
-                      placeholder="Write your document content in Markdown..."
-                      className="w-full min-h-[320px] font-mono text-sm rounded-md border border-input bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    <MarkdownEditor
+                      value={document.content ?? ''}
+                      onChange={(md) => setDocument((d) => ({ ...d, content: md }))}
+                      placeholder="Write your document content…"
+                      minHeight={360}
                     />
                   </div>
                   <div className="space-y-1.5">

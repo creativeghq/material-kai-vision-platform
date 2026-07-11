@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Textarea } from '@/components/core/ui/textarea';
+import { MarkdownEditor } from '@/components/shared/MarkdownEditor';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -238,7 +238,7 @@ const DocsPage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write in Markdown…" className="min-h-[420px] font-mono text-sm" />
+                  <MarkdownEditor value={body} onChange={setBody} placeholder="Write your document…" minHeight={420} />
                   <div className="flex justify-between">
                     <div>
                       {selected && (
@@ -301,7 +301,7 @@ const DocsPage: React.FC = () => {
                   ) : (
                     <div className="pt-3 border-t space-y-2">
                       <p className="text-sm font-medium">Propose changes</p>
-                      <Textarea value={suggestBody} onChange={(e) => setSuggestBody(e.target.value)} className="min-h-[240px] font-mono text-sm" />
+                      <MarkdownEditor value={suggestBody} onChange={setSuggestBody} minHeight={240} />
                       <Input value={suggestReason} onChange={(e) => setSuggestReason(e.target.value)} placeholder="Why this change? (optional)" />
                       <div className="flex justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => setSuggesting(false)}>Cancel</Button>
