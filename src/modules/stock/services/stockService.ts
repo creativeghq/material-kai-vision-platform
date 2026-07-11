@@ -122,6 +122,14 @@ export interface AiForecast {
   credits_used?: number;
 }
 
+export interface ShippingCredsStatus {
+  configured: boolean;
+  provider?: string;
+  enabled?: boolean;
+  base_url?: string | null;
+  key_masked?: string | null;
+}
+
 export interface ShipmentMilestone {
   code: string | null;
   name: string;
@@ -205,4 +213,18 @@ export const stockService = {
     call<{ shipment: InboundShipment }>('shipment-refresh', ws, { shipment_id }).then((r) => r.shipment),
   removeShipment: (ws: string, shipment_id: string) => call<{ ok: true }>('shipment-remove', ws, { shipment_id }),
   receiveShipment: (ws: string, shipment_id: string) => call<{ received: unknown }>('shipment-receive', ws, { shipment_id }),
+
+  // ── Shipping BYOK credentials (per-workspace; the tenant's own ShipsGo key) ──
+  async getShippingStatus(ws: string): Promise<ShippingCredsStatus> {
+    const { data, error } = await supabase.rpc('get_shipping_creds_status', { p_workspace_id: ws });
+    if (error) throw error;
+    return (data ?? { configured: false }) as ShippingCredsStatus;
+  },
+  async saveShippingCreds(ws: string, input: { provider?: string; apiKey?: string | null; enabled: boolean; baseUrl?: string | null }): Promise<void> {
+    const { error } = await supabase.rpc('save_shipping_credentials', {
+      p_workspace_id: ws, p_provider: input.provider ?? 'shipsgo',
+      p_api_key: input.apiKey ?? null, p_enabled: input.enabled, p_base_url: input.baseUrl ?? null,
+    });
+    if (error) throw error;
+  },
 };

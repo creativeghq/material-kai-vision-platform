@@ -16,7 +16,6 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
-import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
 import { trackShipment, refreshShipment, type TrackInput } from '../_shared/shipping/shipsgo.ts';
 
 function json(body: any, status = 200): Response {
@@ -80,12 +79,13 @@ async function refundStockOp(svc: any, userId: string, workspaceId: string, op: 
 
 const TRACKING_TYPES = ['container', 'bl', 'booking'];
 
-/** ShipsGo key: env first (deploy secret), else the platform_secrets DB fallback. */
-async function resolveShipsGoKey(svc: any): Promise<string | null> {
-  const env = Deno.env.get('SHIPSGO_API_KEY');
-  if (env) return env;
-  const { data } = await svc.from('platform_secrets').select('value').eq('key', 'SHIPSGO_API_KEY').maybeSingle();
-  return data?.value || null;
+/** ShipsGo is per-workspace BYOK — the tenant's OWN enabled key from workspace_shipping_credentials.
+ *  The platform NEVER provides a key (no env / platform_secrets fallback). */
+async function resolveShippingCreds(svc: any, workspaceId: string): Promise<{ key: string; baseUrl: string | null } | null> {
+  const { data } = await svc.from('workspace_shipping_credentials')
+    .select('api_key, base_url, enabled').eq('workspace_id', workspaceId).maybeSingle();
+  if (!data?.api_key || data.enabled === false) return null;
+  return { key: data.api_key, baseUrl: data.base_url ?? null };
 }
 
 const FORECAST_MODEL = () => Deno.env.get('STOCK_FORECAST_MODEL') || 'claude-sonnet-4-6';
@@ -459,20 +459,14 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         const orderId = body?.order_id ? String(body.order_id) : null;
         const carrier = body?.carrier ? String(body.carrier) : null;
 
-        const key = await resolveShipsGoKey(svc);
-        if (!key) return json({ ok: false, code: 'not_configured', error: 'Shipment tracking is not configured (SHIPSGO_API_KEY missing). Add it in the Stock module settings.' }, 503);
+        // BYOK: the tenant tracks on their OWN ShipsGo account, so there is no platform credit charge.
+        const creds = await resolveShippingCreds(svc, workspaceId);
+        if (!creds) return json({ ok: false, code: 'not_configured', error: 'Shipment tracking is not set up. Add your ShipsGo API key in Profile → Keys, then enable it.' }, 503);
 
-        // Preflight the per-container charge (fail-fast 402) BEFORE the paid ShipsGo registration.
-        const pre = await checkCreditBalance(svc, userId, 'shipsgo-track', 1, workspaceId);
-        if (!pre.sufficient) return json({ ok: false, code: 'insufficient_credits', error: `Tracking a container costs ${pre.required_credits} credits.` }, 402);
-
-        const input: TrackInput = { reference, tracking_type: trackingType as any, carrier };
+        const input: TrackInput = { reference, tracking_type: trackingType as any, carrier, baseUrl: creds.baseUrl };
         let tracked;
-        try { tracked = await trackShipment(key, input); }
+        try { tracked = await trackShipment(creds.key, input); }
         catch (e) { throw new HttpError(502, `Could not track this shipment: ${(e as Error).message}`); }
-
-        // Charge only after a successful registration.
-        await debitExternalServiceCredits(svc, userId, 'shipsgo-track', 'shipment_track', 1, { reference, tracking_type: trackingType }, workspaceId);
 
         const { data, error } = await usr.from('inbound_shipments').insert({
           workspace_id: workspaceId, order_id: orderId, reference, tracking_type: trackingType,
@@ -489,10 +483,10 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         if (!id) return json({ error: 'shipment_id is required' }, 400);
         const { data: row } = await usr.from('inbound_shipments').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
         if (!row) return json({ error: 'not found' }, 404);
-        const key = await resolveShipsGoKey(svc);
-        if (!key) return json({ ok: false, code: 'not_configured', error: 'Shipment tracking is not configured.' }, 503);
+        const creds = await resolveShippingCreds(svc, workspaceId);
+        if (!creds) return json({ ok: false, code: 'not_configured', error: 'Shipment tracking is not set up. Add your ShipsGo API key in Profile → Keys.' }, 503);
         let tracked;
-        try { tracked = await refreshShipment(key, { reference: row.reference, tracking_type: row.tracking_type, carrier: row.carrier }); }
+        try { tracked = await refreshShipment(creds.key, { reference: row.reference, tracking_type: row.tracking_type, carrier: row.carrier, baseUrl: creds.baseUrl }); }
         catch (e) { throw new HttpError(502, `Could not refresh this shipment: ${(e as Error).message}`); }
         const { data, error } = await usr.from('inbound_shipments').update({
           status: tracked.status, eta: tracked.eta, last_event: tracked.last_event,

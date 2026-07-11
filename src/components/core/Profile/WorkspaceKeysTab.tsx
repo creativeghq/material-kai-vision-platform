@@ -21,6 +21,8 @@ import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentials
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentialsCard';
+import { ShippingCredentialsCard } from '@/modules/stock/components/ShippingCredentialsCard';
+import { useModule } from '@/modules/_core';
 import { paymentRoutingService } from '@/services/paymentRoutingService';
 
 interface ConnState {
@@ -51,6 +53,7 @@ const ConnectionRow: React.FC<{
 
 export const WorkspaceKeysTab: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
+  const stockModule = useModule('stock');
   const [conn, setConn] = useState<ConnState>({ stripe: 'none', social: 0 });
 
   useEffect(() => {
@@ -90,6 +93,7 @@ export const WorkspaceKeysTab: React.FC = () => {
         <WorkspaceEmailConfigCard workspaceId={activeWorkspaceId} />
         <InboundSetupCard workspaceId={activeWorkspaceId} />
         <ErganiCredentialsCard workspaceId={activeWorkspaceId} />
+        {stockModule.enabled && <ShippingCredentialsCard workspaceId={activeWorkspaceId} />}
       </section>
 
       {/* Connections */}

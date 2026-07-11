@@ -219,7 +219,7 @@ const AddShipmentDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =>
             </Select>
             <p className="text-[11px] text-muted-foreground">Linking lets you receive the goods into stock in one click on arrival.</p>
           </div>
-          <p className="text-[11px] text-amber-500">Tracking a new container costs credits (charged once per container).</p>
+          <p className="text-[11px] text-muted-foreground">Tracking runs on your own ShipsGo account (set it up in Profile → Keys). The platform doesn't charge credits for it.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

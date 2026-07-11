@@ -37,7 +37,8 @@ export const NORMALIZED_STATUSES = [
   'arrived', 'discharged', 'gate_out', 'delivered', 'unknown',
 ] as const;
 
-const BASE = () => Deno.env.get('SHIPSGO_BASE_URL') || 'https://api.shipsgo.com/v2';
+// Base URL: the workspace's own override wins (BYOK provider-variant), else env, else the default.
+const BASE = (override?: string | null) => override || Deno.env.get('SHIPSGO_BASE_URL') || 'https://api.shipsgo.com/v2';
 // Endpoint paths — override via env if your ShipsGo plan differs.
 const ADD_PATH = () => Deno.env.get('SHIPSGO_ADD_PATH') || '/ocean/shipments';
 const GET_PATH = () => Deno.env.get('SHIPSGO_GET_PATH') || '/ocean/shipments';
@@ -122,6 +123,7 @@ export interface TrackInput {
   reference: string;
   tracking_type: 'container' | 'bl' | 'booking';
   carrier?: string | null;
+  baseUrl?: string | null;   // per-workspace BYOK override
 }
 
 /**
@@ -136,7 +138,7 @@ export async function trackShipment(key: string, input: TrackInput): Promise<Nor
   if (input.carrier) body.shippingLine = input.carrier;
 
   // 1) register for tracking (idempotent on ShipsGo; returns existing if already tracked)
-  const addRes = await fetch(`${BASE()}${ADD_PATH()}`, { method: 'POST', headers: authHeaders(key), body: JSON.stringify(body) });
+  const addRes = await fetch(`${BASE(input.baseUrl)}${ADD_PATH()}`, { method: 'POST', headers: authHeaders(key), body: JSON.stringify(body) });
   // 200/201 = created/exists. 409 = already tracked (fine — fall through to GET).
   if (!addRes.ok && addRes.status !== 409) {
     const txt = await addRes.text().catch(() => '');
@@ -147,7 +149,7 @@ export async function trackShipment(key: string, input: TrackInput): Promise<Nor
 
   // 2) fetch current status (query by the same reference)
   const q = new URLSearchParams({ [refKey]: input.reference });
-  const getRes = await fetch(`${BASE()}${GET_PATH()}?${q.toString()}`, { headers: authHeaders(key) });
+  const getRes = await fetch(`${BASE(input.baseUrl)}${GET_PATH()}?${q.toString()}`, { headers: authHeaders(key) });
   if (getRes.ok) {
     try { payload = await getRes.json(); } catch { /* keep add payload */ }
   }
@@ -160,7 +162,7 @@ export async function refreshShipment(key: string, input: TrackInput): Promise<N
   const refKey = input.tracking_type === 'bl' ? 'blNumber'
     : input.tracking_type === 'booking' ? 'bookingNumber' : 'containerNumber';
   const q = new URLSearchParams({ [refKey]: input.reference });
-  const getRes = await fetch(`${BASE()}${GET_PATH()}?${q.toString()}`, { headers: authHeaders(key) });
+  const getRes = await fetch(`${BASE(input.baseUrl)}${GET_PATH()}?${q.toString()}`, { headers: authHeaders(key) });
   if (!getRes.ok) {
     const txt = await getRes.text().catch(() => '');
     throw new Error(`ShipsGo refresh failed (${getRes.status})${txt ? `: ${txt.slice(0, 200)}` : ''}`);
