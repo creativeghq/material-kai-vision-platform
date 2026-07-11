@@ -136,6 +136,24 @@ export const createManageStockTool = (
         return JSON.stringify({ success: true, count: movements.length, movements });
       }
 
+      if (action === 'reorder') {
+        const resolved = await resolveItem(ws, item_id, item_query);
+        if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
+        const res = await callStockApi(jwt!, ws, 'reorder', {
+          item_id: resolved.item.id,
+          ...(quantity != null ? { quantity: Number(quantity) } : {}),
+        });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        const r = res.data?.reorder;
+        if (!r?.ok) return JSON.stringify({ success: false, error: r?.message ?? 'No supplier configured for this product.' });
+        onChunk?.({ type: 'stock_reordered', reorder: r, timestamp: Date.now() });
+        const channel = r.supplier_is_app_user ? 'in-app supplier (portal)' : 'supplier (email)';
+        return JSON.stringify({
+          success: true, reorder: r,
+          message: `Drafted a purchase order for ${r.quantity} ${resolved.item.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}. Costs 2 credits. Review & send it in Finance → Orders.`,
+        });
+      }
+
       if (action === 'adjust_stock') {
         if (!DIRECTIONS.includes(direction)) return JSON.stringify({ success: false, error: `direction must be one of ${DIRECTIONS.join(', ')} (in=receive, out=issue, adjust=set exact on-hand).` });
         const qty = Number(quantity);
@@ -165,16 +183,21 @@ export const createManageStockTool = (
         '  list_movements  → the most recent stock movements (receive/issue/adjust) across the warehouse.',
         '  adjust_stock    → change on-hand for ONE item. Give item_id OR item_query, direction, quantity.',
         '                    direction: in = receive/add, out = issue/remove, adjust = set the exact on-hand.',
+        '  reorder         → draft a replenishment PURCHASE ORDER for ONE item from its supplier (preferred/',
+        '                    cheapest). Give item_id OR item_query, optional quantity (else tops back up above the',
+        '                    reorder point, rounded to MOQ). Routes to the in-app supplier portal if the supplier',
+        '                    is a tenant, else email. COSTS 2 CREDITS. Confirm with the user before calling.',
         '',
         'Examples:',
         '  "what\'s low on stock?"          → action=list_low_stock',
         '  "how many oak planks do we have?" → action=check_stock, item_query="oak plank"',
         '  "receive 50 white tiles"          → action=adjust_stock, item_query="white tile", direction="in", quantity=50',
         '  "set stock of SKU-123 to 12"      → action=adjust_stock, item_query="SKU-123", direction="adjust", quantity=12',
+        '  "reorder the white tiles"         → action=reorder, item_query="white tile"',
         'If a query matches multiple items, ask the user which one before writing.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['overview', 'check_stock', 'list_low_stock', 'list_movements', 'adjust_stock']),
+        action: z.enum(['overview', 'check_stock', 'list_low_stock', 'list_movements', 'adjust_stock', 'reorder']),
         item_id: z.string().uuid().optional().describe('Target stock item id (adjust_stock).'),
         item_query: z.string().optional().describe('Fuzzy name or SKU to search/resolve (check_stock, adjust_stock).'),
         direction: z.enum(DIRECTIONS as unknown as [string, ...string[]]).optional().describe('in=receive, out=issue, adjust=set exact on-hand (adjust_stock).'),

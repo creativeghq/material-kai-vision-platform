@@ -42,6 +42,40 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Flat per-operation credit costs for the value/AI actions (1 credit = $0.01). Debited BEFORE the work
+// via the shared debit_credits router (workspace pool → personal), refunded if the work then fails.
+const STOCK_OP_CREDIT_COST: Record<string, number> = {
+  reorder: 2,    // drafting a replenishment PO from the resolved supplier
+  forecast: 5,   // AI resupply forecast (Claude ranking) — W3
+};
+
+async function debitStockOp(
+  svc: any, userId: string, workspaceId: string, op: string, metadata: Record<string, unknown> = {},
+): Promise<{ ok: true; credits: number } | { ok: false; insufficient?: boolean; error: string }> {
+  const credits = STOCK_OP_CREDIT_COST[op] ?? 0;
+  if (credits <= 0) return { ok: true, credits: 0 };
+  const { data, error } = await svc.rpc('debit_credits', {
+    p_user_id: userId, p_amount: credits, p_operation_type: `stock_${op}`,
+    p_description: `Stock ${op}`, p_metadata: { ...metadata, module: 'stock', op }, p_workspace_id: workspaceId,
+  });
+  if (error) return { ok: false, error: error.message };
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r?.success) {
+    const raw = String(r?.error_message ?? '');
+    return { ok: false, insufficient: /insufficient|member_limit_exceeded/i.test(raw), error: raw || 'debit_failed' };
+  }
+  return { ok: true, credits };
+}
+
+async function refundStockOp(svc: any, userId: string, workspaceId: string, op: string, reason: string): Promise<void> {
+  const credits = STOCK_OP_CREDIT_COST[op] ?? 0;
+  if (credits <= 0) return;
+  await svc.rpc('refund_credits', {
+    p_user_id: userId, p_amount: credits, p_operation_type: `stock_${op}_refund`,
+    p_description: `Stock ${op} refund: ${reason}`, p_metadata: { module: 'stock', op, reason }, p_workspace_id: workspaceId,
+  }).then(() => {}, () => {});
+}
+
 Deno.serve(withApiLogging('stock-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -209,6 +243,34 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
         return json({ target_item_id: data });
       }
+      // ── Reorder (Stock → Sourcing bridge) — credit-metered ───────────────────
+      case 'reorder': {
+        const id = String(body?.item_id ?? '');
+        if (!id) return json({ error: 'item_id is required' }, 400);
+        const qty = num(body?.quantity);
+        const supplierProductId = body?.supplier_product_id ? String(body.supplier_product_id) : null;
+
+        const deb = await debitStockOp(svc, userId, workspaceId, 'reorder', { warehouse_item_id: id });
+        if (!deb.ok) {
+          if (deb.insufficient) return json({ ok: false, code: 'insufficient_credits', error: 'Not enough credits to reorder.' }, 402);
+          throw new HttpError(400, deb.error);
+        }
+        const { data, error } = await usr.rpc('reorder_warehouse_item', {
+          p_workspace_id: workspaceId, p_warehouse_item_id: id,
+          p_qty: qty ?? null, p_supplier_product_id: supplierProductId,
+        });
+        if (error) {
+          await refundStockOp(svc, userId, workspaceId, 'reorder', 'rpc_error');
+          throw new HttpError(denied(error) ? 403 : 400, error.message);
+        }
+        // No supplier → nothing drafted → refund the op.
+        if (data && data.ok === false) {
+          await refundStockOp(svc, userId, workspaceId, 'reorder', String(data.reason ?? 'no_draft'));
+          return json({ reorder: data });
+        }
+        return json({ reorder: data }, 201);
+      }
+
       case 'list-movements': {
         let q = usr.from('stock_movements')
           .select('*, item:warehouse_items!stock_movements_item_id_fkey ( id, name, sku, unit )')

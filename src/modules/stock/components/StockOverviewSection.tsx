@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Package, AlertTriangle, PackageX, ArrowLeftRight, ClipboardList, Warehouse as WarehouseIcon, PackageCheck, Inbox, Coins } from 'lucide-react';
+import { Loader2, Package, AlertTriangle, PackageX, ArrowLeftRight, ClipboardList, Warehouse as WarehouseIcon, PackageCheck, Inbox, Coins, ShoppingCart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { stockService, type StockOverview, type StockValuation, type LowStockItem } from '../services/stockService';
@@ -49,6 +50,28 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
     })();
     return () => { cancelled = true; };
   }, [workspaceId, toast]);
+
+  const [reordering, setReordering] = useState<string | null>(null);
+  const reorder = async (it: LowStockItem) => {
+    if (!confirm(`Draft a replenishment purchase order for "${it.name}"? This costs 2 credits.`)) return;
+    setReordering(it.id);
+    try {
+      const r = await stockService.reorder(workspaceId, it.id);
+      if (!r.ok) {
+        toast({ title: 'Could not reorder', description: r.message ?? 'No supplier configured for this product.', variant: 'destructive' });
+        return;
+      }
+      const channel = r.supplier_is_app_user ? 'in-app supplier (portal)' : 'supplier (email)';
+      toast({
+        title: 'Reorder drafted',
+        description: `${r.quantity} ${it.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}. Review & send in Finance → Orders.`,
+      });
+    } catch (err: any) {
+      toast({ title: 'Reorder failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setReordering(null);
+    }
+  };
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   if (!ov) return null;
@@ -117,6 +140,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                   <th className="px-4 py-2 text-left">SKU</th>
                   <th className="px-4 py-2 text-right">On hand</th>
                   <th className="px-4 py-2 text-right">Reorder</th>
+                  <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -129,6 +153,11 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                       <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-500"><AlertTriangle className="h-3 w-3 mr-1" />low</Badge>
                     </td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{it.reorder_point}</td>
+                    <td className="px-4 py-2 text-right">
+                      <Button size="sm" variant="outline" className="rounded-full h-7 text-xs" disabled={reordering === it.id} onClick={() => reorder(it)}>
+                        {reordering === it.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ShoppingCart className="h-3.5 w-3.5 mr-1" /> Reorder</>}
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -73,6 +73,22 @@ export interface StockCountLine {
   note: string | null;
 }
 
+export interface ReorderResult {
+  ok: boolean;
+  reason?: string;
+  message?: string;
+  order_id?: string;
+  order_number?: string | null;
+  supplier_company_id?: string;
+  supplier_name?: string | null;
+  supplier_is_app_user?: boolean;
+  quantity?: number;
+  unit_cost?: number | null;
+  currency?: string;
+  line_total?: number;
+  item_name?: string;
+}
+
 export interface LowStockItem {
   id: string;
   name: string;
@@ -99,6 +115,10 @@ export const stockService = {
   lowStock: (ws: string) => call<{ items: LowStockItem[]; count: number }>('list-low-stock', ws),
   listMovements: (ws: string, opts: { item_id?: string; limit?: number } = {}) =>
     call<{ movements: StockMovement[] }>('list-movements', ws, opts).then((r) => r.movements),
+
+  // ── Reorder (Stock → Sourcing bridge) — credit-metered ──────────────────────
+  reorder: (ws: string, item_id: string, opts: { quantity?: number; supplier_product_id?: string } = {}) =>
+    call<{ reorder: ReorderResult }>('reorder', ws, { item_id, ...opts }).then((r) => r.reorder),
 
   // ── Stocktake ──────────────────────────────────────────────────────────────
   listCounts: (ws: string) => call<{ counts: StockCount[] }>('list-counts', ws).then((r) => r.counts),
