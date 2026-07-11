@@ -16,6 +16,8 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
+import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
+import { trackShipment, refreshShipment, type TrackInput } from '../_shared/shipping/shipsgo.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -74,6 +76,16 @@ async function refundStockOp(svc: any, userId: string, workspaceId: string, op: 
     p_user_id: userId, p_amount: credits, p_operation_type: `stock_${op}_refund`,
     p_description: `Stock ${op} refund: ${reason}`, p_metadata: { module: 'stock', op, reason }, p_workspace_id: workspaceId,
   }).then(() => {}, () => {});
+}
+
+const TRACKING_TYPES = ['container', 'bl', 'booking'];
+
+/** ShipsGo key: env first (deploy secret), else the platform_secrets DB fallback. */
+async function resolveShipsGoKey(svc: any): Promise<string | null> {
+  const env = Deno.env.get('SHIPSGO_API_KEY');
+  if (env) return env;
+  const { data } = await svc.from('platform_secrets').select('value').eq('key', 'SHIPSGO_API_KEY').maybeSingle();
+  return data?.value || null;
 }
 
 const FORECAST_MODEL = () => Deno.env.get('STOCK_FORECAST_MODEL') || 'claude-sonnet-4-6';
@@ -429,6 +441,87 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         const { error } = await usr.rpc('cancel_stock_count', { p_count_id: id });
         if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
         return json({ ok: true });
+      }
+
+      // ── Inbound shipment tracking (container/BL) ─────────────────────────────
+      case 'shipment-list': {
+        const { data, error } = await usr.from('inbound_shipments')
+          .select('*, order:orders(id, order_number, status, supplier_company_id)')
+          .eq('workspace_id', workspaceId).order('created_at', { ascending: false });
+        if (error) throw new HttpError(400, error.message);
+        return json({ shipments: data ?? [] });
+      }
+      case 'shipment-add': {
+        const reference = String(body?.reference ?? '').trim();
+        const trackingType = String(body?.tracking_type ?? 'container');
+        if (!reference) return json({ error: 'reference is required' }, 400);
+        if (!TRACKING_TYPES.includes(trackingType)) return json({ error: `tracking_type must be one of ${TRACKING_TYPES.join(', ')}` }, 400);
+        const orderId = body?.order_id ? String(body.order_id) : null;
+        const carrier = body?.carrier ? String(body.carrier) : null;
+
+        const key = await resolveShipsGoKey(svc);
+        if (!key) return json({ ok: false, code: 'not_configured', error: 'Shipment tracking is not configured (SHIPSGO_API_KEY missing). Add it in the Stock module settings.' }, 503);
+
+        // Preflight the per-container charge (fail-fast 402) BEFORE the paid ShipsGo registration.
+        const pre = await checkCreditBalance(svc, userId, 'shipsgo-track', 1, workspaceId);
+        if (!pre.sufficient) return json({ ok: false, code: 'insufficient_credits', error: `Tracking a container costs ${pre.required_credits} credits.` }, 402);
+
+        const input: TrackInput = { reference, tracking_type: trackingType as any, carrier };
+        let tracked;
+        try { tracked = await trackShipment(key, input); }
+        catch (e) { throw new HttpError(502, `Could not track this shipment: ${(e as Error).message}`); }
+
+        // Charge only after a successful registration.
+        await debitExternalServiceCredits(svc, userId, 'shipsgo-track', 'shipment_track', 1, { reference, tracking_type: trackingType }, workspaceId);
+
+        const { data, error } = await usr.from('inbound_shipments').insert({
+          workspace_id: workspaceId, order_id: orderId, reference, tracking_type: trackingType,
+          carrier: tracked.carrier ?? carrier, status: tracked.status, eta: tracked.eta,
+          last_event: tracked.last_event, origin: tracked.origin, destination: tracked.destination,
+          milestones: tracked.milestones, provider: 'shipsgo', provider_ref: tracked.provider_ref,
+          raw: tracked.raw, last_polled_at: new Date().toISOString(), created_by: userId,
+        }).select('*').single();
+        if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
+        return json({ shipment: data }, 201);
+      }
+      case 'shipment-refresh': {
+        const id = String(body?.shipment_id ?? '');
+        if (!id) return json({ error: 'shipment_id is required' }, 400);
+        const { data: row } = await usr.from('inbound_shipments').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+        if (!row) return json({ error: 'not found' }, 404);
+        const key = await resolveShipsGoKey(svc);
+        if (!key) return json({ ok: false, code: 'not_configured', error: 'Shipment tracking is not configured.' }, 503);
+        let tracked;
+        try { tracked = await refreshShipment(key, { reference: row.reference, tracking_type: row.tracking_type, carrier: row.carrier }); }
+        catch (e) { throw new HttpError(502, `Could not refresh this shipment: ${(e as Error).message}`); }
+        const { data, error } = await usr.from('inbound_shipments').update({
+          status: tracked.status, eta: tracked.eta, last_event: tracked.last_event,
+          carrier: tracked.carrier ?? row.carrier, origin: tracked.origin ?? row.origin,
+          destination: tracked.destination ?? row.destination, milestones: tracked.milestones,
+          provider_ref: tracked.provider_ref ?? row.provider_ref, raw: tracked.raw,
+          is_active: tracked.status !== 'delivered', last_polled_at: new Date().toISOString(),
+        }).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
+        return json({ shipment: data });
+      }
+      case 'shipment-remove': {
+        const id = String(body?.shipment_id ?? '');
+        if (!id) return json({ error: 'shipment_id is required' }, 400);
+        const { error } = await usr.from('inbound_shipments').delete().eq('id', id).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
+        return json({ ok: true });
+      }
+      case 'shipment-receive': {
+        // Arrived → receive the linked purchase order into the warehouse, then close the shipment.
+        const id = String(body?.shipment_id ?? '');
+        if (!id) return json({ error: 'shipment_id is required' }, 400);
+        const { data: row } = await usr.from('inbound_shipments').select('id, order_id').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+        if (!row) return json({ error: 'not found' }, 404);
+        if (!row.order_id) return json({ error: 'This shipment is not linked to a purchase order, so there is nothing to receive.' }, 400);
+        const { data: recv, error: recvErr } = await usr.rpc('receive_order_into_warehouse', { p_order: row.order_id });
+        if (recvErr) throw new HttpError(denied(recvErr) ? 403 : 400, recvErr.message);
+        await usr.from('inbound_shipments').update({ status: 'delivered', is_active: false }).eq('id', id).eq('workspace_id', workspaceId);
+        return json({ received: recv ?? true });
       }
 
       // ── Pending intake (AI-extracted from inbound expenses) ──────────────────

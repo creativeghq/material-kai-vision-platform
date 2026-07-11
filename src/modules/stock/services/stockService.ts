@@ -122,6 +122,35 @@ export interface AiForecast {
   credits_used?: number;
 }
 
+export interface ShipmentMilestone {
+  code: string | null;
+  name: string;
+  date: string | null;
+  location: string | null;
+  status: 'past' | 'current' | 'future' | 'unknown';
+}
+
+export interface InboundShipment {
+  id: string;
+  workspace_id: string;
+  order_id: string | null;
+  reference: string;
+  tracking_type: 'container' | 'bl' | 'booking';
+  carrier: string | null;
+  status: string;
+  eta: string | null;
+  last_event: string | null;
+  origin: string | null;
+  destination: string | null;
+  milestones: ShipmentMilestone[];
+  provider: string;
+  provider_ref: string | null;
+  is_active: boolean;
+  created_at: string;
+  last_polled_at: string | null;
+  order?: { id: string; order_number: string | null; status: string } | null;
+}
+
 export interface LowStockItem {
   id: string;
   name: string;
@@ -167,4 +196,13 @@ export const stockService = {
   postCount: (ws: string, count_id: string) =>
     call<{ result: { count_id: string; adjusted_lines: number } }>('post-count', ws, { count_id }).then((r) => r.result),
   cancelCount: (ws: string, count_id: string) => call<{ ok: true }>('cancel-count', ws, { count_id }),
+
+  // ── Inbound shipment tracking ───────────────────────────────────────────────
+  listShipments: (ws: string) => call<{ shipments: InboundShipment[] }>('shipment-list', ws).then((r) => r.shipments),
+  addShipment: (ws: string, input: { reference: string; tracking_type: string; carrier?: string; order_id?: string }) =>
+    call<{ shipment: InboundShipment }>('shipment-add', ws, input).then((r) => r.shipment),
+  refreshShipment: (ws: string, shipment_id: string) =>
+    call<{ shipment: InboundShipment }>('shipment-refresh', ws, { shipment_id }).then((r) => r.shipment),
+  removeShipment: (ws: string, shipment_id: string) => call<{ ok: true }>('shipment-remove', ws, { shipment_id }),
+  receiveShipment: (ws: string, shipment_id: string) => call<{ received: unknown }>('shipment-receive', ws, { shipment_id }),
 };

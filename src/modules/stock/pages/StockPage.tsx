@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Package, LayoutDashboard, Boxes, ArrowLeftRight, ClipboardList, TrendingUp } from 'lucide-react';
+import { Package, LayoutDashboard, Boxes, ArrowLeftRight, ClipboardList, TrendingUp, Ship } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -11,11 +11,12 @@ import { StockOverviewSection } from '../components/StockOverviewSection';
 import { MovementsSection } from '../components/MovementsSection';
 import { StockCountsSection } from '../components/StockCountsSection';
 import { ResupplySection } from '../components/ResupplySection';
+import { InboundSection } from '../components/InboundSection';
 
 // Stock Management module page. Extracted from the Finance "Warehouse" tab into a first-class
 // entitlement-gated module (EntitlementGuard wraps this route). Plain Radix tabs (no forceMount) so
 // only the active panel renders — mirrors FinancePage; each tab loads its own data on open.
-const TABS = ['overview', 'inventory', 'resupply', 'movements', 'counts'];
+const TABS = ['overview', 'inventory', 'resupply', 'inbound', 'movements', 'counts'];
 
 export default function StockPage() {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
@@ -58,6 +59,7 @@ export default function StockPage() {
             <TabsTrigger value="overview" className="w-full justify-start"><LayoutDashboard className="h-4 w-4 mr-2" /> Overview</TabsTrigger>
             <TabsTrigger value="inventory" className="w-full justify-start"><Boxes className="h-4 w-4 mr-2" /> Inventory</TabsTrigger>
             <TabsTrigger value="resupply" className="w-full justify-start"><TrendingUp className="h-4 w-4 mr-2" /> Resupply</TabsTrigger>
+            <TabsTrigger value="inbound" className="w-full justify-start"><Ship className="h-4 w-4 mr-2" /> Inbound</TabsTrigger>
             <TabsTrigger value="movements" className="w-full justify-start"><ArrowLeftRight className="h-4 w-4 mr-2" /> Movements</TabsTrigger>
             <TabsTrigger value="counts" className="w-full justify-start"><ClipboardList className="h-4 w-4 mr-2" /> Stock counts</TabsTrigger>
           </TabsList>
@@ -71,6 +73,9 @@ export default function StockPage() {
             </TabsContent>
             <TabsContent value="resupply" className="mt-0 space-y-4">
               <ResupplySection workspaceId={ws} />
+            </TabsContent>
+            <TabsContent value="inbound" className="mt-0 space-y-4">
+              <InboundSection workspaceId={ws} />
             </TabsContent>
             <TabsContent value="movements" className="mt-0 space-y-4">
               <MovementsSection workspaceId={ws} />
