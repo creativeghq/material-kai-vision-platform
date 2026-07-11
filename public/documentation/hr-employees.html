@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR: Employees | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="hr.html">HR</a> / Employees</div>
+  <h1>HR · Employees &amp; org</h1>
+  <div class="routes"><span class="badge route">/hr</span> <span class="badge gated">owner / admin</span></div>
+  <p class="lead">The Employees area is where your people become part of HR. Each employee is a <strong>CRM contact tagged as an employee</strong>, with an <strong>employment record attached on top</strong> — so who the person is (name, contact details) stays in one place in the CRM, and HR adds the working relationship: their pay, their leave allowance, their tax situation, and the codes that identify them at the kiosk and to the Greek labour authority. This one record is then read by attendance, time-off, payroll and Ergani, so it's worth filling in carefully.</p>
+
+  <h2>Where it is</h2>
+  <p>Enable <strong>HR</strong> from the <a href="apps.html">App Launcher</a> (it's a Pro add-on), open it at <span class="badge route">/hr</span>, and go to the <strong>Employees</strong> section. HR is <strong>owner/admin only</strong> — the whole area, including this page, is gated to workspace owners and admins, because employee records hold sensitive personal and pay data. Staff never see this admin page; they get the separate, restricted <a href="hr-self-service.html">self-service portal</a> instead.</p>
+
+  <h2>Why an employee is a CRM contact</h2>
+  <p>MaterialsHub keeps every person your business knows — customers, suppliers, and staff — as a <a href="crm-contacts.html">CRM contact</a>. An employee is simply a contact that has been <strong>tagged as an employee</strong> and given a linked HR employment record (one record per contact). Two reasons this matters in practice:</p>
+  <ul class="feat">
+    <li><strong>One source of truth for the person.</strong> Their name, email, phone and address live on the contact in CRM. Change them there and every part of the platform sees the update — you don't maintain a separate "HR copy" of someone's details.</li>
+    <li><strong>HR adds only the employment layer.</strong> The HR record holds the things that only exist because this person works for you — employment type, department, pay rate, leave allowance, tax inputs, and their identifying codes. Remove the employment layer and the person still exists as a contact; the employment relationship is what HR owns.</li>
+  </ul>
+
+  <h2>Adding an employee — step by step</h2>
+  <p>In the <strong>Employees</strong> section, start the <strong>Add employee</strong> form and fill in the fields below. Only <strong>Full name</strong> is required; everything else can be added now or filled in later, but the pay, leave and identity fields are what make the record useful downstream, so complete as many as you can.</p>
+  <ol>
+    <li>Open the <strong>Employees</strong> section and choose to <strong>add an employee</strong>.</li>
+    <li>Enter the person's <strong>Full name</strong> (this is the only required field) and work through the rest of the form field by field, using the table below.</li>
+    <li>Save the record. The new employee appears in the Employees list, showing their <strong>Leave (days)</strong> and <strong>absence</strong> information at a glance.</li>
+    <li>When you're ready to give them their own login, use <strong>Invite to employee portal</strong> to grant access to the restricted <a href="hr-self-service.html">self-service portal</a>.</li>
+  </ol>
+
+  <h2>The fields, and what each one is for</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What to enter</th><th>Why it matters / where it's used</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Full name</strong> <span style="color:var(--muted)">(required)</span></td><td>The employee's name — the form shows <em>"Jane Doe"</em> as a placeholder.</td><td>The only mandatory field. Creates (or links) the underlying <a href="crm-contacts.html">CRM contact</a> and labels the person everywhere in HR.</td></tr>
+      <tr><td><strong>Employment type</strong></td><td>The kind of engagement this person has with the company.</td><td>Classifies the employment relationship; relevant to how their working time and pay are treated and to what gets filed to <a href="hr-ergani.html">Ergani</a>.</td></tr>
+      <tr><td><strong>Department</strong></td><td>The team or department the person belongs to.</td><td>Places them in the org structure. Feeds the department's <em>employee count</em> (see <a href="#org">Departments &amp; the org</a> below).</td></tr>
+      <tr><td><strong>Annual leave (days)</strong></td><td>The number of leave days this employee is entitled to per year.</td><td>Sets their starting leave allowance. <a href="hr-timeoff.html">Time-off &amp; absences</a> counts approved vacation against this to keep a running balance, shown per-employee in the list.</td></tr>
+      <tr><td><strong>Hourly rate</strong></td><td>The employee's pay rate per hour.</td><td>Read by <a href="hr-payroll.html">payroll</a> to calculate pay from attendance. Also underpins hourly pay based on the timesheets that <a href="hr-attendance.html">attendance</a> builds.</td></tr>
+      <tr><td><strong>Dependent children</strong></td><td>How many dependent children the employee has.</td><td>A payroll tax input — the number of dependents affects the Greek tax calculation in a <a href="hr-payroll.html">payroll</a> run.</td></tr>
+      <tr><td><strong>Kiosk PIN</strong></td><td>A personal PIN the employee uses to identify themselves at the shared clock-in device.</td><td>Used at the <a href="hr-attendance.html">clock-in kiosk</a> so the employee can punch in/out on a shared screen without logging in.</td></tr>
+      <tr><td><strong>VAT number</strong> <span style="color:var(--muted)">(9 digits)</span></td><td>The employee's 9-digit tax identification (ΑΦΜ).</td><td>Used to identify the employee at the <a href="hr-attendance.html">kiosk</a> and in <a href="hr-ergani.html">Ergani</a> filings to the Greek labour authority.</td></tr>
+      <tr><td><strong>Social-security number (AMKA)</strong> <span style="color:var(--muted)">(11 digits)</span></td><td>The employee's 11-digit Greek social-security number (ΑΜΚΑ).</td><td>The insurance/social-security identifier used for <a href="hr-payroll.html">payroll</a> and for <a href="hr-ergani.html">Ergani</a> filings — it's how the labour authority knows which insured person a hire, schedule or punch belongs to.</td></tr>
+      <tr><td><strong>Invite to employee portal</strong></td><td>An action, not a text field — trigger it to send the person an invitation.</td><td>Grants the employee access to the restricted <a href="hr-self-service.html">self-service portal</a>, where they clock in, request time off and get payslips — without ever seeing the admin HR page.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout tip"><p><strong>The two ID numbers are different things.</strong> The <strong>VAT number</strong> is the 9-digit tax id (ΑΦΜ); the <strong>social-security number</strong> is the 11-digit ΑΜΚΑ. Both are used in <a href="hr-ergani.html">Ergani</a> filings, so getting them right up front means hires, schedules and punches file cleanly later rather than bouncing back.</p></div>
+
+  <div class="callout warn"><p><strong>Pay and tax fields drive real money.</strong> <em>Hourly rate</em>, <em>Annual leave (days)</em> and <em>Dependent children</em> are read directly by <a href="hr-payroll.html">payroll</a> and <a href="hr-timeoff.html">time-off</a>. A wrong rate or an empty allowance flows straight through to payslips and leave balances, so double-check them when you add or edit an employee.</p></div>
+
+  <h2>The Employees list</h2>
+  <p>Once saved, each employee shows in the list with their <strong>Leave (days)</strong> and <strong>absence</strong> information surfaced inline, so you can scan who has leave remaining and who is currently absent without opening each record. The leave figure reflects the <em>Annual leave (days)</em> you set, adjusted by whatever <a href="hr-timeoff.html">time-off</a> has been booked against it.</p>
+
+  <h2 id="org">Departments &amp; the org structure</h2>
+  <p>Departments are how you describe your company's shape inside HR. A department is a lightweight record with:</p>
+  <ul class="feat">
+    <li><strong>Name</strong> — what the department is called.</li>
+    <li><strong>Description</strong> — a short note on what the department does or covers.</li>
+    <li><strong>Head</strong> (optional) — a contact who leads the department.</li>
+    <li><strong>Employee count</strong> — how many employees are assigned to it, derived from the <em>Department</em> field on each employee record.</li>
+  </ul>
+  <p>Together these give you the org structure: assign each employee to a department when you add them, optionally name a head, and the employee count keeps itself current as people are added or moved. Because the count comes from the employees themselves, the way to grow a department is simply to set that department on more employee records.</p>
+
+  <h2>What this record powers elsewhere</h2>
+  <p>The employee record is the hub the rest of HR reads from — this is why it's worth completing:</p>
+  <ul class="feat">
+    <li><strong><a href="hr-attendance.html">Attendance &amp; clock-in</a></strong> uses the <em>Kiosk PIN</em> and <em>VAT number</em> to identify the person at the shared clock-in kiosk, and builds their timesheets from the punches.</li>
+    <li><strong><a href="hr-payroll.html">Payroll</a></strong> reads the <em>Hourly rate</em> to calculate pay, and the <em>Dependent children</em> count as a Greek-tax input in the run.</li>
+    <li><strong><a href="hr-timeoff.html">Time-off &amp; absences</a></strong> counts leave against the <em>Annual leave (days)</em> allowance to maintain each employee's balance.</li>
+    <li><strong><a href="hr-ergani.html">Ergani</a></strong> filings to the Greek labour authority use the <em>VAT number</em> and <em>social-security (AMKA)</em> number to identify the employee on hires, schedules, leave and punches.</li>
+    <li><strong><a href="hr-self-service.html">Employee self-service</a></strong> is unlocked by the <em>Invite to employee portal</em> action, giving the person their own restricted surface to clock in, request time off, and get payslips.</li>
+    <li><strong><a href="crm-contacts.html">CRM</a></strong> holds the person's underlying contact details, since the employee is a tagged CRM contact — edit name and contact info there.</li>
+  </ul>
+
+  <div class="callout"><p><strong>Back to the map:</strong> this is one area of HR. See the <a href="hr.html">HR overview</a> for how Employees connects to attendance, time-off, payroll, recruitment, documents and Ergani.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

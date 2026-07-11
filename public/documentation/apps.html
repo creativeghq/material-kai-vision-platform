@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apps &amp; Modules | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Apps &amp; Modules</div>
+  <h1>Apps &amp; Modules</h1>
+  <div class="routes"><span class="badge route">/apps</span></div>
+  <p class="lead">MaterialsHub is assembled from <strong>modules</strong> — self-contained capabilities you switch on per workspace. Rather than crowd the top navigation with everything, the optional ones live behind the <strong>App Launcher</strong>: each workspace turns on exactly the apps it needs (HR, Email Marketing, Docs, Flows, and more), and only those appear. This page explains the framework: where apps live, how you enable one, how paid add-ons and BYOK apps work, and how a member can request an app the owner controls.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the <strong>App Launcher</strong> is in the top navigation (after Discover); the full <strong>/apps</strong> hub lists everything. You manage activation from either the launcher or <a href="account-modules.html">Profile → Modules</a>. Apps are enabled <strong>per workspace</strong>.</p></div>
+
+  <h2>Active vs available apps</h2>
+  <p>The launcher and the <span class="badge route">/apps</span> hub split apps into two groups:</p>
+  <ul class="feat">
+    <li><strong>Everything active in this workspace</strong> — the apps already switched on; click one to open it. (If none: <em>“No apps active in this workspace yet.”</em>)</li>
+    <li><strong>Available to add</strong> — apps you can enable. Each shows its name, an icon and a short description, plus an <strong>enable</strong> action.</li>
+  </ul>
+  <p>An app only appears for a workspace when it's <strong>globally enabled</strong> on the platform <em>and</em> <strong>entitled to that workspace</strong> — that's what keeps each tenant's launcher to just its own apps.</p>
+
+  <h2>Price tiers</h2>
+  <p>Every app declares a tier, which governs how you get it:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tier</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Free</strong></td><td>Included — switch it on directly.</td></tr>
+      <tr><td><strong>Pro</strong> / <strong>Enterprise</strong></td><td>A <strong>paid add-on</strong>. Each is bound to a <strong>Stripe product</strong>, so enabling it goes through checkout/billing before it unlocks for the workspace. (Examples: <a href="hr.html">HR</a>, <a href="email-marketing.html">Email Marketing</a>.)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>How to enable an app</h2>
+  <ol>
+    <li>Open the <strong>App Launcher</strong> (or <span class="badge route">/apps</span>) and find the app under <strong>Available to add</strong>.</li>
+    <li>Click <strong>enable</strong>. A free app switches on immediately; a paid one takes you through <strong>checkout</strong> (it's tied to a Stripe product) and switches on once billing is set up.</li>
+    <li>The app moves to <strong>active</strong> and its screens, tabs and tools appear for that workspace. You can also manage activation from <a href="account-modules.html">Profile → Modules</a>.</li>
+  </ol>
+
+  <h2>Requesting an app (members)</h2>
+  <p>Enabling a paid app is an <strong>owner</strong> action (it commits spend). If you're a member, you can <strong>request</strong> an app instead: the owner is notified (a <em>module-access-requested</em> event flows through <a href="flows.html">Flows</a>) and can approve it, after which you get access. This routes the “I need this capability” to the person who authorises it, cleanly.</p>
+
+  <h2>BYOK apps — bring your own key</h2>
+  <p><strong>Some apps run on <em>your</em> credentials, not the platform's</strong> — “bring your own key” (BYOK). Enabling the app is only step one; the app won't actually <em>do</em> its outbound work until you add your own key/account. Two examples in this guide:</p>
+  <ul class="feat">
+    <li><strong><a href="email-marketing.html">Email Marketing</a></strong> — <strong>BYOK-only</strong>: campaigns send exclusively from <em>your own</em> verified <strong>Resend</strong> account. No shared platform sender.</li>
+    <li><strong><a href="hr-ergani.html">HR → Ergani</a></strong> — files to the Greek labour authority (ΠΣ Εργάνη) using <em>your</em> Ergani Web API credentials.</li>
+  </ul>
+  <p>BYOK credentials are added per workspace under <a href="account-keys.html">Profile → Keys &amp; Connections</a> (or in the app's own setup card). Each BYOK app's page below documents <strong>exactly what to add and where</strong>.</p>
+
+  <h2>The apps</h2>
+  <div class="cards">
+    <a class="card" href="hr.html"><div class="ico">👥</div><h3>HR</h3><p>Employees, attendance, time-off, payroll, recruitment, documents, Ergani filing — a full HR suite.</p></a>
+    <a class="card" href="email-marketing.html"><div class="ico">📣</div><h3>Email Marketing</h3><p>Visual email builder + bulk campaigns to CRM audiences — <strong>BYOK Resend</strong>.</p></a>
+    <a class="card" href="flows.html"><div class="ico">🔀</div><h3>Flows</h3><p>Workspace automations — notifications, emails and actions, metered from your credit pool.</p></a>
+    <a class="card" href="account-modules.html"><div class="ico">🧩</div><h3>Manage modules</h3><p>The Profile → Modules tab: activate, purchase and request modules per workspace.</p></a>
+  </div>
+
+  <div class="callout tip"><p><strong>In short:</strong> the App Launcher is your workspace's control panel of capabilities. Free apps switch on instantly; paid ones go through Stripe; BYOK ones also need your own key. Members request, owners approve.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

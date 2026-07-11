@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / HR</div>
+  <h1>HR <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/hr</span></div>
+  <p class="lead">HR turns MaterialsHub into a full people-operations suite for your company: your <strong>employees</strong> (kept as CRM contacts tagged as employees), <strong>attendance</strong> with a clock-in kiosk and Work-Card check-in, <strong>time-off</strong> with leave balances, <strong>payroll</strong> with a Greek tax engine that posts straight into Finance, AI-assisted <strong>recruitment</strong> with a public careers page, <strong>document</strong> handling with AI OCR, and direct filing to the Greek labour authority (<strong>Ergani</strong>). It's the first paid add-on built on the <a href="apps.html">module framework</a>. This page is the map; each area has its own detailed guide below.</p>
+
+  <div class="callout"><p><strong>Where:</strong> enable <strong>HR</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on), then open it at <span class="badge route">/hr</span>. HR is <strong>owner/admin only</strong> — the sensitive people data is gated to workspace owners and admins. Employees get a separate, restricted <a href="hr-self-service.html">self-service portal</a>.</p></div>
+
+  <h2>How it's organised</h2>
+  <p>The HR page is a set of sections — <strong>Overview</strong> (headline analytics), <strong>Employees</strong>, <strong>Attendance</strong>, <strong>Time-off</strong>, <strong>Payroll</strong>, <strong>Recruitment</strong>, <strong>Documents</strong> and <strong>Ergani</strong>. Two things sit outside the admin page: the public-facing <strong>careers</strong> page and the two staff-facing surfaces (the <strong>clock-in kiosk</strong> and the <strong>employee self-service portal</strong>).</p>
+
+  <h2>The areas</h2>
+  <div class="cards">
+    <a class="card" href="hr-employees.html"><div class="ico">👤</div><h3>Employees &amp; org</h3><p>People as CRM contacts + an HR record; departments and the org structure.</p></a>
+    <a class="card" href="hr-attendance.html"><div class="ico">⏱️</div><h3>Attendance &amp; clock-in</h3><p>The clock-in kiosk, Work-Card check-in, timesheets and lateness alerts (filed to Ergani).</p></a>
+    <a class="card" href="hr-timeoff.html"><div class="ico">🌴</div><h3>Time-off &amp; absences</h3><p>Vacation / sick / unpaid / other, working-day counts and per-employee leave balances.</p></a>
+    <a class="card" href="hr-payroll.html"><div class="ico">💶</div><h3>Payroll &amp; payslips</h3><p>Monthly or hourly pay, a Greek tax engine, payslip PDFs, and a 3-way post into Finance.</p></a>
+    <a class="card" href="hr-recruitment.html"><div class="ico">🧑‍💼</div><h3>Recruitment &amp; careers</h3><p>Job postings, a public careers page + apply flow, and AI CV screening of candidates.</p></a>
+    <a class="card" href="hr-documents.html"><div class="ico">📄</div><h3>Documents (AI OCR)</h3><p>HR files, plus AI reading of monthly accounting/payment documents with reconciliation.</p></a>
+    <a class="card" href="hr-ergani.html"><div class="ico">🏛️</div><h3>Ergani filing <span style="font-size:12px">· BYOK</span></h3><p>File hires, schedules, leave and punches to ΠΣ Εργάνη with your own Ergani Web API credentials.</p></a>
+    <a class="card" href="hr-self-service.html"><div class="ico">🙋</div><h3>Employee self-service</h3><p>The restricted portal where staff clock in, request time off, and get payslips.</p></a>
+  </div>
+
+  <h2>How the pieces connect</h2>
+  <ul class="feat">
+    <li><strong>People live in CRM.</strong> An employee <em>is</em> a <a href="crm-contacts.html">CRM contact</a> tagged as an employee, with an HR record attached — so contact details stay in one place and HR adds the employment layer on top.</li>
+    <li><strong>Attendance feeds payroll.</strong> Clock-in punches and time-off build the timesheets and day counts that payroll reads.</li>
+    <li><strong>Payroll posts to Finance.</strong> An approved payroll run fans out into <a href="finance.html">Finance</a> as planned salary payments, so what you owe staff shows up alongside everything else you owe.</li>
+    <li><strong>Ergani is the compliance layer.</strong> Hires, schedules, leave and punches can be filed to the Greek labour authority directly from HR — see <a href="hr-ergani.html">Ergani</a>.</li>
+    <li><strong>AI is credit-metered.</strong> The AI steps (CV screening, accounting-document OCR) consume workspace <a href="account-credits.html">credits</a>, logged per operation.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Getting started:</strong> enable HR → add your <a href="hr-employees.html">employees</a> → (optional) connect <a href="hr-ergani.html">Ergani</a> so filings go to the authority → open the <a href="hr-attendance.html">clock-in kiosk</a> for staff → run <a href="hr-payroll.html">payroll</a> at month-end.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

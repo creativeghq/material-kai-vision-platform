@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR: Employee self-service | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="hr.html">HR</a> / Self-service</div>
+  <h1>HR · Employee self-service portal</h1>
+  <div class="routes"><span class="badge route">/hr</span> <span class="badge gated">employee</span></div>
+  <p class="lead">The self-service portal is the staff-facing side of HR. It's a restricted, isolated persona where an employee handles their own routine HR — clock in and out, see their employment info, check their leave balance, request time off, work through onboarding tasks, and pick up payslips and contracts their HR shares. It is deliberately walled off from the owner/admin HR back-office: an employee only ever sees <strong>their own</strong> data, never the company's payroll or anyone else's records.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the portal opens at <span class="badge route">/hr</span> — the same URL as the admin HR page — but what you see depends on who you are. An owner/admin lands in the full <a href="hr.html">HR back-office</a>; an employee with the restricted persona lands in this self-service view instead. It is not something an employee enables; access is granted for them (see below).</p></div>
+
+  <h2>Why it's a separate, isolated persona</h2>
+  <p>HR data is the most sensitive data in the workspace — salaries, payslips, contracts, absence reasons. The owner/admin HR area is gated to workspace owners and admins for exactly that reason. But employees still need to do everyday things: punch in for a shift, ask for a day off, grab last month's payslip. Rather than open the back-office to them, HR gives employees a <strong>restricted persona</strong> that renders a completely different, scoped-down surface.</p>
+  <ul class="feat">
+    <li><strong>Own-data-only.</strong> Every panel in the portal is filtered to the signed-in employee. There is no company roster, no other employee's leave, no payroll register, no admin queues — those simply don't exist in this view.</li>
+    <li><strong>Privacy by construction.</strong> Because payroll and other people's records are never part of the self-service surface, there's nothing extra to lock down per employee. An employee cannot navigate to another person's data because the portal never offers it.</li>
+    <li><strong>No bottleneck.</strong> Routine self-serve actions (clock in, request leave, download a payslip) don't need an admin to do them, so HR stops being the middleman for day-to-day requests.</li>
+  </ul>
+
+  <h2>How an employee gets in</h2>
+  <p>An employee doesn't sign themselves up for the portal — an admin grants it. On the employee's record in the HR back-office (see <a href="hr-employees.html">Employees &amp; org</a>) there's an <strong>"Invite to employee portal"</strong> action. Using it grants that person the restricted employee persona, so the next time they sign in to <span class="badge route">/hr</span> they get the self-service view rather than the admin back-office.</p>
+  <div class="callout tip"><p><strong>In practice:</strong> add the person as an <a href="hr-employees.html">employee</a> first (they exist as a CRM contact with an HR record), then use <strong>Invite to employee portal</strong> on their record. From that point the employee manages their own clock-ins, leave and documents themselves.</p></div>
+
+  <h2>What an employee can do — a walk-through</h2>
+  <p>The portal is a small set of panels. Each maps to something on the admin side, so an employee's self-service action flows straight back into HR.</p>
+
+  <h3>Clock in / out</h3>
+  <p>At the top of the portal is the Work-Card check-in — the employee's own clock. The prompt reads <em>"Clock in above to start."</em> Tapping it records a punch; tapping again clocks out. This is the same attendance mechanism as the shared kiosk, but scoped to just this employee.</p>
+  <ul class="feat">
+    <li><strong>Feeds attendance.</strong> Each punch becomes part of the employee's timesheet — see <a href="hr-attendance.html">Attendance &amp; clock-in</a> — which in turn feeds the day counts payroll reads.</li>
+    <li><strong>Files to Ergani.</strong> Where Ergani filing is enabled, each punch is filed to the Greek labour authority — see <a href="hr-ergani.html">Ergani filing</a>.</li>
+  </ul>
+
+  <h3>Employment info &amp; profile</h3>
+  <p>The employee can see their own <strong>Employment info</strong> — their department and employment details — alongside their profile. It's read-only reference: it tells the employee how they're set up in HR without exposing the org structure or other people's records.</p>
+
+  <h3>Leave — allowance, remaining, and requesting time off</h3>
+  <p>The Leave panel shows the employee three figures about themselves:</p>
+  <ul class="feat">
+    <li><strong>Leave allowance</strong> — their total entitlement.</li>
+    <li><strong>Leave remaining</strong> — what's left after what they've already taken.</li>
+    <li><strong>Absence taken</strong> — what they've used so far.</li>
+  </ul>
+  <p>From the same panel they can <strong>request time off</strong>. A request doesn't self-approve — it lands in the admin <a href="hr-timeoff.html">Time-off</a> queue for an owner/admin to approve or decline. Until the employee has any requests, the list shows <em>"No time off yet"</em>.</p>
+  <div class="callout"><p><strong>How it connects:</strong> the employee submits from here; the admin decides in <a href="hr-timeoff.html">Time-off &amp; absences</a>. Approved absence adjusts the balances the employee sees back in this same panel and feeds the working-day counts payroll uses.</p></div>
+
+  <h3>Onboarding tasks</h3>
+  <p>New starters get an <strong>Onboarding tasks</strong> checklist — the HR to-dos they need to work through when they join. They tick items off as they complete them. When there's nothing outstanding the panel reads <em>"Nothing to onboard"</em>, so the portal stays useful long after onboarding is done without clutter.</p>
+
+  <h3>Documents &amp; payslips</h3>
+  <p>The <strong>Documents</strong> panel is where the employee picks up files their HR shares with them: <em>"Payslips and contracts your HR shares will appear here."</em> It's read-only from the employee's side — they receive what HR attaches, they don't upload or manage documents here.</p>
+  <ul class="feat">
+    <li><strong>Payslips</strong> come from the payroll side. When a payroll run produces payslip PDFs (see <a href="hr-payroll.html">Payroll &amp; payslips</a>), the employee's own payslip surfaces here for them to download.</li>
+    <li><strong>Contracts and other HR files</strong> are whatever HR attaches to the employee on the admin side — see <a href="hr-documents.html">Documents</a>.</li>
+  </ul>
+
+  <h2>How it connects back to the admin side</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Employee does…</th><th>Admin side it flows into</th></tr></thead>
+    <tbody>
+      <tr><td>Clock in / out</td><td><a href="hr-attendance.html">Attendance</a> timesheets (and <a href="hr-ergani.html">Ergani</a> filing where enabled)</td></tr>
+      <tr><td>Request time off</td><td><a href="hr-timeoff.html">Time-off</a> approval queue → approved absence updates their balances</td></tr>
+      <tr><td>Complete onboarding tasks</td><td>The onboarding checklist set up on their <a href="hr-employees.html">employee record</a></td></tr>
+      <tr><td>Open Documents / payslips</td><td>Files HR shares via <a href="hr-documents.html">Documents</a>; payslips from a <a href="hr-payroll.html">payroll</a> run</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout warn"><p><strong>What an employee never sees:</strong> the HR back-office — company-wide payroll, other employees' records, admin queues and analytics. Those live in the owner/admin <a href="hr.html">HR</a> page and stay gated to workspace owners and admins. The self-service portal is the employee's own corner of HR, and nothing more.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

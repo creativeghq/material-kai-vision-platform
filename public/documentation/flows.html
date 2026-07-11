@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flows | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Flows</div>
+  <h1>Flows <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/apps/flows</span></div>
+  <p class="lead">Flows are <strong>workspace automations</strong>: “when <em>this</em> happens, do <em>that</em>.” Pick a <strong>trigger</strong> — an invoice is paid, a payment comes in, a quote is approved, a product is added, an inbox message arrives, an appointment is booked, or a <strong>schedule</strong> — and an <strong>action</strong> — send an email, a WhatsApp, an in-app notification, an agent message, or fire an <a href="email-marketing.html">Email Marketing</a> campaign. You build them by <strong>chatting with the assistant</strong>, no builder to learn, and they run on the platform's automation engine <strong>scoped to your workspace only</strong>. This page explains the triggers, the actions, how to create one, and how runs are metered.</p>
+
+  <div class="callout"><p><strong>Where:</strong> enable <strong>Flows</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on). You create and manage flows mostly from the <a href="agent-hub.html">assistant</a> — just describe the automation you want.</p></div>
+
+  <h2>Triggers — when a flow fires</h2>
+  <p>A flow starts from one of these:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Trigger</th><th>Fires when…</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Invoice paid</strong></td><td>an invoice is settled.</td></tr>
+      <tr><td><strong>Payment received</strong></td><td>money comes in.</td></tr>
+      <tr><td><strong>Quote approved</strong></td><td>a customer accepts a quote.</td></tr>
+      <tr><td><strong>Product added</strong></td><td>a new product is created.</td></tr>
+      <tr><td><strong>Inbox message</strong></td><td>a message arrives in the <a href="inbox.html">Inbox</a>.</td></tr>
+      <tr><td><strong>Appointment booked</strong></td><td>someone books an appointment.</td></tr>
+      <tr><td><strong>Schedule (cron)</strong></td><td>on a recurring time schedule you set.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Under the hood a flow can be reached four ways — a business <strong>event</strong> (the triggers above), a <strong>schedule</strong>, an inbound <strong>webhook</strong>, or a <strong>manual</strong> run — but the ones you'll build from chat are the events and schedules.</p>
+
+  <h2>Actions — what a flow does</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Action</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Send email</strong></td><td>Email someone (e.g. a customer or a teammate).</td></tr>
+      <tr><td><strong>Send WhatsApp</strong></td><td>Message a WhatsApp contact (needs WhatsApp connected — see <a href="inbox.html">Inbox</a>).</td></tr>
+      <tr><td><strong>In-app notification</strong></td><td>Post a bell notification to a user.</td></tr>
+      <tr><td><strong>Agent message</strong></td><td>Have the assistant post a message.</td></tr>
+      <tr><td><strong>Dispatch an Email Marketing campaign</strong></td><td>Kick off an <a href="email-marketing.html">Email Marketing</a> campaign.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>How to create a flow — from chat</h2>
+  <ol>
+    <li>In the <a href="agent-hub.html">assistant</a>, describe the automation — e.g. <em>“when an invoice is paid, send the customer a thank-you email,”</em> or <em>“every Monday at 9am, send my VIP list a campaign.”</em></li>
+    <li>The assistant sets up the flow (picking the trigger and action); for anything it needs pinned down it opens a short <strong>form</strong> to confirm the details.</li>
+    <li>The flow goes live for your workspace. You can ask the assistant to <strong>list, edit, pause or delete</strong> your flows at any time.</li>
+  </ol>
+  <div class="callout"><p><strong>Scoped &amp; safe.</strong> Chat-built flows are <strong>workspace-scoped</strong> — they only ever see and act on <em>your</em> workspace's data and run under your permissions. They're a deliberately simple, guard-railed subset of the platform's full automation engine.</p></div>
+
+  <h2>Metering — what a run costs</h2>
+  <p>Because flows do real work (send mail, message, dispatch campaigns), tenant flow runs are <strong>metered against your workspace <a href="account-credits.html">credit pool</a></strong>: a <strong>base cost per run</strong> plus the cost of the <strong>action</strong> it performs (e.g. an email or a campaign dispatch). That keeps automations honest — a flow that fires a thousand times has a visible, bounded cost — and it draws from the shared workspace pool like other metered work.</p>
+
+  <div class="callout tip"><p><strong>Good first flows:</strong> “thank-you email when an invoice is paid,” “notify me when a big quote is approved,” “post to the team when an appointment is booked,” or a “weekly newsletter” on a schedule. Start with one, watch it run, then add more.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

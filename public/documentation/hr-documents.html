@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR: Documents | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="hr.html">HR</a> / Documents</div>
+  <h1>HR · Documents (AI OCR)</h1>
+  <div class="routes"><span class="badge route">/hr</span> <span class="badge gated">owner / admin</span></div>
+  <p class="lead">The Documents area covers two very different jobs. One is quiet paperwork storage — the <strong>HR documents</strong> attached to each employee, like contracts and payslips, which are exactly what a staff member sees in their self-service portal. The other is the interesting one: an <strong>AI OCR</strong> workflow that reads your monthly accounting and payment paperwork, turns it into structured, checkable data, and reconciles it against what you actually owe — so a stack of PDFs becomes numbers you can verify without typing any of it by hand. Both AI steps are <strong>credit-metered by actual usage</strong>.</p>
+
+  <h2>The two kinds of document</h2>
+  <p>It's worth being clear on the split before you start, because the two areas serve different audiences:</p>
+  <ul class="feat">
+    <li><strong>HR documents (employee-attached).</strong> Files that belong to a specific person — employment contracts, payslips, and similar. These are the documents that surface for the employee in their <a href="hr-self-service.html">self-service portal</a>, so they can read their own contract or download a payslip. This is straightforward attach-and-share storage, scoped to one employee.</li>
+    <li><strong>Accounting documents (AI-assisted).</strong> The monthly payment / accounting paperwork for the business — the documents that describe what you're paying and to whom. This is where AI OCR and reconciliation live: you upload a document, the system reads it, and it checks the numbers against your obligations. This is the focus of the rest of this page.</li>
+  </ul>
+
+  <h2>Why AI OCR matters here</h2>
+  <p>Month-end accounting paperwork arrives as PDFs full of amounts, payees, references, periods and line items. Retyping all of that into a system is slow and error-prone, and it's exactly the kind of manual data entry that quietly introduces mistakes. The AI OCR step reads the document for you and extracts those fields as structured data — an amount, a payee, a reference number, the period it covers, and the individual line items — so the paperwork stops being an image and becomes numbers the platform can compare, total and check. In short: it turns a PDF of monthly obligations into structured, checkable data without manual entry.</p>
+
+  <div class="callout"><p><strong>Where:</strong> HR is <span class="badge gated">owner/admin only</span>. Open <span class="badge route">/hr</span> → the <strong>Documents</strong> section → the <strong>Accounting documents</strong> area to upload and analyze payment paperwork. HR-document attachment for employees lives with each person's <a href="hr-employees.html">employee record</a>.</p></div>
+
+  <h2>Analyzing a document — step by step</h2>
+  <ol>
+    <li>Open <strong>HR → Documents → Accounting documents</strong>.</li>
+    <li><strong>Upload</strong> the monthly accounting / payment document.</li>
+    <li>(Optional) <strong>Link it to a payroll run</strong> — pick the period it belongs to, so month-end payroll paperwork can be read and reconciled against that run automatically (see below).</li>
+    <li>Click <strong>Analyze</strong>. This kicks off two AI steps in sequence.</li>
+    <li><strong>Step 1 — AI OCR</strong> reads the document (using Claude) and extracts the structured fields. It records an AI <strong>confidence</strong> score, any notes, and how many <strong>credits</strong> it spent.</li>
+    <li><strong>Step 2 — AI reconciliation</strong> matches what you're expected to owe (your obligations) against the uploaded documents and recorded payments, and produces per-obligation matches, a summary of discrepancies, and a <strong>ready-to-pay</strong> flag.</li>
+    <li>Review the extracted values and the reconciliation result. Because the OCR carries a confidence score and notes, you can see at a glance where the AI was sure and where it wasn't.</li>
+  </ol>
+
+  <h2>What AI OCR extracts</h2>
+  <p>The OCR pass reads the document and pulls out the following structured fields, alongside its own confidence and cost metadata:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it captures</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Amount</strong></td><td>The total amount on the document.</td></tr>
+      <tr><td><strong>Currency</strong></td><td>The currency that amount is in.</td></tr>
+      <tr><td><strong>Payee</strong></td><td>Who the payment is to.</td></tr>
+      <tr><td><strong>Payment ID / Reference #</strong></td><td>The document's payment identifier or reference number.</td></tr>
+      <tr><td><strong>Period covered</strong></td><td>The period the document relates to.</td></tr>
+      <tr><td><strong>Due / issued dates</strong></td><td>When the document was issued and when it's due.</td></tr>
+      <tr><td><strong>Line items</strong></td><td>The individual entries, each as a label + an amount.</td></tr>
+      <tr><td><strong>AI confidence &amp; notes</strong></td><td>How confident the AI was in the read, plus any notes it recorded.</td></tr>
+      <tr><td><strong>Credits spent</strong></td><td>How many workspace credits this OCR operation consumed.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>What AI reconciliation does</h2>
+  <p>Once the document is read, reconciliation compares your <strong>expected obligations</strong> — what you owe, for example the amounts coming out of payroll — against the uploaded documents and the payments you've recorded. It produces one match per obligation, so you can see line-by-line whether the paperwork agrees with what was expected:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Per-obligation match field</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Expected amount</strong></td><td>What you were supposed to owe for this obligation.</td></tr>
+      <tr><td><strong>Found amount</strong></td><td>What the AI actually found in the documents / recorded payments.</td></tr>
+      <tr><td><strong>Status</strong></td><td>Whether this obligation matched.</td></tr>
+      <tr><td><strong>Discrepancies</strong></td><td>Any differences the reconciliation surfaced between expected and found.</td></tr>
+      <tr><td><strong>Summary</strong></td><td>An overall summary of the reconciliation across all obligations.</td></tr>
+      <tr><td><strong>Ready-to-pay flag</strong></td><td>The headline outcome — a signal that the obligations line up and the batch is ready to be paid.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The <strong>ready-to-pay</strong> flag is the outcome you're looking for: when expected and found amounts agree with no unresolved discrepancies, the document set is flagged as ready to pay, so you know the month-end paperwork has been checked end to end rather than eyeballed.</p>
+
+  <h2>Linking to a payroll run</h2>
+  <p>An accounting document can be linked to a <strong>payroll run</strong> — that is, to a specific period. This is what lets month-end payroll paperwork be read and reconciled automatically: the reconciliation step already knows the obligations for that run (what payroll says you owe), so linking the document lets the AI compare the paperwork directly against those figures. See <a href="hr-payroll.html">Payroll</a> for how runs and their obligations are produced.</p>
+
+  <h2>Credits — charged by actual usage</h2>
+  <p>Both AI steps consume workspace <a href="account-credits.html">credits</a>, and they are <strong>metered by actual usage</strong> — you're charged for the work each operation actually does, and every operation is logged with the credits it spent. This mirrors how the rest of HR's AI features work (for example CV screening in <a href="hr-recruitment.html">Recruitment</a>): the AI reading is done with Claude and is metered like any other AI operation on the platform.</p>
+  <ul class="feat">
+    <li><strong>AI OCR</strong> is credit-metered by the actual reading it performs, and records the credits it spent on that document.</li>
+    <li><strong>AI reconciliation</strong> is likewise credit-metered by actual usage and logged per operation.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>In practice:</strong> upload the month's accounting document, optionally point it at the matching <a href="hr-payroll.html">payroll run</a>, and hit <strong>Analyze</strong>. The OCR turns the PDF into an amount, a payee, a reference, a period and a set of line items; reconciliation then checks those against what payroll says you owe and, when everything agrees, raises the <strong>ready-to-pay</strong> flag. You've verified a stack of paperwork without hand-entering a single figure — and you've spent only the <a href="account-credits.html">credits</a> the two AI steps actually used.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR: Payroll &amp; payslips | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="hr.html">HR</a> / Payroll</div>
+  <h1>HR · Payroll &amp; payslips <span class="badge gated">owner / admin</span></h1>
+  <div class="routes"><span class="badge route">/hr</span></div>
+  <p class="lead">Payroll turns each month's attendance and each employee's terms into a full, tax-correct run: it computes every person's <strong>gross, deductions, income tax, social-security contributions and net</strong>, shows you your <strong>total employer cost</strong>, produces a <strong>payslip PDF</strong> for each employee, and — on approval — <strong>posts into <a href="finance.html">Finance</a></strong> as scheduled salary payments. It supports both monthly-salaried and hourly staff, and its tax engine is driven by editable brackets and contribution rates so the numbers match Greek payroll rules. This page explains the model, running a payroll, and how it reaches Finance.</p>
+
+  <div class="callout"><p><strong>Where:</strong> <strong>HR → Payroll</strong>. Reading it requires nothing beyond enabling HR, but the numbers depend on each employee's record (pay, hours, dependants) and on the payroll tax settings — set those up first.</p></div>
+
+  <h2>What drives a payroll — the inputs</h2>
+  <p>Each employee's pay is computed from their <a href="hr-employees.html">employee record</a> plus the period's attendance:</p>
+  <ul class="feat">
+    <li><strong>Pay basis</strong> — an employee is paid either <strong>monthly</strong> (a fixed salary) or <strong>hourly</strong>. For hourly staff the pay is <em>rate × working days in the month</em> (with the hours-per-day and rate on the record), so days actually worked drive the figure.</li>
+    <li><strong>Days worked / hours</strong> — taken from <a href="hr-attendance.html">attendance</a> and time-off for the period.</li>
+    <li><strong>Dependent children</strong> — recorded on the employee; they affect the income-tax calculation.</li>
+  </ul>
+
+  <h2>The tax engine</h2>
+  <p><strong>What it is —</strong> a configurable calculator, not a fixed formula. <strong>Why it matters —</strong> rates change and you need the run to reflect the current rules without a code change. In <strong>Payroll settings</strong> you maintain:</p>
+  <ul class="feat">
+    <li><strong>Income-tax brackets</strong> — a progressive table of <em>up-to threshold → rate</em>, applied in bands.</li>
+    <li><strong>Contribution rates</strong> — the <strong>employee</strong> and <strong>employer</strong> social-security contribution rates.</li>
+  </ul>
+  <p>From these, each line computes, per employee:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Figure</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Gross</strong></td><td>Pay before deductions (from the pay basis above).</td></tr>
+      <tr><td><strong>Employee contributions</strong></td><td>The employee's social-security deduction.</td></tr>
+      <tr><td><strong>Income tax</strong></td><td>Calculated from the brackets (adjusted for dependants).</td></tr>
+      <tr><td><strong>Deductions</strong></td><td>Employee contributions + income tax withheld.</td></tr>
+      <tr><td><strong>Net</strong></td><td>What the employee actually receives (gross − deductions).</td></tr>
+      <tr><td><strong>Employer contributions</strong></td><td>The employer's social-security cost on top.</td></tr>
+      <tr><td><strong>Employer cost</strong></td><td>Your true total cost = gross + employer contributions.</td></tr>
+    </tbody>
+  </table></div>
+  <p>A run's <strong>summary</strong> totals all of these (total gross, net, income tax, employee/employer contributions, and employer cost) so you see the whole month at a glance — what staff take home <em>and</em> what it costs you.</p>
+
+  <h2>Running a payroll — step by step</h2>
+  <ol>
+    <li><strong>Create a run</strong> for a period (e.g. a month). It generates a <strong>line per active employee</strong> using their basis, the period's days/hours, and the tax settings; it starts as a <strong>draft</strong>.</li>
+    <li><strong>Review</strong> each line and the totals. Adjust where needed; a line carries its basis, days worked, hours-per-day and rate so you can see how it was derived.</li>
+    <li><strong>Approve</strong> the run. This locks the numbers and <strong>posts them into Finance</strong> (below), and stamps an approved date.</li>
+    <li><strong>Pay</strong> — once the salaries are actually paid, the run is marked <strong>paid</strong>.</li>
+    <li><strong>Payslips</strong> — a <strong>PDF payslip</strong> is produced for each employee; these appear to staff in their <a href="hr-self-service.html">self-service portal</a> and can be shared as HR documents.</li>
+  </ol>
+
+  <h2>How payroll reaches Finance</h2>
+  <p>Approving a run doesn't leave the money in a silo — it <strong>fans out into <a href="finance.html">Finance</a></strong> as scheduled (planned) payments under the <strong>salary</strong> category, so what you owe staff and the authorities sits alongside everything else you owe. The split covers the three real obligations of a payroll: the <strong>net</strong> due to each employee, the withheld <strong>employee contributions + income tax</strong>, and the <strong>employer contributions</strong> — so nothing owed is missed. See <a href="finance-op-planning.html">Planning</a> for scheduled payments.</p>
+
+  <div class="callout tip"><p><strong>Month-end flow:</strong> confirm attendance for the month → create the payroll run → review the summary (watch <em>employer cost</em>, not just net) → approve (it posts to Finance) → distribute payslips → mark paid once salaries go out. Pair this with the AI <a href="hr-documents.html">accounting-document reconciliation</a> to check what you paid against what was owed.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

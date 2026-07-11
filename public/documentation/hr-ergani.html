@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR: Ergani filing (BYOK) | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="hr.html">HR</a> / Ergani</div>
+  <h1>HR · Ergani filing <span class="badge gated">owner / admin · BYOK</span></h1>
+  <div class="routes"><span class="badge route">/hr</span></div>
+  <p class="lead">Greek employers must file employment events — hires, work schedules, leave and attendance punches — to the labour authority's <strong>ΠΣ Εργάνη</strong> (Ergani) system. HR connects directly to the <strong>Ergani II Web API</strong> so those filings happen from inside the platform: an employee clocking in at the kiosk, or a leave you approve, is submitted to Ergani and comes back with an official <strong>protocol number</strong>. This is a <strong>bring-your-own-key (BYOK)</strong> integration — it uses <em>your company's</em> Ergani Web API credentials, because filings are made under your employer identity. This page covers exactly what to add, where, and what gets filed.</p>
+
+  <div class="callout warn"><p><strong>These are special Ergani <em>Web API</em> credentials</strong> — not your normal Ergani/ΕΦΚΑ web login. You obtain a dedicated API username and password for your employer (ΑΦΜ) from the Ergani Web API registration, and enter them here. Filings are made <strong>as your company</strong>, so the credentials must be your own.</p></div>
+
+  <h2>Step 1 — Get your Ergani Web API credentials</h2>
+  <p>From the Ergani side (outside MaterialsHub) you'll need four things for your employer:</p>
+  <ul class="feat">
+    <li>An <strong>Ergani Web API username</strong> and <strong>password</strong> — the API credential pair issued for your employer's account (distinct from the interactive Ergani portal login).</li>
+    <li>Your <strong>Employer VAT (ΑΦΜ)</strong> — the 9-digit tax number of the employing company (e.g. <code>094187530</code>).</li>
+    <li>Your <strong>Branch number (Παράρτημα)</strong> — the establishment/branch the filings are for (the head office is typically branch <code>0</code>).</li>
+  </ul>
+
+  <h2>Step 2 — Enter them in HR → Ergani — exactly what to add</h2>
+  <p><strong>Where:</strong> open <strong>HR → Ergani</strong> and fill the <strong>Ergani credentials</strong> card:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Ergani username</strong></td><td>Your Ergani Web API username.</td></tr>
+      <tr><td><strong>Password</strong></td><td>Your Ergani Web API password (stored securely; never shown back).</td></tr>
+      <tr><td><strong>Employer VAT</strong></td><td>The 9-digit ΑΦΜ of the employing company (e.g. <code>094187530</code>).</td></tr>
+      <tr><td><strong>Branch No.</strong></td><td>The establishment/branch number (head office is usually <code>0</code>).</td></tr>
+      <tr><td><strong>Environment</strong></td><td><strong>Production</strong> for real filings, or the trial/test environment while you're setting up — so you can validate the connection before submitting real events.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Save. HR verifies the connection and shows the credentials as <strong>configured</strong>. Credentials are stored <strong>per workspace</strong>, so each company files under its own identity.</p>
+  <div class="callout tip"><p>Start on the <strong>test environment</strong>, confirm a punch or leave submits and returns a protocol, then switch to <strong>Production</strong>. That way you never send a malformed real filing while learning the flow.</p></div>
+
+  <h2>What gets filed to Ergani</h2>
+  <p>Once connected, HR files the events Ergani requires — each successful submission returns a <strong>protocol number</strong> and submit date that HR records against the item, so you have proof it was lodged:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Event</th><th>How it's triggered</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Attendance punches</strong> (arrival / departure)</td><td>Every clock-in / clock-out at the <a href="hr-attendance.html">kiosk</a> or the employee <a href="hr-self-service.html">portal</a> is filed; the row then shows <strong>Ergani ✓</strong> with its protocol. (Manual correction punches are <em>not</em> filed.)</td></tr>
+      <tr><td><strong>Leave / time-off</strong></td><td>When you approve an absence you can <strong>File leave to Ergani</strong>, choosing the matching <strong>Ergani leave type</strong> (an official leave code — see below). See <a href="hr-timeoff.html">Time-off</a>.</td></tr>
+      <tr><td><strong>Hires &amp; work schedules</strong></td><td>Employment events for your staff are submitted under the supported Ergani submission types.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Ergani leave types</h3>
+  <p>Ergani classifies leave by an official <strong>code</strong> (each with a Greek and English description, a category/subcategory, and whether it's hourly). When you file a time-off, you map your absence to the right Ergani leave code so the authority records the correct category. HR loads the current list of leave types for you to pick from.</p>
+
+  <h2>Why this matters</h2>
+  <p>Filing from inside HR means the compliance step isn't a separate, forgettable task in another portal — the moment someone clocks in or you approve leave, it's lodged and stamped with a protocol. Because it's <strong>BYOK</strong>, every filing is correctly attributed to <em>your</em> employer account, and one workspace can never file under another's identity.</p>
+
+  <div class="callout"><p><strong>Related BYOK:</strong> Ergani is one of the platform's bring-your-own-key integrations. For the general pattern and where per-workspace credentials live, see <a href="account-keys.html">Keys &amp; Connections</a> and the <a href="apps.html#">Apps &amp; Modules</a> BYOK note.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

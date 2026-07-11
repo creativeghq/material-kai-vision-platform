@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR: Time-off & absences | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="hr.html">HR</a> / Time-off</div>
+  <h1>HR · Time-off &amp; absences</h1>
+  <div class="routes"><span class="badge route">/hr</span> <span class="badge gated">owner / admin</span></div>
+  <p class="lead">The <strong>Time Off</strong> section is where every employee absence is recorded, approved and counted. It answers three everyday questions at once: who is off and why, how many working days each absence really costs, and how much leave each person has left. Because absences also feed payroll day-counts and can be filed to the Greek labour authority, this is more than a calendar — it's the single record of who was away and whether it was authorised.</p>
+
+  <h2>Where it is</h2>
+  <p>Open <span class="badge route">/hr</span> and go to the <strong>Time Off</strong> section. Like the rest of HR, it is <strong>owner/admin only</strong> — the sensitive people data is gated to workspace owners and admins. Employees don't work here directly; they submit their own requests from the <a href="hr-self-service.html">self-service portal</a>, and those requests land in this section for an admin to approve or reject.</p>
+
+  <h2>What time-off tracking is for</h2>
+  <p>Every logged absence does three jobs:</p>
+  <ul class="feat">
+    <li><strong>It records the fact.</strong> A dated, typed, note-carrying entry against a named employee — your authoritative "who was off and why" log.</li>
+    <li><strong>It counts working days.</strong> The system computes the number of <strong>working days</strong> in the range automatically, <strong>excluding weekends</strong>, so a Friday-to-Monday absence counts as 2 days, not 4. Those counts are what feed leave balances and payroll.</li>
+    <li><strong>It draws down leave.</strong> Absences reduce the employee's remaining allowance, so you always know how much leave each person has left before you approve the next request.</li>
+  </ul>
+
+  <h2>Logging an absence — field by field</h2>
+  <p>Use the <strong>Log time off</strong> form to record an absence on someone's behalf (for example when they told you in person, or you're catching up the record). Every field:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Employee</strong> <span style="color:var(--muted)">(required)</span></td><td>A <em>Select employee</em> dropdown — pick whose absence this is. The absence and its working-day cost are recorded against this person and draw down <em>their</em> leave balance.</td></tr>
+      <tr><td><strong>Absence type</strong></td><td>One of <strong>vacation</strong>, <strong>sick</strong>, <strong>unpaid</strong> or <strong>other</strong> — see the table below. The type is what the Overview groups by under "Absence by type".</td></tr>
+      <tr><td><strong>Start date</strong></td><td>First day of the absence.</td></tr>
+      <tr><td><strong>End date</strong></td><td>Last day of the absence. The working-day count is computed across the start-to-end range.</td></tr>
+      <tr><td><strong>Note</strong></td><td>Free text — the reason or any context (e.g. "family event", "flu"). Optional but recommended so the record explains itself later.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout tip"><p><strong>You don't type the day count.</strong> Once the start and end dates are set, <strong>working days are computed automatically with weekends excluded</strong>. That figure — not the raw calendar span — is what draws down the leave balance and what payroll reads, so a week off (Mon–Fri) costs 5 days while the same span including the weekend still costs 5.</p></div>
+
+  <h2>The four absence types</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Type</th><th>Use it for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>vacation</strong></td><td>Regular paid annual leave — the absence that draws down the employee's annual allowance.</td></tr>
+      <tr><td><strong>sick</strong></td><td>Illness / sick leave.</td></tr>
+      <tr><td><strong>unpaid</strong></td><td>Leave taken without pay.</td></tr>
+      <tr><td><strong>other</strong></td><td>Anything that doesn't fit the above — the catch-all category.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>The approve / reject lifecycle</h2>
+  <p>Each request carries a <strong>status</strong>, and the status is what makes an absence "real" rather than just proposed:</p>
+  <ul class="feat">
+    <li><strong>pending</strong> — the default for a newly submitted request (including one that arrived from an employee's self-service portal). It's waiting for an admin decision, and shows <strong>Approve</strong> and <strong>Reject</strong> actions.</li>
+    <li><strong>Approve</strong> — you accept the absence. It becomes an authorised, counted absence against that employee.</li>
+    <li><strong>Reject</strong> — you decline it.</li>
+    <li><strong>Cancelled</strong> — the request is withdrawn / no longer active.</li>
+  </ul>
+  <p>When nothing has been logged yet, the section shows the empty state <em>"No time off recorded"</em>.</p>
+
+  <h2>Leave balances &amp; allowances — how the draw-down works</h2>
+  <p>Time-off isn't just a list; each employee carries a running leave balance that this section keeps honest:</p>
+  <ul class="feat">
+    <li><strong>Leave allowance</strong> — the employee's annual entitlement. It's set on the employee record as <strong>Annual leave (days)</strong> (see <a href="hr-employees.html">Employees &amp; org</a>), so a new joiner's allowance is defined once, up front.</li>
+    <li><strong>Leave remaining</strong> — how much of that allowance is still available. Every approved absence subtracts its computed working-day count, so this number falls as the year goes on and tells you at a glance whether the next request fits.</li>
+    <li><strong>Absence taken / Absence days</strong> — the running totals of days already used, the other side of the same coin as <em>Leave remaining</em>.</li>
+  </ul>
+  <p>The <strong>Overview</strong> rolls these up across the whole company: <strong>"Absence by type"</strong> shows the split across vacation / sick / unpaid / other, and <strong>"On leave today"</strong> tells you who is out right now — useful before you promise a customer a delivery date or assign a job.</p>
+
+  <h2>Filing leave to Ergani</h2>
+  <p>In Greece, certain leave has to be declared to the labour authority. Once an absence is logged, you can send it onward: pick an <strong>Ergani leave type</strong> (a specific Ergani leave code — required) and use <strong>File leave to Ergani</strong> to submit it to ΠΣ Εργάνη. The absence type you chose above is the internal category; the <em>Ergani leave type</em> is the official code the authority expects for that leave. Filing uses your workspace's own Ergani Web API credentials — how that connection is set up and what filing does is covered on the <a href="hr-ergani.html">Ergani filing</a> page.</p>
+  <div class="callout"><p><strong>Two separate labels.</strong> The four <em>absence types</em> (vacation / sick / unpaid / other) are how MaterialsHub organises and counts leave internally. The <em>Ergani leave type</em> is a separate, official code you choose only when you file the leave to the authority. Logging an absence and filing it to Ergani are distinct steps.</p></div>
+
+  <h2>Employees requesting their own time off</h2>
+  <p>Staff don't need admin access to ask for leave. From the <a href="hr-self-service.html">self-service portal</a>, an employee can <strong>request time off themselves</strong> — choosing the dates and type just like the admin form. That request arrives here as a <strong>pending</strong> entry for an admin to <strong>Approve</strong> or <strong>Reject</strong>. This keeps the whole loop inside the platform: the employee asks, you decide, the balance updates, and — if it's leave that needs declaring — you file it to Ergani, all from the same record.</p>
+
+  <div class="callout tip"><p><strong>Typical flow:</strong> employee requests vacation from the <a href="hr-self-service.html">portal</a> → it appears here as <em>pending</em> → you check their <em>Leave remaining</em> → <strong>Approve</strong> → the working-day count draws down their balance and shows under <em>"Absence by type"</em> → if required, pick an <strong>Ergani leave type</strong> and <strong>File leave to Ergani</strong>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

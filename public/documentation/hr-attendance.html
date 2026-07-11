@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR: Attendance &amp; clock-in | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="hr.html">HR</a> / Attendance</div>
+  <h1>HR · Attendance &amp; clock-in</h1>
+  <div class="routes"><span class="badge route">/hr</span> <span class="badge gated">owner / admin</span></div>
+  <p class="lead">Attendance is how HR records when your people actually start and stop work. Staff mark themselves present at a shared <strong>clock-in kiosk</strong> — or from their own <a href="hr-self-service.html">self-service portal</a> — and every mark becomes a <strong>punch</strong> that is filed straight to the Greek labour authority (<a href="hr-ergani.html">Ergani</a>). Those punches roll up into <strong>timesheets</strong> (days worked, hours, first-in / last-out) and, when someone is late, into <strong>lateness alerts</strong>. The days and hours that attendance captures are exactly what <a href="hr-payroll.html">payroll</a> reads at month-end, so getting the clock-in flow right keeps pay accurate without anyone re-typing hours.</p>
+
+  <h2>Where it is</h2>
+  <p>Open <strong>HR</strong> (<span class="badge route">/hr</span>, owner/admin only) and go to the <strong>Attendance</strong> section. That section holds the settings, the punch and timesheet views, and the manual-correction tools. The one part that lives <em>outside</em> the admin page is the kiosk itself: it is a public page staff open on a shared device.</p>
+
+  <h2>The clock-in kiosk</h2>
+  <p>The kiosk is a standalone, per-workspace page at <code>/{workspace}/clockin</code> — you'd typically leave it open on a tablet or shared computer by the entrance. It is branded <em>"Powered by MaterialsHub"</em> and is deliberately simple so anyone can use it without an account of their own.</p>
+  <ul class="feat">
+    <li><strong>Staff clock in by VAT number.</strong> An employee types their VAT number, the kiosk greets them with <strong>"Welcome"</strong> and their name, and shows two actions: <strong>Clock in</strong> and <strong>Clock out</strong>.</li>
+    <li><strong>Late is flagged on the spot.</strong> If they clock in after their expected start time plus the configured grace period, the kiosk shows <strong>"Marked late"</strong> so it's clear the arrival was recorded as late.</li>
+    <li><strong>A Kiosk PIN secures the identity.</strong> The VAT number identifies who they are; a per-employee <strong>Kiosk PIN</strong> (set on the employee record — see <a href="hr-employees.html">Employees</a>) is what protects it, so someone can't clock a colleague in or out just by knowing a VAT number.</li>
+    <li><strong>If the kiosk is switched off</strong> the page shows <strong>"The clock-in kiosk is not enabled for this workspace."</strong> — so you'll know immediately if the setting hasn't been turned on.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>The VAT + PIN model in one line:</strong> the <em>VAT number</em> says <em>who</em> is clocking in, and the <em>Kiosk PIN</em> proves it's really them. Both come from the employee record, so onboarding a new starter into the kiosk is just: add the employee, set their VAT and Kiosk PIN.</p></div>
+
+  <h2>Turning the kiosk on and configuring it</h2>
+  <p>All of this lives under <strong>Attendance &amp; clock-in settings</strong> in the Attendance section. Flip the kiosk on, decide how much lateness grace to allow, and choose whether (and who) to alert when someone hasn't clocked in.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Enable public clock-in page</strong></td><td>Turns the kiosk on. While off, the <code>/{workspace}/clockin</code> page shows the "not enabled for this workspace" message and no one can punch from it.</td></tr>
+      <tr><td><strong>Late grace (min)</strong></td><td>How many minutes after an employee's expected start time before an arrival counts as late. A clock-in inside the grace window is on-time; past it, the kiosk shows "Marked late" and the punch is recorded as late.</td></tr>
+      <tr><td><strong>Enable late-check-in alerts</strong></td><td>Switches on the alerting described as "Notify when an employee hasn't clocked in past their start + grace." With it on, the workspace watches for people who should have clocked in by now and haven't.</td></tr>
+      <tr><td><strong>Notify workspace owner</strong></td><td>A notify target: include the workspace owner among the people alerted about a missed / late check-in.</td></tr>
+      <tr><td><strong>Notify finance / admins</strong></td><td>A notify target: include the finance / admin recipients in the alert.</td></tr>
+      <tr><td><strong>Extra emails</strong></td><td>A comma-separated list of additional email addresses to alert. These are <em>email only</em> — they're outside recipients who just get the email, not in-app people.</td></tr>
+      <tr><td><strong>Also notify (bell + email)</strong></td><td>The delivery channel for the alert: send it as a <strong>Bell</strong> in-app notification <em>and</em> an <strong>email</strong>, rather than only one.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout"><p><strong>Note:</strong> the alert targets stack — you can, for example, notify the owner <em>and</em> finance/admins <em>and</em> a couple of extra outside emails at once, all delivered by bell + email.</p></div>
+
+  <h2>Punches, Ergani filing and manual corrections</h2>
+  <p>Every clock-in / clock-out is a <strong>punch</strong>. Punches are of two kinds — an <strong>arrival</strong> or a <strong>departure</strong> — and they're the raw record everything else is built from.</p>
+  <ul class="feat">
+    <li><strong>Each successful punch is filed to Ergani.</strong> When a punch is recorded, it's submitted to the Greek labour authority and comes back with an <strong>Ergani protocol number</strong>. In the punch list you'll see this confirmed as <strong>"Ergani ✓"</strong> / <strong>"Filed to Ergani"</strong> — the proof that the arrival or departure was reported as required. (How the Ergani connection is set up lives in <a href="hr-ergani.html">Ergani filing</a>.)</li>
+    <li><strong>Corrections don't go to Ergani.</strong> When you need to fix a record — a missed clock-out, a forgotten arrival — use <strong>Add a manual punch</strong>. This is explicitly labelled <em>"correction — not filed to Ergani"</em>: it adjusts your internal timesheet without submitting a new official filing.</li>
+    <li><strong>Unmatched clock-ins are surfaced.</strong> If someone clocked in but never clocked out (or vice-versa), the row can show <strong>"Has an unmatched clock-in"</strong> — your cue that a departure is missing and a manual punch may be needed to close the day.</li>
+  </ul>
+
+  <div class="callout warn"><p><strong>Why the split matters:</strong> a real punch from the kiosk is an official Ergani filing with a protocol number; a manual punch is an internal fix only. Use manual punches to keep timesheets and payroll accurate, but remember they don't create an Ergani record — so they're for corrections, not for routinely bypassing the kiosk.</p></div>
+
+  <h2>Timesheets</h2>
+  <p>The <strong>Timesheet</strong> view rolls the raw punches up into something readable per employee. For each person it shows:</p>
+  <ul class="feat">
+    <li><strong>Days worked</strong> — how many days they were present in the period.</li>
+    <li><strong>Total hours</strong> — the summed worked hours.</li>
+    <li><strong>First-in / last-out per day</strong> — the earliest arrival and latest departure recorded on each day, so a day's span is obvious at a glance.</li>
+    <li><strong>Punch history</strong> — the underlying list of individual punches for the <strong>last 30 days</strong>, which is where you'll spot an unmatched clock-in or decide a manual correction is needed.</li>
+  </ul>
+
+  <h2>Lateness alerts and Flows</h2>
+  <p>Beyond the built-in notify targets above, a late check-in is also a first-class <strong>Flows</strong> trigger — <code>hr_late_checkin</code>. That means admins aren't limited to "bell + email to these people": you can build an automation off the same event in <a href="flows.html">Flows</a> — for instance routing lateness to a specific channel, chaining it into another action, or applying your own conditions. The setting-driven alerts and the Flows trigger fire off the same underlying "hasn't clocked in past start + grace" event.</p>
+
+  <div class="callout tip"><p><strong>Two ways to react to lateness:</strong> the quick way is the <em>Enable late-check-in alerts</em> settings (pick recipients, get a bell + email). The powerful way is the <code>hr_late_checkin</code> trigger in Flows, when you want custom logic or delivery. You can use either or both.</p></div>
+
+  <h2>What attendance feeds</h2>
+  <p>Attendance isn't an island — it's the input to pay. The <strong>days worked</strong> and <strong>hours</strong> your timesheets capture flow into <a href="hr-payroll.html">payroll</a>, which reads them at month-end so you don't re-enter anything. That's the whole point of getting punches right: accurate clock-in data means accurate payslips.</p>
+
+  <h2>Where staff clock in from</h2>
+  <p>There are two staff-facing routes into attendance, and they produce the same punches:</p>
+  <ul class="feat">
+    <li><strong>The kiosk</strong> at <code>/{workspace}/clockin</code> — the shared-device path, using VAT number + Kiosk PIN, described above.</li>
+    <li><strong>The self-service portal</strong> — employees can also clock in from their own restricted <a href="hr-self-service.html">self-service portal</a> via a <strong>Work-Card check-in</strong>, so remote or on-the-go staff don't need to reach a physical kiosk.</li>
+  </ul>
+
+  <div class="callout"><p><strong>Getting attendance running:</strong> add your <a href="hr-employees.html">employees</a> with a VAT number and Kiosk PIN → connect <a href="hr-ergani.html">Ergani</a> so punches file with a protocol number → in Attendance settings switch on <em>Enable public clock-in page</em>, set a <em>Late grace</em>, and (optionally) turn on late-check-in alerts → open <code>/{workspace}/clockin</code> on a shared device. From there, timesheets build themselves and feed <a href="hr-payroll.html">payroll</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

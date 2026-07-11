@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Email Marketing (BYOK) | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Email Marketing</div>
+  <h1>Email Marketing <span class="badge gated">Pro add-on · BYOK</span></h1>
+  <div class="routes"><span class="badge route">/apps/email-marketing</span></div>
+  <p class="lead">Email Marketing lets you design email templates in a visual builder and send <strong>bulk campaigns to your CRM audiences</strong>. Crucially, it is <strong>bring-your-own-key (BYOK) only</strong>: every campaign sends from <em>your own</em> verified <strong>Resend</strong> account and domain — there is <strong>no shared platform sender</strong>. That means your campaigns come from <em>your</em> domain (better deliverability and trust), and you're never sending marketing mail through someone else's reputation. This guide covers the whole path: enabling the app, the exact BYOK setup (what to paste and where), building a template, and sending a campaign.</p>
+
+  <div class="callout warn"><p><strong>BYOK is mandatory here.</strong> Until the workspace has its <strong>own Resend API key + a verified sender</strong>, campaigns <strong>cannot send</strong> — the app shows <em>“Configure your Resend account to start sending.”</em> There is deliberately no platform fallback for marketing mail.</p></div>
+
+  <h2>Step 1 — Enable the app</h2>
+  <p>Email Marketing is a <strong>Pro add-on</strong>. Enable it from the <a href="apps.html">App Launcher</a> (or <a href="account-modules.html">Profile → Modules</a>): find it under <strong>Available to add</strong> and click enable. As a paid add-on it goes through <strong>checkout</strong> (bound to a Stripe product); once billing is set up it becomes active and appears in your launcher. A member without owner rights can <strong>request</strong> it instead (the owner is notified to approve).</p>
+
+  <h2>Step 2 — Set up your Resend account (BYOK) — exactly what to add</h2>
+  <p>This is the part that unlocks sending. You need a Resend account with a <strong>verified sending domain</strong>, then you paste its key and sender into MaterialsHub.</p>
+
+  <h3>2a. Get the pieces from Resend (outside MaterialsHub)</h3>
+  <ol>
+    <li>Create a free account at <strong>resend.com</strong>.</li>
+    <li><strong>Verify your sending domain.</strong> In Resend → <strong>Domains</strong> → <em>Add Domain</em>, enter the domain you'll send from (e.g. <code>yourcompany.com</code>). Resend gives you DNS records (SPF/DKIM, and a return-path). Add those records at your DNS host and click <strong>Verify</strong>. This is what proves you own the domain and lets mail be signed as yours.</li>
+    <li><strong>Create an API key.</strong> In Resend → <strong>API Keys</strong> → <em>Create API Key</em> (send-only is enough). Copy it now — Resend shows it once.</li>
+  </ol>
+  <div class="callout tip"><p>Your <strong>From email must be on the verified domain</strong> (e.g. <code>news@yourcompany.com</code>). A Gmail/Outlook address won't work as a marketing sender — that's exactly what domain verification prevents.</p></div>
+
+  <h3>2b. Add them in MaterialsHub</h3>
+  <p><strong>Where:</strong> <a href="account-keys.html">Profile → Keys &amp; Connections</a> → the workspace email card (the Email Marketing app also surfaces this as its <strong>Setup</strong> step / <em>“One step to activate.”</em>). Fill in:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Use my Resend account</strong></td><td>Turn this on (otherwise the “Platform default sender” is used, which Email Marketing doesn't allow).</td></tr>
+      <tr><td><strong>Resend API Key</strong></td><td>Paste the key you created in Resend.</td></tr>
+      <tr><td><strong>From email</strong></td><td>An address <em>on your verified domain</em> — e.g. <code>news@yourcompany.com</code>.</td></tr>
+      <tr><td><strong>From name</strong></td><td>The display name recipients see — e.g. <em>Your Company</em>.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Save. The status flips from <em>“Configure your Resend account…”</em> to <strong>“Your Resend sender is configured”</strong> / <strong>“Ready to send.”</strong> Campaigns will now send from your domain.</p>
+  <div class="callout"><p><strong>Sending limits.</strong> Volume is <strong>metered by a platform-controlled daily cap</strong> (a safety ceiling on how many a workspace can send per day) on top of whatever your own Resend plan allows. The key + sender are configured per <strong>workspace</strong>, so each tenant sends under its own identity and reputation.</p></div>
+
+  <h2>Step 3 — Build an email template</h2>
+  <p>Open the app's <strong>Templates</strong> tab and design your email in the <strong>visual builder</strong> (the same drag-and-drop GrapesJS builder used across the platform) — layout, images, buttons and text, no HTML required. Save it; it becomes selectable when you create a campaign. Each template can carry a default subject (a campaign can override it).</p>
+
+  <h2>Step 4 — Create and send a campaign</h2>
+  <p>On the <strong>Campaigns</strong> tab, click <strong>New Email Campaign</strong> and fill in:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Campaign Name *</strong></td><td>Your internal name (e.g. <em>Summer Sale 2026</em>).</td></tr>
+      <tr><td><strong>Email Template *</strong></td><td>The template to send.</td></tr>
+      <tr><td><strong>Subject Line</strong></td><td>Optional — <em>overrides the template subject</em> for this send.</td></tr>
+      <tr><td><strong>Preview Text</strong></td><td>The snippet shown after the subject in the inbox.</td></tr>
+      <tr><td><strong>Recipients</strong></td><td>Pick one or more <strong>CRM Categories</strong> as the audience, and/or paste <strong>Additional emails</strong> (one per line or comma-separated). The category audience is resolved to your CRM contacts at send time.</td></tr>
+      <tr><td><strong>Send now / Scheduled</strong></td><td>Send immediately, or pick a <strong>Send Date &amp; Time</strong> to schedule it (a background processor sends scheduled campaigns when they're due).</td></tr>
+    </tbody>
+  </table></div>
+  <p>Your <a href="crm-categories.html">CRM categories</a> are how you segment — build the audience there once and reuse it across campaigns.</p>
+
+  <h2>Step 5 — Track delivery</h2>
+  <p>Each campaign shows <strong>Delivery stats</strong> pulled back from Resend — how many were delivered, and the outcomes — so you can see how a send actually performed rather than just that it was queued.</p>
+
+  <div class="callout tip"><p><strong>Recap:</strong> enable the app → verify a domain + create a key in Resend → paste <em>Use my Resend account</em> + key + From-email + From-name in Profile → Keys → build a template → create a campaign targeting CRM categories → send or schedule → watch delivery stats. Everything sends as <em>you</em>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

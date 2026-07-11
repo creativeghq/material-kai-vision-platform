@@ -102,6 +102,21 @@
         { file: "compare.html", title: "Material Compare" },
       ]},
     ]},
+    { title: "Business Apps", items: [
+      { file: "apps.html", title: "Apps & Modules", icon: "🧩" },
+      { file: "hr.html", title: "HR", icon: "👥", children: [
+        { file: "hr-employees.html", title: "Employees & org" },
+        { file: "hr-attendance.html", title: "Attendance & clock-in" },
+        { file: "hr-timeoff.html", title: "Time-off & absences" },
+        { file: "hr-payroll.html", title: "Payroll & payslips" },
+        { file: "hr-recruitment.html", title: "Recruitment & careers" },
+        { file: "hr-documents.html", title: "Documents (AI OCR)" },
+        { file: "hr-ergani.html", title: "Ergani filing (BYOK)" },
+        { file: "hr-self-service.html", title: "Employee self-service" },
+      ]},
+      { file: "email-marketing.html", title: "Email Marketing (BYOK)", icon: "📣" },
+      { file: "flows.html", title: "Flows", icon: "🔀" },
+    ]},
     { title: "Account", items: [
       { file: "account.html", title: "Account & Billing", icon: "⚙️", children: [
         { file: "account-profile.html", title: "Profile" },
