@@ -105,11 +105,9 @@ class MarketingService {
 
   // ── Audience ───────────────────────────────────────────────────────────────
   async listCategories(): Promise<CrmCategory[]> {
-    const { data, error } = await supabase
-      .from('crm_categories')
-      .select('id, name, slug, kind')
-      .eq('is_active', true)
-      .order('name', { ascending: true });
+    // crm_categories is a global taxonomy whose table RLS is admin-only, so a direct select returns
+    // empty for normal tenants. Read the picker fields via the membership-agnostic RPC instead.
+    const { data, error } = await supabase.rpc('list_crm_categories');
     if (error) throw error;
     return (data || []) as CrmCategory[];
   }

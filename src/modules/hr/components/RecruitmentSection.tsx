@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap, ExternalLink, FileUp, FileText, Wand2, Zap } from 'lucide-react';
+import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap, ExternalLink, FileUp, FileText, Wand2, Zap, Trash2, Lock, LockOpen } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -115,6 +115,22 @@ function ApplicationsPipeline({ workspaceId, posting, departments, canManage, on
   }, [workspaceId, posting.id, toast]);
   useEffect(() => { void load(); }, [load]);
 
+  const [busyPosting, setBusyPosting] = useState(false);
+  const toggleStatus = async () => {
+    const next = posting.status === 'closed' ? 'open' : 'closed';
+    setBusyPosting(true);
+    try { await hrService.updateJobPosting(workspaceId, posting.id, { status: next }); toast({ title: next === 'closed' ? 'Position closed' : 'Position reopened' }); onBack(); }
+    catch (e) { toast({ title: 'Update failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusyPosting(false); }
+  };
+  const removePosting = async () => {
+    if (!confirm('Delete this job posting and its applicants? This cannot be undone.')) return;
+    setBusyPosting(true);
+    try { await hrService.deleteJobPosting(workspaceId, posting.id); toast({ title: 'Position deleted' }); onBack(); }
+    catch (e) { toast({ title: 'Delete failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusyPosting(false); }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -125,7 +141,17 @@ function ApplicationsPipeline({ workspaceId, posting, departments, canManage, on
             <p className="text-xs text-muted-foreground">{apps.length} applicant{apps.length === 1 ? '' : 's'} · <Badge variant={statusVariant[posting.status]} className="align-middle">{POSTING_STATUS_LABELS[posting.status]}</Badge></p>
           </div>
         </div>
-        {canManage && <AddApplicantDialog workspaceId={workspaceId} postingId={posting.id} onDone={load} />}
+        {canManage && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="rounded-full" disabled={busyPosting} onClick={toggleStatus}>
+              {posting.status === 'closed' ? <><LockOpen className="h-4 w-4 mr-1" />Reopen</> : <><Lock className="h-4 w-4 mr-1" />Close</>}
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-full text-destructive hover:text-destructive" disabled={busyPosting} onClick={removePosting}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <AddApplicantDialog workspaceId={workspaceId} postingId={posting.id} onDone={load} />
+          </div>
+        )}
       </div>
 
       {loading ? <Skeleton className="h-48 w-full" /> : apps.length === 0 ? (

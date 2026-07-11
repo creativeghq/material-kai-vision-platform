@@ -91,10 +91,10 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', vat: '', amka: '', children: '0', workStart: '', workEnd: '' });
+  const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', weekly: '40', vat: '', amka: '', children: '0', workStart: '', workEnd: '' });
   const [workDays, setWorkDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const upd = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
-  const reset = () => { setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', vat: '', amka: '', children: '0', workStart: '', workEnd: '' }); setWorkDays([1, 2, 3, 4, 5]); };
+  const reset = () => { setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', weekly: '40', vat: '', amka: '', children: '0', workStart: '', workEnd: '' }); setWorkDays([1, 2, 3, 4, 5]); };
 
   const submit = async () => {
     if (!f.name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
@@ -107,6 +107,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
         department_id: f.department_id || null, pay_basis: f.pay_basis,
         monthly_salary: f.pay_basis === 'monthly' ? parseDecimal(f.salary) : null,
         hourly_rate: f.pay_basis === 'hourly' ? parseDecimal(f.hourly) : null,
+        weekly_hours: f.pay_basis === 'hourly' ? parseDecimal(f.weekly) : null,
         amka: f.amka.trim() || null, dependent_children: Number(f.children) || 0,
         work_start_time: f.workStart || null, work_end_time: f.workEnd || null, work_days: workDays,
       });
@@ -161,7 +162,10 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
             </div>
             {f.pay_basis === 'monthly'
               ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="text" inputMode="decimal" value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></div>
-              : <div className="space-y-1"><Label>Hourly rate</Label><Input type="text" inputMode="decimal" value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></div>}
+              : <>
+                  <div className="space-y-1"><Label>Hourly rate</Label><Input type="text" inputMode="decimal" value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></div>
+                  <div className="space-y-1"><Label>Weekly hours <span className="text-muted-foreground text-xs">(→ hours/day)</span></Label><Input type="text" inputMode="decimal" value={f.weekly} onChange={(e) => upd('weekly', e.target.value)} placeholder="40" /></div>
+                </>}
           </div>
           <div className="space-y-1 w-1/2"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={f.children} onChange={(e) => upd('children', e.target.value)} /></div>
         </div>
@@ -217,6 +221,7 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
   const [payBasis, setPayBasis] = useState<PayBasis>(employee.pay_basis ?? 'monthly');
   const [salary, setSalary] = useState(employee.monthly_salary != null ? String(employee.monthly_salary) : '');
   const [hourly, setHourly] = useState(employee.hourly_rate != null ? String(employee.hourly_rate) : '');
+  const [weekly, setWeekly] = useState(employee.weekly_hours != null ? String(employee.weekly_hours) : '40');
   const [allowance, setAllowance] = useState(String(employee.annual_leave_allowance_days ?? 0));
   const [vat, setVat] = useState(employee.contact?.vat_number ?? '');
   const [amka, setAmka] = useState(employee.amka ?? '');
@@ -233,6 +238,7 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
         employee_id: employee.id, status, department_id: deptId || null, pay_basis: payBasis,
         monthly_salary: payBasis === 'monthly' ? parseDecimal(salary) : null,
         hourly_rate: payBasis === 'hourly' ? parseDecimal(hourly) : null,
+        weekly_hours: payBasis === 'hourly' ? parseDecimal(weekly) : null,
         annual_leave_allowance_days: Number(allowance) || 0,
         amka: amka.trim() || null, dependent_children: Number(children) || 0,
         work_start_time: workStart || null, work_end_time: workEnd || null, work_days: workDays,
@@ -277,6 +283,11 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
               ? <div className="space-y-1"><Label>Monthly salary</Label><Input type="text" inputMode="decimal" value={salary} onChange={(e) => setSalary(e.target.value)} /></div>
               : <div className="space-y-1"><Label>Hourly rate</Label><Input type="text" inputMode="decimal" value={hourly} onChange={(e) => setHourly(e.target.value)} /></div>}
           </div>
+          {payBasis === 'hourly' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label>Weekly hours <span className="text-muted-foreground text-xs">(→ hours/day)</span></Label><Input type="text" inputMode="decimal" value={weekly} onChange={(e) => setWeekly(e.target.value)} placeholder="40" /></div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Annual leave (days)</Label><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
             <div className="space-y-1"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={children} onChange={(e) => setChildren(e.target.value)} /></div>
