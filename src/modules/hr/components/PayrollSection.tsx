@@ -9,8 +9,9 @@ import { Skeleton } from '@/components/core/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { hrService, type PayrollRun, type PayrollItem, type PayrollStatus, type PayrollSummary, type PayrollSettings } from '../services/hrService';
+import { hrService, type PayrollRun, type PayrollItem, type PayrollStatus, type PayrollSummary, type PayrollSettings, type BracketReductions } from '../services/hrService';
 import { SectionHeader, EmptyState, hrMoney } from './_shared';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 
@@ -271,14 +272,24 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [s, setS] = useState<PayrollSettings | null>(null);
+  const [gr2026Preset, setGr2026Preset] = useState<BracketReductions | null>(null);
   const upd = (k: keyof PayrollSettings, v: unknown) => setS((p) => (p ? { ...p, [k]: v } : p));
 
   const loadSettings = async () => {
     setLoading(true);
-    try { setS((await hrService.getPayrollSettings(workspaceId)).settings); }
+    try {
+      const res = await hrService.getPayrollSettings(workspaceId);
+      setS(res.settings);
+      setGr2026Preset(res.presets?.greek_2026_bracket_reductions ?? null);
+    }
     catch (e) { toast({ title: 'Failed to load settings', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };
+
+  // Young-worker / family band reductions are ON when any age/child band is configured.
+  const reliefsOn = !!(s?.bracket_reductions && (
+    (s.bracket_reductions.age_bands?.length ?? 0) > 0 || (s.bracket_reductions.child_bands?.length ?? 0) > 0
+  ));
 
   const save = async () => {
     if (!s) return;
@@ -290,6 +301,7 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
         contribution_monthly_ceiling: s.contribution_monthly_ceiling == null || String(s.contribution_monthly_ceiling) === '' ? null : parseDecimalOr(s.contribution_monthly_ceiling, 0),
         income_tax_brackets: s.income_tax_brackets, tax_credit_base: parseDecimalOr(s.tax_credit_base, 0),
         tax_credit_per_child: s.tax_credit_per_child, tax_credit_taper_per_1000: parseDecimalOr(s.tax_credit_taper_per_1000, 0), tax_credit_taper_floor: parseDecimalOr(s.tax_credit_taper_floor, 0),
+        bracket_reductions: s.bracket_reductions ?? {},
       });
       toast({ title: 'Payroll settings saved' }); setOpen(false);
     } catch (e) { toast({ title: 'Save failed', description: (e as Error).message, variant: 'destructive' }); }
@@ -337,6 +349,31 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
               />
               <p className="text-[11px] text-muted-foreground">Array of {`{up_to, rate}`}; last entry uses <code>up_to: null</code> for the top band. Rates are fractions (0.09 = 9%).</p>
             </div>
+            {s.country_code !== 'none' && (
+              <div className="space-y-2 rounded-md border border-input p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label className="text-sm">Young-worker &amp; family tax reliefs</Label>
+                    <p className="text-[11px] text-muted-foreground">GR 2026 reform: under-25 → 0% up to €20k · 26–30 → 9% on the 10–20k band · reduced band by children. Age is read from each employee’s date of birth.</p>
+                  </div>
+                  <Switch
+                    checked={reliefsOn}
+                    disabled={!gr2026Preset}
+                    onCheckedChange={(on) => upd('bracket_reductions', on ? (gr2026Preset ?? {}) : {})}
+                  />
+                </div>
+                {reliefsOn && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-500">⚠ Verify these rates against the enacted 2026 law before running production payroll — edit the JSON below to adjust.</p>
+                )}
+                {reliefsOn && (
+                  <textarea
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono min-h-[90px]"
+                    value={JSON.stringify(s.bracket_reductions ?? {}, null, 0)}
+                    onChange={(e) => { try { upd('bracket_reductions', JSON.parse(e.target.value)); } catch { /* keep typing */ } }}
+                  />
+                )}
+              </div>
+            )}
           </div>
         )}
         <DialogFooter>

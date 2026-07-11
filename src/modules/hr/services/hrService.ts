@@ -177,11 +177,16 @@ export interface PayrollRun { id: string; period: string; status: PayrollStatus;
 export interface PayrollItem { id: string; run_id: string; employee_id: string; gross: number; deductions: number; net: number; employee_contributions: number; income_tax: number; employer_contributions: number; employer_cost: number; currency: string; note: string | null; basis: PayBasis | null; days_worked: number | null; hours_per_day: number | null; rate: number | null; employee?: { id: string; contact: { id: string; name: string } | null } | null; }
 export interface PayrollSummary { total_gross: number; total_net: number; total_income_tax: number; total_employee_contributions: number; total_employer_contributions: number; total_employer_cost: number; }
 export interface TaxBracket { up_to: number | null; rate: number; }
+/** Young-worker (age) + family (children) income-tax band reductions. {} = none (default). */
+export interface BracketReductions {
+  age_bands?: { up_to_age: number; band_rates: Record<string, number> }[];
+  child_bands?: { min_children: number; band_rates: Record<string, number> }[];
+}
 export interface PayrollSettings {
   workspace_id?: string; country_code: string; currency: string; salaries_per_year: number;
   employee_contribution_rate: number; employer_contribution_rate: number; contribution_monthly_ceiling: number | null;
   income_tax_brackets: TaxBracket[]; tax_credit_base: number; tax_credit_per_child: Record<string, number>;
-  tax_credit_taper_per_1000: number; tax_credit_taper_floor: number; is_default?: boolean;
+  tax_credit_taper_per_1000: number; tax_credit_taper_floor: number; bracket_reductions?: BracketReductions; is_default?: boolean;
 }
 export interface HrAnalytics {
   headcount: number; active: number; on_leave_today: number; total_absence_days: number;
@@ -443,7 +448,7 @@ class HrService {
   signAccountingDoc(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'sign-accounting-doc', { document_id }); }
   deleteAccountingDoc(ws: string, document_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-accounting-doc', { document_id }); }
   prepareAccountingPeriod(ws: string, period: string): Promise<{ reconciliation: Reconciliation; stamped_finance_lines: number; credits_used: number }> { return call(ws, 'prepare-accounting-period', { period }); }
-  getPayrollSettings(ws: string): Promise<{ settings: PayrollSettings }> { return call(ws, 'get-payroll-settings'); }
+  getPayrollSettings(ws: string): Promise<{ settings: PayrollSettings; presets?: { greek_2026_bracket_reductions: BracketReductions } }> { return call(ws, 'get-payroll-settings'); }
   updatePayrollSettings(ws: string, input: Partial<PayrollSettings>): Promise<{ settings: PayrollSettings }> { return call(ws, 'update-payroll-settings', input as Record<string, unknown>); }
 
   // ── Employee portal invite (admin) ──

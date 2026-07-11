@@ -81,7 +81,73 @@ const GREEK_PAYROLL_DEFAULTS = {
   tax_credit_base: 777,
   tax_credit_per_child: { '1': 123, '2': 343, '3': 563, '4': 803, '5': 1003 },
   tax_credit_taper_per_1000: 20, tax_credit_taper_floor: 12000,
+  // Young-worker / family band reductions OFF by default — operators opt in (see GREEK_2026_BRACKET_REDUCTIONS).
+  bracket_reductions: {},
 };
+
+// GR 2026 reform reference preset — the operator loads this into `bracket_reductions` from the UI.
+// NOT applied automatically: rates/eligibility must be validated against the enacted law before use.
+// under-25 → 0% up to €20k · 26–30 → 9% on the 10–20k band · families reduce the 10–20k band by children.
+export const GREEK_2026_BRACKET_REDUCTIONS = {
+  age_bands: [
+    { up_to_age: 25, band_rates: { '10000': 0, '20000': 0 } },
+    { up_to_age: 30, band_rates: { '20000': 0.09 } },
+  ],
+  child_bands: [
+    { min_children: 1, band_rates: { '20000': 0.18 } },
+    { min_children: 2, band_rates: { '20000': 0.16 } },
+    { min_children: 3, band_rates: { '20000': 0.09 } },
+    { min_children: 4, band_rates: { '20000': 0 } },
+  ],
+};
+
+/** Whole-years age from a 'YYYY-MM-DD' birth date, or null when absent/unparseable. */
+function ageFromDob(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const b = new Date(`${String(dob).slice(0, 10)}T00:00:00Z`);
+  if (isNaN(b.getTime())) return null;
+  const now = new Date();
+  let age = now.getUTCFullYear() - b.getUTCFullYear();
+  const m = now.getUTCMonth() - b.getUTCMonth();
+  if (m < 0 || (m === 0 && now.getUTCDate() < b.getUTCDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+/**
+ * Apply young-worker (age) + family (children) band-rate overrides to a copy of the base brackets.
+ * Picks the most-specific age band (smallest up_to_age the employee still qualifies for) and the
+ * highest-qualifying child band, then for any band both touch, keeps the LOWER (employee-favourable)
+ * rate. Returns the base brackets unchanged when no reductions are configured or nothing matches.
+ */
+function applyBracketReductions(brackets: any[], age: number | null, children: number, reductions: any): any[] {
+  if (!reductions || typeof reductions !== 'object') return brackets;
+  const overrides: Record<string, number> = {};
+  const merge = (rates: any) => {
+    if (!rates || typeof rates !== 'object') return;
+    for (const [k, v] of Object.entries(rates)) {
+      const r = Number(v);
+      if (!Number.isFinite(r)) continue;
+      overrides[k] = k in overrides ? Math.min(overrides[k], r) : r;
+    }
+  };
+  if (age != null && Array.isArray(reductions.age_bands)) {
+    const match = reductions.age_bands
+      .filter((ab: any) => age <= Number(ab.up_to_age))
+      .sort((a: any, b: any) => Number(a.up_to_age) - Number(b.up_to_age))[0];
+    if (match) merge(match.band_rates);
+  }
+  if (children > 0 && Array.isArray(reductions.child_bands)) {
+    const match = reductions.child_bands
+      .filter((cb: any) => children >= Number(cb.min_children))
+      .sort((a: any, b: any) => Number(b.min_children) - Number(a.min_children))[0];
+    if (match) merge(match.band_rates);
+  }
+  if (!Object.keys(overrides).length) return brackets;
+  return brackets.map((b: any) => {
+    const key = b.up_to == null ? 'null' : String(b.up_to);
+    return key in overrides ? { ...b, rate: overrides[key] } : b;
+  });
+}
 
 async function getPayrollSettings(supabase: any, workspaceId: string): Promise<any> {
   const { data } = await supabase.from('hr_payroll_settings').select('*').eq('workspace_id', workspaceId).maybeSingle();
@@ -103,8 +169,9 @@ function progressiveTax(annual: number, brackets: any[]): number {
 }
 
 interface PayrollBreakdown { employee_contributions: number; income_tax: number; employer_contributions: number; net: number; employer_cost: number; deductions: number; }
-/** gross → statutory breakdown. country_code='none' ⇒ zeros (manual deductions preserved by caller). */
-function computePayroll(grossIn: number, children: number, s: any): PayrollBreakdown {
+/** gross → statutory breakdown. country_code='none' ⇒ zeros (manual deductions preserved by caller).
+ *  `age` (whole years) drives the optional young-worker band reductions; null = unknown (no age relief). */
+function computePayroll(grossIn: number, children: number, s: any, age: number | null = null): PayrollBreakdown {
   const gross = Number(grossIn) || 0;
   if (s.country_code === 'none') return { employee_contributions: 0, income_tax: 0, employer_contributions: 0, net: round2(gross), employer_cost: round2(gross), deductions: 0 };
   const spy = Number(s.salaries_per_year) || 12;
@@ -114,7 +181,8 @@ function computePayroll(grossIn: number, children: number, s: any): PayrollBreak
   const erEfka = round2(capBase * Number(s.employer_contribution_rate || 0));
   const taxable = Math.max(0, gross - eeEfka);
   const annualTaxable = taxable * spy;
-  const grossTax = progressiveTax(annualTaxable, s.income_tax_brackets || []);
+  const brackets = applyBracketReductions(s.income_tax_brackets || [], age, children, s.bracket_reductions);
+  const grossTax = progressiveTax(annualTaxable, brackets);
   const perChild = s.tax_credit_per_child || {};
   const childKeys = Object.keys(perChild).map(Number).filter((n) => !isNaN(n)).sort((a, b) => a - b);
   const maxKey = childKeys.length ? childKeys[childKeys.length - 1] : 0;
@@ -597,7 +665,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const workingDays = businessDaysInMonth(period);
       const settings = await getPayrollSettings(supabase, workspaceId);
       const { data: emps } = await supabase.from('hr_employees')
-        .select('id, monthly_salary, salary_currency, pay_basis, hourly_rate, weekly_hours, dependent_children')
+        .select('id, monthly_salary, salary_currency, pay_basis, hourly_rate, weekly_hours, dependent_children, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( date_of_birth )')
         .eq('workspace_id', workspaceId).eq('status', 'active');
       const items = (emps ?? []).map((e: any) => {
         const basis = e.pay_basis === 'hourly' ? 'hourly' : 'monthly';
@@ -611,7 +679,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
           rate = Number(e.monthly_salary ?? 0);
           gross = rate;
         }
-        const b = computePayroll(gross, Number(e.dependent_children ?? 0), settings);
+        const b = computePayroll(gross, Number(e.dependent_children ?? 0), settings, ageFromDob(e.contact?.date_of_birth));
         return {
           workspace_id: workspaceId, run_id: run.id, employee_id: e.id, gross,
           deductions: b.deductions, net: b.net, employee_contributions: b.employee_contributions,
@@ -650,7 +718,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       // Recompute the statutory breakdown from the rules on the new gross (rules-driven). A manual
       // `deductions` override wins only when auto-rules are off (country_code='none').
       const { data: cur } = await supabase.from('hr_payroll_items')
-        .select('run_id, employee:hr_employees!hr_payroll_items_employee_id_fkey ( dependent_children )')
+        .select('run_id, employee:hr_employees!hr_payroll_items_employee_id_fkey ( dependent_children, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( date_of_birth ) )')
         .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!cur) return json({ error: 'not found' }, 404);
       const settings = await getPayrollSettings(supabase, workspaceId);
@@ -660,7 +728,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
         if (!Number.isFinite(ded) || ded < 0) return json({ error: 'deductions must be a non-negative number' }, 400);
         patch = { gross, deductions: ded, net: round2(Math.max(0, gross - ded)), employee_contributions: 0, income_tax: 0, employer_contributions: 0, employer_cost: round2(gross), note: body?.note ?? null };
       } else {
-        const b = computePayroll(gross, Number((cur as any).employee?.dependent_children ?? 0), settings);
+        const b = computePayroll(gross, Number((cur as any).employee?.dependent_children ?? 0), settings, ageFromDob((cur as any).employee?.contact?.date_of_birth));
         patch = { gross, deductions: b.deductions, net: b.net, employee_contributions: b.employee_contributions, income_tax: b.income_tax, employer_contributions: b.employer_contributions, employer_cost: b.employer_cost, note: body?.note ?? null };
       }
       const { error } = await supabase.from('hr_payroll_items').update(patch).eq('id', id).eq('workspace_id', workspaceId);
@@ -680,11 +748,13 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     }
     case 'get-payroll-settings': {
       const s = await getPayrollSettings(supabase, workspaceId);
-      return json({ settings: s });
+      // Surface the GR-2026 young-worker/family reform preset so the UI can offer a one-click load
+      // (never auto-applied — the operator opts in after validating against the enacted law).
+      return json({ settings: s, presets: { greek_2026_bracket_reductions: GREEK_2026_BRACKET_REDUCTIONS } });
     }
     case 'update-payroll-settings': {
       requireManage();
-      const fields = pick(body, ['country_code', 'currency', 'salaries_per_year', 'employee_contribution_rate', 'employer_contribution_rate', 'contribution_monthly_ceiling', 'income_tax_brackets', 'tax_credit_base', 'tax_credit_per_child', 'tax_credit_taper_per_1000', 'tax_credit_taper_floor']);
+      const fields = pick(body, ['country_code', 'currency', 'salaries_per_year', 'employee_contribution_rate', 'employer_contribution_rate', 'contribution_monthly_ceiling', 'income_tax_brackets', 'tax_credit_base', 'tax_credit_per_child', 'tax_credit_taper_per_1000', 'tax_credit_taper_floor', 'bracket_reductions']);
       const { data, error } = await supabase.from('hr_payroll_settings')
         .upsert({ workspace_id: workspaceId, ...fields, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id' })
         .select('*').single();
