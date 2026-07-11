@@ -89,6 +89,39 @@ export interface ReorderResult {
   item_name?: string;
 }
 
+export interface ForecastCandidate {
+  warehouse_item_id: string;
+  name: string;
+  sku: string | null;
+  unit: string;
+  product_id: string | null;
+  qty_on_hand: number;
+  available: number;
+  reorder_point: number;
+  out_30d: number;
+  out_90d: number;
+  velocity_per_day: number;
+  days_of_cover: number | null;
+  trend: 'flat' | 'accelerating' | 'slowing' | 'steady';
+  trend_ratio: number | null;
+  lead_time_days: number | null;
+  moq: number | null;
+  has_supplier: boolean;
+  below_reorder: boolean;
+  stockout_before_reorder: boolean;
+  // AI-merged fields (ai-forecast only):
+  priority?: number;
+  recommended_order_qty?: number;
+  order_by_days?: number;
+  reason?: string;
+}
+
+export interface AiForecast {
+  candidates: ForecastCandidate[];
+  recommendations: ForecastCandidate[];
+  credits_used?: number;
+}
+
 export interface LowStockItem {
   id: string;
   name: string;
@@ -115,6 +148,10 @@ export const stockService = {
   lowStock: (ws: string) => call<{ items: LowStockItem[]; count: number }>('list-low-stock', ws),
   listMovements: (ws: string, opts: { item_id?: string; limit?: number } = {}) =>
     call<{ movements: StockMovement[] }>('list-movements', ws, opts).then((r) => r.movements),
+
+  // ── Resupply forecast ───────────────────────────────────────────────────────
+  forecast: (ws: string) => call<{ forecast: { candidates: ForecastCandidate[] } }>('forecast', ws).then((r) => r.forecast.candidates),
+  aiForecast: (ws: string) => call<{ forecast: AiForecast }>('ai-forecast', ws).then((r) => r.forecast),
 
   // ── Reorder (Stock → Sourcing bridge) — credit-metered ──────────────────────
   reorder: (ws: string, item_id: string, opts: { quantity?: number; supplier_product_id?: string } = {}) =>

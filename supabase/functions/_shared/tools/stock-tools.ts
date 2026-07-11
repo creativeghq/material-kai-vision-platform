@@ -136,6 +136,22 @@ export const createManageStockTool = (
         return JSON.stringify({ success: true, count: movements.length, movements });
       }
 
+      if (action === 'forecast') {
+        const res = await callStockApi(jwt!, ws, 'ai-forecast');
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        const fc = res.data?.forecast ?? {};
+        const recs = (fc.recommendations ?? []).slice(0, 15).map((r: any) => ({
+          item: r.name, sku: r.sku, priority: r.priority, days_of_cover: r.days_of_cover,
+          trend: r.trend, lead_time_days: r.lead_time_days, recommended_order_qty: r.recommended_order_qty,
+          order_by_days: r.order_by_days, reason: r.reason, warehouse_item_id: r.warehouse_item_id,
+        }));
+        onChunk?.({ type: 'stock_forecast', recommendations: recs, timestamp: Date.now() });
+        if (recs.length === 0) {
+          return JSON.stringify({ success: true, recommendations: [], message: 'No resupply needed right now — nothing is on track to stock out before it can be reordered.' });
+        }
+        return JSON.stringify({ success: true, count: recs.length, recommendations: recs, message: `Top resupply priorities identified (5 credits). Use "reorder" to draft a PO for any of them.` });
+      }
+
       if (action === 'reorder') {
         const resolved = await resolveItem(ws, item_id, item_query);
         if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
@@ -187,6 +203,9 @@ export const createManageStockTool = (
         '                    cheapest). Give item_id OR item_query, optional quantity (else tops back up above the',
         '                    reorder point, rounded to MOQ). Routes to the in-app supplier portal if the supplier',
         '                    is a tenant, else email. COSTS 2 CREDITS. Confirm with the user before calling.',
+        '  forecast        → AI resupply forecast: ranks which items will run out soonest (consumption velocity',
+        '                    + trend vs supplier lead time) and recommends order quantities. COSTS 5 CREDITS.',
+        '                    Confirm with the user before calling.',
         '',
         'Examples:',
         '  "what\'s low on stock?"          → action=list_low_stock',
@@ -197,7 +216,7 @@ export const createManageStockTool = (
         'If a query matches multiple items, ask the user which one before writing.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['overview', 'check_stock', 'list_low_stock', 'list_movements', 'adjust_stock', 'reorder']),
+        action: z.enum(['overview', 'check_stock', 'list_low_stock', 'list_movements', 'adjust_stock', 'reorder', 'forecast']),
         item_id: z.string().uuid().optional().describe('Target stock item id (adjust_stock).'),
         item_query: z.string().optional().describe('Fuzzy name or SKU to search/resolve (check_stock, adjust_stock).'),
         direction: z.enum(DIRECTIONS as unknown as [string, ...string[]]).optional().describe('in=receive, out=issue, adjust=set exact on-hand (adjust_stock).'),

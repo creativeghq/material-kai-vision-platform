@@ -192,6 +192,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   stock_movements: 'Stock movements',
   stock_adjusted: 'Stock updated',
   stock_reordered: 'Reorder drafted',
+  stock_forecast: 'Resupply forecast',
   // Misc
   price_lookup_matches: 'Price lookup matches',
   project_created: 'Project created',

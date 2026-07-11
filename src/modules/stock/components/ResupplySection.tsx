@@ -1,0 +1,125 @@
+import React, { useEffect, useState } from 'react';
+import { Loader2, Sparkles, ShoppingCart, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { stockService, type ForecastCandidate } from '../services/stockService';
+
+const TrendBadge: React.FC<{ t: ForecastCandidate['trend'] }> = ({ t }) => {
+  if (t === 'accelerating') return <Badge variant="outline" className="border-amber-500/50 text-amber-500"><TrendingUp className="h-3 w-3 mr-1" />rising</Badge>;
+  if (t === 'slowing') return <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground"><TrendingDown className="h-3 w-3 mr-1" />slowing</Badge>;
+  return <Badge variant="outline" className="border-border text-muted-foreground"><Minus className="h-3 w-3 mr-1" />steady</Badge>;
+};
+
+export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
+  const { toast } = useToast();
+  const [rows, setRows] = useState<ForecastCandidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiRan, setAiRan] = useState(false);
+  const [reordering, setReordering] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try { setRows(await stockService.forecast(workspaceId)); setAiRan(false); }
+    catch (err: any) { toast({ title: 'Failed to load forecast', description: err?.message, variant: 'destructive' }); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId]);
+
+  const runAi = async () => {
+    if (!confirm('Run the AI resupply forecast? This costs 5 credits.')) return;
+    setAiBusy(true);
+    try {
+      const res = await stockService.aiForecast(workspaceId);
+      if ((res as any)?.code === 'insufficient_credits') { toast({ title: 'Not enough credits', variant: 'destructive' }); return; }
+      // Prefer the AI-ranked list when present; else keep the deterministic order.
+      setRows(res.recommendations.length ? res.recommendations : res.candidates);
+      setAiRan(res.recommendations.length > 0);
+      toast({ title: 'AI forecast ready', description: `${res.recommendations.length} prioritised recommendation(s).` });
+    } catch (err: any) {
+      toast({ title: 'AI forecast failed', description: err?.message, variant: 'destructive' });
+    } finally { setAiBusy(false); }
+  };
+
+  const reorder = async (c: ForecastCandidate) => {
+    if (!confirm(`Draft a replenishment PO for "${c.name}"${c.recommended_order_qty ? ` (${c.recommended_order_qty} ${c.unit})` : ''}? This costs 2 credits.`)) return;
+    setReordering(c.warehouse_item_id);
+    try {
+      const r = await stockService.reorder(workspaceId, c.warehouse_item_id, c.recommended_order_qty ? { quantity: c.recommended_order_qty } : {});
+      if (!r.ok) { toast({ title: 'Could not reorder', description: r.message, variant: 'destructive' }); return; }
+      const channel = r.supplier_is_app_user ? 'in-app supplier (portal)' : 'supplier (email)';
+      toast({ title: 'Reorder drafted', description: `${r.quantity} ${c.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}.` });
+    } catch (err: any) { toast({ title: 'Reorder failed', description: err?.message, variant: 'destructive' }); }
+    finally { setReordering(null); }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
+        <div className="min-w-0">
+          <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Resupply forecast</CardTitle>
+          <p className="text-xs text-muted-foreground mt-0.5">Consumption velocity → days of cover vs supplier lead time. Items that will run out before a reorder lands are flagged.</p>
+        </div>
+        <Button size="sm" className="rounded-full shrink-0" disabled={aiBusy || loading || rows.length === 0} onClick={runAi}>
+          {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="h-4 w-4 mr-1" /> AI forecast (5 cr)</>}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : rows.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Not enough movement history yet. Once items start selling/issuing, the forecast ranks what to restock first.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground">
+              <tr className="border-b border-border/60">
+                {aiRan && <th className="px-3 py-2 text-left">#</th>}
+                <th className="px-4 py-2 text-left">Item</th>
+                <th className="px-4 py-2 text-right">Vel/day</th>
+                <th className="px-4 py-2 text-right">Days cover</th>
+                <th className="px-4 py-2 text-left">Trend</th>
+                <th className="px-4 py-2 text-right">Lead</th>
+                {aiRan && <th className="px-4 py-2 text-left">Recommendation</th>}
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.warehouse_item_id} className="border-b border-border/30 align-top">
+                  {aiRan && <td className="px-3 py-2 font-medium">{c.priority ?? '—'}</td>}
+                  <td className="px-4 py-2 font-medium">
+                    {c.name} <span className="text-xs text-muted-foreground">/ {c.unit}</span>
+                    {c.stockout_before_reorder && (
+                      <Badge variant="outline" className="ml-2 border-destructive/50 text-destructive"><AlertTriangle className="h-3 w-3 mr-1" />stockout risk</Badge>
+                    )}
+                    {c.sku && <div className="font-mono text-[11px] text-muted-foreground">{c.sku}</div>}
+                  </td>
+                  <td className="px-4 py-2 text-right">{c.velocity_per_day}</td>
+                  <td className="px-4 py-2 text-right">{c.days_of_cover == null ? '∞' : `${c.days_of_cover}d`}</td>
+                  <td className="px-4 py-2"><TrendBadge t={c.trend} /></td>
+                  <td className="px-4 py-2 text-right text-muted-foreground">{c.lead_time_days == null ? '—' : `${c.lead_time_days}d`}</td>
+                  {aiRan && (
+                    <td className="px-4 py-2 text-xs text-muted-foreground max-w-[22rem]">
+                      {c.recommended_order_qty != null && <span className="text-foreground font-medium">Order {c.recommended_order_qty} {c.unit}</span>}
+                      {c.order_by_days != null && <span className="ml-1 inline-flex items-center"><Clock className="h-3 w-3 mr-0.5" />within {c.order_by_days}d.</span>}
+                      {c.reason && <div>{c.reason}</div>}
+                    </td>
+                  )}
+                  <td className="px-4 py-2 text-right">
+                    <Button size="sm" variant="outline" className="rounded-full h-7 text-xs" disabled={!c.has_supplier || reordering === c.warehouse_item_id} title={c.has_supplier ? 'Draft a purchase order' : 'No supplier configured for this product'} onClick={() => reorder(c)}>
+                      {reordering === c.warehouse_item_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ShoppingCart className="h-3.5 w-3.5 mr-1" /> Reorder</>}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
