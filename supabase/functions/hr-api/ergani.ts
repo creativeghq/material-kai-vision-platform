@@ -18,7 +18,7 @@ import {
   resolveErganiCredentials, listSubmissions, getDocumentSchema, submitDocument,
   getSubmittedPdf, executeService, ErganiApiError, type ErganiCredentials,
 } from '../_shared/ergani/client.ts';
-import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
+import { fileWorkcardPunch, toHttp } from '../_shared/ergani/workcard.ts';
 
 export interface ErganiCtx {
   supabase: any;
@@ -136,11 +136,6 @@ function fillErganiTemplate(node: any, v: {
 }
 
 /** Map an ErganiApiError → HttpError with a useful status (400 business error, 502 upstream). */
-function toHttp(e: unknown): HttpError {
-  if (e instanceof HttpError) return e;
-  if (e instanceof ErganiApiError) return new HttpError(e.status >= 400 && e.status < 500 ? 400 : 502, e.message);
-  return new HttpError(502, (e as Error)?.message || 'Ergani request failed');
-}
 
 /**
  * Handle an ergani-* action. Returns a Response, or null if the action isn't ours.

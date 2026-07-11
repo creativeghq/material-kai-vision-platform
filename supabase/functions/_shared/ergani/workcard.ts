@@ -44,7 +44,7 @@ function timeToMinutes(t: string | null): number | null {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
-function toHttp(e: unknown): HttpError {
+export function toHttp(e: unknown): HttpError {
   if (e instanceof HttpError) return e;
   if (e instanceof ErganiApiError) return new HttpError(e.status >= 400 && e.status < 500 ? 400 : 502, e.message);
   return new HttpError(502, (e as Error)?.message || 'Ergani request failed');

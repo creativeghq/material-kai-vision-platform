@@ -8,6 +8,7 @@ import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { callClaudeTool, meterHrAi, creditBalance, reserveHrCredits, refundHrCredits, base64FromBytes } from './ai-meter.ts';
+import { businessDaysInclusive, tagEmployee } from './hr-util.ts';
 // NOTE: payslip.ts (→ pdf-lib + fontkit, heavy) is imported LAZILY inside the generate-payslips
 // case so the common read paths (analytics, lists) don't pay its cold-start cost on every call.
 
@@ -66,15 +67,6 @@ function businessDaysInMonth(period: string): number {
   return count;
 }
 const round2 = (n: number) => Math.round(n * 100) / 100;
-
-/** Working (Mon–Fri) days between two ISO dates inclusive. */
-function businessDaysInclusive(startISO: string, endISO: string): number {
-  const s = new Date(startISO + 'T00:00:00Z'), e = new Date(endISO + 'T00:00:00Z');
-  if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return 0;
-  let n = 0;
-  for (const d = new Date(s); d <= e; d.setUTCDate(d.getUTCDate() + 1)) { const w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; }
-  return n;
-}
 
 // ── Payroll rules engine (configurable per workspace; Greek 2026 defaults) ──────────────
 // tax_credit_per_child holds the ADD-ON over the base credit: base 777 (0 kids) → 900/1120/1340/1580/1780.
@@ -149,17 +141,6 @@ const DEFAULT_ONBOARDING = [
   'Assign equipment (laptop, access card)', 'Team & workplace introduction', 'Benefits & payroll enrollment',
 ];
 
-/** Tag a contact as Employee (idempotent) — mirrors index.ts. */
-async function tagEmployee(supabase: any, contactId: string, userId: string) {
-  const { data: cat } = await supabase.from('crm_categories').select('id').eq('slug', 'employee').maybeSingle();
-  if (!cat?.id) return;
-  const { data: ex } = await supabase.from('crm_category_members').select('id')
-    .eq('category_id', cat.id).eq('crm_contact_id', contactId).maybeSingle();
-  if (ex) return;
-  await supabase.from('crm_category_members').insert({
-    category_id: cat.id, member_kind: 'crm_contact', crm_contact_id: contactId, source: 'manual', added_by: userId,
-  });
-}
 
 /** Anthropic tool-use call → returns the tool input object. Used for AI job descriptions. */
 // Thin wrapper — Claude with a forced tool, returning structured input + token usage for metering.

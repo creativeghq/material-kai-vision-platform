@@ -11,11 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type PayrollRun, type PayrollItem, type PayrollStatus, type PayrollSummary, type PayrollSettings } from '../services/hrService';
-import { SectionHeader, EmptyState } from './_shared';
+import { SectionHeader, EmptyState, hrMoney } from './_shared';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 
 const statusVariant: Record<PayrollStatus, 'secondary' | 'default' | 'outline'> = { draft: 'secondary', approved: 'default', paid: 'outline' };
-const money = (n: number | null | undefined, c: string) => `${Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${c}`;
+const money = (n: number | null | undefined, c: string) => hrMoney(n, c, { minDecimals: 0 });
 
 /**
  * Locale-tolerant numeric field for number-backed state (EU decimals like `13,87` / `7.572,00`).

@@ -2,6 +2,18 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 
+/** Currency formatter for the HR sections. `minDecimals` defaults to 2 (accounting-style); pass 0 for
+ *  payroll totals that read cleaner as whole numbers. `nullDash` shows "—" for null instead of 0. */
+export function hrMoney(
+  n: number | null | undefined,
+  currency: string,
+  opts: { minDecimals?: number; nullDash?: boolean } = {},
+): string {
+  if (n == null && opts.nullDash) return '—';
+  const min = opts.minDecimals ?? 2;
+  return `${Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: min, maximumFractionDigits: 2 })} ${currency || 'EUR'}`;
+}
+
 /** Stat tile — a glass dashboard-card div (NOT a shadcn Card, which kills the glass effect). */
 export function HrStat({ icon: Icon, label, value, hint }: { icon?: LucideIcon; label: string; value: React.ReactNode; hint?: string }) {
   return (

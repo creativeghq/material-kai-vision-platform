@@ -10,9 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import {
   hrService, type AccountingDoc, type Reconciliation, ACCT_KIND_GROUP_LABELS,
 } from '../services/hrService';
-import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
+import { SectionHeader, EmptyState, fileToBase64, hrMoney } from './_shared';
 
-const money = (n: number | null | undefined, c: string) => (n == null ? '—' : `${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${c || 'EUR'}`);
+const money = (n: number | null | undefined, c: string) => hrMoney(n, c, { nullDash: true });
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 const statusVariant: Record<string, 'secondary' | 'default' | 'destructive'> = { uploaded: 'secondary', analyzed: 'default', error: 'destructive' };
 
