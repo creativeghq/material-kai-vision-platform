@@ -20,6 +20,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { chargeCronWorkspace, chargeCronUser } from '../_shared/cron-billing.ts';
 
 Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
   await bootstrapForFunction();
@@ -118,6 +119,13 @@ Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
       //    bell is governable. The seeded `material_alert` system-default flow runs
       //    create_notification from this payload.
       if (newAlerts.length > 0) {
+        // Meter one unit per saved-search run that produces alerts. Workspace-scoped searches charge
+        // the workspace owner; personal searches charge the user directly. No credits → skip
+        // notifying (auto-resumes next run once funded). The alert rows stay recorded either way.
+        const gate = ss.workspace_id
+          ? await chargeCronWorkspace(admin, ss.workspace_id, 'check-material-alerts', { description: `Material alerts: ${ss.name}` })
+          : await chargeCronUser(admin, ss.user_id, 'check-material-alerts', { description: `Material alerts: ${ss.name}` });
+        if (!gate.allowed) continue;
         for (const a of newAlerts) {
           const product = matchedProducts.find((p) => p.id === a.product_id);
           await emitFlowEvent('material_alert', {

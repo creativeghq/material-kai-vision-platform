@@ -57,3 +57,28 @@ export async function chargeCronWorkspace(
     return { allowed: true, charged: 0, status: 'active', justPaused: false, justResumed: false };
   }
 }
+
+/** Charge a USER's personal balance for a cron whose subject has no workspace (e.g. a personal
+ *  saved search). Fails open on any error. */
+export async function chargeCronUser(
+  supabase: SupabaseLike,
+  userId: string,
+  cronKey: string,
+  opts: { units?: number; description?: string } = {},
+): Promise<{ allowed: boolean; charged: number }> {
+  if (!userId) return { allowed: true, charged: 0 };
+  try {
+    const { data, error } = await supabase.rpc('cron_charge_user', {
+      p_user_id: userId, p_cron_key: cronKey, p_units: opts.units ?? 1, p_description: opts.description ?? null,
+    });
+    if (error) {
+      console.error(`[cron-billing] user ${cronKey}/${userId} charge error (failing open):`, error.message);
+      return { allowed: true, charged: 0 };
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    return { allowed: row?.allowed !== false, charged: Number(row?.charged ?? 0) };
+  } catch (e) {
+    console.error(`[cron-billing] user ${cronKey}/${userId} charge threw (failing open):`, e);
+    return { allowed: true, charged: 0 };
+  }
+}

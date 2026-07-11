@@ -7,6 +7,7 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
 
 // Sales/Finance — render and email a party (customer or supplier) running ledger
 // statement (Καρτέλα) PDF.
@@ -498,6 +499,7 @@ async function runCronBatch(supabase: SupabaseClient, publicAppUrl: string): Pro
     const range = defaultRange();
     const lang = langForSettings(settings);
     let sent = 0, skipped = 0, failed = 0;
+    let wsOutOfCredits = false; // stop this workspace's run once the owner runs out (all parties bill the same owner)
 
     // Opt-out sets
     const [{ data: optCompanies }, { data: optContacts }] = await Promise.all([
@@ -507,6 +509,7 @@ async function runCronBatch(supabase: SupabaseClient, publicAppUrl: string): Pro
     const optedOut = new Set([...(optCompanies ?? []).map((r: any) => r.id), ...(optContacts ?? []).map((r: any) => r.id)]);
 
     for (const side of sides) {
+      if (wsOutOfCredits) break;
       const { data: parties } = await supabase.from('vw_finance_parties')
         .select('*').eq('workspace_id', wsId).eq(side === 'customer' ? 'is_customer' : 'is_supplier', true);
       for (const party of (parties ?? [])) {
@@ -514,6 +517,10 @@ async function runCronBatch(supabase: SupabaseClient, publicAppUrl: string): Pro
         if (optedOut.has(party.party_id)) { skipped++; continue; }
         const outstanding = Math.abs(Number(side === 'customer' ? party.receivable_outstanding : party.payable_outstanding) || 0);
         if (onlyOutstanding && outstanding <= minBal) { skipped++; continue; }
+        // Meter one unit per statement actually sent. Out of credits → stop this workspace's run
+        // (resumes next scheduled window once funded).
+        const gate = await chargeCronWorkspace(supabase, wsId, 'finance-auto-statement', { description: 'Auto customer/supplier statement' });
+        if (!gate.allowed) { wsOutOfCredits = true; break; }
         try {
           const res = await sendOneStatement(supabase, party, settings, { side, from: range.from, to: range.to, lang, publicAppUrl });
           if (res.ok && res.email_sent_to) sent++; else if (res.ok) skipped++; else failed++;
