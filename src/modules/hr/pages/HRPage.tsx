@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock, Receipt, Landmark,
@@ -20,6 +20,12 @@ import { DocumentsSection } from '../components/DocumentsSection';
 import { PayrollSection } from '../components/PayrollSection';
 import { AccountingSection } from '../components/AccountingSection';
 
+// Tabs whose data loads DIRECTLY from the DB (fast, RLS-gated) are PRELOADED on page open so the
+// first click is instant — no skeleton "blink". Every tab (including the edge-backed
+// attendance/ergani/accounting) also stays MOUNTED once visited, so a revisit never re-flashes.
+// (Edge-backed tabs aren't preloaded — they'd fire an edge call on open even if never opened.)
+const PRELOAD_TABS = ['overview', 'employees', 'departments', 'timeoff', 'recruitment', 'onboarding', 'documents', 'payroll'];
+
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
     <span className="h-px flex-1 bg-foreground/40" aria-hidden="true" />
@@ -35,7 +41,14 @@ export default function HRPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || 'overview';
 
+  // Which tab panels are kept in the DOM. Preloaded (direct-DB) tabs are mounted from the start so
+  // clicking them is instant; any other tab is added the first time it's opened and then stays
+  // mounted (Radix would otherwise unmount inactive tabs and refetch — re-flashing every revisit).
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set([tab, ...PRELOAD_TABS]));
+  const fm = (v: string): true | undefined => (mountedTabs.has(v) ? true : undefined);
+
   const setTab = (v: string) => {
+    setMountedTabs((prev) => (prev.has(v) ? prev : new Set(prev).add(v)));
     const p = new URLSearchParams(searchParams);
     p.set('tab', v);
     setSearchParams(p, { replace: true });
@@ -88,17 +101,17 @@ export default function HRPage() {
           </TabsList>
 
           <div className="min-w-0 flex-1 space-y-4">
-            <TabsContent value="overview" className="mt-0 space-y-4"><OverviewSection {...sectionProps} /></TabsContent>
-            <TabsContent value="employees" className="mt-0 space-y-4"><EmployeesSection {...sectionProps} /></TabsContent>
-            <TabsContent value="departments" className="mt-0 space-y-4"><DepartmentsSection {...sectionProps} /></TabsContent>
-            <TabsContent value="timeoff" className="mt-0 space-y-4"><TimeOffSection {...sectionProps} /></TabsContent>
-            <TabsContent value="attendance" className="mt-0 space-y-4"><AttendanceSection {...sectionProps} /></TabsContent>
-            <TabsContent value="recruitment" className="mt-0 space-y-4"><RecruitmentSection {...sectionProps} /></TabsContent>
-            <TabsContent value="onboarding" className="mt-0 space-y-4"><OnboardingSection {...sectionProps} /></TabsContent>
-            <TabsContent value="documents" className="mt-0 space-y-4"><DocumentsSection {...sectionProps} /></TabsContent>
-            <TabsContent value="payroll" className="mt-0 space-y-4"><PayrollSection {...sectionProps} /></TabsContent>
-            <TabsContent value="accounting" className="mt-0 space-y-4"><AccountingSection {...sectionProps} /></TabsContent>
-            <TabsContent value="ergani" className="mt-0 space-y-4"><ErganiSection {...sectionProps} /></TabsContent>
+            <TabsContent value="overview" forceMount={fm('overview')} className="mt-0 space-y-4"><OverviewSection {...sectionProps} /></TabsContent>
+            <TabsContent value="employees" forceMount={fm('employees')} className="mt-0 space-y-4"><EmployeesSection {...sectionProps} /></TabsContent>
+            <TabsContent value="departments" forceMount={fm('departments')} className="mt-0 space-y-4"><DepartmentsSection {...sectionProps} /></TabsContent>
+            <TabsContent value="timeoff" forceMount={fm('timeoff')} className="mt-0 space-y-4"><TimeOffSection {...sectionProps} /></TabsContent>
+            <TabsContent value="attendance" forceMount={fm('attendance')} className="mt-0 space-y-4"><AttendanceSection {...sectionProps} /></TabsContent>
+            <TabsContent value="recruitment" forceMount={fm('recruitment')} className="mt-0 space-y-4"><RecruitmentSection {...sectionProps} /></TabsContent>
+            <TabsContent value="onboarding" forceMount={fm('onboarding')} className="mt-0 space-y-4"><OnboardingSection {...sectionProps} /></TabsContent>
+            <TabsContent value="documents" forceMount={fm('documents')} className="mt-0 space-y-4"><DocumentsSection {...sectionProps} /></TabsContent>
+            <TabsContent value="payroll" forceMount={fm('payroll')} className="mt-0 space-y-4"><PayrollSection {...sectionProps} /></TabsContent>
+            <TabsContent value="accounting" forceMount={fm('accounting')} className="mt-0 space-y-4"><AccountingSection {...sectionProps} /></TabsContent>
+            <TabsContent value="ergani" forceMount={fm('ergani')} className="mt-0 space-y-4"><ErganiSection {...sectionProps} /></TabsContent>
           </div>
         </Tabs>
       </div>

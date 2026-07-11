@@ -37,23 +37,26 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
     try {
       const [a, e] = await Promise.all([hrService.listAbsences(workspaceId), hrService.listEmployees(workspaceId)]);
       setAbsences(a.absences); setEmployees(e.employees);
-      if (canManage) {
-        const [status, types, log] = await Promise.all([
-          hrService.getErganiStatus(workspaceId).catch(() => null),
-          hrService.listErganiLeaveTypes().catch(() => []),
-          hrService.erganiSubmissionsLog(workspaceId, { limit: 500 }).catch(() => ({ submissions: [] as ErganiSubmission[] })),
-        ]);
-        setErganiOn(!!status?.has_password && !!status?.enabled);
-        setLeaveTypes(types);
-        const m = new Map<string, ErganiSubmission>();
-        for (const s of log.submissions) {
-          if (s.entity_type === 'absence' && s.entity_id && !m.has(s.entity_id)) m.set(s.entity_id, s); // newest first
-        }
-        setErganiByAbsence(m);
-      }
     }
     catch (err) { toast({ title: 'Failed to load time off', description: (err as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
+
+    // Ergani filing-status is SECONDARY enrichment (it hits the edge function) — load it AFTER the
+    // table is already visible so the direct-DB absence list never waits on a slow edge round-trip.
+    if (canManage) {
+      const [status, types, log] = await Promise.all([
+        hrService.getErganiStatus(workspaceId).catch(() => null),
+        hrService.listErganiLeaveTypes().catch(() => []),
+        hrService.erganiSubmissionsLog(workspaceId, { limit: 500 }).catch(() => ({ submissions: [] as ErganiSubmission[] })),
+      ]);
+      setErganiOn(!!status?.has_password && !!status?.enabled);
+      setLeaveTypes(types);
+      const m = new Map<string, ErganiSubmission>();
+      for (const s of log.submissions) {
+        if (s.entity_type === 'absence' && s.entity_id && !m.has(s.entity_id)) m.set(s.entity_id, s); // newest first
+      }
+      setErganiByAbsence(m);
+    }
   }, [workspaceId, canManage, toast]);
   useEffect(() => { void load(); }, [load]);
 
