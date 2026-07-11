@@ -38,6 +38,41 @@ import type {
 } from '@/services/flows/types';
 import { EntityPicker } from './EntityPicker';
 
+/** JSON editor for a `Record<string,string>` fields map. Keeps a free-text draft so typing invalid
+ *  intermediate JSON doesn't reset the cursor; commits to onChange only when the draft parses to an
+ *  object. Used by update_contact / update_product. */
+function FieldsJsonEditor({ value, onChange, label, hint }: {
+  value: Record<string, string> | undefined;
+  onChange: (fields: Record<string, string>) => void;
+  label: string;
+  hint?: string;
+}) {
+  const [draft, setDraft] = React.useState(() => JSON.stringify(value ?? {}, null, 2));
+  const [valid, setValid] = React.useState(true);
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      <Textarea
+        value={draft}
+        onChange={(e) => {
+          const next = e.target.value;
+          setDraft(next);
+          try {
+            const parsed = JSON.parse(next);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) { setValid(true); onChange(parsed); }
+            else setValid(false);
+          } catch { setValid(false); }
+        }}
+        rows={4}
+        className={`text-xs font-mono ${valid ? '' : 'border-destructive'}`}
+        placeholder={'{\n  "status": "active"\n}'}
+      />
+      {!valid && <p className="text-[10px] text-destructive">Enter a valid JSON object.</p>}
+      {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
 interface ActionConfigFormProps {
   data: ActionNodeData;
   onChange: (config: Record<string, unknown>) => void;
@@ -519,9 +554,12 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               placeholder="Select contact..."
             />
           </div>
-          <div className="text-xs text-muted-foreground">
-            Fields to update will be resolved from the flow context at runtime.
-          </div>
+          <FieldsJsonEditor
+            label="Fields to update (JSON)"
+            value={cfg.fields}
+            onChange={(fields) => onChange({ ...cfg, fields })}
+            hint="Allowlisted contact fields only (name, email, phone, status, lead_status…). Values may use {{trigger.data.x}}."
+          />
         </div>
       );
     }
@@ -539,9 +577,12 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               placeholder="Select product..."
             />
           </div>
-          <div className="text-xs text-muted-foreground">
-            Fields to update will be resolved from the flow context at runtime.
-          </div>
+          <FieldsJsonEditor
+            label="Fields to update (JSON)"
+            value={cfg.fields}
+            onChange={(fields) => onChange({ ...cfg, fields })}
+            hint="Allowlisted product fields only (name, description, status, sku, category…). Values may use {{trigger.data.x}}."
+          />
         </div>
       );
     }

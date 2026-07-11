@@ -234,6 +234,15 @@ async function executeCondition(
       return { output: { stopped: true }, branch: '__stop__' };
     }
 
+    case 'ab_split': {
+      // Random A/B branch. Handles are 'a' / 'b' (see ConditionNode). split_percentage is the % going
+      // to branch A. Deterministic-free by design — each run rolls independently.
+      const pct = Math.max(0, Math.min(100, Number((config as { split_percentage?: number }).split_percentage ?? 50)));
+      const roll = Math.random() * 100;
+      const branch = roll < pct ? 'a' : 'b';
+      return { output: { branch, roll: Math.round(roll * 100) / 100, split_percentage: pct }, branch };
+    }
+
     default:
       return { output: {}, branch: 'output' };
   }
@@ -242,6 +251,18 @@ async function executeCondition(
 // =====================================================
 // ACTION EXECUTORS
 // =====================================================
+
+// Allowlisted columns for the update_contact / update_product actions — identity/trust/tenancy fields
+// (id, workspace_id, user_id, created_by, embeddings, cost provenance, …) are NEVER writable via a flow.
+const CONTACT_UPDATABLE = [
+  'name', 'email', 'phone', 'mobile', 'position', 'department', 'company', 'website', 'industry',
+  'address', 'city', 'state', 'postal_code', 'country', 'country_code', 'lead_source', 'lead_status',
+  'status', 'notes', 'profession', 'contact_group',
+];
+const PRODUCT_UPDATABLE = [
+  'name', 'description', 'long_description', 'status', 'sku', 'external_sku', 'category',
+  'barcode', 'measurement_unit_code', 'work_category',
+];
 
 async function executeAction(
   supabase: SupabaseClient,
@@ -985,6 +1006,104 @@ async function executeAction(
       return { output: { invoked: true, function_name: fnName, result: data ?? null } };
     }
 
+    // ── CRM / commerce mutations. Operator/global-flow only (NOT in the tenant action allowlist).
+    // Run under the service role; every write is scoped to scope.workspaceId for a tenant flow, and
+    // operates on the entity in its own workspace for a global/operator flow. Unsupported entity
+    // types return an explicit skip reason (honest no-op), never a silent one. ──
+    case 'approve_quote': {
+      const quoteId = String(resolved.quote_id ?? '');
+      if (!quoteId) return { output: { skipped: true, reason: 'no_quote_id' } };
+      let q = supabase.from('quotes')
+        .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+        .eq('id', quoteId);
+      if (scope?.workspaceId) q = q.eq('workspace_id', scope.workspaceId);
+      const { data, error } = await q.select('id').maybeSingle();
+      if (error) throw new Error(`approve_quote failed: ${error.message}`);
+      return { output: { approved: !!data, quote_id: quoteId } };
+    }
+
+    case 'assign_user': {
+      const kind = String(resolved.entity_type ?? 'contact');
+      const id = String(resolved.entity_id ?? '');
+      const assignee = String(resolved.assign_to ?? '');
+      if (!id || !assignee) return { output: { skipped: true, reason: 'missing_entity_or_assignee' } };
+      // contact → responsible_sales_user_ids (the CRM ownership model); quote → user_id.
+      const target = kind === 'contact' ? { table: 'crm_contacts', patch: { responsible_sales_user_ids: [assignee] } }
+        : kind === 'quote' ? { table: 'quotes', patch: { user_id: assignee } }
+        : null;
+      if (!target) return { output: { skipped: true, reason: `assign_user does not support entity_type '${kind}'` } };
+      let u = supabase.from(target.table).update(target.patch).eq('id', id);
+      if (scope?.workspaceId) u = u.eq('workspace_id', scope.workspaceId);
+      const { data, error } = await u.select('id').maybeSingle();
+      if (error) throw new Error(`assign_user failed: ${error.message}`);
+      return { output: { assigned: !!data, entity_type: kind, entity_id: id, assigned_to: assignee } };
+    }
+
+    case 'add_tag': {
+      const kind = String(resolved.entity_type ?? 'contact');
+      const id = String(resolved.entity_id ?? '');
+      const tag = String(resolved.tag ?? '').trim();
+      if (!id || !tag) return { output: { skipped: true, reason: 'missing_entity_or_tag' } };
+      if (kind !== 'contact') return { output: { skipped: true, reason: `add_tag supports contacts only (got '${kind}')` } };
+      let sel = supabase.from('crm_contacts').select('id, tags').eq('id', id);
+      if (scope?.workspaceId) sel = sel.eq('workspace_id', scope.workspaceId);
+      const { data: c } = await sel.maybeSingle();
+      if (!c) return { output: { skipped: true, reason: 'contact not found' } };
+      const tags: string[] = Array.isArray((c as Record<string, unknown>).tags) ? (c as Record<string, string[]>).tags : [];
+      if (tags.includes(tag)) return { output: { added: false, reason: 'already_tagged', tag } };
+      const { error } = await supabase.from('crm_contacts').update({ tags: [...tags, tag] }).eq('id', id);
+      if (error) throw new Error(`add_tag failed: ${error.message}`);
+      return { output: { added: true, tag, entity_id: id } };
+    }
+
+    case 'add_note': {
+      const kind = String(resolved.entity_type ?? 'contact');
+      const id = String(resolved.entity_id ?? '');
+      const note = String(resolved.note ?? '').trim();
+      if (!id || !note) return { output: { skipped: true, reason: 'missing_entity_or_note' } };
+      // crm_notes.target_kind is 'contact' | 'company' by convention.
+      if (kind !== 'contact' && kind !== 'company') return { output: { skipped: true, reason: `add_note supports contact/company (got '${kind}')` } };
+      const table = kind === 'contact' ? 'crm_contacts' : 'crm_companies';
+      let sel = supabase.from(table).select('id, workspace_id').eq('id', id);
+      if (scope?.workspaceId) sel = sel.eq('workspace_id', scope.workspaceId);
+      const { data: ent } = await sel.maybeSingle();
+      if (!ent) return { output: { skipped: true, reason: `${kind} not found` } };
+      const { error } = await supabase.from('crm_notes').insert({
+        target_kind: kind, target_id: id, body: note,
+        workspace_id: (ent as Record<string, unknown>).workspace_id, created_by: userId ?? null,
+      });
+      if (error) throw new Error(`add_note failed: ${error.message}`);
+      return { output: { added: true, entity_type: kind, entity_id: id } };
+    }
+
+    case 'update_contact': {
+      const id = String(resolved.contact_id ?? '');
+      const fields = (resolved.fields && typeof resolved.fields === 'object') ? resolved.fields as Record<string, unknown> : {};
+      if (!id) return { output: { skipped: true, reason: 'no_contact_id' } };
+      const patch: Record<string, unknown> = {};
+      for (const k of CONTACT_UPDATABLE) if (k in fields) patch[k] = fields[k];
+      if (!Object.keys(patch).length) return { output: { skipped: true, reason: 'no allowed fields to update' } };
+      let u = supabase.from('crm_contacts').update(patch).eq('id', id);
+      if (scope?.workspaceId) u = u.eq('workspace_id', scope.workspaceId);
+      const { data, error } = await u.select('id').maybeSingle();
+      if (error) throw new Error(`update_contact failed: ${error.message}`);
+      return { output: { updated: !!data, fields: Object.keys(patch) } };
+    }
+
+    case 'update_product': {
+      const id = String(resolved.product_id ?? '');
+      const fields = (resolved.fields && typeof resolved.fields === 'object') ? resolved.fields as Record<string, unknown> : {};
+      if (!id) return { output: { skipped: true, reason: 'no_product_id' } };
+      const patch: Record<string, unknown> = {};
+      for (const k of PRODUCT_UPDATABLE) if (k in fields) patch[k] = fields[k];
+      if (!Object.keys(patch).length) return { output: { skipped: true, reason: 'no allowed fields to update' } };
+      let u = supabase.from('products').update(patch).eq('id', id);
+      if (scope?.workspaceId) u = u.eq('workspace_id', scope.workspaceId);
+      const { data, error } = await u.select('id').maybeSingle();
+      if (error) throw new Error(`update_product failed: ${error.message}`);
+      return { output: { updated: !!data, fields: Object.keys(patch) } };
+    }
+
     default:
       return { output: { skipped: true, reason: `Unknown action type: ${actionType}` } };
   }
@@ -1218,6 +1337,10 @@ async function executeFlowGraph(
 // REQUEST HANDLERS
 // =====================================================
 
+// Max runs/minute for one flow before we treat it as a runaway loop and refuse (backstop only —
+// a legit high-volume flow should stay far below this).
+const MAX_FLOW_RUNS_PER_MINUTE = 120;
+
 async function handleExecuteFlow(
   supabase: SupabaseClient,
   body: { flow_id: string; trigger_data?: Record<string, unknown> },
@@ -1261,6 +1384,23 @@ async function handleExecuteFlow(
   const graph = flow.graph_definition as FlowGraph;
   if (!graph.nodes || graph.nodes.length === 0) {
     return jsonResponse({ success: false, error: 'Flow has no nodes' }, 400);
+  }
+
+  // Runaway-loop backstop: flows can re-trigger OUT of process (an action mutates a row → a DB trigger
+  // emits a new event → this flow matches again), so an in-graph depth counter can't see the chain.
+  // Instead cap how often a single flow may run — a tight self-retrigger loop blows past this in
+  // seconds, while a normal high-volume flow stays well under it. Complements the per-loop-node cap.
+  if (!isTestRun) {
+    const since = new Date(Date.now() - 60_000).toISOString();
+    const { count: recentRuns } = await supabase
+      .from('flow_runs')
+      .select('id', { count: 'exact', head: true })
+      .eq('flow_id', flow_id)
+      .gte('started_at', since);
+    if ((recentRuns ?? 0) >= MAX_FLOW_RUNS_PER_MINUTE) {
+      console.warn(`[flow-engine] flow ${flow_id} exceeded ${MAX_FLOW_RUNS_PER_MINUTE} runs/min — suspected loop, refusing`);
+      return jsonResponse({ success: false, error: 'run_rate_exceeded', data: { flow_id } }, 429);
+    }
   }
 
   const runStartTime = Date.now();
