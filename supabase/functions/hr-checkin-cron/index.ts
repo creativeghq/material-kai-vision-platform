@@ -8,6 +8,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -80,6 +81,10 @@ Deno.serve(withApiLogging('hr-checkin-cron', async (req) => {
       .eq('workspace_id', s.workspace_id).eq('status', 'active');
 
     let recipients: { user_id: string | null; email: string | null }[] | null = null;
+    // Meter lazily: only charge when this workspace actually produces a late alert this run (empty
+    // 5-min scans are free). One charge per workspace per run-with-alerts; skips the workspace's
+    // alerting if the owner is out of credits (auto-resumes on top-up).
+    let wsCharged = false;
 
     for (const e of (emps ?? [])) {
       const start = timeToMinutes(e.work_start_time ?? null);
@@ -88,6 +93,14 @@ Deno.serve(withApiLogging('hr-checkin-cron', async (req) => {
       if (!days.includes(isodow)) continue;
       if (nowMin <= start + grace) continue; // not late yet
       checked++;
+
+      // First late employee for this workspace this run → charge the owner once. No credits → stop
+      // alerting for this workspace this run (nothing claimed yet; resumes when funded).
+      if (!wsCharged) {
+        const gate = await chargeCronWorkspace(supabase, s.workspace_id, 'hr-checkin', { description: 'HR late check-in alerts' });
+        if (!gate.allowed) break;
+        wsCharged = true;
+      }
 
       // Already clocked in today?
       const { data: arr } = await supabase.from('hr_time_punches').select('id')
