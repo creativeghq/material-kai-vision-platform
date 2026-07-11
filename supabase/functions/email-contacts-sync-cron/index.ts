@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
+import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
 
 serve(withApiLogging('email-contacts-sync-cron', async (req) => {
   await bootstrapForFunction();
@@ -30,8 +31,12 @@ serve(withApiLogging('email-contacts-sync-cron', async (req) => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 
-  let processed = 0, failed = 0;
+  let processed = 0, failed = 0, skipped = 0;
   for (const row of rows ?? []) {
+    // Meter: 3 credits from the workspace owner per sync. No credits → skip (auto-resumes next day
+    // once topped up).
+    const gate = await chargeCronWorkspace(supabase, row.workspace_id, 'email-contacts-sync');
+    if (!gate.allowed) { skipped++; continue; }
     try {
       const res = await fetch(`${supabaseUrl}/functions/v1/email-api`, {
         method: 'POST',
@@ -45,7 +50,7 @@ serve(withApiLogging('email-contacts-sync-cron', async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ success: true, workspaces: (rows ?? []).length, processed, failed }),
+    JSON.stringify({ success: true, workspaces: (rows ?? []).length, processed, failed, skipped }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );
 }));

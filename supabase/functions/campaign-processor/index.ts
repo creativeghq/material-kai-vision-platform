@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
+import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
 
 const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 
@@ -149,6 +150,25 @@ serve(withApiLogging('campaign-processor', async (req) => {
       if (template.workspace_id && template.workspace_id !== campaign.workspace_id) {
         await blockCampaign(supabase, campaign, 'template_missing', 'The campaign template does not belong to this workspace.');
         continue;
+      }
+
+      // Credit metering: charge the workspace owner ONCE per campaign (one unit of work), guarded so
+      // the many ticks a large send spans never double-charge. Out of credits → skip this tick and
+      // leave the campaign 'sending' with a blocked_reason; the next tick re-charges and auto-resumes
+      // the moment the owner tops up.
+      if (!campaign.metadata?.credit_charged) {
+        const gate = await chargeCronWorkspace(supabase, campaign.workspace_id, 'email-campaign', { description: `Email campaign: ${campaign.name}` });
+        if (!gate.allowed) {
+          await supabase.from('campaigns').update({
+            metadata: { ...(campaign.metadata || {}), blocked_reason: 'insufficient_credits', blocked_message: 'Paused — the workspace owner is out of credits. Sending resumes automatically once credits are added.', blocked_at: new Date().toISOString() },
+          }).eq('id', campaign.id);
+          console.log(`Campaign ${campaign.id} skipped: insufficient credits (auto-resumes on top-up).`);
+          continue;
+        }
+        campaign.metadata = { ...(campaign.metadata || {}), credit_charged: true };
+        await supabase.from('campaigns').update({
+          metadata: { ...campaign.metadata, credit_charged_at: new Date().toISOString(), blocked_reason: null },
+        }).eq('id', campaign.id);
       }
 
       // Get the next batch of pending recipients, bounded by this workspace's remaining send budget
