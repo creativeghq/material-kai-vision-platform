@@ -26,9 +26,9 @@ All APIs are implemented as Supabase Edge Functions running on Deno and are acce
 ### Core Business APIs
 
 #### [Email API](./email-api.md)
-Email sending, domain verification, and analytics using AWS SES.
-- **Function:** `email-api`
-- **Features:** Template-based emails, domain verification, analytics, sending stats
+Email sending, domain verification, and analytics using **Resend** (migrated 2026-03-11; webhooks via `email-webhooks`, Svix signature).
+- **Function:** `email-api` (+ `email-webhooks` for delivery/bounce events)
+- **Features:** Template-based emails, domain verification, analytics, sending stats, per-workspace Resend BYOK
 - **Access:** Authenticated users
 
 #### [Messaging API](./messaging-api.md)
@@ -85,6 +85,10 @@ Unified multi-agent AI system powered by LangChain.js and Claude.
 - **Features:** RBAC tool gating, skills system (`load_skill`), multimodal images, SSE streaming, long-term memory
 - **Access:** JWT (all users for core tools; admin/owner for B2B/SEO/sub-agents)
 
+#### [Agent Chat Partner API](./agent-chat-partner-api.md)
+External `kai_*` API-key access to the agent-chat surface for partner integrations.
+- **Access:** `Authorization: Bearer kai_*` (api_keys), per-call credit metering
+
 #### [MIVAA Gateway API](./mivaa-gateway-api.md)
 Gateway to Python backend services (RAG, search, AI services).
 - **Function:** `mivaa-gateway`
@@ -127,6 +131,20 @@ Scheduled price monitoring from competitor sources.
 - **Function:** `price-monitoring-cron`
 - **Features:** Automated price checks, alerts, history tracking
 - **Access:** Cron secret (scheduled)
+
+### Tracking / Monitoring (Partner) APIs
+
+External `kai_*` API-key flows for partner integrations (per-call credit metering).
+
+#### [Price Monitoring API](./price-monitoring-api.md)
+Full price-tracking reference for external consumers (`/api/v1/prices/track/*`).
+- See also: [price-monitoring-v3-partner-update.md](./price-monitoring-v3-partner-update.md) — v3 partner changelog.
+
+#### [Mention Monitoring API](./mention-monitoring-api.md)
+Multi-source mention tracking + LLM visibility (`/api/v1/mentions/track/*`).
+
+#### [Job Research API](./job-research-api.md)
+Background job-discovery + consolidated digest (`/api/v1/jobs/track/*`).
 
 #### [Flow Engine API](./flow-engine-api.md)
 Visual workflow automation — execute, test, and event-trigger flows.
@@ -247,7 +265,7 @@ Complete SEO content generation pipeline — 5 functions, all POST + JWT.
 | `seo-analyze` | 15+ SEO quality checks, auto-fix via Gemini |
 | `seo-pipeline` | Orchestrator: research → plan → write → analyze |
 
-Surfaced to the `kai` agent as sub-agent tools (admin-gated).
+Surfaced to the `kai` agent as sub-agent tools (admin-gated). Full reference: [**seo-api.md**](./seo-api.md).
 
 ### Social Media APIs
 
@@ -264,6 +282,11 @@ Social media OAuth, publishing, analytics, and content generation.
 Subscriptions and credit purchases via Stripe. The CRM `stripe` resource is part of the consolidated [crm-api](./crm-api.md) router.
 - **Functions:** `crm-api` (stripe resource), `stripe-checkout`, `stripe-customer-portal`
 - **Features:** Subscription checkout, credit packages, customer portal, balance queries
+- **Access:** Authenticated users
+
+#### [Stripe API](./stripe-api.md)
+Stripe checkout, customer portal, and credit/subscription purchase reference.
+- **Functions:** `stripe-checkout`, `stripe-customer-portal`, `crm-api` (stripe resource)
 - **Access:** Authenticated users
 
 #### [Stripe Webhooks API](./stripe-webhooks-api.md)
@@ -285,6 +308,20 @@ Multi-tenant Greek invoicing, AADE/myDATA transmission (Novus connector), AR/AP,
 #### Stripe Connect (tenant payouts)
 - **Function:** `stripe-connect` — `onboard` / `status`. Creates the workspace Stripe Express account on `workspace_payment_config`.
 - **Access:** owner/admin JWT
+
+#### [Supplier Orders API](./supplier-orders-api.md)
+External ERP-facing API for the sourcing/fulfillment spine (Workstream F) — supplier order retrieval and status.
+- **Access:** partner API key / supplier portal auth
+- **Architecture:** [sourcing-fulfillment.md](../sourcing-fulfillment.md)
+
+### HR APIs
+
+#### [HR API](./hr-api.md)
+Tenant HR add-on — employee records + absences (first paid module on the entitlements framework).
+- **Function:** `hr-api`
+- **Features:** Employees as tagged `crm_contacts` + `hr_employees` (1:1) + `hr_absences`; gate chain authenticate → `userCanAccessWorkspace` → `isModuleEnabled` → `assertEntitled` (402) → `hr.view` / `hr.manage`
+- **Access:** JWT, workspace-admin for PII; module entitlement required
+- **Architecture:** [hr-system.md](../hr-system.md)
 
 ### Background Processing APIs
 

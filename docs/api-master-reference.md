@@ -19,7 +19,7 @@ For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoin
 |-------|--------|-------------|
 | **JWT** | `Authorization: Bearer <supabase_access_token>` | Frontend (normal user sessions) |
 | **Service-role** | `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>` | Cron jobs, server-to-server, admin-only functions |
-| **Webhook signature** | Provider-specific (Svix `svix-signature`, Stripe `stripe-signature`, AWS SNS, Zernio `X-Zernio-Signature`) | Inbound webhooks — no bearer token |
+| **Webhook signature** | Provider-specific (Svix `svix-signature` for Resend, Stripe `stripe-signature`, Zernio `X-Zernio-Signature`) | Inbound webhooks — no bearer token |
 | **API key** | `Authorization: Bearer <MIVAA_API_KEY>` | Server-to-server calls into MIVAA Python backend |
 | **Public** | — | Health checks, OAuth callbacks, debug stubs |
 
@@ -185,7 +185,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `email-api` | JWT / secret | Action-discriminated email sending, domain management, logs, and analytics via Resend. |
 | `email-webhooks` | sig | Receives Resend delivery event webhooks and updates email_logs. |
-| `ses-webhook` | sig | Processes SNS notifications from Amazon SES for bounces, complaints, and deliveries. |
+| `ses-webhook` | sig | Legacy/deprecated — Amazon SES was decommissioned 2026-03-11 (email now sent via Resend; delivery events handled by `email-webhooks`). Function retained but unused. |
 
 **Messaging**
 
@@ -367,13 +367,13 @@ WhatsApp moved from Twilio (SMS+WA) to **Zernio** (WhatsApp via Meta Cloud API) 
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `email-api` | POST | JWT | Send transactional email via AWS SES. Templates, analytics, domain verification. | [email-api](api/email-api.md) |
+| `email-api` | POST | JWT | Send transactional email via Resend. Templates, analytics, domain management. | [email-api](api/email-api.md) |
 | `messaging-api` | POST | JWT | Send WhatsApp via Zernio. Actions: `send`, `create-campaign`, `connect-whatsapp`, `sync-channels`, conversation/reply ops. | [messaging-api](api/messaging-api.md) |
 | `messaging-processor` | POST | service-role | WhatsApp campaign batch dispatcher (cron-invoked, see §1.6) | — |
 | `zernio-webhook-handler` | POST | signature (Zernio) | One webhook for social `post.*` + WhatsApp `message.*` (delivery + reply capture) | [zernio-social-api](api/zernio-social-api.md) |
 | `email-webhook` | POST | signature (Resend) | Campaign email events (delivered/bounced/opened/clicked) | — |
 | `email-webhooks` | POST | signature (Svix/Resend) | Transactional email events | — |
-| `ses-webhook` | POST | signature (SNS) | Amazon SES bounce/complaint notifications | — |
+| `ses-webhook` | POST | signature (SNS) | Legacy/deprecated — Amazon SES decommissioned 2026-03-11; email now via Resend (`email-webhooks`) | — |
 
 ### 1.9b Finance (Greek e-invoicing, AADE/myDATA)
 
@@ -520,7 +520,7 @@ The platform is divided into 7 toggleable modules. Frontend modules live in `src
 |---|---|---|---|
 | `greek-marketplaces` | yes | yes (3 routes mounted at `/api/v1/modules/greek-marketplaces/*`) | no |
 | `crm` | yes | no | edge fns: `crm-{users,contacts,companies,stripe}-api` |
-| `email` | yes | no | edge fns: `email-api`, `email-webhook(s)`, `campaign-processor`, `ses-webhook` |
+| `email` | yes | no | edge fns: `email-api`, `email-webhook(s)`, `campaign-processor` (via Resend; `ses-webhook` legacy/deprecated) |
 | `messaging` | yes | yes (`/api/messaging/*`) | edge fns: `messaging-api`, `messaging-processor`, `messaging-webhook` |
 | `quotes` | yes | no | edge fns: `quotes-api`, `generate-quote-pdf` |
 | `notifications` | yes (header bell-icon) | no | edge fn: `notification-dispatcher` |

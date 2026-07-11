@@ -5974,5 +5974,1970 @@
       }
     ],
     "response": "{success, processed, embedded, failed}"
+  },
+  {
+    "name": "hr-api",
+    "tag": "HR",
+    "summary": "HR module API — employees, absences, recruitment, onboarding, payroll, attendance, Ergani, accounting",
+    "description": "Action-based HR backbone (#252). Session JWT; authenticate() yields a service-role client, so every action re-derives the workspace from body.workspace_id and calls userCanAccessWorkspace, plus isModuleEnabled('hr') and per-workspace assertEntitled('hr') (402 upsell). RBAC: reads need hr.view, writes/approvals need hr.manage (owner/admin/global-admin only); self-* actions are open to a linked employee (workspace role 'employee') and hard-scoped to their own record. NOTE: the client reads the list tabs (employees, departments, absences, job postings, applications, onboarding, documents, payroll runs) DIRECTLY from the DB (RLS-gated), not through this function — the edge function serves writes + computed/credit-metered/external actions. Every action requires action and workspace_id in the POST body.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "api/hr-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "list-employees",
+        "description": "List all employees (hr_employees joined to crm_contacts) with absence-summary rollups.",
+        "params": [],
+        "response": "{ employees: [...] }"
+      },
+      {
+        "action": "create-employee",
+        "description": "Create an employee: attach an existing in-workspace crm_contact_id or create a new contact from `contact`, plus HR fields. Requires hr.manage.",
+        "params": [
+          {
+            "name": "crm_contact_id",
+            "type": "string",
+            "required": false,
+            "desc": "Existing in-workspace contact to attach"
+          },
+          {
+            "name": "contact",
+            "type": "object",
+            "required": false,
+            "desc": "New contact fields (name required) when no crm_contact_id"
+          },
+          {
+            "name": "employment_type",
+            "type": "string",
+            "required": false,
+            "desc": "full_time | part_time | contractor"
+          },
+          {
+            "name": "start_date",
+            "type": "string",
+            "required": false,
+            "desc": "Employment start date"
+          },
+          {
+            "name": "manager_contact_id",
+            "type": "string",
+            "required": false,
+            "desc": "Manager (must be in workspace)"
+          }
+        ],
+        "response": "{ employee }"
+      },
+      {
+        "action": "update-employee",
+        "description": "Update an employee's HR fields and optionally the linked contact. Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee to update"
+          },
+          {
+            "name": "contact",
+            "type": "object",
+            "required": false,
+            "desc": "HR-relevant contact fields to update too"
+          }
+        ],
+        "response": "{ employee }"
+      },
+      {
+        "action": "list-absences",
+        "description": "List absences, optionally filtered by employee or status.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by employee"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by status"
+          }
+        ],
+        "response": "{ absences: [...] }"
+      },
+      {
+        "action": "record-absence",
+        "description": "Record an absence (status pending); working_days is server-computed unless overridden. Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee"
+          },
+          {
+            "name": "start_date",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "end_date",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD (>= start)"
+          },
+          {
+            "name": "absence_type",
+            "type": "string",
+            "required": false,
+            "desc": "vacation | sick | unpaid | other"
+          },
+          {
+            "name": "working_days",
+            "type": "number",
+            "required": false,
+            "desc": "Override computed working days"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Optional note"
+          }
+        ],
+        "response": "{ absence }"
+      },
+      {
+        "action": "approve-absence",
+        "description": "Approve an absence (sets status approved). Requires hr.manage.",
+        "params": [
+          {
+            "name": "absence_id",
+            "type": "string",
+            "required": true,
+            "desc": "Absence to approve"
+          }
+        ],
+        "response": "{ absence }"
+      },
+      {
+        "action": "reject-absence",
+        "description": "Reject an absence (sets status rejected). Requires hr.manage.",
+        "params": [
+          {
+            "name": "absence_id",
+            "type": "string",
+            "required": true,
+            "desc": "Absence to reject"
+          }
+        ],
+        "response": "{ absence }"
+      },
+      {
+        "action": "list-departments",
+        "description": "List departments with head contact and employee counts.",
+        "params": [],
+        "response": "{ departments: [...] }"
+      },
+      {
+        "action": "create-department",
+        "description": "Create a department. Requires hr.manage.",
+        "params": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "desc": "Department name"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "desc": "Description"
+          },
+          {
+            "name": "head_contact_id",
+            "type": "string",
+            "required": false,
+            "desc": "Department head contact"
+          }
+        ],
+        "response": "{ department }"
+      },
+      {
+        "action": "update-department",
+        "description": "Update a department. Requires hr.manage.",
+        "params": [
+          {
+            "name": "department_id",
+            "type": "string",
+            "required": true,
+            "desc": "Department to update"
+          }
+        ],
+        "response": "{ department }"
+      },
+      {
+        "action": "delete-department",
+        "description": "Delete a department. Requires hr.manage.",
+        "params": [
+          {
+            "name": "department_id",
+            "type": "string",
+            "required": true,
+            "desc": "Department to delete"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "list-job-postings",
+        "description": "List job postings with applicant counts.",
+        "params": [],
+        "response": "{ postings: [...] }"
+      },
+      {
+        "action": "create-job-posting",
+        "description": "Create a job posting (status open stamps published_at). Requires hr.manage.",
+        "params": [
+          {
+            "name": "title",
+            "type": "string",
+            "required": true,
+            "desc": "Job title"
+          },
+          {
+            "name": "department_id",
+            "type": "string",
+            "required": false,
+            "desc": "Department"
+          },
+          {
+            "name": "employment_type",
+            "type": "string",
+            "required": false,
+            "desc": "full_time | part_time | contractor"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "required": false,
+            "desc": "draft | open | closed"
+          }
+        ],
+        "response": "{ posting }"
+      },
+      {
+        "action": "update-job-posting",
+        "description": "Update a job posting. Requires hr.manage.",
+        "params": [
+          {
+            "name": "job_posting_id",
+            "type": "string",
+            "required": true,
+            "desc": "Posting to update"
+          }
+        ],
+        "response": "{ posting }"
+      },
+      {
+        "action": "delete-job-posting",
+        "description": "Delete a job posting. Requires hr.manage.",
+        "params": [
+          {
+            "name": "job_posting_id",
+            "type": "string",
+            "required": true,
+            "desc": "Posting to delete"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "generate-job-description",
+        "description": "AI-generate a structured job description via Claude tool-use (credit-metered). Requires hr.manage.",
+        "params": [
+          {
+            "name": "title",
+            "type": "string",
+            "required": true,
+            "desc": "Job title"
+          },
+          {
+            "name": "seniority",
+            "type": "string",
+            "required": false,
+            "desc": "Seniority hint"
+          },
+          {
+            "name": "department",
+            "type": "string",
+            "required": false,
+            "desc": "Department hint"
+          },
+          {
+            "name": "keywords",
+            "type": "string",
+            "required": false,
+            "desc": "Must-haves"
+          }
+        ],
+        "response": "{ generated, credits_used }"
+      },
+      {
+        "action": "list-applications",
+        "description": "List applications with candidate + posting, optionally filtered.",
+        "params": [
+          {
+            "name": "job_posting_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by posting"
+          },
+          {
+            "name": "stage",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by stage"
+          }
+        ],
+        "response": "{ applications: [...] }"
+      },
+      {
+        "action": "create-application",
+        "description": "Create an application, attaching an existing candidate or creating one inline. Requires hr.manage.",
+        "params": [
+          {
+            "name": "job_posting_id",
+            "type": "string",
+            "required": true,
+            "desc": "Target posting"
+          },
+          {
+            "name": "candidate_id",
+            "type": "string",
+            "required": false,
+            "desc": "Existing candidate"
+          },
+          {
+            "name": "candidate",
+            "type": "object",
+            "required": false,
+            "desc": "New candidate (name required)"
+          },
+          {
+            "name": "notes",
+            "type": "string",
+            "required": false,
+            "desc": "Notes"
+          }
+        ],
+        "response": "{ application }"
+      },
+      {
+        "action": "update-application",
+        "description": "Update an application stage/rating/notes (emits recruitment flow event on stage change). Requires hr.manage.",
+        "params": [
+          {
+            "name": "application_id",
+            "type": "string",
+            "required": true,
+            "desc": "Application to update"
+          },
+          {
+            "name": "stage",
+            "type": "string",
+            "required": false,
+            "desc": "applied|screening|interview|offer|hired|rejected"
+          },
+          {
+            "name": "rating",
+            "type": "number",
+            "required": false,
+            "desc": "Rating"
+          },
+          {
+            "name": "notes",
+            "type": "string",
+            "required": false,
+            "desc": "Notes"
+          }
+        ],
+        "response": "{ application }"
+      },
+      {
+        "action": "upload-application-cv",
+        "description": "Upload a candidate CV (base64 PDF) through the function into the workspace hr/ prefix. Requires hr.manage.",
+        "params": [
+          {
+            "name": "candidate_id",
+            "type": "string",
+            "required": true,
+            "desc": "Candidate"
+          },
+          {
+            "name": "content_base64",
+            "type": "string",
+            "required": true,
+            "desc": "Base64 PDF (max 10MB)"
+          },
+          {
+            "name": "filename",
+            "type": "string",
+            "required": false,
+            "desc": "File name"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "application-cv-url",
+        "description": "Get a short-lived signed URL for a candidate's stored CV.",
+        "params": [
+          {
+            "name": "candidate_id",
+            "type": "string",
+            "required": true,
+            "desc": "Candidate"
+          }
+        ],
+        "response": "{ url }"
+      },
+      {
+        "action": "screen-application",
+        "description": "AI CV screening — Claude scores the CV against the posting (credit-metered). Requires hr.manage.",
+        "params": [
+          {
+            "name": "application_id",
+            "type": "string",
+            "required": true,
+            "desc": "Application to screen"
+          }
+        ],
+        "response": "{ application, credits_used }"
+      },
+      {
+        "action": "hire-application",
+        "description": "Hire an applicant: create contact + employee, close the application, and seed the onboarding checklist. Requires hr.manage.",
+        "params": [
+          {
+            "name": "application_id",
+            "type": "string",
+            "required": true,
+            "desc": "Application to hire"
+          },
+          {
+            "name": "start_date",
+            "type": "string",
+            "required": false,
+            "desc": "Start date"
+          },
+          {
+            "name": "department_id",
+            "type": "string",
+            "required": false,
+            "desc": "Department"
+          }
+        ],
+        "response": "{ employee_id, onboarding_seeded }"
+      },
+      {
+        "action": "list-onboarding",
+        "description": "List onboarding tasks, optionally filtered by employee / pending only.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by employee"
+          },
+          {
+            "name": "pending_only",
+            "type": "boolean",
+            "required": false,
+            "desc": "Only pending tasks"
+          }
+        ],
+        "response": "{ tasks: [...] }"
+      },
+      {
+        "action": "add-onboarding-task",
+        "description": "Add an onboarding task for an employee. Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee"
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "required": true,
+            "desc": "Task title"
+          }
+        ],
+        "response": "{ task }"
+      },
+      {
+        "action": "toggle-onboarding-task",
+        "description": "Toggle an onboarding task done/pending. Requires hr.manage.",
+        "params": [
+          {
+            "name": "task_id",
+            "type": "string",
+            "required": true,
+            "desc": "Task"
+          }
+        ],
+        "response": "{ task }"
+      },
+      {
+        "action": "delete-onboarding-task",
+        "description": "Delete an onboarding task. Requires hr.manage.",
+        "params": [
+          {
+            "name": "task_id",
+            "type": "string",
+            "required": true,
+            "desc": "Task"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "list-documents",
+        "description": "List HR documents, optionally filtered by employee.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by employee"
+          }
+        ],
+        "response": "{ documents: [...] }"
+      },
+      {
+        "action": "upload-document",
+        "description": "Upload an HR document (base64) into the workspace hr/ prefix and record it. Requires hr.manage.",
+        "params": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "desc": "Document name"
+          },
+          {
+            "name": "content_base64",
+            "type": "string",
+            "required": true,
+            "desc": "Base64 bytes (max 20MB)"
+          },
+          {
+            "name": "doc_type",
+            "type": "string",
+            "required": false,
+            "desc": "contract|id|certificate|payslip|review|other"
+          },
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Owning employee"
+          },
+          {
+            "name": "content_type",
+            "type": "string",
+            "required": false,
+            "desc": "MIME type"
+          }
+        ],
+        "response": "{ document }"
+      },
+      {
+        "action": "sign-document",
+        "description": "Get a short-lived signed URL for an HR document.",
+        "params": [
+          {
+            "name": "document_id",
+            "type": "string",
+            "required": true,
+            "desc": "Document"
+          }
+        ],
+        "response": "{ url }"
+      },
+      {
+        "action": "delete-document",
+        "description": "Delete an HR document (removes storage object + row). Requires hr.manage.",
+        "params": [
+          {
+            "name": "document_id",
+            "type": "string",
+            "required": true,
+            "desc": "Document"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "list-payroll-runs",
+        "description": "List payroll runs newest-first.",
+        "params": [],
+        "response": "{ runs: [...] }"
+      },
+      {
+        "action": "create-payroll-run",
+        "description": "Create a payroll run for a period and auto-populate items from active employees (Greek payroll rules engine). Requires hr.manage.",
+        "params": [
+          {
+            "name": "period",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM"
+          },
+          {
+            "name": "currency",
+            "type": "string",
+            "required": false,
+            "desc": "Run currency (default EUR)"
+          }
+        ],
+        "response": "{ run, items }"
+      },
+      {
+        "action": "get-payroll-run",
+        "description": "Get a payroll run with its items and totals summary.",
+        "params": [
+          {
+            "name": "run_id",
+            "type": "string",
+            "required": true,
+            "desc": "Run"
+          }
+        ],
+        "response": "{ run, items, summary }"
+      },
+      {
+        "action": "update-payroll-item",
+        "description": "Set an item's gross and recompute the statutory breakdown; updates run totals. Requires hr.manage.",
+        "params": [
+          {
+            "name": "item_id",
+            "type": "string",
+            "required": true,
+            "desc": "Payroll item"
+          },
+          {
+            "name": "gross",
+            "type": "number",
+            "required": true,
+            "desc": "New gross"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Note"
+          }
+        ],
+        "response": "{ ok, total_gross, total_net }"
+      },
+      {
+        "action": "generate-payslips",
+        "description": "Generate payslip PDFs for a run (lazy pdf-lib). Requires hr.manage.",
+        "params": [
+          {
+            "name": "run_id",
+            "type": "string",
+            "required": true,
+            "desc": "Run"
+          }
+        ],
+        "response": "payslip generation result"
+      },
+      {
+        "action": "get-payroll-settings",
+        "description": "Read the workspace payroll settings (or Greek defaults).",
+        "params": [],
+        "response": "{ settings }"
+      },
+      {
+        "action": "update-payroll-settings",
+        "description": "Upsert the workspace payroll rules (rates, brackets, tax credits). Requires hr.manage.",
+        "params": [
+          {
+            "name": "country_code",
+            "type": "string",
+            "required": false,
+            "desc": "e.g. GR"
+          },
+          {
+            "name": "income_tax_brackets",
+            "type": "object",
+            "required": false,
+            "desc": "Bracket array"
+          }
+        ],
+        "response": "{ settings }"
+      },
+      {
+        "action": "set-payroll-status",
+        "description": "Set a run's status (draft|approved|paid), stamping approved_at/paid_at. Requires hr.manage.",
+        "params": [
+          {
+            "name": "run_id",
+            "type": "string",
+            "required": true,
+            "desc": "Run"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "required": true,
+            "desc": "draft|approved|paid"
+          }
+        ],
+        "response": "{ run }"
+      },
+      {
+        "action": "post-payroll-to-finance",
+        "description": "Post a run to Finance: one scheduled net payment per employee plus income-tax and EFKA remittances. Requires hr.manage.",
+        "params": [
+          {
+            "name": "run_id",
+            "type": "string",
+            "required": true,
+            "desc": "Run"
+          }
+        ],
+        "response": "{ ok, posted }"
+      },
+      {
+        "action": "invite-employee",
+        "description": "Invite/link an employee to the portal (creates or links the auth user, adds 'employee' membership). Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee"
+          },
+          {
+            "name": "email",
+            "type": "string",
+            "required": true,
+            "desc": "Invite email"
+          }
+        ],
+        "response": "{ ok, invited, role_note }"
+      },
+      {
+        "action": "analytics",
+        "description": "HR analytics rollup: headcount, absences, department breakdown, recruitment funnel, onboarding, last payroll.",
+        "params": [],
+        "response": "{ analytics }"
+      },
+      {
+        "action": "clock-employee",
+        "description": "Admin-file a work-card punch for an employee (files to Ergani when configured). Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee"
+          },
+          {
+            "name": "punch_type",
+            "type": "string",
+            "required": true,
+            "desc": "arrival | departure"
+          },
+          {
+            "name": "comments",
+            "type": "string",
+            "required": false,
+            "desc": "Comments"
+          }
+        ],
+        "response": "{ ok, punch, filed, is_late, protocol }"
+      },
+      {
+        "action": "set-employee-pin",
+        "description": "Set or clear an employee's kiosk PIN (hashed). Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee"
+          },
+          {
+            "name": "pin",
+            "type": "string",
+            "required": false,
+            "desc": "4-8 digit PIN; empty clears"
+          }
+        ],
+        "response": "{ ok, pin_set }"
+      },
+      {
+        "action": "attendance-today",
+        "description": "Today's attendance board: per-employee scheduled-today, PIN presence, and last punch.",
+        "params": [],
+        "response": "{ date, attendance: [...] }"
+      },
+      {
+        "action": "list-notify-candidates",
+        "description": "List workspace members eligible as extra late-alert recipients.",
+        "params": [],
+        "response": "{ candidates: [...] }"
+      },
+      {
+        "action": "get-hr-settings",
+        "description": "Read HR settings (timezone, kiosk, late-alert config) or defaults.",
+        "params": [],
+        "response": "{ settings }"
+      },
+      {
+        "action": "save-hr-settings",
+        "description": "Upsert HR settings (timezone, kiosk_enabled/require_pin, late-alert grace + notify targets). Requires hr.manage.",
+        "params": [
+          {
+            "name": "timezone",
+            "type": "string",
+            "required": false,
+            "desc": "IANA tz"
+          },
+          {
+            "name": "kiosk_enabled",
+            "type": "boolean",
+            "required": false,
+            "desc": "Enable clock-in kiosk"
+          },
+          {
+            "name": "late_grace_minutes",
+            "type": "number",
+            "required": false,
+            "desc": "Late grace window"
+          }
+        ],
+        "response": "{ settings }"
+      },
+      {
+        "action": "list-punches",
+        "description": "List time punches, optionally filtered by employee / date range.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by employee"
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": false,
+            "desc": "reference_date >="
+          },
+          {
+            "name": "to",
+            "type": "string",
+            "required": false,
+            "desc": "reference_date <="
+          }
+        ],
+        "response": "{ punches: [...] }"
+      },
+      {
+        "action": "add-manual-punch",
+        "description": "Add a manual/correction punch (local only, never filed to Ergani). Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee"
+          },
+          {
+            "name": "punch_type",
+            "type": "string",
+            "required": true,
+            "desc": "arrival | departure"
+          },
+          {
+            "name": "at",
+            "type": "string",
+            "required": false,
+            "desc": "Timestamp (defaults now)"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Correction note"
+          }
+        ],
+        "response": "{ punch }"
+      },
+      {
+        "action": "update-punch",
+        "description": "Edit a punch's time/type/late flag (local correction). Requires hr.manage.",
+        "params": [
+          {
+            "name": "punch_id",
+            "type": "string",
+            "required": true,
+            "desc": "Punch"
+          },
+          {
+            "name": "punched_at",
+            "type": "string",
+            "required": false,
+            "desc": "New timestamp"
+          },
+          {
+            "name": "punch_type",
+            "type": "string",
+            "required": false,
+            "desc": "arrival | departure"
+          },
+          {
+            "name": "is_late",
+            "type": "boolean",
+            "required": false,
+            "desc": "Late flag"
+          }
+        ],
+        "response": "{ punch }"
+      },
+      {
+        "action": "delete-punch",
+        "description": "Delete a punch. Requires hr.manage.",
+        "params": [
+          {
+            "name": "punch_id",
+            "type": "string",
+            "required": true,
+            "desc": "Punch"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "timesheet",
+        "description": "Pair arrivals/departures into worked hours per employee/day over a date range.",
+        "params": [
+          {
+            "name": "from",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "to",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD"
+          }
+        ],
+        "response": "{ from, to, timesheet: [...] }"
+      },
+      {
+        "action": "ergani-submission-types",
+        "description": "List the active Ergani submission types for the workspace's employer (live).",
+        "params": [],
+        "response": "{ submission_types: [...] }"
+      },
+      {
+        "action": "ergani-document-schema",
+        "description": "Fetch Ergani's live JSON schema/template for a submission code.",
+        "params": [
+          {
+            "name": "code",
+            "type": "string",
+            "required": true,
+            "desc": "Ergani submission code"
+          }
+        ],
+        "response": "{ code, schema }"
+      },
+      {
+        "action": "ergani-employer-info",
+        "description": "Fetch employer registry info (EX_BASE_01) from Ergani.",
+        "params": [],
+        "response": "{ info }"
+      },
+      {
+        "action": "ergani-submit-leave",
+        "description": "Submit a leave declaration mapped from an hr_absences row. Requires hr.manage.",
+        "params": [
+          {
+            "name": "absence_id",
+            "type": "string",
+            "required": true,
+            "desc": "Absence to declare"
+          },
+          {
+            "name": "ergani_leave_code",
+            "type": "string",
+            "required": false,
+            "desc": "Ergani leave type code"
+          },
+          {
+            "name": "document",
+            "type": "object",
+            "required": false,
+            "desc": "Fully-built override payload"
+          }
+        ],
+        "response": "{ ok, result }"
+      },
+      {
+        "action": "ergani-submit",
+        "description": "Submit an operator-built document for any Ergani code (E3, WTOWeek, etc.). Requires hr.manage.",
+        "params": [
+          {
+            "name": "code",
+            "type": "string",
+            "required": true,
+            "desc": "Ergani submission code"
+          },
+          {
+            "name": "document",
+            "type": "object",
+            "required": true,
+            "desc": "Payload built from the code's schema"
+          },
+          {
+            "name": "schedule_id",
+            "type": "string",
+            "required": false,
+            "desc": "Linked hr_work_schedules row to flip to submitted"
+          }
+        ],
+        "response": "{ ok, result }"
+      },
+      {
+        "action": "ergani-download-pdf",
+        "description": "Download a submitted Ergani document PDF (base64).",
+        "params": [
+          {
+            "name": "code",
+            "type": "string",
+            "required": true,
+            "desc": "Submission code"
+          },
+          {
+            "name": "protocol",
+            "type": "string",
+            "required": true,
+            "desc": "Protocol number"
+          },
+          {
+            "name": "submitted_date",
+            "type": "string",
+            "required": true,
+            "desc": "yyyymmdd"
+          }
+        ],
+        "response": "{ pdf_base64 }"
+      },
+      {
+        "action": "ergani-retry",
+        "description": "Retry a failed submission using its stored request payload. Requires hr.manage.",
+        "params": [
+          {
+            "name": "submission_id",
+            "type": "string",
+            "required": true,
+            "desc": "Failed hr_ergani_submissions row"
+          }
+        ],
+        "response": "{ ok, result }"
+      },
+      {
+        "action": "ergani-submissions-log",
+        "description": "Read the Ergani submission audit log, optionally filtered.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by employee"
+          },
+          {
+            "name": "submission_type",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by code"
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "Max rows (<=500)"
+          }
+        ],
+        "response": "{ submissions: [...] }"
+      },
+      {
+        "action": "list-accounting-docs",
+        "description": "List statutory accounting documents, optionally by period.",
+        "params": [
+          {
+            "name": "period",
+            "type": "string",
+            "required": false,
+            "desc": "YYYY-MM"
+          }
+        ],
+        "response": "{ documents: [...] }"
+      },
+      {
+        "action": "upload-accounting-doc",
+        "description": "Upload an accounting/payment document (base64). Requires hr.manage.",
+        "params": [
+          {
+            "name": "period",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "desc": "Document name"
+          },
+          {
+            "name": "content_base64",
+            "type": "string",
+            "required": true,
+            "desc": "Base64 bytes (max 20MB)"
+          },
+          {
+            "name": "payroll_run_id",
+            "type": "string",
+            "required": false,
+            "desc": "Linked run"
+          },
+          {
+            "name": "content_type",
+            "type": "string",
+            "required": false,
+            "desc": "MIME type"
+          }
+        ],
+        "response": "{ document }"
+      },
+      {
+        "action": "sign-accounting-doc",
+        "description": "Get a short-lived signed URL for an accounting document. Requires hr.manage.",
+        "params": [
+          {
+            "name": "document_id",
+            "type": "string",
+            "required": true,
+            "desc": "Document"
+          }
+        ],
+        "response": "{ url }"
+      },
+      {
+        "action": "delete-accounting-doc",
+        "description": "Delete an accounting document. Requires hr.manage.",
+        "params": [
+          {
+            "name": "document_id",
+            "type": "string",
+            "required": true,
+            "desc": "Document"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "analyze-accounting-doc",
+        "description": "Claude OCR to identify the document + extract payment fields (credit-metered). Requires hr.manage.",
+        "params": [
+          {
+            "name": "document_id",
+            "type": "string",
+            "required": true,
+            "desc": "Document"
+          }
+        ],
+        "response": "{ document, credits_used }"
+      },
+      {
+        "action": "prepare-accounting-period",
+        "description": "AI reconciliation of analyzed docs against the payroll run; stamps payment IDs onto Finance lines (credit-metered). Requires hr.manage.",
+        "params": [
+          {
+            "name": "period",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM"
+          }
+        ],
+        "response": "{ reconciliation, stamped_finance_lines, credits_used }"
+      },
+      {
+        "action": "self-profile",
+        "description": "Employee self-service: read own employee profile + absence summary.",
+        "params": [],
+        "response": "{ profile }"
+      },
+      {
+        "action": "self-onboarding",
+        "description": "Employee self-service: list own onboarding tasks.",
+        "params": [],
+        "response": "{ tasks: [...] }"
+      },
+      {
+        "action": "self-toggle-onboarding",
+        "description": "Employee self-service: toggle one of own onboarding tasks done/pending.",
+        "params": [
+          {
+            "name": "task_id",
+            "type": "string",
+            "required": true,
+            "desc": "Own task"
+          }
+        ],
+        "response": "{ task }"
+      },
+      {
+        "action": "self-timeoff",
+        "description": "Employee self-service: list own absences.",
+        "params": [],
+        "response": "{ absences: [...] }"
+      },
+      {
+        "action": "self-request-timeoff",
+        "description": "Employee self-service: request time off (status pending).",
+        "params": [
+          {
+            "name": "start_date",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "end_date",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "absence_type",
+            "type": "string",
+            "required": false,
+            "desc": "vacation|sick|unpaid|other"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Note"
+          }
+        ],
+        "response": "{ absence }"
+      },
+      {
+        "action": "self-documents",
+        "description": "Employee self-service: list own documents.",
+        "params": [],
+        "response": "{ documents: [...] }"
+      },
+      {
+        "action": "self-clock",
+        "description": "Employee self-service: clock arrival/departure (files to Ergani when configured).",
+        "params": [
+          {
+            "name": "punch_type",
+            "type": "string",
+            "required": true,
+            "desc": "arrival | departure"
+          },
+          {
+            "name": "comments",
+            "type": "string",
+            "required": false,
+            "desc": "Comments"
+          }
+        ],
+        "response": "{ ok, punch, filed, protocol, is_late }"
+      },
+      {
+        "action": "self-punches",
+        "description": "Employee self-service: list own recent punches with authoritative clocked-in state.",
+        "params": [
+          {
+            "name": "days",
+            "type": "number",
+            "required": false,
+            "desc": "Lookback days (1-90, default 14)"
+          }
+        ],
+        "response": "{ punches: [...], clocked_in }"
+      },
+      {
+        "action": "self-sign-document",
+        "description": "Employee self-service: signed URL for one of own documents.",
+        "params": [
+          {
+            "name": "document_id",
+            "type": "string",
+            "required": true,
+            "desc": "Own document"
+          }
+        ],
+        "response": "{ url }"
+      }
+    ],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "hr-careers",
+    "tag": "HR",
+    "summary": "Public careers page — list a workspace's open postings and accept applications",
+    "description": "Anonymous public careers API (#252). No session; resolves the workspace from slug (mirrors finance-storefront) using the service role. apply is Turnstile-gated when TURNSTILE_SECRET_KEY is set (fail-open when not) plus a per-IP throttle (8 applications per 10-minute window). Writes only hr_candidates + hr_applications.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "meta",
+        "description": "Return the company name, Turnstile site key, and the list of OPEN job postings for the workspace slug.",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace public slug"
+          }
+        ],
+        "response": "{ ok, company, turnstile_site_key, jobs: [...] }"
+      },
+      {
+        "action": "get-job",
+        "description": "Return one open posting's full detail (description + requirements).",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace slug"
+          },
+          {
+            "name": "job_id",
+            "type": "string",
+            "required": true,
+            "desc": "Posting id"
+          }
+        ],
+        "response": "{ ok, company, turnstile_site_key, job }"
+      },
+      {
+        "action": "apply",
+        "description": "Submit an application to an open posting; reuses an existing candidate (same email) or creates one. Turnstile-gated + per-IP throttled.",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace slug"
+          },
+          {
+            "name": "job_id",
+            "type": "string",
+            "required": true,
+            "desc": "Open posting"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "desc": "Applicant name"
+          },
+          {
+            "name": "email",
+            "type": "string",
+            "required": false,
+            "desc": "Applicant email"
+          },
+          {
+            "name": "phone",
+            "type": "string",
+            "required": false,
+            "desc": "Phone"
+          },
+          {
+            "name": "headline",
+            "type": "string",
+            "required": false,
+            "desc": "Headline"
+          },
+          {
+            "name": "cover_letter",
+            "type": "string",
+            "required": false,
+            "desc": "Cover letter (<=5000)"
+          },
+          {
+            "name": "turnstile_token",
+            "type": "string",
+            "required": false,
+            "desc": "Turnstile token when configured"
+          }
+        ],
+        "response": "{ ok, message }"
+      }
+    ],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "hr-checkin-cron",
+    "tag": "HR",
+    "summary": "Cron: fire late check-in alerts for employees who haven't clocked in",
+    "description": "Runs every few minutes via pg_cron (x-cron-secret via isCronAuthorized). For every workspace with late alerts on, finds active employees scheduled to work today who are past (work_start_time + grace) and haven't clocked in, then emits one hr_late_checkin flow event per resolved recipient. Deduped per employee/day via hr_checkin_alerts; charges the workspace owner once per run that produces alerts.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ ok, checked, alerted }"
+  },
+  {
+    "name": "hr-kiosk",
+    "tag": "HR",
+    "summary": "Public attendance kiosk — VAT (+ optional PIN) clock in/out",
+    "description": "Anonymous shared-device clock-in kiosk (#252). No session; resolves the workspace from slug. Kiosk is off by default (hr_settings.kiosk_enabled). Identity is the employee's VAT number; optional per-employee 4-8 digit PIN second factor with per-(workspace,VAT) lockout after 8 fails plus a per-IP rate limit (20/min). Uniform not-found responses avoid enumeration; punches file to Ergani WRKCardSE when configured.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "resolve",
+        "description": "Public metadata: whether the kiosk is enabled, workspace name, and whether a PIN is required.",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace slug"
+          }
+        ],
+        "response": "{ enabled, workspace_name, require_pin }"
+      },
+      {
+        "action": "lookup",
+        "description": "Resolve an active employee by VAT (+ PIN when required) and return name + current clocked-in state.",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace slug"
+          },
+          {
+            "name": "vat",
+            "type": "string",
+            "required": true,
+            "desc": "Employee VAT number"
+          },
+          {
+            "name": "pin",
+            "type": "string",
+            "required": false,
+            "desc": "PIN when kiosk_require_pin"
+          }
+        ],
+        "response": "{ name, clocked_in, work_start_time }"
+      },
+      {
+        "action": "clock",
+        "description": "File an arrival/departure punch for the resolved employee (files to Ergani when configured).",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Workspace slug"
+          },
+          {
+            "name": "vat",
+            "type": "string",
+            "required": true,
+            "desc": "Employee VAT number"
+          },
+          {
+            "name": "pin",
+            "type": "string",
+            "required": false,
+            "desc": "PIN when required"
+          },
+          {
+            "name": "punch_type",
+            "type": "string",
+            "required": true,
+            "desc": "arrival | departure"
+          }
+        ],
+        "response": "{ ok, name, clocked_in, filed, is_late, protocol, reason }"
+      }
+    ],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "dashboard-insights",
+    "tag": "AI Generation",
+    "summary": "Generate cached AI insights for the home dashboard",
+    "description": "User JWT; caller must be an active member of workspace_id. Gathers a live workspace snapshot (projects, AR/finance, tasks, inbox, quotes) and asks Claude Haiku for 2-5 friendly insights, cached 15 days per (user, workspace) in dashboard_insights_cache. Never errors: on LLM failure it returns a deterministic numbers-driven fallback cached with a short TTL.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "workspace_id",
+        "type": "string",
+        "required": true,
+        "desc": "Workspace to summarise (caller must be an active member)"
+      },
+      {
+        "name": "force",
+        "type": "boolean",
+        "required": false,
+        "desc": "Bypass the warm cache and regenerate"
+      }
+    ],
+    "response": "{ insights, model, source, generated_at, expires_at, cached }"
+  },
+  {
+    "name": "data-integrity-runner",
+    "tag": "Admin",
+    "summary": "Run the platform data-integrity check battery + manage checks/findings",
+    "description": "Auth boundary + thin dispatcher over the run_data_integrity_checks / heal_data_integrity_check Postgres RPCs. Cron path (x-cron-secret / service-role via isCronAuthorized) runs the full battery with auto-heal, no body. Admin path (session JWT; admin/super_admin/owner) runs on demand and manages checks/findings.",
+    "security": [
+      "cronSecret",
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "run",
+        "description": "Run the check battery (admin path), optionally with autoheal and a domain filter.",
+        "params": [
+          {
+            "name": "autoheal",
+            "type": "boolean",
+            "required": false,
+            "desc": "Also run heal fns"
+          },
+          {
+            "name": "domains",
+            "type": "string[]",
+            "required": false,
+            "desc": "Limit to these domains"
+          }
+        ],
+        "response": "{ ok, run_id }"
+      },
+      {
+        "action": "heal_check",
+        "description": "Run a single check's heal function on demand.",
+        "params": [
+          {
+            "name": "key",
+            "type": "string",
+            "required": true,
+            "desc": "Check key"
+          }
+        ],
+        "response": "{ ok, healed }"
+      },
+      {
+        "action": "ignore_finding",
+        "description": "Mark a finding as ignored (accepted / won't-fix).",
+        "params": [
+          {
+            "name": "findingId",
+            "type": "string",
+            "required": true,
+            "desc": "Finding id"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "reopen_finding",
+        "description": "Un-ignore a finding (back to open).",
+        "params": [
+          {
+            "name": "findingId",
+            "type": "string",
+            "required": true,
+            "desc": "Finding id"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "set_autoheal",
+        "description": "Toggle a check's autoheal_enabled flag.",
+        "params": [
+          {
+            "name": "key",
+            "type": "string",
+            "required": true,
+            "desc": "Check key"
+          },
+          {
+            "name": "enabled",
+            "type": "boolean",
+            "required": false,
+            "desc": "New value"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "toggle_check",
+        "description": "Enable/disable a check (is_enabled).",
+        "params": [
+          {
+            "name": "key",
+            "type": "string",
+            "required": true,
+            "desc": "Check key"
+          },
+          {
+            "name": "enabled",
+            "type": "boolean",
+            "required": false,
+            "desc": "New value"
+          }
+        ],
+        "response": "{ ok }"
+      }
+    ],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "email-contacts-sync-cron",
+    "tag": "Crons",
+    "summary": "Daily cron: push CRM contacts to each workspace's Resend audience",
+    "description": "Daily pg_cron job (x-cron-secret via isCronAuthorized) for #255. For every workspace with workspace_email_config.contacts_auto_sync=true, charges the owner 3 credits (skips on insufficient balance) and re-invokes email-api's sync-resend-contacts action with the real service-role key. No request body.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ success, workspaces, processed, failed, skipped }"
+  },
+  {
+    "name": "finance-customer-documents",
+    "tag": "Finance",
+    "summary": "Customer self-service view of their own invoices, receipts and orders",
+    "description": "Any authenticated user (customer-facing, not admin-gated). Resolves the caller's linked crm_contacts (and their businesses via crm_company_contacts), then returns strictly the documents whose counterparty is one of those — issued invoices/retail receipts, payment receipts, and sales orders — with fresh 7-day signed PDF URLs. Runs under service role because customers are not workspace members.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "overview",
+        "description": "Default: account summary per currency plus the caller's orders, invoices/receipts, and payment receipts.",
+        "params": [],
+        "response": "{ ok, linked, summary, orders, invoices, receipts }"
+      },
+      {
+        "action": "order_detail",
+        "description": "Line items for a single sales order the caller owns.",
+        "params": [
+          {
+            "name": "order_id",
+            "type": "string",
+            "required": true,
+            "desc": "Owned order id"
+          }
+        ],
+        "response": "{ ok, order, items }"
+      }
+    ],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "project-plan-engine",
+    "tag": "Quotes",
+    "summary": "Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes)",
+    "description": "The only writer of persisted plan-line prices, plan versions, and plan->quote items (#242). User JWT or service-role secret; every write re-binds to the plan/project workspace via userCanAccessWorkspace. Resolves quantities from formulas + rates from product_prices, expands sub-blueprints, and syncs to quotes / purchase items.",
+    "security": [
+      "supabaseJwt",
+      "apiKeySecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "create-from-blueprint",
+        "description": "Create a project plan from a blueprint (with sub-blueprint expansion + option defaults) and compute item prices.",
+        "params": [
+          {
+            "name": "blueprint_id",
+            "type": "string",
+            "required": true,
+            "desc": "Source blueprint"
+          },
+          {
+            "name": "project_id",
+            "type": "string",
+            "required": false,
+            "desc": "Owning project (determines workspace)"
+          },
+          {
+            "name": "dimensions",
+            "type": "object",
+            "required": false,
+            "desc": "Dimension overrides"
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "required": false,
+            "desc": "Plan title"
+          }
+        ],
+        "response": "{ plan, items }"
+      },
+      {
+        "action": "rescale",
+        "description": "Merge new dimensions into the plan and recompute all item quantities + prices.",
+        "params": [
+          {
+            "name": "plan_id",
+            "type": "string",
+            "required": true,
+            "desc": "Plan"
+          },
+          {
+            "name": "dimensions",
+            "type": "object",
+            "required": true,
+            "desc": "Dimensions to merge"
+          }
+        ],
+        "response": "{ plan, items }"
+      },
+      {
+        "action": "reprice",
+        "description": "Recompute item prices from current rates without changing dimensions.",
+        "params": [
+          {
+            "name": "plan_id",
+            "type": "string",
+            "required": true,
+            "desc": "Plan"
+          }
+        ],
+        "response": "{ plan, items }"
+      },
+      {
+        "action": "save-version",
+        "description": "Snapshot the plan (dimensions + items) as the next version.",
+        "params": [
+          {
+            "name": "plan_id",
+            "type": "string",
+            "required": true,
+            "desc": "Plan"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Version note"
+          }
+        ],
+        "response": "{ version }"
+      },
+      {
+        "action": "restore-version",
+        "description": "Restore a saved version's snapshot and recompute.",
+        "params": [
+          {
+            "name": "plan_id",
+            "type": "string",
+            "required": true,
+            "desc": "Plan"
+          },
+          {
+            "name": "version",
+            "type": "number",
+            "required": true,
+            "desc": "Version number"
+          }
+        ],
+        "response": "{ plan, items }"
+      },
+      {
+        "action": "create-quote-from-plan",
+        "description": "Build/refresh a draft quote from the plan's selected leaf tasks (idempotent).",
+        "params": [
+          {
+            "name": "plan_id",
+            "type": "string",
+            "required": true,
+            "desc": "Plan"
+          }
+        ],
+        "response": "{ quote_id }"
+      },
+      {
+        "action": "add-section-from-blueprint",
+        "description": "Append one premade section (+ its tasks) from any blueprint into an existing plan, then reprice.",
+        "params": [
+          {
+            "name": "plan_id",
+            "type": "string",
+            "required": true,
+            "desc": "Target plan"
+          },
+          {
+            "name": "source_blueprint_id",
+            "type": "string",
+            "required": true,
+            "desc": "Blueprint to copy from"
+          },
+          {
+            "name": "section_id",
+            "type": "string",
+            "required": true,
+            "desc": "Section to append"
+          }
+        ],
+        "response": "{ plan, items }"
+      },
+      {
+        "action": "generate-material-list",
+        "description": "Derive a material shopping list from the plan's material-bearing selected tasks into project_purchase_items.",
+        "params": [
+          {
+            "name": "plan_id",
+            "type": "string",
+            "required": true,
+            "desc": "Plan attached to a project"
+          }
+        ],
+        "response": "{ count }"
+      },
+      {
+        "action": "create-change-order",
+        "description": "Spawn a revision quote (in the parent_quote_id chain) from an updated plan for re-approval.",
+        "params": [
+          {
+            "name": "plan_id",
+            "type": "string",
+            "required": true,
+            "desc": "Plan with an existing quote"
+          }
+        ],
+        "response": "{ quote_id }"
+      }
+    ],
+    "request": [],
+    "response": "{}"
+  },
+  {
+    "name": "public-project-plan",
+    "tag": "Quotes",
+    "summary": "Public lead-gen Blueprint estimator (/tools/project-plan)",
+    "description": "Anonymous estimator for #242. Pure compute (no paid upstreams), runs in-repo under the service role. Turnstile-gated and metered against public_lookup_log (combined 2/day per IP, shared with the other public tools). Reads platform-starter blueprints and returns a read-only estimate from visitor dimensions using default inline rates — no save, no workspace data.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "starters",
+        "description": "Return each active platform-starter blueprint with its full works list for client-side pricing (no metering).",
+        "params": [],
+        "response": "{ starters: [...] }"
+      },
+      {
+        "action": "estimate",
+        "description": "Compute a read-only estimate for a starter blueprint from visitor dimensions. Turnstile-gated + counts toward the 2/day per-IP quota.",
+        "params": [
+          {
+            "name": "blueprint_id",
+            "type": "string",
+            "required": true,
+            "desc": "Platform-starter blueprint id"
+          },
+          {
+            "name": "dimensions",
+            "type": "object",
+            "required": false,
+            "desc": "Dimension values keyed by schema key"
+          },
+          {
+            "name": "turnstile_token",
+            "type": "string",
+            "required": true,
+            "desc": "Cloudflare Turnstile token"
+          }
+        ],
+        "response": "{ success, result }"
+      }
+    ],
+    "request": [],
+    "response": "{}"
   }
 ]

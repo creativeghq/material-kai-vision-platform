@@ -117,9 +117,11 @@ Complete documentation for Material Kai Vision Platform.
 - Visual drag-and-drop flow builder at `/admin/flows`
 - Trigger types: cron, webhook, event, manual
 - Condition nodes: if_else, switch, filter, delay
-- Action nodes: send_sms, send_email, http_request, notification, quote
+- Action nodes: send_whatsapp (WhatsApp via Zernio), send_email, http_request, notification, quote — `send_sms` is now a legacy alias for `send_whatsapp` (SMS removed 2026-06-08)
 - Template variable resolution `{{trigger.data.field}}`
 - Dry-run / test mode, execution logs
+
+**[flows-notification-system.md](flows-notification-system.md)** - Flows engine for notifications, emails & automations (emit an event, never hardcode a send)
 
 **[background-agents.md](background-agents.md)** - Background Agent Framework ✨ NEW
 - 6 registered agent types (kai-task, product-enrichment, material-tagger, social sync, factory-enrichment)
@@ -190,7 +192,7 @@ Complete documentation for Material Kai Vision Platform.
 - Campaign scheduling and sending
 - Real-time analytics and reporting
 - Admin dashboard at /admin/emails → Campaigns tab
-- SES webhook integration for bounce/complaint handling
+- Resend webhook integration for bounce/complaint handling (via `email-webhooks`, Svix signature)
 - Complete API reference and usage examples
 - Best practices and troubleshooting
 
@@ -311,14 +313,6 @@ Complete documentation for Material Kai Vision Platform.
 - Same architecture as dimension aggregation
 - Prevents data loss from scattered information
 
-**[metadata-normalization-system.md](metadata-normalization-system.md)** - Metadata normalization system ✨ NEW
-- Two-layer normalization architecture (prevention + correction)
-- Semantic similarity-based field standardization (60% threshold)
-- Automatic consolidation (individual fields → objects, single → arrays)
-- Integrated into extraction pipeline
-- Migration script for existing products
-- 95%+ field standardization accuracy
-
 **[job-queue-system.md](job-queue-system.md)** - Job queue & async processing
 - Supabase-native job queue architecture
 - Checkpoint-based recovery system
@@ -345,6 +339,14 @@ Complete documentation for Material Kai Vision Platform.
 - Stage-by-stage monitoring (Stage 0, 1, 3.5, 4)
 - Cost tracking per AI model
 - Alert system (critical, warning, notifications)
+
+**[relevancy-system.md](relevancy-system.md)** - Search relevancy scoring & ranking system
+
+**[supabase-types-automation.md](supabase-types-automation.md)** - Auto-generated Supabase TypeScript types workflow
+
+**[platform-secrets.md](platform-secrets.md)** - Centralised external-key store (`platform_secrets`, env-first → DB resolution, per-module Settings pages)
+
+**[per-workspace-byok.md](per-workspace-byok.md)** - Per-tenant bring-your-own-key credentials (AADE, myDATA REST, Resend email) under Profile → Keys
 
 ---
 
@@ -388,6 +390,8 @@ Complete documentation for Material Kai Vision Platform.
 - Token usage tracking across iterations
 - Human-in-the-loop patterns (planned)
 - Database schema (agent_checkpoints, agent_memories)
+
+**[agent-and-tools-reference.md](agent-and-tools-reference.md)** - Reference for the KAI agents and their tool surfaces
 
 **[prompt-enhancement-system.md](prompt-enhancement-system.md)** - Dynamic prompt system ✨ NEW
 - Database-driven extraction prompts (extraction_prompts table)
@@ -441,12 +445,12 @@ Complete documentation for Material Kai Vision Platform.
 - Social: follow/unfollow, profile views, moodboard comments
 - DB tables: `user_profiles`, `profile_contact_requests`, `user_follows`
 
-**[email-system.md](email-system.md)** - Email system with Amazon SES
+**[email-system.md](email-system.md)** - Email system with Resend (migrated 2026-03-11)
 - Domain verification and management
 - React Email template system
 - Delivery tracking and analytics
 - Bounce and complaint handling
-- SNS webhook integration
+- Resend webhook integration via `email-webhooks` (Svix signature verification)
 - Admin dashboard at /admin/emails
 - Complete API reference
 
@@ -500,6 +504,24 @@ Complete documentation for Material Kai Vision Platform.
 **[capabilities-and-tenancy.md](capabilities-and-tenancy.md)** - Authorization backbone ✨ NEW (2026-06)
 - 7 personas × 15 capabilities matrix; `usePermissions`/`CapabilityGuard`
 - Module entitlements (#212); workspace tenancy, hierarchy & guard RPCs
+
+**[role-access-matrix.md](role-access-matrix.md)** - Role → feature/route access matrix
+
+**[user-levels-access.md](user-levels-access.md)** - User levels (solo / dealer / factory / admin) and what each can access
+
+**[data-retention-policy.md](data-retention-policy.md)** - Data retention & cleanup policy across tables and storage
+
+**[payments.md](payments.md)** - Payments overview (credits, subscriptions, checkout)
+
+**[payments-stripe.md](payments-stripe.md)** - Stripe integration reference (checkout, portal, webhooks, Connect)
+
+**[hr-system.md](hr-system.md)** - HR module ✨ NEW (2026-07) — first paid tenant add-on; employees as tagged `crm_contacts` + `hr_employees`/`hr_absences`, gated `hr-api`
+
+**[inbox-system.md](inbox-system.md)** - Multi-tenant Inbox ✨ NEW — unified customer conversation inbox with agent takeover
+
+**[email-marketing.md](email-marketing.md)** - Email Marketing add-on ✨ NEW (2026-07) — tenant GrapesJS campaigns, Resend BYOK, workspace-scoped
+
+**[workspace-shared-credits.md](workspace-shared-credits.md)** - Workspace shared credits ✨ NEW (2026-07) — pooled credits (owner funds, members draw with optional per-member caps)
 
 **[trip-expense-cards.md](trip-expense-cards.md)** - Trip/expense cards & customer AR aging ✨ NEW (2026-06)
 - Expense cards with per-line finance approval + reimbursement→planned_payment; receipts via `trip-expense-ops`; KAI tools
@@ -563,6 +585,10 @@ Complete documentation for Material Kai Vision Platform.
 - Common issues (PDF processing, search, latency, auth, images)
 - Performance optimization
 - Support resources
+
+**[monitoring-and-alerting.md](monitoring-and-alerting.md)** - Monitoring & alerting (Sentry, health checks, cron/alert wiring)
+
+**[unified-job-tracking.md](unified-job-tracking.md)** - Single-table job tracking (`background_jobs` + JSONB stage/recovery history)
 
 ---
 
@@ -672,8 +698,8 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: April 2026
-**Version**: 3.7.0
+**Last Updated**: July 2026
+**Version**: 3.8.0
 **Status**: Production
 **Maintainer**: Development Team
 

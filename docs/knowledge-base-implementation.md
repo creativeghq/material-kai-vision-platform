@@ -217,6 +217,51 @@ Stored in `kb_docs` table:
 
 ---
 
+## Section-Level Chunking (2026-07)
+
+KB retrieval is **section-level**, not whole-document. Previously a query embedding was
+compared against a single per-document `kb_docs.text_embedding` and the document body was
+truncated to a head (~8k chars) before being handed to the agent — long manuals lost their
+tail and matched imprecisely. Now every document is split into **sections** stored in
+`kb_doc_chunks`, and search matches per-section.
+
+### `kb_doc_chunks` table
+
+One row per section of a document:
+
+- `id`, `kb_doc_id` (FK to `kb_docs`), `workspace_id`
+- `chunk_index` — ordinal position of the section within the doc
+- `heading` — the section heading the chunk falls under
+- `content` — the section text
+- `char_start` / `char_end` — offsets back into the source document
+- `token_count`
+- `text_embedding` (1024D) + `embedding_model` (`voyage-4`) + `schema_version`
+- `created_at`
+
+The chunker is **boundary-aware** (splits on section/heading boundaries) and
+coverage-invariant — the concatenation of chunks reproduces the full document, so no content
+is dropped.
+
+### `kb_match_doc_chunks` RPC
+
+Retrieval calls the `kb_match_doc_chunks(query_embedding, match_workspace_id, match_threshold,
+match_count, allowed_access_levels, match_category_id, match_category_slug,
+match_price_doc_type, require_published, include_private, match_agent_id)` RPC, which performs
+pgvector cosine similarity over `kb_doc_chunks.text_embedding` and returns the best-matching
+**sections** (with their `kb_doc_id`, heading, and similarity) rather than whole documents.
+This replaces the whole-doc match + truncation path for agent retrieval.
+
+### On-write auto-rechunk
+
+Chunks are kept in sync automatically. After `kb-generate-embedding`
+(`supabase/functions/kb-generate-embedding/`) saves a document's embedding, it fires a
+fire-and-forget `POST /api/rag/kb-docs/rechunk` to the MIVAA backend (kept alive past the
+response via `EdgeRuntime.waitUntil` where supported) to (re)build that document's
+`kb_doc_chunks` rows. It is non-fatal — the doc save is never blocked, and a backfill
+re-chunks on miss.
+
+---
+
 ## 📊 API Response Formats
 
 Success responses include document fields such as `id`, `workspace_id`, `title`, `content`, `embedding_status`, `embedding_generated_at`, `created_at`, and `view_count`. Error responses include a `detail` message and `status_code`. Search responses include `success`, `results`, `total_count`, `search_time_ms`, and `search_type`.

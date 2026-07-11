@@ -452,7 +452,7 @@ Document-level intelligence beyond product catalogs:
 
 Trigger events include: `hire_me_received`, `profile_followed`, `profile_published`, `quote_requested`, `quote_approved`, `moodboard_shared`, `moodboard_commented`, `material_reviewed`, `user_signup`, `search_executed`, `model_3d_created`, `vr_world_created`, and scheduled (cron).
 
-Actions: send email (Amazon SES), Slack notification, call webhook, trigger AI agent, create CRM record.
+Actions: send email (Resend), Slack notification, call webhook, trigger AI agent, create CRM record.
 
 **Background Agent Framework** — autonomous long-running AI tasks:
 - Product Enrichment Agent: continuously enriches catalog products with AI metadata
@@ -488,11 +488,11 @@ Professionals using Material KAI to design rooms and source materials can publis
 
 ### Feature 13 — Email System & Campaigns
 
-Full transactional and campaign email infrastructure via Amazon SES:
+Full transactional and campaign email infrastructure via Resend:
 - Domain verification and management
 - React Email templates with personalization
 - Per-recipient tracking: sent, delivered, opened, clicked, bounced
-- Bounce/complaint handling via SES + SNS webhooks
+- Bounce/complaint handling via Resend webhooks (`email-webhooks`, Svix `whsec_` signature)
 - **Campaign system**: bulk email campaigns with audience targeting, scheduling, real-time delivery analytics
 - Admin dashboard at `/admin/emails`
 
@@ -773,7 +773,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 - Background agent framework (6 types: product enrichment, material tagging, social analytics, factory enrichment + auto-recovery)
 - Factory Analytics dashboard (own data + market trends + platform-wide for admins)
 - Full admin dashboard (analytics, monitoring, prompt management, CRM, campaigns, background agents, flows)
-- Email system (Amazon SES, React Email, campaign management)
+- Email system (Resend, React Email, campaign management)
 - Billing & credits (Stripe subscriptions + credit packages, customer portal)
 - Duplicate detection & product merging (factory-scoped, undo capability)
 - Collaborative filtering recommendations

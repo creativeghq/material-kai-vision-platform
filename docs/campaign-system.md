@@ -626,8 +626,11 @@ Campaign event webhooks are planned and will deliver JSON payloads containing th
 - Marketing automation
 - Lead scoring
 - CRM integration
-- SMS campaigns
 - Advanced analytics
+
+> **Note:** SMS is **not** on the roadmap. SMS (Twilio) was removed 2026-06-08; the
+> platform's non-email messaging channel is **WhatsApp via Zernio** (see
+> `docs/api/messaging-api.md`), managed outside the email campaign system.
 
 ---
 

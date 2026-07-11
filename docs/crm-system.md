@@ -6,7 +6,7 @@ Customer Relationship Management — contacts, companies, and user account manag
 
 ## Overview
 
-The CRM provides workspace admins with a unified view of contacts, companies, and platform users. It integrates with the messaging system (SMS/email campaigns), the quotes system, and the [Finance / Orders](orders-system.md) layer.
+The CRM provides workspace admins with a unified view of contacts, companies, and platform users. It integrates with the messaging system (WhatsApp via Zernio / email campaigns), the quotes system, and the [Finance / Orders](orders-system.md) layer.
 
 **Admin Route:** `/admin/crm`
 
@@ -91,7 +91,7 @@ Platform user accounts. Admins can view all workspace users, update roles, and m
 Contacts from the CRM can be targeted in messaging campaigns:
 
 1. Admin selects contacts/segments in `/admin/messaging`
-2. Campaign uses `messaging-api` to send SMS or WhatsApp to contact phone numbers
+2. Campaign uses `messaging-api` to send WhatsApp (via Zernio / Meta Cloud API) to contact phone numbers — cold sends require a Meta-approved template (SMS removed 2026-06-08)
 3. Delivery status and analytics sync back to `message_logs`
 
 ---

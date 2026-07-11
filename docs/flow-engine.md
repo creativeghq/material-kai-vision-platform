@@ -80,7 +80,7 @@ Perform side effects. Templated values like `{{trigger.data.user_email}}` are re
 |---|---|---|
 | `send_sms` | **Legacy alias for `send_whatsapp`** — both route to `messaging-api` debiting `zernio-whatsapp` (~0.005/msg). SMS (Twilio) removed 2026-06-08. Old saved flows using `send_sms` continue to work via this alias. | ~0.005/msg |
 | `send_whatsapp` | Sends WhatsApp message via `messaging-api` (Zernio). Requires a Meta-approved template outside the 24h session window. | ~0.005/msg |
-| `send_email` | Sends email via `email-api` | SES per-message |
+| `send_email` | Sends email via `email-api` (Resend). Tenant flows (`is_global=false`) send from the workspace's own BYOK Resend sender; global/operator flows send as the platform. | Resend per-message |
 | `http_request` | Makes outbound HTTP call (GET/POST/PUT/DELETE) | None |
 | `create_notification` | Inserts record into `notifications` table | None |
 | `send_quote` | Generates and sends quote PDF via `generate-quote-pdf` | Included |
@@ -167,11 +167,36 @@ The payload is passed as `trigger.data` in the execution context.
 
 ---
 
+## Workspace Scoping (#256)
+
+Flows are no longer only global/admin — they are **tenant-scoped**. Each `flows` row carries:
+
+- `workspace_id` — the owning workspace (NULL for platform-wide flows).
+- `is_global boolean` — `true` = a platform/operator flow that runs for every event; `false` = a tenant flow that only runs for its own workspace's events.
+
+**Authoritative, non-spoofable dispatch.** When `trigger-event` fires, `flow-engine` resolves the event's workspace before matching flows and never trusts a client-supplied `workspace_id`:
+
+- A **trusted server emitter** (service-role bearer or the cron secret — how `emitFlowEvent` / DB triggers dispatch) may assert the payload's `workspace_id`.
+- A plain authenticated user may only scope to a workspace they actually belong to (verified via `userCanAccessWorkspace`), so a caller can never forge another tenant's context.
+- Server-only / financial event types (see `SERVER_ONLY_EVENTS`) are rejected outright (403) when emitted by a browser/user.
+
+The engine then matches on `trigger_type` + `status = 'active'` with a scoped filter: **all `is_global` flows PLUS the resolved workspace's own non-global flows** — never another tenant's rows. When no trustworthy workspace is established, only `is_global` flows run.
+
+**Chat-driven tenant automations.** Workspace owners can build simple flows from chat (no `/admin/flows` access needed) via the KAI agent's **`manage_flows`** tool (`supabase/functions/_shared/tools/flow-tools.ts`). It writes real workspace-scoped rows through the SECURITY DEFINER allowlist RPCs **`create_simple_flow` / `toggle_simple_flow` / `delete_simple_flow`**, which enforce a tenant-safe trigger/action vocabulary server-side (the tool/UI restriction is not the security line):
+
+- Allowed triggers: `scheduled`, `quote_approved`, `invoice_paid`, `payment_received`, `inbox.message_received`.
+- Allowed actions: `send_email`, `send_whatsapp`, `create_notification`, `send_agent_message`, `send_campaign`.
+- Tenant flows are always `is_global=false`; the RPC never lets a tenant set `is_global`. Gated on the `flows-toolkit` module being enabled + the workspace being entitled.
+
+**`send_campaign` bridge to Email Marketing (#255).** The `send_campaign` action names an existing email campaign owned by the flow's own workspace and flips it to `status='sending'` so `campaign-processor` fans it out via the workspace's BYOK Resend. It is tenant-only (refuses when the flow has no workspace scope) and never dispatches a campaign belonging to another workspace.
+
+---
+
 ## Database Tables
 
 | Table | Purpose |
 |---|---|
-| `flows` | Flow definitions (name, graph JSON, trigger config, enabled state) |
+| `flows` | Flow definitions (name, graph JSON, trigger config, enabled state, `workspace_id`, `is_global`) |
 | `flow_runs` | Execution log (status, duration, node results, errors) |
 
 ---

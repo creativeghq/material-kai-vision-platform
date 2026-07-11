@@ -130,6 +130,10 @@
     {
       "name": "Internal",
       "description": "Internal proxies called by agents/service-role."
+    },
+    {
+      "name": "HR",
+      "description": "HR functions."
     }
   ],
   "paths": {
@@ -12273,6 +12277,3243 @@
                     "type": "string",
                     "description": "Restrict backfill to one workspace (string (uuid))"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hr-api": {
+      "post": {
+        "tags": [
+          "HR"
+        ],
+        "summary": "HR module API — employees, absences, recruitment, onboarding, payroll, attendance, Ergani, accounting",
+        "operationId": "post_hr_api",
+        "description": "Action-based HR backbone (#252). Session JWT; authenticate() yields a service-role client, so every action re-derives the workspace from body.workspace_id and calls userCanAccessWorkspace, plus isModuleEnabled('hr') and per-workspace assertEntitled('hr') (402 upsell). RBAC: reads need hr.view, writes/approvals need hr.manage (owner/admin/global-admin only); self-* actions are open to a linked employee (workspace role 'employee') and hard-scoped to their own record. NOTE: the client reads the list tabs (employees, departments, absences, job postings, applications, onboarding, documents, payroll runs) DIRECTLY from the DB (RLS-gated), not through this function — the edge function serves writes + computed/credit-metered/external actions. Every action requires action and workspace_id in the POST body.\n\n**Response:** `{}`\n\n📖 [docs/api/hr-api.md](hr-api.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-employees"
+                        ],
+                        "description": "List all employees (hr_employees joined to crm_contacts) with absence-summary rollups."
+                      }
+                    },
+                    "description": "Returns: { employees: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-employee"
+                        ],
+                        "description": "Create an employee: attach an existing in-workspace crm_contact_id or create a new contact from `contact`, plus HR fields. Requires hr.manage."
+                      },
+                      "crm_contact_id": {
+                        "type": "string",
+                        "description": "Existing in-workspace contact to attach"
+                      },
+                      "contact": {
+                        "type": "object",
+                        "description": "New contact fields (name required) when no crm_contact_id"
+                      },
+                      "employment_type": {
+                        "type": "string",
+                        "description": "full_time | part_time | contractor"
+                      },
+                      "start_date": {
+                        "type": "string",
+                        "description": "Employment start date"
+                      },
+                      "manager_contact_id": {
+                        "type": "string",
+                        "description": "Manager (must be in workspace)"
+                      }
+                    },
+                    "description": "Returns: { employee }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-employee"
+                        ],
+                        "description": "Update an employee's HR fields and optionally the linked contact. Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee to update"
+                      },
+                      "contact": {
+                        "type": "object",
+                        "description": "HR-relevant contact fields to update too"
+                      }
+                    },
+                    "description": "Returns: { employee }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-absences"
+                        ],
+                        "description": "List absences, optionally filtered by employee or status."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Filter by employee"
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Filter by status"
+                      }
+                    },
+                    "description": "Returns: { absences: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id",
+                      "start_date",
+                      "end_date"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "record-absence"
+                        ],
+                        "description": "Record an absence (status pending); working_days is server-computed unless overridden. Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee"
+                      },
+                      "start_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "end_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD (>= start)"
+                      },
+                      "absence_type": {
+                        "type": "string",
+                        "description": "vacation | sick | unpaid | other"
+                      },
+                      "working_days": {
+                        "type": "number",
+                        "description": "Override computed working days"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Optional note"
+                      }
+                    },
+                    "description": "Returns: { absence }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "absence_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "approve-absence"
+                        ],
+                        "description": "Approve an absence (sets status approved). Requires hr.manage."
+                      },
+                      "absence_id": {
+                        "type": "string",
+                        "description": "Absence to approve"
+                      }
+                    },
+                    "description": "Returns: { absence }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "absence_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "reject-absence"
+                        ],
+                        "description": "Reject an absence (sets status rejected). Requires hr.manage."
+                      },
+                      "absence_id": {
+                        "type": "string",
+                        "description": "Absence to reject"
+                      }
+                    },
+                    "description": "Returns: { absence }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-departments"
+                        ],
+                        "description": "List departments with head contact and employee counts."
+                      }
+                    },
+                    "description": "Returns: { departments: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "name"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-department"
+                        ],
+                        "description": "Create a department. Requires hr.manage."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Department name"
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Description"
+                      },
+                      "head_contact_id": {
+                        "type": "string",
+                        "description": "Department head contact"
+                      }
+                    },
+                    "description": "Returns: { department }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "department_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-department"
+                        ],
+                        "description": "Update a department. Requires hr.manage."
+                      },
+                      "department_id": {
+                        "type": "string",
+                        "description": "Department to update"
+                      }
+                    },
+                    "description": "Returns: { department }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "department_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-department"
+                        ],
+                        "description": "Delete a department. Requires hr.manage."
+                      },
+                      "department_id": {
+                        "type": "string",
+                        "description": "Department to delete"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-job-postings"
+                        ],
+                        "description": "List job postings with applicant counts."
+                      }
+                    },
+                    "description": "Returns: { postings: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "title"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-job-posting"
+                        ],
+                        "description": "Create a job posting (status open stamps published_at). Requires hr.manage."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Job title"
+                      },
+                      "department_id": {
+                        "type": "string",
+                        "description": "Department"
+                      },
+                      "employment_type": {
+                        "type": "string",
+                        "description": "full_time | part_time | contractor"
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "draft | open | closed"
+                      }
+                    },
+                    "description": "Returns: { posting }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "job_posting_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-job-posting"
+                        ],
+                        "description": "Update a job posting. Requires hr.manage."
+                      },
+                      "job_posting_id": {
+                        "type": "string",
+                        "description": "Posting to update"
+                      }
+                    },
+                    "description": "Returns: { posting }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "job_posting_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-job-posting"
+                        ],
+                        "description": "Delete a job posting. Requires hr.manage."
+                      },
+                      "job_posting_id": {
+                        "type": "string",
+                        "description": "Posting to delete"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "title"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "generate-job-description"
+                        ],
+                        "description": "AI-generate a structured job description via Claude tool-use (credit-metered). Requires hr.manage."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Job title"
+                      },
+                      "seniority": {
+                        "type": "string",
+                        "description": "Seniority hint"
+                      },
+                      "department": {
+                        "type": "string",
+                        "description": "Department hint"
+                      },
+                      "keywords": {
+                        "type": "string",
+                        "description": "Must-haves"
+                      }
+                    },
+                    "description": "Returns: { generated, credits_used }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-applications"
+                        ],
+                        "description": "List applications with candidate + posting, optionally filtered."
+                      },
+                      "job_posting_id": {
+                        "type": "string",
+                        "description": "Filter by posting"
+                      },
+                      "stage": {
+                        "type": "string",
+                        "description": "Filter by stage"
+                      }
+                    },
+                    "description": "Returns: { applications: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "job_posting_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-application"
+                        ],
+                        "description": "Create an application, attaching an existing candidate or creating one inline. Requires hr.manage."
+                      },
+                      "job_posting_id": {
+                        "type": "string",
+                        "description": "Target posting"
+                      },
+                      "candidate_id": {
+                        "type": "string",
+                        "description": "Existing candidate"
+                      },
+                      "candidate": {
+                        "type": "object",
+                        "description": "New candidate (name required)"
+                      },
+                      "notes": {
+                        "type": "string",
+                        "description": "Notes"
+                      }
+                    },
+                    "description": "Returns: { application }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "application_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-application"
+                        ],
+                        "description": "Update an application stage/rating/notes (emits recruitment flow event on stage change). Requires hr.manage."
+                      },
+                      "application_id": {
+                        "type": "string",
+                        "description": "Application to update"
+                      },
+                      "stage": {
+                        "type": "string",
+                        "description": "applied|screening|interview|offer|hired|rejected"
+                      },
+                      "rating": {
+                        "type": "number",
+                        "description": "Rating"
+                      },
+                      "notes": {
+                        "type": "string",
+                        "description": "Notes"
+                      }
+                    },
+                    "description": "Returns: { application }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "candidate_id",
+                      "content_base64"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upload-application-cv"
+                        ],
+                        "description": "Upload a candidate CV (base64 PDF) through the function into the workspace hr/ prefix. Requires hr.manage."
+                      },
+                      "candidate_id": {
+                        "type": "string",
+                        "description": "Candidate"
+                      },
+                      "content_base64": {
+                        "type": "string",
+                        "description": "Base64 PDF (max 10MB)"
+                      },
+                      "filename": {
+                        "type": "string",
+                        "description": "File name"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "candidate_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "application-cv-url"
+                        ],
+                        "description": "Get a short-lived signed URL for a candidate's stored CV."
+                      },
+                      "candidate_id": {
+                        "type": "string",
+                        "description": "Candidate"
+                      }
+                    },
+                    "description": "Returns: { url }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "application_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "screen-application"
+                        ],
+                        "description": "AI CV screening — Claude scores the CV against the posting (credit-metered). Requires hr.manage."
+                      },
+                      "application_id": {
+                        "type": "string",
+                        "description": "Application to screen"
+                      }
+                    },
+                    "description": "Returns: { application, credits_used }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "application_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "hire-application"
+                        ],
+                        "description": "Hire an applicant: create contact + employee, close the application, and seed the onboarding checklist. Requires hr.manage."
+                      },
+                      "application_id": {
+                        "type": "string",
+                        "description": "Application to hire"
+                      },
+                      "start_date": {
+                        "type": "string",
+                        "description": "Start date"
+                      },
+                      "department_id": {
+                        "type": "string",
+                        "description": "Department"
+                      }
+                    },
+                    "description": "Returns: { employee_id, onboarding_seeded }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-onboarding"
+                        ],
+                        "description": "List onboarding tasks, optionally filtered by employee / pending only."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Filter by employee"
+                      },
+                      "pending_only": {
+                        "type": "boolean",
+                        "description": "Only pending tasks"
+                      }
+                    },
+                    "description": "Returns: { tasks: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id",
+                      "title"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "add-onboarding-task"
+                        ],
+                        "description": "Add an onboarding task for an employee. Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee"
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Task title"
+                      }
+                    },
+                    "description": "Returns: { task }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "task_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "toggle-onboarding-task"
+                        ],
+                        "description": "Toggle an onboarding task done/pending. Requires hr.manage."
+                      },
+                      "task_id": {
+                        "type": "string",
+                        "description": "Task"
+                      }
+                    },
+                    "description": "Returns: { task }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "task_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-onboarding-task"
+                        ],
+                        "description": "Delete an onboarding task. Requires hr.manage."
+                      },
+                      "task_id": {
+                        "type": "string",
+                        "description": "Task"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-documents"
+                        ],
+                        "description": "List HR documents, optionally filtered by employee."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Filter by employee"
+                      }
+                    },
+                    "description": "Returns: { documents: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "name",
+                      "content_base64"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upload-document"
+                        ],
+                        "description": "Upload an HR document (base64) into the workspace hr/ prefix and record it. Requires hr.manage."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Document name"
+                      },
+                      "content_base64": {
+                        "type": "string",
+                        "description": "Base64 bytes (max 20MB)"
+                      },
+                      "doc_type": {
+                        "type": "string",
+                        "description": "contract|id|certificate|payslip|review|other"
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Owning employee"
+                      },
+                      "content_type": {
+                        "type": "string",
+                        "description": "MIME type"
+                      }
+                    },
+                    "description": "Returns: { document }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "document_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "sign-document"
+                        ],
+                        "description": "Get a short-lived signed URL for an HR document."
+                      },
+                      "document_id": {
+                        "type": "string",
+                        "description": "Document"
+                      }
+                    },
+                    "description": "Returns: { url }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "document_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-document"
+                        ],
+                        "description": "Delete an HR document (removes storage object + row). Requires hr.manage."
+                      },
+                      "document_id": {
+                        "type": "string",
+                        "description": "Document"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-payroll-runs"
+                        ],
+                        "description": "List payroll runs newest-first."
+                      }
+                    },
+                    "description": "Returns: { runs: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "period"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-payroll-run"
+                        ],
+                        "description": "Create a payroll run for a period and auto-populate items from active employees (Greek payroll rules engine). Requires hr.manage."
+                      },
+                      "period": {
+                        "type": "string",
+                        "description": "YYYY-MM"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "Run currency (default EUR)"
+                      }
+                    },
+                    "description": "Returns: { run, items }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "run_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-payroll-run"
+                        ],
+                        "description": "Get a payroll run with its items and totals summary."
+                      },
+                      "run_id": {
+                        "type": "string",
+                        "description": "Run"
+                      }
+                    },
+                    "description": "Returns: { run, items, summary }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "item_id",
+                      "gross"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-payroll-item"
+                        ],
+                        "description": "Set an item's gross and recompute the statutory breakdown; updates run totals. Requires hr.manage."
+                      },
+                      "item_id": {
+                        "type": "string",
+                        "description": "Payroll item"
+                      },
+                      "gross": {
+                        "type": "number",
+                        "description": "New gross"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Note"
+                      }
+                    },
+                    "description": "Returns: { ok, total_gross, total_net }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "run_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "generate-payslips"
+                        ],
+                        "description": "Generate payslip PDFs for a run (lazy pdf-lib). Requires hr.manage."
+                      },
+                      "run_id": {
+                        "type": "string",
+                        "description": "Run"
+                      }
+                    },
+                    "description": "Returns: payslip generation result"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-payroll-settings"
+                        ],
+                        "description": "Read the workspace payroll settings (or Greek defaults)."
+                      }
+                    },
+                    "description": "Returns: { settings }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-payroll-settings"
+                        ],
+                        "description": "Upsert the workspace payroll rules (rates, brackets, tax credits). Requires hr.manage."
+                      },
+                      "country_code": {
+                        "type": "string",
+                        "description": "e.g. GR"
+                      },
+                      "income_tax_brackets": {
+                        "type": "object",
+                        "description": "Bracket array"
+                      }
+                    },
+                    "description": "Returns: { settings }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "run_id",
+                      "status"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "set-payroll-status"
+                        ],
+                        "description": "Set a run's status (draft|approved|paid), stamping approved_at/paid_at. Requires hr.manage."
+                      },
+                      "run_id": {
+                        "type": "string",
+                        "description": "Run"
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "draft|approved|paid"
+                      }
+                    },
+                    "description": "Returns: { run }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "run_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "post-payroll-to-finance"
+                        ],
+                        "description": "Post a run to Finance: one scheduled net payment per employee plus income-tax and EFKA remittances. Requires hr.manage."
+                      },
+                      "run_id": {
+                        "type": "string",
+                        "description": "Run"
+                      }
+                    },
+                    "description": "Returns: { ok, posted }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id",
+                      "email"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "invite-employee"
+                        ],
+                        "description": "Invite/link an employee to the portal (creates or links the auth user, adds 'employee' membership). Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee"
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Invite email"
+                      }
+                    },
+                    "description": "Returns: { ok, invited, role_note }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "analytics"
+                        ],
+                        "description": "HR analytics rollup: headcount, absences, department breakdown, recruitment funnel, onboarding, last payroll."
+                      }
+                    },
+                    "description": "Returns: { analytics }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id",
+                      "punch_type"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "clock-employee"
+                        ],
+                        "description": "Admin-file a work-card punch for an employee (files to Ergani when configured). Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee"
+                      },
+                      "punch_type": {
+                        "type": "string",
+                        "description": "arrival | departure"
+                      },
+                      "comments": {
+                        "type": "string",
+                        "description": "Comments"
+                      }
+                    },
+                    "description": "Returns: { ok, punch, filed, is_late, protocol }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "set-employee-pin"
+                        ],
+                        "description": "Set or clear an employee's kiosk PIN (hashed). Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee"
+                      },
+                      "pin": {
+                        "type": "string",
+                        "description": "4-8 digit PIN; empty clears"
+                      }
+                    },
+                    "description": "Returns: { ok, pin_set }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "attendance-today"
+                        ],
+                        "description": "Today's attendance board: per-employee scheduled-today, PIN presence, and last punch."
+                      }
+                    },
+                    "description": "Returns: { date, attendance: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-notify-candidates"
+                        ],
+                        "description": "List workspace members eligible as extra late-alert recipients."
+                      }
+                    },
+                    "description": "Returns: { candidates: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-hr-settings"
+                        ],
+                        "description": "Read HR settings (timezone, kiosk, late-alert config) or defaults."
+                      }
+                    },
+                    "description": "Returns: { settings }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "save-hr-settings"
+                        ],
+                        "description": "Upsert HR settings (timezone, kiosk_enabled/require_pin, late-alert grace + notify targets). Requires hr.manage."
+                      },
+                      "timezone": {
+                        "type": "string",
+                        "description": "IANA tz"
+                      },
+                      "kiosk_enabled": {
+                        "type": "boolean",
+                        "description": "Enable clock-in kiosk"
+                      },
+                      "late_grace_minutes": {
+                        "type": "number",
+                        "description": "Late grace window"
+                      }
+                    },
+                    "description": "Returns: { settings }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-punches"
+                        ],
+                        "description": "List time punches, optionally filtered by employee / date range."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Filter by employee"
+                      },
+                      "from": {
+                        "type": "string",
+                        "description": "reference_date >="
+                      },
+                      "to": {
+                        "type": "string",
+                        "description": "reference_date <="
+                      }
+                    },
+                    "description": "Returns: { punches: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id",
+                      "punch_type"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "add-manual-punch"
+                        ],
+                        "description": "Add a manual/correction punch (local only, never filed to Ergani). Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee"
+                      },
+                      "punch_type": {
+                        "type": "string",
+                        "description": "arrival | departure"
+                      },
+                      "at": {
+                        "type": "string",
+                        "description": "Timestamp (defaults now)"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Correction note"
+                      }
+                    },
+                    "description": "Returns: { punch }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "punch_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-punch"
+                        ],
+                        "description": "Edit a punch's time/type/late flag (local correction). Requires hr.manage."
+                      },
+                      "punch_id": {
+                        "type": "string",
+                        "description": "Punch"
+                      },
+                      "punched_at": {
+                        "type": "string",
+                        "description": "New timestamp"
+                      },
+                      "punch_type": {
+                        "type": "string",
+                        "description": "arrival | departure"
+                      },
+                      "is_late": {
+                        "type": "boolean",
+                        "description": "Late flag"
+                      }
+                    },
+                    "description": "Returns: { punch }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "punch_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-punch"
+                        ],
+                        "description": "Delete a punch. Requires hr.manage."
+                      },
+                      "punch_id": {
+                        "type": "string",
+                        "description": "Punch"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "from",
+                      "to"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "timesheet"
+                        ],
+                        "description": "Pair arrivals/departures into worked hours per employee/day over a date range."
+                      },
+                      "from": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "to": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      }
+                    },
+                    "description": "Returns: { from, to, timesheet: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-submission-types"
+                        ],
+                        "description": "List the active Ergani submission types for the workspace's employer (live)."
+                      }
+                    },
+                    "description": "Returns: { submission_types: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "code"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-document-schema"
+                        ],
+                        "description": "Fetch Ergani's live JSON schema/template for a submission code."
+                      },
+                      "code": {
+                        "type": "string",
+                        "description": "Ergani submission code"
+                      }
+                    },
+                    "description": "Returns: { code, schema }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-employer-info"
+                        ],
+                        "description": "Fetch employer registry info (EX_BASE_01) from Ergani."
+                      }
+                    },
+                    "description": "Returns: { info }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "absence_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-submit-leave"
+                        ],
+                        "description": "Submit a leave declaration mapped from an hr_absences row. Requires hr.manage."
+                      },
+                      "absence_id": {
+                        "type": "string",
+                        "description": "Absence to declare"
+                      },
+                      "ergani_leave_code": {
+                        "type": "string",
+                        "description": "Ergani leave type code"
+                      },
+                      "document": {
+                        "type": "object",
+                        "description": "Fully-built override payload"
+                      }
+                    },
+                    "description": "Returns: { ok, result }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "code",
+                      "document"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-submit"
+                        ],
+                        "description": "Submit an operator-built document for any Ergani code (E3, WTOWeek, etc.). Requires hr.manage."
+                      },
+                      "code": {
+                        "type": "string",
+                        "description": "Ergani submission code"
+                      },
+                      "document": {
+                        "type": "object",
+                        "description": "Payload built from the code's schema"
+                      },
+                      "schedule_id": {
+                        "type": "string",
+                        "description": "Linked hr_work_schedules row to flip to submitted"
+                      }
+                    },
+                    "description": "Returns: { ok, result }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "code",
+                      "protocol",
+                      "submitted_date"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-download-pdf"
+                        ],
+                        "description": "Download a submitted Ergani document PDF (base64)."
+                      },
+                      "code": {
+                        "type": "string",
+                        "description": "Submission code"
+                      },
+                      "protocol": {
+                        "type": "string",
+                        "description": "Protocol number"
+                      },
+                      "submitted_date": {
+                        "type": "string",
+                        "description": "yyyymmdd"
+                      }
+                    },
+                    "description": "Returns: { pdf_base64 }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "submission_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-retry"
+                        ],
+                        "description": "Retry a failed submission using its stored request payload. Requires hr.manage."
+                      },
+                      "submission_id": {
+                        "type": "string",
+                        "description": "Failed hr_ergani_submissions row"
+                      }
+                    },
+                    "description": "Returns: { ok, result }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-submissions-log"
+                        ],
+                        "description": "Read the Ergani submission audit log, optionally filtered."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Filter by employee"
+                      },
+                      "submission_type": {
+                        "type": "string",
+                        "description": "Filter by code"
+                      },
+                      "limit": {
+                        "type": "number",
+                        "description": "Max rows (<=500)"
+                      }
+                    },
+                    "description": "Returns: { submissions: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-accounting-docs"
+                        ],
+                        "description": "List statutory accounting documents, optionally by period."
+                      },
+                      "period": {
+                        "type": "string",
+                        "description": "YYYY-MM"
+                      }
+                    },
+                    "description": "Returns: { documents: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "period",
+                      "name",
+                      "content_base64"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upload-accounting-doc"
+                        ],
+                        "description": "Upload an accounting/payment document (base64). Requires hr.manage."
+                      },
+                      "period": {
+                        "type": "string",
+                        "description": "YYYY-MM"
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Document name"
+                      },
+                      "content_base64": {
+                        "type": "string",
+                        "description": "Base64 bytes (max 20MB)"
+                      },
+                      "payroll_run_id": {
+                        "type": "string",
+                        "description": "Linked run"
+                      },
+                      "content_type": {
+                        "type": "string",
+                        "description": "MIME type"
+                      }
+                    },
+                    "description": "Returns: { document }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "document_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "sign-accounting-doc"
+                        ],
+                        "description": "Get a short-lived signed URL for an accounting document. Requires hr.manage."
+                      },
+                      "document_id": {
+                        "type": "string",
+                        "description": "Document"
+                      }
+                    },
+                    "description": "Returns: { url }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "document_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-accounting-doc"
+                        ],
+                        "description": "Delete an accounting document. Requires hr.manage."
+                      },
+                      "document_id": {
+                        "type": "string",
+                        "description": "Document"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "document_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "analyze-accounting-doc"
+                        ],
+                        "description": "Claude OCR to identify the document + extract payment fields (credit-metered). Requires hr.manage."
+                      },
+                      "document_id": {
+                        "type": "string",
+                        "description": "Document"
+                      }
+                    },
+                    "description": "Returns: { document, credits_used }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "period"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "prepare-accounting-period"
+                        ],
+                        "description": "AI reconciliation of analyzed docs against the payroll run; stamps payment IDs onto Finance lines (credit-metered). Requires hr.manage."
+                      },
+                      "period": {
+                        "type": "string",
+                        "description": "YYYY-MM"
+                      }
+                    },
+                    "description": "Returns: { reconciliation, stamped_finance_lines, credits_used }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-profile"
+                        ],
+                        "description": "Employee self-service: read own employee profile + absence summary."
+                      }
+                    },
+                    "description": "Returns: { profile }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-onboarding"
+                        ],
+                        "description": "Employee self-service: list own onboarding tasks."
+                      }
+                    },
+                    "description": "Returns: { tasks: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "task_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-toggle-onboarding"
+                        ],
+                        "description": "Employee self-service: toggle one of own onboarding tasks done/pending."
+                      },
+                      "task_id": {
+                        "type": "string",
+                        "description": "Own task"
+                      }
+                    },
+                    "description": "Returns: { task }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-timeoff"
+                        ],
+                        "description": "Employee self-service: list own absences."
+                      }
+                    },
+                    "description": "Returns: { absences: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "start_date",
+                      "end_date"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-request-timeoff"
+                        ],
+                        "description": "Employee self-service: request time off (status pending)."
+                      },
+                      "start_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "end_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "absence_type": {
+                        "type": "string",
+                        "description": "vacation|sick|unpaid|other"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Note"
+                      }
+                    },
+                    "description": "Returns: { absence }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-documents"
+                        ],
+                        "description": "Employee self-service: list own documents."
+                      }
+                    },
+                    "description": "Returns: { documents: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "punch_type"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-clock"
+                        ],
+                        "description": "Employee self-service: clock arrival/departure (files to Ergani when configured)."
+                      },
+                      "punch_type": {
+                        "type": "string",
+                        "description": "arrival | departure"
+                      },
+                      "comments": {
+                        "type": "string",
+                        "description": "Comments"
+                      }
+                    },
+                    "description": "Returns: { ok, punch, filed, protocol, is_late }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-punches"
+                        ],
+                        "description": "Employee self-service: list own recent punches with authoritative clocked-in state."
+                      },
+                      "days": {
+                        "type": "number",
+                        "description": "Lookback days (1-90, default 14)"
+                      }
+                    },
+                    "description": "Returns: { punches: [...], clocked_in }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "document_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "self-sign-document"
+                        ],
+                        "description": "Employee self-service: signed URL for one of own documents."
+                      },
+                      "document_id": {
+                        "type": "string",
+                        "description": "Own document"
+                      }
+                    },
+                    "description": "Returns: { url }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hr-careers": {
+      "post": {
+        "tags": [
+          "HR"
+        ],
+        "summary": "Public careers page — list a workspace's open postings and accept applications",
+        "operationId": "post_hr_careers",
+        "description": "Anonymous public careers API (#252). No session; resolves the workspace from slug (mirrors finance-storefront) using the service role. apply is Turnstile-gated when TURNSTILE_SECRET_KEY is set (fail-open when not) plus a per-IP throttle (8 applications per 10-minute window). Writes only hr_candidates + hr_applications.\n\n**Response:** `{}`",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "slug"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "meta"
+                        ],
+                        "description": "Return the company name, Turnstile site key, and the list of OPEN job postings for the workspace slug."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "Workspace public slug"
+                      }
+                    },
+                    "description": "Returns: { ok, company, turnstile_site_key, jobs: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "slug",
+                      "job_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-job"
+                        ],
+                        "description": "Return one open posting's full detail (description + requirements)."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "Workspace slug"
+                      },
+                      "job_id": {
+                        "type": "string",
+                        "description": "Posting id"
+                      }
+                    },
+                    "description": "Returns: { ok, company, turnstile_site_key, job }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "slug",
+                      "job_id",
+                      "name"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "apply"
+                        ],
+                        "description": "Submit an application to an open posting; reuses an existing candidate (same email) or creates one. Turnstile-gated + per-IP throttled."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "Workspace slug"
+                      },
+                      "job_id": {
+                        "type": "string",
+                        "description": "Open posting"
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Applicant name"
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Applicant email"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "description": "Phone"
+                      },
+                      "headline": {
+                        "type": "string",
+                        "description": "Headline"
+                      },
+                      "cover_letter": {
+                        "type": "string",
+                        "description": "Cover letter (<=5000)"
+                      },
+                      "turnstile_token": {
+                        "type": "string",
+                        "description": "Turnstile token when configured"
+                      }
+                    },
+                    "description": "Returns: { ok, message }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hr-checkin-cron": {
+      "post": {
+        "tags": [
+          "HR"
+        ],
+        "summary": "Cron: fire late check-in alerts for employees who haven't clocked in",
+        "operationId": "post_hr_checkin_cron",
+        "description": "Runs every few minutes via pg_cron (x-cron-secret via isCronAuthorized). For every workspace with late alerts on, finds active employees scheduled to work today who are past (work_start_time + grace) and haven't clocked in, then emits one hr_late_checkin flow event per resolved recipient. Deduped per employee/day via hr_checkin_alerts; charges the workspace owner once per run that produces alerts.\n\n**Response:** `{ ok, checked, alerted }`",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hr-kiosk": {
+      "post": {
+        "tags": [
+          "HR"
+        ],
+        "summary": "Public attendance kiosk — VAT (+ optional PIN) clock in/out",
+        "operationId": "post_hr_kiosk",
+        "description": "Anonymous shared-device clock-in kiosk (#252). No session; resolves the workspace from slug. Kiosk is off by default (hr_settings.kiosk_enabled). Identity is the employee's VAT number; optional per-employee 4-8 digit PIN second factor with per-(workspace,VAT) lockout after 8 fails plus a per-IP rate limit (20/min). Uniform not-found responses avoid enumeration; punches file to Ergani WRKCardSE when configured.\n\n**Response:** `{}`",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "slug"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "resolve"
+                        ],
+                        "description": "Public metadata: whether the kiosk is enabled, workspace name, and whether a PIN is required."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "Workspace slug"
+                      }
+                    },
+                    "description": "Returns: { enabled, workspace_name, require_pin }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "slug",
+                      "vat"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "lookup"
+                        ],
+                        "description": "Resolve an active employee by VAT (+ PIN when required) and return name + current clocked-in state."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "Workspace slug"
+                      },
+                      "vat": {
+                        "type": "string",
+                        "description": "Employee VAT number"
+                      },
+                      "pin": {
+                        "type": "string",
+                        "description": "PIN when kiosk_require_pin"
+                      }
+                    },
+                    "description": "Returns: { name, clocked_in, work_start_time }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "slug",
+                      "vat",
+                      "punch_type"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "clock"
+                        ],
+                        "description": "File an arrival/departure punch for the resolved employee (files to Ergani when configured)."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "Workspace slug"
+                      },
+                      "vat": {
+                        "type": "string",
+                        "description": "Employee VAT number"
+                      },
+                      "pin": {
+                        "type": "string",
+                        "description": "PIN when required"
+                      },
+                      "punch_type": {
+                        "type": "string",
+                        "description": "arrival | departure"
+                      }
+                    },
+                    "description": "Returns: { ok, name, clocked_in, filed, is_late, protocol, reason }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard-insights": {
+      "post": {
+        "tags": [
+          "AI Generation"
+        ],
+        "summary": "Generate cached AI insights for the home dashboard",
+        "operationId": "post_dashboard_insights",
+        "description": "User JWT; caller must be an active member of workspace_id. Gathers a live workspace snapshot (projects, AR/finance, tasks, inbox, quotes) and asks Claude Haiku for 2-5 friendly insights, cached 15 days per (user, workspace) in dashboard_insights_cache. Never errors: on LLM failure it returns a deterministic numbers-driven fallback cached with a short TTL.\n\n**Response:** `{ insights, model, source, generated_at, expires_at, cached }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Workspace to summarise (caller must be an active member)"
+                  },
+                  "force": {
+                    "type": "boolean",
+                    "description": "Bypass the warm cache and regenerate"
+                  }
+                },
+                "required": [
+                  "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data-integrity-runner": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Run the platform data-integrity check battery + manage checks/findings",
+        "operationId": "post_data_integrity_runner",
+        "description": "Auth boundary + thin dispatcher over the run_data_integrity_checks / heal_data_integrity_check Postgres RPCs. Cron path (x-cron-secret / service-role via isCronAuthorized) runs the full battery with auto-heal, no body. Admin path (session JWT; admin/super_admin/owner) runs on demand and manages checks/findings.\n\n**Response:** `{}`",
+        "security": [
+          {
+            "cronSecret": []
+          },
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "run"
+                        ],
+                        "description": "Run the check battery (admin path), optionally with autoheal and a domain filter."
+                      },
+                      "autoheal": {
+                        "type": "boolean",
+                        "description": "Also run heal fns"
+                      },
+                      "domains": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Limit to these domains"
+                      }
+                    },
+                    "description": "Returns: { ok, run_id }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "key"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "heal_check"
+                        ],
+                        "description": "Run a single check's heal function on demand."
+                      },
+                      "key": {
+                        "type": "string",
+                        "description": "Check key"
+                      }
+                    },
+                    "description": "Returns: { ok, healed }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "findingId"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ignore_finding"
+                        ],
+                        "description": "Mark a finding as ignored (accepted / won't-fix)."
+                      },
+                      "findingId": {
+                        "type": "string",
+                        "description": "Finding id"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "findingId"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "reopen_finding"
+                        ],
+                        "description": "Un-ignore a finding (back to open)."
+                      },
+                      "findingId": {
+                        "type": "string",
+                        "description": "Finding id"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "key"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "set_autoheal"
+                        ],
+                        "description": "Toggle a check's autoheal_enabled flag."
+                      },
+                      "key": {
+                        "type": "string",
+                        "description": "Check key"
+                      },
+                      "enabled": {
+                        "type": "boolean",
+                        "description": "New value"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "key"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "toggle_check"
+                        ],
+                        "description": "Enable/disable a check (is_enabled)."
+                      },
+                      "key": {
+                        "type": "string",
+                        "description": "Check key"
+                      },
+                      "enabled": {
+                        "type": "boolean",
+                        "description": "New value"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/email-contacts-sync-cron": {
+      "post": {
+        "tags": [
+          "Crons"
+        ],
+        "summary": "Daily cron: push CRM contacts to each workspace's Resend audience",
+        "operationId": "post_email_contacts_sync_cron",
+        "description": "Daily pg_cron job (x-cron-secret via isCronAuthorized) for #255. For every workspace with workspace_email_config.contacts_auto_sync=true, charges the owner 3 credits (skips on insufficient balance) and re-invokes email-api's sync-resend-contacts action with the real service-role key. No request body.\n\n**Response:** `{ success, workspaces, processed, failed, skipped }`",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/finance-customer-documents": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Customer self-service view of their own invoices, receipts and orders",
+        "operationId": "get_finance_customer_documents",
+        "description": "Any authenticated user (customer-facing, not admin-gated). Resolves the caller's linked crm_contacts (and their businesses via crm_company_contacts), then returns strictly the documents whose counterparty is one of those — issued invoices/retail receipts, payment receipts, and sales orders — with fresh 7-day signed PDF URLs. Runs under service role because customers are not workspace members.\n\n**Response:** `{}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Customer self-service view of their own invoices, receipts and orders",
+        "operationId": "post_finance_customer_documents",
+        "description": "Any authenticated user (customer-facing, not admin-gated). Resolves the caller's linked crm_contacts (and their businesses via crm_company_contacts), then returns strictly the documents whose counterparty is one of those — issued invoices/retail receipts, payment receipts, and sales orders — with fresh 7-day signed PDF URLs. Runs under service role because customers are not workspace members.\n\n**Response:** `{}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "overview"
+                        ],
+                        "description": "Default: account summary per currency plus the caller's orders, invoices/receipts, and payment receipts."
+                      }
+                    },
+                    "description": "Returns: { ok, linked, summary, orders, invoices, receipts }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "order_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "order_detail"
+                        ],
+                        "description": "Line items for a single sales order the caller owns."
+                      },
+                      "order_id": {
+                        "type": "string",
+                        "description": "Owned order id"
+                      }
+                    },
+                    "description": "Returns: { ok, order, items }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-plan-engine": {
+      "post": {
+        "tags": [
+          "Quotes"
+        ],
+        "summary": "Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes)",
+        "operationId": "post_project_plan_engine",
+        "description": "The only writer of persisted plan-line prices, plan versions, and plan->quote items (#242). User JWT or service-role secret; every write re-binds to the plan/project workspace via userCanAccessWorkspace. Resolves quantities from formulas + rates from product_prices, expands sub-blueprints, and syncs to quotes / purchase items.\n\n**Response:** `{}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "apiKeySecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "blueprint_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-from-blueprint"
+                        ],
+                        "description": "Create a project plan from a blueprint (with sub-blueprint expansion + option defaults) and compute item prices."
+                      },
+                      "blueprint_id": {
+                        "type": "string",
+                        "description": "Source blueprint"
+                      },
+                      "project_id": {
+                        "type": "string",
+                        "description": "Owning project (determines workspace)"
+                      },
+                      "dimensions": {
+                        "type": "object",
+                        "description": "Dimension overrides"
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Plan title"
+                      }
+                    },
+                    "description": "Returns: { plan, items }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "plan_id",
+                      "dimensions"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "rescale"
+                        ],
+                        "description": "Merge new dimensions into the plan and recompute all item quantities + prices."
+                      },
+                      "plan_id": {
+                        "type": "string",
+                        "description": "Plan"
+                      },
+                      "dimensions": {
+                        "type": "object",
+                        "description": "Dimensions to merge"
+                      }
+                    },
+                    "description": "Returns: { plan, items }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "plan_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "reprice"
+                        ],
+                        "description": "Recompute item prices from current rates without changing dimensions."
+                      },
+                      "plan_id": {
+                        "type": "string",
+                        "description": "Plan"
+                      }
+                    },
+                    "description": "Returns: { plan, items }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "plan_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "save-version"
+                        ],
+                        "description": "Snapshot the plan (dimensions + items) as the next version."
+                      },
+                      "plan_id": {
+                        "type": "string",
+                        "description": "Plan"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Version note"
+                      }
+                    },
+                    "description": "Returns: { version }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "plan_id",
+                      "version"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "restore-version"
+                        ],
+                        "description": "Restore a saved version's snapshot and recompute."
+                      },
+                      "plan_id": {
+                        "type": "string",
+                        "description": "Plan"
+                      },
+                      "version": {
+                        "type": "number",
+                        "description": "Version number"
+                      }
+                    },
+                    "description": "Returns: { plan, items }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "plan_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-quote-from-plan"
+                        ],
+                        "description": "Build/refresh a draft quote from the plan's selected leaf tasks (idempotent)."
+                      },
+                      "plan_id": {
+                        "type": "string",
+                        "description": "Plan"
+                      }
+                    },
+                    "description": "Returns: { quote_id }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "plan_id",
+                      "source_blueprint_id",
+                      "section_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "add-section-from-blueprint"
+                        ],
+                        "description": "Append one premade section (+ its tasks) from any blueprint into an existing plan, then reprice."
+                      },
+                      "plan_id": {
+                        "type": "string",
+                        "description": "Target plan"
+                      },
+                      "source_blueprint_id": {
+                        "type": "string",
+                        "description": "Blueprint to copy from"
+                      },
+                      "section_id": {
+                        "type": "string",
+                        "description": "Section to append"
+                      }
+                    },
+                    "description": "Returns: { plan, items }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "plan_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "generate-material-list"
+                        ],
+                        "description": "Derive a material shopping list from the plan's material-bearing selected tasks into project_purchase_items."
+                      },
+                      "plan_id": {
+                        "type": "string",
+                        "description": "Plan attached to a project"
+                      }
+                    },
+                    "description": "Returns: { count }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "plan_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-change-order"
+                        ],
+                        "description": "Spawn a revision quote (in the parent_quote_id chain) from an updated plan for re-approval."
+                      },
+                      "plan_id": {
+                        "type": "string",
+                        "description": "Plan with an existing quote"
+                      }
+                    },
+                    "description": "Returns: { quote_id }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public-project-plan": {
+      "post": {
+        "tags": [
+          "Quotes"
+        ],
+        "summary": "Public lead-gen Blueprint estimator (/tools/project-plan)",
+        "operationId": "post_public_project_plan",
+        "description": "Anonymous estimator for #242. Pure compute (no paid upstreams), runs in-repo under the service role. Turnstile-gated and metered against public_lookup_log (combined 2/day per IP, shared with the other public tools). Reads platform-starter blueprints and returns a read-only estimate from visitor dimensions using default inline rates — no save, no workspace data.\n\n**Response:** `{}`",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "starters"
+                        ],
+                        "description": "Return each active platform-starter blueprint with its full works list for client-side pricing (no metering)."
+                      }
+                    },
+                    "description": "Returns: { starters: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "blueprint_id",
+                      "turnstile_token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "estimate"
+                        ],
+                        "description": "Compute a read-only estimate for a starter blueprint from visitor dimensions. Turnstile-gated + counts toward the 2/day per-IP quota."
+                      },
+                      "blueprint_id": {
+                        "type": "string",
+                        "description": "Platform-starter blueprint id"
+                      },
+                      "dimensions": {
+                        "type": "object",
+                        "description": "Dimension values keyed by schema key"
+                      },
+                      "turnstile_token": {
+                        "type": "string",
+                        "description": "Cloudflare Turnstile token"
+                      }
+                    },
+                    "description": "Returns: { success, result }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
                 }
               }
             }

@@ -44,16 +44,27 @@ for each matching flow -> execute graph (BFS over nodes)
   (fire-and-forget; never throws into the calling feature).
 - **Edge emit:** `supabase/functions/_shared/flow-events.ts -> emitFlowEvent(eventType, data)`.
 - **Engine:** `supabase/functions/flow-engine/index.ts`.
-  - `trigger-event` -> runs every **active** flow whose `trigger_type` matches.
+  - `trigger-event` -> runs every **active** flow whose `trigger_type` matches,
+    **scoped to workspace** (see the note below).
   - `execute-flow` / `test-flow` -> run a single flow (used by **Run Now** + builder).
 - **Templating:** action configs use `{{trigger.data.fieldname}}` (and `{{item}}`
   inside a Loop). Unresolved templates are guarded (see section 6).
+
+> **Workspace-scoped now (#256).** Flows are no longer only global/admin. Each `flows`
+> row carries `workspace_id` + `is_global`; `trigger-event` resolves the event's
+> **authoritative, non-spoofable** workspace (trusting a body `workspace_id` only from a
+> service-role/cron emitter, else a workspace the caller verifiably belongs to) and matches
+> **all `is_global` flows PLUS that workspace's own non-global flows** — never another
+> tenant's rows. Tenants can create simple workspace automations from chat via the KAI
+> `manage_flows` tool (allowlist RPCs `create_simple_flow`/`toggle_simple_flow`/`delete_simple_flow`),
+> and the `send_campaign` action bridges to the Email-Marketing module (#255). Full detail:
+> `docs/flow-engine.md` → "Workspace Scoping (#256)".
 
 ### Tables
 
 | Table | Purpose |
 |---|---|
-| `flows` | The flows themselves (`graph_definition` jsonb, `trigger_type`, `status`, `is_locked`, `tags`). |
+| `flows` | The flows themselves (`graph_definition` jsonb, `trigger_type`, `status`, `is_locked`, `tags`, `workspace_id`, `is_global`). |
 | `flow_runs` | One row per execution (status, timing, error). |
 | `flow_run_steps` | Per-node execution log within a run. |
 | `flow_area_registry` | Coverage registry — maps each platform **area** to its canonical flow. |
