@@ -219,6 +219,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             slug,
             content: document.content,
             content_markdown: document.content_markdown,
+            editor_json: (document.editor_json ?? null) as never,
             summary: document.summary,
             category_id: document.category_id,
             seo_keywords: document.seo_keywords,
@@ -249,6 +250,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             slug,
             content: document.content,
             content_markdown: document.content_markdown,
+            editor_json: (document.editor_json ?? null) as never,
             summary: document.summary,
             category_id: document.category_id,
             seo_keywords: document.seo_keywords,
@@ -634,8 +636,12 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   <div className="space-y-1.5">
                     <Label htmlFor="content">Content *</Label>
                     <MarkdownEditor
-                      value={document.content ?? ''}
-                      onChange={(md) => setDocument((d) => ({ ...d, content: md }))}
+                      seedKey={documentId ?? 'new'}
+                      value={(document.editor_json ?? null) as never}
+                      fallbackMarkdown={document.content ?? ''}
+                      onChange={(json, md) =>
+                        setDocument((d) => ({ ...d, editor_json: json, content: md, content_markdown: md }))
+                      }
                       placeholder="Write your document content…"
                       minHeight={360}
                     />

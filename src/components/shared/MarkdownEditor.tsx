@@ -1,19 +1,17 @@
 // Shared inline (Notion-style) block editor built on Yoopta-Editor v6.
 //
-// Type `/` for the block menu, drag blocks to reorder, select text for the
-// floating toolbar. Genuine Notion/Craft feel — headings, lists, todo, tables,
-// code (Shiki-highlighted), links, images, blockquotes, dividers.
+// SOURCE OF TRUTH = Yoopta block-JSON (`value`). On every edit this also generates
+// a markdown projection, and callers persist BOTH: the JSON (so fancy blocks —
+// callout / embed / accordion — survive round-trips losslessly) and the markdown
+// (so the KAI agent's FTS + embeddings, the public KB page, and legacy consumers
+// keep reading plain markdown/text, never a JSON blob).
 //
-// IMPORTANT — storage contract: this platform stores `content_markdown` and the
-// KAI agent reads KB/docs via markdown (FTS + embeddings). Yoopta's native value
-// is block JSON, so this wrapper keeps a MARKDOWN in / MARKDOWN out boundary via
-// @yoopta/exports: it deserializes the incoming markdown on mount (and on genuine
-// external changes, e.g. switching docs) and serializes back to markdown on every
-// edit. The plugin set is deliberately limited to markdown-representable blocks —
-// no callout/embed/accordion, which would be dropped on save into a markdown column.
+// Legacy rows (no JSON yet) seed from `fallbackMarkdown`; the first save backfills
+// the JSON column. Re-seeding is keyed on `seedKey` (the doc id) so switching docs
+// reloads content while typing never resets the cursor.
 //
-// Theming: @yoopta/themes-shadcn consumes the same shadcn CSS tokens the app
-// already defines, so light/dark tracks the existing `.dark` class automatically.
+// Theming: @yoopta/themes-shadcn consumes the app's existing shadcn CSS tokens, so
+// light/dark tracks the global `.dark` class automatically.
 import React, { useEffect, useMemo, useRef } from 'react';
 import YooptaEditor, {
   createYooptaEditor,
@@ -28,6 +26,9 @@ import Link from '@yoopta/link';
 import Image, { type ImageElementProps } from '@yoopta/image';
 import Table from '@yoopta/table';
 import Divider from '@yoopta/divider';
+import Callout from '@yoopta/callout';
+import Accordion from '@yoopta/accordion';
+import Embed from '@yoopta/embed';
 import { Bold, Italic, Underline, Strike, CodeMark, Highlight } from '@yoopta/marks';
 import { FloatingToolbar, FloatingBlockActions, SlashCommandMenu } from '@yoopta/ui';
 import { applyTheme } from '@yoopta/themes-shadcn';
@@ -53,11 +54,24 @@ async function defaultImageUpload(file: File): Promise<ImageElementProps> {
   return { id: null, src: data.publicUrl, alt: file.name };
 }
 
+const isNonEmpty = (v: YooptaContentValue | null | undefined): v is YooptaContentValue =>
+  !!v && typeof v === 'object' && Object.keys(v).length > 0;
+
 export interface MarkdownEditorProps {
-  /** Current markdown value. */
-  value: string;
-  /** Called with the new markdown on every edit. */
-  onChange: (markdown: string) => void;
+  /** Yoopta block-JSON value = source of truth. Null/undefined for legacy rows. */
+  value?: YooptaContentValue | null;
+  /** Legacy markdown, used to seed the editor ONLY when `value` is empty. */
+  fallbackMarkdown?: string;
+  /**
+   * Re-seeds the editor when it changes (pass the doc id, or 'new'). Stable while
+   * editing a single doc so typing never resets; changes on doc switch to reload.
+   */
+  seedKey?: string | null;
+  /**
+   * Fires on every edit with BOTH the block-JSON (persist as source of truth) and
+   * the generated markdown (persist for agents / embeddings / public rendering).
+   */
+  onChange: (json: YooptaContentValue, markdown: string) => void;
   placeholder?: string;
   /** Minimum height of the editable surface. Default 320px. */
   minHeight?: number;
@@ -71,11 +85,12 @@ export interface MarkdownEditorProps {
 }
 
 /**
- * Inline Notion-style editor with a markdown-in / markdown-out contract, so it is
- * a drop-in for anything that stores `content_markdown`.
+ * Inline Notion-style block editor with JSON-source-of-truth + markdown projection.
  */
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   value,
+  fallbackMarkdown,
+  seedKey,
   onChange,
   placeholder = 'Type / for commands…',
   minHeight = 320,
@@ -84,14 +99,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   imageUpload,
 }) => {
   const uploadFn = imageUpload === undefined ? defaultImageUpload : imageUpload;
-  // Stable ref so onChange/effects always call the latest parent handler without
-  // rebuilding the editor.
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  // The last markdown this editor emitted — lets the seeding effect distinguish a
-  // genuine external value change (switch docs) from the echo of our own edit, so
-  // typing never resets the cursor.
-  const lastMarkdownRef = useRef<string | null>(null);
+  // Latest seed inputs, read inside the seed effect so it only depends on seedKey.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const fallbackRef = useRef(fallbackMarkdown);
+  fallbackRef.current = fallbackMarkdown;
 
   const editor = useMemo(() => {
     const imagePlugin = uploadFn ? Image.extend({ options: { upload: uploadFn } }) : Image;
@@ -104,29 +118,36 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       NumberedList,
       TodoList,
       Blockquote,
+      Callout,
       Code,
       Link,
       imagePlugin,
       Table,
       Divider,
+      Accordion,
+      Embed,
     ]);
     return createYooptaEditor({ plugins, marks: MARKS, readOnly });
-    // Editor is created once; content flows through the seeding effect + onChange.
+    // Editor is created once; content flows through the seed effect + onChange.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Seed from markdown on mount and on genuine external changes.
+  // Seed on mount and on genuine doc switches (seedKey change). JSON wins; markdown
+  // is only deserialized as a fallback for legacy rows that have no JSON yet.
   useEffect(() => {
-    if (value === lastMarkdownRef.current) return; // echo of our own edit — ignore
-    const content = markdown.deserialize(editor, value || '');
-    editor.setEditorValue(content);
-    lastMarkdownRef.current = value;
-  }, [editor, value]);
+    const v = valueRef.current;
+    const content = isNonEmpty(v)
+      ? v
+      : fallbackRef.current
+        ? markdown.deserialize(editor, fallbackRef.current)
+        : null;
+    if (isNonEmpty(content)) editor.setEditorValue(content);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, seedKey]);
 
   const handleChange = (content: YooptaContentValue) => {
     const md = markdown.serialize(editor, content);
-    lastMarkdownRef.current = md;
-    onChangeRef.current(md);
+    onChangeRef.current(content, md);
   };
 
   return (

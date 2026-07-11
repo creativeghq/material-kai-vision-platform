@@ -3,11 +3,16 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
-export type WorkspaceDoc = Database['public']['Tables']['workspace_docs']['Row'];
+// editor_json added 2026-07-11 (Yoopta block-JSON source of truth); the generated
+// Row type is regenerated out-of-band, so widen it here until then.
+export type WorkspaceDoc = Database['public']['Tables']['workspace_docs']['Row'] & {
+  editor_json: unknown | null;
+};
 
 export interface DocInput {
   title: string;
-  content_markdown: string;
+  content_markdown: string;      // generated markdown projection (agent FTS + read view)
+  editor_json?: unknown | null;  // Yoopta block-JSON = editor source of truth
   tags: string[];
   category: string | null;
   status: string; // 'published' | 'draft'
@@ -26,22 +31,22 @@ export async function listDocs(workspaceId: string): Promise<WorkspaceDoc[]> {
 export async function createDoc(workspaceId: string, userId: string, input: DocInput): Promise<WorkspaceDoc> {
   const { data, error } = await supabase
     .from('workspace_docs')
-    .insert({ ...input, workspace_id: workspaceId, created_by: userId, updated_by: userId })
+    .insert({ ...input, workspace_id: workspaceId, created_by: userId, updated_by: userId } as never)
     .select('*')
     .single();
   if (error) throw new Error(error.message);
-  return data;
+  return data as WorkspaceDoc;
 }
 
 export async function updateDoc(id: string, userId: string, input: DocInput): Promise<WorkspaceDoc> {
   const { data, error } = await supabase
     .from('workspace_docs')
-    .update({ ...input, updated_by: userId, updated_at: new Date().toISOString() })
+    .update({ ...input, updated_by: userId, updated_at: new Date().toISOString() } as never)
     .eq('id', id)
     .select('*')
     .single();
   if (error) throw new Error(error.message);
-  return data;
+  return data as WorkspaceDoc;
 }
 
 export async function deleteDoc(id: string): Promise<void> {

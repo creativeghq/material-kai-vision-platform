@@ -35,7 +35,8 @@ const DocsPage: React.FC = () => {
 
   // editor fields
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState('');                 // generated markdown (agent FTS + read view)
+  const [bodyJson, setBodyJson] = useState<unknown | null>(null); // Yoopta block-JSON source of truth
   const [tags, setTags] = useState('');
   const [status, setStatus] = useState('published');
 
@@ -68,12 +69,13 @@ const DocsPage: React.FC = () => {
     setSelectedId(d.id);
     setTitle(d.title);
     setBody(d.content_markdown);
+    setBodyJson(d.editor_json ?? null);
     setTags((d.tags ?? []).join(', '));
     setStatus(d.status);
   };
   const openNew = () => {
     setSelectedId(NEW);
-    setTitle(''); setBody(''); setTags(''); setStatus('published');
+    setTitle(''); setBody(''); setBodyJson(null); setTags(''); setStatus('published');
   };
 
   const save = async () => {
@@ -83,6 +85,7 @@ const DocsPage: React.FC = () => {
     const input = {
       title: title.trim(),
       content_markdown: body,
+      editor_json: bodyJson,
       tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       category: null,
       status,
@@ -238,7 +241,14 @@ const DocsPage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <MarkdownEditor value={body} onChange={setBody} placeholder="Write your document…" minHeight={420} />
+                  <MarkdownEditor
+                    seedKey={selectedId ?? 'new'}
+                    value={bodyJson as never}
+                    fallbackMarkdown={body}
+                    onChange={(json, md) => { setBodyJson(json); setBody(md); }}
+                    placeholder="Write your document…"
+                    minHeight={420}
+                  />
                   <div className="flex justify-between">
                     <div>
                       {selected && (
@@ -301,7 +311,12 @@ const DocsPage: React.FC = () => {
                   ) : (
                     <div className="pt-3 border-t space-y-2">
                       <p className="text-sm font-medium">Propose changes</p>
-                      <MarkdownEditor value={suggestBody} onChange={setSuggestBody} minHeight={240} />
+                      <MarkdownEditor
+                        seedKey={`suggest-${selected?.id ?? 'new'}`}
+                        fallbackMarkdown={suggestBody}
+                        onChange={(_json, md) => setSuggestBody(md)}
+                        minHeight={240}
+                      />
                       <Input value={suggestReason} onChange={(e) => setSuggestReason(e.target.value)} placeholder="Why this change? (optional)" />
                       <div className="flex justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => setSuggesting(false)}>Cancel</Button>
