@@ -60,8 +60,11 @@ export interface MarketplaceListing {
 export interface BrowseFilters {
   q?: string;
   materialCategory?: string;
+  minPrice?: number;
   maxPrice?: number;
   city?: string;
+  conditions?: string[];
+  deliveries?: string[];
   limit?: number;
   offset?: number;
 }
@@ -203,8 +206,11 @@ export const marketplaceService = {
   async browse(filters: BrowseFilters = {}): Promise<MarketplaceListing[]> {
     let q = sb.from('marketplace_listings').select(LISTING_COLUMNS).eq('status', 'active');
     if (filters.materialCategory) q = q.eq('material_category', filters.materialCategory);
+    if (filters.minPrice != null) q = q.gte('price', filters.minPrice);
     if (filters.maxPrice != null) q = q.lte('price', filters.maxPrice);
     if (filters.city) q = q.ilike('location_city', `%${filters.city}%`);
+    if (filters.conditions?.length) q = q.in('condition', filters.conditions);
+    if (filters.deliveries?.length) q = q.in('delivery_option', filters.deliveries);
     if (filters.q) q = q.or(`title.ilike.%${filters.q}%,seller_name.ilike.%${filters.q}%`);
     q = q.order('created_at', { ascending: false })
          .range(filters.offset ?? 0, (filters.offset ?? 0) + (filters.limit ?? 40) - 1);
