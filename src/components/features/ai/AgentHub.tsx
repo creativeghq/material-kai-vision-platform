@@ -3296,6 +3296,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.inspirationData) return { id: m.id, kind: 'inspiration', title: m.inspirationData.page_title || 'Inspiration board' };
     if (m.techRadarData) return { id: m.id, kind: 'radar', title: 'Tech radar' };
     if (m.agentResultData) return { id: m.id, kind: 'result', title: m.agentResultData.title || 'Result' };
+    if (m.jobFindingsData) return { id: m.id, kind: 'jobs', title: m.jobFindingsData.tracked_job_label ? `Jobs · ${m.jobFindingsData.tracked_job_label}` : 'Job findings' };
+    if (m.sourcingOptionsData) return { id: m.id, kind: 'sourcing', title: 'Supply options' };
+    if (m.purchaseOrderCreatedData) return { id: m.id, kind: 'order', title: 'Purchase orders created' };
+    if (m.purchaseOrderSentData) return { id: m.id, kind: 'order', title: m.purchaseOrderSentData.order_number ? `PO ${m.purchaseOrderSentData.order_number}` : 'Purchase order sent' };
+    if (m.mentionSummaryData) return { id: m.id, kind: 'mentions', title: 'Mention summary' };
+    if (m.llmVisibilityData) return { id: m.id, kind: 'llm', title: 'LLM visibility' };
+    if (m.mentionFeedData) return { id: m.id, kind: 'mentions', title: 'Mention feed' };
+    if (m.seoResearchData) return { id: m.id, kind: 'seo', title: 'SEO research' };
+    if (m.seoGenericData) return { id: m.id, kind: 'seo', title: 'SEO' };
+    if (m.catalogExtractionData) return { id: m.id, kind: 'catalog', title: 'Catalog candidates' };
+    if (m.catalogImageCandidatesData) return { id: m.id, kind: 'catalog', title: m.catalogImageCandidatesData.material_name ? `Images · ${m.catalogImageCandidatesData.material_name}` : 'Catalog images' };
     return null;
   }, []);
 
@@ -3484,6 +3495,276 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     />
   );
 
+  // Bespoke "data cards" (jobs / sourcing / POs / mentions / SEO / catalog). Extracted so the
+  // SAME markup renders on the canvas AND inline (#253 P4). The trailing markdown content stays in
+  // the chat rail; this returns only the card body.
+  const renderDataCardBody = (message: Message): React.ReactNode => {
+    if (message.jobFindingsData) {
+      return (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-xs text-white/60">Daily job digest · {message.jobFindingsData.discovered_at_window === 'last_24h' ? 'last 24h' : message.jobFindingsData.discovered_at_window}</div>
+              <div className="text-sm font-medium mt-0.5">{message.jobFindingsData.tracked_job_label}</div>
+            </div>
+            <div className="text-2xl font-light text-white/80">
+              {message.jobFindingsData.listings.length}
+              <span className="text-xs text-white/40 ml-1">{message.jobFindingsData.listings.length === 1 ? 'match' : 'matches'}</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {message.jobFindingsData.listings.slice(0, 8).map((l, idx) => (
+              <div key={l.id || `${idx}-${l.url}`} className="bg-black/20 rounded-md p-2.5 border border-white/5">
+                <div className="flex items-start justify-between gap-2">
+                  <a
+                    href={l.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium text-pink-300 hover:underline inline-flex items-start gap-1 min-w-0"
+                  >
+                    <span className="line-clamp-1">{l.title || '(untitled)'}</span>
+                  </a>
+                  {l.id && (
+                    <button
+                      type="button"
+                      title="Wrong match? Tell the classifier"
+                      onClick={async () => {
+                        const reason = window.prompt(
+                          `Why is "${l.title || 'this listing'}" a wrong match?`,
+                          '',
+                        );
+                        if (reason === null) return;
+                        try {
+                          const { jobResearchService } = await import('@/services/jobResearchService');
+                          await jobResearchService.correctMatch(l.id!, 'mismatch', reason || undefined);
+                          window.alert('Thanks — the classifier will mirror this judgment on the next refresh.');
+                        } catch (e: unknown) {
+                          window.alert('Failed to record correction: ' + String(e));
+                        }
+                      }}
+                      className="text-[11px] text-white/40 hover:text-red-400 shrink-0 px-1"
+                    >
+                      ⚠ wrong
+                    </button>
+                  )}
+                </div>
+                <div className="text-xs text-white/60 mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span>{l.company || '—'}</span>
+                  {l.location && <span>· {l.location}</span>}
+                  {l.is_remote && <span className="text-emerald-400">· Remote</span>}
+                  {(l.salary_min || l.salary_max) && (
+                    <span>
+                      · {l.salary_currency || ''}
+                      {l.salary_min ? l.salary_min.toLocaleString() : ''}
+                      {l.salary_min && l.salary_max ? '–' : ''}
+                      {l.salary_max ? l.salary_max.toLocaleString() : (l.salary_min ? '+' : '')}
+                    </span>
+                  )}
+                  {l.source && <span className="text-white/40">· {l.source.replace(/_/g, ' ')}</span>}
+                </div>
+              </div>
+            ))}
+            {message.jobFindingsData.listings.length > 8 && (
+              <div className="text-xs text-white/40 text-center pt-1">
+                + {message.jobFindingsData.listings.length - 8} more
+              </div>
+            )}
+          </div>
+          <div className="text-[11px] text-white/40 mt-3">
+            Tip: ask "show me the rest" or "find more like #2" to dig in.
+          </div>
+        </div>
+      );
+    }
+    if (message.sourcingOptionsData) {
+      return (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-xs text-white/60 mb-2">Supply options · qty {message.sourcingOptionsData.quantity}</div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.warehouse ?? 0}</div><div className="text-[11px] text-white/60">Warehouse</div></div>
+            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.inbound_po ?? 0}</div><div className="text-[11px] text-white/60">Inbound PO</div></div>
+            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.supplier ?? 0}</div><div className="text-[11px] text-white/60">Supplier</div></div>
+          </div>
+          {(message.sourcingOptionsData.result?.options?.supplier || []).length > 0 && (
+            <div className="mt-3 space-y-1">
+              {message.sourcingOptionsData.result.options.supplier.slice(0, 5).map((s: any, i: number) => (
+                <div key={i} className="flex justify-between text-xs">
+                  <span>{s.supplier_name || 'Supplier'}{s.is_preferred ? ' ★' : ''}</span>
+                  <span className="text-white/60">{s.cost != null ? `${s.cost} ${s.currency || ''}` : '—'}{s.lead_time_days != null ? ` · ${s.lead_time_days}d` : ''}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+    if (message.purchaseOrderCreatedData) {
+      return (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-xs text-white/60 mb-2">Sourcing committed</div>
+          <div className="text-sm">{message.purchaseOrderCreatedData.purchase_orders_created} draft purchase order(s) · {message.purchaseOrderCreatedData.allocations_created} allocation(s)</div>
+        </div>
+      );
+    }
+    if (message.purchaseOrderSentData) {
+      return (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-xs text-white/60 mb-2">Purchase order sent</div>
+          <div className="space-y-1 text-sm">
+            <div><span className="text-white/60">PO #:</span> {message.purchaseOrderSentData.order_number}</div>
+            {message.purchaseOrderSentData.recipient && <div><span className="text-white/60">To:</span> {message.purchaseOrderSentData.recipient}</div>}
+            {message.purchaseOrderSentData.pdf_url && <a href={message.purchaseOrderSentData.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">Open PDF</a>}
+          </div>
+        </div>
+      );
+    }
+    if (message.mentionSummaryData) {
+      return (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-xs text-white/60 mb-2">
+            Mention summary · last {message.mentionSummaryData.days} days
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <div className="text-xs text-white/60">Total</div>
+              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.total_count ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-xs text-green-400">Positive</div>
+              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.positive ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-xs text-white/60">Neutral</div>
+              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.neutral ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-xs text-red-400">Negative</div>
+              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.negative ?? 0}</div>
+            </div>
+          </div>
+          {(message.mentionSummaryData.summary?.top_outlets || []).length > 0 && (
+            <div className="mt-3">
+              <div className="text-xs text-white/60 mb-1">Top outlets</div>
+              <div className="flex flex-wrap gap-1">
+                {message.mentionSummaryData.summary.top_outlets.slice(0, 6).map((o: any) => (
+                  <span key={o.domain} className="text-[11px] bg-white/10 rounded-full px-2 py-0.5">
+                    {o.domain} · {o.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <a
+            href={`/admin/mention-monitoring/products/${message.mentionSummaryData.product_id}`}
+            className="text-xs text-blue-300 hover:underline mt-3 inline-block"
+          >Open Mentions tab →</a>
+        </div>
+      );
+    }
+    if (message.llmVisibilityData) {
+      return (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-xs text-white/60 mb-2">LLM visibility{message.llmVisibilityData.forced ? ' · fresh probe' : ''}</div>
+          {!message.llmVisibilityData.snapshot?.present ? (
+            <div className="text-sm text-white/60">No probes recorded yet.</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-white/60">Share of voice</div>
+                  <div className="text-2xl font-medium">
+                    {Math.round((message.llmVisibilityData.snapshot.share_of_voice || 0) * 100)}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-white/60">Average rank</div>
+                  <div className="text-2xl font-medium">
+                    {message.llmVisibilityData.snapshot.avg_position
+                      ? `#${message.llmVisibilityData.snapshot.avg_position.toFixed(1)}`
+                      : '—'}
+                  </div>
+                </div>
+              </div>
+              {message.llmVisibilityData.snapshot.per_model && (
+                <div className="mt-3 space-y-1 text-xs">
+                  {Object.entries(message.llmVisibilityData.snapshot.per_model).map(([model, stats]: any) => (
+                    <div key={model} className="flex justify-between">
+                      <span>{model}</span>
+                      <span className="text-white/60">{stats.mentioned}/{stats.probes} mentions</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {message.llmVisibilityData.snapshot.top_competitors && message.llmVisibilityData.snapshot.top_competitors.length > 0 && (
+                <div className="mt-3">
+                  <div className="text-xs text-white/60 mb-1">Top co-mentioned competitors</div>
+                  <div className="flex flex-wrap gap-1">
+                    {message.llmVisibilityData.snapshot.top_competitors.slice(0, 8).map(([name, count]: any) => (
+                      <span key={String(name)} className="text-[11px] bg-white/10 rounded-full px-2 py-0.5">
+                        {String(name)} · {count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+    if (message.mentionFeedData) {
+      return (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-xs text-white/60 mb-2">
+            Mention feed{message.mentionFeedData.sentiment_filter ? ` · ${message.mentionFeedData.sentiment_filter}` : ''} · last {message.mentionFeedData.days}d
+          </div>
+          {message.mentionFeedData.rows.length === 0 ? (
+            <div className="text-sm text-white/60">No mentions match the filter.</div>
+          ) : (
+            <ul className="divide-y divide-white/10">
+              {message.mentionFeedData.rows.slice(0, 10).map((r) => (
+                <li key={r.id} className="py-2">
+                  <a
+                    href={r.url} target="_blank" rel="noopener noreferrer"
+                    className="text-sm hover:underline"
+                  >{r.title || r.url}</a>
+                  <div className="text-xs text-white/60">
+                    {r.outlet_name || r.outlet_domain}
+                    {r.sentiment ? ` · ${r.sentiment}` : ''}
+                    {r.published_at ? ` · ${new Date(r.published_at).toLocaleDateString()}` : ''}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    }
+    if (message.seoResearchData) return <SEOResearchCard data={message.seoResearchData} />;
+    if (message.seoGenericData) return <SEOGenericCard data={message.seoGenericData} />;
+    if (message.catalogExtractionData) {
+      return (
+        <CatalogExtractionCandidatesCard
+          catalogId={message.catalogExtractionData.catalog_id}
+          query={message.catalogExtractionData.query}
+          candidates={message.catalogExtractionData.candidates}
+        />
+      );
+    }
+    if (message.catalogImageCandidatesData) {
+      return (
+        <CatalogImageCandidatesCard
+          catalogId={message.catalogImageCandidatesData.catalog_id}
+          sectionId={message.catalogImageCandidatesData.section_id}
+          materialId={message.catalogImageCandidatesData.material_id}
+          materialName={message.catalogImageCandidatesData.material_name}
+          candidates={message.catalogImageCandidatesData.candidates}
+        />
+      );
+    }
+    return null;
+  };
+
   const renderCanvasArtifact = (message: Message): React.ReactNode => {
     if (message.generation_job) return renderGenerationGrid(message);
     if (message.designData) return renderDesignResults(message);
@@ -3642,7 +3923,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     if (message.techRadarData) return <TechRadarFindingsCard data={message.techRadarData} />;
     if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} />;
-    return null;
+    return renderDataCardBody(message);
   };
 
   // Contextual inspector for the active canvas artifact (issue #253 P3).
@@ -4010,7 +4291,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-primary text-white shadow-sm'
@@ -4077,84 +4358,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.jobFindingsData ? (
                       <div className="space-y-3">
-                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <div className="text-xs text-white/60">Daily job digest · {message.jobFindingsData.discovered_at_window === 'last_24h' ? 'last 24h' : message.jobFindingsData.discovered_at_window}</div>
-                              <div className="text-sm font-medium mt-0.5">{message.jobFindingsData.tracked_job_label}</div>
-                            </div>
-                            <div className="text-2xl font-light text-white/80">
-                              {message.jobFindingsData.listings.length}
-                              <span className="text-xs text-white/40 ml-1">{message.jobFindingsData.listings.length === 1 ? 'match' : 'matches'}</span>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            {message.jobFindingsData.listings.slice(0, 8).map((l, idx) => (
-                              <div key={l.id || `${idx}-${l.url}`} className="bg-black/20 rounded-md p-2.5 border border-white/5">
-                                <div className="flex items-start justify-between gap-2">
-                                  <a
-                                    href={l.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-sm font-medium text-pink-300 hover:underline inline-flex items-start gap-1 min-w-0"
-                                  >
-                                    <span className="line-clamp-1">{l.title || '(untitled)'}</span>
-                                  </a>
-                                  {l.id && (
-                                    <button
-                                      type="button"
-                                      title="Wrong match? Tell the classifier"
-                                      onClick={async () => {
-                                        const reason = window.prompt(
-                                          `Why is "${l.title || 'this listing'}" a wrong match?`,
-                                          '',
-                                        );
-                                        if (reason === null) return;
-                                        try {
-                                          const { jobResearchService } = await import('@/services/jobResearchService');
-                                          await jobResearchService.correctMatch(l.id!, 'mismatch', reason || undefined);
-                                          // Optimistic UI: greying out the row would require state-lifting; the next
-                                          // conversation reload will reflect the new relevance.
-                                          // Lightweight feedback for now:
-                                          // eslint-disable-next-line no-alert
-                                          window.alert('Thanks — the classifier will mirror this judgment on the next refresh.');
-                                        } catch (e: unknown) {
-                                          // eslint-disable-next-line no-alert
-                                          window.alert('Failed to record correction: ' + String(e));
-                                        }
-                                      }}
-                                      className="text-[11px] text-white/40 hover:text-red-400 shrink-0 px-1"
-                                    >
-                                      ⚠ wrong
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="text-xs text-white/60 mt-0.5 flex items-center gap-2 flex-wrap">
-                                  <span>{l.company || '—'}</span>
-                                  {l.location && <span>· {l.location}</span>}
-                                  {l.is_remote && <span className="text-emerald-400">· Remote</span>}
-                                  {(l.salary_min || l.salary_max) && (
-                                    <span>
-                                      · {l.salary_currency || ''}
-                                      {l.salary_min ? l.salary_min.toLocaleString() : ''}
-                                      {l.salary_min && l.salary_max ? '–' : ''}
-                                      {l.salary_max ? l.salary_max.toLocaleString() : (l.salary_min ? '+' : '')}
-                                    </span>
-                                  )}
-                                  {l.source && <span className="text-white/40">· {l.source.replace(/_/g, ' ')}</span>}
-                                </div>
-                              </div>
-                            ))}
-                            {message.jobFindingsData.listings.length > 8 && (
-                              <div className="text-xs text-white/40 text-center pt-1">
-                                + {message.jobFindingsData.listings.length - 8} more
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-white/40 mt-3">
-                            Tip: ask "show me the rest" or "find more like #2" to dig in.
-                          </div>
-                        </div>
+                        {canvasShown ? (
+                          <ArtifactChip kind="jobs" title={message.jobFindingsData.tracked_job_label ? `Jobs · ${message.jobFindingsData.tracked_job_label}` : 'Job findings'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.agentResultData ? (
@@ -4172,176 +4378,58 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.sourcingOptionsData ? (
                       <div className="space-y-3">
-                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <div className="text-xs text-white/60 mb-2">Supply options · qty {message.sourcingOptionsData.quantity}</div>
-                          <div className="grid grid-cols-3 gap-3 text-center">
-                            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.warehouse ?? 0}</div><div className="text-[11px] text-white/60">Warehouse</div></div>
-                            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.inbound_po ?? 0}</div><div className="text-[11px] text-white/60">Inbound PO</div></div>
-                            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.supplier ?? 0}</div><div className="text-[11px] text-white/60">Supplier</div></div>
-                          </div>
-                          {(message.sourcingOptionsData.result?.options?.supplier || []).length > 0 && (
-                            <div className="mt-3 space-y-1">
-                              {message.sourcingOptionsData.result.options.supplier.slice(0, 5).map((s: any, i: number) => (
-                                <div key={i} className="flex justify-between text-xs">
-                                  <span>{s.supplier_name || 'Supplier'}{s.is_preferred ? ' ★' : ''}</span>
-                                  <span className="text-white/60">{s.cost != null ? `${s.cost} ${s.currency || ''}` : '—'}{s.lead_time_days != null ? ` · ${s.lead_time_days}d` : ''}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        {canvasShown ? (
+                          <ArtifactChip kind="sourcing" title="Supply options" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.purchaseOrderCreatedData ? (
                       <div className="space-y-3">
-                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <div className="text-xs text-white/60 mb-2">Sourcing committed</div>
-                          <div className="text-sm">{message.purchaseOrderCreatedData.purchase_orders_created} draft purchase order(s) · {message.purchaseOrderCreatedData.allocations_created} allocation(s)</div>
-                        </div>
+                        {canvasShown ? (
+                          <ArtifactChip kind="order" title="Purchase orders created" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.purchaseOrderSentData ? (
                       <div className="space-y-3">
-                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <div className="text-xs text-white/60 mb-2">Purchase order sent</div>
-                          <div className="space-y-1 text-sm">
-                            <div><span className="text-white/60">PO #:</span> {message.purchaseOrderSentData.order_number}</div>
-                            {message.purchaseOrderSentData.recipient && <div><span className="text-white/60">To:</span> {message.purchaseOrderSentData.recipient}</div>}
-                            {message.purchaseOrderSentData.pdf_url && <a href={message.purchaseOrderSentData.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">Open PDF</a>}
-                          </div>
-                        </div>
+                        {canvasShown ? (
+                          <ArtifactChip kind="order" title={message.purchaseOrderSentData.order_number ? `PO ${message.purchaseOrderSentData.order_number}` : 'Purchase order sent'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.mentionSummaryData ? (
                       <div className="space-y-3">
-                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <div className="text-xs text-white/60 mb-2">
-                            Mention summary · last {message.mentionSummaryData.days} days
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div>
-                              <div className="text-xs text-white/60">Total</div>
-                              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.total_count ?? 0}</div>
-                            </div>
-                            <div>
-                              <div className="text-xs text-green-400">Positive</div>
-                              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.positive ?? 0}</div>
-                            </div>
-                            <div>
-                              <div className="text-xs text-white/60">Neutral</div>
-                              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.neutral ?? 0}</div>
-                            </div>
-                            <div>
-                              <div className="text-xs text-red-400">Negative</div>
-                              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.negative ?? 0}</div>
-                            </div>
-                          </div>
-                          {(message.mentionSummaryData.summary?.top_outlets || []).length > 0 && (
-                            <div className="mt-3">
-                              <div className="text-xs text-white/60 mb-1">Top outlets</div>
-                              <div className="flex flex-wrap gap-1">
-                                {message.mentionSummaryData.summary.top_outlets.slice(0, 6).map((o: any) => (
-                                  <span key={o.domain} className="text-[11px] bg-white/10 rounded-full px-2 py-0.5">
-                                    {o.domain} · {o.count}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          <a
-                            href={`/admin/mention-monitoring/products/${message.mentionSummaryData.product_id}`}
-                            className="text-xs text-blue-300 hover:underline mt-3 inline-block"
-                          >Open Mentions tab →</a>
-                        </div>
+                        {canvasShown ? (
+                          <ArtifactChip kind="mentions" title="Mention summary" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.llmVisibilityData ? (
                       <div className="space-y-3">
-                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <div className="text-xs text-white/60 mb-2">LLM visibility{message.llmVisibilityData.forced ? ' · fresh probe' : ''}</div>
-                          {!message.llmVisibilityData.snapshot?.present ? (
-                            <div className="text-sm text-white/60">No probes recorded yet.</div>
-                          ) : (
-                            <>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <div className="text-xs text-white/60">Share of voice</div>
-                                  <div className="text-2xl font-medium">
-                                    {Math.round((message.llmVisibilityData.snapshot.share_of_voice || 0) * 100)}%
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="text-xs text-white/60">Average rank</div>
-                                  <div className="text-2xl font-medium">
-                                    {message.llmVisibilityData.snapshot.avg_position
-                                      ? `#${message.llmVisibilityData.snapshot.avg_position.toFixed(1)}`
-                                      : '—'}
-                                  </div>
-                                </div>
-                              </div>
-                              {message.llmVisibilityData.snapshot.per_model && (
-                                <div className="mt-3 space-y-1 text-xs">
-                                  {Object.entries(message.llmVisibilityData.snapshot.per_model).map(([model, stats]: any) => (
-                                    <div key={model} className="flex justify-between">
-                                      <span>{model}</span>
-                                      <span className="text-white/60">{stats.mentioned}/{stats.probes} mentions</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {message.llmVisibilityData.snapshot.top_competitors && message.llmVisibilityData.snapshot.top_competitors.length > 0 && (
-                                <div className="mt-3">
-                                  <div className="text-xs text-white/60 mb-1">Top co-mentioned competitors</div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {message.llmVisibilityData.snapshot.top_competitors.slice(0, 8).map(([name, count]: any) => (
-                                      <span key={String(name)} className="text-[11px] bg-white/10 rounded-full px-2 py-0.5">
-                                        {String(name)} · {count}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
+                        {canvasShown ? (
+                          <ArtifactChip kind="llm" title="LLM visibility" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.mentionFeedData ? (
                       <div className="space-y-3">
-                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <div className="text-xs text-white/60 mb-2">
-                            Mention feed{message.mentionFeedData.sentiment_filter ? ` · ${message.mentionFeedData.sentiment_filter}` : ''} · last {message.mentionFeedData.days}d
-                          </div>
-                          {message.mentionFeedData.rows.length === 0 ? (
-                            <div className="text-sm text-white/60">No mentions match the filter.</div>
-                          ) : (
-                            <ul className="divide-y divide-white/10">
-                              {message.mentionFeedData.rows.slice(0, 10).map((r) => (
-                                <li key={r.id} className="py-2">
-                                  <a
-                                    href={r.url} target="_blank" rel="noopener noreferrer"
-                                    className="text-sm hover:underline"
-                                  >{r.title || r.url}</a>
-                                  <div className="text-xs text-white/60">
-                                    {r.outlet_name || r.outlet_domain}
-                                    {r.sentiment ? ` · ${r.sentiment}` : ''}
-                                    {r.published_at ? ` · ${new Date(r.published_at).toLocaleDateString()}` : ''}
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
+                        {canvasShown ? (
+                          <ArtifactChip kind="mentions" title="Mention feed" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.seoResearchData ? (
                       <div className="space-y-3">
-                        <SEOResearchCard data={message.seoResearchData} />
+                        {canvasShown ? (
+                          <ArtifactChip kind="seo" title="SEO research" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.seoGenericData ? (
                       <div className="space-y-3">
-                        <SEOGenericCard data={message.seoGenericData} />
+                        {canvasShown ? (
+                          <ArtifactChip kind="seo" title="SEO" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.materialData ? (
@@ -4478,22 +4566,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.catalogExtractionData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        <CatalogExtractionCandidatesCard
-                          catalogId={message.catalogExtractionData.catalog_id}
-                          query={message.catalogExtractionData.query}
-                          candidates={message.catalogExtractionData.candidates}
-                        />
+                        {canvasShown ? (
+                          <ArtifactChip kind="catalog" title="Catalog candidates" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                       </div>
                     ) : message.catalogImageCandidatesData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        <CatalogImageCandidatesCard
-                          catalogId={message.catalogImageCandidatesData.catalog_id}
-                          sectionId={message.catalogImageCandidatesData.section_id}
-                          materialId={message.catalogImageCandidatesData.material_id}
-                          materialName={message.catalogImageCandidatesData.material_name}
-                          candidates={message.catalogImageCandidatesData.candidates}
-                        />
+                        {canvasShown ? (
+                          <ArtifactChip kind="catalog" title={message.catalogImageCandidatesData.material_name ? `Images · ${message.catalogImageCandidatesData.material_name}` : 'Catalog images'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : renderDataCardBody(message)}
                       </div>
                     ) : message.virtualStagingData ? (
                       <div className="space-y-3">

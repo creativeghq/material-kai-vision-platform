@@ -14,12 +14,14 @@ import React from 'react';
 import {
   FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video, Sofa,
   PanelRightClose, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
+  Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
   | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design' | 'render'
-  | 'inspiration' | 'radar' | 'result';
+  | 'inspiration' | 'radar' | 'result'
+  | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog';
 
 export interface CanvasArtifact {
   id: string;
@@ -40,6 +42,13 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   inspiration: Sparkles,
   radar: Radar,
   result: ClipboardList,
+  jobs: Briefcase,
+  sourcing: Boxes,
+  order: PackageCheck,
+  mentions: MessageSquare,
+  llm: Bot,
+  seo: TrendingUp,
+  catalog: Images,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -55,6 +64,13 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   inspiration: 'Inspiration board',
   radar: 'Tech radar',
   result: 'Result',
+  jobs: 'Job findings',
+  sourcing: 'Supply options',
+  order: 'Purchase order',
+  mentions: 'Mentions',
+  llm: 'LLM visibility',
+  seo: 'SEO',
+  catalog: 'Catalog',
 };
 
 interface CanvasPanelProps {
