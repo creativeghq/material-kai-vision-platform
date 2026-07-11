@@ -25,9 +25,13 @@ const MODULE_SLUG = 'flows-toolkit';
 
 // Curated tenant-safe vocabulary — MUST stay in sync with the allowlists in
 // create_simple_flow (the RPC is the enforcer; this is for the LLM + graceful errors).
+// NOTE: only triggers with a real workspace-scoped emitter belong here. product_added and
+// appointment_booked were removed — the former has no emitter at all, and the latter is emitted by
+// the (non-member) person booking, without a workspace_id, so a tenant flow could never match it.
+// Re-add either only once a trusted server-side emitter stamps workspace_id.
 const TENANT_TRIGGERS = [
   'scheduled', 'quote_approved', 'invoice_paid', 'payment_received',
-  'inbox.message_received', 'product_added', 'appointment_booked',
+  'inbox.message_received',
 ] as const;
 const TENANT_ACTIONS = [
   'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
@@ -163,7 +167,7 @@ export const createManageFlowsTool = (
         'A flow = one TRIGGER (an event) + one or more ACTIONS that run when it fires. Scoped to this workspace only.',
         '',
         'Allowed triggers: scheduled (cron), quote_approved, invoice_paid, payment_received,',
-        '  inbox.message_received, product_added, appointment_booked.',
+        '  inbox.message_received.',
         'Allowed actions: send_email, send_whatsapp, create_notification, send_agent_message,',
         '  send_campaign (dispatch an Email-Marketing campaign by campaign_id).',
         'Action config may use {{trigger.data.FIELD}} templates (e.g. {{trigger.data.user_id}}).',

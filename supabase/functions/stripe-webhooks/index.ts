@@ -4,6 +4,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getStripe, getPlatformBillingStripe, getSupabase, stripeWebhookSecret, platformBillingWebhookSecret } from '../_shared/stripe-clients.ts';
+import { moduleTierRank } from '../_shared/module-tiers.ts';
 
 // Module-level handles re-assigned per-request from the memoised shared
 // factories. The downstream `handle*` functions reference these by name to
@@ -16,9 +17,6 @@ let supabase!: SupabaseClient;
 // with STRIPE_BILLING_WEBHOOK_SECRET). Drives which customer-id column we persist/lookup.
 let eventIsBilling = false;
 
-// #251 — module add-on plan-tier reconciliation.
-const MODULE_TIER_RANK: Record<string, number> = { free: 0, pro: 1, enterprise: 2 };
-const moduleTierRank = (t?: string | null) => MODULE_TIER_RANK[(t || '').toLowerCase()] ?? 999;
 
 /** Match a user profile by a Stripe customer id from EITHER account (default or billing). */
 function profileByCustomer(customerId: string, columns: string) {

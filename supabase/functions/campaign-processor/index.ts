@@ -97,6 +97,10 @@ serve(withApiLogging('campaign-processor', async (req) => {
     if (sendingError) throw sendingError;
 
     let totalProcessed = 0;
+    // Per-WORKSPACE send budget for this tick. Sends go through each tenant's own BYOK Resend, so the
+    // rate that matters is per-Resend-account: cap total sends per workspace this tick (was applied
+    // per-campaign, so N concurrent campaigns in one workspace sent N× the intended rate).
+    const wsSendBudget = new Map<string, number>();
 
     for (const campaign of sendingCampaigns || []) {
       // Server-side paywall: email-marketing is a paid add-on. The route/UI is entitlement-gated on
@@ -146,13 +150,17 @@ serve(withApiLogging('campaign-processor', async (req) => {
         continue;
       }
 
-      // Get the next batch of pending recipients (rate-limited).
+      // Get the next batch of pending recipients, bounded by this workspace's remaining send budget
+      // for the tick (shared across all of the workspace's campaigns). 0 → skip; it resumes next tick.
+      const wid = campaign.workspace_id ?? 'no-ws';
+      const wsRemaining = wsSendBudget.get(wid) ?? SEND_RATE_PER_MINUTE;
+      if (wsRemaining <= 0) continue;
       const { data: recipients, error: recipientsError } = await supabase
         .from('campaign_recipients')
         .select('*')
         .eq('campaign_id', campaign.id)
         .eq('status', 'pending')
-        .limit(SEND_RATE_PER_MINUTE);
+        .limit(wsRemaining);
 
       if (recipientsError) {
         console.error(`Error fetching recipients for campaign ${campaign.id}:`, recipientsError);
@@ -255,6 +263,8 @@ serve(withApiLogging('campaign-processor', async (req) => {
             .eq('id', recipient.id);
         }
       }
+      // Charge this batch against the workspace's per-tick budget so its other campaigns share it.
+      wsSendBudget.set(wid, wsRemaining - recipients.length);
     }
 
     console.log(`Campaign processor completed. Processed ${totalProcessed} emails.`);

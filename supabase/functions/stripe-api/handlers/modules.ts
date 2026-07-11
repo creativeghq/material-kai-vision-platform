@@ -29,10 +29,7 @@ import {
   hasDistinctBillingAccount,
 } from '../../_shared/stripe-clients.ts';
 
-const TIER_RANK: Record<string, number> = { free: 0, pro: 1, enterprise: 2 };
-function tierRank(tier: string | null | undefined): number {
-  return TIER_RANK[(tier || '').toLowerCase()] ?? 999;
-}
+import { moduleTierRank as tierRank } from '../../_shared/module-tiers.ts';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

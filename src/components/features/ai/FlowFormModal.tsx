@@ -26,9 +26,7 @@ const TRIGGERS: { value: string; label: string; hint: string }[] = [
   { value: 'invoice_paid', label: 'Invoice paid', hint: 'When a customer invoice is marked paid' },
   { value: 'payment_received', label: 'Payment received', hint: 'When a payment is recorded' },
   { value: 'quote_approved', label: 'Quote approved', hint: 'When a customer approves a quote' },
-  { value: 'product_added', label: 'Product added', hint: 'When a product is added to the catalog' },
   { value: 'inbox.message_received', label: 'Inbox message received', hint: 'When a customer message arrives' },
-  { value: 'appointment_booked', label: 'Appointment booked', hint: 'When an appointment is booked' },
   { value: 'scheduled', label: 'On a schedule (cron)', hint: 'Run repeatedly on a cron schedule' },
 ];
 
