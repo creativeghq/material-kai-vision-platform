@@ -185,6 +185,12 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   job_searches_list: 'Job searches',
   job_listings_feed: 'Job listings',
   job_digest_preview: 'Job digest preview',
+  // Stock management
+  stock_overview: 'Stock overview',
+  stock_items: 'Stock items',
+  stock_low: 'Low stock',
+  stock_movements: 'Stock movements',
+  stock_adjusted: 'Stock updated',
   // Misc
   price_lookup_matches: 'Price lookup matches',
   project_created: 'Project created',

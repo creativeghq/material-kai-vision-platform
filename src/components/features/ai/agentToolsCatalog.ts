@@ -1189,6 +1189,46 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'stock',
+    name: 'Stock',
+    description: 'Check inventory and adjust stock from chat: what\'s low, how many of an item you have, receive/issue/set quantities, recent movements.',
+    icon: 'Package',
+    moduleSlug: 'stock',
+    adminOnly: true, // writes require finance-manager (owner/admin); stock-api enforces regardless.
+    tool_ids: ['manage_stock'],
+    quick_starts: [
+      {
+        label: 'Low stock', description: 'Items at/below reorder point', icon: 'AlertTriangle',
+        prompt: "What's low on stock?",
+        run: { tool: 'manage_stock', fixedArgs: { action: 'list_low_stock' } },
+      },
+      {
+        label: 'Stock overview', description: 'Items, warehouses, low/out-of-stock', icon: 'LayoutDashboard',
+        prompt: 'Give me a stock overview.',
+        run: { tool: 'manage_stock', fixedArgs: { action: 'overview' } },
+      },
+      {
+        label: 'Check an item', description: 'On-hand & available for a product', icon: 'Search',
+        prompt: 'Check stock for an item.',
+        promptTemplate: 'How many "{{item}}" do we have in stock?',
+        run: { tool: 'manage_stock', fixedArgs: { action: 'check_stock' } },
+        form: [
+          { key: 'item', label: 'Item name or SKU', kind: 'text', required: true, placeholder: 'Oak plank' },
+        ],
+      },
+      {
+        label: 'Receive stock', description: 'Add received units to an item', icon: 'PackagePlus',
+        prompt: 'Receive stock for an item.',
+        promptTemplate: 'Receive {{quantity}} units of "{{item}}" into stock.',
+        run: { tool: 'manage_stock', fixedArgs: { action: 'adjust_stock', direction: 'in' } },
+        form: [
+          { key: 'item', label: 'Item name or SKU', kind: 'text', required: true, placeholder: 'White tile 60x60' },
+          { key: 'quantity', label: 'Quantity', kind: 'text', required: true, placeholder: '50' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'projects',
     name: 'Projects',
     description: 'Organize work into projects + tasks. Create, browse, and add tasks straight from chat.',

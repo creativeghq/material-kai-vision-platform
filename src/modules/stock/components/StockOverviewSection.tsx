@@ -1,0 +1,99 @@
+import React, { useEffect, useState } from 'react';
+import { Loader2, Package, AlertTriangle, PackageX, ArrowLeftRight, ClipboardList, Warehouse as WarehouseIcon, PackageCheck, Inbox } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { stockService, type StockOverview, type LowStockItem } from '../services/stockService';
+
+const KPI: React.FC<{ icon: React.ElementType; label: string; value: React.ReactNode; tone?: 'default' | 'amber' | 'red' }> = ({ icon: Icon, label, value, tone = 'default' }) => (
+  <div className="dashboard-card p-4 flex items-center gap-3">
+    <div className={`rounded-full p-2 ${tone === 'amber' ? 'bg-amber-500/15 text-amber-500' : tone === 'red' ? 'bg-destructive/15 text-destructive' : 'bg-primary/15 text-primary'}`}>
+      <Icon className="h-4 w-4" />
+    </div>
+    <div className="min-w-0">
+      <div className="text-lg font-medium leading-none">{value}</div>
+      <div className="text-xs text-muted-foreground mt-1 truncate">{label}</div>
+    </div>
+  </div>
+);
+
+export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: (tab: string) => void }> = ({ workspaceId, onNavigate }) => {
+  const { toast } = useToast();
+  const [ov, setOv] = useState<StockOverview | null>(null);
+  const [low, setLow] = useState<LowStockItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [overview, lowRes] = await Promise.all([stockService.overview(workspaceId), stockService.lowStock(workspaceId)]);
+        if (cancelled) return;
+        setOv(overview);
+        setLow(lowRes.items);
+      } catch (err: any) {
+        if (!cancelled) toast({ title: 'Failed to load stock overview', description: err?.message, variant: 'destructive' });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [workspaceId, toast]);
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+  if (!ov) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <KPI icon={Package} label="Stock items" value={ov.items} />
+        <KPI icon={WarehouseIcon} label="Warehouses" value={ov.warehouses} />
+        <KPI icon={PackageCheck} label="Units on hand" value={Number(ov.total_on_hand).toLocaleString()} />
+        <KPI icon={ArrowLeftRight} label="Units reserved" value={Number(ov.total_reserved).toLocaleString()} />
+        <KPI icon={AlertTriangle} label="Low stock" value={ov.low_stock} tone={ov.low_stock > 0 ? 'amber' : 'default'} />
+        <KPI icon={PackageX} label="Out of stock" value={ov.out_of_stock} tone={ov.out_of_stock > 0 ? 'red' : 'default'} />
+        <KPI icon={Inbox} label="Pending intake" value={ov.pending_intake} tone={ov.pending_intake > 0 ? 'amber' : 'default'} />
+        <KPI icon={ClipboardList} label="Open counts" value={ov.open_counts} />
+      </div>
+
+      <Card>
+        <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /> Low stock</CardTitle>
+          {low.length > 0 && onNavigate && (
+            <button className="text-xs text-primary hover:underline" onClick={() => onNavigate('inventory')}>Manage in inventory →</button>
+          )}
+        </CardHeader>
+        <CardContent className="p-0">
+          {low.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">Nothing below its reorder point. Inventory is healthy.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-xs text-muted-foreground">
+                <tr className="border-b border-border/60">
+                  <th className="px-4 py-2 text-left">Item</th>
+                  <th className="px-4 py-2 text-left">SKU</th>
+                  <th className="px-4 py-2 text-right">On hand</th>
+                  <th className="px-4 py-2 text-right">Reorder</th>
+                </tr>
+              </thead>
+              <tbody>
+                {low.map((it) => (
+                  <tr key={it.id} className="border-b border-border/30">
+                    <td className="px-4 py-2 font-medium">{it.name} <span className="text-xs text-muted-foreground">/ {it.unit}</span></td>
+                    <td className="px-4 py-2 font-mono text-xs">{it.sku ?? '—'}</td>
+                    <td className="px-4 py-2 text-right">
+                      {it.qty_on_hand}
+                      <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-500"><AlertTriangle className="h-3 w-3 mr-1" />low</Badge>
+                    </td>
+                    <td className="px-4 py-2 text-right text-muted-foreground">{it.reorder_point}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};

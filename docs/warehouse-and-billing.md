@@ -10,6 +10,19 @@ Three [Finance module](finance-system.md) surfaces that feed documents and stock
 
 ## 1. Warehouse / inventory
 
+> **Now a standalone paid add-on: the "Stock" module (`/stock`).** Inventory was extracted from the Finance
+> "Warehouse" tab into a first-class entitlement-gated module (`public.modules.slug='stock'`, `is_addon=true`,
+> `price_tier='pro'`), mirroring HR (#252). Home is [`src/modules/stock/`](../src/modules/stock/) →
+> `StockPage` with Overview / Inventory / Movements / Stock-counts tabs (Inventory reuses `WarehousePanel`).
+> Nav item `moduleSlug:'stock'` + `requireCapability:'warehouse.manage'`; the route is EntitlementGuard-wrapped.
+> The old Finance tab is a redirect pointer. Backfill granted `stock` to every `sales-finance`-entitled workspace
+> (operator root auto-entitled) so no existing user lost access. **The paid gate is REAL at the DB write boundary**:
+> `warehouses` / `warehouse_items` / `warehouse_pending_items` / `stock_counts` WRITE policies now require
+> `is_workspace_finance_manager(ws) AND is_workspace_entitled(ws,'stock')` (reads stay membership-only so
+> finance/marketplace/delivery-note readers never break). `stock_allocations`/`warehouse_coverage` are the #237
+> sourcing spine, deliberately NOT coupled to this add-on. Server API: [`stock-api`](../supabase/functions/stock-api/index.ts)
+> edge fn (gate chain then a user-JWT client so RLS + RPC guards enforce as the caller). Agent toolkit `manage_stock`.
+
 Workspace-scoped inventory. Each workspace lazily gets one default "Main" warehouse (`ensure_default_warehouse(p_workspace_id)`, called by `WarehousePanel` on mount). Stock is tracked per warehouse in `warehouse_items`; every change is an immutable `stock_movements` row. **Only the workspace's own catalog products are stocked** — operator-catalog reference items (`products.supply_mode='reference_only'`) are excluded from the add-item search.
 
 ### Tables
@@ -29,12 +42,20 @@ Workspace-scoped inventory. Each workspace lazily gets one default "Main" wareho
 
 Frontend: `WarehousePanel.tsx` (warehouse selector, item table, receive/issue/transfer/delete, `AddItemDialog` catalog search + `AddDealerProductDialog`, `AddWarehouseDialog`); `inboundService.ts` + `InboundSetupCard.tsx` + the Expenses (Inbox) tab in `DocumentsPage`. Mounted in the Finance "Warehouse" tab (`FinancePage.tsx`).
 
+### Stock counts (stocktake / reconcile)
+`create_stock_count(ws, warehouse)` snapshots every item in a warehouse into `stock_count_lines` (blind
+count sheet, `system_qty` frozen). The user enters physical `counted_qty` per line; `post_stock_count(count)`
+records an `adjust` `stock_movement` for each counted line that differs from the LIVE on-hand (so the ledger
+stays the single source of truth), stamps `adjusted_lines`, and flips the count to `posted`. `cancel_stock_count`
+discards a draft. `stock_overview(ws)` powers the module dashboard KPIs. All four are `SECURITY DEFINER`,
+`authenticated`-only, self-guarded on membership (reads) or finance-manager + `stock` entitlement (writes).
+
 ### Gaps
-- `qty_reserved` exists but is never written (no reservation/picklist logic).
-- No DB UNIQUE on `(workspace_id, warehouse_id, product_id)`.
+- `qty_reserved` is now co-written by the #237 sourcing spine + marketplace listings (was "never written").
+- ~~No DB UNIQUE on `(workspace_id, warehouse_id, product_id)`~~ — **fixed**: `uniq_warehouse_items_ws_wh_product` (partial, `product_id not null`).
+- ~~`warehouses` write is `is_workspace_member`~~ — **fixed**: tightened to `is_workspace_finance_manager` (+ `stock` entitlement).
 - Transfer target selection uses `window.prompt()` with >2 warehouses (placeholder UX).
 - Inbound→warehouse mapping is fully manual.
-- `warehouses` write is `is_workspace_member` (any member can create a warehouse) while item writes need `is_workspace_finance_manager`.
 
 ---
 

@@ -107,6 +107,12 @@ verify_jwt = false
 [functions.hr-api]
 verify_jwt = false
 
+# Stock Management module API (warehouse inventory + movements + stocktake). Does its own auth
+# (authenticate + userCanAccessWorkspace + isModuleEnabled('stock') + assertEntitled('stock');
+# writes run on a user-JWT client so RLS + stock RPC guards enforce finance-manager + entitlement).
+[functions.stock-api]
+verify_jwt = false
+
 # #252 — PUBLIC careers page (anonymous): list open jobs by workspace slug + accept applications.
 [functions.hr-careers]
 verify_jwt = false

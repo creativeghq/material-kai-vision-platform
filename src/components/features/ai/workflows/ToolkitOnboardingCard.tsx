@@ -16,6 +16,7 @@ import {
   PencilLine, ImageIcon, Mail, ListChecks, Grid3x3, Palette, AlertCircle, ArrowRight,
   Briefcase, FolderKanban,
   Users, CalendarOff, CalendarPlus, LayoutDashboard,
+  Package, PackagePlus, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -28,6 +29,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   PencilLine, ImageIcon, Mail, ListChecks, Grid3x3, Palette, AlertCircle,
   Briefcase, FolderKanban,
   Users, CalendarOff, CalendarPlus, LayoutDashboard,
+  Package, PackagePlus, AlertTriangle,
 };
 
 interface Props {

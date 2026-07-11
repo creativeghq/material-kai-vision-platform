@@ -1,0 +1,9 @@
+{
+  "slug": "stock",
+  "name": "Stock Management",
+  "description": "Multi-warehouse inventory: stock levels, receive/issue/adjust movements, transfers, reorder-point low-stock alerts, stock counts (stocktake), inbound-document intake and marketplace listing — all workspace-scoped. Extracted from Finance into a first-class paid add-on.",
+  "category": "operations",
+  "priceTier": "pro",
+  "icon": "Package",
+  "version": "0.1.0"
+}

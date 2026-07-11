@@ -64,7 +64,6 @@ import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
 import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
-import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
 import { SourcingBoardPanel } from '@/modules/finance/components/SourcingBoardPanel';
 import { MarketplaceEarningsTab } from '@/modules/finance/components/MarketplaceEarningsTab';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
@@ -415,11 +414,6 @@ const FinancePage: React.FC = () => {
             {!isAccountant && (
               <TabsTrigger value="marketplace" className="w-full justify-start">
                 <TrendingUp className="h-4 w-4 mr-2" /> Marketplace
-              </TabsTrigger>
-            )}
-            {!isAccountant && (
-              <TabsTrigger value="warehouse" className="w-full justify-start">
-                <Package className="h-4 w-4 mr-2" /> Warehouse
               </TabsTrigger>
             )}
             {!isAccountant && (
@@ -861,8 +855,15 @@ const FinancePage: React.FC = () => {
             <MarketplaceEarningsTab />
           </TabsContent>
 
+          {/* Warehouse/inventory moved out of Finance into its own paid Stock module. Keep a pointer
+              for anyone following an old ?tab=warehouse deep link. */}
           <TabsContent value="warehouse" className="space-y-4">
-            <WarehousePanel workspaceId={workspaceId} />
+            <div className="dashboard-card p-8 text-center">
+              <Package className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+              <div className="text-sm font-medium mb-1">Inventory now lives in Stock</div>
+              <p className="text-sm text-muted-foreground mb-4">Warehouse stock, movements, transfers and stocktake moved to the dedicated Stock module.</p>
+              <a href="/stock" className="text-sm text-primary hover:underline">Open Stock →</a>
+            </div>
           </TabsContent>
 
           <TabsContent value="sourcing" className="space-y-4">
