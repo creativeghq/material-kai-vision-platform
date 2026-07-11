@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CreditsService } from '@/services/credits.service';
 import { StripeService, calculateCreditsForAmount } from '@/services/stripe.service';
 import { CreditUsageHistory } from './CreditUsageHistory';
+import { CronPausedBanner } from './CronPausedBanner';
 
 const creditsService = new CreditsService();
 const stripeService = new StripeService();
@@ -71,6 +72,9 @@ export const CreditsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Scheduled features paused for lack of credits (auto-resume on top-up) */}
+      <CronPausedBanner />
+
       {/* Current Balance */}
       <Card className="rounded-2xl">
         <CardHeader>
