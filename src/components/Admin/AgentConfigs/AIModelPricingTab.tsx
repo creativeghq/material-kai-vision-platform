@@ -85,6 +85,7 @@ export const AIModelPricingTab: React.FC = () => {
   const [editValues, setEditValues] = useState<Partial<ModelPricing>>({});
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showInactive, setShowInactive] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
 
@@ -242,10 +243,16 @@ export const AIModelPricingTab: React.FC = () => {
     });
   };
 
-  const categories = ['all', ...Array.from(new Set(pricing.map(p => p.category).filter(Boolean)))];
+  // Retired/replaced models are deactivated (is_active=false) rather than deleted so
+  // their historical ai_usage_logs still resolve. Hide them by default so the tab only
+  // shows models the platform actually uses; the toggle brings them back for auditing.
+  const inactiveCount = pricing.filter(p => !p.is_active).length;
+  const visiblePricing = showInactive ? pricing : pricing.filter(p => p.is_active);
+
+  const categories = ['all', ...Array.from(new Set(visiblePricing.map(p => p.category).filter(Boolean)))];
   const filteredPricing = selectedCategory === 'all'
-    ? pricing
-    : pricing.filter(p => p.category === selectedCategory);
+    ? visiblePricing
+    : visiblePricing.filter(p => p.category === selectedCategory);
 
   // Group by category
   const groupedPricing = filteredPricing.reduce((acc, model) => {
@@ -290,7 +297,7 @@ export const AIModelPricingTab: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">LLM Models</p>
-                <p className="text-2xl font-bold">{pricing.filter(p => p.category === 'llm').length}</p>
+                <p className="text-2xl font-bold">{visiblePricing.filter(p => p.category === 'llm').length}</p>
               </div>
             </div>
           </CardContent>
@@ -303,7 +310,7 @@ export const AIModelPricingTab: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Embedding Models</p>
-                <p className="text-2xl font-bold">{pricing.filter(p => p.category === 'embedding').length}</p>
+                <p className="text-2xl font-bold">{visiblePricing.filter(p => p.category === 'embedding').length}</p>
               </div>
             </div>
           </CardContent>
@@ -316,7 +323,7 @@ export const AIModelPricingTab: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Vision Models</p>
-                <p className="text-2xl font-bold">{pricing.filter(p => p.category === 'vision').length}</p>
+                <p className="text-2xl font-bold">{visiblePricing.filter(p => p.category === 'vision').length}</p>
               </div>
             </div>
           </CardContent>
@@ -329,7 +336,7 @@ export const AIModelPricingTab: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">External Services</p>
-                <p className="text-2xl font-bold">{pricing.filter(p => p.category === 'external_service').length}</p>
+                <p className="text-2xl font-bold">{visiblePricing.filter(p => p.category === 'external_service').length}</p>
               </div>
             </div>
           </CardContent>
@@ -350,17 +357,27 @@ export const AIModelPricingTab: React.FC = () => {
       </div>
 
       {/* Category Filter */}
-      <div className="flex gap-2 flex-wrap">
-        {categories.map(category => (
-          <Button
-            key={category}
-            variant={selectedCategory === category ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedCategory(category)}
-          >
-            {category === 'all' ? 'All' : (CATEGORY_DISPLAY_NAMES[category] || category)}
-          </Button>
-        ))}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
+          {categories.map(category => (
+            <Button
+              key={category}
+              variant={selectedCategory === category ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category === 'all' ? 'All' : (CATEGORY_DISPLAY_NAMES[category] || category)}
+            </Button>
+          ))}
+        </div>
+        {inactiveCount > 0 && (
+          <div className="flex items-center gap-2">
+            <Switch id="show-inactive" checked={showInactive} onCheckedChange={setShowInactive} />
+            <Label htmlFor="show-inactive" className="text-sm text-muted-foreground cursor-pointer">
+              Show retired ({inactiveCount})
+            </Label>
+          </div>
+        )}
       </div>
 
       {/* Pricing Tables by Category */}
@@ -400,7 +417,14 @@ export const AIModelPricingTab: React.FC = () => {
                   <TableRow key={model.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{model.model_name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{model.model_name}</p>
+                          {!model.is_active && (
+                            <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-muted-foreground/30">
+                              Retired
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground font-mono">{model.model_key}</p>
                       </div>
                     </TableCell>

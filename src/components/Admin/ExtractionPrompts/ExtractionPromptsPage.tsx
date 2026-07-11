@@ -102,24 +102,35 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
   }, [selectedStage, selectedCategory]);
 
   const loadPrompts = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({ workspace_id: workspaceId });
-      if (selectedStage !== 'all') params.append('stage', selectedStage);
-      if (selectedCategory !== 'all') params.append('category', selectedCategory);
+    setLoading(true);
+    const params = new URLSearchParams({ workspace_id: workspaceId });
+    if (selectedStage !== 'all') params.append('stage', selectedStage);
+    if (selectedCategory !== 'all') params.append('category', selectedCategory);
 
+    // Hits the MIVAA backend (v1api.materialshub.gr), which can fail on the first
+    // request after an idle period (cold worker) or before the Supabase session
+    // token is warm. Retry once silently before surfacing a destructive toast so a
+    // transient first-hit failure doesn't flash a red error on page load.
+    const attempt = async () => {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) throw new Error('No auth session');
       const response = await fetch(
         `https://v1api.materialshub.gr/admin/extraction-prompts?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-        },
+        { headers: { Authorization: `Bearer ${token}` } },
       );
+      if (!response.ok) throw new Error(`Failed to load prompts (${response.status})`);
+      return response.json();
+    };
 
-      if (!response.ok) throw new Error('Failed to load prompts');
-
-      const data = await response.json();
+    try {
+      let data;
+      try {
+        data = await attempt();
+      } catch (firstError) {
+        console.warn('Extraction prompts: first load failed, retrying once…', firstError);
+        await new Promise((r) => setTimeout(r, 800));
+        data = await attempt();
+      }
       setPrompts(data);
     } catch (error) {
       console.error('Error loading prompts:', error);
