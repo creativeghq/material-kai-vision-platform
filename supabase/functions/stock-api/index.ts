@@ -18,6 +18,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { trackShipment, refreshShipment, type TrackInput } from '../_shared/shipping/shipsgo.ts';
 import { getFreightQuote, type SearatesCreds, type QuoteParams } from '../_shared/shipping/searates.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -523,14 +524,34 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         if (!origin || !destination) return json({ error: 'origin and destination are required' }, 400);
         if (!QUOTE_MODES.includes(mode)) return json({ error: `mode must be one of ${QUOTE_MODES.join(', ')}` }, 400);
 
-        const creds = await resolveSearatesCreds(svc, workspaceId);
-        if (!creds) return json({ ok: false, code: 'not_configured', error: 'Freight quotes are not set up. Add your SeaRates API key in Profile → Keys.' }, 503);
-
         const params: QuoteParams = {
           origin, destination, mode: mode as any,
           containerType: body?.container_type ? String(body.container_type) : null,
           readyDate: body?.ready_date ? String(body.ready_date) : null,
         };
+        const creds = await resolveSearatesCreds(svc, workspaceId);
+
+        // No BYOK key → the request goes to the OPERATOR, who fulfils it and the answer flows back.
+        if (!creds) {
+          const { data, error } = await usr.from('freight_quotes').insert({
+            workspace_id: workspaceId, origin, destination, mode, container_type: params.containerType,
+            ready_date: params.readyDate, offers: [], offer_count: 0,
+            source: 'operator', status: 'pending', requested_by: userId, created_by: userId,
+          }).select('*').single();
+          if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
+          // Notify the operator (best-effort; the operator queue at /admin/freight-quotes is the surface).
+          try {
+            await emitFlowEvent('freight_quote_requested', {
+              type: 'freight_quote_requested', quote_id: data.id, workspace_id: workspaceId,
+              origin, destination, mode, container_type: params.containerType,
+              title: 'Freight quote requested', body: `${origin} → ${destination} (${mode.toUpperCase()})`,
+              action_url: '/admin/freight-quotes',
+            });
+          } catch { /* best-effort */ }
+          return json({ quote: data }, 201);
+        }
+
+        // BYOK → direct SeaRates quote, instant.
         let offers;
         try { offers = await getFreightQuote(creds, params); }
         catch (e) { throw new HttpError(502, `Could not get a quote: ${(e as Error).message}`); }
@@ -539,7 +560,8 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         const { data, error } = await usr.from('freight_quotes').insert({
           workspace_id: workspaceId, origin, destination, mode, container_type: params.containerType,
           ready_date: params.readyDate, offers, offer_count: offers.length,
-          cheapest_amount: cheapest?.amount ?? null, cheapest_currency: cheapest?.currency ?? null, created_by: userId,
+          cheapest_amount: cheapest?.amount ?? null, cheapest_currency: cheapest?.currency ?? null,
+          source: 'byok', status: 'quoted', created_by: userId,
         }).select('*').single();
         if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
         return json({ quote: data }, 201);

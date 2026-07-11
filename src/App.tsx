@@ -95,6 +95,7 @@ const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').
 const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
 const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
 const SupplierClaimsPage = lazy(() => import('./pages/Admin/SupplierClaimsPage'));
+const FreightQuoteRequestsPage = lazy(() => import('./pages/Admin/FreightQuoteRequestsPage'));
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
@@ -763,6 +764,19 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <SupplierClaimsPage />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* Operator queue for tenant freight-quote requests (no-BYOK → request to operator) */}
+                <Route
+                  path="/admin/freight-quotes"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <FreightQuoteRequestsPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>

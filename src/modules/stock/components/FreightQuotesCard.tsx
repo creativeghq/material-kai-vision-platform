@@ -92,14 +92,22 @@ export const FreightQuotesCard: React.FC<{ workspaceId: string }> = ({ workspace
                       <td className="px-4 py-2 font-medium">
                         <span className="inline-flex items-center gap-1">{isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}{q.origin} → {q.destination}</span>
                         {q.container_type && <span className="ml-2 text-xs text-muted-foreground">{q.container_type}</span>}
+                        {q.status === 'pending' && <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-500">Awaiting operator</Badge>}
+                        {q.status === 'declined' && <Badge variant="outline" className="ml-2 border-muted-foreground/40 text-muted-foreground">Declined</Badge>}
                       </td>
                       <td className="px-4 py-2 uppercase text-xs text-muted-foreground">{q.mode}</td>
-                      <td className="px-4 py-2 text-right font-medium">{money(q.cheapest_amount, q.cheapest_currency)}</td>
-                      <td className="px-4 py-2 text-right text-muted-foreground">{q.offer_count}</td>
+                      <td className="px-4 py-2 text-right font-medium">{q.status === 'quoted' ? money(q.cheapest_amount, q.cheapest_currency) : '—'}</td>
+                      <td className="px-4 py-2 text-right text-muted-foreground">{q.status === 'quoted' ? q.offer_count : '—'}</td>
                       <td className="px-4 py-2 text-xs text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</td>
                     </tr>
                     {isOpen && (
-                      <tr className="border-b border-border/30 bg-muted/10"><td colSpan={5} className="px-6 py-2"><OffersTable offers={q.offers} /></td></tr>
+                      <tr className="border-b border-border/30 bg-muted/10">
+                        <td colSpan={5} className="px-6 py-2">
+                          {q.status === 'quoted' ? <OffersTable offers={q.offers} />
+                            : q.status === 'declined' ? <div className="text-xs text-muted-foreground py-2">Declined by the operator{q.operator_note ? `: ${q.operator_note}` : '.'}</div>
+                            : <div className="text-xs text-muted-foreground py-2">Requested from the operator — you'll see offers here once they respond.</div>}
+                        </td>
+                      </tr>
                     )}
                   </React.Fragment>
                 );
@@ -136,8 +144,14 @@ const GetQuoteModal: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
         container_type: mode === 'fcl' ? container : undefined,
         ready_date: readyDate || undefined,
       });
-      setResult(q);
       onQuoted();
+      if (q.status === 'pending') {
+        setResult(null);
+        toast({ title: 'Request sent to the operator', description: "You'll see the offers here once they respond." });
+        onOpenChange(false);
+        return;
+      }
+      setResult(q);
       if (q.offer_count === 0) toast({ title: 'No offers found', description: 'Try a different route or mode.' });
     } catch (err: any) {
       toast({ title: 'Quote failed', description: err?.message, variant: 'destructive' });
@@ -183,7 +197,7 @@ const GetQuoteModal: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
               <div className="max-h-64 overflow-y-auto"><OffersTable offers={result.offers} /></div>
             </div>
           )}
-          <p className="text-[11px] text-muted-foreground">Runs on your own SeaRates account (set it up in Profile → Keys). Aggregates rates from many forwarders.</p>
+          <p className="text-[11px] text-muted-foreground">With your own SeaRates key (Profile → Keys) you get instant offers from 100+ forwarders. Without one, the request is sent to the operator, who sends you a quote.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Close</Button>

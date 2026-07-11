@@ -154,6 +154,23 @@ export interface FreightQuote {
   offer_count: number;
   cheapest_amount: number | null;
   cheapest_currency: string | null;
+  source: 'byok' | 'operator';
+  status: 'pending' | 'quoted' | 'declined';
+  operator_note: string | null;
+  created_at: string;
+}
+
+/** Operator queue row — a tenant's pending freight-quote request (cross-tenant, operator-only). */
+export interface PendingQuoteRequest {
+  id: string;
+  workspace_id: string;
+  workspace_name: string;
+  origin: string;
+  destination: string;
+  mode: string;
+  container_type: string | null;
+  ready_date: string | null;
+  requested_by: string | null;
   created_at: string;
 }
 
@@ -265,4 +282,19 @@ export const stockService = {
   listFreightQuotes: (ws: string) => call<{ quotes: FreightQuote[] }>('shipping-quotes-list', ws).then((r) => r.quotes),
   getFreightQuote: (ws: string, input: { origin: string; destination: string; mode: string; container_type?: string; ready_date?: string }) =>
     call<{ quote: FreightQuote }>('shipping-quote', ws, input).then((r) => r.quote),
+
+  // ── Operator freight-quote queue (cross-tenant; operator-only, RPC-gated) ────
+  async listPendingQuotes(): Promise<PendingQuoteRequest[]> {
+    const { data, error } = await supabase.rpc('list_pending_freight_quotes');
+    if (error) throw error;
+    return (data ?? []) as PendingQuoteRequest[];
+  },
+  async answerQuote(quoteId: string, offers: FreightOffer[], note?: string): Promise<void> {
+    const { error } = await supabase.rpc('answer_freight_quote', { p_quote_id: quoteId, p_offers: offers, p_note: note ?? null });
+    if (error) throw error;
+  },
+  async declineQuote(quoteId: string, reason?: string): Promise<void> {
+    const { error } = await supabase.rpc('decline_freight_quote', { p_quote_id: quoteId, p_reason: reason ?? null });
+    if (error) throw error;
+  },
 };
