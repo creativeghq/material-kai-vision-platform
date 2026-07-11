@@ -1146,6 +1146,49 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'hr',
+    name: 'HR',
+    description: 'Ask about your team and log absences from chat: who\'s on leave, HR overview, record a sick/vacation day, add an employee.',
+    icon: 'Users',
+    moduleSlug: 'hr',
+    adminOnly: true, // HR data is owner/admin-only (hr.view); hr-api enforces regardless.
+    tool_ids: ['manage_hr'],
+    quick_starts: [
+      {
+        label: "Who's on leave", description: 'Approved absences this week', icon: 'CalendarOff',
+        prompt: "Who's on leave this week?",
+        run: { tool: 'manage_hr', fixedArgs: { action: 'who_is_on_leave' } },
+      },
+      {
+        label: 'HR overview', description: 'Headcount, on-leave-today, pending requests', icon: 'LayoutDashboard',
+        prompt: 'Give me an HR overview.',
+        run: { tool: 'manage_hr', fixedArgs: { action: 'overview' } },
+      },
+      {
+        label: 'List employees', description: 'The team roster with absence totals', icon: 'ListChecks',
+        prompt: 'List my employees.',
+        run: { tool: 'manage_hr', fixedArgs: { action: 'list_employees' } },
+      },
+      {
+        label: 'Record absence', description: 'Log a sick/vacation day (pending approval)', icon: 'CalendarPlus',
+        prompt: 'Record an absence for an employee.',
+        promptTemplate: 'Record a {{absence_type}} day for {{employee}} from {{start_date}} to {{end_date}}.',
+        run: { tool: 'manage_hr' },
+        form: [
+          { key: 'employee', label: 'Employee name', kind: 'text', required: true, placeholder: 'Maria' },
+          { key: 'absence_type', label: 'Type', kind: 'select', default: 'sick', options: [
+            { value: 'sick', label: 'Sick' },
+            { value: 'vacation', label: 'Vacation' },
+            { value: 'unpaid', label: 'Unpaid' },
+            { value: 'other', label: 'Other' },
+          ] },
+          { key: 'start_date', label: 'Start (YYYY-MM-DD)', kind: 'text', required: true, placeholder: '2026-07-14' },
+          { key: 'end_date', label: 'End (YYYY-MM-DD)', kind: 'text', required: true, placeholder: '2026-07-14' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'projects',
     name: 'Projects',
     description: 'Organize work into projects + tasks. Create, browse, and add tasks straight from chat.',
