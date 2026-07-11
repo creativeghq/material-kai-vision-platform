@@ -52,7 +52,11 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import { CanvasPanel, ArtifactChip, type CanvasArtifact } from './CanvasPanel';
-import { SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector, RenderInspector } from './ArtifactInspector';
+import {
+  SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector, RenderInspector,
+  JobFindingsInspector, SourcingInspector, OrderInspector, MentionSummaryInspector, MentionFeedInspector,
+  LlmVisibilityInspector, CatalogInspector,
+} from './ArtifactInspector';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
@@ -3284,6 +3288,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Which messages carry a canvas-eligible artifact (the P2 pilot set).
   const getCanvasArtifact = useCallback((m: Message): CanvasArtifact | null => {
     if (m.role !== 'assistant') return null;
+    if (m.demoData) return { id: m.id, kind: 'demo', title: 'Demo results' };
+    if (m.heatPumpData) return { id: m.id, kind: 'calc', title: 'Heat-pump sizing' };
+    if (m.heatingCostData) return { id: m.id, kind: 'calc', title: 'Heating cost comparison' };
     if (m.sheetPdfData) return { id: m.id, kind: 'sheet', title: m.sheetPdfData.title || 'Presentation sheet' };
     if (m.virtualStagingData) return { id: m.id, kind: 'staging', title: 'Virtual staging' };
     if (m.materialData?.products && m.materialData.products.length > 0) {
@@ -3770,6 +3777,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const renderCanvasArtifact = (message: Message): React.ReactNode => {
     if (message.generation_job) return renderGenerationGrid(message);
     if (message.designData) return renderDesignResults(message);
+    if (message.demoData) {
+      return (
+        <DemoAgentResults
+          result={message.demoData}
+          onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+          onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
+          onUseIn3DScene={handleUseProductIn3DScene}
+        />
+      );
+    }
+    if (message.heatPumpData) return <HeatPumpResultCard result={message.heatPumpData.result} />;
+    if (message.heatingCostData) return <HeatingCostResultCard result={message.heatingCostData.result} />;
     if (message.sheetPdfData) {
       return (
         <SheetPreviewCard
@@ -3938,6 +3957,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     if (message.worldData) return <WorldInspector data={message.worldData} />;
     if (message.materialsBoardData) return <BoardInspector data={message.materialsBoardData} />;
+    if (message.jobFindingsData) return <JobFindingsInspector data={message.jobFindingsData} />;
+    if (message.sourcingOptionsData) return <SourcingInspector data={message.sourcingOptionsData} />;
+    if (message.purchaseOrderCreatedData || message.purchaseOrderSentData) {
+      return <OrderInspector created={message.purchaseOrderCreatedData} sent={message.purchaseOrderSentData} />;
+    }
+    if (message.mentionSummaryData) return <MentionSummaryInspector data={message.mentionSummaryData} />;
+    if (message.mentionFeedData) return <MentionFeedInspector data={message.mentionFeedData} />;
+    if (message.llmVisibilityData) return <LlmVisibilityInspector data={message.llmVisibilityData} />;
+    if (message.catalogExtractionData) return <CatalogInspector data={message.catalogExtractionData} />;
+    if (message.catalogImageCandidatesData) return <CatalogInspector data={message.catalogImageCandidatesData} material={message.catalogImageCandidatesData.material_name} />;
     return null;
   };
   const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
@@ -4302,12 +4331,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     {message.demoData ? (
                       <div className="space-y-4">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        <DemoAgentResults
-                          result={message.demoData}
-                          onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-                          onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                          onUseIn3DScene={handleUseProductIn3DScene}
-                        />
+                        {canvasShown ? (
+                          <ArtifactChip kind="demo" title="Demo results" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : (
+                          <DemoAgentResults
+                            result={message.demoData}
+                            onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                            onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
+                            onUseIn3DScene={handleUseProductIn3DScene}
+                          />
+                        )}
                       </div>
                     ) : message.inspirationData ? (
                       <div className="space-y-3">
@@ -4336,12 +4369,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.heatPumpData ? (
                       <div className="space-y-3">
-                        <HeatPumpResultCard result={message.heatPumpData.result} />
+                        {canvasShown ? (
+                          <ArtifactChip kind="calc" title="Heat-pump sizing" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : (
+                          <HeatPumpResultCard result={message.heatPumpData.result} />
+                        )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.heatingCostData ? (
                       <div className="space-y-3">
-                        <HeatingCostResultCard result={message.heatingCostData.result} />
+                        {canvasShown ? (
+                          <ArtifactChip kind="calc" title="Heating cost comparison" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
+                        ) : (
+                          <HeatingCostResultCard result={message.heatingCostData.result} />
+                        )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.techRadarData ? (
@@ -4441,18 +4482,27 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
                         )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {/* Products open in the canvas; the chip below stands in when it's shown */}
-                        {!canvasShown && (
-                          <DemoAgentResults
-                            result={{
-                              type: 'product_list',
-                              data: message.materialData.products,
-                              message: message.materialData.title || 'Material Results',
-                            }}
-                            onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-                            onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                            onUseIn3DScene={handleUseProductIn3DScene}
-                          />
+                        {/* Products open in the canvas; the chip stands in when it's shown */}
+                        {message.materialData.products && message.materialData.products.length > 0 && (
+                          canvasShown ? (
+                            <ArtifactChip
+                              kind="products"
+                              title={message.materialData.title || `${message.materialData.products.length} products`}
+                              active={activeCanvasId === message.id}
+                              onOpen={() => focusCanvas(message.id)}
+                            />
+                          ) : (
+                            <DemoAgentResults
+                              result={{
+                                type: 'product_list',
+                                data: message.materialData.products,
+                                message: message.materialData.title || 'Material Results',
+                              }}
+                              onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                              onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
+                              onUseIn3DScene={handleUseProductIn3DScene}
+                            />
+                          )
                         )}
                       </div>
                     ) : message.designData ? (
@@ -4716,31 +4766,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           </div>
                         )}
 
-                        {/* Show ProductStrip for messages with material data (chip when canvas is open) */}
-                        {message.role === 'assistant' && message.materialData?.products && message.materialData.products.length > 0 && (
-                          canvasShown ? (
-                            <ArtifactChip
-                              kind="products"
-                              title={message.materialData.title || `${message.materialData.products.length} products`}
-                              active={activeCanvasId === message.id}
-                              onOpen={() => focusCanvas(message.id)}
-                            />
-                          ) : (
-                            <ProductStrip
-                              products={message.materialData.products}
-                              title={`Found ${message.materialData.products.length} products`}
-                              onReplaceInImage={(product) => {
-                                const primaryImage = product.images?.find((img: any) => img.isPrimary) || product.images?.[0];
-                                setPendingReplacement({
-                                  id: product.id,
-                                  name: product.name,
-                                  imageUrl: primaryImage?.url,
-                                });
-                              }}
-                              onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
-                            />
-                          )
-                        )}
+                        {/* NOTE: materialData is handled by its own ternary branch above (with the
+                            SearchSpec + products chip); it never reaches this regular-message block. */}
 
                         {/* Async 3D room-generation grid — full grid opens in the canvas (chip in chat) */}
                         {message.role === 'assistant' && message.generation_job && (

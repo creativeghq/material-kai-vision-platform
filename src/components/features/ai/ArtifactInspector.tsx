@@ -193,3 +193,127 @@ export const ProductsInspector: React.FC<{ data: any }> = ({ data }) => {
     </Shell>
   );
 };
+
+// ── Data-card inspectors (#253 P4) ─────────────────────────────────────────
+export const JobFindingsInspector: React.FC<{ data: any }> = ({ data }) => {
+  const listings: any[] = Array.isArray(data?.listings) ? data.listings : [];
+  const remote = listings.filter((l) => l?.is_remote).length;
+  const win = data?.discovered_at_window === 'last_24h' ? 'Last 24h' : humanize(data?.discovered_at_window) || '—';
+  return (
+    <Shell kicker="Job findings" title={data?.tracked_job_label || 'Job digest'}>
+      <div>
+        <SectionH>Summary</SectionH>
+        <Field k="Matches" v={listings.length} />
+        <Field k="Remote" v={remote} />
+        <Field k="Window" v={win} />
+      </div>
+    </Shell>
+  );
+};
+
+export const SourcingInspector: React.FC<{ data: any }> = ({ data }) => (
+  <Shell kicker="Supply options" title={`Quantity ${data?.quantity ?? '—'}`}>
+    <div>
+      <SectionH>Sources</SectionH>
+      <Field k="Warehouse" v={data?.counts?.warehouse ?? 0} />
+      <Field k="Inbound PO" v={data?.counts?.inbound_po ?? 0} />
+      <Field k="Supplier" v={data?.counts?.supplier ?? 0} />
+    </div>
+  </Shell>
+);
+
+export const OrderInspector: React.FC<{ created?: any; sent?: any }> = ({ created, sent }) => (
+  <Shell kicker="Purchase order" title={sent?.order_number ? `PO ${sent.order_number}` : 'Purchase orders'}>
+    <div>
+      <SectionH>Details</SectionH>
+      {created && <Field k="Drafts created" v={created.purchase_orders_created ?? 0} />}
+      {created && <Field k="Allocations" v={created.allocations_created ?? 0} />}
+      {sent?.order_number && <Field k="PO #" v={sent.order_number} />}
+      {sent?.recipient && <Field k="Recipient" v={sent.recipient} />}
+    </div>
+    {sent?.pdf_url && (
+      <a
+        href={sent.pdf_url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90"
+      >
+        Open PDF <ArrowUpRight className="h-4 w-4" />
+      </a>
+    )}
+  </Shell>
+);
+
+export const MentionSummaryInspector: React.FC<{ data: any }> = ({ data }) => {
+  const s = data?.summary || {};
+  const bs = s.by_sentiment || {};
+  return (
+    <Shell kicker="Mention summary" title={`Last ${data?.days ?? '—'} days`}>
+      <div>
+        <SectionH>Totals</SectionH>
+        <Field k="Total" v={s.total_count ?? 0} />
+        <Field k="Positive" v={bs.positive ?? 0} />
+        <Field k="Neutral" v={bs.neutral ?? 0} />
+        <Field k="Negative" v={bs.negative ?? 0} />
+      </div>
+      {Array.isArray(s.top_outlets) && s.top_outlets.length > 0 && (
+        <div>
+          <SectionH>Top outlets</SectionH>
+          <div className="flex flex-wrap gap-1.5">
+            {s.top_outlets.slice(0, 8).map((o: any) => (
+              <span key={o.domain} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-muted-foreground">
+                {o.domain} · {o.count}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </Shell>
+  );
+};
+
+export const MentionFeedInspector: React.FC<{ data: any }> = ({ data }) => {
+  const rows: any[] = Array.isArray(data?.rows) ? data.rows : [];
+  return (
+    <Shell kicker="Mention feed" title={`Last ${data?.days ?? '—'} days`}>
+      <div>
+        <SectionH>Summary</SectionH>
+        <Field k="Mentions" v={rows.length} />
+        {data?.sentiment_filter && <Field k="Filter" v={humanize(data.sentiment_filter)} />}
+      </div>
+    </Shell>
+  );
+};
+
+export const LlmVisibilityInspector: React.FC<{ data: any }> = ({ data }) => {
+  const snap = data?.snapshot;
+  if (!snap?.present) {
+    return (
+      <Shell kicker="LLM visibility" title="No probes yet">
+        <div className="text-[13px] text-muted-foreground">No probes recorded.</div>
+      </Shell>
+    );
+  }
+  return (
+    <Shell kicker="LLM visibility" title={data?.forced ? 'Fresh probe' : 'Snapshot'}>
+      <div>
+        <SectionH>Metrics</SectionH>
+        <Field k="Share of voice" v={`${Math.round((snap.share_of_voice || 0) * 100)}%`} />
+        <Field k="Average rank" v={snap.avg_position ? `#${Number(snap.avg_position).toFixed(1)}` : '—'} />
+      </div>
+    </Shell>
+  );
+};
+
+export const CatalogInspector: React.FC<{ data: any; material?: string }> = ({ data, material }) => {
+  const candidates: any[] = Array.isArray(data?.candidates) ? data.candidates : [];
+  return (
+    <Shell kicker="Catalog" title={material || data?.query || 'Candidates'}>
+      <div>
+        <SectionH>Details</SectionH>
+        <Field k="Candidates" v={candidates.length} />
+        {data?.query && <Field k="Query" v={data.query} />}
+      </div>
+    </Shell>
+  );
+};

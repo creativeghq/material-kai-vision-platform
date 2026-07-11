@@ -15,13 +15,15 @@ import {
   FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video, Sofa,
   PanelRightClose, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
+  Wand2, Calculator,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
   | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design' | 'render'
   | 'inspiration' | 'radar' | 'result'
-  | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog';
+  | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
+  | 'demo' | 'calc';
 
 export interface CanvasArtifact {
   id: string;
@@ -49,6 +51,8 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   llm: Bot,
   seo: TrendingUp,
   catalog: Images,
+  demo: Wand2,
+  calc: Calculator,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -71,6 +75,8 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   llm: 'LLM visibility',
   seo: 'SEO',
   catalog: 'Catalog',
+  demo: 'Demo results',
+  calc: 'Calculation',
 };
 
 interface CanvasPanelProps {
