@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 export type OrderType = 'sales' | 'purchase';
 export type OrderStatus = 'draft' | 'confirmed' | 'partially_fulfilled' | 'fulfilled' | 'cancelled';
@@ -230,7 +231,7 @@ export const ordersService = {
         total,
         notes: input.notes ?? null,
       })
-      .select('id')
+      .select('id, order_number')
       .single();
     if (error) throw error;
     const orderId = order.id as string;
@@ -256,6 +257,23 @@ export const ordersService = {
       const { error: itErr } = await supabase.from('order_items').insert(itemRows);
       if (itErr) throw itErr;
     }
+    // Flows — order lifecycle (fire-and-forget).
+    flowEventService.emit('order_created', {
+      type: 'order_created',
+      workspace_id: input.workspaceId,
+      order_id: orderId,
+      order_number: (order as any).order_number ?? null,
+      order_type: input.orderType,
+      status: input.status ?? 'draft',
+      total,
+      currency: input.currency ?? 'EUR',
+      customer_company_id: input.customerCompanyId ?? null,
+      supplier_company_id: input.supplierCompanyId ?? null,
+      project_id: input.projectId ?? null,
+      title: `${input.orderType === 'purchase' ? 'Purchase' : 'Sales'} order created${(order as any).order_number ? ` #${(order as any).order_number}` : ''}`,
+      body: `A ${input.orderType} order was created (${total.toFixed(2)} ${input.currency ?? 'EUR'}).`,
+      action_url: '/finance?tab=orders',
+    });
     return orderId;
   },
 
@@ -408,8 +426,27 @@ export const ordersService = {
   },
 
   async setStatus(id: string, status: OrderStatus): Promise<void> {
-    const { error } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+    const { data, error } = await supabase.from('orders')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id, order_number, order_type, workspace_id, total, currency')
+      .single();
     if (error) throw error;
+    // Flows — order status change (fire-and-forget).
+    flowEventService.emit('order_status_changed', {
+      type: 'order_status_changed',
+      workspace_id: (data as any).workspace_id,
+      order_id: id,
+      order_number: (data as any).order_number ?? null,
+      order_type: (data as any).order_type,
+      status,
+      status_label: ORDER_STATUS_LABEL[status] ?? status,
+      total: (data as any).total,
+      currency: (data as any).currency ?? 'EUR',
+      title: `Order ${(data as any).order_number ? `#${(data as any).order_number} ` : ''}→ ${ORDER_STATUS_LABEL[status] ?? status}`,
+      body: `Order status changed to "${ORDER_STATUS_LABEL[status] ?? status}".`,
+      action_url: '/finance?tab=orders',
+    });
   },
 
   /** Replace an order's line items and recompute its totals (draft/un-invoiced orders). */

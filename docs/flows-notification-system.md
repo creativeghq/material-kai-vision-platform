@@ -137,6 +137,21 @@ Defined in `src/services/flows/types.ts` (`TriggerType`). Beyond the originals
 `role_upgrade_request_submitted/approved/rejected`,
 `stripe_payment_succeeded/failed`, `project_invitation_sent/resent`.
 
+**Module lifecycle triggers** (each wired to a real emit point — a trigger with no
+emitter is not shipped):
+- **HR** (`hr-api`): `hr.employee_added` (create-employee), `hr.absence_requested`
+  (record-absence), `hr.absence_reviewed` (approve/reject-absence), plus the existing
+  `hr_late_checkin` (cron) and `hr.applicant_stage_changed` (ATS).
+- **Finance** (`ordersService`): `order_created` (order create), `order_status_changed`
+  (status transition) — alongside the existing invoice/receipt/payment/expense/PO events.
+- **Docs** (`docsService`): `document_published` (draft→published transition, fires once),
+  `doc_suggestion_submitted` (a member proposes an edit).
+
+These are registered in `flow_area_registry` as **optional** (unbound) automation
+surfaces — an operator builds and binds their own flow. They are NOT pre-seeded with
+a skip-forever default notification (no natural single recipient), so nothing runs
+until an operator wires one in the builder.
+
 ### Action types (engine handlers in `flow-engine/index.ts`)
 - `create_notification` — insert into `user_notifications` (bell). Guarded.
 - `send_email` — invoke `email-api`. Guarded. Tenant-scoped flows send BYOK.

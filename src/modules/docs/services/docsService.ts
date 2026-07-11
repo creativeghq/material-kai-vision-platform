@@ -2,6 +2,7 @@
 // the doc creator or workspace owner edits/deletes (members otherwise propose — follow-up).
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 // editor_json added 2026-07-11 (Yoopta block-JSON source of truth); the generated
 // Row type is regenerated out-of-band, so widen it here until then.
@@ -28,6 +29,21 @@ export async function listDocs(workspaceId: string): Promise<WorkspaceDoc[]> {
   return data ?? [];
 }
 
+/** Flows — a workspace doc reached the 'published' state (fire-and-forget). */
+function emitDocumentPublished(doc: WorkspaceDoc, workspaceId: string) {
+  flowEventService.emit('document_published', {
+    type: 'document_published',
+    workspace_id: workspaceId,
+    doc_id: (doc as any).id,
+    doc_title: (doc as any).title,
+    category: (doc as any).category ?? null,
+    tags: (doc as any).tags ?? [],
+    title: `Document published: ${(doc as any).title}`,
+    body: `"${(doc as any).title}" was published in your workspace docs.`,
+    action_url: `/docs?doc=${(doc as any).id}`,
+  });
+}
+
 export async function createDoc(workspaceId: string, userId: string, input: DocInput): Promise<WorkspaceDoc> {
   const { data, error } = await supabase
     .from('workspace_docs')
@@ -35,10 +51,18 @@ export async function createDoc(workspaceId: string, userId: string, input: DocI
     .select('*')
     .single();
   if (error) throw new Error(error.message);
-  return data as WorkspaceDoc;
+  const doc = data as WorkspaceDoc;
+  if (input.status === 'published') emitDocumentPublished(doc, workspaceId);
+  return doc;
 }
 
 export async function updateDoc(id: string, userId: string, input: DocInput): Promise<WorkspaceDoc> {
+  // Detect the draft→published transition so the flow fires once, not on every re-save.
+  let priorStatus: string | null = null;
+  if (input.status === 'published') {
+    const { data: prev } = await supabase.from('workspace_docs').select('status').eq('id', id).maybeSingle();
+    priorStatus = (prev as any)?.status ?? null;
+  }
   const { data, error } = await supabase
     .from('workspace_docs')
     .update({ ...input, updated_by: userId, updated_at: new Date().toISOString() } as never)
@@ -46,7 +70,11 @@ export async function updateDoc(id: string, userId: string, input: DocInput): Pr
     .select('*')
     .single();
   if (error) throw new Error(error.message);
-  return data as WorkspaceDoc;
+  const doc = data as WorkspaceDoc;
+  if (input.status === 'published' && priorStatus !== 'published') {
+    emitDocumentPublished(doc, (doc as any).workspace_id);
+  }
+  return doc;
 }
 
 export async function deleteDoc(id: string): Promise<void> {
@@ -84,6 +112,23 @@ export async function createSuggestion(
     rationale: rationale || null,
   });
   if (error) throw new Error(error.message);
+  // Flows — a member proposed an edit; the doc owner can automate a review notification.
+  let docTitle: string | null = null;
+  try {
+    const { data: d } = await supabase.from('workspace_docs').select('title').eq('id', docId).maybeSingle();
+    docTitle = (d as any)?.title ?? null;
+  } catch { /* best-effort */ }
+  flowEventService.emit('doc_suggestion_submitted', {
+    type: 'doc_suggestion_submitted',
+    workspace_id: workspaceId,
+    doc_id: docId,
+    doc_title: docTitle,
+    proposer_user_id: userId,
+    rationale: rationale || null,
+    title: `Edit proposed${docTitle ? `: ${docTitle}` : ''}`,
+    body: `A member proposed an edit${docTitle ? ` to "${docTitle}"` : ''}.`,
+    action_url: `/docs?doc=${docId}`,
+  });
 }
 
 export async function reviewSuggestion(id: string, action: 'accept' | 'reject'): Promise<void> {

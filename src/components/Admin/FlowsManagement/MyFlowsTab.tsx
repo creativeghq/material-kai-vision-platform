@@ -36,6 +36,11 @@ import {
   Lock,
   Unlock,
   Inbox,
+  CalendarOff,
+  CalendarCheck,
+  ShoppingCart,
+  BookOpen,
+  FilePlus2,
   Building2,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
@@ -140,6 +145,13 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   module_access_requested: Package,
   hr_late_checkin: Clock,
   'hr.applicant_stage_changed': UserPlus,
+  'hr.employee_added': UserPlus,
+  'hr.absence_requested': CalendarOff,
+  'hr.absence_reviewed': CalendarCheck,
+  order_created: ShoppingCart,
+  order_status_changed: Package,
+  document_published: BookOpen,
+  doc_suggestion_submitted: FilePlus2,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -212,6 +224,13 @@ const triggerLabels: Record<TriggerType, string> = {
   pricing_change_decided: 'Discount Approval Decided',
   hr_late_checkin: 'HR — Late Check-in',
   'hr.applicant_stage_changed': 'HR — Applicant Stage Changed',
+  'hr.employee_added': 'HR — Employee Added',
+  'hr.absence_requested': 'HR — Absence Requested',
+  'hr.absence_reviewed': 'HR — Absence Reviewed',
+  order_created: 'Order Created',
+  order_status_changed: 'Order Status Changed',
+  document_published: 'Document Published',
+  doc_suggestion_submitted: 'Doc Edit Proposed',
 };
 
 const statusColors: Record<FlowStatus, string> = {

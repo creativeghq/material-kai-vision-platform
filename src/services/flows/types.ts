@@ -88,12 +88,29 @@ export type TriggerType =
   // #252 — HR: an employee has not clocked in past their start time + grace (payload-only)
   | 'hr_late_checkin'
   // #252 — HR recruiting: a job applicant moved through the pipeline (payload-only, dotted key)
-  | 'hr.applicant_stage_changed';
+  | 'hr.applicant_stage_changed'
+  // #252 — HR lifecycle (payload-only, dotted keys)
+  | 'hr.employee_added'
+  | 'hr.absence_requested'
+  | 'hr.absence_reviewed'
+  // Finance — order lifecycle (sales/purchase orders)
+  | 'order_created'
+  | 'order_status_changed'
+  // #254 — Docs module: a workspace doc was published, or a member proposed an edit
+  | 'document_published'
+  | 'doc_suggestion_submitted';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
 export interface HrLateCheckinTriggerConfig {}
 export interface HrApplicantStageChangedTriggerConfig {}
+export interface HrEmployeeAddedTriggerConfig {}
+export interface HrAbsenceRequestedTriggerConfig {}
+export interface HrAbsenceReviewedTriggerConfig {}
+export interface OrderCreatedTriggerConfig {}
+export interface OrderStatusChangedTriggerConfig {}
+export interface DocumentPublishedTriggerConfig {}
+export interface DocSuggestionSubmittedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
@@ -291,6 +308,13 @@ export type TriggerConfigMap = {
   module_access_requested: ModuleAccessRequestedTriggerConfig;
   hr_late_checkin: HrLateCheckinTriggerConfig;
   'hr.applicant_stage_changed': HrApplicantStageChangedTriggerConfig;
+  'hr.employee_added': HrEmployeeAddedTriggerConfig;
+  'hr.absence_requested': HrAbsenceRequestedTriggerConfig;
+  'hr.absence_reviewed': HrAbsenceReviewedTriggerConfig;
+  order_created: OrderCreatedTriggerConfig;
+  order_status_changed: OrderStatusChangedTriggerConfig;
+  document_published: DocumentPublishedTriggerConfig;
+  doc_suggestion_submitted: DocSuggestionSubmittedTriggerConfig;
 };
 
 // =====================================================

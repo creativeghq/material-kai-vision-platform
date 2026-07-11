@@ -12,6 +12,9 @@ import {
   LayoutGrid, ImagePlus, Share2,
   BotMessageSquare,
   Compass, FileSearch, Building2, UserSearch, MailCheck,
+  MessageCircle, Megaphone, TrendingDown,
+  Inbox, ClipboardCheck, FileCheck, Eye, Star, Package,
+  CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
 } from 'lucide-react';
 import {
   Accordion,
@@ -35,6 +38,9 @@ const iconMap: Record<string, React.ElementType> = {
   LayoutGrid, ImagePlus, Share2,
   BotMessageSquare,
   Compass, FileSearch, Building2, UserSearch, MailCheck,
+  MessageCircle, Megaphone, TrendingDown,
+  Inbox, ClipboardCheck, FileCheck, Eye, Star, Package,
+  CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
 };
 
 const categoryColors: Record<string, string> = {

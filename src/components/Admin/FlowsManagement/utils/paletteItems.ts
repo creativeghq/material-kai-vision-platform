@@ -228,12 +228,36 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'material_alert', group: 'Users',
     label: 'Saved-Search Material Alert', description: 'A new material matches a saved search', icon: 'Bell', color: 'blue',
     defaultData: { label: 'Saved-Search Material Alert', category: 'trigger', triggerType: 'material_alert', config: {} } as TriggerNodeData },
-  { type: 'triggerNode', category: 'trigger', subType: 'hr_late_checkin', group: 'Users',
+  { type: 'triggerNode', category: 'trigger', subType: 'hr_late_checkin', group: 'HR',
     label: 'HR — Late Check-in', description: 'An employee has not clocked in past their start time + grace', icon: 'Clock', color: 'amber',
     defaultData: { label: 'HR — Late Check-in', category: 'trigger', triggerType: 'hr_late_checkin', config: {} } as TriggerNodeData },
-  { type: 'triggerNode', category: 'trigger', subType: 'hr.applicant_stage_changed', group: 'Users',
+  { type: 'triggerNode', category: 'trigger', subType: 'hr.applicant_stage_changed', group: 'HR',
     label: 'HR — Applicant Stage Changed', description: 'A job applicant moved through the pipeline (applied → interview → offer → hired…)', icon: 'UserPlus', color: 'violet',
     defaultData: { label: 'HR — Applicant Stage Changed', category: 'trigger', triggerType: 'hr.applicant_stage_changed', config: {} } as TriggerNodeData },
+  // #252 — HR lifecycle
+  { type: 'triggerNode', category: 'trigger', subType: 'hr.employee_added', group: 'HR',
+    label: 'HR — Employee Added', description: 'A new employee was created in the HR module', icon: 'UserPlus', color: 'violet',
+    defaultData: { label: 'HR — Employee Added', category: 'trigger', triggerType: 'hr.employee_added', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'hr.absence_requested', group: 'HR',
+    label: 'HR — Absence Requested', description: 'An absence/leave was recorded (pending review)', icon: 'CalendarOff', color: 'violet',
+    defaultData: { label: 'HR — Absence Requested', category: 'trigger', triggerType: 'hr.absence_requested', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'hr.absence_reviewed', group: 'HR',
+    label: 'HR — Absence Reviewed', description: 'An absence was approved or rejected', icon: 'CalendarCheck', color: 'violet',
+    defaultData: { label: 'HR — Absence Reviewed', category: 'trigger', triggerType: 'hr.absence_reviewed', config: {} } as TriggerNodeData },
+  // Finance — order lifecycle
+  { type: 'triggerNode', category: 'trigger', subType: 'order_created', group: 'Finance',
+    label: 'Order Created', description: 'A sales or purchase order was created', icon: 'ShoppingCart', color: 'emerald',
+    defaultData: { label: 'Order Created', category: 'trigger', triggerType: 'order_created', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'order_status_changed', group: 'Finance',
+    label: 'Order Status Changed', description: 'An order moved to a new status (confirmed / fulfilled / cancelled…)', icon: 'Package', color: 'emerald',
+    defaultData: { label: 'Order Status Changed', category: 'trigger', triggerType: 'order_status_changed', config: {} } as TriggerNodeData },
+  // #254 — Docs module
+  { type: 'triggerNode', category: 'trigger', subType: 'document_published', group: 'Docs',
+    label: 'Document Published', description: 'A workspace document was published', icon: 'BookOpen', color: 'emerald',
+    defaultData: { label: 'Document Published', category: 'trigger', triggerType: 'document_published', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'doc_suggestion_submitted', group: 'Docs',
+    label: 'Doc Edit Proposed', description: 'A member proposed an edit to a workspace document', icon: 'FilePlus2', color: 'emerald',
+    defaultData: { label: 'Doc Edit Proposed', category: 'trigger', triggerType: 'doc_suggestion_submitted', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

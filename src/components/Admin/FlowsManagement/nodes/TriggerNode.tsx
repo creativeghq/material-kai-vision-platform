@@ -6,6 +6,7 @@ import {
   Search, Box, Orbit,
   SearchCheck, ScanEye, PackagePlus,
   LayoutGrid, ImagePlus, Share2, Inbox, Send,
+  CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -79,6 +80,13 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   pricing_change_decided: CheckCircle2,
   hr_late_checkin: Clock,
   'hr.applicant_stage_changed': UserPlus,
+  'hr.employee_added': UserPlus,
+  'hr.absence_requested': CalendarOff,
+  'hr.absence_reviewed': CalendarCheck,
+  order_created: ShoppingCart,
+  order_status_changed: Package,
+  document_published: BookOpen,
+  doc_suggestion_submitted: FilePlus2,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {
