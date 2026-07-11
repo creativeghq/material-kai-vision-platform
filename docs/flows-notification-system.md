@@ -151,6 +151,16 @@ emitter is not shipped):
   campaign-aware via `email_logs.tags`). Opens/clicks are **intentionally not** triggers
   (high-volume; every open would fire a metered flow run — the campaign dashboard already
   aggregates them). The `send_campaign` **action** dispatches an existing campaign.
+- **Social publishing** (Zernio): `social_post_published` + `social_post_failed`
+  (`zernio-webhook-handler` `post.published`/`post.partial`/`post.failed`, workspace-scoped).
+- **Project Client Views**: `client_view_feedback_received` (`moodboard-sheet-share` — a
+  client approves / requests changes / comments on a shared deliverable; routed to the
+  deliverable owner + resolved workspace via the project).
+
+> **Deferred (needs a design decision, not just wiring):** a CRM `crm_contact_created`
+> trigger. Contacts are created from many paths (manual, bulk import, WhatsApp inbound),
+> so a raw insert trigger would fire on every imported row — it needs a "new lead vs
+> import" definition first. Not shipped as inert palette decoration.
 
 These are registered in `flow_area_registry` as **optional** (unbound) automation
 surfaces — an operator builds and binds their own flow. They are NOT pre-seeded with

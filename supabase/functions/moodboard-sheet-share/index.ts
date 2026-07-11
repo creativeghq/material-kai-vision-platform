@@ -18,6 +18,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -43,7 +44,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
   // ---------- 1. CLIENT VIEW token? ----------
   const { data: view } = await supabase
     .from('project_client_views')
-    .select('id, project_id, title, cover, sheet_ids, pdf_storage_path, ' +
+    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, ' +
       'public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, ' +
       'feedback_enabled, vr_world_id, quote_id')
     .eq('public_share_token', token)
@@ -77,6 +78,31 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
         body: typeof feedback.body === 'string' ? feedback.body.slice(0, 4000) : null,
       });
       if (fErr) return jsonResponse({ error: 'Could not save feedback' }, 500);
+      // Flows — notify the deliverable owner that a client responded. Resolve the owning
+      // workspace via the project so tenant-scoped flows match. Best-effort.
+      try {
+        const { data: proj } = await supabase
+          .from('projects').select('workspace_id, name').eq('id', view.project_id).maybeSingle();
+        const authorName = typeof feedback.author_name === 'string' ? feedback.author_name.slice(0, 120) : 'A client';
+        const verb = status === 'approved' ? 'approved' : status === 'changes_requested' ? 'requested changes on' : 'commented on';
+        await emitFlowEvent('client_view_feedback_received', {
+          type: 'client_view_feedback_received',
+          workspace_id: (proj as any)?.workspace_id ?? null,
+          user_id: view.created_by,
+          client_view_id: view.id,
+          project_id: view.project_id,
+          project_name: (proj as any)?.name ?? null,
+          view_title: view.title,
+          kind, status,
+          author_name: authorName,
+          comment: typeof feedback.body === 'string' ? feedback.body.slice(0, 300) : null,
+          title: `${authorName} ${verb} "${view.title}"`,
+          body: typeof feedback.body === 'string' && feedback.body.trim()
+            ? `${authorName} ${verb} the deliverable: "${String(feedback.body).slice(0, 200)}"`
+            : `${authorName} ${verb} the deliverable "${view.title}".`,
+          action_url: `/projects/${view.project_id}?tab=client-view`,
+        });
+      } catch { /* best-effort — never fail the public feedback write on a flow emit */ }
       return jsonResponse({ success: true });
     }
 

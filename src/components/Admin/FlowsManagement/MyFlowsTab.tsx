@@ -158,6 +158,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   campaign_sent: Megaphone,
   email_bounced: MailX,
   email_complained: MailWarning,
+  social_post_published: Share2,
+  social_post_failed: XCircle,
+  client_view_feedback_received: ClipboardCheck,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -240,6 +243,9 @@ const triggerLabels: Record<TriggerType, string> = {
   campaign_sent: 'Campaign Sent',
   email_bounced: 'Email Bounced',
   email_complained: 'Spam Complaint',
+  social_post_published: 'Social Post Published',
+  social_post_failed: 'Social Post Failed',
+  client_view_feedback_received: 'Client View Feedback',
 };
 
 const statusColors: Record<FlowStatus, string> = {

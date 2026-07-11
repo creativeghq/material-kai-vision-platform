@@ -91,6 +91,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   campaign_sent: Megaphone,
   email_bounced: MailX,
   email_complained: MailWarning,
+  social_post_published: Share2,
+  social_post_failed: XCircle,
+  client_view_feedback_received: ClipboardCheck,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

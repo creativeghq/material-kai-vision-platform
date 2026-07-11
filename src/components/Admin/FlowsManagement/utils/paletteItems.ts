@@ -268,6 +268,17 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'email_complained', group: 'Email Marketing',
     label: 'Spam Complaint', description: 'A recipient marked a campaign email as spam', icon: 'MailWarning', color: 'amber',
     defaultData: { label: 'Spam Complaint', category: 'trigger', triggerType: 'email_complained', config: {} } as TriggerNodeData },
+  // Social publishing (Zernio)
+  { type: 'triggerNode', category: 'trigger', subType: 'social_post_published', group: 'Social',
+    label: 'Social Post Published', description: 'A scheduled social post went live', icon: 'Share2', color: 'emerald',
+    defaultData: { label: 'Social Post Published', category: 'trigger', triggerType: 'social_post_published', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'social_post_failed', group: 'Social',
+    label: 'Social Post Failed', description: 'A social post failed to publish', icon: 'XCircle', color: 'amber',
+    defaultData: { label: 'Social Post Failed', category: 'trigger', triggerType: 'social_post_failed', config: {} } as TriggerNodeData },
+  // Project Client Views
+  { type: 'triggerNode', category: 'trigger', subType: 'client_view_feedback_received', group: 'Projects',
+    label: 'Client View Feedback', description: 'A client approved / requested changes / commented on a shared deliverable', icon: 'ClipboardCheck', color: 'emerald',
+    defaultData: { label: 'Client View Feedback', category: 'trigger', triggerType: 'client_view_feedback_received', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

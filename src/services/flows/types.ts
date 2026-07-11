@@ -102,7 +102,12 @@ export type TriggerType =
   // #255 — Email Marketing: a campaign finished sending; a recipient bounced or complained
   | 'campaign_sent'
   | 'email_bounced'
-  | 'email_complained';
+  | 'email_complained'
+  // Social publishing (Zernio): a scheduled post went live or failed on all platforms
+  | 'social_post_published'
+  | 'social_post_failed'
+  // Project Client Views: a client approved / requested changes / commented on a deliverable
+  | 'client_view_feedback_received';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
@@ -118,6 +123,9 @@ export interface DocSuggestionSubmittedTriggerConfig {}
 export interface CampaignSentTriggerConfig {}
 export interface EmailBouncedTriggerConfig {}
 export interface EmailComplainedTriggerConfig {}
+export interface SocialPostPublishedTriggerConfig {}
+export interface SocialPostFailedTriggerConfig {}
+export interface ClientViewFeedbackReceivedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
@@ -325,6 +333,9 @@ export type TriggerConfigMap = {
   campaign_sent: CampaignSentTriggerConfig;
   email_bounced: EmailBouncedTriggerConfig;
   email_complained: EmailComplainedTriggerConfig;
+  social_post_published: SocialPostPublishedTriggerConfig;
+  social_post_failed: SocialPostFailedTriggerConfig;
+  client_view_feedback_received: ClientViewFeedbackReceivedTriggerConfig;
 };
 
 // =====================================================

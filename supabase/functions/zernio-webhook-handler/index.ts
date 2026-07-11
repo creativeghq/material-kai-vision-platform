@@ -428,21 +428,49 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
         if (event === 'post.partial') {
           update.metadata = { partial: true, error: firstPlatformError(post) || 'Some platforms failed' };
         }
-        await supabase.from('social_posts').update(update).eq('zernio_post_id', zernioPostId);
+        const { data: sp } = await supabase.from('social_posts').update(update)
+          .eq('zernio_post_id', zernioPostId)
+          .select('id, workspace_id, user_id, platform, caption').maybeSingle();
+        if (sp) {
+          try {
+            await emitFlowEvent('social_post_published', {
+              type: 'social_post_published', workspace_id: (sp as any).workspace_id,
+              user_id: (sp as any).user_id, social_post_id: (sp as any).id, platform: (sp as any).platform,
+              partial: event === 'post.partial',
+              title: `Post published${(sp as any).platform ? ` on ${(sp as any).platform}` : ''}`,
+              body: `${(sp as any).caption ? `"${String((sp as any).caption).slice(0, 80)}"` : 'Your scheduled post'} is now live.`,
+              action_url: '/social',
+            });
+          } catch { /* best-effort */ }
+        }
       }
     }
 
     // ── post.failed ─────────────────────────────────────────────────
     else if (event === 'post.failed') {
       if (zernioPostId) {
-        await supabase
+        const reason = firstPlatformError(post) || 'Publish failed on all platforms';
+        const { data: sp } = await supabase
           .from('social_posts')
           .update({
             status: 'failed',
-            metadata: { error: firstPlatformError(post) || 'Publish failed on all platforms' },
+            metadata: { error: reason },
             updated_at: new Date().toISOString(),
           })
-          .eq('zernio_post_id', zernioPostId);
+          .eq('zernio_post_id', zernioPostId)
+          .select('id, workspace_id, user_id, platform, caption').maybeSingle();
+        if (sp) {
+          try {
+            await emitFlowEvent('social_post_failed', {
+              type: 'social_post_failed', workspace_id: (sp as any).workspace_id,
+              user_id: (sp as any).user_id, social_post_id: (sp as any).id, platform: (sp as any).platform,
+              reason,
+              title: `Post failed${(sp as any).platform ? ` on ${(sp as any).platform}` : ''}`,
+              body: `A scheduled post failed to publish: ${reason}`,
+              action_url: '/social',
+            });
+          } catch { /* best-effort */ }
+        }
       }
     }
 
