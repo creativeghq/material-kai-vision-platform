@@ -13,12 +13,13 @@
 import React from 'react';
 import {
   FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video, Sofa,
-  PanelRightClose, ArrowUpRight, LayoutPanelLeft,
+  PanelRightClose, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
-  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design' | 'render';
+  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design' | 'render'
+  | 'inspiration' | 'radar' | 'result';
 
 export interface CanvasArtifact {
   id: string;
@@ -36,6 +37,9 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   video: Video,
   design: Sofa,
   render: LayoutGrid,
+  inspiration: Sparkles,
+  radar: Radar,
+  result: ClipboardList,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -48,6 +52,9 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   video: 'Generated video',
   design: 'Interior design',
   render: 'Room generation',
+  inspiration: 'Inspiration board',
+  radar: 'Tech radar',
+  result: 'Result',
 };
 
 interface CanvasPanelProps {

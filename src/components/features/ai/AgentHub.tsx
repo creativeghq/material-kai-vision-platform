@@ -3293,6 +3293,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board' };
     if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image' };
     if (m.videoData) return { id: m.id, kind: 'video', title: 'Generated video' };
+    if (m.inspirationData) return { id: m.id, kind: 'inspiration', title: m.inspirationData.page_title || 'Inspiration board' };
+    if (m.techRadarData) return { id: m.id, kind: 'radar', title: 'Tech radar' };
+    if (m.agentResultData) return { id: m.id, kind: 'result', title: m.agentResultData.title || 'Result' };
     return null;
   }, []);
 
@@ -3621,6 +3624,24 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
       );
     }
+    if (message.inspirationData) {
+      return (
+        <InspirationCard
+          sourceUrl={message.inspirationData.source_url}
+          pageTitle={message.inspirationData.page_title}
+          heroImage={message.inspirationData.hero_image}
+          colors={message.inspirationData.colors}
+          colorHex={message.inspirationData.color_hex}
+          materials={message.inspirationData.materials}
+          textures={message.inspirationData.textures}
+          styles={message.inspirationData.styles}
+          roomType={message.inspirationData.room_type}
+          focus={message.inspirationData.focus}
+        />
+      );
+    }
+    if (message.techRadarData) return <TechRadarFindingsCard data={message.techRadarData} />;
+    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} />;
     return null;
   };
 
@@ -3989,7 +4010,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-primary text-white shadow-sm'
@@ -4007,18 +4028,27 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.inspirationData ? (
                       <div className="space-y-3">
-                        <InspirationCard
-                          sourceUrl={message.inspirationData.source_url}
-                          pageTitle={message.inspirationData.page_title}
-                          heroImage={message.inspirationData.hero_image}
-                          colors={message.inspirationData.colors}
-                          colorHex={message.inspirationData.color_hex}
-                          materials={message.inspirationData.materials}
-                          textures={message.inspirationData.textures}
-                          styles={message.inspirationData.styles}
-                          roomType={message.inspirationData.room_type}
-                          focus={message.inspirationData.focus}
-                        />
+                        {canvasShown ? (
+                          <ArtifactChip
+                            kind="inspiration"
+                            title={message.inspirationData.page_title || 'Inspiration board'}
+                            active={activeCanvasId === message.id}
+                            onOpen={() => focusCanvas(message.id)}
+                          />
+                        ) : (
+                          <InspirationCard
+                            sourceUrl={message.inspirationData.source_url}
+                            pageTitle={message.inspirationData.page_title}
+                            heroImage={message.inspirationData.hero_image}
+                            colors={message.inspirationData.colors}
+                            colorHex={message.inspirationData.color_hex}
+                            materials={message.inspirationData.materials}
+                            textures={message.inspirationData.textures}
+                            styles={message.inspirationData.styles}
+                            roomType={message.inspirationData.room_type}
+                            focus={message.inspirationData.focus}
+                          />
+                        )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.heatPumpData ? (
@@ -4033,7 +4063,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.techRadarData ? (
                       <div className="space-y-3">
-                        <TechRadarFindingsCard data={message.techRadarData} />
+                        {canvasShown ? (
+                          <ArtifactChip
+                            kind="radar"
+                            title="Tech radar"
+                            active={activeCanvasId === message.id}
+                            onOpen={() => focusCanvas(message.id)}
+                          />
+                        ) : (
+                          <TechRadarFindingsCard data={message.techRadarData} />
+                        )}
                         {message.content && <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />}
                       </div>
                     ) : message.jobFindingsData ? (
@@ -4120,7 +4159,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.agentResultData ? (
                       <div className="space-y-3">
-                        <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} />
+                        {canvasShown ? (
+                          <ArtifactChip
+                            kind="result"
+                            title={message.agentResultData.title || 'Result'}
+                            active={activeCanvasId === message.id}
+                            onOpen={() => focusCanvas(message.id)}
+                          />
+                        ) : (
+                          <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} />
+                        )}
                       </div>
                     ) : message.sourcingOptionsData ? (
                       <div className="space-y-3">
