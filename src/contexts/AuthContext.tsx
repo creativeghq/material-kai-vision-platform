@@ -15,6 +15,7 @@ interface AuthContextType {
     email: string,
     password: string,
     displayName?: string,
+    resellerApplication?: { vatNumber: string; countryCode?: string },
   ) => Promise<{ error: AuthError | null }>;
   signIn: (
     email: string,
@@ -81,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     email: string,
     password: string,
     displayName?: string,
+    resellerApplication?: { vatNumber: string; countryCode?: string },
   ) => {
     try {
       const redirectUrl = `${window.location.origin}/`;
@@ -93,6 +95,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           data: {
             display_name: displayName,
             role: 'member', // Default role for new users
+            // Reseller intent captured at signup. The handle_new_user_workspace_assignment
+            // trigger reads these to file a pending reseller_applications row; without them
+            // the user is provisioned as a plain consumer of the operator.
+            ...(resellerApplication?.vatNumber
+              ? {
+                  reseller_intent: true,
+                  vat_number: resellerApplication.vatNumber,
+                  country_code: (resellerApplication.countryCode || 'EL').toUpperCase(),
+                }
+              : {}),
           },
         },
       });

@@ -393,13 +393,27 @@ export async function handleUsers(req: Request): Promise<Response> {
     if (method === 'DELETE' && path.length === 1) {
       const targetUserId = path[0];
 
+      // 0. Remove workspaces this user SOLELY owns (their personal consumer/reseller
+      //    workspace + any solo tenant). MUST run BEFORE the auth delete: workspace_members
+      //    CASCADE-vanish when the auth user is removed, so the "sole owner" check would find
+      //    nothing afterward. workspaces.created_by is SET NULL (not CASCADE), so without this
+      //    step the tenant — and its "(reseller)" CRM mirror — would be orphaned. Shared or
+      //    parent-of-children workspaces are left intact by the RPC.
+      const { data: removedWs, error: soloWsError } = await supabase.rpc('delete_user_solo_workspaces', {
+        p_user_id: targetUserId,
+      });
+      if (soloWsError) {
+        console.error(`[crm-users-api] solo-workspace cleanup failed for ${targetUserId}:`, soloWsError.message);
+        // Non-fatal: proceed with the auth delete; storage-orphan-cleanup-cron is the backstop.
+      }
+
       // 1. Delete the auth user. Foreign keys on auth.users now CASCADE all of the user's
       //    personal data (user_profiles, user_credits, moodboards, projects, quotes,
       //    conversations, generations, api keys, social accounts, tracked queries/mentions/
-      //    jobs, notifications, preferences, …) and SET NULL on shared/business records they
-      //    merely authored (catalog products/documents, KB docs, CRM, finance). AFTER DELETE
-      //    storage triggers fire during this cascade for entity-keyed outputs (moodboard
-      //    sheets, quote / catalog / client-view PDFs).
+      //    jobs, notifications, preferences, reseller applications, …) and SET NULL on
+      //    shared/business records they merely authored (catalog products/documents, KB docs,
+      //    CRM, finance). AFTER DELETE storage triggers fire during this cascade for
+      //    entity-keyed outputs (moodboard sheets, quote / catalog / client-view PDFs).
       const { error: authDeleteError } = await supabase.auth.admin.deleteUser(targetUserId);
       if (authDeleteError) {
         // Surface the real failure — do NOT report success on a failed delete.
@@ -426,7 +440,11 @@ export async function handleUsers(req: Request): Promise<Response> {
       };
 
       return new Response(
-        JSON.stringify({ message: 'User deleted successfully', storage_objects_removed: storageRemoved }),
+        JSON.stringify({
+          message: 'User deleted successfully',
+          workspaces_removed: removedWs ?? 0,
+          storage_objects_removed: storageRemoved,
+        }),
         { status: 200, headers: corsHeaders },
       );
     }

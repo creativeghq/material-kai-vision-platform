@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Store } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { OAuthButtons } from '@/components/core/Auth/OAuthButtons';
 
 export const Auth: React.FC = () => {
@@ -40,6 +41,10 @@ export const Auth: React.FC = () => {
     searchParams.get('reset') === 'true' || hashHasRecovery || isRecoverySession;
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  // Reseller onboarding: default signup is a plain consumer of the operator. Ticking this
+  // files a reseller application (VAT → operator ΑΑΔΕ check → operator approval) instead.
+  const [applyAsReseller, setApplyAsReseller] = useState(false);
+  const [vatNumber, setVatNumber] = useState('');
 
   // Listen for Supabase's PASSWORD_RECOVERY event — fires after the recovery
   // link establishes a session. Belt-and-suspenders on top of URL detection.
@@ -60,6 +65,8 @@ export const Auth: React.FC = () => {
     setDisplayName('');
     setShowPassword(false);
     setShowForgotPassword(false);
+    setApplyAsReseller(false);
+    setVatNumber('');
   };
   const { signIn, signUp, resetPassword, updatePassword, user } = useAuth();
   const navigate = useNavigate();
@@ -131,7 +138,11 @@ export const Auth: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error: _error } = await signUp(email, password, displayName);
+    const resellerApplication =
+      applyAsReseller && vatNumber.trim()
+        ? { vatNumber: vatNumber.trim(), countryCode: 'EL' }
+        : undefined;
+    const { error: _error } = await signUp(email, password, displayName, resellerApplication);
 
     setIsLoading(false);
   };
@@ -428,6 +439,45 @@ export const Auth: React.FC = () => {
                     </Button>
                   </div>
                 </div>
+                {/* Reseller application (optional). Default signup = plain consumer of the operator. */}
+                <div className="rounded-lg border border-border/60 p-3 space-y-3">
+                  <label htmlFor="apply-reseller" className="flex items-start gap-3 cursor-pointer">
+                    <Checkbox
+                      id="apply-reseller"
+                      checked={applyAsReseller}
+                      onCheckedChange={(v) => setApplyAsReseller(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                        <Store className="w-3.5 h-3.5 text-primary" />
+                        Apply as a reseller / business
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Requires a business VAT number. The operator verifies it with ΑΑΔΕ and approves
+                        your reseller access — until then you have a standard account.
+                      </span>
+                    </span>
+                  </label>
+                  {applyAsReseller && (
+                    <div className="space-y-2 pl-7">
+                      <Label htmlFor="signup-vat" className="text-sm font-medium text-foreground">
+                        Business VAT number (ΑΦΜ)
+                      </Label>
+                      <Input
+                        id="signup-vat"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="9 digits"
+                        value={vatNumber}
+                        onChange={(e) => setVatNumber(e.target.value)}
+                        required={applyAsReseller}
+                        className="h-11"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
                   {isLoading && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

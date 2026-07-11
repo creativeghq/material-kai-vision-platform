@@ -16,12 +16,16 @@ interface WsRow {
   name: string;
   parent_workspace_id: string | null;
   is_root: boolean;
+  kind?: 'operator' | 'reseller' | 'consumer';
   can_supply_products: boolean;
   catalog_access: 'operator_catalog' | 'own_products_only';
   commission_pct: number;
 }
 
-const rankOf = (w: WsRow) => (w.is_root ? 'operator' : w.can_supply_products ? 'dealer' : 'architect');
+const rankOf = (w: WsRow) =>
+  w.is_root ? 'operator'
+    : w.kind === 'consumer' ? 'consumer'
+      : w.can_supply_products ? 'dealer' : 'reseller';
 
 const MarketplaceNetworkPage: React.FC = () => {
   const { toast } = useToast();

@@ -44,8 +44,11 @@ interface LookupBody {
   /** Why this lookup was made — audited because every live call notifies the looked-up ΑΦΜ. */
   reason?: 'own_business' | 'crm_enrichment' | 'invoice_counterparty' | string;
   workspace_id?: string;
-  /** 'creds-status' → report the EFFECTIVE codes (workspace row, else operator root default). */
-  action?: 'creds-status' | string;
+  /** 'creds-status' → report the EFFECTIVE codes (workspace row, else operator root default).
+   *  'verify-reseller-application' → operator vets a reseller applicant's ΑΦΜ (see below). */
+  action?: 'creds-status' | 'verify-reseller-application' | string;
+  /** For action='verify-reseller-application': the reseller_applications row to check. */
+  application_id?: string;
 }
 
 interface FirmActivity {
@@ -166,6 +169,94 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
         username: creds.username || null,
         afm_called_by: creds.afmCalledBy || null,
         has_password: !!creds.password,
+      });
+    }
+
+    // ── verify-reseller-application: the OPERATOR vets a reseller applicant's ΑΦΜ ──────
+    // Runs the RgWsPublic2 lookup under the operator's (root workspace) Special Access
+    // Codes — the operator, not the applicant, consumes the TAXISnet quota and owns the
+    // audit notification. Operator-admin gated. Writes the verdict onto the application so
+    // approve_reseller_application() can require a passing check.
+    if (body.action === 'verify-reseller-application') {
+      const appId = body.application_id;
+      if (!appId) return jsonResponse({ error: 'application_id required' }, 400);
+      const { data: isOp } = await userClient.rpc('is_operator_admin');
+      if (!isOp) return jsonResponse({ error: 'not authorized' }, 403);
+
+      const admin = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: app } = await admin
+        .from('reseller_applications')
+        .select('id, vat_number, country_code, operator_workspace_id, status')
+        .eq('id', appId)
+        .maybeSingle();
+      if (!app) return jsonResponse({ error: 'application_not_found' }, 404);
+      if (!['pending', 'aade_failed', 'aade_verified'].includes(app.status)) {
+        return jsonResponse({ error: 'already_decided', message: `Application is ${app.status}.` }, 409);
+      }
+      if ((app.country_code || 'EL').toUpperCase() !== 'EL') {
+        return jsonResponse({ error: 'unsupported_country', message: 'ΑΑΔΕ verification supports Greek (EL) VAT numbers only.' }, 400);
+      }
+      const afm = (app.vat_number || '').replace(/[^0-9]/g, '');
+      if (afm.length !== 9) {
+        return jsonResponse({ error: 'invalid_afm', message: 'Greek ΑΦΜ must be exactly 9 digits.' }, 400);
+      }
+
+      const creds = await resolveAadeCredentials(admin, app.operator_workspace_id);
+      if (!creds.username || !creds.password) {
+        return jsonResponse({
+          error: 'aade_not_configured',
+          message: 'Operator ΑΑΔΕ Special Access Codes are not configured. Set them under the operator root workspace.',
+        }, 503);
+      }
+
+      const envelope = buildSoapEnvelope(
+        { username: creds.username, password: creds.password },
+        buildRgWsPublic2Body(creds.afmCalledBy, afm),
+      );
+      const { ok: httpOk, xml, httpStatus, err: networkErr } = await postSoap(AADE_ENDPOINT, envelope);
+      if (networkErr) {
+        return jsonResponse({ error: 'aade_unreachable', message: `ΑΑΔΕ web-service unreachable: ${networkErr}` }, 503);
+      }
+
+      const aadeError = summarizeAadeError(xml);
+      const basicRec = (!httpOk || aadeError) ? null : parseBasicRec(xml);
+      const activities = basicRec ? parseActivities(xml) : [];
+      // deactivation_flag '1' = active business, '2' = deactivated. Only an active business passes.
+      const validAfm = !!basicRec && basicRec.deactivation_flag === '1';
+
+      try {
+        await admin.from('aade_lookup_log').insert({
+          looked_up_afm: afm,
+          workspace_id: app.operator_workspace_id,
+          requested_by: user.id,
+          reason: 'reseller_application',
+          source: 'aade',
+          valid_afm: basicRec ? validAfm : null,
+        });
+      } catch (logErr) {
+        console.error('[myaade-rgwspublic2] reseller audit log insert failed:', logErr);
+      }
+
+      const snapshot = basicRec
+        ? { basic_rec: basicRec, activities }
+        : { error: aadeError?.message ?? `ΑΑΔΕ HTTP ${httpStatus}` };
+      const newStatus = validAfm ? 'aade_verified' : 'aade_failed';
+
+      await admin.from('reseller_applications').update({
+        aade_valid: validAfm,
+        aade_snapshot: snapshot,
+        aade_checked_at: new Date().toISOString(),
+        status: newStatus,
+      }).eq('id', appId);
+
+      return jsonResponse({
+        ok: true,
+        application_id: appId,
+        status: newStatus,
+        valid_afm: validAfm,
+        basic_rec: basicRec,
+        activities,
+        aade_error: basicRec ? null : (aadeError?.message ?? `ΑΑΔΕ HTTP ${httpStatus}`),
       });
     }
 

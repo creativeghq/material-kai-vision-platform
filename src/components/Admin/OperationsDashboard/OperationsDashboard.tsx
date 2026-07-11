@@ -27,6 +27,7 @@ import {
   Send,
   BookOpen,
   KeyRound,
+  Store,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MIVAA_API_URL } from '@/config/mivaa';
@@ -70,6 +71,7 @@ import { StorageAuditPanel } from '../StorageAuditPanel';
 import { SystemPerformance } from '../SystemPerformance';
 // Relocated here (2026-06-09) from the misnamed /admin/training-models grab-bag.
 import { FactoryRegistrationsTab } from '../FactoryRegistrationsTab';
+import { ResellerApplicationsTab } from '../ResellerApplicationsTab';
 import { FactoryAccessRequestsTab } from '../FactoryAccessRequestsTab';
 import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
@@ -878,6 +880,10 @@ const OperationsDashboardInner: React.FC = () => {
               <Users className="h-4 w-4 mr-2" />
               Factory Onboarding
             </TabsTrigger>
+            <TabsTrigger value="resellers">
+              <Store className="h-4 w-4 mr-2" />
+              Resellers
+            </TabsTrigger>
             <TabsTrigger value="catalogs">
               <BookOpen className="h-4 w-4 mr-2" />
               Catalogs
@@ -924,6 +930,11 @@ const OperationsDashboardInner: React.FC = () => {
               <TabsContent value="registrations"><FactoryRegistrationsTab /></TabsContent>
               <TabsContent value="access"><FactoryAccessRequestsTab /></TabsContent>
             </Tabs>
+          </TabsContent>
+
+          {/* Reseller onboarding — VAT + ΑΑΔΕ-verified self-serve reseller applications. */}
+          <TabsContent value="resellers" className="space-y-4">
+            <ResellerApplicationsTab />
           </TabsContent>
 
           {/* Agent Chat Analytics Tab */}
