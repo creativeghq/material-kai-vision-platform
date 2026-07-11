@@ -33,12 +33,22 @@
   <ul class="feat">
     <li><strong>Balance</strong> — how many credits you have available right now.</li>
     <li><strong>Percentage of your monthly allowance</strong> — your balance against your plan's allowance, so you can see at a glance how much of your plan you've used.</li>
-    <li><strong>Usage history</strong> — a record of what consumed credits, so you can see where they went.</li>
+    <li><strong>Usage &amp; spend history</strong> — a <strong>categorised summary</strong> of where your credits went (by type of action) plus a detailed <strong>activity list</strong> of individual debits, so you can see exactly what consumed them.</li>
   </ul>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/credits.png" alt="Credits tab showing balance and usage history">
     <figcaption>The Credits tab — your current balance, your percentage of the monthly allowance, and usage history.</figcaption>
   </figure>
+
+  <h2>Personal credits vs the workspace pool</h2>
+  <p><strong>What it is —</strong> a workspace can run on a <strong>shared credit pool</strong> that the owner funds, so the whole team draws from one balance instead of everyone buying their own. <strong>Why it matters —</strong> it's how a business pays for its team's AI usage centrally, with control over how much each member can spend.</p>
+  <ul class="feat">
+    <li><strong>The pool.</strong> The owner tops up a workspace <strong>Pool balance</strong>; metered actions by any member draw from it. Until it's funded the card reads <em>“Not funded yet — the team is on personal credits until you add some,”</em> and members simply use their own personal credits — so there's a clean fallback.</li>
+    <li><strong>Per-member caps.</strong> The owner can set a <strong>Monthly limit per member</strong> (blank = unlimited, shown as <strong>∞</strong>) so no one person can drain the pool.</li>
+    <li><strong>Where the owner funds it.</strong> In <strong>Finance → Settings → Team</strong> (the workspace credits card): add funds to the pool, set per-member monthly caps, and see each member's usage.</li>
+    <li><strong>What members see.</strong> When your workspace is on a pool, your Credits tab shows a <strong>banner</strong> indicating you're drawing from the shared pool (and your cap, if any) rather than personal credits.</li>
+  </ul>
+  <div class="callout"><p><strong>Which is used?</strong> If the workspace pool is funded, metered actions draw from it (up to your per-member cap); otherwise they fall back to your <strong>personal</strong> credits. Either way the action tells you the cost first.</p></div>
 
   <h2>Buying credit packs (with volume discounts)</h2>
   <p><strong>What it is —</strong> the credit-pack store at <span class="badge route">/billing/credits</span>. <strong>Why it matters —</strong> it's the fastest way to refill when you run low, and <strong>bigger packs earn bigger volume discounts</strong>. Each button shows exactly what you'll receive, for example <em>"Buy 2,631 Credits for €25"</em>.</p>

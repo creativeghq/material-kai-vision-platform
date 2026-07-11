@@ -116,6 +116,7 @@
       ]},
       { file: "email-marketing.html", title: "Email Marketing (BYOK)", icon: "📣" },
       { file: "flows.html", title: "Flows", icon: "🔀" },
+      { file: "team-docs.html", title: "Team Docs", icon: "📓" },
     ]},
     { title: "Account", items: [
       { file: "account.html", title: "Account & Billing", icon: "⚙️", children: [
