@@ -15,7 +15,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
 import { Badge } from '@/components/core/ui/badge';
-import { Loader2, Save, Ship, ExternalLink } from 'lucide-react';
+import { Loader2, Save, Ship, ExternalLink, Calculator } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { stockService } from '../services/stockService';
 
@@ -26,6 +26,12 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
   const [hasKey, setHasKey] = useState(false);
   const [keyMasked, setKeyMasked] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(true);
+  // SeaRates (freight-rate quotes) BYOK.
+  const [srId, setSrId] = useState('');
+  const [srKey, setSrKey] = useState('');
+  const [srHasKey, setSrHasKey] = useState(false);
+  const [srMasked, setSrMasked] = useState<string | null>(null);
+  const [savingSr, setSavingSr] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -40,10 +46,27 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
       setEnabled(s?.enabled ?? true);
       setBaseUrl(s?.base_url ?? '');
       setApiKey('');
+      setSrHasKey(!!s?.searates_configured);
+      setSrMasked(s?.searates_key_masked ?? null);
+      setSrId(s?.searates_platform_id ?? '');
+      setSrKey('');
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [workspaceId]);
+
+  const saveSearates = async () => {
+    if (!srHasKey && !srKey.trim()) { toast({ title: 'SeaRates API key required', variant: 'destructive' }); return; }
+    setSavingSr(true);
+    try {
+      await stockService.saveSearatesCreds(workspaceId, { platformId: srId.trim() || null, apiKey: srKey.trim() || null });
+      if (srKey.trim()) setSrHasKey(true);
+      setSrKey('');
+      toast({ title: 'SeaRates credentials saved' });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally { setSavingSr(false); }
+  };
 
   const save = async () => {
     if (!hasKey && !apiKey.trim()) {
@@ -100,6 +123,27 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
           <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
           </Button>
+        </div>
+
+        {/* SeaRates — freight-rate quotes (separate provider + key from ShipsGo tracking). */}
+        <div className="border-t border-border/60 pt-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Freight quotes (SeaRates)</span>
+            {srHasKey && <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">Configured</Badge>}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Optional. Add your own <a href="https://www.searates.com/integrations/api-logistics-explorer/" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">SeaRates <ExternalLink className="h-3 w-3" /></a> credentials to compare shipping cost from 100+ forwarders via the "Get quote" button in the Inbound tab. Runs on your SeaRates plan — no platform key, no platform credits.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label className="text-xs">Platform ID <span className="text-muted-foreground">(optional)</span></Label><Input value={srId} onChange={(e) => setSrId(e.target.value)} placeholder="SeaRates account id" autoComplete="off" /></div>
+            <div className="space-y-1"><Label className="text-xs">API key</Label><Input type="password" value={srKey} onChange={(e) => setSrKey(e.target.value)} autoComplete="new-password" placeholder={srHasKey ? `${srMasked ?? '••••'} (configured — blank keeps)` : 'SeaRates API key / token'} /></div>
+          </div>
+          <div>
+            <Button size="sm" variant="outline" onClick={saveSearates} disabled={savingSr} className="rounded-full">
+              {savingSr ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save SeaRates
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

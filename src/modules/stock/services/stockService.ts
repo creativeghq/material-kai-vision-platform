@@ -128,6 +128,33 @@ export interface ShippingCredsStatus {
   enabled?: boolean;
   base_url?: string | null;
   key_masked?: string | null;
+  searates_configured?: boolean;
+  searates_platform_id?: string | null;
+  searates_key_masked?: string | null;
+}
+
+export interface FreightOffer {
+  carrier: string | null;
+  amount: number | null;
+  currency: string | null;
+  transit_days: number | null;
+  valid_until: string | null;
+  mode: string;
+}
+
+export interface FreightQuote {
+  id: string;
+  workspace_id: string;
+  origin: string;
+  destination: string;
+  mode: 'fcl' | 'lcl' | 'air';
+  container_type: string | null;
+  ready_date: string | null;
+  offers: FreightOffer[];
+  offer_count: number;
+  cheapest_amount: number | null;
+  cheapest_currency: string | null;
+  created_at: string;
 }
 
 export interface ShipmentMilestone {
@@ -227,4 +254,15 @@ export const stockService = {
     });
     if (error) throw error;
   },
+  async saveSearatesCreds(ws: string, input: { platformId?: string | null; apiKey?: string | null }): Promise<void> {
+    const { error } = await supabase.rpc('save_searates_credentials', {
+      p_workspace_id: ws, p_platform_id: input.platformId ?? null, p_api_key: input.apiKey ?? null,
+    });
+    if (error) throw error;
+  },
+
+  // ── Freight quotes (SeaRates, BYOK) ─────────────────────────────────────────
+  listFreightQuotes: (ws: string) => call<{ quotes: FreightQuote[] }>('shipping-quotes-list', ws).then((r) => r.quotes),
+  getFreightQuote: (ws: string, input: { origin: string; destination: string; mode: string; container_type?: string; ready_date?: string }) =>
+    call<{ quote: FreightQuote }>('shipping-quote', ws, input).then((r) => r.quote),
 };

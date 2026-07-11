@@ -17,6 +17,7 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { trackShipment, refreshShipment, type TrackInput } from '../_shared/shipping/shipsgo.ts';
+import { getFreightQuote, type SearatesCreds, type QuoteParams } from '../_shared/shipping/searates.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -87,6 +88,16 @@ async function resolveShippingCreds(svc: any, workspaceId: string): Promise<{ ke
   if (!data?.api_key || data.enabled === false) return null;
   return { key: data.api_key, baseUrl: data.base_url ?? null };
 }
+
+/** SeaRates BYOK creds (freight-rate quotes) — the workspace's own SeaRates id + api key. */
+async function resolveSearatesCreds(svc: any, workspaceId: string): Promise<SearatesCreds | null> {
+  const { data } = await svc.from('workspace_shipping_credentials')
+    .select('searates_platform_id, searates_api_key').eq('workspace_id', workspaceId).maybeSingle();
+  if (!data?.searates_api_key) return null;
+  return { platformId: data.searates_platform_id ?? null, apiKey: data.searates_api_key };
+}
+
+const QUOTE_MODES = ['fcl', 'lcl', 'air'];
 
 const FORECAST_MODEL = () => Deno.env.get('STOCK_FORECAST_MODEL') || 'claude-sonnet-4-6';
 
@@ -498,6 +509,42 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
         return json({ shipment: data });
       }
+      // ── Freight rate quotes (SeaRates, BYOK) ─────────────────────────────────
+      case 'shipping-quotes-list': {
+        const { data, error } = await usr.from('freight_quotes').select('*')
+          .eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(20);
+        if (error) throw new HttpError(400, error.message);
+        return json({ quotes: data ?? [] });
+      }
+      case 'shipping-quote': {
+        const origin = String(body?.origin ?? '').trim();
+        const destination = String(body?.destination ?? '').trim();
+        const mode = String(body?.mode ?? 'fcl');
+        if (!origin || !destination) return json({ error: 'origin and destination are required' }, 400);
+        if (!QUOTE_MODES.includes(mode)) return json({ error: `mode must be one of ${QUOTE_MODES.join(', ')}` }, 400);
+
+        const creds = await resolveSearatesCreds(svc, workspaceId);
+        if (!creds) return json({ ok: false, code: 'not_configured', error: 'Freight quotes are not set up. Add your SeaRates API key in Profile → Keys.' }, 503);
+
+        const params: QuoteParams = {
+          origin, destination, mode: mode as any,
+          containerType: body?.container_type ? String(body.container_type) : null,
+          readyDate: body?.ready_date ? String(body.ready_date) : null,
+        };
+        let offers;
+        try { offers = await getFreightQuote(creds, params); }
+        catch (e) { throw new HttpError(502, `Could not get a quote: ${(e as Error).message}`); }
+
+        const cheapest = offers.find((o) => o.amount != null) ?? null;
+        const { data, error } = await usr.from('freight_quotes').insert({
+          workspace_id: workspaceId, origin, destination, mode, container_type: params.containerType,
+          ready_date: params.readyDate, offers, offer_count: offers.length,
+          cheapest_amount: cheapest?.amount ?? null, cheapest_currency: cheapest?.currency ?? null, created_by: userId,
+        }).select('*').single();
+        if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
+        return json({ quote: data }, 201);
+      }
+
       case 'shipment-remove': {
         const id = String(body?.shipment_id ?? '');
         if (!id) return json({ error: 'shipment_id is required' }, 400);
