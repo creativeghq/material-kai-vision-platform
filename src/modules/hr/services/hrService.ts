@@ -333,8 +333,14 @@ class HrService {
   rejectAbsence(workspaceId: string, absenceId: string): Promise<{ absence: Absence }> {
     return call(workspaceId, 'reject-absence', { absence_id: absenceId });
   }
-  analytics(workspaceId: string): Promise<{ analytics: HrAnalytics }> {
-    return call(workspaceId, 'analytics');
+  // Overview landing reads the always-warm `hr_overview_analytics` RPC (PostgREST) instead of the
+  // hr-api edge function — the edge pays a ~1.5-2.9s isolate cold-start on the first HR navigation,
+  // which is the "HR body loads slowly" symptom. The RPC enforces the identical gates in SQL
+  // (owner/admin-or-global access → module enabled → entitlement). Matches Finance's direct-read pattern.
+  async analytics(workspaceId: string): Promise<{ analytics: HrAnalytics }> {
+    const { data, error } = await sb.rpc('hr_overview_analytics', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return { analytics: data as HrAnalytics };
   }
 
   // ── Departments ──
