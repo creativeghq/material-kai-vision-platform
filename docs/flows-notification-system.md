@@ -146,6 +146,11 @@ emitter is not shipped):
   (status transition) — alongside the existing invoice/receipt/payment/expense/PO events.
 - **Docs** (`docsService`): `document_published` (draft→published transition, fires once),
   `doc_suggestion_submitted` (a member proposes an edit).
+- **Email Marketing** (#255): `campaign_sent` (`campaign-processor` completion, once per
+  campaign), `email_bounced` + `email_complained` (`email-webhooks`, workspace-scoped +
+  campaign-aware via `email_logs.tags`). Opens/clicks are **intentionally not** triggers
+  (high-volume; every open would fire a metered flow run — the campaign dashboard already
+  aggregates them). The `send_campaign` **action** dispatches an existing campaign.
 
 These are registered in `flow_area_registry` as **optional** (unbound) automation
 surfaces — an operator builds and binds their own flow. They are NOT pre-seeded with

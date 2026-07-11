@@ -9,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -168,7 +169,7 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
     // Find the email log entry by Resend's email ID
     const { data: emailLog, error: logError } = await supabaseClient
       .from('email_logs')
-      .select('id')
+      .select('id, workspace_id, to_email, tags')
       .eq('message_id', messageId)
       .single();
 
@@ -232,6 +233,32 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
         .from('email_logs')
         .update({ clicked_at: event.created_at })
         .eq('id', emailLog.id);
+    }
+
+    // Flows — surface actionable reputation events (bounce / spam complaint) as workspace-scoped
+    // triggers so an operator can auto-suppress the contact or alert. Opens/clicks are intentionally
+    // NOT emitted (high-volume; the campaign dashboard already aggregates them). Best-effort.
+    if (event.type === 'email.bounced' || event.type === 'email.complained') {
+      try {
+        const tags = (emailLog as any).tags ?? {};
+        const wsId = (emailLog as any).workspace_id ?? null;
+        const toEmail = (emailLog as any).to_email ?? (event.data.to?.[0] ?? null);
+        const isBounce = event.type === 'email.bounced';
+        await emitFlowEvent(isBounce ? 'email_bounced' : 'email_complained', {
+          type: isBounce ? 'email_bounced' : 'email_complained',
+          workspace_id: wsId,
+          email_log_id: (emailLog as any).id,
+          email: toEmail,
+          campaign_id: tags.campaign_id ?? null,
+          recipient_id: tags.recipient_id ?? null,
+          reason: isBounce ? (event.data.bounce?.message ?? null) : 'marked as spam',
+          title: isBounce ? `Email bounced: ${toEmail ?? 'recipient'}` : `Spam complaint: ${toEmail ?? 'recipient'}`,
+          body: isBounce
+            ? `${toEmail ?? 'A recipient'} bounced${event.data.bounce?.message ? ` (${event.data.bounce.message})` : ''}.`
+            : `${toEmail ?? 'A recipient'} marked a campaign email as spam.`,
+          action_url: '/email-marketing?tab=campaigns',
+        });
+      } catch { /* best-effort — never fail the webhook on a flow emit */ }
     }
 
     return new Response(JSON.stringify({ success: true, event_type: eventType }), {

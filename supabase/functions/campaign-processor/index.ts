@@ -23,6 +23,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 
@@ -206,6 +207,27 @@ serve(withApiLogging('campaign-processor', async (req) => {
           .eq('id', campaign.id);
 
         console.log(`Completed campaign: ${campaign.id} (${finalStatus}, ${failedCount ?? 0} failed)`);
+        // Flows — the campaign finished sending. Fires once (this block only runs when no
+        // pending recipients remain). Best-effort; never block the completion.
+        try {
+          const { count: sentCount } = await supabase
+            .from('campaign_recipients')
+            .select('id', { count: 'exact', head: true })
+            .eq('campaign_id', campaign.id)
+            .eq('status', 'sent');
+          await emitFlowEvent('campaign_sent', {
+            type: 'campaign_sent',
+            workspace_id: campaign.workspace_id,
+            campaign_id: campaign.id,
+            campaign_name: campaign.name,
+            status: finalStatus,
+            sent_count: sentCount ?? 0,
+            failed_count: failedCount ?? 0,
+            title: `Campaign sent: ${campaign.name}`,
+            body: `"${campaign.name}" finished sending — ${sentCount ?? 0} delivered${failedCount ? `, ${failedCount} failed` : ''}.`,
+            action_url: '/email-marketing?tab=campaigns',
+          });
+        } catch { /* best-effort */ }
         continue;
       }
 

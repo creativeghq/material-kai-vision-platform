@@ -258,6 +258,16 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'doc_suggestion_submitted', group: 'Docs',
     label: 'Doc Edit Proposed', description: 'A member proposed an edit to a workspace document', icon: 'FilePlus2', color: 'emerald',
     defaultData: { label: 'Doc Edit Proposed', category: 'trigger', triggerType: 'doc_suggestion_submitted', config: {} } as TriggerNodeData },
+  // #255 — Email Marketing lifecycle
+  { type: 'triggerNode', category: 'trigger', subType: 'campaign_sent', group: 'Email Marketing',
+    label: 'Campaign Sent', description: 'An email campaign finished sending', icon: 'Megaphone', color: 'emerald',
+    defaultData: { label: 'Campaign Sent', category: 'trigger', triggerType: 'campaign_sent', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'email_bounced', group: 'Email Marketing',
+    label: 'Email Bounced', description: 'A campaign email bounced (bad address / mailbox full)', icon: 'MailX', color: 'amber',
+    defaultData: { label: 'Email Bounced', category: 'trigger', triggerType: 'email_bounced', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'email_complained', group: 'Email Marketing',
+    label: 'Spam Complaint', description: 'A recipient marked a campaign email as spam', icon: 'MailWarning', color: 'amber',
+    defaultData: { label: 'Spam Complaint', category: 'trigger', triggerType: 'email_complained', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

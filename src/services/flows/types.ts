@@ -98,7 +98,11 @@ export type TriggerType =
   | 'order_status_changed'
   // #254 — Docs module: a workspace doc was published, or a member proposed an edit
   | 'document_published'
-  | 'doc_suggestion_submitted';
+  | 'doc_suggestion_submitted'
+  // #255 — Email Marketing: a campaign finished sending; a recipient bounced or complained
+  | 'campaign_sent'
+  | 'email_bounced'
+  | 'email_complained';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
@@ -111,6 +115,9 @@ export interface OrderCreatedTriggerConfig {}
 export interface OrderStatusChangedTriggerConfig {}
 export interface DocumentPublishedTriggerConfig {}
 export interface DocSuggestionSubmittedTriggerConfig {}
+export interface CampaignSentTriggerConfig {}
+export interface EmailBouncedTriggerConfig {}
+export interface EmailComplainedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
@@ -315,6 +322,9 @@ export type TriggerConfigMap = {
   order_status_changed: OrderStatusChangedTriggerConfig;
   document_published: DocumentPublishedTriggerConfig;
   doc_suggestion_submitted: DocSuggestionSubmittedTriggerConfig;
+  campaign_sent: CampaignSentTriggerConfig;
+  email_bounced: EmailBouncedTriggerConfig;
+  email_complained: EmailComplainedTriggerConfig;
 };
 
 // =====================================================

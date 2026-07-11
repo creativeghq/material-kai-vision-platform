@@ -41,6 +41,9 @@ import {
   ShoppingCart,
   BookOpen,
   FilePlus2,
+  Megaphone,
+  MailX,
+  MailWarning,
   Building2,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
@@ -152,6 +155,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   order_status_changed: Package,
   document_published: BookOpen,
   doc_suggestion_submitted: FilePlus2,
+  campaign_sent: Megaphone,
+  email_bounced: MailX,
+  email_complained: MailWarning,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -231,6 +237,9 @@ const triggerLabels: Record<TriggerType, string> = {
   order_status_changed: 'Order Status Changed',
   document_published: 'Document Published',
   doc_suggestion_submitted: 'Doc Edit Proposed',
+  campaign_sent: 'Campaign Sent',
+  email_bounced: 'Email Bounced',
+  email_complained: 'Spam Complaint',
 };
 
 const statusColors: Record<FlowStatus, string> = {

@@ -15,6 +15,7 @@ import {
   MessageCircle, Megaphone, TrendingDown,
   Inbox, ClipboardCheck, FileCheck, Eye, Star, Package,
   CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
+  MailX, MailWarning,
 } from 'lucide-react';
 import {
   Accordion,
@@ -41,6 +42,7 @@ const iconMap: Record<string, React.ElementType> = {
   MessageCircle, Megaphone, TrendingDown,
   Inbox, ClipboardCheck, FileCheck, Eye, Star, Package,
   CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
+  MailX, MailWarning,
 };
 
 const categoryColors: Record<string, string> = {

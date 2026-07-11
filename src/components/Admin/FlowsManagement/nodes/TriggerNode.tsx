@@ -7,6 +7,7 @@ import {
   SearchCheck, ScanEye, PackagePlus,
   LayoutGrid, ImagePlus, Share2, Inbox, Send,
   CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
+  Megaphone, MailX, MailWarning,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -87,6 +88,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   order_status_changed: Package,
   document_published: BookOpen,
   doc_suggestion_submitted: FilePlus2,
+  campaign_sent: Megaphone,
+  email_bounced: MailX,
+  email_complained: MailWarning,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {
