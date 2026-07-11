@@ -206,18 +206,6 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         return json({ employees: await withSummaries(supabase, workspaceId, data ?? []) });
       }
 
-      case 'get-employee': {
-        const id = String(body?.employee_id ?? '');
-        if (!id) return json({ error: 'employee_id is required' }, 400);
-        const { data, error } = await supabase
-          .from('hr_employees').select(EMPLOYEE_SELECT)
-          .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
-        if (error) throw new HttpError(400, error.message);
-        if (!data) return json({ error: 'not found' }, 404);
-        const [withSum] = await withSummaries(supabase, workspaceId, [data]);
-        return json({ employee: withSum });
-      }
-
       case 'create-employee': {
         requireManage();
         const empFields = pick(body, EMPLOYEE_WRITABLE);
@@ -380,28 +368,6 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
       }
 
       // ── Overview ─────────────────────────────────────────────────────────
-      case 'overview': {
-        const { data: emps, error: eErr } = await supabase
-          .from('hr_employees').select('id, status').eq('workspace_id', workspaceId);
-        if (eErr) throw new HttpError(400, eErr.message);
-        const { data: sums } = await supabase
-          .from('vw_hr_employee_absence_summary').select('*').eq('workspace_id', workspaceId);
-        const headcount = (emps ?? []).length;
-        const activeCount = (emps ?? []).filter((e: any) => e.status === 'active').length;
-        const onLeaveToday = (sums ?? []).filter((s: any) => s.on_leave_today).length;
-        const totalsByType: Record<string, number> = {};
-        let totalAbsenceDays = 0;
-        for (const s of (sums ?? [])) {
-          totalAbsenceDays += Number(s.total_absence_days ?? 0);
-          for (const [k, v] of Object.entries((s.days_by_type ?? {}) as Record<string, number>)) {
-            totalsByType[k] = (totalsByType[k] ?? 0) + Number(v ?? 0);
-          }
-        }
-        return json({
-          overview: { headcount, active_count: activeCount, on_leave_today: onLeaveToday, total_absence_days: totalAbsenceDays, days_by_type: totalsByType },
-        });
-      }
-
       default: {
         // Ergani II (ΠΣ Ergani) submissions — work card, leaves, E3, schedules, audit.
         const erganiHandled = await handleErgani(action, { supabase, workspaceId, userId, body, access });

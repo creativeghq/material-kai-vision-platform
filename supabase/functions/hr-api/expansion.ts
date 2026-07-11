@@ -332,23 +332,6 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       return json({ generated: res.input, credits_used: creditsUsed });
     }
 
-    case 'list-candidates': {
-      const { data, error } = await supabase.from('hr_candidates').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false });
-      if (error) throw new HttpError(400, error.message);
-      return json({ candidates: data ?? [] });
-    }
-    case 'create-candidate': {
-      requireManage();
-      // resume_bucket/resume_path are NEVER accepted from the client — they are set server-side only
-      // by `upload-application-cv` (which pins the hr/{workspaceId}/ prefix). Accepting them here would
-      // let an admin point a candidate's CV at another tenant's private object. (#252 BOLA fix)
-      const fields = pick(body, ['name', 'email', 'phone', 'headline', 'source']);
-      if (!fields.name) return json({ error: 'name is required' }, 400);
-      const { data, error } = await supabase.from('hr_candidates').insert({ ...fields, workspace_id: workspaceId }).select('*').single();
-      if (error) throw new HttpError(400, error.message);
-      return json({ candidate: data }, 201);
-    }
-
     case 'list-applications': {
       let q = supabase.from('hr_applications')
         .select(`*,
@@ -562,31 +545,6 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const { data, error } = await q;
       if (error) throw new HttpError(400, error.message);
       return json({ documents: data ?? [] });
-    }
-    case 'document-upload-path': {
-      // Return the private storage path the client should upload to (client uploads directly, then
-      // calls record-document). Keeps large bytes off the edge function.
-      requireManage();
-      const employeeId = body?.employee_id ? String(body.employee_id) : 'general';
-      const safe = String(body?.filename ?? 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
-      const path = `hr/${workspaceId}/${employeeId}/${Date.now()}-${safe}`;
-      return json({ bucket: HR_DOC_BUCKET, path });
-    }
-    case 'record-document': {
-      requireManage();
-      const fields = pick(body, ['employee_id', 'name', 'doc_type', 'storage_object_path', 'size_bytes']);
-      if (!fields.name || !fields.storage_object_path) return json({ error: 'name and storage_object_path are required' }, 400);
-      if (fields.doc_type && !DOC_TYPES.includes(String(fields.doc_type))) return json({ error: 'invalid doc_type' }, 400);
-      // Bucket is fixed server-side and the path must live under this workspace's hr/ prefix (#252 BOLA fix).
-      const objectPath = assertHrObjectPath(fields.storage_object_path, workspaceId);
-      if (fields.employee_id) {
-        const { data: emp } = await supabase.from('hr_employees').select('id').eq('id', String(fields.employee_id)).eq('workspace_id', workspaceId).maybeSingle();
-        if (!emp) return json({ error: 'employee not found in this workspace' }, 404);
-      }
-      const { data, error } = await supabase.from('hr_documents')
-        .insert({ ...fields, storage_object_path: objectPath, storage_bucket: HR_DOC_BUCKET, workspace_id: workspaceId, uploaded_by: userId }).select('*').single();
-      if (error) throw new HttpError(400, error.message);
-      return json({ document: data }, 201);
     }
     // Upload a document THROUGH the function (service role) — pdf-documents refuses client writes
     // outside the caller's own uid/ prefix, so send the file as base64 and we store + record it.

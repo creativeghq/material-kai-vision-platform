@@ -16,7 +16,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import {
   resolveErganiCredentials, listSubmissions, getDocumentSchema, submitDocument,
-  cancelDocument, getSubmittedPdf, executeService, ErganiApiError, type ErganiCredentials,
+  getSubmittedPdf, executeService, ErganiApiError, type ErganiCredentials,
 } from '../_shared/ergani/client.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 
@@ -152,24 +152,6 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
 
   switch (action) {
     // ── Config status (masked; never returns the password) ────────────────────
-    case 'ergani-status': {
-      const { data } = await supabase
-        .from('workspace_ergani_credentials')
-        .select('username, employer_afm, branch_aa, usertype, environment, enabled, password')
-        .eq('workspace_id', workspaceId).maybeSingle();
-      if (!data) return json({ configured: false });
-      return json({
-        configured: !!(data.username && data.password && data.enabled),
-        username: data.username ?? null,
-        employer_afm: data.employer_afm ?? null,
-        branch_aa: data.branch_aa ?? '0',
-        usertype: data.usertype ?? '02',
-        environment: data.environment ?? 'trial',
-        enabled: data.enabled ?? true,
-        has_password: !!(data.password && String(data.password).trim()),
-      });
-    }
-
     // ── Live: active submission types for this employer (§6.1.4) ───────────────
     case 'ergani-submission-types': {
       const creds = await client(ctx);
@@ -191,24 +173,6 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       const creds = await client(ctx);
       try { return json({ info: await executeService(creds, workspaceId, 'EX_BASE_01', []) }); }
       catch (e) { throw toHttp(e); }
-    }
-
-    // ── Work Card start/stop — WRKCardSE (§6.2.1) ─────────────────────────────
-    // Fully modelled from the guide. f_type: 0 arrival (προσέλευση), 1 departure (αποχώρηση).
-    case 'ergani-submit-workcard': {
-      requireManage();
-      const employeeId = String(body?.employee_id ?? '');
-      const punchType = String(body?.punch_type ?? '');
-      if (!employeeId) return json({ error: 'employee_id is required' }, 400);
-      if (!['arrival', 'departure'].includes(punchType)) return json({ error: "punch_type must be 'arrival' or 'departure'" }, 400);
-      const r = await fileWorkcardPunch(supabase, workspaceId, ctx.userId, {
-        employeeId, punchType: punchType as 'arrival' | 'departure',
-        at: body?.at ? String(body.at) : undefined,
-        comments: body?.comments ? String(body.comments) : undefined,
-        lateReason: body?.late_reason ? String(body.late_reason) : undefined,
-        source: 'admin',
-      }, { requireErgani: true });
-      return json({ ok: true, result: r.result, punch: r.punch });
     }
 
     // ── Leave declaration mapped from an hr_absences row ──────────────────────
@@ -263,24 +227,6 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       }
     }
 
-    // ── Persist a work-time schedule (WTOWeek/WTODaily) and optionally submit it ─
-    case 'ergani-save-schedule': {
-      requireManage();
-      const employeeId = String(body?.employee_id ?? '');
-      const scheduleType = String(body?.schedule_type ?? '');
-      const effectiveFrom = String(body?.effective_from ?? '');
-      if (!employeeId || !['weekly', 'daily'].includes(scheduleType) || !effectiveFrom)
-        return json({ error: 'employee_id, schedule_type (weekly|daily) and effective_from are required' }, 400);
-      await loadEmployee(ctx, employeeId); // workspace-scope check
-      const { data, error } = await supabase.from('hr_work_schedules').insert({
-        workspace_id: workspaceId, employee_id: employeeId, schedule_type: scheduleType,
-        effective_from: effectiveFrom, effective_to: body?.effective_to ?? null,
-        details: body?.details ?? [], created_by: ctx.userId,
-      }).select('*').single();
-      if (error) throw new HttpError(400, error.message);
-      return json({ schedule: data }, 201);
-    }
-
     // ── Generic submit for any code (E3, WTOWeek, WTODaily, WKChgWK) ───────────
     // The caller builds `document` from `ergani-document-schema` (Ergani's own template). This
     // avoids fabricating field names for the submission types the API guide doesn't document.
@@ -308,26 +254,6 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
         await audit(ctx, { submission_type: code, entity_type: body?.entity_type ?? null, entity_id: body?.entity_id ?? null, employee_id: body?.employee_id ?? null, environment: creds.environment, status: 'failed', request: document, error: he.message });
         throw he;
       }
-    }
-
-    // ── Cancel a submitted declaration (§6.1.7 — leaves) ──────────────────────
-    case 'ergani-cancel': {
-      requireManage();
-      const typeOfDocument = String(body?.type_of_document ?? '').trim();
-      const protocol = String(body?.protocol ?? '').trim();
-      const submittedDate = String(body?.submitted_date ?? '').trim(); // yyyymmdd
-      if (!typeOfDocument || !protocol || !submittedDate)
-        return json({ error: 'type_of_document, protocol and submitted_date (yyyymmdd) are required' }, 400);
-      const creds = await client(ctx);
-      try {
-        const res = await cancelDocument(creds, workspaceId, { typeOfDocument, protocol, submittedDate });
-        // Mark the matching audit row cancelled.
-        await supabase.from('hr_ergani_submissions')
-          .update({ status: 'cancelled' })
-          .eq('workspace_id', workspaceId).eq('protocol', protocol);
-        await audit(ctx, { submission_type: typeOfDocument, environment: creds.environment, status: 'cancelled', protocol, response: res });
-        return json({ ok: true, ...res });
-      } catch (e) { throw toHttp(e); }
     }
 
     // ── Download the submitted PDF (Base64) (§6.1.8) ──────────────────────────

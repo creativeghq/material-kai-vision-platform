@@ -258,10 +258,7 @@ export interface SaveErganiInput {
 export interface ErganiLeaveType { code: string; description_el: string; description_en: string | null; category: string; subcategory: string; is_hourly: boolean; sort_order: number; }
 export interface ErganiSubmissionType { id: number; code: string; description: string; }
 export interface ErganiSubmitResult { id: string; protocol: string; submitDate: string; }
-export interface SubmitWorkcardInput { employee_id: string; punch_type: 'arrival' | 'departure'; reference_date?: string; at?: string; late_reason?: string; comments?: string; }
 export interface SubmitLeaveInput { absence_id: string; ergani_leave_code: string; document?: unknown; }
-export interface SaveScheduleInput { employee_id: string; schedule_type: 'weekly' | 'daily'; effective_from: string; effective_to?: string | null; details?: unknown; }
-export interface WorkSchedule { id: string; workspace_id: string; employee_id: string; schedule_type: 'weekly' | 'daily'; effective_from: string; effective_to: string | null; details: unknown; status: 'draft' | 'submitted' | 'failed'; created_at: string; }
 export interface ErganiSubmission {
   id: string; workspace_id: string; submission_type: string; entity_type: string | null; entity_id: string | null;
   employee_id: string | null; environment: string; status: 'submitted' | 'failed' | 'cancelled';
@@ -418,11 +415,8 @@ class HrService {
   erganiSubmissionTypes(ws: string): Promise<{ submission_types: ErganiSubmissionType[] }> { return call(ws, 'ergani-submission-types'); }
   erganiDocumentSchema(ws: string, code: string): Promise<{ code: string; schema: unknown }> { return call(ws, 'ergani-document-schema', { code }); }
   erganiEmployerInfo(ws: string): Promise<{ info: unknown }> { return call(ws, 'ergani-employer-info'); }
-  submitWorkcard(ws: string, input: SubmitWorkcardInput): Promise<{ ok: boolean; result: ErganiSubmitResult; punch: unknown }> { return call(ws, 'ergani-submit-workcard', input as unknown as Record<string, unknown>); }
   submitLeave(ws: string, input: SubmitLeaveInput): Promise<{ ok: boolean; result: ErganiSubmitResult }> { return call(ws, 'ergani-submit-leave', input as unknown as Record<string, unknown>); }
-  saveSchedule(ws: string, input: SaveScheduleInput): Promise<{ schedule: WorkSchedule }> { return call(ws, 'ergani-save-schedule', input as unknown as Record<string, unknown>); }
   erganiSubmit(ws: string, input: { code: string; document: unknown; entity_type?: string; entity_id?: string; employee_id?: string; schedule_id?: string }): Promise<{ ok: boolean; result: ErganiSubmitResult }> { return call(ws, 'ergani-submit', input); }
-  erganiCancel(ws: string, input: { type_of_document: string; protocol: string; submitted_date: string }): Promise<{ ok: boolean; message: string }> { return call(ws, 'ergani-cancel', input); }
   erganiDownloadPdf(ws: string, input: { code: string; protocol: string; submitted_date: string }): Promise<{ pdf_base64: string }> { return call(ws, 'ergani-download-pdf', input); }
   erganiSubmissionsLog(ws: string, filters: { employee_id?: string; submission_type?: string; limit?: number } = {}): Promise<{ submissions: ErganiSubmission[] }> { return call(ws, 'ergani-submissions-log', filters); }
   erganiRetry(ws: string, submission_id: string): Promise<{ ok: boolean; result: ErganiSubmitResult }> { return call(ws, 'ergani-retry', { submission_id }); }
