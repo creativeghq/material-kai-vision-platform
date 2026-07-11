@@ -122,6 +122,28 @@ class MarketingService {
     return (data || []) as AudienceRecipient[];
   }
 
+  /** All CRM contacts in the workspace that have an email — the full addressable audience, not just
+   *  category members. crm_contacts is workspace-RLS-scoped, so a direct select is safe + tenant-correct. */
+  async listContacts(workspaceId: string): Promise<AudienceRecipient[]> {
+    const { data, error } = await supabase
+      .from('crm_contacts')
+      .select('crm_contact_id:id, email, display_name:name')
+      .eq('workspace_id', workspaceId)
+      .not('email', 'is', null)
+      .neq('email', '')
+      .order('name', { ascending: true })
+      .limit(5000);
+    if (error) throw error;
+    // Normalize + de-dupe by email (a workspace can hold the same address on multiple contact rows).
+    const byEmail = new Map<string, AudienceRecipient>();
+    for (const r of (data || []) as any[]) {
+      const email = String(r.email).trim().toLowerCase();
+      if (!email || byEmail.has(email)) continue;
+      byEmail.set(email, { email, member_kind: 'crm_contact', crm_contact_id: r.crm_contact_id, crm_company_id: null, display_name: r.display_name });
+    }
+    return [...byEmail.values()];
+  }
+
   // ── Campaigns ──────────────────────────────────────────────────────────────
   async listCampaigns(workspaceId: string): Promise<MarketingCampaign[]> {
     const { data, error } = await supabase

@@ -34,6 +34,8 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
   const [manualEmails, setManualEmails] = useState('');
   const [resolved, setResolved] = useState<AudienceRecipient[]>([]);
   const [resolving, setResolving] = useState(false);
+  const [contacts, setContacts] = useState<AudienceRecipient[]>([]);
+  const [includeAllContacts, setIncludeAllContacts] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -48,15 +50,20 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
 
   useEffect(() => {
     (async () => {
-      try {
-        const [tpls, cats] = await Promise.all([
-          marketingService.listTemplates(workspaceId),
-          marketingService.listCategories(),
-        ]);
-        setTemplates(tpls.filter((t) => t.is_active));
-        setCategories(cats);
-      } catch (e: any) {
-        toast({ title: 'Error', description: e?.message || 'Failed to load', variant: 'destructive' });
+      // Load independently — a failure in one source (e.g. a categories RPC hiccup) must not blank
+      // the others (templates / the full contacts list).
+      const [tpls, cats, cts] = await Promise.allSettled([
+        marketingService.listTemplates(workspaceId),
+        marketingService.listCategories(),
+        marketingService.listContacts(workspaceId),
+      ]);
+      if (tpls.status === 'fulfilled') setTemplates(tpls.value.filter((t) => t.is_active));
+      if (cats.status === 'fulfilled') setCategories(cats.value);
+      if (cts.status === 'fulfilled') setContacts(cts.value);
+      const failed = [tpls, cats, cts].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+      if (failed) {
+        console.error('[email-marketing] audience load partial failure:', failed.reason);
+        toast({ title: 'Some audience data failed to load', description: failed.reason?.message || 'Try reopening the dialog.', variant: 'destructive' });
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,15 +93,16 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
     [manualEmails],
   );
 
-  // Merge CRM + manual, de-dupe by email.
+  // Merge all-contacts + category members + manual, de-dupe by email.
   const finalRecipients = useMemo<AudienceRecipient[]>(() => {
     const byEmail = new Map<string, AudienceRecipient>();
+    if (includeAllContacts) for (const c of contacts) byEmail.set(c.email.toLowerCase(), c);
     for (const r of resolved) byEmail.set(r.email.toLowerCase(), r);
     for (const e of manualList) {
       if (!byEmail.has(e)) byEmail.set(e, { email: e, member_kind: null, crm_contact_id: null, crm_company_id: null, display_name: null });
     }
     return [...byEmail.values()];
-  }, [resolved, manualList]);
+  }, [includeAllContacts, contacts, resolved, manualList]);
 
   const toggleCategory = (id: string) => {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
@@ -180,8 +188,19 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
               {resolving && <span className="text-muted-foreground"> · resolving…</span>}
             </div>
 
+            {/* Whole-CRM audience — the fast path for "email everyone". */}
+            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
+              <Checkbox checked={includeAllContacts} onCheckedChange={(v) => setIncludeAllContacts(!!v)} />
+              <div className="flex-1">
+                <p className="text-sm font-medium">All CRM contacts with an email</p>
+                <p className="text-xs text-muted-foreground">
+                  {contacts.length > 0 ? `${contacts.length} contact${contacts.length === 1 ? '' : 's'} in this workspace` : 'No CRM contacts with an email yet'}
+                </p>
+              </div>
+            </label>
+
             <div className="space-y-2">
-              <Label>CRM Categories</Label>
+              <Label>CRM Categories <span className="text-muted-foreground font-normal">(target a segment)</span></Label>
               {categories.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No CRM categories found. Tag contacts in CRM, or use manual emails below.</p>
               ) : (
