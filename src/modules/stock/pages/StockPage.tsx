@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Package, LayoutDashboard, Boxes, ArrowLeftRight, ClipboardList } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -12,21 +12,18 @@ import { MovementsSection } from '../components/MovementsSection';
 import { StockCountsSection } from '../components/StockCountsSection';
 
 // Stock Management module page. Extracted from the Finance "Warehouse" tab into a first-class
-// entitlement-gated module (EntitlementGuard wraps this route). The Inventory grid reuses the
-// battle-tested WarehousePanel; Overview / Movements / Counts are new module surfaces.
-const PRELOAD_TABS = ['overview', 'inventory'];
+// entitlement-gated module (EntitlementGuard wraps this route). Plain Radix tabs (no forceMount) so
+// only the active panel renders — mirrors FinancePage; each tab loads its own data on open.
+const TABS = ['overview', 'inventory', 'movements', 'counts'];
 
 export default function StockPage() {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { can } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get('tab') || 'overview';
-
-  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set([tab, ...PRELOAD_TABS]));
-  const fm = (v: string): true | undefined => (mountedTabs.has(v) ? true : undefined);
+  const raw = searchParams.get('tab') || 'overview';
+  const tab = TABS.includes(raw) ? raw : 'overview';
 
   const setTab = (v: string) => {
-    setMountedTabs((prev) => (prev.has(v) ? prev : new Set(prev).add(v)));
     const p = new URLSearchParams(searchParams);
     p.set('tab', v);
     setSearchParams(p, { replace: true });
@@ -64,16 +61,16 @@ export default function StockPage() {
           </TabsList>
 
           <div className="min-w-0 flex-1 space-y-4">
-            <TabsContent value="overview" forceMount={fm('overview')} className="mt-0 space-y-4">
+            <TabsContent value="overview" className="mt-0 space-y-4">
               <StockOverviewSection workspaceId={ws} onNavigate={setTab} />
             </TabsContent>
-            <TabsContent value="inventory" forceMount={fm('inventory')} className="mt-0 space-y-4">
+            <TabsContent value="inventory" className="mt-0 space-y-4">
               <WarehousePanel workspaceId={ws} />
             </TabsContent>
-            <TabsContent value="movements" forceMount={fm('movements')} className="mt-0 space-y-4">
+            <TabsContent value="movements" className="mt-0 space-y-4">
               <MovementsSection workspaceId={ws} />
             </TabsContent>
-            <TabsContent value="counts" forceMount={fm('counts')} className="mt-0 space-y-4">
+            <TabsContent value="counts" className="mt-0 space-y-4">
               <StockCountsSection workspaceId={ws} />
             </TabsContent>
           </div>
