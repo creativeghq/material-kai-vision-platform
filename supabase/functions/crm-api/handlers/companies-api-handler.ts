@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows } from './_scope.ts';
+import { emitFlowEvent } from '../../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -187,6 +188,19 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
+      // Flows — new CRM company. Best-effort; never block the create.
+      const created = data?.[0];
+      if (created) {
+        try {
+          await emitFlowEvent('crm_company_created', {
+            type: 'crm_company_created', workspace_id: targetWs, user_id: user.id,
+            company_id: created.id, company_name: created.name, email: created.email ?? null,
+            title: `New company: ${created.name}`,
+            body: `${created.name} was added to your CRM.`,
+            action_url: `/crm/companies/${created.id}`,
+          });
+        } catch { /* best-effort */ }
+      }
       return new Response(
         JSON.stringify({ data: data?.[0] }),
         { status: 201, headers: corsHeaders },

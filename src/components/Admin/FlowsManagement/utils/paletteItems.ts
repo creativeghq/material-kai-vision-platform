@@ -279,6 +279,38 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'client_view_feedback_received', group: 'Projects',
     label: 'Client View Feedback', description: 'A client approved / requested changes / commented on a shared deliverable', icon: 'ClipboardCheck', color: 'emerald',
     defaultData: { label: 'Client View Feedback', category: 'trigger', triggerType: 'client_view_feedback_received', config: {} } as TriggerNodeData },
+  // CRM
+  { type: 'triggerNode', category: 'trigger', subType: 'crm_contact_created', group: 'CRM',
+    label: 'Contact Created', description: 'A new CRM contact was created (payload carries lead_source so imports can be filtered out)', icon: 'UserPlus', color: 'emerald',
+    defaultData: { label: 'Contact Created', category: 'trigger', triggerType: 'crm_contact_created', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'crm_company_created', group: 'CRM',
+    label: 'Company Created', description: 'A new CRM company was created', icon: 'Building2', color: 'emerald',
+    defaultData: { label: 'Company Created', category: 'trigger', triggerType: 'crm_company_created', config: {} } as TriggerNodeData },
+  // Email Marketing engagement (HIGH-VOLUME — pair with a Filter node)
+  { type: 'triggerNode', category: 'trigger', subType: 'email_opened', group: 'Email Marketing',
+    label: 'Email Opened', description: 'A recipient opened a campaign email. HIGH-VOLUME — filter to a specific campaign', icon: 'MailOpen', color: 'amber',
+    defaultData: { label: 'Email Opened', category: 'trigger', triggerType: 'email_opened', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'email_clicked', group: 'Email Marketing',
+    label: 'Email Link Clicked', description: 'A recipient clicked a link in a campaign email. HIGH-VOLUME — filter to a specific campaign', icon: 'MousePointerClick', color: 'amber',
+    defaultData: { label: 'Email Link Clicked', category: 'trigger', triggerType: 'email_clicked', config: {} } as TriggerNodeData },
+  // Catalogs
+  { type: 'triggerNode', category: 'trigger', subType: 'catalog_sent_to_customers', group: 'Catalogs',
+    label: 'Catalog Sent', description: 'A presentation catalog was emailed to a batch of customers', icon: 'Send', color: 'emerald',
+    defaultData: { label: 'Catalog Sent', category: 'trigger', triggerType: 'catalog_sent_to_customers', config: {} } as TriggerNodeData },
+  // Quotes
+  { type: 'triggerNode', category: 'trigger', subType: 'quote_sent', group: 'Quotes',
+    label: 'Quote Sent', description: 'A quote was emailed to its customer', icon: 'Send', color: 'emerald',
+    defaultData: { label: 'Quote Sent', category: 'trigger', triggerType: 'quote_sent', config: {} } as TriggerNodeData },
+  // Monitoring (bridged from the Python dispatchers via DB triggers on *_alert_log)
+  { type: 'triggerNode', category: 'trigger', subType: 'price_alert_triggered', group: 'Monitoring',
+    label: 'Price Alert', description: 'The price-monitoring dispatcher fired an alert (drop / new retailer / promo / anomaly)', icon: 'TrendingDown', color: 'blue',
+    defaultData: { label: 'Price Alert', category: 'trigger', triggerType: 'price_alert_triggered', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'mention_alert_triggered', group: 'Monitoring',
+    label: 'Mention Alert', description: 'The mention-monitoring dispatcher fired an alert (spike / negative / new outlet / LLM visibility)', icon: 'AtSign', color: 'blue',
+    defaultData: { label: 'Mention Alert', category: 'trigger', triggerType: 'mention_alert_triggered', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'job_alert_triggered', group: 'Monitoring',
+    label: 'Job Alert', description: 'The job-research dispatcher fired a digest/burst alert', icon: 'Briefcase', color: 'blue',
+    defaultData: { label: 'Job Alert', category: 'trigger', triggerType: 'job_alert_triggered', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

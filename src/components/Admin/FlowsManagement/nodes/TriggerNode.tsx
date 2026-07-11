@@ -8,6 +8,7 @@ import {
   LayoutGrid, ImagePlus, Share2, Inbox, Send,
   CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
   Megaphone, MailX, MailWarning,
+  Building2, MailOpen, MousePointerClick, TrendingDown, AtSign, Briefcase,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -94,6 +95,15 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   social_post_published: Share2,
   social_post_failed: XCircle,
   client_view_feedback_received: ClipboardCheck,
+  crm_contact_created: UserPlus,
+  crm_company_created: Building2,
+  email_opened: MailOpen,
+  email_clicked: MousePointerClick,
+  catalog_sent_to_customers: Send,
+  quote_sent: Send,
+  price_alert_triggered: TrendingDown,
+  mention_alert_triggered: AtSign,
+  job_alert_triggered: Briefcase,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

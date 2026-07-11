@@ -261,6 +261,28 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
       } catch { /* best-effort — never fail the webhook on a flow emit */ }
     }
 
+    // Engagement events. HIGH-VOLUME: every open/click fires a metered flow run, so operators
+    // should pair the trigger with a Filter node (e.g. a specific campaign_id). Still surfaced
+    // because they enable drip / re-engagement automations. Best-effort.
+    if (event.type === 'email.opened' || event.type === 'email.clicked') {
+      try {
+        const tags = (emailLog as any).tags ?? {};
+        const isClick = event.type === 'email.clicked';
+        await emitFlowEvent(isClick ? 'email_clicked' : 'email_opened', {
+          type: isClick ? 'email_clicked' : 'email_opened',
+          workspace_id: (emailLog as any).workspace_id ?? null,
+          email_log_id: (emailLog as any).id,
+          email: (emailLog as any).to_email ?? (event.data.to?.[0] ?? null),
+          campaign_id: tags.campaign_id ?? null,
+          recipient_id: tags.recipient_id ?? null,
+          link: isClick ? (event.data.click?.link ?? null) : null,
+          title: isClick ? 'Campaign link clicked' : 'Campaign email opened',
+          body: `${(emailLog as any).to_email ?? 'A recipient'} ${isClick ? 'clicked a link in' : 'opened'} a campaign email.`,
+          action_url: '/email-marketing?tab=campaigns',
+        });
+      } catch { /* best-effort */ }
+    }
+
     return new Response(JSON.stringify({ success: true, event_type: eventType }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

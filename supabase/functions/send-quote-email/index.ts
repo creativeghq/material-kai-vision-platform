@@ -18,6 +18,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -164,6 +165,27 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
   } catch (err) {
     return json({ success: false, error: err instanceof Error ? err.message : 'send failed' }, 500);
   }
+
+  // Flows — a quote was emailed to its customer (enables "3 days after sending, follow up"
+  // style automations). Best-effort; never affect the send result.
+  try {
+    await emitFlowEvent('quote_sent', {
+      type: 'quote_sent',
+      workspace_id: quote.workspace_id ?? null,
+      user_id: quote.user_id,
+      quote_id: quote.id,
+      quote_number: quote.quote_number ?? null,
+      quote_name: quote.name ?? null,
+      grand_total: quote.grand_total ?? null,
+      currency: quote.currency ?? null,
+      customer_email: recipient,
+      customer_name: recipientName,
+      view_url: viewUrl,
+      title: `Quote sent: ${quote.quote_number || quote.name || quote.id}`,
+      body: `Quote ${quote.quote_number || quote.name || ''} was emailed to ${recipientName || recipient}.`,
+      action_url: `/quotes/${quote.id}`,
+    });
+  } catch { /* best-effort */ }
 
   return json({ success: true, sent_to: recipient, view_url: viewUrl });
 }));

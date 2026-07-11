@@ -19,6 +19,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -259,6 +260,24 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
         failed++;
       }
     }
+
+    // Flows — a catalog was emailed to a batch of customers. Best-effort.
+    try {
+      await emitFlowEvent('catalog_sent_to_customers', {
+        type: 'catalog_sent_to_customers',
+        workspace_id: catalog.workspace_id,
+        user_id: catalog.owner_user_id,
+        catalog_id: catalog.id,
+        catalog_title: catalog.title,
+        send_batch_id: sendBatchId,
+        recipients_count: recipients.length,
+        sent_count: sent,
+        failed_count: failed,
+        title: `Catalog sent: ${catalog.title}`,
+        body: `"${catalog.title}" was emailed to ${sent} customer${sent === 1 ? '' : 's'}${failed ? ` (${failed} failed)` : ''}.`,
+        action_url: `/catalogs/${catalog.id}`,
+      });
+    } catch { /* best-effort */ }
 
     return jsonResponse({
       success: true,

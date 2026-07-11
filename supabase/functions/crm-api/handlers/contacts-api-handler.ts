@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, type CrmScope } from './_scope.ts';
+import { emitFlowEvent } from '../../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -149,6 +150,21 @@ export async function handleContacts(req: Request): Promise<Response> {
         );
       }
 
+      // Flows — new CRM contact. Carries lead_source so a flow can filter out bulk imports
+      // (e.g. only fire for lead_source != 'import'). Best-effort; never block the create.
+      const created = data?.[0];
+      if (created) {
+        try {
+          await emitFlowEvent('crm_contact_created', {
+            type: 'crm_contact_created', workspace_id: targetWs, user_id: userId || undefined,
+            contact_id: created.id, contact_name: created.name, email: created.email ?? null,
+            lead_source: created.lead_source ?? null, lead_status: created.lead_status ?? null,
+            title: `New contact: ${created.name}`,
+            body: `${created.name}${created.lead_source ? ` (${created.lead_source})` : ''} was added to your CRM.`,
+            action_url: `/crm/contacts/${created.id}`,
+          });
+        } catch { /* best-effort */ }
+      }
       return new Response(
         JSON.stringify({ data: data?.[0] }),
         { status: 201, headers: corsHeaders },

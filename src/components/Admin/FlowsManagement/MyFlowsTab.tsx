@@ -44,6 +44,11 @@ import {
   Megaphone,
   MailX,
   MailWarning,
+  MailOpen,
+  MousePointerClick,
+  TrendingDown,
+  AtSign,
+  Briefcase,
   Building2,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
@@ -161,6 +166,15 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   social_post_published: Share2,
   social_post_failed: XCircle,
   client_view_feedback_received: ClipboardCheck,
+  crm_contact_created: UserPlus,
+  crm_company_created: Building2,
+  email_opened: MailOpen,
+  email_clicked: MousePointerClick,
+  catalog_sent_to_customers: Send,
+  quote_sent: Send,
+  price_alert_triggered: TrendingDown,
+  mention_alert_triggered: AtSign,
+  job_alert_triggered: Briefcase,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -246,6 +260,15 @@ const triggerLabels: Record<TriggerType, string> = {
   social_post_published: 'Social Post Published',
   social_post_failed: 'Social Post Failed',
   client_view_feedback_received: 'Client View Feedback',
+  crm_contact_created: 'Contact Created',
+  crm_company_created: 'Company Created',
+  email_opened: 'Email Opened',
+  email_clicked: 'Email Link Clicked',
+  catalog_sent_to_customers: 'Catalog Sent',
+  quote_sent: 'Quote Sent',
+  price_alert_triggered: 'Price Alert',
+  mention_alert_triggered: 'Mention Alert',
+  job_alert_triggered: 'Job Alert',
 };
 
 const statusColors: Record<FlowStatus, string> = {

@@ -156,11 +156,23 @@ emitter is not shipped):
 - **Project Client Views**: `client_view_feedback_received` (`moodboard-sheet-share` — a
   client approves / requests changes / comments on a shared deliverable; routed to the
   deliverable owner + resolved workspace via the project).
+- **CRM**: `crm_contact_created` + `crm_company_created` (`crm-api` handlers). The contact
+  payload carries `lead_source` so a Filter node can exclude bulk imports (e.g. fire only
+  when `lead_source != 'import'`).
+- **Email Marketing engagement**: `email_opened` + `email_clicked` (`email-webhooks`).
+  **HIGH-VOLUME** — each event fires a metered flow run, so pair with a Filter node
+  (e.g. a specific `campaign_id`). Surfaced because they enable drip / re-engagement flows.
+- **Catalogs**: `catalog_sent_to_customers` (`catalog-send-to-customers`). **Quotes**:
+  `quote_sent` (`send-quote-email`) — enables "N days after sending, follow up" automations.
+- **Monitoring** (Price / Mention / Job): `price_alert_triggered`, `mention_alert_triggered`,
+  `job_alert_triggered`. Detection + credit metering stay in the Python dispatchers; the
+  bridge is an **AFTER INSERT DB trigger** on each `*_alert_log` table (`_notify_price_alert`
+  / `_notify_mention_alert` / `_notify_job_alert`) that POSTs `trigger-event` to `flow-engine`
+  via `pg_net` (same pattern as `_notify_want_match`), resolving `workspace_id` from the
+  tracked subject. This finally routes the monitoring channel fan-out through Flows.
 
-> **Deferred (needs a design decision, not just wiring):** a CRM `crm_contact_created`
-> trigger. Contacts are created from many paths (manual, bulk import, WhatsApp inbound),
-> so a raw insert trigger would fire on every imported row — it needs a "new lead vs
-> import" definition first. Not shipped as inert palette decoration.
+> **myAADE** is intentionally NOT given a trigger — it's a synchronous registry-lookup
+> helper (fill a business profile from ΑΦΜ), not a lifecycle with an automatable event.
 
 These are registered in `flow_area_registry` as **optional** (unbound) automation
 surfaces — an operator builds and binds their own flow. They are NOT pre-seeded with

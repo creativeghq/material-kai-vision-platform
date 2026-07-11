@@ -107,7 +107,20 @@ export type TriggerType =
   | 'social_post_published'
   | 'social_post_failed'
   // Project Client Views: a client approved / requested changes / commented on a deliverable
-  | 'client_view_feedback_received';
+  | 'client_view_feedback_received'
+  // CRM: a new contact / company was created
+  | 'crm_contact_created'
+  | 'crm_company_created'
+  // Email Marketing engagement (high-volume — see note in the config interfaces below)
+  | 'email_opened'
+  | 'email_clicked'
+  // Catalog sent to customers; a quote emailed to its customer
+  | 'catalog_sent_to_customers'
+  | 'quote_sent'
+  // Monitoring alerts (bridged from the Python dispatchers via DB triggers on the *_alert_log tables)
+  | 'price_alert_triggered'
+  | 'mention_alert_triggered'
+  | 'job_alert_triggered';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
@@ -126,6 +139,17 @@ export interface EmailComplainedTriggerConfig {}
 export interface SocialPostPublishedTriggerConfig {}
 export interface SocialPostFailedTriggerConfig {}
 export interface ClientViewFeedbackReceivedTriggerConfig {}
+export interface CrmContactCreatedTriggerConfig {}
+export interface CrmCompanyCreatedTriggerConfig {}
+/** NOTE: opens/clicks are HIGH-VOLUME. Each event fires a metered flow run — pair with a
+ *  Filter node (e.g. only a specific campaign) to avoid running on every open. */
+export interface EmailOpenedTriggerConfig {}
+export interface EmailClickedTriggerConfig {}
+export interface CatalogSentToCustomersTriggerConfig {}
+export interface QuoteSentTriggerConfig {}
+export interface PriceAlertTriggeredTriggerConfig {}
+export interface MentionAlertTriggeredTriggerConfig {}
+export interface JobAlertTriggeredTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
@@ -336,6 +360,15 @@ export type TriggerConfigMap = {
   social_post_published: SocialPostPublishedTriggerConfig;
   social_post_failed: SocialPostFailedTriggerConfig;
   client_view_feedback_received: ClientViewFeedbackReceivedTriggerConfig;
+  crm_contact_created: CrmContactCreatedTriggerConfig;
+  crm_company_created: CrmCompanyCreatedTriggerConfig;
+  email_opened: EmailOpenedTriggerConfig;
+  email_clicked: EmailClickedTriggerConfig;
+  catalog_sent_to_customers: CatalogSentToCustomersTriggerConfig;
+  quote_sent: QuoteSentTriggerConfig;
+  price_alert_triggered: PriceAlertTriggeredTriggerConfig;
+  mention_alert_triggered: MentionAlertTriggeredTriggerConfig;
+  job_alert_triggered: JobAlertTriggeredTriggerConfig;
 };
 
 // =====================================================
