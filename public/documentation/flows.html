@@ -32,6 +32,7 @@
   <p>Under the hood a flow can be reached four ways — a business <strong>event</strong> (the triggers above), a <strong>schedule</strong>, an inbound <strong>webhook</strong>, or a <strong>manual</strong> run — but the ones you'll build from chat are the events and schedules.</p>
 
   <h2>Actions — what a flow does</h2>
+  <p><strong>Messaging actions</strong> reach out to someone:</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Action</th><th>What it does</th></tr></thead>
     <tbody>
@@ -42,6 +43,19 @@
       <tr><td><strong>Dispatch an Email Marketing campaign</strong></td><td>Kick off an <a href="email-marketing.html">Email Marketing</a> campaign.</td></tr>
     </tbody>
   </table></div>
+  <p><strong>CRM &amp; commerce actions</strong> update your data — so a flow can <em>do</em> work, not just notify:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Action</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Add tag</strong></td><td>Tag a <a href="crm.html">CRM</a> contact (e.g. tag everyone who books an appointment).</td></tr>
+      <tr><td><strong>Add note</strong></td><td>Attach a note to a CRM contact/company.</td></tr>
+      <tr><td><strong>Update contact</strong></td><td>Change a field on a CRM contact.</td></tr>
+      <tr><td><strong>Assign owner</strong></td><td>Assign a contact/record to a team member.</td></tr>
+      <tr><td><strong>Approve quote</strong></td><td>Approve a <a href="quotes.html">quote</a> automatically.</td></tr>
+      <tr><td><strong>Update product</strong></td><td>Change a field on a product.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><p><strong>Branch with A/B split.</strong> Between the trigger and the action you can drop an <strong>A/B Split</strong> — it randomly sends each run down path <em>A</em> or <em>B</em>, so you can test two versions (e.g. two email subjects) and compare. Each branch then runs its own action.</p></div>
 
   <h2>How to create a flow — from chat</h2>
   <ol>
