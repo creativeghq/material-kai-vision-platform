@@ -15,6 +15,8 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import YooptaEditor, {
   createYooptaEditor,
+  buildBlockData,
+  generateId,
   type YooptaContentValue,
 } from '@yoopta/editor';
 import Paragraph from '@yoopta/paragraph';
@@ -31,7 +33,6 @@ import Accordion from '@yoopta/accordion';
 import Embed from '@yoopta/embed';
 import { Bold, Italic, Underline, Strike, CodeMark, Highlight } from '@yoopta/marks';
 import { FloatingToolbar, FloatingBlockActions, SlashCommandMenu } from '@yoopta/ui';
-import { applyTheme } from '@yoopta/themes-shadcn';
 import { markdown } from '@yoopta/exports';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -56,6 +57,16 @@ async function defaultImageUpload(file: File): Promise<ImageElementProps> {
 
 const isNonEmpty = (v: YooptaContentValue | null | undefined): v is YooptaContentValue =>
   !!v && typeof v === 'object' && Object.keys(v).length > 0;
+
+// A Yoopta editor with an empty value renders NO block, so there's nothing to
+// click into or type — a brand-new doc would look like a dead text area. Seed a
+// single empty paragraph so the editor is always focusable/typeable.
+const emptyParagraphValue = (): YooptaContentValue => {
+  const id = generateId();
+  return {
+    [id]: buildBlockData({ id, type: 'Paragraph', meta: { order: 0, depth: 0 } }),
+  } as unknown as YooptaContentValue;
+};
 
 export interface MarkdownEditorProps {
   /** Yoopta block-JSON value = source of truth. Null/undefined for legacy rows. */
@@ -107,9 +118,23 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const fallbackRef = useRef(fallbackMarkdown);
   fallbackRef.current = fallbackMarkdown;
 
+  // #254 — Yoopta (themes-shadcn / ui / marks) injects its OWN copies of Tailwind utility classes
+  // (.flex-col, .items-center, .justify-between, .text-center, …) into <head> at module load via
+  // style-inject. They land AFTER the app's Tailwind, so at equal specificity they win the cascade
+  // and clobber our responsive utilities app-wide (e.g. injected .flex-col beats our sm:flex-row →
+  // PageHeader collapses into a centered column). The definitions are identical to ours, so it's a
+  // pure source-ORDER problem: move the app's own stylesheets to the END of <head> once the editor
+  // has mounted (Yoopta injects at import — before mount — and memoises, so nothing re-injects
+  // later). Ours then win order again, WITHOUT a global specificity change (important:'#root' would
+  // break the design system, which deliberately overrides utilities like .bg-primary in CSS).
+  useEffect(() => {
+    const appSheets = document.head.querySelectorAll<HTMLElement>('link[rel="stylesheet"], style[data-vite-dev-id]');
+    appSheets.forEach((el) => document.head.appendChild(el));
+  }, []);
+
   const editor = useMemo(() => {
     const imagePlugin = uploadFn ? Image.extend({ options: { upload: uploadFn } }) : Image;
-    const plugins = applyTheme([
+    const plugins = ([
       Paragraph,
       HeadingOne,
       HeadingTwo,
@@ -126,7 +151,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       Divider,
       Accordion,
       Embed,
-    ]);
+      // Yoopta's per-plugin element generics (Table/Image/…) don't unify into the editor's
+      // Record<string, SlateElement> plugin type — a known upstream typing looseness. Runtime is
+      // correct; cast so the build stays clean.
+    ] as unknown as Parameters<typeof createYooptaEditor>[0]['plugins']);
     return createYooptaEditor({ plugins, marks: MARKS, readOnly });
     // Editor is created once; content flows through the seed effect + onChange.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,12 +164,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   // is only deserialized as a fallback for legacy rows that have no JSON yet.
   useEffect(() => {
     const v = valueRef.current;
-    const content = isNonEmpty(v)
+    const parsed = isNonEmpty(v)
       ? v
       : fallbackRef.current
         ? markdown.deserialize(editor, fallbackRef.current)
         : null;
-    if (isNonEmpty(content)) editor.setEditorValue(content);
+    // Always give the editor at least one block, or the surface is un-clickable
+    // (a brand-new doc would look like a dead text area).
+    editor.setEditorValue(isNonEmpty(parsed) ? parsed : emptyParagraphValue());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, seedKey]);
 
