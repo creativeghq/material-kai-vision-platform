@@ -6,13 +6,16 @@ import { AdminGuard } from '@/components/core/AdminGuard';
 import { EntitlementGuard } from '@/components/core/EntitlementGuard';
 import { Layout } from '@/components/core/Layout';
 import { PageErrorBoundary } from '@/components/core/ErrorBoundary';
+import { PageLoader } from '@/components/core/PageLoader';
 
 import { registeredModules } from './registry';
 import { useModule } from './useEnabledModules';
 
 const ModuleGate: React.FC<{ slug: string; children: React.ReactNode }> = ({ slug, children }) => {
   const { enabled, isLoading } = useModule(slug);
-  if (isLoading) return null;
+  // Show the shared loader (not a blank screen) while the module-enabled lookup resolves, so
+  // navigating to a module route matches the loading state every other page shows.
+  if (isLoading) return <PageLoader />;
   if (!enabled) {
     return (
       <div className="container mx-auto py-12 text-center text-sm text-muted-foreground">

@@ -14,6 +14,7 @@ import { Lock, ArrowLeft, Sparkles } from 'lucide-react';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { PageLoader } from '@/components/core/PageLoader';
 
 interface Props {
   moduleSlug: string;
@@ -27,7 +28,9 @@ export const EntitlementGuard: React.FC<Props> = ({ moduleSlug, moduleName, chil
   const { isModuleAvailable, tierOf, loading } = useEntitlements();
   const navigate = useNavigate();
 
-  if (loading) return null;
+  // Show the shared loader (not a blank screen) while entitlements resolve — matches every other
+  // page's loading state and avoids the paid-module upsell flashing before the check completes.
+  if (loading) return <PageLoader />;
   if (isModuleAvailable(moduleSlug)) return <>{children}</>;
 
   const label = moduleName ?? moduleSlug;
