@@ -273,9 +273,40 @@ async function call<T>(workspaceId: string, action: string, extra: Record<string
   return data as T;
 }
 
+// Reads go DIRECT to the DB (like Finance), not through the hr-api edge function — that pays a
+// cold-start on the first navigation and a per-tab-switch round-trip, which is the whole "blank
+// div while it loads" symptom. The hr_* SELECT RLS policy is `is_workspace_admin(workspace_id) OR
+// is_platform_operator()`, i.e. the IDENTICAL owner/admin-only gate resolveHrAccess enforces on the
+// edge, so a direct client read is equally safe AND runs at always-warm PostgREST speed (~100ms).
+// Writes + computed/credit-metered/external endpoints stay on `call()`.
+//
+// hr_* tables post-date the last `supabase gen types` run so they're absent from the generated
+// Database type; `sb` is a thin untyped handle for those reads. Rows are cast to the exported
+// interfaces below — the same type-safety level `call<T>()` had (neither validates at runtime).
+// deno-lint-ignore no-explicit-any
+const sb = supabase as any;
+
 class HrService {
-  listEmployees(workspaceId: string): Promise<{ employees: Employee[] }> {
-    return call(workspaceId, 'list-employees');
+  async listEmployees(workspaceId: string): Promise<{ employees: Employee[] }> {
+    const [{ data: emps, error }, { data: sums }] = await Promise.all([
+      sb.from('hr_employees')
+        .select(`*, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name, first_name, last_name, email, phone, mobile, position, department, date_of_birth, vat_number ), manager:crm_contacts!hr_employees_manager_contact_id_fkey ( id, name )`)
+        .eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
+      sb.from('vw_hr_employee_absence_summary').select('*').eq('workspace_id', workspaceId),
+    ]);
+    if (error) throw error;
+    const byId = new Map((sums ?? []).map((s: any) => [s.employee_id, s]));
+    const employees = (emps ?? []).map((e: any) => {
+      const s: any = byId.get(e.id) ?? {};
+      return {
+        ...e,
+        total_absence_days: Number(s.total_absence_days ?? 0),
+        days_by_type: s.days_by_type ?? {},
+        on_leave_today: !!s.on_leave_today,
+        remaining_leave_days: s.remaining_leave_days ?? e.annual_leave_allowance_days ?? 0,
+      };
+    });
+    return { employees: employees as Employee[] };
   }
   createEmployee(workspaceId: string, input: CreateEmployeeInput): Promise<{ employee: Employee }> {
     return call(workspaceId, 'create-employee', input as unknown as Record<string, unknown>);
@@ -283,8 +314,15 @@ class HrService {
   updateEmployee(workspaceId: string, input: UpdateEmployeeInput): Promise<{ employee: Employee }> {
     return call(workspaceId, 'update-employee', input as unknown as Record<string, unknown>);
   }
-  listAbsences(workspaceId: string, filters: { employee_id?: string; status?: AbsenceStatus } = {}): Promise<{ absences: Absence[] }> {
-    return call(workspaceId, 'list-absences', filters);
+  async listAbsences(workspaceId: string, filters: { employee_id?: string; status?: AbsenceStatus } = {}): Promise<{ absences: Absence[] }> {
+    let q = sb.from('hr_absences')
+      .select('*, employee:hr_employees!hr_absences_employee_id_fkey ( id, crm_contact_id, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name ) )')
+      .eq('workspace_id', workspaceId).order('start_date', { ascending: false });
+    if (filters.employee_id) q = q.eq('employee_id', filters.employee_id);
+    if (filters.status) q = q.eq('status', filters.status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return { absences: (data ?? []) as Absence[] };
   }
   recordAbsence(workspaceId: string, input: RecordAbsenceInput): Promise<{ absence: Absence }> {
     return call(workspaceId, 'record-absence', input as unknown as Record<string, unknown>);
@@ -300,18 +338,49 @@ class HrService {
   }
 
   // ── Departments ──
-  listDepartments(ws: string): Promise<{ departments: Department[] }> { return call(ws, 'list-departments'); }
+  async listDepartments(ws: string): Promise<{ departments: Department[] }> {
+    const [{ data: depts, error }, { data: emps }] = await Promise.all([
+      sb.from('hr_departments').select('*, head:crm_contacts!hr_departments_head_contact_id_fkey ( id, name )').eq('workspace_id', ws).order('name'),
+      sb.from('hr_employees').select('department_id').eq('workspace_id', ws),
+    ]);
+    if (error) throw error;
+    const counts = new Map<string, number>();
+    for (const e of (emps ?? [])) if (e.department_id) counts.set(e.department_id, (counts.get(e.department_id) ?? 0) + 1);
+    return { departments: (depts ?? []).map((d: any) => ({ ...d, employee_count: counts.get(d.id) ?? 0 })) as Department[] };
+  }
   createDepartment(ws: string, input: { name: string; description?: string; head_contact_id?: string }): Promise<{ department: Department }> { return call(ws, 'create-department', input); }
   updateDepartment(ws: string, department_id: string, input: { name?: string; description?: string; head_contact_id?: string | null }): Promise<{ department: Department }> { return call(ws, 'update-department', { department_id, ...input }); }
   deleteDepartment(ws: string, department_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-department', { department_id }); }
 
   // ── Recruitment ──
-  listJobPostings(ws: string): Promise<{ postings: JobPosting[] }> { return call(ws, 'list-job-postings'); }
+  async listJobPostings(ws: string): Promise<{ postings: JobPosting[] }> {
+    const [{ data: posts, error }, { data: apps }] = await Promise.all([
+      sb.from('hr_job_postings').select('*, department:hr_departments!hr_job_postings_department_id_fkey ( id, name )').eq('workspace_id', ws).order('created_at', { ascending: false }),
+      sb.from('hr_applications').select('job_posting_id, stage').eq('workspace_id', ws),
+    ]);
+    if (error) throw error;
+    const byJob = new Map<string, { total: number; active: number }>();
+    for (const a of (apps ?? [])) {
+      const cur = byJob.get(a.job_posting_id) ?? { total: 0, active: 0 };
+      cur.total++; if (!['hired', 'rejected'].includes(a.stage)) cur.active++;
+      byJob.set(a.job_posting_id, cur);
+    }
+    return { postings: (posts ?? []).map((p: any) => ({ ...p, applicant_count: byJob.get(p.id)?.total ?? 0, active_applicants: byJob.get(p.id)?.active ?? 0 })) as JobPosting[] };
+  }
   createJobPosting(ws: string, input: Record<string, unknown>): Promise<{ posting: JobPosting }> { return call(ws, 'create-job-posting', input); }
   updateJobPosting(ws: string, job_posting_id: string, input: Record<string, unknown>): Promise<{ posting: JobPosting }> { return call(ws, 'update-job-posting', { job_posting_id, ...input }); }
   deleteJobPosting(ws: string, job_posting_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-job-posting', { job_posting_id }); }
   generateJobDescription(ws: string, input: { title: string; seniority?: string; department?: string; employment_type?: string; location?: string; keywords?: string; company?: string }): Promise<{ generated: { description: string; requirements: string; suggested_salary_min?: number; suggested_salary_max?: number }; credits_used: number }> { return call(ws, 'generate-job-description', input); }
-  listApplications(ws: string, filters: { job_posting_id?: string; stage?: AppStage } = {}): Promise<{ applications: Application[] }> { return call(ws, 'list-applications', filters); }
+  async listApplications(ws: string, filters: { job_posting_id?: string; stage?: AppStage } = {}): Promise<{ applications: Application[] }> {
+    let q = sb.from('hr_applications')
+      .select(`*, candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email, phone, headline, resume_path ), posting:hr_job_postings!hr_applications_job_posting_id_fkey ( id, title )`)
+      .eq('workspace_id', ws).order('applied_at', { ascending: false });
+    if (filters.job_posting_id) q = q.eq('job_posting_id', filters.job_posting_id);
+    if (filters.stage) q = q.eq('stage', filters.stage);
+    const { data, error } = await q;
+    if (error) throw error;
+    return { applications: (data ?? []) as Application[] };
+  }
   createApplication(ws: string, input: { job_posting_id: string; candidate_id?: string; candidate?: { name: string; email?: string; phone?: string; headline?: string; source?: string }; notes?: string }): Promise<{ application: Application }> { return call(ws, 'create-application', input); }
   updateApplication(ws: string, application_id: string, input: { stage?: AppStage; rating?: number; notes?: string }): Promise<{ application: Application }> { return call(ws, 'update-application', { application_id, ...input }); }
   hireApplication(ws: string, application_id: string, input: { start_date?: string; department_id?: string } = {}): Promise<{ employee_id: string; onboarding_seeded: number }> { return call(ws, 'hire-application', { application_id, ...input }); }
@@ -320,19 +389,40 @@ class HrService {
   screenApplication(ws: string, application_id: string): Promise<{ application: { id: string; ai_score: number; ai_summary: string; ai_rated_at: string }; credits_used: number }> { return call(ws, 'screen-application', { application_id }); }
 
   // ── Onboarding ──
-  listOnboarding(ws: string, filters: { employee_id?: string; pending_only?: boolean } = {}): Promise<{ tasks: OnboardingTask[] }> { return call(ws, 'list-onboarding', filters); }
+  async listOnboarding(ws: string, filters: { employee_id?: string; pending_only?: boolean } = {}): Promise<{ tasks: OnboardingTask[] }> {
+    let q = sb.from('hr_onboarding_tasks')
+      .select('*, employee:hr_employees!hr_onboarding_tasks_employee_id_fkey ( id, crm_contact_id, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name ) )')
+      .eq('workspace_id', ws).order('sort_order');
+    if (filters.employee_id) q = q.eq('employee_id', filters.employee_id);
+    if (filters.pending_only) q = q.eq('status', 'pending');
+    const { data, error } = await q;
+    if (error) throw error;
+    return { tasks: (data ?? []) as OnboardingTask[] };
+  }
   addOnboardingTask(ws: string, input: { employee_id: string; title: string; description?: string; due_date?: string; assignee_contact_id?: string }): Promise<{ task: OnboardingTask }> { return call(ws, 'add-onboarding-task', input); }
   toggleOnboardingTask(ws: string, task_id: string): Promise<{ task: OnboardingTask }> { return call(ws, 'toggle-onboarding-task', { task_id }); }
   deleteOnboardingTask(ws: string, task_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-onboarding-task', { task_id }); }
 
   // ── Documents ──
-  listDocuments(ws: string, filters: { employee_id?: string } = {}): Promise<{ documents: HrDocument[] }> { return call(ws, 'list-documents', filters); }
+  async listDocuments(ws: string, filters: { employee_id?: string } = {}): Promise<{ documents: HrDocument[] }> {
+    let q = sb.from('hr_documents')
+      .select('*, employee:hr_employees!hr_documents_employee_id_fkey ( id, crm_contact_id, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name ) )')
+      .eq('workspace_id', ws).order('created_at', { ascending: false });
+    if (filters.employee_id) q = q.eq('employee_id', filters.employee_id);
+    const { data, error } = await q;
+    if (error) throw error;
+    return { documents: (data ?? []) as HrDocument[] };
+  }
   uploadDocument(ws: string, input: { name: string; doc_type: DocType; content_base64: string; content_type?: string; employee_id?: string }): Promise<{ document: HrDocument }> { return call(ws, 'upload-document', input); }
   signDocument(ws: string, document_id: string): Promise<{ url: string }> { return call(ws, 'sign-document', { document_id }); }
   deleteDocument(ws: string, document_id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-document', { document_id }); }
 
   // ── Payroll ──
-  listPayrollRuns(ws: string): Promise<{ runs: PayrollRun[] }> { return call(ws, 'list-payroll-runs'); }
+  async listPayrollRuns(ws: string): Promise<{ runs: PayrollRun[] }> {
+    const { data, error } = await sb.from('hr_payroll_runs').select('*').eq('workspace_id', ws).order('period', { ascending: false });
+    if (error) throw error;
+    return { runs: (data ?? []) as PayrollRun[] };
+  }
   createPayrollRun(ws: string, input: { period: string; currency?: string }): Promise<{ run: PayrollRun; items: number }> { return call(ws, 'create-payroll-run', input); }
   getPayrollRun(ws: string, run_id: string): Promise<{ run: PayrollRun; items: PayrollItem[]; summary: PayrollSummary }> { return call(ws, 'get-payroll-run', { run_id }); }
   updatePayrollItem(ws: string, item_id: string, input: { gross: number; deductions?: number; note?: string }): Promise<{ ok: boolean; total_gross: number; total_net: number }> { return call(ws, 'update-payroll-item', { item_id, ...input }); }
