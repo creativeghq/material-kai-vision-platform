@@ -792,6 +792,51 @@ function getModelNameForAgent(
     : 'claude-opus-4-8';
 }
 
+// ── Orchestrator routing (Agent Fabric #132) ──────────────────────────────
+// When the client sends the orchestrator agent id ('orchestrator'/'jarvis'/'auto'),
+// JARVIS picks the specialist whose remit fits and the turn runs AS that agent —
+// the user never switches agents manually. Only the runnable function-tier agents
+// are routable (sandbox agents developer/qa-reviewer are not chat-executable here).
+const ORCHESTRATOR_IDS = new Set(['orchestrator', 'jarvis', 'auto']);
+const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
+  { slug: 'interior-designer', name: 'Vision', blurb: 'interior design, room redesign, image or 3D generation, virtual staging, lighting, VR worlds, moodboards, presentation sheets' },
+  { slug: 'product-business', name: 'Pepper', blurb: 'building or publishing catalogs, B2B manufacturer research, company/contact enrichment and CRM, product knowledge-graph (provenance, brand, related products, specs), tech radar, job research' },
+  { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
+  { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history' },
+  { slug: 'social-media', name: 'Hermes', blurb: 'publishing or scheduling social-media posts, social analytics, best time to post' },
+];
+
+/**
+ * Classify the user message → a specialist slug (or null = generalist/JARVIS).
+ * Cheap Haiku call. Fully defensive: any error/timeout/ambiguity → null so the
+ * turn falls back to the generalist (current behavior) and chat never breaks.
+ */
+async function routeToSpecialist(userInput: string): Promise<{ slug: string; name: string } | null> {
+  try {
+    if (!modelHaiku || !userInput || !userInput.trim()) return null;
+    const menu = ROUTABLE_SPECIALISTS.map((s) => `- ${s.slug}: ${s.blurb}`).join('\n');
+    const resp = await modelHaiku.invoke([
+      {
+        role: 'system',
+        content:
+          `You route a message on a materials / interior-design B2B platform to the best specialist.\n` +
+          `Specialists:\n${menu}\n` +
+          `Reply with ONLY the slug of the best fit, or the word "generalist" for general questions, ` +
+          `material/knowledge-base search, greetings, follow-ups, or anything not clearly one specialist's job. ` +
+          `Output the slug (or "generalist") and nothing else.`,
+      },
+      { role: 'user', content: userInput.slice(0, 2000) },
+    ]);
+    const c = resp?.content;
+    const raw = (typeof c === 'string' ? c : Array.isArray(c) ? c.map((p: any) => p?.text || '').join('') : '')
+      .trim().toLowerCase();
+    const hit = ROUTABLE_SPECIALISTS.find((s) => raw.includes(s.slug));
+    return hit ? { slug: hit.slug, name: hit.name } : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 interface AgentConfig {
   id: string;
   name: string;
@@ -928,6 +973,73 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
   },
+  // ── Agent Fabric specialists (#132) — curated views over the proven tool
+  // catalog, each with its own persona (prompts.category = slug). JARVIS
+  // (orchestrator) routes to these; users can also pick them directly. Every
+  // tool id below already exists on the generalist, so binding is regression-safe.
+  'product-business': {
+    id: 'product-business', // Pepper
+    name: 'Pepper',
+    description: 'Product & business — catalogs, B2B research, product knowledge-graph, tech radar, job research',
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
+    tools: [
+      'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
+      'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog',
+      'add_material_to_catalog', 'find_image_for_material', 'generate_catalog_pdf', 'publish_catalog',
+      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery',
+      'email_validate', 'save_to_crm',
+      'product_provenance', 'product_price_history', 'products_by_brand', 'brand_overview',
+      'related_products', 'find_products_by_spec', 'products_in_project', 'projects_using_product',
+      'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
+      'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
+      'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
+    ],
+  },
+  marketing: {
+    id: 'marketing', // Edith
+    name: 'Edith',
+    description: 'Marketing, SEO & reputation — keyword/SERP research, audits, content, brand & LLM-visibility monitoring',
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
+    tools: [
+      'knowledge_base_search', 'material_search', 'analyze_inspiration_url',
+      'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
+      'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url',
+      'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors', 'seo_keyword_gap',
+      'seo_traffic_estimation', 'seo_subdomains', 'seo_relevant_pages', 'seo_categories_for_domain',
+      'seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains',
+      'seo_site_crawl_start', 'seo_site_crawl_status', 'seo_content_sentiment', 'seo_domain_technologies',
+      'seo_domain_whois', 'seo_llm_mentions_search', 'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
+      'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
+      'seo_site_review', 'seo_brand_search_audit', 'seo_dataforseo_call',
+      'create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer',
+      'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
+      'research_analysis', 'analytics_analysis',
+    ],
+  },
+  erp: {
+    id: 'erp', // Trinity
+    name: 'Trinity',
+    description: 'Finance & quotes — build client quotes + branded PDFs, customer/supplier overviews, price history',
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
+    tools: [
+      'knowledge_base_search', 'material_search',
+      'create_quote', 'generate_quote_pdf', 'list_my_quotes',
+      'customer_overview', 'supplier_overview', 'product_price_history',
+      'products_in_project', 'projects_using_product', 'price_lookup',
+      'create_project', 'list_my_projects', 'find_project',
+    ],
+  },
+  'social-media': {
+    id: 'social-media', // Hermes
+    name: 'Hermes',
+    description: 'Social media — publish/schedule posts and read analytics across connected accounts',
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
+    tools: [
+      'knowledge_base_search',
+      'manage_social',
+    ],
+  },
+
   // Legacy aliases — old frontends sending 'search', 'insights', or 'seo' route to KAI
   search: {
     id: 'kai',
@@ -993,6 +1105,19 @@ async function executeAgent(
     turnCount: number;
   };
 }> {
+  // Orchestrator: JARVIS routes this turn to the best specialist (or the generalist).
+  // Runs before config lookup so the rest of the turn executes AS the chosen agent.
+  if (ORCHESTRATOR_IDS.has(agentId)) {
+    const routed = await routeToSpecialist(userInput);
+    if (routed && AGENT_CONFIGS[routed.slug]) {
+      onChunk?.({ type: 'agent_routed', to: routed.slug, name: routed.name, timestamp: Date.now() });
+      agentId = routed.slug;
+    } else {
+      // Generalist fallback — behaves exactly like the pre-orchestrator default.
+      agentId = 'kai';
+    }
+  }
+
   let config = AGENT_CONFIGS[agentId];
   if (!config) {
     throw new Error(`Unknown agent: ${agentId}`);
@@ -1055,6 +1180,9 @@ async function executeAgent(
     },
     'quotes': {
       tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes'],
+    },
+    'social': {
+      tool_ids: ['manage_social'],
     },
     'tech-radar': {
       tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
@@ -1139,9 +1267,13 @@ async function executeAgent(
   // the regular tools.
   for (const m of META_TOOLS) toolkitToolIds.add(m);
 
-  // Filter the agent's allowed tool list to the toolkit-resolved set, then
-  // ensure META_TOOLS are present even if the agent config didn't list them.
-  const baseTools = config.tools.filter((t) => toolkitToolIds.has(t));
+  // Curated specialists (#132) bind their WHOLE toolkit by default — the point of a
+  // specialist is that its focused kit is ready without a load_toolkit hop. The
+  // generalist (kai) stays lean (core + load_toolkit) to keep context small.
+  const CURATED_SPECIALISTS = new Set(['erp', 'product-business', 'marketing', 'social-media']);
+  const baseTools = CURATED_SPECIALISTS.has(agentId)
+    ? [...config.tools]
+    : config.tools.filter((t) => toolkitToolIds.has(t));
   for (const m of META_TOOLS) if (!baseTools.includes(m)) baseTools.push(m);
   config = { ...config, tools: baseTools };
 
@@ -1306,6 +1438,7 @@ async function executeAgent(
   const needsHr = config.tools.includes('manage_hr');
   const needsStock = config.tools.includes('manage_stock');
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
+  const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
   // (internal ops capability) — gate to admin/owner like price_lookup.
   const needsTechRadar = isAdmin && config.tools.some((t: string) => ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'].includes(t));
@@ -1316,7 +1449,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, quotesMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, quotesMod, socialMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1339,6 +1472,7 @@ async function executeAgent(
     needsHr           ? import('../_shared/tools/hr-tools.ts') : null,
     needsStock        ? import('../_shared/tools/stock-tools.ts') : null,
     needsQuotes       ? import('../_shared/tools/quote-tools.ts') : null,
+    needsSocial       ? import('../_shared/tools/social-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -1423,6 +1557,7 @@ async function executeAgent(
   const createCreateQuoteTool = quotesMod?.createCreateQuoteTool;
   const createGenerateQuotePdfTool = quotesMod?.createGenerateQuotePdfTool;
   const createListMyQuotesTool = quotesMod?.createListMyQuotesTool;
+  const createManageSocialTool = socialMod?.createManageSocialTool;
   const createTrackJobSearchTool = jobResearchMod?.createTrackJobSearchTool;
   const createListMyJobSearchesTool = jobResearchMod?.createListMyJobSearchesTool;
   const createFindJobsTool = jobResearchMod?.createFindJobsTool;
@@ -1687,6 +1822,11 @@ async function executeAgent(
   }
   if (config.tools.includes('list_my_quotes') && createListMyQuotesTool) {
     tools.push(createListMyQuotesTool(userId, workspaceId, onChunk));
+  }
+
+  // Social toolkit (Hermes; module-gated social-media; publish/schedule/analytics over connected accounts)
+  if (config.tools.includes('manage_social') && createManageSocialTool) {
+    tools.push(createManageSocialTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Sourcing tools (#237; RPC-gated at the DB layer — resolve=member, create_po=finance-manager; 0 cr)
@@ -2231,6 +2371,11 @@ async function getUserWorkspaceMembership(userId: string): Promise<{ role: strin
  * Check user role and agent access
  */
 function checkAgentAccess(role: string, agentId: string): { allowed: boolean; role: string } {
+  // The orchestrator (JARVIS) is available to every role — it routes to a specialist
+  // and per-agent/per-tool RBAC is enforced once the target agent is resolved.
+  if (ORCHESTRATOR_IDS.has(agentId)) {
+    return { allowed: true, role };
+  }
   const agentConfig = AGENT_CONFIGS[agentId];
   if (!agentConfig) {
     return { allowed: false, role };

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Star, Loader2, Pencil, X } from 'lucide-react';
+import { Star, Loader2, Pencil, X, BadgeCheck } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -13,6 +13,7 @@ interface Review {
   review_text?: string;
   created_at: string;
   user_id: string;
+  is_verified?: boolean;
   user_profiles?: { full_name?: string; avatar_url?: string } | null;
 }
 
@@ -60,7 +61,7 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
   const loadReviews = async () => {
     const { data } = await supabase
       .from('material_reviews')
-      .select('id, rating, review_text, created_at, user_id, user_profiles(full_name, avatar_url)')
+      .select('id, rating, review_text, created_at, user_id, is_verified, user_profiles(full_name, avatar_url)')
       .eq('product_id', productId)
       .order('created_at', { ascending: false });
 
@@ -223,8 +224,13 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="text-xs font-semibold">{r.user_profiles?.full_name || 'User'}</span>
+                  {r.is_verified && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                      <BadgeCheck className="h-3 w-3" /> Verified purchase
+                    </span>
+                  )}
                   <StarRating value={r.rating} readOnly />
                   <span className="text-xs text-muted-foreground">{fmt(r.created_at)}</span>
                 </div>

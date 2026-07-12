@@ -1,0 +1,220 @@
+// Social Media agent toolkit (Hermes). Lets the user list connected social accounts,
+// publish or schedule a post, and read analytics from chat — over the workspace's
+// already-connected accounts (via the zernio-api edge function).
+//
+// DESIGN: read/list uses the service-role client scoped to the caller's workspace;
+// publish/schedule/analytics call zernio-api over HTTP with the CALLER'S JWT, so
+// zernio-api authenticates AS the user and applies its own workspace-membership
+// checks. workspace_id / user_id are server-derived (never model-supplied). It
+// CANNOT connect new accounts — that's the app UI's OAuth flow.
+
+// deno-lint-ignore-file no-explicit-any
+
+const { tool } = await import('npm:@langchain/core@1.1.15/tools');
+const { z } = await import('npm:zod@3.24.0');
+const { createClient } = await import('npm:@supabase/supabase-js@2');
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+const MODULE_SLUG = 'social-media';
+
+function svcClient() {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** Call a zernio-api action AS the user (so its auth + workspace checks apply). */
+async function callZernio(jwt: string, payload: Record<string, unknown>): Promise<any> {
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/zernio-api`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jwt}`, apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const text = await resp.text();
+    let parsed: any = {};
+    try { parsed = text ? JSON.parse(text) : {}; } catch { parsed = { error: text }; }
+    if (!resp.ok) return { ok: false, status: resp.status, error: parsed?.error || `zernio-api failed (${resp.status})` };
+    return { ok: true, data: parsed };
+  } catch (e) {
+    return { ok: false, error: `zernio-api call failed: ${(e as Error).message}` };
+  }
+}
+
+export const createManageSocialTool = (
+  userId: string,
+  workspaceId: string | undefined,
+  jwt: string | undefined,
+  onChunk?: (chunk: any) => void,
+) => {
+  async function moduleReady(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      if (!workspaceId) return { ok: false, error: 'No active workspace for the current user.' };
+      if (!jwt) return { ok: false, error: 'Social tools require an authenticated user session.' };
+      const svc = svcClient();
+      const { data: mod } = await svc.from('modules').select('enabled').eq('slug', MODULE_SLUG).maybeSingle();
+      if (!mod?.enabled) return { ok: false, error: 'The Social Media module is not enabled on this platform.' };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: `Social availability check failed: ${(e as Error).message}` };
+    }
+  }
+
+  /** Resolve a connected account by id or platform → row, or a clarification error. */
+  async function resolveAccount(ws: string, account_id?: string, platform?: string): Promise<
+    { ok: true; account: any } | { ok: false; error: string; candidates?: any[] }
+  > {
+    const svc = svcClient();
+    const { data: accounts } = await svc
+      .from('social_accounts')
+      .select('id, platform, handle, is_active, zernio_account_id')
+      .eq('workspace_id', ws)
+      .eq('is_active', true);
+    const list = accounts ?? [];
+    if (list.length === 0) return { ok: false, error: 'No social accounts are connected. Connect one in Profile → Social Accounts first.' };
+    if (account_id) {
+      const hit = list.find((a) => a.id === account_id);
+      if (!hit) return { ok: false, error: 'No connected account with that id.' };
+      return { ok: true, account: hit };
+    }
+    if (platform) {
+      const matches = list.filter((a) => String(a.platform).toLowerCase() === platform.toLowerCase());
+      if (matches.length === 0) return { ok: false, error: `No connected ${platform} account. Connect it in Profile → Social Accounts.` };
+      if (matches.length > 1) {
+        return { ok: false, error: `Multiple ${platform} accounts connected. Ask the user which one.`, candidates: matches.map((a) => ({ id: a.id, platform: a.platform, handle: a.handle })) };
+      }
+      return { ok: true, account: matches[0] };
+    }
+    return { ok: false, error: 'Provide account_id or platform.' };
+  }
+
+  return tool(
+    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at }: any) => {
+      const gate = await moduleReady();
+      if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
+      const ws = workspaceId!;
+      const svc = svcClient();
+
+      if (action === 'list_accounts') {
+        const { data: accounts } = await svc
+          .from('social_accounts')
+          .select('id, platform, handle, is_active')
+          .eq('workspace_id', ws);
+        const list = (accounts ?? []).map((a: any) => ({ id: a.id, platform: a.platform, handle: a.handle, active: a.is_active }));
+        onChunk?.({ type: 'social_accounts', accounts: list, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: list.length, accounts: list });
+      }
+
+      if (action === 'publish' || action === 'schedule') {
+        if (action === 'schedule' && !scheduled_at) {
+          return JSON.stringify({ success: false, error: 'scheduled_at (ISO datetime) is required to schedule.' });
+        }
+        if (!caption || !String(caption).trim()) {
+          return JSON.stringify({ success: false, error: 'caption is required to publish or schedule a post.' });
+        }
+        const resolved = await resolveAccount(ws, account_id, platform);
+        if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
+        const acct = resolved.account;
+
+        // Draft the post row (server-derived identity). Allowlisted payload — never spread input.
+        const { data: post, error: postErr } = await svc
+          .from('social_posts')
+          .insert({
+            workspace_id: ws,
+            user_id: userId,
+            social_account_id: acct.id,
+            platform: acct.platform,
+            post_type: (Array.isArray(image_urls) && image_urls.length) ? 'image' : 'text',
+            caption: String(caption),
+            hashtags: Array.isArray(hashtags) ? hashtags.map(String) : null,
+            image_urls: Array.isArray(image_urls) ? image_urls.map(String) : null,
+            status: 'draft',
+          })
+          .select('id')
+          .single();
+        if (postErr || !post) return JSON.stringify({ success: false, error: `Could not draft the post: ${postErr?.message || 'unknown'}` });
+
+        const res = await callZernio(jwt!, {
+          action: action === 'publish' ? 'publish_now' : 'schedule',
+          post_id: (post as any).id,
+          social_account_id: acct.id,
+          workspace_id: ws,
+          ...(action === 'schedule' ? { scheduled_at } : {}),
+        });
+        if (!res.ok) {
+          // Leave the draft in place so the user can retry/publish from the UI.
+          return JSON.stringify({ success: false, error: res.error, post_id: (post as any).id });
+        }
+        onChunk?.({ type: 'social_post', action, post_id: (post as any).id, platform: acct.platform, handle: acct.handle, scheduled_at: scheduled_at ?? null, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true,
+          post_id: (post as any).id,
+          platform: acct.platform,
+          handle: acct.handle,
+          status: action === 'publish' ? 'published' : 'scheduled',
+          scheduled_at: scheduled_at ?? null,
+          message: action === 'publish'
+            ? `Published to ${acct.platform}${acct.handle ? ` (${acct.handle})` : ''}.`
+            : `Scheduled for ${scheduled_at} on ${acct.platform}${acct.handle ? ` (${acct.handle})` : ''}.`,
+        });
+      }
+
+      if (action === 'best_time') {
+        const resolved = await resolveAccount(ws, account_id, platform);
+        if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
+        const res = await callZernio(jwt!, { action: 'get_best_time', social_account_id: resolved.account.id, workspace_id: ws });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        onChunk?.({ type: 'social_best_time', platform: resolved.account.platform, best_times: res.data?.best_times ?? [], timestamp: Date.now() });
+        return JSON.stringify({ success: true, platform: resolved.account.platform, best_times: res.data?.best_times ?? [] });
+      }
+
+      if (action === 'account_insights') {
+        const resolved = account_id || platform ? await resolveAccount(ws, account_id, platform) : null;
+        const res = await callZernio(jwt!, {
+          action: 'get_account_insights',
+          ...(resolved && resolved.ok ? { social_account_id: resolved.account.id } : { workspace_id: ws }),
+        });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        onChunk?.({ type: 'social_insights', insights: res.data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, insights: res.data });
+      }
+
+      if (action === 'post_analytics') {
+        const res = await callZernio(jwt!, { action: 'get_post_analytics', workspace_id: ws });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        onChunk?.({ type: 'social_post_analytics', result: res.data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, result: res.data });
+      }
+
+      return JSON.stringify({ success: false, error: `unknown action: ${action}` });
+    },
+    {
+      name: 'manage_social',
+      description: [
+        "Publish/schedule social posts and read analytics over the workspace's ALREADY-CONNECTED social accounts.",
+        'Requires the Social Media module enabled. You cannot connect new accounts — that is done in the app UI',
+        '(Profile → Social Accounts).',
+        '',
+        'Actions:',
+        '  list_accounts    → list connected accounts (id, platform, handle). Start here if unsure which account.',
+        '  publish          → post NOW. Needs caption + (account_id OR platform); optional hashtags[], image_urls[].',
+        '  schedule         → post at a future time. Same as publish + scheduled_at (ISO datetime).',
+        '  best_time        → recommended posting window for an account (account_id or platform).',
+        '  account_insights → follower/engagement insights for an account (or the whole workspace if none given).',
+        '  post_analytics   → sync + return analytics for the workspace\'s published posts.',
+        '',
+        'Always confirm the copy, target account, and (for schedule) the exact time with the user before publishing.',
+      ].join('\n'),
+      schema: z.object({
+        action: z.enum(['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics']),
+        account_id: z.string().uuid().optional().describe('Target connected account id.'),
+        platform: z.string().optional().describe("Platform name (e.g. 'instagram', 'facebook', 'linkedin') to resolve the account when there is one per platform."),
+        caption: z.string().optional().describe('Post text/caption (publish/schedule).'),
+        hashtags: z.array(z.string()).optional().describe('Optional hashtags, appended to the caption.'),
+        image_urls: z.array(z.string()).optional().describe('Optional image URLs to attach.'),
+        scheduled_at: z.string().optional().describe('ISO datetime for schedule.'),
+      }),
+    },
+  );
+};

@@ -23,6 +23,8 @@ import { buildTestOnRoomUrl } from '@/utils/testOnRoom';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuth } from '@/contexts/AuthContext';
+import { MaterialReviews } from '@/components/features/social/MaterialReviews';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
@@ -234,6 +236,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // preserving the old `workspace_members.role IN (owner,admin)` behaviour for the active workspace.
   const { can } = usePermissions();
   const isAdmin = can('pricing.manage');
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [images, setImages] = useState<any[]>([]);
@@ -1833,6 +1836,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <Sparkles className="h-4 w-4" />
               Related
             </TabsTrigger>
+            <TabsTrigger value="reviews" className="flex items-center gap-2">
+              <Star className="h-4 w-4" />
+              Reviews
+              {typeof product.review_count === 'number' && product.review_count > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-xs font-normal">
+                  {product.review_count}
+                </Badge>
+              )}
+            </TabsTrigger>
             {/* Admin-only tabs (after end-user tabs) */}
             {isAdmin && (
               <>
@@ -2858,6 +2870,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             />
           </div>
         </div>
+      </TabsContent>
+
+      {/* Reviews Tab — all users. Product reviews + star ratings (verified-purchase badge). */}
+      <TabsContent value="reviews" className="mt-6">
+        <MaterialReviews productId={product.id} currentUserId={user?.id} />
       </TabsContent>
 
       {/* Monitoring Tab — Admin only: price tracking + mention/LLM-visibility merged */}

@@ -110,6 +110,9 @@ export interface Product {
   variants?: ProductVariant[];
   /** Source PDF document this product was extracted from (when applicable) */
   source_document_id?: string;
+  /** Denormalized review aggregates (maintained by the material_reviews trigger). */
+  avg_rating?: number | null;
+  review_count?: number;
 }
 
 /**
