@@ -81,6 +81,18 @@ const FLOW_RUN_BASE_CREDITS = 20;
  * (+ their workspace pool if known). For a tenant flow fired by a 'system' trigger, bill the
  * flow owner against the flow's workspace pool.
  */
+/** Does this workspace have a usable BYOK Resend sender? (enabled + api key + from_email).
+ *  Mirrors resolveWorkspaceEmailSender's `source==='workspace'` condition. */
+async function workspaceHasByok(supabase: SupabaseClient, workspaceId: string): Promise<boolean> {
+  const { data: cfg } = await supabase
+    .from('workspace_email_config')
+    .select('resend_api_key, from_email, enabled')
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  const c = cfg as { resend_api_key?: string; from_email?: string; enabled?: boolean } | null;
+  return !!(c && c.enabled !== false && (c.resend_api_key ?? '').trim() && (c.from_email ?? '').trim());
+}
+
 /** Global platform admin/super_admin — allowed to run operator (is_global) flows on demand. */
 async function isPlatformAdmin(supabase: SupabaseClient, userId: string): Promise<boolean> {
   const { data } = await supabase
@@ -340,12 +352,27 @@ async function executeAction(
         }
       }
 
-      // #256 — sender resolution depends on flow scope. A TENANT flow (workspace_id set,
-      // is_global=false) sends strictly from that workspace's OWN Resend (BYOK): pass
-      // workspace_id + requireWorkspaceSender so email-api 503s rather than falling back to
-      // the platform domain (mirrors campaign-processor). An operator/global flow (or a
-      // legacy flow with no scope) keeps sending as the platform, unmetered.
+      // #256 — the "from" identity follows the WORKSPACE the email is ABOUT, so a tenant's
+      // customer-facing mail carries the tenant's own domain, not the platform's:
+      //  • TENANT flow (is_global=false): strict BYOK from the flow's workspace — 503 if unset
+      //    (never silently fall back to the platform domain for a tenant's own automation).
+      //  • OPERATOR/global flow: use the EVENT's workspace when it carries one (invoice/payment/
+      //    receipt events do) AND that workspace has BYOK → sends from that tenant's domain;
+      //    otherwise (no event workspace, or no BYOK — e.g. platform subscription/role emails)
+      //    fall back to the platform sender. requireWorkspaceSender is false here, so it degrades
+      //    gracefully rather than failing.
       const emailIsTenant = !!scope?.workspaceId && !scope?.isGlobal;
+      let emailWorkspaceId: string | null = null;
+      if (emailIsTenant) {
+        emailWorkspaceId = scope!.workspaceId; // strict BYOK below
+      } else {
+        // Operator flow: divert to the event's workspace sender ONLY when that workspace has BYOK
+        // (so a no-BYOK / platform-level email stays platform-sent AND unmetered — no daily cap).
+        const eventWs = (context.trigger as { data?: Record<string, unknown> } | undefined)?.data?.workspace_id;
+        if (typeof eventWs === 'string' && eventWs && await workspaceHasByok(supabase, eventWs)) {
+          emailWorkspaceId = eventWs;
+        }
+      }
       const { data, error } = await supabase.functions.invoke('email-api', {
         body: {
           action: 'send',
@@ -357,8 +384,12 @@ async function executeAction(
           // (subject/body) are rendered from `variables` server-side.
           templateSlug: resolved.template_id || resolved.template_slug || undefined,
           variables: emailVariables,
-          ...(emailIsTenant
-            ? { workspace_id: scope!.workspaceId, requireWorkspaceSender: true, emailType: 'marketing' }
+          ...(emailWorkspaceId
+            ? {
+                workspace_id: emailWorkspaceId,
+                requireWorkspaceSender: emailIsTenant, // strict only for tenant flows
+                ...(emailIsTenant ? { emailType: 'marketing' } : {}),
+              }
             : {}),
         },
       });
