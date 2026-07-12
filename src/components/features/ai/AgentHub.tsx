@@ -33,6 +33,8 @@ import {
   TrendingUp,
   Share2,
   Boxes,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -44,6 +46,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/core/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveUploadPath } from '@/utils/storagePaths';
@@ -5377,34 +5386,66 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             <TooltipProvider delayDuration={200}>
             <div className="border border-input rounded-xl bg-background shadow-sm">
 
-              {/* Agent row — full width on top */}
-                <div className="flex items-center gap-1 px-2 py-1.5 border-b border-input">
-                  {availableAgents.map((agent) => {
-                    const Icon = agent.icon;
-                    const isActive = selectedAgent === agent.id;
-                    return (
-                      <Tooltip key={agent.id}>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => setSelectedAgent(agent.id)}
-                            className={cn(
-                              'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200',
-                              isActive
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
-                            )}
+              {/* Agent row — dropdown selector. JARVIS (orchestrator) is the
+                  default and auto-routes to the right specialist; the rest are
+                  pickable directly. */}
+                <div className="flex items-center gap-2 px-2 py-1.5 border-b border-input">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted/60 hover:bg-muted text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        title="Switch agent"
+                      >
+                        {(() => {
+                          const Icon = currentAgent?.icon || Bot;
+                          return <Icon className={cn('h-3.5 w-3.5', currentAgent?.color)} />;
+                        })()}
+                        <span>{currentAgent?.name || 'JARVIS'}</span>
+                        {selectedAgent === 'orchestrator' && (
+                          <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            Auto-assign
+                          </span>
+                        )}
+                        <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-72">
+                      <div className="px-2 py-1.5">
+                        <p className="text-xs font-semibold">Choose an agent</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          JARVIS auto-routes to the right specialist — or pick one directly.
+                        </p>
+                      </div>
+                      <DropdownMenuSeparator />
+                      {availableAgents.map((agent) => {
+                        const Icon = agent.icon;
+                        const isActive = selectedAgent === agent.id;
+                        const isOrchestrator = agent.id === 'orchestrator';
+                        return (
+                          <DropdownMenuItem
+                            key={agent.id}
+                            onSelect={() => setSelectedAgent(agent.id)}
+                            className="flex items-start gap-2 py-2 cursor-pointer"
                           >
-                            <Icon className={cn('h-3.5 w-3.5', !isActive && agent.color)} />
-                            <span>{agent.name}</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[200px]">
-                          <p className="font-semibold">{agent.name}</p>
-                          <p className="text-xs text-muted-foreground">{agent.description}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
+                            <Icon className={cn('h-4 w-4 mt-0.5 shrink-0', agent.color)} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-medium">{agent.name}</span>
+                                {isOrchestrator && (
+                                  <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                    Auto-assign
+                                  </span>
+                                )}
+                                {isActive && <Check className="h-3.5 w-3.5 ml-auto shrink-0 text-primary" />}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-snug">{agent.description}</p>
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
               {/* Main input row */}
