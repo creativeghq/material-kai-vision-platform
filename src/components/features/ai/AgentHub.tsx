@@ -103,6 +103,7 @@ import { SEOGenericCard, type SEOGenericCardData } from './SEOGenericCard';
 import { VirtualStagingViewer } from './VirtualStagingViewer';
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 import { SheetPreviewCard } from '@/components/features/sheets/SheetPreviewCard';
+import { QuoteCanvasCard, type QuoteCanvasData } from '@/components/features/ai/QuoteCanvasCard';
 import { SheetWizardModal, type SheetWizardResult } from '@/components/features/sheets/SheetWizardModal';
 import type { SheetType } from '@/services/moodboardSheetsService';
 // Agent response caching removed 2026-07-06 (see the send handler) — it replayed stale
@@ -343,6 +344,7 @@ interface Message {
     page_count?: number;
     credits_used?: number;
   }; // Rendered presentation sheet PDF ready for download
+  quoteData?: QuoteCanvasData; // Agent-created quote (real quotes row) + branded PDF, shown on canvas
   mentionSummaryData?: {
     product_id: string;
     days: number;
@@ -2385,6 +2387,46 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   agentId: selectedAgent,
                   model: selectedModel,
                 };
+              } else if (chunk.type === 'quote_created') {
+                const quoteData: QuoteCanvasData = {
+                  quote_id: chunk.quote_id,
+                  quote_number: chunk.quote_number ?? null,
+                  name: chunk.name || 'Quote',
+                  currency: chunk.currency || 'EUR',
+                  subtotal: chunk.subtotal ?? null,
+                  vat_rate: chunk.vat_rate ?? null,
+                  vat_amount: chunk.vat_amount ?? null,
+                  grand_total: chunk.grand_total ?? null,
+                  item_count: chunk.item_count ?? null,
+                  pdf_url: chunk.pdf_url ?? null,
+                  pdf_error: chunk.pdf_error ?? null,
+                };
+                const qMsg: Message = {
+                  id: `msg-quote-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Quote${quoteData.quote_number ? ` ${quoteData.quote_number}` : ''} ready${
+                    quoteData.grand_total != null ? ` — total ${quoteData.currency === 'USD' ? '$' : '€'}${Number(quoteData.grand_total).toFixed(2)}` : ''
+                  }.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  quoteData,
+                };
+                setMessages(prev => [...prev, qMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: qMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, quoteData },
+                  });
+                }
+                finalResult = {
+                  type: 'final_result',
+                  text: qMsg.content,
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                };
               } else if (chunk.type === 'mention_summary') {
                 const m: Message = {
                   id: `msg-mention-summary-${Date.now()}`,
@@ -3200,6 +3242,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // from this restore map, so they vanished on conversation reload (audit #217 H13).
           sheetCanvasData: msg.metadata?.sheetCanvasData as any | undefined,
           sheetPdfData: msg.metadata?.sheetPdfData as any | undefined,
+          quoteData: msg.metadata?.quoteData as any | undefined,
           catalogData: msg.metadata?.catalogData as any | undefined,
           catalogExtractionData: msg.metadata?.catalogExtractionData as any | undefined,
           catalogImageCandidatesData: msg.metadata?.catalogImageCandidatesData as any | undefined,
@@ -3317,6 +3360,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.heatPumpData) return { id: m.id, kind: 'calc', title: 'Heat-pump sizing' };
     if (m.heatingCostData) return { id: m.id, kind: 'calc', title: 'Heating cost comparison' };
     if (m.sheetPdfData) return { id: m.id, kind: 'sheet', title: m.sheetPdfData.title || 'Presentation sheet' };
+    if (m.quoteData) return { id: m.id, kind: 'quote', title: m.quoteData.quote_number ? `Quote ${m.quoteData.quote_number}` : (m.quoteData.name || 'Quote') };
     if (m.virtualStagingData) return { id: m.id, kind: 'staging', title: 'Virtual staging' };
     if (m.materialData?.products && m.materialData.products.length > 0) {
       return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products` };
@@ -3826,6 +3870,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         />
       );
     }
+    if (message.quoteData) return <QuoteCanvasCard data={message.quoteData} />;
     if (message.virtualStagingData) {
       return (
         <VirtualStagingViewer
@@ -3976,6 +4021,34 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const renderCanvasInspector = (message: Message): React.ReactNode => {
     if (message.generation_job) return <RenderInspector data={message.generation_job} />;
     if (message.sheetPdfData) return <SheetInspector data={message.sheetPdfData} />;
+    if (message.quoteData) {
+      const q = message.quoteData;
+      const sym = q.currency === 'USD' ? '$' : q.currency === 'GBP' ? '£' : '€';
+      const fmt = (v?: number | null) => (v == null ? '—' : `${sym}${Number(v).toFixed(2)}`);
+      return (
+        <div className="space-y-3 text-xs">
+          <div>
+            <div className="text-muted-foreground uppercase tracking-wider text-[10px] mb-1">Quote</div>
+            <div className="font-medium text-foreground">{q.name || 'Quote'}</div>
+            {q.quote_number && <div className="text-muted-foreground">{q.quote_number}</div>}
+          </div>
+          <div className="space-y-1">
+            {q.item_count != null && (
+              <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span>{q.item_count}</span></div>
+            )}
+            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{fmt(q.subtotal)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">VAT{q.vat_rate != null ? ` (${q.vat_rate}%)` : ''}</span><span>{fmt(q.vat_amount)}</span></div>
+            <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-white/10"><span>Total</span><span>{fmt(q.grand_total)}</span></div>
+          </div>
+          <button
+            onClick={() => window.open(`/quotes/${q.quote_id}`, '_blank')}
+            className="text-primary hover:underline"
+          >
+            Open in Quotes →
+          </button>
+        </div>
+      );
+    }
     if (message.virtualStagingData) return <StagingInspector data={message.virtualStagingData} />;
     if (message.materialData?.products && message.materialData.products.length > 0) {
       return <ProductsInspector data={message.materialData} />;
@@ -4638,6 +4711,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             pageCount={message.sheetPdfData.page_count}
                             creditsUsed={message.sheetPdfData.credits_used}
                           />
+                        )}
+                      </div>
+                    ) : message.quoteData ? (
+                      <div className="space-y-3">
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                        {canvasShown ? (
+                          <ArtifactChip
+                            kind="quote"
+                            title={message.quoteData.quote_number ? `Quote ${message.quoteData.quote_number}` : (message.quoteData.name || 'Quote')}
+                            active={activeCanvasId === message.id}
+                            onOpen={() => focusCanvas(message.id)}
+                          />
+                        ) : (
+                          <QuoteCanvasCard data={message.quoteData} />
                         )}
                       </div>
                     ) : message.catalogExtractionData ? (

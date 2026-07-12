@@ -219,6 +219,30 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Quotes (all users; 0 credits) ─────────────────────────────────
+  {
+    id: 'create_quote', name: 'Create Quote', category: 'Quotes',
+    desc: 'Build a real, editable quote from products (catalog or custom) and generate its branded PDF, opened on the canvas. Saves to the Quotes module.',
+    examples: [
+      'Create a quote: Tagina 75 sqm at €34/sqm and Keros 18 sqm at €15/sqm',
+      'Make a quote for these products for the customer',
+    ],
+  },
+  {
+    id: 'generate_quote_pdf', name: 'Generate Quote PDF', category: 'Quotes',
+    desc: 'Generate or regenerate the branded PDF for an existing quote and open it on the canvas.',
+    examples: [
+      'Regenerate the PDF for that quote',
+    ],
+  },
+  {
+    id: 'list_my_quotes', name: 'My Quotes', category: 'Quotes',
+    desc: 'List recent quotes with status and totals.',
+    examples: [
+      'Show my recent quotes',
+    ],
+  },
+
   // ── SEO research (all users; 0 user credits) ──────────────────────
   {
     id: 'seo_research_keyword', name: 'SEO Research', category: 'SEO Research',
@@ -1258,6 +1282,30 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'query', label: 'Project name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
         ],
+      },
+    ],
+  },
+  {
+    id: 'quotes',
+    name: 'Quotes',
+    description: 'Build client quotes from chat: add catalog or custom products (e.g. 75 sqm at €34/sqm), auto-price + VAT, generate the branded PDF, and open it on the canvas. Saved to the Quotes module.',
+    icon: 'FileText',
+    tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes'],
+    quick_starts: [
+      {
+        label: 'New quote', description: 'Create a quote from products', icon: 'Plus',
+        prompt: 'Create a quote.',
+        promptTemplate: 'Create a quote named "{{name}}" with these items: {{items}}',
+        run: { tool: 'create_quote' },
+        form: [
+          { key: 'name', label: 'Quote name', kind: 'text', placeholder: 'Living room — tiles' },
+          { key: 'items', label: 'Items (name, qty, unit, price)', kind: 'textarea', required: true, placeholder: 'Tagina, 75 sqm, €34/sqm\nKeros, 18 sqm, €15/sqm' },
+        ],
+      },
+      {
+        label: 'My quotes', description: 'List recent quotes', icon: 'ListChecks',
+        prompt: 'Show my recent quotes.',
+        run: { tool: 'list_my_quotes' },
       },
     ],
   },

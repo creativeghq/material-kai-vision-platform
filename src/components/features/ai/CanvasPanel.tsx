@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
   | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design' | 'render'
-  | 'inspiration' | 'radar' | 'result'
+  | 'inspiration' | 'radar' | 'result' | 'quote'
   | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
   | 'demo' | 'calc';
 
@@ -44,6 +44,7 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   inspiration: Sparkles,
   radar: Radar,
   result: ClipboardList,
+  quote: FileText,
   jobs: Briefcase,
   sourcing: Boxes,
   order: PackageCheck,
@@ -68,6 +69,7 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   inspiration: 'Inspiration board',
   radar: 'Tech radar',
   result: 'Result',
+  quote: 'Quote',
   jobs: 'Job findings',
   sourcing: 'Supply options',
   order: 'Purchase order',

@@ -882,6 +882,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
+      // Quotes (all users; 0 cr — creates real quotes + branded PDF, opens on canvas)
+      'create_quote', 'generate_quote_pdf', 'list_my_quotes',
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
@@ -1047,6 +1049,9 @@ async function executeAgent(
     },
     'projects': {
       tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'],
+    },
+    'quotes': {
+      tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes'],
     },
     'tech-radar': {
       tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
@@ -1297,6 +1302,7 @@ async function executeAgent(
   const needsFlows = config.tools.includes('manage_flows');
   const needsHr = config.tools.includes('manage_hr');
   const needsStock = config.tools.includes('manage_stock');
+  const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
   // (internal ops capability) — gate to admin/owner like price_lookup.
   const needsTechRadar = isAdmin && config.tools.some((t: string) => ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'].includes(t));
@@ -1307,7 +1313,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, quotesMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1329,6 +1335,7 @@ async function executeAgent(
     needsFlows        ? import('../_shared/tools/flow-tools.ts') : null,
     needsHr           ? import('../_shared/tools/hr-tools.ts') : null,
     needsStock        ? import('../_shared/tools/stock-tools.ts') : null,
+    needsQuotes       ? import('../_shared/tools/quote-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -1410,6 +1417,9 @@ async function executeAgent(
   const createManageFlowsTool = flowsMod?.createManageFlowsTool;
   const createManageHrTool = hrToolsMod?.createManageHrTool;
   const createManageStockTool = stockToolsMod?.createManageStockTool;
+  const createCreateQuoteTool = quotesMod?.createCreateQuoteTool;
+  const createGenerateQuotePdfTool = quotesMod?.createGenerateQuotePdfTool;
+  const createListMyQuotesTool = quotesMod?.createListMyQuotesTool;
   const createTrackJobSearchTool = jobResearchMod?.createTrackJobSearchTool;
   const createListMyJobSearchesTool = jobResearchMod?.createListMyJobSearchesTool;
   const createFindJobsTool = jobResearchMod?.createFindJobsTool;
@@ -1662,6 +1672,18 @@ async function executeAgent(
   // Stock toolkit (module-gated stock + entitlement; finance-manager RBAC enforced server-side in stock-api)
   if (config.tools.includes('manage_stock') && createManageStockTool) {
     tools.push(createManageStockTool(userId, workspaceId, userJwt, onChunk));
+  }
+
+  // Quotes toolkit (0 cr — DB writes + deterministic PDF; workspace-scoped; user_id/workspace_id
+  // server-derived. Creates first-class quotes visible in the Quotes module.)
+  if (config.tools.includes('create_quote') && createCreateQuoteTool) {
+    tools.push(createCreateQuoteTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('generate_quote_pdf') && createGenerateQuotePdfTool) {
+    tools.push(createGenerateQuotePdfTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('list_my_quotes') && createListMyQuotesTool) {
+    tools.push(createListMyQuotesTool(userId, workspaceId, onChunk));
   }
 
   // Sourcing tools (#237; RPC-gated at the DB layer — resolve=member, create_po=finance-manager; 0 cr)
