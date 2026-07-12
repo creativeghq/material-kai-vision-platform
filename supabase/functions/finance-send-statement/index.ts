@@ -2,12 +2,14 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import { encodeBase64 as base64Encode } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
+import { getStripe } from '../_shared/stripe-clients.ts';
 
 // Sales/Finance — render and email a party (customer or supplier) running ledger
 // statement (Καρτέλα) PDF.
@@ -50,6 +52,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     kind_invoice: 'Τιμολόγιο', kind_credit_note: 'Πιστωτικό', kind_payment: 'Είσπραξη/Πληρωμή',
     kind_supplier_bill: 'Τιμολόγιο προμηθευτή', kind_supplier_credit_note: 'Πιστωτικό προμηθευτή',
     statementDate: 'Ημ/νία έκδοσης', footer: 'Παρακαλούμε απαντήστε σε αυτό το email για οποιαδήποτε διευκρίνιση.',
+    payByBank: 'Πληρωμή με τραπεζική κατάθεση', bankName: 'Τράπεζα', bankRef: 'Αρ. λογαριασμού',
   },
   en: {
     titleCustomer: 'Customer Statement', titleSupplier: 'Supplier Statement',
@@ -63,8 +66,35 @@ const LABELS: Record<Lang, Record<string, string>> = {
     kind_invoice: 'Invoice', kind_credit_note: 'Credit note', kind_payment: 'Payment',
     kind_supplier_bill: 'Supplier bill', kind_supplier_credit_note: 'Supplier credit note',
     statementDate: 'Statement date', footer: 'Please reply to this email with any questions or to confirm settlement.',
+    payByBank: 'Pay by bank transfer', bankName: 'Bank', bankRef: 'Account',
   },
 };
+
+interface BankTransfer { name: string | null; iban: string | null; account_ref: string | null; notes: string | null }
+
+// The workspace's default (or first active) bank account with an IBAN, for the
+// "pay by bank transfer" block on the statement.
+async function fetchBankAccount(supabase: SupabaseClient, workspaceId: string): Promise<BankTransfer | null> {
+  const { data } = await supabase.from('finance_bank_accounts')
+    .select('name, iban, account_ref, notes, is_default, kind')
+    .eq('workspace_id', workspaceId).eq('is_active', true)
+    .not('iban', 'is', null)
+    .order('is_default', { ascending: false }).order('sort_order', { ascending: true });
+  const row = (data ?? []).find((a: any) => a.kind === 'bank') ?? (data ?? [])[0];
+  if (!row?.iban) return null;
+  return { name: row.name ?? null, iban: row.iban, account_ref: row.account_ref ?? null, notes: row.notes ?? null };
+}
+
+// The bank-transfer block as an ordered list of "Label: value" lines. The free-form
+// `notes` field is split on newlines so multi-row bank details you type are preserved.
+function bankLines(bank: BankTransfer, L: Record<string, string>): string[] {
+  const lines: string[] = [];
+  if (bank.name) lines.push(`${L.bankName}: ${bank.name}`);
+  if (bank.iban) lines.push(`IBAN: ${bank.iban}`);
+  if (bank.account_ref) lines.push(`${L.bankRef}: ${bank.account_ref}`);
+  if (bank.notes) for (const n of String(bank.notes).split(/\r?\n/)) { if (n.trim()) lines.push(n.trim()); }
+  return lines;
+}
 
 // Open Sans (full Greek + Latin + Cyrillic) — the platform-wide typeface. Greek
 // customer names/labels would throw under pdf-lib's WinAnsi standard fonts, so embed
@@ -187,7 +217,17 @@ async function fetchPartyDetails(supabase: SupabaseClient, partyType: 'company' 
   return data ?? {};
 }
 
-interface BuildOpts { party: any; details: any; settings: any; ledger: LedgerData; side: Side; from: string; to: string; lang: Lang; backdrop: any }
+interface BuildOpts { party: any; details: any; settings: any; ledger: LedgerData; side: Side; from: string; to: string; lang: Lang; backdrop: any; logo?: Uint8Array | null; footer?: Uint8Array | null; bank?: BankTransfer | null }
+
+// Load the workspace's finance logo (generation-images bucket, public) → bytes.
+async function loadLogo(supabase: SupabaseClient, path: string | null | undefined): Promise<Uint8Array | null> {
+  if (!path) return null;
+  try {
+    const { data } = supabase.storage.from('generation-images').getPublicUrl(path);
+    if (!data?.publicUrl) return null;
+    return await loadBackdrop(data.publicUrl);
+  } catch { return null; }
+}
 
 async function buildStatementPdf(opts: BuildOpts): Promise<{ bytes: Uint8Array; pages: number }> {
   const { party, details, settings, ledger, side, from, to, lang } = opts;
@@ -206,11 +246,22 @@ async function buildStatementPdf(opts: BuildOpts): Promise<{ bytes: Uint8Array; 
     try { backdrop = await pdf.embedPng(opts.backdrop); }
     catch { try { backdrop = await pdf.embedJpg(opts.backdrop); } catch { /* ignore */ } }
   }
+  let logoImg: any = null;
+  if (opts.logo) {
+    try { logoImg = await pdf.embedPng(opts.logo); }
+    catch { try { logoImg = await pdf.embedJpg(opts.logo); } catch { /* ignore */ } }
+  }
 
   let page: PDFPage = pdf.addPage([PAGE_W, PAGE_H]);
   const drawBackdrop = (p: PDFPage) => { if (backdrop) p.drawImage(backdrop, { x: 0, y: 0, width: PAGE_W, height: PAGE_H }); };
   drawBackdrop(page);
   let y = PAGE_H - MARGIN;
+
+  // Workspace logo, top-left, on the first page (max 130×34, aspect-preserved).
+  if (logoImg) {
+    const lh = 34; const lw = Math.min((logoImg.width / logoImg.height) * lh, 130);
+    page.drawImage(logoImg, { x: MARGIN, y: PAGE_H - MARGIN - lh, width: lw, height: lh });
+  }
 
   const text = (s: any, x: number, yy: number, size: number, f: PDFFont = font, color = COLOR_DARK) =>
     page.drawText(String(s ?? ''), { x, y: yy, size, font: f, color });
@@ -353,8 +404,35 @@ async function buildStatementPdf(opts: BuildOpts): Promise<{ bytes: Uint8Array; 
   textR(money(Math.abs(balance)), PAGE_W - MARGIN, y, 12, bold, owes && side === 'customer' ? COLOR_RED : COLOR_DARK);
   y -= 24;
 
+  // Bank-transfer block (an alternative to card payment) — one detail per line, so
+  // multi-row bank details (incl. free-form notes) are preserved.
+  const bank = opts.bank;
+  if (bank?.iban) {
+    const lines = bankLines(bank, L);
+    const boxH = 16 + lines.length * 12 + 6;
+    if (y < MARGIN + boxH + 6) newPage();
+    y -= 6;
+    page.drawRectangle({ x: MARGIN, y: y - (boxH - 12), width: PAGE_W - 2 * MARGIN, height: boxH, color: rgb(0.96, 0.96, 0.98) });
+    text(L.payByBank, MARGIN + 8, y - 2, 9, bold, COLOR_ACCENT);
+    let by = y - 16;
+    for (const line of lines) { text(line, MARGIN + 8, by, 8.5, font, COLOR_DARK); by -= 12; }
+    y -= boxH + 6;
+  }
+
   if (y < MARGIN + 20) newPage();
   text(L.footer, MARGIN, y, 8, font, COLOR_GRAY);
+
+  // Back-cover / footer template — a full A4 page appended at the end (same convention
+  // as quote back covers). Optional.
+  if (opts.footer) {
+    let footerImg: any = null;
+    try { footerImg = await pdf.embedPng(opts.footer); }
+    catch { try { footerImg = await pdf.embedJpg(opts.footer); } catch { /* ignore */ } }
+    if (footerImg) {
+      const fp = pdf.addPage([PAGE_W, PAGE_H]);
+      fp.drawImage(footerImg, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+    }
+  }
 
   const bytes = await pdf.save();
   return { bytes, pages: pdf.getPageCount() };
@@ -398,8 +476,15 @@ async function sendOneStatement(
     const { data: urlData } = await supabase.storage.from('quote-templates').createSignedUrl(settings.statement_template_cover_path, 60);
     if (urlData?.signedUrl) backdrop = await loadBackdrop(urlData.signedUrl);
   }
+  let footerImg: Uint8Array | null = null;
+  if (settings.statement_template_footer_path) {
+    const { data: fData } = await supabase.storage.from('quote-templates').createSignedUrl(settings.statement_template_footer_path, 60);
+    if (fData?.signedUrl) footerImg = await loadBackdrop(fData.signedUrl);
+  }
+  const logo = await loadLogo(supabase, settings.business_logo_path);
+  const bank = await fetchBankAccount(supabase, party.workspace_id);
 
-  const { bytes } = await buildStatementPdf({ party, details, settings, ledger, side: opts.side, from: opts.from, to: opts.to, lang: opts.lang, backdrop });
+  const { bytes } = await buildStatementPdf({ party, details, settings, ledger, side: opts.side, from: opts.from, to: opts.to, lang: opts.lang, backdrop, logo, footer: footerImg, bank });
 
   const objectPath = `statements/${party.workspace_id}/${partyType}-${party.party_id}-${Date.now()}.pdf`;
   const { error: upErr } = await supabase.storage.from('pdf-documents').upload(objectPath, bytes, { contentType: 'application/pdf', upsert: false });
@@ -416,9 +501,25 @@ async function sendOneStatement(
   if (!targetEmail) return { ok: true, email_sent_to: null, pdf_url: pdfUrl, rows: ledger.rows.length, closing_balance: closing, note: 'No email on file; PDF generated but not sent.' };
   if (opts.dryRun) return { ok: true, email_sent_to: null, pdf_url: pdfUrl, rows: ledger.rows.length, closing_balance: closing, note: 'dry_run: PDF generated, not emailed.' };
 
-  // Pay-by-card links (customer side, open invoices)
+  // Pay-by-card links (customer side): a durable "Pay balance" link for the whole
+  // outstanding total + per-invoice links.
+  let payBalanceHtml = '';
   let payLinksHtml = '';
   if (opts.side === 'customer') {
+    const outstanding = Number(party.receivable_outstanding || 0);
+    if (outstanding > 0) {
+      const shareRow = await getOrCreateShareRow(supabase, party, 'customer', null);
+      const balanceUrl = await ensureBalancePaymentLink(
+        supabase, party.workspace_id, partyType, party.party_id, outstanding, ledger.currency, shareRow,
+        `${opts.publicAppUrl}/statement/${shareRow.token}`,
+      );
+      if (balanceUrl) {
+        payBalanceHtml = `<div style="margin:20px 0;text-align:center;">
+          <a href="${balanceUrl}" style="background:#883366;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600;display:inline-block;">
+            Pay balance ${fmtMoney(outstanding, ledger.currency, opts.lang)}</a>
+        </div>`;
+      }
+    }
     const { open, links } = await buildPayLinks(supabase, party.workspace_id, partyType, party.party_id, opts.publicAppUrl);
     if (open.length > 0) {
       payLinksHtml = `<table style="width:100%;border-collapse:collapse;margin:16px 0;"><thead><tr style="background:#f3f3f3;">
@@ -439,19 +540,41 @@ async function sendOneStatement(
   // interpolating into HTML (escape first, THEN turn newlines into <br>).
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  // Logo header (public URL — generation-images bucket is public-read).
+  let logoHtml = '';
+  if (settings.business_logo_path) {
+    const { data: pub } = supabase.storage.from('generation-images').getPublicUrl(settings.business_logo_path);
+    if (pub?.publicUrl) logoHtml = `<div style="margin-bottom:16px;"><img src="${pub.publicUrl}" alt="${esc(settings.business_name)}" style="max-height:48px;max-width:180px;"></div>`;
+  }
+  // Bank-transfer block (alternative to card) — reuse the account fetched for the PDF.
+  // One detail per line so multi-row bank details / notes are preserved.
+  let bankHtml = '';
+  if (bank?.iban) {
+    const L = LABELS[opts.lang];
+    const rowsHtml = bankLines(bank, L).map((l) => esc(l)).join('<br>');
+    bankHtml = `<div style="margin:14px 0;padding:12px 14px;background:#f4f4f7;border-radius:8px;font-size:13px;line-height:1.55;">
+      <strong>${esc(L.payByBank)}</strong><br>${rowsHtml}</div>`;
+  }
   const html = `<div style="font-family:'Open Sans',Arial,sans-serif;max-width:600px;">
+      ${logoHtml}
       <p>${esc(party.display_name)},</p>
       <p>${esc(bodyText).replace(/\n/g, '<br>')}</p>
+      ${payBalanceHtml}
       ${payLinksHtml}
-      <p><a href="${pdfUrl}">Download full PDF statement</a></p>
+      ${bankHtml}
+      <p><a href="${pdfUrl}">Download full PDF statement</a> (also attached)</p>
       <p style="color:#666;font-size:12px;margin-top:32px;">Generated on ${fmtDate(new Date().toISOString(), opts.lang)}. Pay links expire after 90 days.</p>
     </div>`;
+
+  // Attach the PDF so it travels with the email (not just a link).
+  const pdfBase64 = base64Encode(bytes);
+  const attachmentName = `statement-${(party.display_name ?? 'account').replace(/[^a-z0-9]+/gi, '-').slice(0, 40)}.pdf`;
 
   const { data: dispatch, error: dispatchErr } = await supabase.functions.invoke('email-api', {
     // Tenant business mail (statement to the tenant's customer/supplier) → must send from the
     // workspace's own BYOK Resend, never the shared platform domain. requireWorkspaceSender makes
     // email-api 503 (code=workspace_sender_required) until BYOK is configured; root workspace exempt.
-    body: { action: 'send', to: targetEmail, subject, html, emailType: 'transactional', tags: { feature: 'finance_statement', party_type: partyType, party_id: party.party_id }, workspace_id: party.workspace_id, requireWorkspaceSender: true },
+    body: { action: 'send', to: targetEmail, subject, html, emailType: 'transactional', attachments: [{ filename: attachmentName, content: pdfBase64 }], tags: { feature: 'finance_statement', party_type: partyType, party_id: party.party_id }, workspace_id: party.workspace_id, requireWorkspaceSender: true },
   });
   if (dispatchErr || !(dispatch as any)?.success) {
     return { ok: false, email_sent_to: null, pdf_url: pdfUrl, rows: ledger.rows.length, closing_balance: closing, error: dispatchErr?.message ?? (dispatch as any)?.error ?? 'email send failed' };
@@ -537,6 +660,249 @@ async function runCronBatch(supabase: SupabaseClient, publicAppUrl: string): Pro
   return { ok: true, mode: 'cron_batch', processed_workspaces: summary.length, summary };
 }
 
+// Mint (or reuse) a durable Stripe Payment Link for a customer's whole outstanding
+// balance. Routed to the workspace's connected account (Connect destination charge),
+// same as the per-invoice flow. The PaymentIntent carries type='statement_payment'
+// metadata so the webhook allocates it oldest-invoice-first. Cached on the share row
+// while the amount is unchanged. Returns null when no balance / no Stripe / on error.
+async function ensureBalancePaymentLink(
+  supabase: SupabaseClient, workspaceId: string, partyType: 'company' | 'contact', partyId: string,
+  outstanding: number, currency: string, share: any | null, redirectUrl: string,
+): Promise<string | null> {
+  if (!(outstanding > 0)) return null;
+  const stripe = getStripe();
+  if (!stripe) return null;
+
+  const amountCents = Math.round(outstanding * 100);
+  // Reuse the cached link while the balance is unchanged.
+  if (share?.payment_link_url && Math.round(Number(share.payment_link_amount || 0) * 100) === amountCents
+    && String(share.payment_link_currency || '').toUpperCase() === currency.toUpperCase()) {
+    return share.payment_link_url;
+  }
+
+  try {
+    const { data: destAcct } = await supabase.rpc('get_workspace_payout_account', { p_workspace_id: workspaceId });
+    const price = await stripe.prices.create({
+      currency: currency.toLowerCase(),
+      unit_amount: amountCents,
+      product_data: { name: 'Account balance' },
+    });
+    const link = await stripe.paymentLinks.create({
+      line_items: [{ price: price.id, quantity: 1 }],
+      // Single-use: deactivate after the first successful payment so a stale emailed
+      // link can't double-charge once the balance is already settled.
+      restrictions: { completed_sessions: { limit: 1 } },
+      ...(destAcct ? { transfer_data: { destination: destAcct as string } } : {}),
+      payment_intent_data: {
+        metadata: { type: 'statement_payment', workspace_id: workspaceId, party_type: partyType, party_id: partyId, side: 'customer' },
+      },
+      metadata: { type: 'statement_payment', workspace_id: workspaceId, party_type: partyType, party_id: partyId },
+      after_completion: { type: 'redirect', redirect: { url: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}paid=1` } },
+    });
+    if (share?.id) {
+      await supabase.from('finance_statement_shares').update({
+        payment_link_id: link.id, payment_link_url: link.url,
+        payment_link_amount: outstanding, payment_link_currency: currency.toUpperCase(),
+      }).eq('id', share.id);
+    }
+    return link.url ?? null;
+  } catch (e) {
+    console.error('ensureBalancePaymentLink failed', (e as any)?.message);
+    return null;
+  }
+}
+
+// --- Public statement share (points 4/5) ---------------------------------
+// A workspace user mints a stable token per party; the recipient unlocks
+// /statement/{token} with their VAT + email. Everything reuses the ledger / pay-link
+// / PDF helpers above so there's one statement code path.
+
+const randToken = () =>
+  Array.from(crypto.getRandomValues(new Uint8Array(20))).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+const digitsOnly = (v: unknown) => String(v ?? '').replace(/\D/g, '');
+const normEmail = (v: unknown) => String(v ?? '').trim().toLowerCase();
+
+// Find-or-create the active share row for a party (full row).
+async function getOrCreateShareRow(supabase: SupabaseClient, party: any, side: Side, userId: string | null): Promise<any> {
+  const sel = () => supabase.from('finance_statement_shares').select('*')
+    .eq('workspace_id', party.workspace_id).eq('party_type', party.party_type)
+    .eq('party_id', party.party_id).eq('is_active', true).maybeSingle();
+  const { data: existing } = await sel();
+  if (existing) return existing;
+  const { data: inserted, error } = await supabase.from('finance_statement_shares').insert({
+    token: randToken(), workspace_id: party.workspace_id, party_type: party.party_type,
+    party_id: party.party_id, side, created_by: userId,
+  }).select('*').maybeSingle();
+  if (inserted) return inserted;
+  const { data: again } = await sel(); // unique-index race → the winner
+  if (again) return again;
+  throw new Error(error?.message ?? 'could not create share');
+}
+
+// Mint (or reuse) the active share row for a party. Auth already verified by caller.
+async function mintShare(
+  supabase: SupabaseClient, party: any, side: Side, userId: string | null, publicAppUrl: string,
+) {
+  const row = await getOrCreateShareRow(supabase, party, side, userId);
+  return { token: row.token as string, url: `${publicAppUrl}/statement/${row.token}` };
+}
+
+// Resolve a share token + VAT/email → the recipient's ledger. Generic errors so a
+// wrong VAT/email can't be distinguished from a bad token (no enumeration).
+async function resolveShareView(
+  supabase: SupabaseClient, body: any, publicAppUrl: string,
+): Promise<{ status: number; payload: any }> {
+  const token = String(body.token ?? '');
+  const GENERIC = { status: 401, payload: { ok: false, error: 'The VAT number or email does not match our records.' } };
+  const LOCKED = { status: 423, payload: { ok: false, error: 'This link is locked after too many failed attempts. Please ask us to re-send it.' } };
+  const MAX_ATTEMPTS = 10;
+  if (!token) return { status: 400, payload: { ok: false, error: 'Missing link token.' } };
+
+  const { data: share } = await supabase.from('finance_statement_shares')
+    .select('*').eq('token', token).maybeSingle();
+  if (!share || !share.is_active) return GENERIC;
+  if (share.expires_at && new Date(share.expires_at) < new Date()) return GENERIC;
+
+  const partyType = share.party_type as 'company' | 'contact';
+  const details = await fetchPartyDetails(supabase, partyType, share.party_id);
+  const onFileEmail = normEmail(details.email);
+  const onFileVat = digitsOnly(details.vat_number);
+  const inEmail = normEmail(body.email);
+  const inVat = digitsOnly(body.vat);
+
+  // Email must always match. VAT must match too when the party has one on file
+  // (companies always do; individual contacts may not). On mismatch, count the failed
+  // attempt and lock the link after MAX_ATTEMPTS (brute-force backstop, no infra needed).
+  const emailOk = !!onFileEmail && inEmail === onFileEmail;
+  const vatOk = !onFileVat || inVat === onFileVat;
+  if (!emailOk || !vatOk) {
+    const attempts = (share.failed_attempts ?? 0) + 1;
+    const patch: any = { failed_attempts: attempts };
+    if (attempts >= MAX_ATTEMPTS) patch.is_active = false;
+    await supabase.from('finance_statement_shares').update(patch).eq('id', share.id);
+    return attempts >= MAX_ATTEMPTS ? LOCKED : GENERIC;
+  }
+
+  const { data: party } = await supabase.from('vw_finance_parties').select('*')
+    .eq('party_type', partyType).eq('party_id', share.party_id).maybeSingle();
+  if (!party) return GENERIC;
+
+  const { data: settingsRow } = await supabase.from('finance_settings').select('*').eq('workspace_id', share.workspace_id).maybeSingle();
+  const settings = settingsRow ?? {};
+  // Consistency with the email path: a workspace with statements turned off has no live links.
+  if (settingsRow && settingsRow.statements_enabled === false) {
+    return { status: 403, payload: { ok: false, error: 'Statements are currently unavailable. Please contact us.' } };
+  }
+  const side: Side = (share.side === 'supplier') ? 'supplier' : 'customer';
+  const lang = langForSettings(settings, body.lang);
+  const range = defaultRange();
+  const from = (typeof body.from === 'string' && body.from) || range.from;
+  const to = (typeof body.to === 'string' && body.to) || range.to;
+
+  const ledger = await loadLedger(supabase, share.workspace_id, side, partyType, share.party_id, from, to, (settings as any).base_currency ?? 'EUR');
+  let progrDebit = 0, progrCredit = 0;
+  const rows = ledger.rows.map((r) => {
+    progrDebit += r.debit; progrCredit += r.credit;
+    return { date: r.date, kind: r.kind, doc: r.doc, debit: r.debit, credit: r.credit, balance: ledger.opening + progrDebit - progrCredit };
+  });
+  const closing = ledger.opening + progrDebit - progrCredit;
+
+  // Open invoices → each links to the existing /pay/{token} Stripe flow, plus a single
+  // "pay the whole balance" Payment Link (customer side only).
+  let invoices: any[] = [];
+  let paymentLinkUrl: string | null = null;
+  const outstanding = Number(party.receivable_outstanding || 0);
+  if (side === 'customer') {
+    const { open, links } = await buildPayLinks(supabase, share.workspace_id, partyType, share.party_id, publicAppUrl);
+    invoices = open.map((i: any) => ({
+      internal_number: i.internal_number, amount_due: Number(i.amount_due || 0),
+      currency: i.currency ?? ledger.currency, pay_url: links.get(i.id) ?? null,
+    }));
+    paymentLinkUrl = await ensureBalancePaymentLink(
+      supabase, share.workspace_id, partyType, share.party_id, outstanding, ledger.currency, share,
+      `${publicAppUrl}/statement/${share.token}`,
+    );
+  }
+
+  // Branding + identity for the page to render a PDF-like statement.
+  const set = settings as any;
+  const logoUrl = set.business_logo_path
+    ? (supabase.storage.from('generation-images').getPublicUrl(set.business_logo_path).data?.publicUrl ?? null) : null;
+  let backgroundUrl: string | null = null;
+  let logoBytes: Uint8Array | null = null;
+  if (set.statement_template_cover_path) {
+    const { data: bg } = await supabase.storage.from('quote-templates').createSignedUrl(set.statement_template_cover_path, 60 * 30);
+    backgroundUrl = bg?.signedUrl ?? null;
+  }
+  if (logoUrl) logoBytes = await loadLogo(supabase, set.business_logo_path);
+
+  const backdrop = backgroundUrl ? await loadBackdrop(backgroundUrl) : null;
+  let footerImg: Uint8Array | null = null;
+  if (set.statement_template_footer_path) {
+    const { data: fData } = await supabase.storage.from('quote-templates').createSignedUrl(set.statement_template_footer_path, 60 * 30);
+    if (fData?.signedUrl) footerImg = await loadBackdrop(fData.signedUrl);
+  }
+  const bank = await fetchBankAccount(supabase, share.workspace_id);
+
+  const L = LABELS[lang];
+  const owes = side === 'customer' ? closing > 0 : closing < 0;
+  const closingLabel = owes
+    ? (side === 'customer' ? L.owesUs : L.weOwe)
+    : (side === 'customer' ? L.weOwe : L.owesUs);
+
+  const issuer = {
+    name: set.business_name ?? null,
+    address: [set.business_address, set.business_street_number].filter(Boolean).join(' ') || null,
+    city: [set.business_postal_code, set.business_city].filter(Boolean).join(' ') || null,
+    vat: set.business_vat ?? null,
+    tax_office: set.business_tax_office ?? null,
+    phone: set.business_phone ?? set.contact_phone ?? null,
+    email: set.business_email ?? set.contact_email ?? null,
+  };
+  const recipient = {
+    name: party.display_name ?? details.name ?? null,
+    address: [details.street, details.street_number].filter(Boolean).join(' ') || details.address || null,
+    city: [details.postal_code, details.city].filter(Boolean).join(' ') || null,
+    vat: details.vat_number ?? null,
+    tax_office: details.tax_office ?? null,
+    email: party.email ?? details.email ?? null,
+  };
+
+  // Best-effort PDF for a download button; the on-page statement is the primary view.
+  let pdfUrl: string | null = null;
+  try {
+    const { bytes } = await buildStatementPdf({ party, details, settings, ledger, side, from, to, lang, backdrop, logo: logoBytes, footer: footerImg, bank });
+    const objectPath = `statements/${share.workspace_id}/${partyType}-${share.party_id}-share.pdf`;
+    await supabase.storage.from('pdf-documents').upload(objectPath, bytes, { contentType: 'application/pdf', upsert: true });
+    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(objectPath, 60 * 60 * 24 * 7);
+    pdfUrl = signed?.signedUrl ?? null;
+  } catch (e) { console.error('share PDF gen failed', (e as any)?.message); }
+
+  // Successful unlock → reset the failed-attempt counter + bump view stats.
+  await supabase.from('finance_statement_shares')
+    .update({ view_count: (share.view_count ?? 0) + 1, last_viewed_at: new Date().toISOString(), failed_attempts: 0 })
+    .eq('id', share.id);
+
+  return {
+    status: 200,
+    payload: {
+      ok: true,
+      party_name: party.display_name,
+      side, currency: ledger.currency, lang,
+      from, to, opening: ledger.opening, closing,
+      closing_label: closingLabel, owes, outstanding,
+      rows, invoices, pdf_url: pdfUrl,
+      payment_link_url: paymentLinkUrl,
+      logo_url: logoUrl, background_url: backgroundUrl,
+      business_name: set.business_name ?? null,
+      issuer, recipient,
+      bank_transfer: bank ? { label: L.payByBank, lines: bankLines(bank, L) } : null,
+      title: side === 'customer' ? L.titleCustomer : L.titleSupplier,
+    },
+  };
+}
+
 Deno.serve(withApiLogging('finance-send-statement', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -559,12 +925,44 @@ Deno.serve(withApiLogging('finance-send-statement', async (req) => {
       return json(result);
     }
 
-    // ---- Single party mode (user/role auth) ----
+    // ---- Public statement view (no auth; gated by VAT + email) ----
+    if (body.mode === 'share_view') {
+      await bootstrapForFunction(); // resolve STRIPE_SECRET_KEY for the balance Payment Link
+      const { status, payload } = await resolveShareView(supabase, body, publicAppUrl);
+      return json(payload, status);
+    }
+
+    // ---- Single party + share-mint modes (user/role auth) ----
     const auth = await authenticate(req, {
       requireUser: true,
       allowedRoles: ['admin', 'super_admin', 'owner', 'finance', 'sales'],
     });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
+
+    // ---- Mint / rotate a public share link for a party ----
+    if (body.mode === 'share_mint' || body.mode === 'share_rotate') {
+      const pt = body.party_type as 'company' | 'contact';
+      if (!pt || !body.party_id) return json({ error: 'party_type and party_id are required' }, 400);
+      const { data: party, error: pErr } = await supabase.from('vw_finance_parties').select('*')
+        .eq('party_type', pt).eq('party_id', body.party_id).maybeSingle();
+      if (pErr || !party) return json({ error: 'Party not found' }, 404);
+      if (!(await userCanAccessWorkspace(supabase, auth.userId, party.workspace_id))) {
+        return json({ error: 'Not authorized for this party' }, 403);
+      }
+      const { data: mintSettings } = await supabase.from('finance_settings').select('statements_enabled').eq('workspace_id', party.workspace_id).maybeSingle();
+      if (mintSettings && mintSettings.statements_enabled === false) {
+        return json({ error: 'Statements are disabled in finance settings.' }, 409);
+      }
+      const side: Side = (body.side === 'supplier') ? 'supplier' : (party.is_customer ? 'customer' : party.is_supplier ? 'supplier' : 'customer');
+      // Rotate: deactivate any existing active link first so the old URL dies.
+      if (body.mode === 'share_rotate') {
+        await supabase.from('finance_statement_shares')
+          .update({ is_active: false })
+          .eq('workspace_id', party.workspace_id).eq('party_type', pt).eq('party_id', body.party_id).eq('is_active', true);
+      }
+      const res = await mintShare(supabase, party, side, auth.userId, publicAppUrl);
+      return json({ ok: true, rotated: body.mode === 'share_rotate', ...res });
+    }
 
     const partyType = (body.party_type as 'company' | 'contact');
     if (!partyType || !body.party_id) return json({ error: 'party_type and party_id are required' }, 400);

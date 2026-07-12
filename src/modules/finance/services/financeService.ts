@@ -2110,6 +2110,56 @@ const _financeServiceV2 = {
     return data as any;
   },
 
+  /**
+   * Mint (or reuse) a public account-statement share link for a party. The recipient
+   * opens it and unlocks the statement with their VAT + email. Admin/finance/sales auth.
+   */
+  async mintStatementShareLink(input: {
+    partyType: 'company' | 'contact'; partyId: string; side?: 'customer' | 'supplier';
+    /** Revoke the current link and issue a fresh one (kills the old URL). */
+    rotate?: boolean;
+  }): Promise<{ ok: boolean; url: string; token: string; rotated?: boolean }> {
+    const { data, error } = await supabase.functions.invoke('finance-send-statement', {
+      body: { mode: input.rotate ? 'share_rotate' : 'share_mint', party_type: input.partyType, party_id: input.partyId, side: input.side },
+    });
+    if (error) throw await edgeError(error);
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return data as any;
+  },
+
+  /**
+   * Public: resolve a statement share token with the recipient's VAT + email. No auth —
+   * called from the /statement/:token page. Returns the ledger + open invoices (each with
+   * a /pay/{token} Stripe link) on match, or an error payload otherwise.
+   */
+  async viewStatementShare(input: { token: string; vat: string; email: string }): Promise<{
+    ok: boolean; error?: string;
+    party_name?: string; business_name?: string | null; side?: 'customer' | 'supplier';
+    currency?: string; lang?: 'el' | 'en'; from?: string; to?: string;
+    opening?: number; closing?: number;
+    closing_label?: string; owes?: boolean; outstanding?: number;
+    title?: string;
+    issuer?: { name: string | null; address: string | null; city: string | null; vat: string | null; tax_office: string | null; phone: string | null; email: string | null };
+    recipient?: { name: string | null; address: string | null; city: string | null; vat: string | null; tax_office: string | null; email: string | null };
+    bank_transfer?: { label: string; lines: string[] } | null;
+    rows?: Array<{ date: string | null; kind: string; doc: string | null; debit: number; credit: number; balance: number }>;
+    invoices?: Array<{ internal_number: string | null; amount_due: number; currency: string; pay_url: string | null }>;
+    pdf_url?: string | null;
+    payment_link_url?: string | null;
+    logo_url?: string | null;
+    background_url?: string | null;
+  }> {
+    const { data, error } = await supabase.functions.invoke('finance-send-statement', {
+      body: { mode: 'share_view', token: input.token, vat: input.vat, email: input.email },
+    });
+    // A 401 (no match) comes back as a FunctionsHttpError; surface the body's message.
+    if (error) {
+      const e = await edgeError(error).catch(() => null);
+      return { ok: false, error: (e as any)?.message ?? 'The VAT number or email does not match our records.' };
+    }
+    return data as any;
+  },
+
   // -------- Stripe pay link / checkout --------
 
   /**

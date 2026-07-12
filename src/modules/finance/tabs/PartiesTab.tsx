@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Mail, Loader2, FileText, Receipt, Printer, BookOpen } from 'lucide-react';
+import { Loader2, FileText, Receipt, Printer, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -9,14 +9,12 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/core/ui/dialog';
-import { Link } from 'react-router-dom';
 import {
   financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill, type Payment, type PartyLedgerRow, type CustomerAgingBuckets,
 } from '@/modules/finance/services/financeService';
 import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
-import { ExternalLink } from 'lucide-react';
+import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { humanizeLabel } from '@/utils/humanize';
-import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
@@ -249,12 +247,10 @@ interface DetailProps {
 
 const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose, statementsEnabled, crmBase }) => {
   const { toast } = useToast();
-  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<SupplierBill[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [sending, setSending] = useState(false);
   // Running ledger (καρτέλα)
   const [ledgerSide, setLedgerSide] = useState<'customer' | 'supplier'>('customer');
   const [ledger, setLedger] = useState<PartyLedgerRow[]>([]);
@@ -374,31 +370,6 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
     })();
   }, [party, toast]);
 
-  const handleSend = async () => {
-    if (!party) return;
-    if (!statementsEnabled) {
-      toast({ title: 'Statements disabled', description: 'Enable statements in Settings first.', variant: 'destructive' });
-      return;
-    }
-    try {
-      setSending(true);
-      const res = await financeService.sendStatement({
-        partyType: party.party_type, partyId: party.party_id,
-        side: ledgerSide, from: fromDate, to: toDate,
-      });
-      if (res.ok) {
-        toast({ title: res.email_sent_to ? 'Statement sent' : 'Statement generated', description: res.email_sent_to ?? 'PDF ready' });
-      } else {
-        toast({ title: 'Send failed', description: res.error ?? 'Unknown error', variant: 'destructive' });
-      }
-    } catch (err: any) {
-      if (await handleEmailSendError(err, { workspaceId: party.workspace_id, feature: 'statement' })) return;
-      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
-    } finally {
-      setSending(false);
-    }
-  };
-
   return (
     <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -420,15 +391,19 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
               aging={aging ? { not_due: Number(aging.not_due), due_0_30: Number(aging.due_0_30), due_31_90: Number(aging.due_31_90), due_90_plus: Number(aging.due_90_plus) } : null}
             />
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button onClick={handleSend} disabled={sending || !statementsEnabled} className="flex-1">
-                {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
-                {statementsEnabled ? 'Email account statement' : 'Statements disabled (Settings)'}
-              </Button>
-              <Link to={`${crmBase}/${party.party_type === 'company' ? 'companies' : 'contacts'}/${party.party_id}`} className="sm:w-auto">
-                <Button variant="outline" className="w-full"><ExternalLink className="h-4 w-4 mr-2" /> View in CRM</Button>
-              </Link>
-            </div>
+            <StatementActions
+              partyType={party.party_type}
+              partyId={party.party_id}
+              workspaceId={party.workspace_id}
+              email={party.email}
+              side={ledgerSide}
+              from={fromDate}
+              to={toDate}
+              statementsEnabled={statementsEnabled}
+              crmHref={`${crmBase}/${party.party_type === 'company' ? 'companies' : 'contacts'}/${party.party_id}`}
+              variant="buttons"
+              className="flex-wrap"
+            />
 
             {loading ? (
               <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -556,7 +531,6 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         )}
       </DialogContent>
     </Dialog>
-    {connectEmailGate}
     </>
   );
 };

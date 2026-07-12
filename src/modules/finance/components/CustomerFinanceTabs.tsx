@@ -1,9 +1,9 @@
 // Reusable Finance sub-tabs for a CRM customer (contact or company).
 // Mounts inside ContactDetailPage / CompanyDetailPage. Each tab is self-contained
 // and lazy-loads its data on first render.
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, FileText, Mail, Wallet, ShoppingBag, ShoppingCart, Banknote, AlertCircle, CalendarClock } from 'lucide-react';
+import { Loader2, FileText, Wallet, ShoppingBag, ShoppingCart, Banknote, AlertCircle, CalendarClock, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -17,7 +17,8 @@ import {
 } from '@/modules/finance/services/financeService';
 import { ordersService } from '@/modules/finance/services/ordersService';
 import { humanizeLabel } from '@/utils/humanize';
-import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
+import { StatementActions } from '@/modules/finance/components/StatementActions';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -71,36 +72,53 @@ export const PartyAccountSummary: React.FC<{
     </div>
   );
 
+  // The net-balance headline. In the compact drill-down (no orders roll-up and no
+  // account meta) it would sit alone on its own row above the role breakdown — so
+  // there we fold it into the first role grid as the leading column instead of
+  // leaving a lonely card. The full CRM Account tab keeps it in the top strip.
+  const balanceStat = stat(
+    <Wallet className="h-3.5 w-3.5" />, <>Balance <span className="normal-case text-[9px]">· {netDir}</span></>,
+    formatMoney(Math.abs(net)),
+    { tone: netTone, title: 'Net invoiced position: what they owe us on issued invoices minus what we owe them as a supplier. Separate from un-invoiced order cash (Owed on orders).' },
+  );
+  const showTopStrip = !!orders || (!!meta && meta.length > 0);
+  const balanceInCustomer = !showTopStrip && !!customer;
+  const balanceInSupplier = !showTopStrip && !customer && !!supplier;
+
   return (
     <div className="space-y-3">
       {/* Consolidated top strip — orders roll-up + net balance + account meta, all as compact
-          icon columns in one row (Balance is no longer a full-width row of its own). */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count, { title: 'Active (non-cancelled) orders for this party' })}
-        {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered), { title: 'Total value of those orders (incl. VAT)' })}
-        {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed on orders', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0, title: 'Cash still owed on orders that have NOT been invoiced yet (order total − payments). Once invoiced, it moves into the Balance below.' })}
-        {stat(<Wallet className="h-3.5 w-3.5" />, <>Balance <span className="normal-case text-[9px]">· {netDir}</span></>, formatMoney(Math.abs(net)), { tone: netTone, title: 'Net invoiced position: what they owe us on issued invoices minus what we owe them as a supplier. Separate from un-invoiced order cash (Owed on orders).' })}
-        {meta && meta.length > 0 && (
-          <Card className="dashboard-card border-0">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><CalendarClock className="h-3.5 w-3.5" /> Account</div>
-              <div className="mt-1 space-y-0.5 text-xs">
-                {meta.map((m, i) => (
-                  <div key={i} className="flex items-baseline justify-between gap-2">
-                    <span className="text-muted-foreground">{m.label}</span>
-                    <span className="text-foreground font-medium">{m.value}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          icon columns in one row. Rendered only when there's an orders roll-up or account meta;
+          in the compact drill-down the Balance moves into the role row below (see below). */}
+      {showTopStrip && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count, { title: 'Active (non-cancelled) orders for this party' })}
+          {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered), { title: 'Total value of those orders (incl. VAT)' })}
+          {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed on orders', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0, title: 'Cash still owed on orders that have NOT been invoiced yet (order total − payments). Once invoiced, it moves into the Balance below.' })}
+          {balanceStat}
+          {meta && meta.length > 0 && (
+            <Card className="dashboard-card border-0">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><CalendarClock className="h-3.5 w-3.5" /> Account</div>
+                <div className="mt-1 space-y-0.5 text-xs">
+                  {meta.map((m, i) => (
+                    <div key={i} className="flex items-baseline justify-between gap-2">
+                      <span className="text-muted-foreground">{m.label}</span>
+                      <span className="text-foreground font-medium">{m.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {customer && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-medium text-muted-foreground">As customer</div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${balanceInCustomer ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
+            {balanceInCustomer && balanceStat}
             {cell('Invoiced', formatMoney(customer.invoiced))}
             {cell('Paid', formatMoney(customer.paid))}
             {cell('They owe us', formatMoney(customer.outstanding), customer.outstanding > 0)}
@@ -119,7 +137,8 @@ export const PartyAccountSummary: React.FC<{
       {supplier && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-medium text-muted-foreground">As supplier</div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className={`grid gap-3 grid-cols-2 ${balanceInSupplier ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+            {balanceInSupplier && balanceStat}
             {cell('Billed to us', formatMoney(supplier.billed))}
             {cell('Paid to them', formatMoney(supplier.paid))}
             {cell('We owe', formatMoney(supplier.outstanding), supplier.outstanding > 0)}
@@ -138,16 +157,13 @@ export const PartyAccountSummary: React.FC<{
  * products to push + email-statement + an optional "View ledger in Finance" cross-link.
  */
 export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, isSupplier, ledgerHref }) => {
-  const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
-  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState<{ invoicedTotal: number; paidTotal: number; outstandingTotal: number; quoteCount: number } | null>(null);
   const [supplierAcct, setSupplierAcct] = useState<{ billedTotal: number; paidTotal: number; outstandingTotal: number; orderedTotal: number } | null>(null);
   const [lastPayment, setLastPayment] = useState<{ paid_at: string; amount: number; currency: string } | null>(null);
   const [openOrders, setOpenOrders] = useState(0);
   const [aging, setAging] = useState<{ not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null>(null);
-  const [emailing, setEmailing] = useState(false);
   // Orders roll-up for the KPI strip. Receivables/payables now live PER ORDER (open an order),
   // not as a separate party-level section.
   const [orderStats, setOrderStats] = useState<{ count: number; ordered: number; owedUninvoiced: number } | null>(null);
@@ -195,26 +211,9 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
     }
   };
 
-  const emailOverview = async () => {
-    const partyId = companyId ?? contactId;
-    if (!partyId) return;
-    try {
-      setEmailing(true);
-      const res = await financeService.sendStatement({ partyType: companyId ? 'company' : 'contact', partyId });
-      if (res.ok) {
-        toast({ title: 'Account overview sent', description: res.email_sent_to ? `Emailed to ${res.email_sent_to}` : 'Statement generated' });
-      } else {
-        toast({ title: 'Could not send', description: res.error ?? 'No email on file for this customer', variant: 'destructive' });
-      }
-    } catch (e: any) {
-      if (await handleEmailSendError(e, { workspaceId: activeWorkspaceId, feature: 'statement' })) return;
-      toast({ title: 'Failed to send', description: e?.message, variant: 'destructive' });
-    } finally {
-      setEmailing(false);
-    }
-  };
-
   if (loading) return <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>;
+
+  const partyId = companyId ?? contactId;
 
   return (
     <div className="space-y-4">
@@ -224,10 +223,14 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
           {ledgerHref && (
             <Link to={ledgerHref}><Button size="sm" variant="ghost"><FileText className="h-3.5 w-3.5 mr-2" /> View ledger in Finance</Button></Link>
           )}
-          <Button size="sm" variant="outline" onClick={emailOverview} disabled={emailing}>
-            {emailing ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
-            Email account info
-          </Button>
+          {partyId && (
+            <StatementActions
+              partyType={companyId ? 'company' : 'contact'}
+              partyId={partyId}
+              workspaceId={activeWorkspaceId}
+              side={isSupplier && !account ? 'supplier' : 'customer'}
+            />
+          )}
         </div>
       </div>
 
@@ -244,7 +247,6 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
 
       {/* Receivables & payables are managed PER ORDER now — open an order to add/see them.
           "Top items to push" renders separately (CustomerTopItemsCard) BELOW the orders list. */}
-      {connectEmailGate}
     </div>
   );
 };
@@ -259,36 +261,40 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
   const { activeWorkspaceId } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PaymentWithAllocation[]>([]);
+  const [payOpen, setPayOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!activeWorkspaceId || (!contactId && !companyId)) { setRows([]); setLoading(false); return; }
-      setLoading(true);
-      try {
-        const list = await financeService.listPayments({
-          workspaceId: activeWorkspaceId, counterpartyCompanyId: companyId, counterpartyContactId: contactId, limit: 50,
-        });
-        if (!cancelled) setRows(list);
-      } catch { if (!cancelled) setRows([]); }
-      finally { if (!cancelled) setLoading(false); }
-    })();
-    return () => { cancelled = true; };
+  const reload = useCallback(async () => {
+    if (!activeWorkspaceId || (!contactId && !companyId)) { setRows([]); setLoading(false); return; }
+    setLoading(true);
+    try {
+      const list = await financeService.listPayments({
+        workspaceId: activeWorkspaceId, counterpartyCompanyId: companyId, counterpartyContactId: contactId, limit: 50,
+      });
+      setRows(list);
+    } catch { setRows([]); }
+    finally { setLoading(false); }
   }, [contactId, companyId, activeWorkspaceId]);
+
+  useEffect(() => { void reload(); }, [reload]);
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3">
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm flex items-center gap-2">
           <Banknote className="h-4 w-4" /> Payments <span className="text-[10px] font-normal text-muted-foreground">· money in &amp; out</span>
         </CardTitle>
+        {activeWorkspaceId && (
+          <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Record payment
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
           <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>
         ) : rows.length === 0 ? (
           <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-            No payments recorded for this party yet. Payments are recorded per order — open an order to add one.
+            No payments recorded for this party yet. Use “Record payment” above to add one, or record it against a specific order.
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -324,6 +330,15 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
           </table>
         )}
       </CardContent>
+      {activeWorkspaceId && (
+        <RecordPaymentDialog
+          workspaceId={activeWorkspaceId}
+          open={payOpen}
+          onOpenChange={setPayOpen}
+          onSaved={reload}
+          initialCounterparty={{ contactId: contactId ?? null, companyId: companyId ?? null }}
+        />
+      )}
     </Card>
   );
 };

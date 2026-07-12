@@ -376,6 +376,11 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     await handleInvoicePaymentSucceeded(paymentIntent);
     return;
   }
+  // Statement "pay balance" link — allocates across the party's open invoices.
+  if (paymentIntent.metadata?.type === 'statement_payment') {
+    await handleStatementPaymentSucceeded(paymentIntent);
+    return;
+  }
 
   const customerId = paymentIntent.customer as string;
   if (!customerId) return;
@@ -586,6 +591,101 @@ async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent
     body: `We received your payment of ${amount.toFixed(2)} ${currency} for invoice ${inv.internal_number}.`,
     action_url: `/finance/invoices/${inv.id}`,
   }).catch(() => {});
+}
+
+/**
+ * Sales/Finance — a customer paid their WHOLE outstanding balance via the statement
+ * "Pay balance" Stripe Payment Link (no single invoice_id). Records one inbound payment
+ * for the party and allocates it across their open invoices oldest-first; any remainder
+ * stays as unallocated on-account credit. Idempotent on payment_intent.id.
+ */
+async function handleStatementPaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  const meta = paymentIntent.metadata ?? {};
+  const workspaceId = meta.workspace_id;
+  const partyType = meta.party_type as 'company' | 'contact' | undefined;
+  const partyId = meta.party_id;
+  if (!workspaceId || !partyType || !partyId) {
+    console.warn('statement_payment metadata incomplete', paymentIntent.id);
+    return;
+  }
+
+  // Idempotency: skip if already recorded for this intent.
+  const { data: existing } = await supabase
+    .from('payments').select('id').eq('stripe_payment_intent_id', paymentIntent.id).maybeSingle();
+  if (existing) {
+    console.log(`statement_payment ${paymentIntent.id} already recorded as payment ${existing.id}`);
+    return;
+  }
+
+  const amount = (paymentIntent.amount_received ?? paymentIntent.amount) / 100;
+  const currency = (paymentIntent.currency || 'eur').toUpperCase();
+  const isCompany = partyType === 'company';
+
+  const { data: paymentRow, error: payErr } = await supabase
+    .from('payments')
+    .insert({
+      workspace_id: workspaceId,
+      direction: 'in',
+      amount,
+      currency,
+      method: 'card',
+      paid_at: new Date().toISOString(),
+      counterparty_contact_id: isCompany ? null : partyId,
+      counterparty_company_id: isCompany ? partyId : null,
+      reference: `Stripe ${paymentIntent.id}`,
+      notes: 'Account balance via Stripe payment link',
+      stripe_payment_intent_id: paymentIntent.id,
+    })
+    .select('id')
+    .single();
+  if (payErr || !paymentRow) {
+    console.error('payments insert failed for statement_payment', payErr?.message);
+    return;
+  }
+
+  // Allocate oldest-first across open invoices for this party.
+  const { data: openInvoices } = await supabase
+    .from('invoices')
+    .select('id, amount_due, issued_at, status')
+    .eq('workspace_id', workspaceId)
+    .eq(isCompany ? 'customer_company_id' : 'customer_contact_id', partyId)
+    .order('issued_at', { ascending: true });
+
+  let remaining = amount;
+  const allocations: Array<{ payment_id: string; invoice_id: string; amount: number }> = [];
+  for (const inv of (openInvoices ?? [])) {
+    if (remaining <= 0) break;
+    if (inv.status === 'void' || inv.status === 'credit_noted' || inv.status === 'draft') continue;
+    const due = Number(inv.amount_due || 0);
+    if (due <= 0) continue;
+    const applied = Math.min(due, remaining);
+    allocations.push({ payment_id: paymentRow.id, invoice_id: inv.id, amount: applied });
+    remaining -= applied;
+  }
+  if (allocations.length > 0) {
+    const { error: allocErr } = await supabase.from('payment_allocations').insert(allocations);
+    if (allocErr) console.error('statement_payment allocations insert failed', allocErr.message);
+  }
+
+  // Customer-facing receipt + notify, via the same seeded flow as invoice payments.
+  const { data: partyRow } = await supabase
+    .from(isCompany ? 'crm_companies' : 'crm_contacts')
+    .select('email, name').eq('id', partyId).maybeSingle();
+  await emitFlowEvent('payment_received', {
+    type: 'payment_received',
+    customer_email: (partyRow as any)?.email ?? undefined,
+    customer_name: (partyRow as any)?.name ?? undefined,
+    payment_id: paymentRow.id,
+    amount: `${amount.toFixed(2)} ${currency}`,
+    currency,
+    workspace_id: workspaceId,
+    receipt_line: '',
+    title: `Payment received — ${amount.toFixed(2)} ${currency}`,
+    body: `We received your account payment of ${amount.toFixed(2)} ${currency}. Thank you.`,
+    action_url: '/finance',
+  }).catch(() => {});
+
+  console.log(`Recorded statement balance payment ${paymentRow.id} (${amount} ${currency}); allocated to ${allocations.length} invoice(s), ${remaining.toFixed(2)} on account`);
 }
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {

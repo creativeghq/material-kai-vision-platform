@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService, type QuoteWithItems } from '@/modules/quotes/services/QuotesService';
+import { StatementActions } from '@/modules/finance/components/StatementActions';
 
 interface CustomerOption { type: 'contact' | 'company'; id: string; label: string; sub?: string; }
 
@@ -148,6 +149,9 @@ export const SalesPage: React.FC = () => {
                     {orders.map((q) => {
                       const cid = (q as any).customer_company_id ? `company:${(q as any).customer_company_id}` : (q as any).customer_contact_id ? `contact:${(q as any).customer_contact_id}` : null;
                       const cust = cid ? customers[cid] : null;
+                      const partyCompanyId = (q as any).customer_company_id as string | null;
+                      const partyContactId = (q as any).customer_contact_id as string | null;
+                      const partyId = partyCompanyId ?? partyContactId;
                       return (
                       <tr
                         key={q.id}
@@ -166,14 +170,24 @@ export const SalesPage: React.FC = () => {
                         <td className="px-3 py-2.5 tabular-nums">{q.total_items || q.items?.length || 0}</td>
                         <td className="px-3 py-2.5 text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</td>
                         <td className="px-6 py-2.5 text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/quotes/${q.id}`); }}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                            {partyId && (
+                              <StatementActions
+                                partyType={partyCompanyId ? 'company' : 'contact'}
+                                partyId={partyId}
+                                workspaceId={activeWorkspaceId}
+                                crmHref={cust?.href}
+                              />
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => { e.stopPropagation(); navigate(`/quotes/${q.id}`); }}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                       );
