@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, Menu, LogOut, Wrench, Eye, EyeOff, LayoutDashboard, Settings } from 'lucide-react';
+import React from 'react';
+import { User, LogOut, Wrench, Eye, EyeOff, LayoutDashboard, Settings } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useShowPrices } from '@/hooks/useShowPrices';
 
@@ -10,12 +10,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { SIDEBAR_NAV_ITEMS, filterNavItems } from '@/config/nav-items';
 import { ModuleHeaderActions } from '@/modules/_core';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { Button } from '@/components/core/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from '@/components/core/ui/sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,15 +45,10 @@ export const Sidebar: React.FC = () => {
   const { can, isAccountant, isSalesRep } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const isMobile = useIsMobile();
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isModuleAvailable, can });
   // #251 — items marked surface:'app' render in the App Launcher, not the top bar / drawer.
   const topNav = navigationItems.filter((item) => item.surface !== 'app');
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -132,63 +121,18 @@ export const Sidebar: React.FC = () => {
   );
 
   if (isMobile) {
+    // No hamburger drawer and no App Launcher here — every destination (universal
+    // surfaces + the workspace's entitled apps) lives in the MobileBottomNav, so the
+    // top bar is just brand + workspace/profile controls.
     return (
       <>
         <div className="mobile-topbar fixed top-0 left-0 right-0 z-50 flex items-center justify-between gap-2 px-3 bg-sidebar border-b border-white/8">
-          <div className="flex items-center gap-1 min-w-0">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-foreground/70 hover:text-foreground hover:bg-white/5">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0 bg-sidebar border-r border-white/8">
-              <div className="flex flex-col h-full py-8 px-4">
-                <div className="mb-8">
-                  <img src="/mh-logo.png" alt="materialshub" className="h-8 w-auto block dark:hidden" />
-                  <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-8 w-auto hidden dark:block" />
-                </div>
-                <nav className="flex-1 flex flex-col space-y-1">
-                  {topNav.map((item) => (
-                    <Link
-                      key={item.id}
-                      to={item.path}
-                      onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                        isActive(item.path)
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
-                      }`}
-                    >
-                      <item.icon className="w-4 h-4 flex-shrink-0" />
-                      <span className="font-light">{item.label}</span>
-                    </Link>
-                  ))}
-                </nav>
-                <Link
-                  to="/profile"
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                    isActive('/profile')
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
-                  }`}
-                >
-                  <User className="w-4 h-4 flex-shrink-0" />
-                  <span className="font-light">Profile</span>
-                </Link>
-              </div>
-            </SheetContent>
-          </Sheet>
-
-            <Link to="/" className="flex items-center shrink-0" aria-label="Home">
-              <img src="/mh-logo.png" alt="materialshub" className="h-7 w-auto block dark:hidden" />
-              <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-7 w-auto hidden dark:block" />
-            </Link>
-          </div>
+          <Link to="/" className="flex items-center shrink-0 min-w-0" aria-label="Home">
+            <img src="/mh-logo.png" alt="materialshub" className="h-7 w-auto block dark:hidden" />
+            <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-7 w-auto hidden dark:block" />
+          </Link>
 
           <div className="flex items-center gap-0.5 shrink-0">
-            <AppLauncher />
             <WorkspaceSwitcher />
             <ModuleHeaderActions />
             {profileMenu}

@@ -41,6 +41,10 @@ export const MobileBottomNav: React.FC = () => {
 
   const navItems = useMemo(
     () =>
+      // Every gated destination (universal top-bar surfaces + the workspace's entitled
+      // apps) lives in the bottom bar on mobile: the priority set fills the bar, the rest
+      // — including surface:'app' modules — fall under "More". The mobile top bar keeps no
+      // hamburger/App Launcher, so this is the single mobile navigation surface.
       filterNavItems(SIDEBAR_NAV_ITEMS, {
         isFactory,
         isAdmin,
@@ -49,9 +53,7 @@ export const MobileBottomNav: React.FC = () => {
         isSalesRep,
         isModuleAvailable,
         can,
-      })
-        // #251 — surface:'app' items live in the App Launcher (mobile top bar), not the bottom bar.
-        .filter((i) => i.surface !== 'app'),
+      }),
     [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isModuleAvailable, can],
   );
 
