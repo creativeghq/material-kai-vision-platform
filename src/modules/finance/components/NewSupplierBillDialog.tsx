@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService } from '@/modules/finance/services/financeService';
+import { ordersService } from '@/modules/finance/services/ordersService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
 
@@ -49,6 +50,10 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
   const [issuedAt, setIssuedAt] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [dueAt, setDueAt] = useState<string>('');
   const [notes, setNotes] = useState('');
+
+  // Optional 3-way match: link this bill to one of the supplier's purchase orders.
+  const [poOptions, setPoOptions] = useState<Array<{ id: string; order_number: string | null; total: number }>>([]);
+  const [matchedOrderId, setMatchedOrderId] = useState<string>('');
 
   // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
   const clearDraft = useSessionDraft(
@@ -104,6 +109,25 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
     return () => clearTimeout(t);
   }, [supplierSearch, open]);
 
+  // Load the chosen supplier's purchase orders so the bill can be matched (3-way match).
+  useEffect(() => {
+    setMatchedOrderId('');
+    setPoOptions([]);
+    if (!open || !supplier) return;
+    let cancelled = false;
+    (async () => {
+      const companyId = supplier.type === 'company'
+        ? supplier.id
+        : await financeService.resolvePrimaryCompanyId(supplier.id).catch(() => null);
+      if (!companyId || cancelled) return;
+      try {
+        const pos = await ordersService.listPurchaseOrdersForSupplier(workspaceId, companyId);
+        if (!cancelled) setPoOptions(pos.map((p) => ({ id: p.id, order_number: p.order_number, total: p.total })));
+      } catch { /* non-fatal — matching stays optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, [supplier, open, workspaceId]);
+
   const total = parseDecimalOr(subtotalNet, 0) + parseDecimalOr(vatAmount, 0);
 
   const handleSave = async () => {
@@ -137,6 +161,7 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
         issuedAt: issuedAt || undefined,
         dueAt: dueAt || undefined,
         notes: notes || undefined,
+        orderId: matchedOrderId || undefined,
       });
       toast({ title: 'Supplier bill recorded' });
       clearDraft();
@@ -243,6 +268,23 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
               <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
             </div>
           </div>
+
+          {poOptions.length > 0 && (
+            <div className="space-y-1">
+              <Label>Match to purchase order <span className="text-muted-foreground font-normal">(optional — enables 3-way match)</span></Label>
+              <Select value={matchedOrderId || '__none__'} onValueChange={(v) => setMatchedOrderId(v === '__none__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="— No purchase order —" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— No purchase order —</SelectItem>
+                  {poOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.order_number || p.id.slice(0, 8)} · {p.total.toFixed(2)} {currency}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label>Notes</Label>

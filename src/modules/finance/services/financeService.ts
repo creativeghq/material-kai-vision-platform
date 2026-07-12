@@ -1115,6 +1115,8 @@ const _financeServiceCore = {
     issuedAt?: string;
     dueAt?: string;
     notes?: string;
+    /** Optional purchase order this bill is matched against (drives 3-way match). */
+    orderId?: string;
   }): Promise<SupplierBill> {
     const { data, error } = await supabase
       .from('supplier_bills')
@@ -1130,6 +1132,7 @@ const _financeServiceCore = {
         issued_at: input.issuedAt ?? null,
         due_at: input.dueAt ?? null,
         notes: input.notes ?? null,
+        order_id: input.orderId ?? null,
       })
       .select()
       .single();

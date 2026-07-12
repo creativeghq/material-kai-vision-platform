@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -23,6 +23,7 @@ import { MoneyInput } from '@/components/core/ui/money-input';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderListRow, type OrderItem, type Order,
+  type ThreeWayMatch, type ThreeWayMatchStatus,
 } from '@/modules/finance/services/ordersService';
 
 const STATUS_TONE: Record<OrderStatus, string> = {
@@ -165,7 +166,16 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
                   <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => setOpenId(r.id)}>
                     <td className="px-4 py-2 font-mono text-xs">{r.order_number ?? r.id.slice(0, 8)}</td>
                     <td className="px-4 py-2">{r.party_name ?? '—'}</td>
-                    <td className="px-4 py-2"><Badge variant="outline" className="text-[10px] capitalize">{r.order_type}</Badge></td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-[10px] capitalize">{r.order_type}</Badge>
+                        {r.order_type === 'purchase' && r.three_way_match_status && (r.three_way_match_status === 'variance' || r.three_way_match_status === 'awaiting_bill') && (
+                          <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[9px] font-medium ${MATCH_META[r.three_way_match_status].cls}`} title="3-way match status">
+                            {MATCH_META[r.three_way_match_status].label}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2"><Badge variant={STATUS_TONE[r.status] as any} className="text-[10px]">{ORDER_STATUS_LABEL[r.status]}</Badge></td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[r.payment_status]}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(r.total), r.currency)}</td>
@@ -524,6 +534,15 @@ const NewOrderModal: React.FC<{
 
 // ---------------------------------------------------------------------------
 
+// 3-way match verdict → badge label + tone. Shared by the PO list row and detail panel.
+const MATCH_META: Record<ThreeWayMatchStatus, { label: string; cls: string }> = {
+  no_lines:         { label: 'No lines',         cls: 'text-muted-foreground border-border' },
+  awaiting_receipt: { label: 'Awaiting receipt', cls: 'text-sky-600 border-sky-500/40' },
+  awaiting_bill:    { label: 'Awaiting bill',    cls: 'text-amber-600 border-amber-500/40' },
+  matched:          { label: 'Matched',          cls: 'text-emerald-600 border-emerald-500/40' },
+  variance:         { label: 'Variance',         cls: 'text-destructive border-destructive/40' },
+};
+
 const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClose: () => void; onChanged: () => void }> = ({ orderId, open, onClose, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -563,6 +582,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   // Audit trail of payment edits/deletes on this order (finance-manager-readable only).
   const [payAudit, setPayAudit] = useState<Awaited<ReturnType<typeof ordersService.listOrderPaymentAudit>>>([]);
   const [showPayAudit, setShowPayAudit] = useState(false);
+  // Purchase-order 3-way match (PO × goods received × supplier bill).
+  const [match, setMatch] = useState<ThreeWayMatch | null>(null);
 
   const load = async (id: string) => {
     try {
@@ -580,13 +601,16 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       ]);
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
       setBankAccounts(accounts); setPayAudit(audit);
+      setMatch(res.order.order_type === 'purchase'
+        ? await ordersService.getThreeWayMatch(id).catch(() => null)
+        : null);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -1052,6 +1076,48 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                     <div className="flex justify-between gap-8 w-60 font-medium"><span className="text-muted-foreground">Profit (excl. VAT)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}{Number(order.subtotal_net) > 0 && <span className="ml-1.5 text-[10px] text-muted-foreground">{Math.round((orderMargin / Number(order.subtotal_net)) * 100)}%</span>}</span></div>
                   )}
                 </div>
+
+                {/* 3-way match — purchase orders only: PO cost × goods received × supplier bill. */}
+                {order.order_type === 'purchase' && match && match.match_status !== 'no_lines' && (
+                  <div className="mt-4 rounded-md border border-border/60 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold">3-way match</span>
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${MATCH_META[match.match_status].cls}`}>
+                        {MATCH_META[match.match_status].label}
+                      </span>
+                      <span className="ml-auto text-[10px] text-muted-foreground">PO cost × goods received × supplier bill</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="rounded bg-muted/40 p-2">
+                        <div className="text-muted-foreground">Ordered (PO net)</div>
+                        <div className="tabular-nums font-medium">{formatMoney(match.po_net, order.currency)}</div>
+                      </div>
+                      <div className="rounded bg-muted/40 p-2">
+                        <div className="text-muted-foreground">Received</div>
+                        <div className="tabular-nums font-medium">{match.received_qty} / {match.ordered_qty}</div>
+                      </div>
+                      <div className="rounded bg-muted/40 p-2">
+                        <div className="text-muted-foreground">Billed{match.bill_count > 0 ? ` (${match.bill_count})` : ''}</div>
+                        <div className="tabular-nums font-medium">{formatMoney(match.bill_net, order.currency)}</div>
+                      </div>
+                    </div>
+                    {match.variances.length > 0 && (
+                      <ul className="space-y-0.5 text-[11px] text-destructive">
+                        {match.variances.map((v, i) => (
+                          <li key={i} className="flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            {v.type === 'amount'
+                              ? `Bill net ${formatMoney(v.bill_net, order.currency)} vs PO ${formatMoney(v.po_net, order.currency)} (${v.delta >= 0 ? '+' : ''}${formatMoney(v.delta, order.currency)})`
+                              : `Received ${v.received} vs ordered ${v.ordered} (${v.delta >= 0 ? '+' : ''}${v.delta})`}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {match.match_status === 'awaiting_bill' && (
+                      <p className="text-[11px] text-muted-foreground">Goods received — record the supplier bill and match it to this PO to complete the check.</p>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <div className="rounded-md border border-border/60">

@@ -31,8 +31,31 @@ export interface Order {
   vat_amount: number;
   total: number;
   notes: string | null;
+  /** Purchase-order 3-way match verdict (denormalized; null for sales orders). */
+  three_way_match_status: ThreeWayMatchStatus | null;
   created_at: string;
   updated_at: string;
+}
+
+export type ThreeWayMatchStatus =
+  | 'no_lines' | 'awaiting_receipt' | 'awaiting_bill' | 'matched' | 'variance';
+
+export interface ThreeWayMatch {
+  order_id: string;
+  order_number: string | null;
+  order_type: OrderType;
+  currency: string;
+  po_net: number;
+  ordered_qty: number;
+  received_qty: number;
+  bill_net: number;
+  bill_count: number;
+  tolerance: number;
+  match_status: ThreeWayMatchStatus;
+  variances: Array<
+    | { type: 'amount'; po_net: number; bill_net: number; delta: number }
+    | { type: 'quantity'; ordered: number; received: number; delta: number }
+  >;
 }
 
 export interface OrderItem {
@@ -189,6 +212,30 @@ export const ordersService = {
     if (error) throw error;
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', id).order('sort_order', { ascending: true });
     return { order: order as Order, items: (items ?? []) as OrderItem[] };
+  },
+
+  /** 3-way match for a purchase order: PO net × goods received × supplier-bill net. */
+  async getThreeWayMatch(orderId: string): Promise<ThreeWayMatch | null> {
+    const { data, error } = await supabase.rpc('compute_three_way_match', { p_order_id: orderId });
+    if (error) throw error;
+    const d = data as unknown as ThreeWayMatch & { error?: string };
+    if (!d || d.error) return null;
+    return d;
+  },
+
+  /** Purchase orders for a supplier that a bill can be matched against. */
+  async listPurchaseOrdersForSupplier(workspaceId: string, supplierCompanyId: string): Promise<Array<{ id: string; order_number: string | null; total: number; three_way_match_status: string | null }>> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, order_number, total, three_way_match_status')
+      .eq('workspace_id', workspaceId)
+      .eq('order_type', 'purchase')
+      .eq('supplier_company_id', supplierCompanyId)
+      .neq('status', 'cancelled')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return (data ?? []) as Array<{ id: string; order_number: string | null; total: number; three_way_match_status: string | null }>;
   },
 
   async create(input: {
