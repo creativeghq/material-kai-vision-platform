@@ -818,7 +818,7 @@ export const ProfileTab: React.FC = () => {
             factory_name: factoryToAdd,
             added_at: new Date().toISOString(),
             type: 'preferred_factory',
-            title: 'A user added your factory as a preferred factory',
+            title: 'A user added your brand as a preferred brand',
             body: '',
             action_url: '/analytics/factory',
           });
@@ -1098,9 +1098,9 @@ export const ProfileTab: React.FC = () => {
       <Card className="rounded-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" />Preferred Factories</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" />Preferred Brands</CardTitle>
             <Button size="sm" variant="outline" onClick={() => setAddingFactory((v) => !v)}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" />Add Factory
+              <Plus className="h-3.5 w-3.5 mr-1.5" />Add Brand
             </Button>
           </div>
         </CardHeader>
@@ -1121,7 +1121,7 @@ export const ProfileTab: React.FC = () => {
             </div>
           )}
           {factories.length === 0 && !addingFactory && (
-            <p className="text-sm text-muted-foreground">No preferred factories added yet.</p>
+            <p className="text-sm text-muted-foreground">No preferred brands added yet.</p>
           )}
           {addingFactory && (
             <div className="rounded-xl border p-4 space-y-3 bg-muted/20">
@@ -1132,18 +1132,18 @@ export const ProfileTab: React.FC = () => {
                     options={factoryComboOptions}
                     value={selectedFactoryName}
                     onSelect={setSelectedFactoryName}
-                    placeholder="Search factories…"
-                    emptyText="No factories found."
+                    placeholder="Search brands…"
+                    emptyText="No brands found."
                   />
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground italic">
-                  No factory data in catalog yet. Import products to populate this list.
+                  No brand data in catalog yet. Import products to populate this list.
                 </p>
               )}
               <div className="flex gap-2 justify-end">
                 <Button size="sm" variant="ghost" onClick={() => { setAddingFactory(false); setSelectedFactoryName(''); }}>Cancel</Button>
-                <Button size="sm" onClick={addFactory} disabled={!selectedFactoryName}>Add Factory</Button>
+                <Button size="sm" onClick={addFactory} disabled={!selectedFactoryName}>Add Brand</Button>
               </div>
             </div>
           )}
@@ -1215,14 +1215,14 @@ export const ProfileTab: React.FC = () => {
                     options={factoryOptions.map((f) => ({ value: f.name, label: f.name }))}
                     value={regForm.factory_claimed_name}
                     onSelect={(v) => setRegForm({ ...regForm, factory_claimed_name: v })}
-                    placeholder="Search factory catalog…"
-                    emptyText="No factories found. Enter manually below."
+                    placeholder="Search brand catalog…"
+                    emptyText="No brands found. Enter manually below."
                   />
                   {!regForm.factory_claimed_name && (
                     <Input
                       value={regForm.factory_claimed_name}
                       onChange={(e) => setRegForm({ ...regForm, factory_claimed_name: e.target.value })}
-                      placeholder="Or type factory name manually"
+                      placeholder="Or type brand name manually"
                       className="mt-1.5"
                     />
                   )}

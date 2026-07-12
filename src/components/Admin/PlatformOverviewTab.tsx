@@ -973,18 +973,18 @@ export function PlatformOverviewTab() {
       )}
 
       {/* ─── 2. Supply Side: Factory Engagement ─────────────────── */}
-      <SectionHeader title="Supply Side: Factory Engagement" desc="Which factories drive the most buyer activity — saves, quotes, and catalog growth" icon={Building2} />
+      <SectionHeader title="Supply Side: Brand Engagement" desc="Which brands drive the most buyer activity — saves, quotes, and catalog growth" icon={Building2} />
       <div className="grid grid-cols-3 gap-3">
-        <KpiCard label="Active Factories" value={topFactories.length} icon={Building2} />
+        <KpiCard label="Active Brands" value={topFactories.length} icon={Building2} />
         <KpiCard label="Registrations Pending" value={factoryPipeline.find(p => p.status === 'pending')?.count ?? 0} icon={Package} color="text-amber-500" />
-        <KpiCard label="Approved Factories" value={factoryPipeline.find(p => p.status === 'approved')?.count ?? 0} icon={Package} color="text-green-600" />
+        <KpiCard label="Approved Brands" value={factoryPipeline.find(p => p.status === 'approved')?.count ?? 0} icon={Package} color="text-green-600" />
       </div>
       {topFactories.length > 0 && (
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Top Factories by Buyer Engagement (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">Ranked by combined moodboard saves + quote inclusions</p></CardHeader>
+          <CardHeader><CardTitle className="text-sm">Top Brands by Buyer Engagement (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">Ranked by combined moodboard saves + quote inclusions</p></CardHeader>
           <CardContent>
             <div className="overflow-auto max-h-[340px]">
-              <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">Factory</th><th className="text-right py-2 pr-4 font-medium">Catalog</th><th className="text-right py-2 pr-4 font-medium">Saves</th><th className="text-right py-2 pr-4 font-medium">Quotes</th><th className="text-right py-2 font-medium">Conv.</th></tr></thead>
+              <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">Brand</th><th className="text-right py-2 pr-4 font-medium">Catalog</th><th className="text-right py-2 pr-4 font-medium">Saves</th><th className="text-right py-2 pr-4 font-medium">Quotes</th><th className="text-right py-2 font-medium">Conv.</th></tr></thead>
                 <tbody>{topFactories.map((row, i) => (<tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td><td className="py-2 pr-4 font-medium">{row.name}</td><td className="py-2 pr-4 text-right tabular-nums text-muted-foreground">{row.products}</td><td className="py-2 pr-4 text-right tabular-nums">{row.saves}</td><td className="py-2 pr-4 text-right tabular-nums text-primary font-semibold">{row.quotes}</td><td className="py-2 text-right tabular-nums text-green-600 text-xs">{row.saves > 0 ? `${Math.round((row.quotes / row.saves) * 100)}%` : '—'}</td></tr>))}</tbody>
               </table>
             </div>
@@ -1802,7 +1802,7 @@ export function PlatformOverviewTab() {
       {/* ─── 11. Factory Registration Pipeline ──────────────────── */}
       {factoryPipeline.length > 0 && (
         <Card className="mt-8">
-          <CardHeader><CardTitle className="text-sm font-semibold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Factory Registration Pipeline</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm font-semibold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Brand Registration Pipeline</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3 mb-4">
               {factoryPipeline.map((p) => (

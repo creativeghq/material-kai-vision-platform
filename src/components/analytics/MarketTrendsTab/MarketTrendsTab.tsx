@@ -930,7 +930,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         </Select>
         {viewScope === 'factory' && factoryName && (
           <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded border border-primary/20">
-            My Factory · {factoryName}
+            My Brand · {factoryName}
           </span>
         )}
         <button

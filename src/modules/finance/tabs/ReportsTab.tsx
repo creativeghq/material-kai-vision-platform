@@ -31,7 +31,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   // Sales
   { value: 'sales_per_day',       label: 'Sales per day',           group: 'sales',       period: 'range' },
   { value: 'sales_per_customer',  label: 'Sales per customer',      group: 'sales',       period: 'range' },
-  { value: 'sales_per_factory',   label: 'Sales per factory',       group: 'sales',       period: 'range' },
+  { value: 'sales_per_factory',   label: 'Sales per brand',         group: 'sales',       period: 'range' },
   { value: 'sales_per_product',   label: 'Sales per product',       group: 'sales',       period: 'range' },
   { value: 'sales_per_category',  label: 'Sales per category',      group: 'sales',       period: 'range' },
   { value: 'sales_per_designer',  label: 'Sales per designer',      group: 'sales',       period: 'range' },
@@ -563,7 +563,7 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
   }
   if (report === 'sales_per_factory') {
     return (
-      <Table headers={['Factory', 'Lines', 'Quantity', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
+      <Table headers={['Brand', 'Lines', 'Quantity', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
         r.factory_name, String(r.line_count ?? 0), String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
       ])} />
     );

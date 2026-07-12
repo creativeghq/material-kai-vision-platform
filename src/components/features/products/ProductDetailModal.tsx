@@ -2044,10 +2044,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
               // ── Universal rows (always shown) ──────────────────────────
               const universalRows: Array<{ label: string; value: string }> = [];
-              if (factory !== '—') universalRows.push({ label: 'Factory', value: factory });
+              if (factory !== '—') universalRows.push({ label: 'Brand', value: factory });
 
               const group = extractValue(allData?.factory_group_name);
-              if (group && group !== factory) universalRows.push({ label: 'Factory Group', value: String(group) });
+              if (group && group !== factory) universalRows.push({ label: 'Brand Group', value: String(group) });
               if (origin) universalRows.push({ label: 'Country of Origin', value: origin });
               if (collection) universalRows.push({ label: 'Collection', value: collection });
               universalRows.push({ label: 'Material', value: material });

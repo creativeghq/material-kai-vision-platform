@@ -549,7 +549,7 @@ export const PublicProfilePage: React.FC = () => {
               {profile.preferred_factories.length > 0 && (
                 <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
                     <h3 className="text-sm font-semibold flex items-center gap-2 mb-4 text-primary">
-                      <Building2 className="h-4 w-4" /> Preferred Factories
+                      <Building2 className="h-4 w-4" /> Preferred Brands
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {profile.preferred_factories.map((f, i) => (

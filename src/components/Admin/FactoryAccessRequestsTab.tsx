@@ -53,14 +53,14 @@ export const FactoryAccessRequestsTab: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <KeyRound className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold">Factory Access Requests</h3>
+          <h3 className="font-semibold">Brand Access Requests</h3>
           {pending > 0 && <Badge variant="secondary" className="text-xs">{pending} pending</Badge>}
         </div>
         <Button size="sm" variant="outline" onClick={load}>Refresh</Button>
       </div>
 
       {requests.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No factory-access requests yet.</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">No brand-access requests yet.</p>
       ) : (
         <div className="space-y-3">
           {requests.map((req) => (

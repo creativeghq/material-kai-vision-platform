@@ -470,7 +470,7 @@ function FactoriesWidget() {
     <>
       <Widget
         icon={Factory}
-        title="Latest Factories"
+        title="Latest Brands"
         viewAllLink="/discover"
         loading={loading}
         empty={factories.length === 0}

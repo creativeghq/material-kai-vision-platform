@@ -114,7 +114,7 @@ export const ApplyForRoleCard: React.FC = () => {
       <CardContent className="pt-5 pb-5 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold">Become a Dealer or Factory</h3>
+            <h3 className="text-lg font-semibold">Become a Dealer or Brand</h3>
             <p className="text-sm text-muted-foreground mt-0.5">
               Operating as a registered company? Apply for one of our business roles to unlock CRM, inventory, and partner features.
             </p>

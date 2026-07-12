@@ -103,7 +103,7 @@ export const factoryAccessService = {
       .eq('factory_verified', true)
       .eq('professional_type', 'supplier');
     if (error) throw error;
-    return (data ?? []).map((f: any) => ({ user_id: f.user_id, name: f.factory_claimed_name || f.full_name || 'Factory' }));
+    return (data ?? []).map((f: any) => ({ user_id: f.user_id, name: f.factory_claimed_name || f.full_name || 'Brand' }));
   },
 
   /** Products from factories this workspace has been granted access to. */

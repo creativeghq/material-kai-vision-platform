@@ -878,7 +878,7 @@ const OperationsDashboardInner: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="factory-onboarding">
               <Users className="h-4 w-4 mr-2" />
-              Factory Onboarding
+              Brand Onboarding
             </TabsTrigger>
             <TabsTrigger value="resellers">
               <Store className="h-4 w-4 mr-2" />

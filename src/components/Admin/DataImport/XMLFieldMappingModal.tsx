@@ -89,9 +89,9 @@ interface XMLFieldMappingModalProps {
 // it's NOT rendered here as a gap row — it's already known.
 const TARGET_FIELDS: Array<{ value: string; label: string; required: boolean }> = [
   { value: 'name', label: 'Product Name', required: true },
-  { value: 'factory_name', label: 'Factory / Manufacturer', required: true },
+  { value: 'factory_name', label: 'Brand', required: true },
   { value: 'description', label: 'Description', required: false },
-  { value: 'factory_group_name', label: 'Factory Group', required: false },
+  { value: 'factory_group_name', label: 'Brand Group', required: false },
   { value: 'price', label: 'Price', required: false },
   { value: 'color', label: 'Color', required: false },
   { value: 'colors', label: 'Colors (Multiple)', required: false },

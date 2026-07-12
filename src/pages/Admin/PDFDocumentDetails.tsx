@@ -592,7 +592,7 @@ export const PDFDocumentDetails: React.FC = () => {
                         <TableHead>Type</TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Description</TableHead>
-                        <TableHead>Factory/Group</TableHead>
+                        <TableHead>Brand/Group</TableHead>
                         <TableHead>Page Range</TableHead>
                       </TableRow>
                     </TableHeader>

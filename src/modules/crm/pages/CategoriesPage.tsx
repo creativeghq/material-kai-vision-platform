@@ -185,7 +185,7 @@ export const CategoriesPanel: React.FC = () => {
         <div className="text-sm text-muted-foreground max-w-2xl space-y-1">
           <p>Group platform users + CRM contacts + companies into lists — used by "Send to Customers" and other outreach. Every category here is fully editable: rename, recolour, toggle active, add/remove members, or delete.</p>
           <p className="text-xs">
-            <b className="text-foreground">Professional type</b> categories are <i>auto-built</i> from each user's professional type and keep their members in sync — but you can still add anyone to them manually on top. <b className="text-foreground">Custom</b> lists are entirely yours. (Account role — Operator/Dealer/Factory — is a user permission, managed in the Users tab, not a CRM category.)
+            <b className="text-foreground">Professional type</b> categories are <i>auto-built</i> from each user's professional type and keep their members in sync — but you can still add anyone to them manually on top. <b className="text-foreground">Custom</b> lists are entirely yours. (Account role — Operator/Dealer/Brand — is a user permission, managed in the Users tab, not a CRM category.)
           </p>
         </div>
         <div className="flex gap-2">

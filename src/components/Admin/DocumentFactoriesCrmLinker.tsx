@@ -176,7 +176,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
       name: factory.name,
       website: '',
       description: factory.inferredGroup
-        ? `Imported from PDF catalog. Part of factory group: ${factory.inferredGroup}.`
+        ? `Imported from PDF catalog. Part of brand group: ${factory.inferredGroup}.`
         : 'Imported from PDF catalog.',
       markAsSupplier: true,
     });
@@ -231,7 +231,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
         <CardContent>
           <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground space-y-2">
             <AlertCircle className="h-6 w-6 mx-auto opacity-50" />
-            <p>No factory / brand names found in the extracted entities or products.</p>
+            <p>No brand names found in the extracted entities or products.</p>
             <p className="text-xs">
               The extraction pipeline writes the maker into <code>products.metadata.factory_name</code> and{' '}
               <code>document_entities.factory_name</code>. If this catalog has a brand on the cover, it may not have been picked up yet.
@@ -251,7 +251,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
             Businesses in this document
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            {factories.length} distinct factory / brand name{factories.length === 1 ? '' : 's'} found. One-click promotion to the CRM.
+            {factories.length} distinct brand name{factories.length === 1 ? '' : 's'} found. One-click promotion to the CRM.
           </p>
         </div>
         {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
@@ -261,7 +261,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Factory / Brand</TableHead>
+                <TableHead>Brand</TableHead>
                 <TableHead className="text-center">Entities</TableHead>
                 <TableHead className="text-center">Products</TableHead>
                 <TableHead>CRM status</TableHead>

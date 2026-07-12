@@ -91,8 +91,8 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Profile Review Received', description: 'A professional received a profile review', icon: 'Star', color: 'emerald',
     defaultData: { label: 'Profile Review Received', category: 'trigger', triggerType: 'review_submitted', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'preferred_factory_added', group: 'Profiles',
-    label: 'Factory Added to Profile', description: 'User adds a preferred factory to their profile', icon: 'Building2', color: 'emerald',
-    defaultData: { label: 'Factory Added to Profile', category: 'trigger', triggerType: 'preferred_factory_added', config: {} } as TriggerNodeData },
+    label: 'Brand Added to Profile', description: 'User adds a preferred brand to their profile', icon: 'Building2', color: 'emerald',
+    defaultData: { label: 'Brand Added to Profile', category: 'trigger', triggerType: 'preferred_factory_added', config: {} } as TriggerNodeData },
 
   // ── Quotes (PDF) ──
   { type: 'triggerNode', category: 'trigger', subType: 'quote_pdf_generated', group: 'Quotes',
@@ -101,11 +101,11 @@ export const paletteItems: NodePaletteItem[] = [
 
   // ── Suppliers ──
   { type: 'triggerNode', category: 'trigger', subType: 'factory_approved', group: 'Suppliers',
-    label: 'Factory Approved', description: 'Admin approves a factory registration', icon: 'CheckCircle2', color: 'emerald',
-    defaultData: { label: 'Factory Approved', category: 'trigger', triggerType: 'factory_approved', config: {} } as TriggerNodeData },
+    label: 'Brand Approved', description: 'Admin approves a brand registration', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'Brand Approved', category: 'trigger', triggerType: 'factory_approved', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'factory_rejected', group: 'Suppliers',
-    label: 'Factory Rejected', description: 'Admin rejects a factory registration', icon: 'XCircle', color: 'emerald',
-    defaultData: { label: 'Factory Rejected', category: 'trigger', triggerType: 'factory_rejected', config: {} } as TriggerNodeData },
+    label: 'Brand Rejected', description: 'Admin rejects a brand registration', icon: 'XCircle', color: 'emerald',
+    defaultData: { label: 'Brand Rejected', category: 'trigger', triggerType: 'factory_rejected', config: {} } as TriggerNodeData },
 
   // ── Appointments ──
   { type: 'triggerNode', category: 'trigger', subType: 'appointment_booked', group: 'Appointments',

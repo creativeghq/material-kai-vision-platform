@@ -209,7 +209,7 @@ export const AddCompanyModal: React.FC<{
               <DialogTitle>What are you adding?</DialogTitle>
               <DialogDescription>
                 Pick the role first — it decides which form you get. Suppliers stay lean
-                (no pricing/invoicing) and can be matched to a factory; customers get the full
+                (no pricing/invoicing) and can be matched to a brand; customers get the full
                 commercial profile.
               </DialogDescription>
             </DialogHeader>
@@ -230,7 +230,7 @@ export const AddCompanyModal: React.FC<{
               >
                 <Factory className="h-6 w-6 mb-2 text-muted-foreground group-hover:text-primary" />
                 <div className="font-medium">Supplier</div>
-                <p className="text-xs text-muted-foreground mt-1">A business we buy from — match it to an ingested factory's products.</p>
+                <p className="text-xs text-muted-foreground mt-1">A business we buy from — match it to an ingested brand's products.</p>
               </button>
             </div>
           </>

@@ -409,7 +409,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                 <div>
                   <p className="font-medium text-sm">Business entity</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Registered company. Required to apply for Dealer or Factory roles.
+                    Registered company. Required to apply for Dealer or Brand roles.
                   </p>
                 </div>
               </button>
@@ -584,7 +584,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                You're registered as a solo entity. Switch to <strong>Business</strong> if you operate as a registered company, and you'll be able to apply for Dealer or Factory roles.
+                You're registered as a solo entity. Switch to <strong>Business</strong> if you operate as a registered company, and you'll be able to apply for Dealer or Brand roles.
               </p>
             )}
           </>

@@ -76,7 +76,7 @@ export const FactoryLinkCard: React.FC<{
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Factory className="h-4 w-4" />
-          Linked factory / manufacturer
+          Linked brand
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
           Pin this supplier to the maker name(s) on ingested products. This is what ties
@@ -114,17 +114,17 @@ export const FactoryLinkCard: React.FC<{
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ingested factory names…"
+            placeholder="Search ingested brand names…"
             className="pl-8 h-9"
           />
         </div>
         <div className="max-h-56 overflow-y-auto rounded-md border border-border/60 divide-y divide-border/40">
           {loading ? (
             <div className="flex items-center gap-2 justify-center py-6 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading factories…
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading brands…
             </div>
           ) : filtered.length === 0 ? (
-            <div className="py-6 text-center text-xs text-muted-foreground">No ingested factory names match.</div>
+            <div className="py-6 text-center text-xs text-muted-foreground">No ingested brand names match.</div>
           ) : (
             filtered.map((f) => {
               const isSel = selected.includes(f.name);

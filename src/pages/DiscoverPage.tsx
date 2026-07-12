@@ -613,7 +613,7 @@ export const DiscoverPage: React.FC = () => {
       <PageHeader
         icon={Layers}
         title="Discover"
-        subtitle="Explore profiles, factories, and materials from the community."
+        subtitle="Explore profiles, brands, and materials from the community."
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
@@ -623,7 +623,7 @@ export const DiscoverPage: React.FC = () => {
               <Users className="h-4 w-4" /> Profiles
             </TabsTrigger>
             <TabsTrigger value="factory" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" /> Factory
+              <Building2 className="h-4 w-4" /> Brand
             </TabsTrigger>
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="h-4 w-4" /> Products
@@ -755,7 +755,7 @@ export const DiscoverPage: React.FC = () => {
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input value={factorySearch} onChange={(e) => setFactorySearch(e.target.value)}
-                  placeholder="Search factories…" className="pl-9" />
+                  placeholder="Search brands…" className="pl-9" />
               </div>
               <Select value={factoryCat} onValueChange={setFactoryCat}>
                 <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Material category" /></SelectTrigger>
@@ -778,7 +778,7 @@ export const DiscoverPage: React.FC = () => {
             {loading ? (
               <SkeletonCards count={6} />
             ) : filteredFactories.length === 0 ? (
-              <Empty icon={Building2} text="No factories found." />
+              <Empty icon={Building2} text="No brands found." />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredFactories.map((factory) => (
@@ -826,7 +826,7 @@ export const DiscoverPage: React.FC = () => {
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search materials by name or factory…" className="pl-9" />
+                  placeholder="Search materials by name or brand…" className="pl-9" />
               </div>
               <Select value={productCat} onValueChange={setProductCat}>
                 <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
@@ -838,9 +838,9 @@ export const DiscoverPage: React.FC = () => {
                 </SelectContent>
               </Select>
               <Select value={productFactory} onValueChange={setProductFactory}>
-                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Factory" /></SelectTrigger>
+                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Brand" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All factories</SelectItem>
+                  <SelectItem value="all">All brands</SelectItem>
                   {factoryNamesAZ.map((n) => (<SelectItem key={n} value={n}>{n}</SelectItem>))}
                 </SelectContent>
               </Select>
@@ -848,7 +848,7 @@ export const DiscoverPage: React.FC = () => {
                 <SelectTrigger className="w-[48%] sm:w-36"><SelectValue placeholder="Sort" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name">Name A–Z</SelectItem>
-                  <SelectItem value="factory">By factory</SelectItem>
+                  <SelectItem value="factory">By brand</SelectItem>
                 </SelectContent>
               </Select>
               {Object.keys(surplus).length > 0 && (
