@@ -82,6 +82,8 @@ export async function handleModuleAction(req: Request, body: Record<string, unkn
       return requestModule(auth, body);
     case 'list-stripe-products':
       return listStripeProducts(auth);
+    case 'create-addon-product':
+      return createAddonProduct(auth, body);
     default:
       return json({ error: `Unknown module action '${action}'` }, 400);
   }
@@ -327,6 +329,76 @@ async function requestModule(auth: AuthResult, body: Record<string, unknown>): P
  * can bind a module 1:1 to a product. Products whose default_price isn't a recurring price are
  * returned with `price: null` so the admin UI can flag them as not subscription-ready.
  */
+/**
+ * #256 — one-click "make this module purchasable": create a Stripe PRODUCT + recurring price on
+ * the platform-billing account, set the price as the product default, and bind it to the module
+ * row (is_addon + addon_stripe_product_id + price). Operator-only. Saves the operator a trip to
+ * the Stripe dashboard; the normal activate-module → checkout → webhook grant flow then works.
+ */
+async function createAddonProduct(auth: AuthResult, body: Record<string, unknown>): Promise<Response> {
+  if (!isAdminAccess(auth) && !(await isOperator(auth.supabase, auth.userId))) {
+    return json({ error: 'Operator access required', code: 'not_operator' }, 403);
+  }
+  const moduleSlug = String(body.module_slug || '').trim();
+  const amountCents = Math.round(Number(body.amount_cents));
+  const currency = String(body.currency || 'eur').toLowerCase();
+  const interval = String(body.interval || 'month') === 'year' ? 'year' : 'month';
+  if (!moduleSlug) return json({ error: 'module_slug is required' }, 400);
+  if (!Number.isFinite(amountCents) || amountCents < 50) {
+    return json({ error: 'amount_cents must be a whole number ≥ 50 (Stripe minimum)' }, 400);
+  }
+
+  const service = auth.supabase;
+  const { data: mod } = await service
+    .from('modules')
+    .select('slug, name, summary, description, addon_stripe_product_id')
+    .eq('slug', moduleSlug)
+    .maybeSingle();
+  if (!mod) return json({ error: 'Module not found' }, 404);
+
+  const stripe = getPlatformBillingStripe();
+  if (!stripe) return noPaymentProviderResponse(corsHeaders);
+
+  // Create product → recurring price → set as default. Product carries module metadata so it's
+  // identifiable in the Stripe dashboard.
+  const product = await stripe.products.create({
+    name: `${mod.name} (add-on)`,
+    description: (mod.summary || mod.description || undefined) as string | undefined,
+    metadata: { module_slug: moduleSlug, kind: 'module_addon' },
+  });
+  const price = await stripe.prices.create({
+    product: product.id,
+    unit_amount: amountCents,
+    currency,
+    recurring: { interval: interval as 'month' | 'year' },
+  });
+  await stripe.products.update(product.id, { default_price: price.id });
+
+  // Bind to the module (unique-product-per-module index enforces 1:1).
+  const { error: updErr } = await service
+    .from('modules')
+    .update({
+      is_addon: true,
+      addon_stripe_product_id: product.id,
+      addon_price_cents: amountCents,
+      addon_currency: currency,
+    })
+    .eq('slug', moduleSlug);
+  if (updErr) {
+    const dup = /modules_addon_product_uniq|duplicate key/i.test(updErr.message);
+    return json({ error: dup ? 'That module is already bound to a product.' : updErr.message }, 500);
+  }
+
+  return json({
+    created: true,
+    product: {
+      id: product.id,
+      name: product.name,
+      price: { id: price.id, unit_amount: amountCents, currency, interval },
+    },
+  });
+}
+
 async function listStripeProducts(auth: AuthResult): Promise<Response> {
   if (!isAdminAccess(auth) && !(await isOperator(auth.supabase, auth.userId))) {
     return json({ error: 'Operator access required', code: 'not_operator' }, 403);

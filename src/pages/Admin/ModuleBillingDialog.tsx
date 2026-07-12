@@ -50,6 +50,10 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
   const [isAddon, setIsAddon] = useState(false);
   const [productId, setProductId] = useState<string>('');
   const [summary, setSummary] = useState('');
+  // #256 — one-click "create & attach" a Stripe product so the operator never leaves the app.
+  const [creating, setCreating] = useState(false);
+  const [newAmount, setNewAmount] = useState(''); // major units, e.g. "9.00"
+  const [newInterval, setNewInterval] = useState<'month' | 'year'>('month');
 
   useEffect(() => {
     if (!open) return;
@@ -76,6 +80,30 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
 
   const selected = products.find((p) => p.id === productId);
   const priceMissing = isAddon && !!selected && !selected.price;
+
+  const createProduct = async () => {
+    const amount = Math.round(parseFloat(newAmount.replace(',', '.')) * 100);
+    if (!Number.isFinite(amount) || amount < 50) {
+      toast({ title: 'Enter a price', description: 'Amount must be at least 0.50.', variant: 'destructive' });
+      return;
+    }
+    setCreating(true);
+    const { data, error } = await supabase.functions.invoke('stripe-api', {
+      body: { action: 'create-addon-product', module_slug: slug, amount_cents: amount, currency: 'eur', interval: newInterval },
+    });
+    setCreating(false);
+    const res = data as { created?: boolean; product?: StripeProduct; error?: string } | null;
+    if (error || !res?.created || !res.product) {
+      toast({ title: 'Could not create product', description: res?.error || error?.message || 'Stripe error', variant: 'destructive' });
+      return;
+    }
+    // Splice the new product into the list + select it, and reflect it saved.
+    setProducts((prev) => [res.product as StripeProduct, ...prev.filter((p) => p.id !== res.product!.id)]);
+    setProductId(res.product.id);
+    setNewAmount('');
+    toast({ title: 'Product created & attached', description: `${name} is now purchasable.` });
+    onSaved();
+  };
 
   const save = async () => {
     setSaving(true);
@@ -141,9 +169,33 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    One product per module. The charge uses the product's <strong>default price</strong> (set it in Stripe).
+                    One product per module. The charge uses the product's <strong>default price</strong>.
                   </p>
                 )}
+
+                {/* One-click create — no Stripe dashboard trip needed. */}
+                <div className="rounded-md border border-dashed p-3 space-y-2">
+                  <Label className="text-xs">Or create a new product</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text" inputMode="decimal" value={newAmount}
+                      onChange={(e) => setNewAmount(e.target.value)}
+                      placeholder="9.00" className="w-24"
+                    />
+                    <span className="text-xs text-muted-foreground">EUR /</span>
+                    <Select value={newInterval} onValueChange={(v) => setNewInterval(v as 'month' | 'year')}>
+                      <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="month">month</SelectItem>
+                        <SelectItem value="year">year</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" variant="secondary" onClick={createProduct} disabled={creating || !newAmount.trim()}>
+                      {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create & attach'}
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Creates the Stripe product + recurring price and binds it here automatically.</p>
+                </div>
               </div>
             )}
 

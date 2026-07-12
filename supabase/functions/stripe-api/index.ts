@@ -46,6 +46,7 @@ Deno.serve(withApiLogging('stripe-api', async (req) => {
     case 'deactivate-module':
     case 'request-module':
     case 'list-stripe-products':
+    case 'create-addon-product':
       return handleModuleAction(req, body);
     default:
       return new Response(JSON.stringify({
