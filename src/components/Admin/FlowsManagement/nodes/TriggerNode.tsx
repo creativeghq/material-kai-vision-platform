@@ -9,7 +9,7 @@ import {
   CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
   Megaphone, MailX, MailWarning,
   Building2, MailOpen, MousePointerClick, TrendingDown, AtSign, Briefcase,
-  Ship,
+  Ship, Truck,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -64,6 +64,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   project_invitation_resent: Share2,
   inventory_low_stock: Package,
   freight_quote_requested: Ship,
+  order_dispatched: Truck,
   'inbox.message_received': Inbox,
   'inbox.thread_assigned': UserPlus,
   marketplace_want_match: Package,

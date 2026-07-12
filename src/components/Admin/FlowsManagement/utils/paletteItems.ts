@@ -168,6 +168,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'freight_quote_requested', group: 'Finance',
     label: 'Freight Quote Requested', description: 'A tenant requests a shipping quote (operator fulfils it)', icon: 'Ship', color: 'blue',
     defaultData: { label: 'Freight Quote Requested', category: 'trigger', triggerType: 'freight_quote_requested', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'order_dispatched', group: 'Finance',
+    label: 'Order Dispatched', description: 'A dispatch note is issued (order shipped) — notify the customer', icon: 'Truck', color: 'emerald',
+    defaultData: { label: 'Order Dispatched', category: 'trigger', triggerType: 'order_dispatched', config: {} } as TriggerNodeData },
   // #209 — multi-tenant inbox
   { type: 'triggerNode', category: 'trigger', subType: 'inbox.message_received', group: 'Inbox',
     label: 'Inbox Message Received', description: 'A new message lands in an inbox thread', icon: 'Inbox', color: 'emerald',
