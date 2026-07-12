@@ -30,6 +30,9 @@ import {
   Pencil,
   FileText,
   Loader2,
+  TrendingUp,
+  Share2,
+  Boxes,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -129,11 +132,16 @@ interface AgentDefinition {
   defaultModel: string; // Default AI model for this agent
 }
 
+// The agent roster mirrors the `agent_definitions` table (Agent Fabric #132).
+// JARVIS (orchestrator) is the default — it auto-routes each message to the right
+// specialist. Users can also pick a specialist directly. Sandbox agents
+// (Stark/Veritas) require a container execution tier that isn't built yet, so they
+// are registered in agent_definitions but not offered in the chat picker.
 const AGENTS: AgentDefinition[] = [
   {
-    id: 'kai',
+    id: 'orchestrator',
     name: 'JARVIS',
-    description: 'Material intelligence — search, insights, research & content',
+    description: 'Orchestrator — routes you to the right specialist automatically',
     icon: Bot,
     color: 'text-blue-500',
     requiredRole: 'member',
@@ -142,10 +150,50 @@ const AGENTS: AgentDefinition[] = [
   },
   {
     id: 'interior-designer',
-    name: 'Interior',
-    description: 'AI-powered interior design with 3D generation',
+    name: 'Vision',
+    description: 'Interior design, image & 3D generation, staging, moodboards',
     icon: Sparkles,
     color: 'text-violet-500',
+    requiredRole: 'member',
+    available: true,
+    defaultModel: 'anthropic/claude-opus-4-8',
+  },
+  {
+    id: 'product-business',
+    name: 'Pepper',
+    description: 'Catalogs, B2B research, product knowledge-graph, tech radar, jobs',
+    icon: Package,
+    color: 'text-amber-500',
+    requiredRole: 'member',
+    available: true,
+    defaultModel: 'anthropic/claude-opus-4-8',
+  },
+  {
+    id: 'marketing',
+    name: 'Edith',
+    description: 'SEO research & audits, content, brand-mention & LLM visibility',
+    icon: TrendingUp,
+    color: 'text-emerald-500',
+    requiredRole: 'member',
+    available: true,
+    defaultModel: 'anthropic/claude-opus-4-8',
+  },
+  {
+    id: 'erp',
+    name: 'Trinity',
+    description: 'Finance & quotes — build quotes + branded PDFs, account overviews',
+    icon: FileText,
+    color: 'text-rose-500',
+    requiredRole: 'member',
+    available: true,
+    defaultModel: 'anthropic/claude-opus-4-8',
+  },
+  {
+    id: 'social-media',
+    name: 'Hermes',
+    description: 'Publish & schedule social posts, read social analytics',
+    icon: Share2,
+    color: 'text-sky-500',
     requiredRole: 'member',
     available: true,
     defaultModel: 'anthropic/claude-opus-4-8',
@@ -154,11 +202,24 @@ const AGENTS: AgentDefinition[] = [
     id: 'demo',
     name: 'Demo',
     description: 'Platform showcase demos',
-    icon: Package,
+    icon: Boxes,
     color: 'text-cyan-500',
     requiredRole: 'admin',
     available: true,
     defaultModel: 'anthropic/claude-haiku-4-5',
+  },
+  // Hidden: the generalist that JARVIS falls back to, and the target of legacy
+  // `?agent=kai` deep-links. Not shown in the picker (available:false) — users
+  // pick JARVIS (orchestrator), which routes to it when no specialist fits.
+  {
+    id: 'kai',
+    name: 'JARVIS',
+    description: 'Generalist — material intelligence & everything not owned by a specialist',
+    icon: Bot,
+    color: 'text-blue-500',
+    requiredRole: 'member',
+    available: false,
+    defaultModel: 'anthropic/claude-opus-4-8',
   },
 ];
 
@@ -577,10 +638,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [canvasHidden, setCanvasHidden] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
-  const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'kai');
-  // Initialize with JARVIS agent's default model
+  const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'orchestrator');
+  // Initialize with JARVIS (orchestrator) default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-opus-4-8',
+    AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-4-8',
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
@@ -1955,7 +2016,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               const chunk = JSON.parse(line);
 
               // Capture reasoning steps for Jarvis-style display
-              if (chunk.type === 'status') {
+              if (chunk.type === 'agent_routed') {
+                // JARVIS auto-routed this turn to a specialist.
+                setReasoningSteps((prev) => [
+                  ...prev,
+                  {
+                    type: 'iteration',
+                    message: `Routing to ${chunk.name || chunk.to}.`,
+                    timestamp: Date.now(),
+                  },
+                ]);
+              } else if (chunk.type === 'status') {
                 setReasoningSteps((prev) => [
                   ...prev,
                   {
