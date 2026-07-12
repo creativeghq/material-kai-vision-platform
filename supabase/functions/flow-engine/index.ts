@@ -1542,7 +1542,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'role_upgrade_approved', 'role_upgrade_rejected', 'role_upgrade_request_submitted',
   'finance_follow_up', 'finance_document_requested', 'module_access_requested',
   'hr_late_checkin', 'hr.applicant_stage_changed', 'background_agent_failed',
-  'material_alert', 'inventory_low_stock', 'marketplace_want_match',
+  'material_alert', 'inventory_low_stock', 'freight_quote_requested', 'marketplace_want_match',
   'purchase_order.sent', 'quote_pdf_generated',
   'video_generation_completed', 'video_generation_failed',
   'vr_world_created', 'vr_world_failed', 'virtual_staging_completed', 'svbrdf_extraction_complete',

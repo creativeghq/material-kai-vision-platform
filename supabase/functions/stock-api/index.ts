@@ -544,15 +544,33 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
             source: 'operator', status: 'pending', requested_by: userId, created_by: userId,
           }).select('*').single();
           if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
-          // Notify the operator (best-effort; the operator queue at /admin/freight-quotes is the surface).
+          // Notify the OPERATOR(s) only — root-workspace owner/admins. One event per recipient so the
+          // seeded Flow's create_notification + send_email resolve per person (bell + email).
           try {
-            await emitFlowEvent('freight_quote_requested', {
-              type: 'freight_quote_requested', quote_id: data.id, workspace_id: workspaceId,
-              origin, destination, mode, container_type: params.containerType,
-              title: 'Freight quote requested', body: `${origin} → ${destination} (${mode.toUpperCase()})`,
-              action_url: '/admin/freight-quotes',
-            });
-          } catch { /* best-effort */ }
+            const { data: root } = await svc.from('workspaces').select('id, name').eq('is_root', true).maybeSingle();
+            const { data: tenant } = await svc.from('workspaces').select('name').eq('id', workspaceId).maybeSingle();
+            if (root?.id) {
+              const { data: ops } = await svc.from('workspace_members')
+                .select('user_id').eq('workspace_id', root.id).in('role', ['owner', 'admin']).eq('status', 'active');
+              const ids = (ops ?? []).map((o: any) => o.user_id);
+              const { data: profs } = ids.length
+                ? await svc.from('user_profiles').select('user_id, email').in('user_id', ids)
+                : { data: [] };
+              const emailById = new Map((profs ?? []).map((p: any) => [p.user_id, p.email]));
+              const route = `${origin} → ${destination} (${mode.toUpperCase()}${params.containerType ? `, ${params.containerType}` : ''})`;
+              for (const o of (ops ?? [])) {
+                await emitFlowEvent('freight_quote_requested', {
+                  type: 'info', quote_id: data.id, workspace_id: root.id,
+                  user_id: o.user_id, email: emailById.get(o.user_id) ?? null,
+                  requester_workspace: tenant?.name ?? 'A workspace',
+                  origin, destination, mode, container_type: params.containerType,
+                  title: 'New shipping quote request',
+                  body: `${tenant?.name ?? 'A workspace'} requested a shipping quote: ${route}.`,
+                  action_url: '/admin/freight-quotes',
+                });
+              }
+            }
+          } catch { /* best-effort — the operator queue is the durable surface */ }
           return json({ quote: data }, 201);
         }
 

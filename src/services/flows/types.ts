@@ -59,6 +59,7 @@ export type TriggerType =
   | 'project_invitation_sent'
   | 'project_invitation_resent'
   | 'inventory_low_stock'
+  | 'freight_quote_requested'
   // #209 — multi-tenant inbox (dotted keys; payload-only, no custom config UI)
   | 'inbox.message_received'
   | 'inbox.thread_assigned'
@@ -151,6 +152,7 @@ export interface PriceAlertTriggeredTriggerConfig {}
 export interface MentionAlertTriggeredTriggerConfig {}
 export interface JobAlertTriggeredTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
+export interface FreightQuoteRequestedTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
 export interface MarketplaceWantMatchTriggerConfig {}
@@ -327,6 +329,7 @@ export type TriggerConfigMap = {
   project_invitation_sent: ProjectInvitationSentTriggerConfig;
   project_invitation_resent: ProjectInvitationResentTriggerConfig;
   inventory_low_stock: InventoryLowStockTriggerConfig;
+  freight_quote_requested: FreightQuoteRequestedTriggerConfig;
   'inbox.message_received': InboxMessageReceivedTriggerConfig;
   'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
   marketplace_want_match: MarketplaceWantMatchTriggerConfig;

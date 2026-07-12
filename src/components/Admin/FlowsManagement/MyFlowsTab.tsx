@@ -50,6 +50,7 @@ import {
   AtSign,
   Briefcase,
   Building2,
+  Ship,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -133,6 +134,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   project_invitation_sent: Share2,
   project_invitation_resent: Share2,
   inventory_low_stock: Package,
+  freight_quote_requested: Ship,
   'inbox.message_received': Inbox,
   'inbox.thread_assigned': UserPlus,
   marketplace_want_match: Package,
@@ -227,6 +229,7 @@ const triggerLabels: Record<TriggerType, string> = {
   project_invitation_sent: 'Project Invite Sent',
   project_invitation_resent: 'Project Invite Resent',
   inventory_low_stock: 'Low Stock',
+  freight_quote_requested: 'Freight Quote Requested',
   'inbox.message_received': 'Inbox Message Received',
   'inbox.thread_assigned': 'Inbox Thread Assigned',
   marketplace_want_match: 'Surplus Match',
