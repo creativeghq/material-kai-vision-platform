@@ -70,29 +70,33 @@ const LABELS: Record<Lang, Record<string, string>> = {
   },
 };
 
-interface BankTransfer { name: string | null; iban: string | null; account_ref: string | null; notes: string | null }
-
-// The workspace's default (or first active) bank account with an IBAN, for the
-// "pay by bank transfer" block on the statement.
-async function fetchBankAccount(supabase: SupabaseClient, workspaceId: string): Promise<BankTransfer | null> {
-  const { data } = await supabase.from('finance_bank_accounts')
-    .select('name, iban, account_ref, notes, is_default, kind')
-    .eq('workspace_id', workspaceId).eq('is_active', true)
-    .not('iban', 'is', null)
-    .order('is_default', { ascending: false }).order('sort_order', { ascending: true });
-  const row = (data ?? []).find((a: any) => a.kind === 'bank') ?? (data ?? [])[0];
-  if (!row?.iban) return null;
-  return { name: row.name ?? null, iban: row.iban, account_ref: row.account_ref ?? null, notes: row.notes ?? null };
-}
-
-// The bank-transfer block as an ordered list of "Label: value" lines. The free-form
-// `notes` field is split on newlines so multi-row bank details you type are preserved.
-function bankLines(bank: BankTransfer, L: Record<string, string>): string[] {
+// Customer-facing payment accounts, read from the SAME source invoices use —
+// finance_settings.bank_accounts (jsonb array of bank/PayPal/other), with a legacy
+// fallback to the flat bank_* columns. One line per account so multiple accounts are
+// preserved as separate rows; free-form `notes` on an "other" account keep their
+// newlines. Mirrors finance-invoice-pdf so statements and invoices always agree.
+function paymentAccountLines(fs: any): string[] {
+  const accounts: any[] = Array.isArray(fs?.bank_accounts) ? fs.bank_accounts : [];
   const lines: string[] = [];
-  if (bank.name) lines.push(`${L.bankName}: ${bank.name}`);
-  if (bank.iban) lines.push(`IBAN: ${bank.iban}`);
-  if (bank.account_ref) lines.push(`${L.bankRef}: ${bank.account_ref}`);
-  if (bank.notes) for (const n of String(bank.notes).split(/\r?\n/)) { if (n.trim()) lines.push(n.trim()); }
+  if (accounts.length > 0) {
+    for (const a of accounts) {
+      let detail = '';
+      if (a?.type === 'bank') {
+        detail = [a.bank_name, a.iban ? `IBAN ${a.iban}` : '', a.bic ? `BIC ${a.bic}` : '', a.beneficiary].filter(Boolean).join('  ·  ');
+      } else if (a?.type === 'paypal') {
+        detail = ['PayPal', a.paypal_email, a.url].filter(Boolean).join('  ·  ');
+      } else {
+        detail = [a.url, a.notes].filter(Boolean).join('  ·  ');
+      }
+      if (!detail) continue;
+      const labelled = a?.label ? `${a.label}: ${detail}` : detail;
+      // Preserve newlines a user typed into a free-form account (e.g. `notes`).
+      for (const ln of labelled.split(/\r?\n/)) { if (ln.trim()) lines.push(ln.trim()); }
+    }
+  } else {
+    const legacy = [fs?.bank_name, fs?.bank_iban ? `IBAN ${fs.bank_iban}` : '', fs?.bank_bic ? `BIC ${fs.bank_bic}` : '', fs?.bank_beneficiary].filter(Boolean).join('  ·  ');
+    if (legacy) lines.push(legacy);
+  }
   return lines;
 }
 
@@ -217,7 +221,7 @@ async function fetchPartyDetails(supabase: SupabaseClient, partyType: 'company' 
   return data ?? {};
 }
 
-interface BuildOpts { party: any; details: any; settings: any; ledger: LedgerData; side: Side; from: string; to: string; lang: Lang; backdrop: any; logo?: Uint8Array | null; footer?: Uint8Array | null; bank?: BankTransfer | null }
+interface BuildOpts { party: any; details: any; settings: any; ledger: LedgerData; side: Side; from: string; to: string; lang: Lang; backdrop: any; logo?: Uint8Array | null; footer?: Uint8Array | null; payment?: string[] }
 
 // Load the workspace's finance logo (generation-images bucket, public) → bytes.
 async function loadLogo(supabase: SupabaseClient, path: string | null | undefined): Promise<Uint8Array | null> {
@@ -404,11 +408,10 @@ async function buildStatementPdf(opts: BuildOpts): Promise<{ bytes: Uint8Array; 
   textR(money(Math.abs(balance)), PAGE_W - MARGIN, y, 12, bold, owes && side === 'customer' ? COLOR_RED : COLOR_DARK);
   y -= 24;
 
-  // Bank-transfer block (an alternative to card payment) — one detail per line, so
-  // multi-row bank details (incl. free-form notes) are preserved.
-  const bank = opts.bank;
-  if (bank?.iban) {
-    const lines = bankLines(bank, L);
+  // Payment-accounts block (an alternative to card payment) — one account per line,
+  // from the same source as invoices.
+  const lines = opts.payment ?? [];
+  if (lines.length > 0) {
     const boxH = 16 + lines.length * 12 + 6;
     if (y < MARGIN + boxH + 6) newPage();
     y -= 6;
@@ -482,9 +485,9 @@ async function sendOneStatement(
     if (fData?.signedUrl) footerImg = await loadBackdrop(fData.signedUrl);
   }
   const logo = await loadLogo(supabase, settings.business_logo_path);
-  const bank = await fetchBankAccount(supabase, party.workspace_id);
+  const payment = paymentAccountLines(settings);
 
-  const { bytes } = await buildStatementPdf({ party, details, settings, ledger, side: opts.side, from: opts.from, to: opts.to, lang: opts.lang, backdrop, logo, footer: footerImg, bank });
+  const { bytes } = await buildStatementPdf({ party, details, settings, ledger, side: opts.side, from: opts.from, to: opts.to, lang: opts.lang, backdrop, logo, footer: footerImg, payment });
 
   const objectPath = `statements/${party.workspace_id}/${partyType}-${party.party_id}-${Date.now()}.pdf`;
   const { error: upErr } = await supabase.storage.from('pdf-documents').upload(objectPath, bytes, { contentType: 'application/pdf', upsert: false });
@@ -546,12 +549,11 @@ async function sendOneStatement(
     const { data: pub } = supabase.storage.from('generation-images').getPublicUrl(settings.business_logo_path);
     if (pub?.publicUrl) logoHtml = `<div style="margin-bottom:16px;"><img src="${pub.publicUrl}" alt="${esc(settings.business_name)}" style="max-height:48px;max-width:180px;"></div>`;
   }
-  // Bank-transfer block (alternative to card) — reuse the account fetched for the PDF.
-  // One detail per line so multi-row bank details / notes are preserved.
+  // Payment-accounts block (alternative to card) — reuse the lines built for the PDF.
   let bankHtml = '';
-  if (bank?.iban) {
+  if (payment.length > 0) {
     const L = LABELS[opts.lang];
-    const rowsHtml = bankLines(bank, L).map((l) => esc(l)).join('<br>');
+    const rowsHtml = payment.map((l) => esc(l)).join('<br>');
     bankHtml = `<div style="margin:14px 0;padding:12px 14px;background:#f4f4f7;border-radius:8px;font-size:13px;line-height:1.55;">
       <strong>${esc(L.payByBank)}</strong><br>${rowsHtml}</div>`;
   }
@@ -843,7 +845,7 @@ async function resolveShareView(
     const { data: fData } = await supabase.storage.from('quote-templates').createSignedUrl(set.statement_template_footer_path, 60 * 30);
     if (fData?.signedUrl) footerImg = await loadBackdrop(fData.signedUrl);
   }
-  const bank = await fetchBankAccount(supabase, share.workspace_id);
+  const payment = paymentAccountLines(set);
 
   const L = LABELS[lang];
   const owes = side === 'customer' ? closing > 0 : closing < 0;
@@ -872,7 +874,7 @@ async function resolveShareView(
   // Best-effort PDF for a download button; the on-page statement is the primary view.
   let pdfUrl: string | null = null;
   try {
-    const { bytes } = await buildStatementPdf({ party, details, settings, ledger, side, from, to, lang, backdrop, logo: logoBytes, footer: footerImg, bank });
+    const { bytes } = await buildStatementPdf({ party, details, settings, ledger, side, from, to, lang, backdrop, logo: logoBytes, footer: footerImg, payment });
     const objectPath = `statements/${share.workspace_id}/${partyType}-${share.party_id}-share.pdf`;
     await supabase.storage.from('pdf-documents').upload(objectPath, bytes, { contentType: 'application/pdf', upsert: true });
     const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(objectPath, 60 * 60 * 24 * 7);
@@ -897,7 +899,7 @@ async function resolveShareView(
       logo_url: logoUrl, background_url: backgroundUrl,
       business_name: set.business_name ?? null,
       issuer, recipient,
-      bank_transfer: bank ? { label: L.payByBank, lines: bankLines(bank, L) } : null,
+      bank_transfer: payment.length > 0 ? { label: L.payByBank, lines: payment } : null,
       title: side === 'customer' ? L.titleCustomer : L.titleSupplier,
     },
   };
