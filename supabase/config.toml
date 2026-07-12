@@ -107,6 +107,12 @@ verify_jwt = false
 [functions.hr-api]
 verify_jwt = false
 
+# Contracts & e-signature API. verify_jwt off so the public /sign token path works; management
+# actions call authenticate + isModuleEnabled('contracts') + assertEntitled('contracts') and write
+# through a user-JWT client so the context-branched RLS (hr/finance/project) enforces access.
+[functions.contracts-api]
+verify_jwt = false
+
 # Stock Management module API (warehouse inventory + movements + stocktake). Does its own auth
 # (authenticate + userCanAccessWorkspace + isModuleEnabled('stock') + assertEntitled('stock');
 # writes run on a user-JWT client so RLS + stock RPC guards enforce finance-manager + entitlement).
