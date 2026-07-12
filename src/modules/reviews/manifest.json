@@ -1,0 +1,9 @@
+{
+  "slug": "reviews",
+  "name": "Reviews & Ratings",
+  "description": "Product and professional-profile reviews with star ratings, verified-purchase badges, owner replies, and AI review summaries. Surfaces inside product and profile pages.",
+  "category": "core",
+  "priceTier": "free",
+  "icon": "Star",
+  "version": "1.0.0"
+}

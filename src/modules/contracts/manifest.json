@@ -1,0 +1,9 @@
+{
+  "slug": "contracts",
+  "name": "Contracts & e-Signature",
+  "description": "Signable contracts across HR (employment), Finance (customer/supplier), and Projects (client work agreements), with a public e-signature page and audit trail.",
+  "category": "operations",
+  "priceTier": "pro",
+  "icon": "FileSignature",
+  "version": "1.0.0"
+}
