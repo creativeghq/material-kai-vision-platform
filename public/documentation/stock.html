@@ -15,6 +15,11 @@
 
   <div class="callout"><p><strong>Where:</strong> enable <strong>Stock Management</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on), then open it at <span class="badge route">/stock</span>. Everything is <strong>per workspace</strong>. Note: inventory used to live under <a href="finance-op-warehouse.html">Finance → Warehouse</a>; it's now this dedicated module.</p></div>
 
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/stock.png" alt="The Stock Management module — inventory overview across warehouses">
+    <figcaption>Stock Management — Overview, Inventory, Resupply, Inbound and Movements across warehouses.</figcaption>
+  </figure>
+
   <h2>Overview — what you hold</h2>
   <p>The overview is your at-a-glance inventory health: <strong>Stock items</strong>, <strong>Warehouses</strong>, <strong>Units on hand</strong> and <strong>Units reserved</strong>, plus the numbers that need action — <strong>Low stock</strong> (items below their reorder point), <strong>Out of stock</strong>, <strong>Open counts</strong> (stocktakes in progress) and <strong>Pending intake</strong> (inbound not yet received). When all's well it reads <em>“Nothing below its reorder point. Inventory is healthy.”</em></p>
 
@@ -40,6 +45,11 @@
   <h2>AI resupply forecast <span style="font-size:13px;color:var(--muted)">· credit-metered</span></h2>
   <p><strong>What it is —</strong> a trend-based forecast that tells you <em>what to reorder and when</em>. <strong>Why it matters —</strong> a static reorder point doesn't know that demand is climbing; the forecast reads your movement history and projects it. For each item it shows a <strong>Days cover</strong> (how long current stock lasts at the recent rate), a <strong>stockout risk</strong>, and a <strong>Recommendation</strong>. Because it runs an AI/analytics pass, it's <strong>metered against your <a href="account-credits.html">credits</a></strong> (charged by usage).</p>
 
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/resupply.png" alt="Stock → Resupply — AI forecast with days-cover, stockout risk and recommendations">
+    <figcaption>Stock → Resupply — the AI forecast: days cover, stockout risk and a per-item recommendation.</figcaption>
+  </figure>
+
   <h2>Inbound container tracking (ShipsGo) <span class="badge gated">BYOK</span></h2>
   <p><strong>What it is —</strong> live tracking of shipments coming to you, by <strong>container</strong> or <strong>Bill of Lading</strong>. <strong>Why it matters —</strong> you see where inbound stock actually is and when it'll land, and can <strong>Receive it into a warehouse</strong> when it arrives. Tracking uses <strong>ShipsGo</strong> and is <strong>bring-your-own-key</strong>.</p>
   <h3>Set up ShipsGo — exactly what to add</h3>
@@ -52,6 +62,11 @@
     </tbody>
   </table></div>
   <p>Once <strong>Configured</strong>, add an inbound shipment with its <strong>Container</strong> number (e.g. <code>MSCU1234567</code>) or <strong>Bill of Lading</strong>, an optional <strong>Carrier / line</strong> and <strong>Reference</strong>, and optionally <strong>link it to a purchase order</strong>. the module then pulls milestone updates; <strong>Refresh</strong> re-checks, and <strong>Receive into warehouse</strong> books it in on arrival. Tracking refreshes are credit-metered.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/inbound.png" alt="Stock → Inbound — container / Bill of Lading tracking with milestones">
+    <figcaption>Stock → Inbound — track a container or Bill of Lading, then Receive into warehouse on arrival.</figcaption>
+  </figure>
 
   <h2>Freight quotes (SeaRates)</h2>
   <p><strong>What it is —</strong> getting a shipping price for an order. <strong>Where —</strong> on a <a href="quotes-build.html">quote</a>, under <strong>Extras</strong>: <strong>“Get shipping quote”</strong> fetches freight offers, and a chosen offer is added to the quote as a shipping line item. <strong>How it's provided —</strong> freight rates come from <strong>SeaRates</strong>, which is <strong>operator-provided</strong>: a tenant's request <strong>routes to the operator</strong>, who returns the offers (they appear on the quote when answered). So you don't need your own SeaRates key — you request, the platform operator fulfils.</p>
