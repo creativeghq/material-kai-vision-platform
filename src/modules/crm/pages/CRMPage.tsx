@@ -123,11 +123,14 @@ export const CRMManagement: React.FC = () => {
   // Per-tab filters (ANY = no filter)
   const [userF, setUserF] = useState({ role: ANY, status: ANY, subscription: ANY, profession: ANY });
   const [contactF, setContactF] = useState({ profession: ANY, status: ANY, company: ANY, clientSupplier: ANY, category: ANY });
-  const [companyF, setCompanyF] = useState({ profession: ANY, status: ANY, customerSupplier: ANY, category: ANY });
+  const [companyF, setCompanyF] = useState({ profession: ANY, status: ANY, customerSupplier: ANY, industry: ANY, category: ANY });
 
   // Category-filter member sets (fetched on demand)
   const [contactCatIds, setContactCatIds] = useState<Set<string> | null>(null);
   const [companyCatIds, setCompanyCatIds] = useState<Set<string> | null>(null);
+  // Industry is a `kind='industry'` CRM category; filtering by it is the same
+  // membership lookup as the generic category filter, kept in its own set.
+  const [companyIndustryIds, setCompanyIndustryIds] = useState<Set<string> | null>(null);
 
   // Per-tab selection (users keyed by user_id; contacts/companies by id)
   const [selUsers, setSelUsers] = useState<Set<string>>(new Set());
@@ -223,9 +226,28 @@ export const CRMManagement: React.FC = () => {
     return () => { cancelled = true; };
   }, [companyF.category]);
 
+  useEffect(() => {
+    if (!companyF.industry || companyF.industry === ANY) { setCompanyIndustryIds(null); return; }
+    let cancelled = false;
+    crmCategoriesService.listMembers(companyF.industry).then((members) => {
+      if (cancelled) return;
+      setCompanyIndustryIds(new Set(members.filter((m) => m.crm_company_id).map((m) => m.crm_company_id as string)));
+    }).catch(() => setCompanyIndustryIds(new Set()));
+    return () => { cancelled = true; };
+  }, [companyF.industry]);
+
   // ── option lists ──────────────────────────────────────────────────────────
   const roleOptions: Option[] = useMemo(() => roles.map((r) => ({ value: r.id, label: roleLabel(r.name) })), [roles]);
   const categoryOptions: Option[] = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
+  // Industries are their own `kind='industry'` categories. Surface them as a
+  // dedicated company filter, and drop them from the generic company "category"
+  // filter so they aren't listed twice.
+  const industryOptions: Option[] = useMemo(
+    () => categories.filter((c) => c.kind === 'industry').map((c) => ({ value: c.id, label: c.name })),
+    [categories]);
+  const companyCategoryOptions: Option[] = useMemo(
+    () => categories.filter((c) => c.kind !== 'industry').map((c) => ({ value: c.id, label: c.name })),
+    [categories]);
   const companyNameOptions: Option[] = useMemo(() =>
     [...new Set(companies.map((c) => c.name).filter(Boolean))].sort().map((n) => ({ value: n as string, label: n as string })),
     [companies]);
@@ -271,15 +293,16 @@ export const CRMManagement: React.FC = () => {
       (companyF.customerSupplier === 'client' && c.is_customer) ||
       (companyF.customerSupplier === 'supplier' && c.is_supplier) ||
       (companyF.customerSupplier === 'neither' && !c.is_customer && !c.is_supplier)) &&
+    (!companyIndustryIds || companyIndustryIds.has(c.id)) &&
     (!companyCatIds || companyCatIds.has(c.id)),
-  ), [companies, q, companyF, companyCatIds]);
+  ), [companies, q, companyF, companyCatIds, companyIndustryIds]);
 
   // ── pagination ────────────────────────────────────────────────────────────
   // Reset to page 1 whenever the filtered result set changes (search/filter), so
   // a narrowed list never strands the user on an out-of-range page.
   useEffect(() => { setUsersPage(1); }, [q, userF]);
   useEffect(() => { setContactsPage(1); }, [q, contactF, contactCatIds]);
-  useEffect(() => { setCompaniesPage(1); }, [q, companyF, companyCatIds]);
+  useEffect(() => { setCompaniesPage(1); }, [q, companyF, companyCatIds, companyIndustryIds]);
 
   const pagedUsers = useMemo(
     () => filteredUsers.slice((usersPage - 1) * PAGE_SIZE, usersPage * PAGE_SIZE),
@@ -421,7 +444,8 @@ export const CRMManagement: React.FC = () => {
     { key: 'profession', label: 'type', value: companyF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setCompanyF((f) => ({ ...f, profession: v })) },
     { key: 'status', label: 'status', value: companyF.status, options: STATUS_OPTIONS, onChange: (v) => setCompanyF((f) => ({ ...f, status: v })) },
     { key: 'customerSupplier', label: 'kind', value: companyF.customerSupplier, options: CLIENT_SUPPLIER_OPTIONS, onChange: (v) => setCompanyF((f) => ({ ...f, customerSupplier: v })) },
-    { key: 'category', label: 'category', value: companyF.category, options: categoryOptions, onChange: (v) => setCompanyF((f) => ({ ...f, category: v })) },
+    { key: 'industry', label: 'industry', value: companyF.industry, options: industryOptions, onChange: (v) => setCompanyF((f) => ({ ...f, industry: v })) },
+    { key: 'category', label: 'category', value: companyF.category, options: companyCategoryOptions, onChange: (v) => setCompanyF((f) => ({ ...f, category: v })) },
   ];
 
   return (

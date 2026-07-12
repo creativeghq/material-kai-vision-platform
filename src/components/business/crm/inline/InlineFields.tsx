@@ -88,6 +88,13 @@ interface InlineTextProps {
 const toSaveValue = (raw: string, type: string) =>
   type === 'number' ? (raw === '' ? null : Number(raw)) : (raw === '' ? null : raw);
 
+// Inline multiline editing should read like "typing into the line" — not a big
+// bordered box. Strip the card chrome (border/rounding/min-height/bg) and leave a
+// single bottom rule that highlights on focus.
+const INLINE_TEXTAREA_CLASS =
+  'min-h-0 rounded-none border-0 border-b border-input bg-transparent px-0 py-1 shadow-none resize-none ' +
+  'hover:border-input focus-visible:ring-0 focus-visible:border-primary';
+
 /** Click-to-edit text / textarea / number field with copy. */
 export const InlineText: React.FC<InlineTextProps> = ({
   value, onSave, label, placeholder, hint, type = 'text', multiline, copy = true, emptyText = 'Not set', display, alwaysEdit,
@@ -114,7 +121,7 @@ export const InlineText: React.FC<InlineTextProps> = ({
     return (
       <Field label={label} hint={hint}>
         {multiline ? (
-          <Textarea value={str} placeholder={placeholder} rows={3} onChange={(e) => onSave(toSaveValue(e.target.value, type))} />
+          <Textarea className={INLINE_TEXTAREA_CLASS} value={str} placeholder={placeholder} rows={2} onChange={(e) => onSave(toSaveValue(e.target.value, type))} />
         ) : (
           <Input type={type} value={str} placeholder={placeholder} onChange={(e) => onSave(toSaveValue(e.target.value, type))} />
         )}
@@ -133,7 +140,7 @@ export const InlineText: React.FC<InlineTextProps> = ({
     return (
       <Field label={label} hint={hint}>
         {multiline ? (
-          <Textarea {...commonProps} rows={3} onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }} />
+          <Textarea {...commonProps} className={INLINE_TEXTAREA_CLASS} rows={2} onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }} />
         ) : (
           <Input
             {...commonProps}
