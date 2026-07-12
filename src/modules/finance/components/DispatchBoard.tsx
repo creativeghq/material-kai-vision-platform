@@ -89,6 +89,18 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
     } finally { setBusy(null); }
   };
 
+  // Planning: schedule an order into a day (buckets update on reload). Tomorrow = next day's dispatch load.
+  const tomorrowISO = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();
+  const schedule = async (o: DispatchQueueOrder, date: string | null) => {
+    setBusy(o.invoice_id);
+    try {
+      await deliveryNotesService.scheduleDispatch(workspaceId, o.invoice_id, date);
+      await load();
+    } catch (err: any) {
+      toast({ title: 'Failed to schedule', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(null); }
+  };
+
   const toggle = (id: string) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
@@ -143,6 +155,24 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                           </td>
                           <td className="px-2 py-2 max-w-[260px]">
                             <div className="truncate text-xs text-muted-foreground" title={o.ship_to ?? ''}>{o.ship_to ?? '—'}</div>
+                            {!readOnly && (
+                              <div className="mt-1 flex items-center gap-1">
+                                <input
+                                  type="date" value={o.transport_date ?? ''} disabled={busy === o.invoice_id}
+                                  onChange={(e) => schedule(o, e.target.value || null)}
+                                  className="h-6 rounded border border-border/60 bg-transparent px-1 text-[11px]"
+                                  title="Ship date — plan which day this order goes out"
+                                />
+                                {o.transport_date !== tomorrowISO && (
+                                  <button type="button" disabled={busy === o.invoice_id} onClick={() => schedule(o, tomorrowISO)}
+                                    className="text-[11px] text-primary hover:underline whitespace-nowrap">Tomorrow</button>
+                                )}
+                                {o.transport_date && (
+                                  <button type="button" disabled={busy === o.invoice_id} onClick={() => schedule(o, null)}
+                                    className="text-[11px] text-muted-foreground hover:underline">clear</button>
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td className="px-2 py-2 text-xs text-muted-foreground whitespace-nowrap">
                             {o.lines.length} line{o.lines.length === 1 ? '' : 's'}

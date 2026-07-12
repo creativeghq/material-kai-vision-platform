@@ -158,6 +158,14 @@ export const deliveryNotesService = {
     if (error) throw error;
   },
 
+  /** Schedule (or clear) an order's ship date — the dispatch board buckets by this. RLS-gated to
+   *  finance managers on `invoices`. Pass null to unschedule (back to "No ship date"). */
+  async scheduleDispatch(workspaceId: string, invoiceId: string, date: string | null): Promise<void> {
+    const { error } = await supabase.from('invoices')
+      .update({ transport_date: date }).eq('id', invoiceId).eq('workspace_id', workspaceId);
+    if (error) throw error;
+  },
+
   /** Render (or fetch cached) the delivery-note PDF. */
   async generatePdf(id: string, regenerate = false): Promise<string | null> {
     const { data, error } = await supabase.functions.invoke('finance-invoice-pdf', { body: { delivery_note_id: id, regenerate } });

@@ -13,6 +13,7 @@ import {
   UserCircle,
   Megaphone,
   Package,
+  Workflow,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -80,6 +81,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // #255 — Email Marketing: appears only when the workspace is entitled to 'email-marketing' AND
   // the persona holds marketing.email (owner/admin of a business node).
   { id: 'email-marketing', label: 'Email Marketing', path: '/marketing/email', icon: Megaphone, requireCapability: 'marketing.email', moduleSlug: 'email-marketing', surface: 'app', description: 'Design templates and send bulk email campaigns.' },
+  // #256 — Flows toolkit: appears when the workspace owns 'flows-toolkit' AND the user can use
+  // the agent (Flows are agent-built). The page is the management view; chat is the create surface.
+  { id: 'automations', label: 'Automations', path: '/automations', icon: Workflow, requireCapability: 'agent.use', moduleSlug: 'flows-toolkit', surface: 'app', description: 'Automate actions when things happen in your workspace.' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',

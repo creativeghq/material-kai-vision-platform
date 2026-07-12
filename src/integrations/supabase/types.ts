@@ -24468,6 +24468,25 @@ export type Database = {
         }
         Returns: string
       }
+      create_simple_flow: {
+        Args: {
+          p_workspace_id: string
+          p_name: string
+          p_trigger_type: string
+          p_trigger_config?: Json
+          p_actions?: Json
+          p_activate?: boolean
+        }
+        Returns: Database["public"]["Tables"]["flows"]["Row"]
+      }
+      delete_simple_flow: {
+        Args: { p_workspace_id: string; p_flow_id: string }
+        Returns: boolean
+      }
+      toggle_simple_flow: {
+        Args: { p_workspace_id: string; p_flow_id: string; p_active: boolean }
+        Returns: Database["public"]["Tables"]["flows"]["Row"]
+      }
       create_marketplace_listing: {
         Args: {
           p_batch_lot?: string
