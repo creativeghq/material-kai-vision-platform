@@ -448,7 +448,10 @@ async function sendOneStatement(
     </div>`;
 
   const { data: dispatch, error: dispatchErr } = await supabase.functions.invoke('email-api', {
-    body: { action: 'send', to: targetEmail, subject, html, emailType: 'transactional', tags: { feature: 'finance_statement', party_type: partyType, party_id: party.party_id }, workspace_id: party.workspace_id },
+    // Tenant business mail (statement to the tenant's customer/supplier) → must send from the
+    // workspace's own BYOK Resend, never the shared platform domain. requireWorkspaceSender makes
+    // email-api 503 (code=workspace_sender_required) until BYOK is configured; root workspace exempt.
+    body: { action: 'send', to: targetEmail, subject, html, emailType: 'transactional', tags: { feature: 'finance_statement', party_type: partyType, party_id: party.party_id }, workspace_id: party.workspace_id, requireWorkspaceSender: true },
   });
   if (dispatchErr || !(dispatch as any)?.success) {
     return { ok: false, email_sent_to: null, pdf_url: pdfUrl, rows: ledger.rows.length, closing_balance: closing, error: dispatchErr?.message ?? (dispatch as any)?.error ?? 'email send failed' };

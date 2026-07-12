@@ -99,7 +99,10 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
     </div>`;
 
   const { data: dispatch, error: dispatchErr } = await supabase.functions.invoke('email-api', {
-    body: { action: 'send', to: email, subject, html, emailType: 'transactional', tags: { feature: 'invoice_email', invoice_id }, attachments, workspace_id: inv.workspace_id },
+    // Tenant business mail (invoice to the tenant's customer) → must send from the workspace's
+    // own BYOK Resend, never the shared platform domain. requireWorkspaceSender makes email-api
+    // 503 (code=workspace_sender_required) until BYOK is configured; the operator's root workspace is exempt.
+    body: { action: 'send', to: email, subject, html, emailType: 'transactional', tags: { feature: 'invoice_email', invoice_id }, attachments, workspace_id: inv.workspace_id, requireWorkspaceSender: true },
   });
   if (dispatchErr || !(dispatch as any)?.success) {
     return json({ ok: false, error: dispatchErr?.message ?? 'email send failed' }, 502);

@@ -215,6 +215,9 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
               send_batch_id: sendBatchId,
             },
             workspace_id: ownerWsId ?? undefined,
+            // Catalog marketing to the tenant's customers → must send from the workspace's own
+            // BYOK Resend, never the shared platform domain. Root workspace is exempt.
+            requireWorkspaceSender: true,
           },
         });
         if (dispatchErr || !dispatch?.success) {

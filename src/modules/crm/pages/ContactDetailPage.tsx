@@ -921,6 +921,7 @@ export const ContactDetailPage: React.FC = () => {
         toEmail={contact.email || ''}
         toName={contact.name || null}
         recipientLabel={contact.name || 'Contact'}
+        workspaceId={activeWorkspaceId}
         onSent={({ subject }) => logActivity('email_sent', `Email sent to ${contact.email}`, subject)}
       />
 

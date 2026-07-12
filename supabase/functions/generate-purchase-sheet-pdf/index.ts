@@ -810,6 +810,9 @@ async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise
         attachments: [{ filename: `purchase-order-${orderNumber}.pdf`, content: bytesToBase64(bytes) }],
         tags: { feature: 'purchase_orders', order_id: order.id },
         workspace_id: order.workspace_id,
+        // Tenant business mail (PO sent to the tenant's supplier on the tenant's behalf) → must
+        // send from the workspace's own BYOK Resend, never the shared platform domain.
+        requireWorkspaceSender: true,
       },
     });
     if (mailErr) throw new HttpError(502, `Email send failed: ${mailErr.message ?? 'unknown'}`);

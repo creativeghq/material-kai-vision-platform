@@ -112,8 +112,10 @@ export const CRMManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0 });
 
-  // Client-side pagination (20 rows/page) over the already-filtered lists.
+  // Client-side pagination over the already-filtered lists. Contacts paginate at
+  // 10 rows/page; users/companies stay at 20.
   const PAGE_SIZE = 20;
+  const CONTACTS_PAGE_SIZE = 10;
   const [usersPage, setUsersPage] = useState(1);
   const [contactsPage, setContactsPage] = useState(1);
   const [companiesPage, setCompaniesPage] = useState(1);
@@ -172,10 +174,15 @@ export const CRMManagement: React.FC = () => {
   const loadContacts = async () => {
     try {
       setLoadingContacts(true);
-      const { data, error } = await supabase
-        .from('crm_contacts').select('*').order('created_at', { ascending: false }).limit(500);
-      if (error) throw error;
-      setContacts(data || []);
+      // Load through the crm-api edge function (same path as users/companies) rather than
+      // a direct supabase query. The direct query is bound by the `is_workspace_member`
+      // RLS on crm_contacts, so a global operator on the /admin/crm surface who isn't an
+      // active member of the tenant workspace that owns the contacts sees an empty table
+      // — even though companies (loaded via this API, which grants global operators
+      // cross-tenant scope in getCrmScope) show up fine. The API also flattens the
+      // attached-company junction into the `companies` array the table renders.
+      const response = await contactsAPI.listContacts(500, 0);
+      setContacts(response.data || []);
     } catch (error: any) {
       toast({ title: 'Error', description: `Failed to load contacts: ${error.message}`, variant: 'destructive' });
     } finally { setLoadingContacts(false); }
@@ -278,7 +285,7 @@ export const CRMManagement: React.FC = () => {
     () => filteredUsers.slice((usersPage - 1) * PAGE_SIZE, usersPage * PAGE_SIZE),
     [filteredUsers, usersPage]);
   const pagedContacts = useMemo(
-    () => filteredContacts.slice((contactsPage - 1) * PAGE_SIZE, contactsPage * PAGE_SIZE),
+    () => filteredContacts.slice((contactsPage - 1) * CONTACTS_PAGE_SIZE, contactsPage * CONTACTS_PAGE_SIZE),
     [filteredContacts, contactsPage]);
   const pagedCompanies = useMemo(
     () => filteredCompanies.slice((companiesPage - 1) * PAGE_SIZE, companiesPage * PAGE_SIZE),
@@ -585,7 +592,7 @@ export const CRMManagement: React.FC = () => {
                     </TableBody>
                   </Table>
                 </div>
-                <CrmPager page={contactsPage} pageSize={PAGE_SIZE} total={filteredContacts.length} onPageChange={setContactsPage} />
+                <CrmPager page={contactsPage} pageSize={CONTACTS_PAGE_SIZE} total={filteredContacts.length} onPageChange={setContactsPage} />
               </CardContent>
             </Card>
           </TabsContent>

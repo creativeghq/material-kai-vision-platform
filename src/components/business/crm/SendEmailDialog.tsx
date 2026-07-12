@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Send, FileText, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { emailService } from '@/modules/email/services/emailService';
+import { emailService, isSenderNotConfigured } from '@/modules/email/services/emailService';
+import { ConnectEmailModal } from '@/modules/email/components/ConnectEmailModal';
+import { notifyEmailSenderNotConfigured } from '@/modules/email/lib/emailSenderGate';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -27,6 +29,9 @@ interface SendEmailDialogProps {
   toName?: string | null;
   /** Free-form context shown in the dialog header (e.g. "Granitifiandre Spa"). */
   recipientLabel?: string | null;
+  /** Workspace whose OWN Resend BYOK sender the email must go out from. Tenant business mail
+   *  never sends from the platform address — a missing sender surfaces the Connect-email modal. */
+  workspaceId?: string | null;
   /** Called after a successful send (used to log a CRM activity). */
   onSent?: (info: { subject: string }) => void;
 }
@@ -50,9 +55,17 @@ interface EmailTemplateRow {
  *  - "Custom" — write subject + body once, send as a one-off transactional email.
  */
 export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
-  open, onClose, toEmail, toName, recipientLabel, onSent,
+  open, onClose, toEmail, toName, recipientLabel, workspaceId, onSent,
 }) => {
   const { toast } = useToast();
+  const [showConnect, setShowConnect] = useState(false);
+
+  // Tenant business mail must go from the workspace's own sender. When email-api 503s because no
+  // BYOK is configured, surface the Connect-email modal + raise the admin bell instead of a raw error.
+  const handleSenderBlocked = async () => {
+    setShowConnect(true);
+    await notifyEmailSenderNotConfigured({ workspaceId, feature: 'crm_contact' });
+  };
   const [templates, setTemplates] = useState<EmailTemplateRow[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [mode, setMode] = useState<'template' | 'custom'>('template');
@@ -138,6 +151,8 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         templateSlug: selectedTemplate.slug,
         variables: templateVars,
         emailType: 'transactional',
+        workspaceId: workspaceId ?? undefined,
+        requireWorkspaceSender: true,
       });
       toast({
         title: 'Email sent',
@@ -146,6 +161,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       onSent?.({ subject: selectedTemplate.subject_template || selectedTemplate.name });
       onClose();
     } catch (err: any) {
+      if (isSenderNotConfigured(err)) { await handleSenderBlocked(); return; }
       toast({ title: 'Send failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setSending(false);
@@ -169,6 +185,8 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         html: htmlBody,
         text: customBody.trim(),
         emailType: 'transactional',
+        workspaceId: workspaceId ?? undefined,
+        requireWorkspaceSender: true,
       });
       toast({
         title: 'Email sent',
@@ -177,6 +195,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       onSent?.({ subject: customSubject.trim() });
       onClose();
     } catch (err: any) {
+      if (isSenderNotConfigured(err)) { await handleSenderBlocked(); return; }
       toast({ title: 'Send failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setSending(false);
@@ -184,6 +203,8 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
   };
 
   return (
+    <>
+    <ConnectEmailModal open={showConnect} onClose={() => setShowConnect(false)} feature="email" />
     <Dialog open={open} onOpenChange={(o) => { if (!o && !sending) onClose(); }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
@@ -325,6 +346,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
 

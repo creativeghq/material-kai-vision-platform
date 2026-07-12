@@ -1083,7 +1083,8 @@ export const CompanyDetailPage: React.FC = () => {
         toEmail={company.email || ''}
         toName={company.name || null}
         recipientLabel={company.name || 'Company'}
-/>
+        workspaceId={activeWorkspaceId}
+      />
 
       {/* Add Contact Dialog */}
       <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>

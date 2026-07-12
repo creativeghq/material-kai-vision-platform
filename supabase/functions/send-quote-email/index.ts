@@ -157,6 +157,11 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
         emailType: 'transactional',
         tags: { feature: 'quotes', quote_id: quote.id },
         workspace_id: quote.workspace_id ?? undefined,
+        // A quote is tenant business mail to the tenant's customer — it MUST go from the
+        // workspace's own BYOK Resend, never the shared platform domain. email-api 503s
+        // (code=workspace_sender_required) when the workspace hasn't configured its sender;
+        // the operator's root workspace is exempt (sends from the platform default).
+        requireWorkspaceSender: true,
       },
     });
     if (dErr || !dispatch?.success) {

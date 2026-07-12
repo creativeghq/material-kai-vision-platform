@@ -52,6 +52,34 @@ export interface SendEmailOptions {
   emailType?: 'transactional' | 'marketing' | 'notification';
   priority?: number;
   scheduledAt?: Date;
+  /** Bind the send to a workspace so its OWN Resend BYOK key + verified sender is used. */
+  workspaceId?: string;
+  /** Fail closed (503 `workspace_sender_required`) instead of falling back to the platform
+   *  sender when the workspace hasn't configured its own Resend. Set for all tenant business mail. */
+  requireWorkspaceSender?: boolean;
+}
+
+/** Structured error codes email-api returns so callers can branch (e.g. open the Connect-email modal). */
+export type EmailSendErrorCode =
+  | 'workspace_sender_required'
+  | 'provider_not_configured'
+  | 'workspace_email_quota_exceeded'
+  | 'unknown';
+
+/** Thrown by emailService.sendEmail. Carries the machine-readable `code` from email-api so UI
+ *  can react — notably `workspace_sender_required` → prompt the user to connect their own email. */
+export class EmailSendError extends Error {
+  code: EmailSendErrorCode;
+  constructor(message: string, code: EmailSendErrorCode) {
+    super(message);
+    this.name = 'EmailSendError';
+    this.code = code;
+  }
+}
+
+/** True when a send failed only because the workspace has no BYOK Resend configured yet. */
+export function isSenderNotConfigured(err: unknown): err is EmailSendError {
+  return err instanceof EmailSendError && err.code === 'workspace_sender_required';
 }
 
 export interface EmailLog {
@@ -73,36 +101,37 @@ export class EmailService {
    * Send an email via the email-api Edge Function (Resend)
    */
   async sendEmail(options: SendEmailOptions): Promise<{ messageId: string; logId: string }> {
-    try {
-      const { data, error } = await supabase.functions.invoke('email-api', {
-        body: { action: 'send', ...options },
-      });
+    // email-api reads snake_case `workspace_id`; the rest of the options pass through as-is.
+    const { workspaceId, ...rest } = options;
+    const { data, error } = await supabase.functions.invoke('email-api', {
+      body: {
+        action: 'send',
+        ...rest,
+        ...(workspaceId ? { workspace_id: workspaceId } : {}),
+      },
+    });
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Failed to send email');
-      }
-
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to send email');
-      }
-
-      if (!data.messageId) {
-        throw new Error('Invalid response from email service');
-      }
-
-      return data;
-    } catch (error: any) {
-      console.error('Error sending email:', error);
-
-      if (error.message?.includes('FunctionsRelayError')) {
-        throw new Error('Email service unavailable. Please check edge function deployment.');
-      } else if (error.message?.includes('FunctionsHttpError')) {
-        throw new Error('Email service error. Please check Resend configuration.');
-      }
-
-      throw error;
+    // Non-2xx from email-api is masked by the SDK — the real reason + machine code live in the
+    // response body (error.context). Unwrap it so callers can branch on `code`.
+    if (error) {
+      let bodyErr: string | undefined;
+      let code: EmailSendErrorCode = 'unknown';
+      try {
+        const body = await (error as any)?.context?.json?.();
+        bodyErr = body?.error ?? body?.message;
+        if (body?.code) code = body.code as EmailSendErrorCode;
+      } catch { /* body not JSON — fall through */ }
+      console.error('Email send failed:', code, bodyErr ?? error.message);
+      throw new EmailSendError(bodyErr || error.message || 'Failed to send email', code);
     }
+
+    if (!data?.success) {
+      throw new EmailSendError(data?.error || 'Failed to send email', (data?.code as EmailSendErrorCode) || 'unknown');
+    }
+    if (!data.messageId) {
+      throw new EmailSendError('Invalid response from email service', 'unknown');
+    }
+    return data;
   }
 
   /**

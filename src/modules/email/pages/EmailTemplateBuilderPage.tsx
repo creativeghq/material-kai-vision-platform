@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/core/
 import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getProductName, getMaterialCategory, getAvailableColors } from '@/utils/productMetadata';
 import { getAllTriggerGroups } from '@/services/flows/triggerVariables';
 import { humanizeLabel } from '@/utils/humanize';
@@ -219,7 +220,15 @@ function injectPreheader(html: string, text: string): string {
 
 // ── MH custom blocks for GrapesJS ──────────────────────────────────────────
 // Async: fetches material categories from DB to populate the category trait.
-async function addMhBlocks(editor: GrapesEditor) {
+//
+// Visibility tiers (2026-07-12):
+//   • Operator-only blocks carry the platform's own MaterialsHub / Material Kai
+//     branding (the "MH · Brand" group). These are gated on `isPlatformOperator`
+//     so tenant/dealer workspaces — whose emails go only to their own workspace
+//     members from their own BYOK sender — never expose the operator's branding.
+//   • Workspace blocks (materials, inspiration, generic content) are available to
+//     every workspace user regardless of tier.
+async function addMhBlocks(editor: GrapesEditor, isPlatformOperator: boolean) {
 
   // SVG line icon helper — matches GrapesJS panel style
   const svgIcon = (paths: string) =>
@@ -242,12 +251,17 @@ async function addMhBlocks(editor: GrapesEditor) {
     cube:     '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
     header:   '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="14" y2="10"/><rect x="4" y="14" width="16" height="6" rx="1"/>',
     button:   '<rect x="2" y="8" width="20" height="8" rx="4"/><line x1="8" y1="12" x2="16" y2="12"/><polyline points="13 9 16 12 13 15"/>',
+    contact:  '<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="13" y2="14"/>',
+    footer:   '<line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="12" x2="16" y2="12"/><rect x="4" y="16" width="16" height="4" rx="1"/>',
+    divider:  '<line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
   };
 
   // ── Category groups ───────────────────────────────────────────────────────
   const CAT_MATERIALS   = { id: 'mh-materials',   label: 'MH · Materials',   open: true  };
   const CAT_INSPIRATION = { id: 'mh-inspiration', label: 'MH · Inspiration', open: false };
-  const CAT_BRAND       = { id: 'mh-brand',       label: 'MH · Brand',       open: false };
+  const CAT_CONTENT     = { id: 'mh-content',     label: 'Content',          open: false };
+  // Operator-only — carries the platform's MaterialsHub / Material Kai identity.
+  const CAT_BRAND       = { id: 'mh-brand',       label: 'MH · Brand (operator)', open: false };
 
   // ── Fetch material categories from DB ─────────────────────────────────────
   let categoryOptions: { id: string; label: string }[] = [{ id: '', label: 'All Categories' }];
@@ -263,31 +277,94 @@ async function addMhBlocks(editor: GrapesEditor) {
     ];
   } catch { /* use default */ }
 
-  // ── Static blocks (Branded Header + CTA Button — fully editable HTML) ────
-  editor.BlockManager.add('mh-branded-header', {
-    label: 'Branded Header',
-    category: CAT_BRAND,
+  // ── Operator-only branded header — carries the Material Kai platform identity.
+  // Registered ONLY for the platform operator so tenant workspaces (who email
+  // their own members from their own BYOK sender) never expose operator branding.
+  if (isPlatformOperator) {
+    editor.BlockManager.add('mh-branded-header', {
+      label: 'MH Brand Header',
+      category: CAT_BRAND,
+      media: svgIcon(ICONS.header),
+      content:
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#3E192A;">' +
+        '<tr><td align="center" style="padding:28px 24px;">' +
+          '<div style="font-family:\'Open Sans\',Arial,sans-serif;color:#ffffff;font-size:28px;font-weight:300;letter-spacing:3px;">MATERIAL KAI</div>' +
+          '<div style="font-family:\'Open Sans\',Arial,sans-serif;color:#ffffff;opacity:0.75;font-size:13px;margin-top:8px;letter-spacing:1px;">Your Weekly Materials Update</div>' +
+        '</td></tr></table>',
+    });
+  }
+
+  // ── Workspace content blocks (fully editable HTML, available to every tier) ──
+
+  // Neutral header — a tenant fills in their own business name. The brand-locked
+  // "MH Brand Header" above is operator-only; this is the tenant-safe counterpart.
+  editor.BlockManager.add('mh-workspace-header', {
+    label: 'Header',
+    category: CAT_CONTENT,
     media: svgIcon(ICONS.header),
     content:
-      '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#3E192A;">' +
-      '<tr><td align="center" style="padding:28px 24px;">' +
-        '<div style="font-family:\'Open Sans\',Arial,sans-serif;color:#ffffff;font-size:28px;font-weight:300;letter-spacing:3px;">MATERIAL KAI</div>' +
-        '<div style="font-family:\'Open Sans\',Arial,sans-serif;color:#ffffff;opacity:0.75;font-size:13px;margin-top:8px;letter-spacing:1px;">Your Weekly Materials Update</div>' +
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-bottom:1px solid #eee;">' +
+      '<tr><td align="center" style="padding:24px;">' +
+        '<div style="font-family:\'Open Sans\',Arial,sans-serif;color:#1a1a1a;font-size:24px;font-weight:600;letter-spacing:1px;">{{companyName}}</div>' +
+        '<div style="font-family:\'Open Sans\',Arial,sans-serif;color:#888;font-size:13px;margin-top:6px;">Add your tagline here</div>' +
       '</td></tr></table>',
   });
 
   editor.BlockManager.add('mh-cta-button', {
     label: 'CTA Button',
-    category: CAT_BRAND,
+    category: CAT_CONTENT,
     media: svgIcon(ICONS.button),
+    // Neutral default — editable link/label. (Was hardcoded to materialkai.com /
+    // "Explore Materials"; neutralised now that this is a workspace-tier block.)
     content:
       '<table width="100%" cellpadding="0" cellspacing="0" border="0">' +
       '<tr><td align="center" style="padding:24px;">' +
-        '<a href="https://materialkai.com" style="background:#3E192A;color:#ffffff;' +
+        '<a href="#" style="background:#3E192A;color:#ffffff;' +
         'font-family:\'Open Sans\',Arial,sans-serif;font-size:15px;font-weight:600;' +
         'text-decoration:none;padding:14px 40px;border-radius:50px;display:inline-block;">' +
-          'Explore Materials' +
+          'View Details' +
         '</a></td></tr></table>',
+  });
+
+  // Business / contact info — for tenants sending from their own business identity.
+  editor.BlockManager.add('mh-business-info', {
+    label: 'Business Info',
+    category: CAT_CONTENT,
+    media: svgIcon(ICONS.contact),
+    content:
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0">' +
+      '<tr><td align="center" style="padding:24px 16px;font-family:\'Open Sans\',Arial,sans-serif;color:#555;font-size:13px;line-height:1.7;">' +
+        '<div style="font-weight:600;color:#1a1a1a;font-size:15px;margin-bottom:6px;">{{companyName}}</div>' +
+        '<div>123 Example Street, City, Country</div>' +
+        '<div>+30 210 000 0000 &nbsp;·&nbsp; <a href="mailto:hello@example.com" style="color:#3E192A;text-decoration:none;">hello@example.com</a></div>' +
+      '</td></tr></table>',
+  });
+
+  // Divider — thin horizontal rule with breathing room.
+  editor.BlockManager.add('mh-divider', {
+    label: 'Divider',
+    category: CAT_CONTENT,
+    media: svgIcon(ICONS.divider),
+    content:
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>' +
+      '<td style="padding:12px 24px;">' +
+        '<div style="border-top:1px solid #e5ddd6;height:1px;line-height:1px;font-size:0;">&nbsp;</div>' +
+      '</td></tr></table>',
+  });
+
+  // Footer with unsubscribe — required for marketing sends. Uses the recipient
+  // tags filled by the send pipeline ({{companyName}}, {{currentYear}}, {{unsubscribeUrl}}).
+  editor.BlockManager.add('mh-footer', {
+    label: 'Footer',
+    category: CAT_CONTENT,
+    media: svgIcon(ICONS.footer),
+    content:
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f1ee;">' +
+      '<tr><td align="center" style="padding:24px 16px;font-family:\'Open Sans\',Arial,sans-serif;color:#999;font-size:12px;line-height:1.7;">' +
+        '<div>© {{currentYear}} {{companyName}}. All rights reserved.</div>' +
+        '<div style="margin-top:8px;">You are receiving this email because you are part of {{companyName}}.</div>' +
+        '<div style="margin-top:8px;"><a href="{{unsubscribeUrl}}" style="color:#999;text-decoration:underline;">Unsubscribe</a></div>' +
+      '</td></tr></table>',
   });
 
   // ── Shared layout traits (used by top_week, top_month, moodboard, vr3d) ──
@@ -547,6 +624,9 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  // Operator-only branded blocks (e.g. "MH Brand Header") are gated on this.
+  // `wsLoading` gates editor init so the flag is settled before blocks register.
+  const { isPlatformOperator, loading: wsLoading } = useWorkspace();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef    = useRef<GrapesEditor | null>(null);
@@ -584,9 +664,10 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
     }
   };
 
-  // Initialize GrapesJS once the container is mounted
+  // Initialize GrapesJS once the container is mounted AND the workspace context
+  // has resolved (so `isPlatformOperator` is settled before blocks register).
   useEffect(() => {
-    if (!containerRef.current || initGuard.current) return;
+    if (wsLoading || !containerRef.current || initGuard.current) return;
     initGuard.current = true;
 
     const editor = grapesjs.init({
@@ -604,14 +685,15 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
     editorRef.current = editor;
 
     // addMhBlocks is async (fetches DB categories for the trait select)
-    addMhBlocks(editor).finally(() => setEditorReady(true));
+    addMhBlocks(editor, isPlatformOperator).finally(() => setEditorReady(true));
 
     return () => {
       editor.destroy();
       editorRef.current = null;
       initGuard.current = false;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsLoading]);
 
   // Load saved design once both editor and template are ready
   useEffect(() => {
