@@ -6,6 +6,9 @@
  * them. Reads go through RLS (`flows_tenant_select`); mutations go through the workspace-safe
  * SECURITY DEFINER RPCs (`toggle_simple_flow` / `delete_simple_flow`). Operator/global/system
  * flows are never visible or editable here.
+ *
+ * Layout follows the design-system New-Page checklist: <PageHeader> + `p-3 sm:p-6` wrapper +
+ * `div.dashboard-card` sections (no ad-hoc container / <Card> / inline h1).
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -15,8 +18,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
-import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 interface WorkspaceFlow {
   id: string;
@@ -106,32 +109,30 @@ export default function FlowsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-primary/10">
-            <Workflow className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-display">Automations</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              When something happens in your workspace, run an action automatically. Each run costs 20 credits ($0.20) plus any per-action cost.
-            </p>
-          </div>
-        </div>
-        <Button onClick={createViaAgent} className="gap-2 shrink-0">
-          <Sparkles className="h-4 w-4" />
-          Create with AI
-        </Button>
-      </div>
+    <div className="min-h-screen">
+      <PageHeader
+        icon={Workflow}
+        title="Automations"
+        subtitle="Run an action automatically when something happens in your workspace"
+        actions={
+          <Button onClick={createViaAgent} className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            Create with AI
+          </Button>
+        }
+      />
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16 text-muted-foreground">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        </div>
-      ) : flows.length === 0 ? (
-        <Card className="dashboard-card">
-          <CardContent className="py-14 text-center">
+      <div className="p-3 sm:p-6 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Each run costs 20 credits ($0.20) from your workspace pool, plus any per-action cost.
+        </p>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          </div>
+        ) : flows.length === 0 ? (
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm py-14 text-center">
             <Zap className="h-8 w-8 text-muted-foreground/50 mx-auto mb-3" />
             <p className="font-medium">No automations yet</p>
             <p className="text-sm text-muted-foreground mt-1 mb-4">
@@ -141,13 +142,14 @@ export default function FlowsPage() {
               <Sparkles className="h-4 w-4" />
               Create your first automation
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {flows.map((flow) => (
-            <Card key={flow.id} className="dashboard-card">
-              <CardContent className="flex items-center gap-4 py-4">
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {flows.map((flow) => (
+              <div
+                key={flow.id}
+                className="dashboard-card rounded-2xl border-0 shadow-sm p-4 flex items-center gap-4 hover:bg-accent transition-colors"
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="font-medium truncate">{flow.name}</h3>
@@ -169,11 +171,11 @@ export default function FlowsPage() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
