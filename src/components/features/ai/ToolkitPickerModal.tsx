@@ -71,6 +71,9 @@ export const ToolkitPickerModal: React.FC<Props> = ({
     () => {
       const byRoleAndModule = getAccessibleToolkits(role, enabledModules);
       if (!currentAgentId) return byRoleAndModule;
+      // JARVIS (orchestrator) auto-routes to whichever specialist owns a tool,
+      // so it can access EVERY toolkit — show the full accessible set.
+      if (currentAgentId === 'orchestrator') return byRoleAndModule;
       // Strict-filter to the current agent: only show toolkits whose tools
       // are actually bound to this agent. Always-on toolkits (Core) bypass
       // the filter because they're loaded into every agent.

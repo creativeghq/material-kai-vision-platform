@@ -1,26 +1,27 @@
 /**
  * Automations — the workspace-owner surface for the Flows toolkit (#256).
  *
- * Chat (the KAI agent's `manage_flows` tool) is the primary CREATE surface; this page is the
- * lightweight management view: list the workspace's own automations and pause / resume / delete
- * them. Reads go through RLS (`flows_tenant_select`); mutations go through the workspace-safe
- * SECURITY DEFINER RPCs (`toggle_simple_flow` / `delete_simple_flow`). Operator/global/system
- * flows are never visible or editable here.
+ * Two views: a LIST of the workspace's own automations, and the VISUAL BUILDER (the same
+ * xyflow builder the admin uses, in `tenantMode` so the palette is trimmed to the safe subset).
+ * New/Edit open the builder; the DB (tenant write RLS + the flows_tenant_allowlist_guard trigger)
+ * is the real security boundary. Operator/global flows are never visible or editable here.
+ * "Create with AI" deep-links to the KAI agent as an alternative create path.
  *
  * Layout follows the design-system New-Page checklist: <PageHeader> + `p-3 sm:p-6` wrapper +
- * `div.dashboard-card` sections (no ad-hoc container / <Card> / inline h1).
+ * `div.dashboard-card` sections.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Workflow, Play, Pause, Trash2, Sparkles, Clock, Zap, Plus } from 'lucide-react';
+import { Workflow, Play, Pause, Trash2, Sparkles, Clock, Zap, Plus, Pencil, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { FlowFormModal, type FlowFormState, type SimpleFlowPayload } from '@/components/features/ai/FlowFormModal';
+import { FlowBuilderTab } from '@/components/Admin/FlowsManagement/FlowBuilderTab';
+import { flowService } from '@/services/flows';
 
 interface WorkspaceFlow {
   id: string;
@@ -33,6 +34,7 @@ interface WorkspaceFlow {
 }
 
 const TRIGGER_LABELS: Record<string, string> = {
+  manual: 'Manual',
   scheduled: 'On a schedule',
   invoice_paid: 'Invoice paid',
   payment_received: 'Payment received',
@@ -57,7 +59,8 @@ export default function FlowsPage() {
   const [flows, setFlows] = useState<WorkspaceFlow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [formState, setFormState] = useState<FlowFormState>(null);
+  // null = list view; a string = the flow id open in the builder.
+  const [builderFlowId, setBuilderFlowId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
@@ -106,30 +109,48 @@ export default function FlowsPage() {
     void load();
   };
 
-  // Manual create — open the guided form; on submit it calls create_simple_flow directly.
-  const openManualForm = () => setFormState({ default_trigger_type: 'invoice_paid' });
-
-  const createFlow = async (payload: SimpleFlowPayload) => {
+  // New automation → create an empty workspace flow, then open the builder on it.
+  const createNew = async () => {
     if (!activeWorkspaceId) return;
-    const { error } = await supabase.rpc('create_simple_flow', {
-      p_workspace_id: activeWorkspaceId,
-      p_name: payload.name,
-      p_trigger_type: payload.trigger_type,
-      p_trigger_config: payload.trigger_config,
-      p_actions: payload.actions,
-      p_activate: true,
-    });
-    if (error) { toast({ title: 'Could not create', description: error.message, variant: 'destructive' }); throw error; }
-    toast({ title: 'Automation created', description: `"${payload.name}" is now active.` });
-    void load();
+    const name = (window.prompt('Name your automation', 'New automation') || '').trim();
+    if (name === '') return; // cancelled
+    try {
+      const flow = await flowService.createFlowForWorkspace(name, activeWorkspaceId);
+      setBuilderFlowId(flow.id);
+    } catch (e) {
+      toast({ title: 'Could not create', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    }
   };
 
-  // AI create — deep-link to the KAI agent. The page reads `?prompt=` and auto-sends it, so the
-  // agent opens the guided flow (manage_flows) in chat.
+  const closeBuilder = () => { setBuilderFlowId(null); void load(); };
+
   const createViaAgent = () => {
     navigate('/agent-hub?agent=kai&prompt=' + encodeURIComponent('Set up a new automation for my workspace'));
   };
 
+  // ── Builder view ────────────────────────────────────────────────────────
+  if (builderFlowId) {
+    return (
+      <div className="min-h-screen">
+        <PageHeader
+          icon={Workflow}
+          title="Edit automation"
+          subtitle="Drag triggers and actions onto the canvas, connect them, then Save"
+          actions={
+            <Button variant="outline" onClick={closeBuilder} className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to automations
+            </Button>
+          }
+        />
+        <div className="p-3 sm:p-6">
+          <FlowBuilderTab flowId={builderFlowId} tenantMode />
+        </div>
+      </div>
+    );
+  }
+
+  // ── List view ───────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen">
       <PageHeader
@@ -142,7 +163,7 @@ export default function FlowsPage() {
               <Sparkles className="h-4 w-4" />
               Create with AI
             </Button>
-            <Button onClick={openManualForm} className="gap-2">
+            <Button onClick={createNew} className="gap-2">
               <Plus className="h-4 w-4" />
               New automation
             </Button>
@@ -164,10 +185,10 @@ export default function FlowsPage() {
             <Zap className="h-8 w-8 text-muted-foreground/50 mx-auto mb-3" />
             <p className="font-medium">No automations yet</p>
             <p className="text-sm text-muted-foreground mt-1 mb-4">
-              Build one manually, or ask the assistant — e.g. “email the customer when their invoice is paid”.
+              Build one in the visual editor, or ask the assistant — e.g. “email the customer when their invoice is paid”.
             </p>
             <div className="flex items-center justify-center gap-2">
-              <Button onClick={openManualForm} className="gap-2">
+              <Button onClick={createNew} className="gap-2">
                 <Plus className="h-4 w-4" />
                 New automation
               </Button>
@@ -198,6 +219,10 @@ export default function FlowsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => setBuilderFlowId(flow.id)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </Button>
                   <Button size="sm" variant="outline" className="gap-1" disabled={busy === flow.id} onClick={() => toggle(flow)}>
                     {flow.status === 'active' ? <><Pause className="h-3.5 w-3.5" />Pause</> : <><Play className="h-3.5 w-3.5" />Resume</>}
                   </Button>
@@ -210,12 +235,6 @@ export default function FlowsPage() {
           </div>
         )}
       </div>
-
-      <FlowFormModal
-        state={formState}
-        onClose={() => setFormState(null)}
-        onCreate={createFlow}
-      />
     </div>
   );
 }

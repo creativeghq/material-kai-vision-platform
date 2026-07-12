@@ -81,6 +81,44 @@ class FlowService {
     return data as unknown as Flow;
   }
 
+  /**
+   * #256 — create an empty WORKSPACE (tenant) flow for the visual builder. Unlike createFlow
+   * (which makes operator/global flows on the admin surface), this sets workspace_id + is_global
+   * false so it's owned by the workspace and subject to the tenant allowlist guard. Tenant write
+   * RLS + the flows_tenant_allowlist_guard trigger enforce scope + safe nodes at the DB.
+   */
+  async createFlowForWorkspace(name: string, workspaceId: string): Promise<Flow> {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from('flows')
+      .insert({
+        name: name.trim() || 'New automation',
+        trigger_type: 'manual',
+        trigger_config: {},
+        graph_definition: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+        workspace_id: workspaceId,
+        is_global: false,
+        created_by: user?.id,
+        updated_by: user?.id,
+      })
+      .select()
+      .single();
+    if (error) throw new Error(`Failed to create automation: ${error.message}`);
+    return data as unknown as Flow;
+  }
+
+  /** List a workspace's own (non-global) flows — RLS-scoped to the caller's workspace. */
+  async listWorkspaceFlows(workspaceId: string): Promise<Flow[]> {
+    const { data, error } = await supabase
+      .from('flows')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .eq('is_global', false)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to list automations: ${error.message}`);
+    return (data ?? []) as unknown as Flow[];
+  }
+
   async updateFlow(id: string, updates: Partial<Pick<Flow, 'name' | 'description' | 'status' | 'trigger_type' | 'trigger_config' | 'tags' | 'is_global'>>): Promise<Flow> {
     const { data: { user } } = await supabase.auth.getUser();
 

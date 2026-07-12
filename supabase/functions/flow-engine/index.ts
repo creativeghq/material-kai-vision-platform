@@ -81,6 +81,17 @@ const FLOW_RUN_BASE_CREDITS = 20;
  * (+ their workspace pool if known). For a tenant flow fired by a 'system' trigger, bill the
  * flow owner against the flow's workspace pool.
  */
+/** Global platform admin/super_admin — allowed to run operator (is_global) flows on demand. */
+async function isPlatformAdmin(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('user_profiles')
+    .select('roles!user_profiles_role_id_fkey(name)')
+    .eq('user_id', userId)
+    .maybeSingle();
+  const role = (data as { roles?: { name?: string } } | null)?.roles?.name;
+  return role === 'admin' || role === 'super_admin';
+}
+
 function resolveFlowDebit(
   userId: string | undefined,
   scope: FlowScope | undefined,
@@ -1363,14 +1374,16 @@ async function handleExecuteFlow(
 
   // #256 SECURITY (BOLA): the direct execute-flow / test-flow entrypoints run under the service role,
   // so without this check any authenticated user could run ANOTHER tenant's flow by id — billing their
-  // credit pool and sending mail/WhatsApp from their BYOK sender. Require the caller to own the flow's
-  // workspace; never let a normal caller run a global/operator flow on demand. Internal trigger-event
-  // dispatch passes no `access` (it already scoped the match), so it is unaffected.
+  // credit pool and sending mail/WhatsApp from their BYOK sender. A caller may run a workspace flow
+  // only if they belong to that workspace; a global/operator flow only if they are a platform admin
+  // (so the admin builder's Run/Test still works). Internal trigger-event dispatch passes no `access`
+  // (it already scoped the match), so it is unaffected.
   if (access && !access.trusted) {
-    const denied = flow.is_global === true
-      || !flow.workspace_id
-      || !access.callerUserId
-      || !(await userCanAccessWorkspace(supabase, access.callerUserId, flow.workspace_id as string));
+    const globalFlow = flow.is_global === true || !flow.workspace_id;
+    const denied = !access.callerUserId
+      || (globalFlow
+        ? !(await isPlatformAdmin(supabase, access.callerUserId))
+        : !(await userCanAccessWorkspace(supabase, access.callerUserId, flow.workspace_id as string)));
     if (denied) return jsonResponse({ success: false, error: 'Flow not found' }, 404);
   }
 

@@ -24,7 +24,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/core/ui/accordion';
-import { triggerPaletteItems, conditionPaletteItems, actionPaletteItems, groupBySubcategory } from '../utils/paletteItems';
+import { triggerPaletteItems, conditionPaletteItems, actionPaletteItems, groupBySubcategory, isTenantAllowedItem } from '../utils/paletteItems';
 import type { NodePaletteItem } from '@/services/flows/types';
 
 const iconMap: Record<string, React.ElementType> = {
@@ -131,20 +131,31 @@ function PaletteSection({ label, category, items }: PaletteSectionProps) {
   );
 }
 
-export function NodePalette() {
+interface NodePaletteProps {
+  /** #256 — when true, show only the tenant-safe subset (workspace builder). The DB guard trigger
+   *  is the real enforcer; this trims the palette so a workspace user never sees privileged nodes. */
+  tenantMode?: boolean;
+}
+
+export function NodePalette({ tenantMode = false }: NodePaletteProps) {
   const [search, setSearch] = useState('');
 
   const q = search.toLowerCase().trim();
 
-  const filterItems = (items: NodePaletteItem[]) =>
-    q
-      ? items.filter(
+  const scope = (items: NodePaletteItem[]) =>
+    tenantMode ? items.filter(isTenantAllowedItem) : items;
+
+  const filterItems = (items: NodePaletteItem[]) => {
+    const scoped = scope(items);
+    return q
+      ? scoped.filter(
           (i) =>
             i.label.toLowerCase().includes(q) ||
             i.description.toLowerCase().includes(q) ||
             i.group.toLowerCase().includes(q),
         )
-      : items;
+      : scoped;
+  };
 
   const filteredTriggers = filterItems(triggerPaletteItems);
   const filteredConditions = filterItems(conditionPaletteItems);

@@ -452,6 +452,24 @@ export const triggerPaletteItems = paletteItems.filter(i => i.category === 'trig
 export const conditionPaletteItems = paletteItems.filter(i => i.category === 'condition');
 export const actionPaletteItems = paletteItems.filter(i => i.category === 'action');
 
+/**
+ * #256 — the tenant-safe subset a workspace user may drop in the visual builder. MUST mirror the
+ * DB `flows_tenant_allowlist_guard` trigger (which is the real enforcer; this only trims the UI).
+ * Condition nodes are pure logic and always allowed — only trigger/action subtypes are listed.
+ */
+export const TENANT_ALLOWED_SUBTYPES: ReadonlySet<string> = new Set<string>([
+  // triggers
+  'scheduled', 'quote_approved', 'invoice_paid', 'payment_received',
+  'inbox.message_received', 'product_added', 'appointment_booked',
+  // actions (send_sms is the engine's WhatsApp alias)
+  'send_email', 'send_sms', 'create_notification', 'send_agent_message',
+]);
+
+/** Is this palette item allowed for a tenant (workspace) builder? Conditions always pass. */
+export function isTenantAllowedItem(item: NodePaletteItem): boolean {
+  return item.category === 'condition' || TENANT_ALLOWED_SUBTYPES.has(item.subType as string);
+}
+
 /** Group palette items by their `group` field */
 export function groupBySubcategory(items: NodePaletteItem[]): Array<{ group: string; items: NodePaletteItem[] }> {
   const map = new Map<string, NodePaletteItem[]>();

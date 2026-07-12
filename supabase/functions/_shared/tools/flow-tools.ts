@@ -90,17 +90,6 @@ export const createManageFlowsTool = (
       const db = callerClient(jwt);
       const ws = workspaceId!;
 
-      // Vague / underspecified create → open the modal instead of guessing.
-      if (action === 'open_form') {
-        onChunk?.({
-          type: 'flow_form_open',
-          default_trigger_type: (trigger_type && (TENANT_TRIGGERS as readonly string[]).includes(trigger_type)) ? trigger_type : 'invoice_paid',
-          prefill: { name, trigger_config, actions },
-          timestamp: Date.now(),
-        });
-        return JSON.stringify({ success: true, mode: 'form_opened' });
-      }
-
       if (action === 'list') {
         const { data, error } = await db
           .from('flows')
@@ -114,15 +103,12 @@ export const createManageFlowsTool = (
       }
 
       if (action === 'create') {
-        // Missing the essentials → open the form prefilled with whatever we have.
+        // Missing the essentials → ask for them in chat (the visual builder is the other path).
         if (!name || !trigger_type || !Array.isArray(actions) || actions.length === 0) {
-          onChunk?.({
-            type: 'flow_form_open',
-            default_trigger_type: (trigger_type && (TENANT_TRIGGERS as readonly string[]).includes(trigger_type)) ? trigger_type : 'invoice_paid',
-            prefill: { name, trigger_config, actions },
-            timestamp: Date.now(),
+          return JSON.stringify({
+            success: false,
+            error: 'To create an automation I need: a name, a trigger_type, and at least one action. Ask the user for whatever is missing, then call create again. (They can also build it visually on the Automations page.)',
           });
-          return JSON.stringify({ success: true, mode: 'form_opened', note: 'missing required fields; opened modal' });
         }
         const { data, error } = await db.rpc('create_simple_flow', {
           p_workspace_id: ws,
@@ -176,20 +162,19 @@ export const createManageFlowsTool = (
         '',
         'Actions:',
         '  list   → show this workspace\'s flows.',
-        '  create → build a flow. Requires name + trigger_type + a non-empty actions array.',
+        '  create → build a flow. Requires name + trigger_type + a non-empty actions array. If the',
+        '           user is vague, ASK for the missing details in chat, then call create. (They can',
+        '           also build it visually on the Automations page.)',
         '  toggle → pause/resume a flow (flow_id + active).',
         '  remove → delete a flow (flow_id).',
-        '  open_form → when the user is vague ("set up an automation" / "remind me when an invoice is paid"',
-        '              without specifics), open the guided modal instead of guessing.',
         '',
         'Examples:',
-        '  "email the customer when their invoice is paid" (no details) → action=open_form, trigger_type=invoice_paid',
         '  "notify me every morning at 9" → action=create, trigger_type=scheduled, trigger_config={cron:"0 9 * * *"}, actions=[{action_type:"create_notification",...}]',
         '  "list my automations" → action=list',
         '  "turn off flow X" → action=toggle, active=false',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list', 'create', 'toggle', 'remove', 'open_form']).default('list'),
+        action: z.enum(['list', 'create', 'toggle', 'remove']).default('list'),
         name: z.string().optional().describe('Human name for the flow (create).'),
         trigger_type: z.enum(TENANT_TRIGGERS as unknown as [string, ...string[]]).optional()
           .describe('The event that starts the flow.'),

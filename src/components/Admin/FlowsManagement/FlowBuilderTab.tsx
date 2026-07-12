@@ -24,9 +24,12 @@ import type { FlowNodeData } from '@/services/flows/types';
 
 interface FlowBuilderTabProps {
   flowId: string | null;
+  /** #256 — workspace (tenant) builder: restrict the palette to the tenant-safe node subset.
+   *  The DB guard trigger enforces it regardless; this trims the UI. Admin surface leaves it off. */
+  tenantMode?: boolean;
 }
 
-function FlowBuilderCanvas({ flowId }: FlowBuilderTabProps) {
+function FlowBuilderCanvas({ flowId, tenantMode = false }: FlowBuilderTabProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const { toast } = useToast();
@@ -245,7 +248,7 @@ function FlowBuilderCanvas({ flowId }: FlowBuilderTabProps) {
         className="h-[calc(100vh-340px)] border rounded-lg overflow-hidden flex"
       >
         {/* Left: Palette */}
-        <NodePalette />
+        <NodePalette tenantMode={tenantMode} />
 
         {/* Center: Canvas */}
         <div className="flex-1">
@@ -287,10 +290,10 @@ function FlowBuilderCanvas({ flowId }: FlowBuilderTabProps) {
   );
 }
 
-export function FlowBuilderTab({ flowId }: FlowBuilderTabProps) {
+export function FlowBuilderTab({ flowId, tenantMode = false }: FlowBuilderTabProps) {
   return (
     <ReactFlowProvider>
-      <FlowBuilderCanvas flowId={flowId} />
+      <FlowBuilderCanvas flowId={flowId} tenantMode={tenantMode} />
     </ReactFlowProvider>
   );
 }
