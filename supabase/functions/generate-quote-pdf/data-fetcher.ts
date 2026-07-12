@@ -37,6 +37,7 @@ export async function fetchQuoteData(
       custom_product_description,
       custom_sku,
       custom_unit,
+      custom_image_url,
       room,
       dimensions,
       installation_requirements,
@@ -77,6 +78,24 @@ export async function fetchQuoteData(
     quote.customer_contact_id ?? null,
   );
 
+  // Resolve a primary image per catalog product (same source as QuotesService.getQuote).
+  const productImageMap: Record<string, string> = {};
+  const productIds = items.map((i: any) => i.products?.id).filter(Boolean);
+  if (productIds.length > 0) {
+    try {
+      const { data: rels } = await supabase
+        .from('image_product_associations')
+        .select('product_id, image:document_images(image_url)')
+        .in('product_id', productIds);
+      for (const rel of rels || []) {
+        const img = (rel as any).image;
+        if (img?.image_url && !productImageMap[(rel as any).product_id]) {
+          productImageMap[(rel as any).product_id] = img.image_url;
+        }
+      }
+    } catch { /* images are optional — a missing thumbnail just renders blank */ }
+  }
+
   // Map items (supports both catalog products and custom items)
   const mappedItems: QuoteItemData[] = items.map((item: any) => {
     const product = item.products;
@@ -85,6 +104,9 @@ export async function fetchQuoteData(
 
     return {
       id: item.id,
+      image_url: isCustom
+        ? (item.custom_image_url || null)
+        : (productImageMap[product.id] || metadata?.image_url || null),
       product_name: isCustom
         ? (item.custom_product_name || 'Custom Item')
         : (product?.name || 'Unknown Product'),
@@ -288,6 +310,26 @@ export async function fetchStorageFile(
     return new Uint8Array(await data.arrayBuffer());
   } catch (e) {
     console.warn(`[generate-quote-pdf] Failed to fetch template image ${bucket}/${path}:`, e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+/**
+ * Fetch an item thumbnail from its (public) URL as Uint8Array. Defensive: only
+ * https(s), 8 MB cap, image/* only — a failure just renders a blank thumbnail
+ * cell rather than breaking PDF generation.
+ */
+export async function fetchImageBytesFromUrl(url: string): Promise<Uint8Array | null> {
+  try {
+    if (!/^https?:\/\//i.test(url)) return null;
+    const resp = await fetch(url, { redirect: 'follow' });
+    if (!resp.ok) return null;
+    const ct = resp.headers.get('content-type') || '';
+    if (ct && !ct.startsWith('image/')) return null;
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    if (buf.length === 0 || buf.length > 8 * 1024 * 1024) return null;
+    return buf;
+  } catch {
     return null;
   }
 }

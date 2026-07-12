@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { fetchQuoteData, fetchTemplateConfig, fetchStorageFile, applyWorkspaceBranding } from './data-fetcher.ts';
+import { fetchQuoteData, fetchTemplateConfig, fetchStorageFile, fetchImageBytesFromUrl, applyWorkspaceBranding } from './data-fetcher.ts';
 import { buildQuotePDF } from './pdf-builder.ts';
 import type { QuotePDFRequest, QuotePDFResponse } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -138,6 +138,18 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       logoPath ? fetchStorageFile(supabase, 'generation-images', logoPath) : Promise.resolve(null),
     ]);
 
+    // Fetch per-item thumbnails (catalog product image or custom_image_url), in
+    // parallel. Each is optional — a failure renders a blank cell, never fails.
+    const itemImageBytes: Record<string, Uint8Array> = {};
+    await Promise.all(
+      quoteData.items
+        .filter((it) => it.image_url)
+        .map(async (it) => {
+          const bytes = await fetchImageBytesFromUrl(it.image_url as string);
+          if (bytes) itemImageBytes[it.id] = bytes;
+        }),
+    );
+
     // Build the PDF
     const pdfBytes = await buildQuotePDF(
       quoteData,
@@ -145,7 +157,8 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       coverBytes,
       bgBytes,
       backcoverBytes,
-      logoBytes
+      logoBytes,
+      itemImageBytes
     );
 
     // Upload to storage

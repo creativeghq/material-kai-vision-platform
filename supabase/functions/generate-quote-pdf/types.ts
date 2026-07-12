@@ -44,6 +44,8 @@ export interface QuoteItemData {
   discounted_price: number | null;
   line_total: number;
   notes: string | null;
+  /** Resolved thumbnail: product image (catalog) or custom_image_url (custom). */
+  image_url: string | null;
   // FF&E fields
   room: string | null;
   dimensions: string | null;

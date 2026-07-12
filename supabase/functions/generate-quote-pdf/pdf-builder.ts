@@ -34,21 +34,25 @@ const TABLE_MARGIN_RIGHT = 40;
 const TABLE_W = PAGE_W - TABLE_MARGIN_LEFT - TABLE_MARGIN_RIGHT;
 const TABLE_Y_START = PAGE_H - 120;
 const HEADER_ROW_H = 28;
-const DATA_ROW_H = 24;
-const ROWS_PER_PAGE = 22;
+// Taller rows leave room for a thumbnail column (fewer rows per page as a result).
+const DATA_ROW_H = 36;
+const ROWS_PER_PAGE = 15;
 
-// Column definitions (proportional widths totaling TABLE_W)
+// Column definitions (proportional widths totaling TABLE_W ≈ 515). Index-sensitive:
+// drawTableRow references these by position, so keep the order in sync.
 const COLUMNS = [
-  { label: '#', width: 22 },
-  { label: 'Product', width: 120 },
-  { label: 'Room', width: 55 },
-  { label: 'SKU', width: 52 },
-  { label: 'Size / Color', width: 56 },
-  { label: 'Qty', width: 30 },
-  { label: 'Unit', width: 32 },
-  { label: 'Price', width: 68 },
-  { label: 'Total', width: 80 },
+  { label: '#', width: 20 },
+  { label: '', width: 34 }, // thumbnail
+  { label: 'Product', width: 98 },
+  { label: 'Room', width: 52 },
+  { label: 'SKU', width: 48 },
+  { label: 'Size / Color', width: 52 },
+  { label: 'Qty', width: 28 },
+  { label: 'Unit', width: 30 },
+  { label: 'Price', width: 64 },
+  { label: 'Total', width: 89 },
 ];
+const IMG_CELL = 30; // rendered thumbnail box (px) inside the 34pt column
 
 /**
  * Build the complete Quote PDF document
@@ -59,7 +63,8 @@ export async function buildQuotePDF(
   coverBytes: Uint8Array | null,
   bgBytes: Uint8Array | null,
   backcoverBytes: Uint8Array | null,
-  logoBytes: Uint8Array | null = null
+  logoBytes: Uint8Array | null = null,
+  itemImageBytes: Record<string, Uint8Array> = {}
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
 
@@ -72,6 +77,13 @@ export async function buildQuotePDF(
   const bgImage = await embedImage(pdfDoc, bgBytes);
   const backcoverImage = await embedImage(pdfDoc, backcoverBytes);
   const logoImage = await embedImage(pdfDoc, logoBytes);
+
+  // Embed per-item thumbnails (defensive — a bad/undecodable image is skipped).
+  const itemImages: Record<string, PDFImage> = {};
+  for (const [itemId, bytes] of Object.entries(itemImageBytes)) {
+    const img = await embedImage(pdfDoc, bytes);
+    if (img) itemImages[itemId] = img;
+  }
 
   // Page 1: Cover (skipped if no cover template uploaded). The seller's logo is
   // overlaid on the cover for the white-label flow (#177).
@@ -90,7 +102,7 @@ export async function buildQuotePDF(
   addClientDetailsPage(pdfDoc, quoteData, templateConfig, fontRegular, fontBold);
 
   // Pages 3+: Items Table
-  addItemsPages(pdfDoc, quoteData, bgImage, fontRegular, fontBold);
+  addItemsPages(pdfDoc, quoteData, bgImage, fontRegular, fontBold, itemImages);
 
   // Last Page: Back Cover (skipped if no back-cover template uploaded)
   if (backcoverImage) addFullPageImage(pdfDoc, backcoverImage);
@@ -112,11 +124,16 @@ async function embedImage(
   bytes: Uint8Array | null
 ): Promise<PDFImage | null> {
   if (!bytes || bytes.length === 0) return null;
-  // PNG magic bytes: 0x89 0x50 0x4E 0x47
-  if (bytes[0] === 0x89 && bytes[1] === 0x50) {
-    return pdfDoc.embedPng(bytes);
+  try {
+    // PNG magic bytes: 0x89 0x50 0x4E 0x47
+    if (bytes[0] === 0x89 && bytes[1] === 0x50) {
+      return await pdfDoc.embedPng(bytes);
+    }
+    return await pdfDoc.embedJpg(bytes);
+  } catch {
+    // Unsupported/corrupt image (e.g. webp) — skip rather than fail the PDF.
+    return null;
   }
-  return pdfDoc.embedJpg(bytes);
 }
 
 function addFullPageImage(pdfDoc: PDFDocument, image: PDFImage): void {
@@ -261,7 +278,8 @@ function addItemsPages(
   quote: QuoteData,
   bgImage: PDFImage | null,
   font: PDFFont,
-  fontBold: PDFFont
+  fontBold: PDFFont,
+  itemImages: Record<string, PDFImage> = {}
 ): void {
   const { items } = quote;
   const totalPages = Math.ceil(items.length / ROWS_PER_PAGE);
@@ -308,7 +326,7 @@ function addItemsPages(
       const rowNum = startIdx + i + 1;
       const isAlt = i % 2 === 1;
 
-      drawTableRow(page, y, rowNum, item, isAlt, font, fontBold);
+      drawTableRow(page, y, rowNum, item, isAlt, font, fontBold, itemImages[item.id] || null);
       y -= DATA_ROW_H;
     }
 
@@ -374,73 +392,76 @@ function drawTableRow(
   item: QuoteData['items'][0],
   isAlt: boolean,
   font: PDFFont,
-  fontBold: PDFFont
+  fontBold: PDFFont,
+  thumb: PDFImage | null
 ): void {
   // Row background
-  if (isAlt) {
-    page.drawRectangle({
-      x: TABLE_MARGIN_LEFT,
-      y: y - DATA_ROW_H,
-      width: TABLE_W,
-      height: DATA_ROW_H,
-      color: COLOR_ROW_ALT,
-    });
-  } else {
-    // White background with slight opacity for readability over background image
-    page.drawRectangle({
-      x: TABLE_MARGIN_LEFT,
-      y: y - DATA_ROW_H,
-      width: TABLE_W,
-      height: DATA_ROW_H,
-      color: COLOR_WHITE,
-      opacity: 0.92,
-    });
-  }
+  page.drawRectangle({
+    x: TABLE_MARGIN_LEFT,
+    y: y - DATA_ROW_H,
+    width: TABLE_W,
+    height: DATA_ROW_H,
+    color: isAlt ? COLOR_ROW_ALT : COLOR_WHITE,
+    opacity: isAlt ? 1 : 0.92, // white rows slightly translucent over the bg image
+  });
 
-  const textY = y - 16;
+  // Text baseline — vertically centered in the taller row.
+  const textY = y - DATA_ROW_H / 2 - 3;
   let x = TABLE_MARGIN_LEFT;
   const fontSize = 7;
 
-  // # column
+  // [0] # column
   page.drawText(String(rowNum), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
   x += COLUMNS[0].width;
 
-  // Product name + dimensions (truncate if needed)
+  // [1] Thumbnail — contain-fit inside the cell, vertically centered.
+  if (thumb) {
+    const scale = Math.min(IMG_CELL / thumb.width, IMG_CELL / thumb.height);
+    const w = thumb.width * scale, h = thumb.height * scale;
+    page.drawImage(thumb, {
+      x: x + (COLUMNS[1].width - w) / 2,
+      y: y - DATA_ROW_H / 2 - h / 2,
+      width: w,
+      height: h,
+    });
+  }
+  x += COLUMNS[1].width;
+
+  // [2] Product name + dimensions (truncate if needed)
   const fullProductName = item.dimensions
     ? `${item.product_name}, ${item.dimensions}`
     : item.product_name;
-  const productName = truncateText(fullProductName, font, fontSize, COLUMNS[1].width - 10);
+  const productName = truncateText(fullProductName, font, fontSize, COLUMNS[2].width - 10);
   page.drawText(productName, { x: x + 4, y: textY, size: fontSize, font: fontBold, color: COLOR_BLACK });
-  x += COLUMNS[1].width;
-
-  // Room
-  const roomText = truncateText(item.room || '-', font, fontSize, COLUMNS[2].width - 10);
-  page.drawText(roomText, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
   x += COLUMNS[2].width;
 
-  // SKU
-  const skuText = truncateText(item.sku || '-', font, fontSize, COLUMNS[3].width - 10);
-  page.drawText(skuText, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
+  // [3] Room
+  const roomText = truncateText(item.room || '-', font, fontSize, COLUMNS[3].width - 10);
+  page.drawText(roomText, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
   x += COLUMNS[3].width;
 
-  // Size / Color
-  const sizeColor = [item.selected_size, item.selected_color].filter(Boolean).join(' / ') || '-';
-  const sizeColorTrunc = truncateText(sizeColor, font, fontSize, COLUMNS[4].width - 10);
-  page.drawText(sizeColorTrunc, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
+  // [4] SKU
+  const skuText = truncateText(item.sku || '-', font, fontSize, COLUMNS[4].width - 10);
+  page.drawText(skuText, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
   x += COLUMNS[4].width;
 
-  // Qty
-  page.drawText(String(item.quantity), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
+  // [5] Size / Color
+  const sizeColor = [item.selected_size, item.selected_color].filter(Boolean).join(' / ') || '-';
+  const sizeColorTrunc = truncateText(sizeColor, font, fontSize, COLUMNS[5].width - 10);
+  page.drawText(sizeColorTrunc, { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
   x += COLUMNS[5].width;
 
-  // Unit
-  page.drawText(item.unit || 'pcs', { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
+  // [6] Qty
+  page.drawText(String(item.quantity), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK });
   x += COLUMNS[6].width;
 
-  // Price — single column: strikethrough original + actual when discounted
-  const priceColRight = x + COLUMNS[7].width - 4;
+  // [7] Unit
+  page.drawText(item.unit || 'pcs', { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY });
+  x += COLUMNS[7].width;
+
+  // [8] Price — single column: strikethrough original + actual when discounted
+  const priceColRight = x + COLUMNS[8].width - 4;
   if (item.discounted_price != null) {
-    // Original price with strikethrough (smaller, gray, above)
     const origStr = formatCurrency(item.unit_price);
     const origSize = fontSize - 1;
     drawRightAligned(page, origStr, priceColRight, textY + 4, origSize, font, COLOR_GRAY);
@@ -451,18 +472,17 @@ function drawTableRow(
       thickness: 0.4,
       color: COLOR_GRAY,
     });
-    // Actual price below
     const discStr = formatCurrency(item.discounted_price);
     drawRightAligned(page, discStr, priceColRight, textY - 7, fontSize, fontBold, COLOR_BLACK);
   } else {
     const priceStr = formatCurrency(item.unit_price);
     drawRightAligned(page, priceStr, priceColRight, textY, fontSize, font, COLOR_BLACK);
   }
-  x += COLUMNS[7].width;
+  x += COLUMNS[8].width;
 
-  // Line Total (right-aligned, bold)
+  // [9] Line Total (right-aligned, bold)
   const totalStr = formatCurrency(item.line_total);
-  drawRightAligned(page, totalStr, x + COLUMNS[8].width - 4, textY, fontSize, fontBold, COLOR_BLACK);
+  drawRightAligned(page, totalStr, x + COLUMNS[9].width - 4, textY, fontSize, fontBold, COLOR_BLACK);
 }
 
 function drawTotals(
