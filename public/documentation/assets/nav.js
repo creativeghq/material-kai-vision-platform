@@ -114,6 +114,7 @@
         { file: "hr-ergani.html", title: "Ergani filing (BYOK)" },
         { file: "hr-self-service.html", title: "Employee self-service" },
       ]},
+      { file: "stock.html", title: "Stock Management", icon: "📦" },
       { file: "email-marketing.html", title: "Email Marketing (BYOK)", icon: "📣" },
       { file: "flows.html", title: "Flows", icon: "🔀" },
       { file: "team-docs.html", title: "Team Docs", icon: "📓" },

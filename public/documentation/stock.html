@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock Management | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Stock Management</div>
+  <h1>Stock Management <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/stock</span></div>
+  <p class="lead">Stock Management is your <strong>multi-warehouse inventory</strong>: what you hold and where, every <strong>movement</strong> (receive / issue / adjust / transfer), <strong>reorder-point</strong> low-stock alerts, physical <strong>stock counts</strong>, <strong>inbound container tracking</strong>, an <strong>AI resupply forecast</strong>, and a bridge to buy more when you run low. It was extracted from Finance into a first-class paid add-on so businesses that live and die by inventory get a proper home for it. This page covers each section, plus the two shipping integrations — <strong>ShipsGo</strong> container tracking (bring-your-own-key) and <strong>SeaRates</strong> freight quotes.</p>
+
+  <div class="callout"><p><strong>Where:</strong> enable <strong>Stock Management</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on), then open it at <span class="badge route">/stock</span>. Everything is <strong>per workspace</strong>. Note: inventory used to live under <a href="finance-op-warehouse.html">Finance → Warehouse</a>; it's now this dedicated module.</p></div>
+
+  <h2>Overview — what you hold</h2>
+  <p>The overview is your at-a-glance inventory health: <strong>Stock items</strong>, <strong>Warehouses</strong>, <strong>Units on hand</strong> and <strong>Units reserved</strong>, plus the numbers that need action — <strong>Low stock</strong> (items below their reorder point), <strong>Out of stock</strong>, <strong>Open counts</strong> (stocktakes in progress) and <strong>Pending intake</strong> (inbound not yet received). When all's well it reads <em>“Nothing below its reorder point. Inventory is healthy.”</em></p>
+
+  <h2>Movements — receive, issue, adjust, transfer</h2>
+  <p><strong>What it is —</strong> the ledger of every change to stock. <strong>Why it matters —</strong> on-hand numbers are only trustworthy if every in and out is recorded, so movements are the source of truth behind the overview. Each movement records the item, the quantity, a <strong>reason</strong> and a source, and moves stock between states/warehouses:</p>
+  <ul class="feat">
+    <li><strong>Receive</strong> — stock coming in (e.g. from a supplier or an inbound container).</li>
+    <li><strong>Issue</strong> — stock going out (sold, consumed).</li>
+    <li><strong>Adjust</strong> — a correction (breakage, a stocktake difference).</li>
+    <li><strong>Transfer</strong> — moving stock between your warehouses.</li>
+  </ul>
+
+  <h2>Stock counts (stocktake)</h2>
+  <p><strong>What it is —</strong> a physical count reconciled against the system. <strong>How —</strong> click <strong>New stock count</strong>, pick the <strong>warehouse</strong> (optionally name it, e.g. <em>“Q3 physical count”</em>), and count each item; differences post as <strong>adjust</strong> movements so on-hand matches reality. Counts in progress show as <strong>Open counts</strong> on the overview.</p>
+
+  <h2>Reorder points &amp; the resupply bridge</h2>
+  <p>Each item can carry a <strong>reorder point</strong>; when on-hand falls below it, the item shows under <strong>Low stock</strong>. From there you can act:</p>
+  <ul class="feat">
+    <li><strong>Reorder bridge (Stock → Sourcing).</strong> Turn a low-stock item straight into a purchase — it bridges into the sourcing/purchase flow so you can restock without re-keying.</li>
+    <li><strong>Inventory valuation.</strong> Stock is valued from each product's <strong>cost</strong>, so you always know what your inventory is <em>worth</em>, not just how many units you hold.</li>
+  </ul>
+
+  <h2>AI resupply forecast <span style="font-size:13px;color:var(--muted)">· credit-metered</span></h2>
+  <p><strong>What it is —</strong> a trend-based forecast that tells you <em>what to reorder and when</em>. <strong>Why it matters —</strong> a static reorder point doesn't know that demand is climbing; the forecast reads your movement history and projects it. For each item it shows a <strong>Days cover</strong> (how long current stock lasts at the recent rate), a <strong>stockout risk</strong>, and a <strong>Recommendation</strong>. Because it runs an AI/analytics pass, it's <strong>metered against your <a href="account-credits.html">credits</a></strong> (charged by usage).</p>
+
+  <h2>Inbound container tracking (ShipsGo) <span class="badge gated">BYOK</span></h2>
+  <p><strong>What it is —</strong> live tracking of shipments coming to you, by <strong>container</strong> or <strong>Bill of Lading</strong>. <strong>Why it matters —</strong> you see where inbound stock actually is and when it'll land, and can <strong>Receive it into a warehouse</strong> when it arrives. Tracking uses <strong>ShipsGo</strong> and is <strong>bring-your-own-key</strong>.</p>
+  <h3>Set up ShipsGo — exactly what to add</h3>
+  <p>In the Stock module's <strong>shipping credentials</strong> card, enter:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>ShipsGo API key</strong></td><td>Your ShipsGo API key (from your ShipsGo account).</td></tr>
+      <tr><td><strong>Base URL</strong></td><td>The ShipsGo API endpoint (default <code>https://api.shipsgo.com/v2</code>).</td></tr>
+    </tbody>
+  </table></div>
+  <p>Once <strong>Configured</strong>, add an inbound shipment with its <strong>Container</strong> number (e.g. <code>MSCU1234567</code>) or <strong>Bill of Lading</strong>, an optional <strong>Carrier / line</strong> and <strong>Reference</strong>, and optionally <strong>link it to a purchase order</strong>. the module then pulls milestone updates; <strong>Refresh</strong> re-checks, and <strong>Receive into warehouse</strong> books it in on arrival. Tracking refreshes are credit-metered.</p>
+
+  <h2>Freight quotes (SeaRates)</h2>
+  <p><strong>What it is —</strong> getting a shipping price for an order. <strong>Where —</strong> on a <a href="quotes-build.html">quote</a>, under <strong>Extras</strong>: <strong>“Get shipping quote”</strong> fetches freight offers, and a chosen offer is added to the quote as a shipping line item. <strong>How it's provided —</strong> freight rates come from <strong>SeaRates</strong>, which is <strong>operator-provided</strong>: a tenant's request <strong>routes to the operator</strong>, who returns the offers (they appear on the quote when answered). So you don't need your own SeaRates key — you request, the platform operator fulfils.</p>
+  <div class="callout"><p><strong>Two different shipping integrations, two models:</strong> <strong>ShipsGo tracking</strong> is <em>your</em> key (BYOK, per workspace); <strong>SeaRates freight quotes</strong> are <em>operator-provided</em> (you request, the operator answers). Don't confuse the two.</p></div>
+
+  <h2>Also here</h2>
+  <ul class="feat">
+    <li><strong>Inbound-document intake</strong> — bring inbound paperwork into the module.</li>
+    <li><strong>Marketplace listing</strong> — list surplus/last-stock straight from inventory to the <a href="discover-marketplace.html">Marketplace</a>.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Day-to-day:</strong> watch the overview for <em>Low stock</em> → check the <em>AI resupply forecast</em> for what's actually at risk → reorder via the bridge → track the inbound container (ShipsGo) → <em>Receive into warehouse</em> on arrival → run a periodic <em>stock count</em> to keep it honest.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
