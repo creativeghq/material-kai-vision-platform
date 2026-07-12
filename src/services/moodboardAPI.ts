@@ -556,8 +556,8 @@ class MoodBoardAPI {
    * a `moodboard_quote_requests` link so the board's CREATOR gets the lead (this
    * is what populates the "Quote reqs" stat on their profile). The creator is
    * notified through the `moodboard_quote_requested` Flow — no hardcoded
-   * notification insert. Commission is left at the table default; actual pricing
-   * is governed by the marketplace pyramid, not a per-request commission.
+   * notification insert. Actual pricing is governed by the marketplace resale
+   * pyramid.
    *
    * Throws with a user-facing message on the guarded cases (not signed in, own
    * board, empty board) so the caller can toast it directly.

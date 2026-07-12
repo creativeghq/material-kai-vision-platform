@@ -29,7 +29,7 @@ export type Persona =
 export type Capability =
   | 'platform.admin'        // /admin shell: modules, secrets, base pricing, user mgmt
   | 'catalog.import'        // operator-assisted catalog ingestion (operator only)
-  | 'network.manage'        // child workspaces, commission %, referral links (/network)
+  | 'network.manage'        // child workspaces, catalog access, referral links (/network)
   | 'pricing.manage'        // markup + pricing rules for this node's offerings
   | 'finance.manage'        // finance module: settings, documents, payments
   | 'invoice.issue'         // create/transmit invoices, receipts, credit/delivery notes

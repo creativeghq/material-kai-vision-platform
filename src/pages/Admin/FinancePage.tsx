@@ -65,9 +65,7 @@ import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
 import { SourcingBoardPanel } from '@/modules/finance/components/SourcingBoardPanel';
-import { MarketplaceEarningsTab } from '@/modules/finance/components/MarketplaceEarningsTab';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
-import { CommissionSummaryCard } from '@/components/business/marketplace/CommissionSummaryCard';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -412,11 +410,6 @@ const FinancePage: React.FC = () => {
               <Bell className="h-4 w-4 mr-2" /> Follow-ups ({followUps.length})
             </TabsTrigger>
             {!isAccountant && (
-              <TabsTrigger value="marketplace" className="w-full justify-start">
-                <TrendingUp className="h-4 w-4 mr-2" /> Marketplace
-              </TabsTrigger>
-            )}
-            {!isAccountant && (
               <TabsTrigger value="sourcing" className="w-full justify-start">
                 <PackageSearch className="h-4 w-4 mr-2" /> Sourcing
               </TabsTrigger>
@@ -472,9 +465,6 @@ const FinancePage: React.FC = () => {
 
             {/* Revenue trend + period-over-period growth signal (reuses the 12-mo P&L). */}
             <RevenueTrendCard rows={pnl} />
-
-            {/* Marketplace commission earned (downline catalog sales) — renders only when non-zero */}
-            <CommissionSummaryCard />
 
             {/* AR / AP buckets side-by-side */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -848,11 +838,6 @@ const FinancePage: React.FC = () => {
           {/* ─────────── PARTIES ─────────── */}
           <TabsContent value="parties" className="space-y-4">
             <PartiesTab workspaceId={workspaceId} statementsEnabled={settings?.statements_enabled ?? false} autoOpenParty={autoOpenParty} financeBase={financeBase} />
-          </TabsContent>
-
-          {/* ─────────── SETTINGS ─────────── */}
-          <TabsContent value="marketplace" className="space-y-4">
-            <MarketplaceEarningsTab />
           </TabsContent>
 
           {/* Warehouse/inventory moved out of Finance into its own paid Stock module. Keep a pointer

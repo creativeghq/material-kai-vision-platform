@@ -8,7 +8,6 @@ import { marketplacePricingService, type WorkspacePrice } from '@/services/marke
  * Shows a reseller (dealer/architect) workspace its own buy price for an operator-catalog
  * product — i.e. what THEY pay (cost_basis = the resale-chain cost). Hidden for the operator
  * itself, for products with no resolvable cost, and when the global Show-Prices toggle is off.
- * #227: commission was retired from the price path, so this no longer gates on a commission %.
  */
 export const WorkspaceCostBadge: React.FC<{ productId: string; className?: string }> = ({ productId, className }) => {
   const { activeWorkspaceId } = useWorkspace();

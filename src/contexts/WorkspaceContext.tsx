@@ -17,7 +17,7 @@ import { ACTIVE_WORKSPACE_KEY } from '@/utils/activeWorkspace';
  *                        nobody else. Drives "can I administer the PLATFORM" decisions
  *                        (the /admin/* surfaces, module toggles, operator finance).
  *   3. marketplaceRank — operator | dealer | architect, derived from the active
- *                        workspace's node flags. Drives catalog/commission behaviour.
+ *                        workspace's node flags. Drives catalog behaviour.
  *
  * Active-workspace selection is persisted per-user in localStorage for now; the
  * durable home is `app_metadata.workspace_id` on the JWT (a later increment that
@@ -35,8 +35,6 @@ export interface WorkspaceNode {
   canSupplyProducts: boolean;
   /** What this node may sell from (set by its parent): operator_catalog | own_products_only. */
   catalogAccess: 'operator_catalog' | 'own_products_only';
-  /** Parent's commission cut on this node's operator-catalog sales (%). */
-  commissionPct: number;
 }
 
 export interface WorkspaceMembership {
@@ -102,7 +100,6 @@ function mapMembership(row: any): WorkspaceMembership | null {
       parentWorkspaceId: ws.parent_workspace_id ?? null,
       canSupplyProducts: !!ws.can_supply_products,
       catalogAccess: ws.catalog_access === 'own_products_only' ? 'own_products_only' : 'operator_catalog',
-      commissionPct: typeof ws.commission_pct === 'number' ? ws.commission_pct : Number(ws.commission_pct ?? 0),
     },
   };
 }
@@ -142,7 +139,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const { data, error } = await supabase
       .from('workspace_members')
       .select(
-        'role, status, workspace:workspaces(id, name, slug, is_root, parent_workspace_id, can_supply_products, catalog_access, commission_pct)',
+        'role, status, workspace:workspaces(id, name, slug, is_root, parent_workspace_id, can_supply_products, catalog_access)',
       )
       .eq('user_id', user.id)
       .eq('status', 'active');

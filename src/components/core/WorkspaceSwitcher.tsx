@@ -105,7 +105,6 @@ const CreateWorkspaceDialog: React.FC<{
   // A dealer can only create architects; an operator can create either.
   const [type, setType] = useState<'dealer' | 'architect'>(parentRank === 'operator' ? 'dealer' : 'architect');
   const [catalogAccess, setCatalogAccess] = useState<'operator_catalog' | 'own_products_only'>('operator_catalog');
-  const [commissionPct, setCommissionPct] = useState('5');
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -117,7 +116,6 @@ const CreateWorkspaceDialog: React.FC<{
         parentId,
         canSupplyProducts: type === 'dealer',
         catalogAccess,
-        commissionPct: parseFloat(commissionPct) || 0,
       });
       setName('');
       onCreated();
@@ -149,26 +147,16 @@ const CreateWorkspaceDialog: React.FC<{
               </Select>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Catalog access</Label>
-              <Select value={catalogAccess} onValueChange={(v: any) => setCatalogAccess(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="operator_catalog">Full operator catalog</SelectItem>
-                  <SelectItem value="own_products_only">Own products only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Commission %</Label>
-              <Input type="number" step="0.5" min="0" max="100" value={commissionPct}
-                onChange={(e) => setCommissionPct(e.target.value)} />
-            </div>
+          <div className="space-y-1">
+            <Label>Catalog access</Label>
+            <Select value={catalogAccess} onValueChange={(v: any) => setCatalogAccess(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="operator_catalog">Full operator catalog</SelectItem>
+                <SelectItem value="own_products_only">Own products only</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Commission is your cut on this workspace's sales from the operator catalog. They add their own margin on top.
-          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

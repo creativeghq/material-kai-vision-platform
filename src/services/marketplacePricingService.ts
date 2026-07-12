@@ -1,31 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export interface CommissionLine {
-  on_workspace: string;
-  rank: string;
-  commission_pct: number;
-  commission_amount: number;
-  paid_to_parent: string | null;
-}
-
 export interface WorkspacePrice {
   mode: 'own_product' | 'operator_catalog';
   base_price: number | null;
   currency: string;
-  ancestor_commission_pct: number;
   cost_basis: number | null;
-  commission_breakdown: CommissionLine[];
-}
-
-export interface CommissionSummary {
-  total_earned: number;
-  currency: string;
-  lines: number;
-  by_seller: { seller: string; amount: number; lines: number }[];
 }
 
 export const marketplacePricingService = {
-  /** Cascade cost of a product to a given workspace (C2: operator base + Σ ancestor commission). */
+  /** Cascade cost of a product to a given workspace (operator base resolved down the resale chain). */
   async getProductPrice(workspaceId: string, productId: string): Promise<WorkspacePrice | null> {
     const { data, error } = await supabase.rpc('get_product_price_for_workspace', {
       p_workspace_id: workspaceId,
@@ -34,30 +17,4 @@ export const marketplacePricingService = {
     if (error) throw error;
     return (data as WorkspacePrice) ?? null;
   },
-
-  /** Commission earned by a workspace as beneficiary (parent's cut on children's catalog sales). */
-  async getCommissionSummary(workspaceId: string): Promise<CommissionSummary> {
-    const { data, error } = await supabase.rpc('get_commission_summary', { p_workspace_id: workspaceId });
-    if (error) throw error;
-    return (data as CommissionSummary) ?? { total_earned: 0, currency: 'EUR', lines: 0, by_seller: [] };
-  },
-
-  /** Per-sale commission ledger rows for the beneficiary (operator/dealer earnings detail). */
-  async getCommissionLedger(workspaceId: string): Promise<CommissionLedgerRow[]> {
-    const { data, error } = await supabase.rpc('get_commission_ledger', { p_workspace_id: workspaceId });
-    if (error) throw error;
-    return (data ?? []) as CommissionLedgerRow[];
-  },
 };
-
-export interface CommissionLedgerRow {
-  occurred_at: string;
-  seller: string;
-  seller_rank: string;
-  product: string;
-  category: string;
-  base_price: number;
-  commission_pct: number;
-  commission_amount: number;
-  currency: string;
-}

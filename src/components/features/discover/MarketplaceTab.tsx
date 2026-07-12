@@ -376,7 +376,7 @@ export const MarketplaceTab: React.FC = () => {
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           {loading ? 'Searching…' : `${count} listing${count === 1 ? '' : 's'}`}
-          <span className="hidden sm:inline"> · surplus &amp; last-stock, contact sellers directly — zero commission</span>
+          <span className="hidden sm:inline"> · surplus &amp; last-stock, contact sellers directly</span>
         </p>
         {activeFilterCount > 0 && (
           <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 cursor-pointer">

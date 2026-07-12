@@ -2,7 +2,7 @@
  * #176 — supplier per-product pricing + supply mode.
  *
  * The price set here is the BASE the cascade resolver reads:
- *  - root operator → the catalog base price every downstream tier inherits (+ commission);
+ *  - root operator → the catalog base price every downstream tier inherits;
  *  - a dealer on their OWN product → their sell price to the tier below.
  *
  * Writes product_prices (UNIQUE workspace_id,product_id → upsert) + products.supply_mode.

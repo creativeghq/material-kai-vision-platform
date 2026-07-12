@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Store, Check, X, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -36,7 +35,6 @@ export const ResellerApplicationsTab: React.FC = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
-  const [commission, setCommission] = useState<Record<string, string>>({});
 
   useEffect(() => { load(); }, []);
 
@@ -76,9 +74,8 @@ export const ResellerApplicationsTab: React.FC = () => {
   const approve = async (app: ResellerApplication) => {
     setBusyId(app.id);
     try {
-      const pct = Number(commission[app.id] ?? '5');
-      await resellerApplicationsService.approve(app.id, Number.isFinite(pct) ? pct : 5);
-      setApps((prev) => prev.map((a) => a.id === app.id ? { ...a, status: 'approved', commission_pct: pct } : a));
+      await resellerApplicationsService.approve(app.id);
+      setApps((prev) => prev.map((a) => a.id === app.id ? { ...a, status: 'approved' } : a));
       toast({ title: 'Reseller approved', description: 'Their workspace is now a reseller of the operator catalog.' });
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Could not approve.', variant: 'destructive' });
@@ -178,29 +175,15 @@ export const ResellerApplicationsTab: React.FC = () => {
                         </Button>
                       )}
                       {app.status === 'aade_verified' && (
-                        <>
-                          <div className="flex items-center gap-1">
-                            <Input
-                              type="number"
-                              value={commission[app.id] ?? '5'}
-                              onChange={(e) => setCommission((c) => ({ ...c, [app.id]: e.target.value }))}
-                              className="h-8 w-16 text-sm"
-                              min={0}
-                              max={100}
-                              aria-label="Commission %"
-                            />
-                            <span className="text-xs text-muted-foreground">%</span>
-                          </div>
-                          <Button
-                            size="sm"
-                            className="h-8 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => approve(app)}
-                            disabled={busyId === app.id}
-                          >
-                            {busyId === app.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                            <span className="ml-1.5">Approve</span>
-                          </Button>
-                        </>
+                        <Button
+                          size="sm"
+                          className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => approve(app)}
+                          disabled={busyId === app.id}
+                        >
+                          {busyId === app.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                          <span className="ml-1.5">Approve</span>
+                        </Button>
                       )}
                       <Button
                         size="sm"

@@ -2,7 +2,7 @@
 //
 // A plain signup is a CONSUMER of the operator. To become a reseller a user must
 // supply a business VAT number; the operator verifies it with ΑΑΔΕ and approves,
-// which upgrades their workspace (kind='reseller' + CRM mirror + commission).
+// which upgrades their workspace (kind='reseller' + CRM mirror).
 //
 // Backend: reseller_applications table + submit/approve/reject SECURITY DEFINER
 // RPCs, and the myaade-rgwspublic2 `verify-reseller-application` action for the
@@ -35,7 +35,6 @@ export interface ResellerApplication {
   aade_valid: boolean | null;
   aade_snapshot: Record<string, unknown> | null;
   aade_checked_at: string | null;
-  commission_pct: number | null;
   review_notes: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -86,10 +85,9 @@ export const resellerApplicationsService = {
   },
 
   /** Operator: approve (requires a passing ΑΑΔΕ check). Returns the reseller workspace id. */
-  async approve(applicationId: string, commissionPct = 5): Promise<string> {
+  async approve(applicationId: string): Promise<string> {
     const { data, error } = await sb.rpc('approve_reseller_application', {
       p_application_id: applicationId,
-      p_commission_pct: commissionPct,
     });
     if (error) throw error;
     return data as string;

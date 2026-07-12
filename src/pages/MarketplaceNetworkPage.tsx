@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Network, Save, Link2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
@@ -19,7 +18,6 @@ interface WsRow {
   kind?: 'operator' | 'reseller' | 'consumer';
   can_supply_products: boolean;
   catalog_access: 'operator_catalog' | 'own_products_only';
-  commission_pct: number;
 }
 
 const rankOf = (w: WsRow) =>
@@ -31,7 +29,7 @@ const MarketplaceNetworkPage: React.FC = () => {
   const { toast } = useToast();
   const { memberships, refresh } = useWorkspace();
   const [rows, setRows] = useState<WsRow[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, { commission_pct: string; catalog_access: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { catalog_access: string }>>({});
   const [einvoicing, setEinvoicing] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -52,7 +50,7 @@ const MarketplaceNetworkPage: React.FC = () => {
       ]);
       setRows(data);
       setEinvoicing(ent);
-      setDrafts(Object.fromEntries(data.map((r) => [r.id, { commission_pct: String(r.commission_pct), catalog_access: r.catalog_access }])));
+      setDrafts(Object.fromEntries(data.map((r) => [r.id, { catalog_access: r.catalog_access }])));
     } catch (err: any) {
       toast({ title: 'Failed to load network', description: err?.message, variant: 'destructive' });
     } finally {
@@ -67,7 +65,6 @@ const MarketplaceNetworkPage: React.FC = () => {
     try {
       setSavingId(row.id);
       await workspaceManagementService.updateChildSettings(row.id, {
-        commissionPct: parseFloat(d.commission_pct) || 0,
         catalogAccess: d.catalog_access as any,
       });
       toast({ title: `Updated ${row.name}` });
@@ -110,7 +107,7 @@ const MarketplaceNetworkPage: React.FC = () => {
       <PageHeader
         icon={Network}
         title="Network"
-        subtitle="Your dealers, architects and their commission — you set the cut on each node's operator-catalog sales."
+        subtitle="Your dealers and architects — manage each node's catalog access and entitlements."
       />
       <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-6">
       <Card>
@@ -126,18 +123,17 @@ const MarketplaceNetworkPage: React.FC = () => {
                   <th className="px-4 py-2 text-left">Rank</th>
                   <th className="px-4 py-2 text-left">Parent</th>
                   <th className="px-4 py-2 text-left">Catalog access</th>
-                  <th className="px-4 py-2 text-right">Commission %</th>
                   <th className="px-4 py-2 text-center">e-Invoicing</th>
                   <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.filter((r) => !r.is_root).length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No sub-workspaces yet. Create one from the workspace switcher.</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No sub-workspaces yet. Create one from the workspace switcher.</td></tr>
                 )}
                 {rows.filter((r) => !r.is_root).map((r) => {
                   const canEdit = editable(r);
-                  const d = drafts[r.id] ?? { commission_pct: String(r.commission_pct), catalog_access: r.catalog_access };
+                  const d = drafts[r.id] ?? { catalog_access: r.catalog_access };
                   return (
                     <tr key={r.id} className="border-b border-border/30">
                       <td className="px-4 py-2 font-medium">{r.name}</td>
@@ -154,15 +150,6 @@ const MarketplaceNetworkPage: React.FC = () => {
                           </Select>
                         ) : (
                           <span className="text-muted-foreground">{r.catalog_access === 'own_products_only' ? 'Own only' : 'Full catalog'}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {canEdit ? (
-                          <Input type="number" step="0.5" min="0" max="100" value={d.commission_pct}
-                            onChange={(e) => setDrafts((s) => ({ ...s, [r.id]: { ...d, commission_pct: e.target.value } }))}
-                            className="h-8 w-20 ml-auto text-right" />
-                        ) : (
-                          <span>{r.commission_pct}%</span>
                         )}
                       </td>
                       <td className="px-4 py-2 text-center">
