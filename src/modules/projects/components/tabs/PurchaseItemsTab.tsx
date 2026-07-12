@@ -24,6 +24,7 @@ import {
 } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import {
   projectsService,
   PURCHASE_ITEM_TYPES,
@@ -62,6 +63,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
   projectId, workspaceId, projectName,
 }) => {
   const { toast } = useToast();
+  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [rows, setRows] = useState<ProjectPurchaseItem[]>([]);
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +118,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
       toast({ title: `Sheet ready — ${res.page_count} page${res.page_count === 1 ? '' : 's'}` });
       window.open(res.pdf_url, '_blank', 'noopener');
     } catch (err: any) {
+      if (await handleEmailSendError(err, { workspaceId, feature: 'purchase order' })) return;
       toast({ title: 'Sheet generation failed', description: err?.message, variant: 'destructive' });
     } finally { setGeneratingSheet(false); }
   };
@@ -207,6 +210,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
         />
       )}
       {dialogItem && !workspaceId && (() => { toast({ title: 'This project has no workspace — purchase items need one.', variant: 'destructive' }); setDialogItem(null); return null; })()}
+      {connectEmailGate}
     </div>
   );
 };

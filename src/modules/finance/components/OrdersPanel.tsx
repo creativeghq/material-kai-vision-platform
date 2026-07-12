@@ -19,6 +19,7 @@ import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
@@ -546,6 +547,7 @@ const MATCH_META: Record<ThreeWayMatchStatus, { label: string; cls: string }> = 
 const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClose: () => void; onChanged: () => void }> = ({ orderId, open, onClose, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -898,7 +900,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       const { data, error } = await supabase.functions.invoke('generate-purchase-sheet-pdf', {
         body: { order_id: order.id, send: true },
       });
-      if (error) throw new Error(await edgeErrorMessage(error, 'Failed to send purchase order'));
+      if (error) {
+        if (await handleEmailSendError(error, { workspaceId: order.workspace_id, feature: 'purchase order' })) return;
+        throw new Error(await edgeErrorMessage(error, 'Failed to send purchase order'));
+      }
       if (!data?.success) throw new Error(data?.error || 'Failed to send purchase order');
       await load(order.id); onChanged();
       toast({
@@ -926,6 +931,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
   const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[1400px] w-[95vw] max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle></DialogHeader>
@@ -1374,6 +1380,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
         />
       )}
     </Dialog>
+    {connectEmailGate}
+    </>
   );
 };
 

@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { catalogsService, type PresentationCatalog } from '@/services/catalogsService';
 import { crmCategoriesService, type CrmCategorySummary, type ResolvedRecipient } from '@/services/crmCategoriesService';
 import { getErrorMessage } from '@/core/errors/utils';
+import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 
 interface Props {
   open: boolean;
@@ -20,6 +21,7 @@ interface Props {
 
 export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, onSent }) => {
   const { toast } = useToast();
+  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loadingCats, setLoadingCats] = useState(true);
@@ -104,6 +106,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
       toast({ title: `Sent to ${res.sent_count} recipients`, description: res.failed_count > 0 ? `${res.failed_count} failed.` : undefined });
       if (onSent) onSent(res.send_batch_id);
     } catch (err) {
+      if (await handleEmailSendError(err, { workspaceId: catalog.workspace_id, feature: 'catalog' })) return;
       toast({ title: 'Send failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally { setSending(false); }
   };
@@ -111,6 +114,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
   const canSend = catalog.status === 'published' && recipients.length > 0 && subject.trim().length > 0;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => !v && !sending && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
@@ -257,5 +261,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
         )}
       </DialogContent>
     </Dialog>
+    {connectEmailGate}
+    </>
   );
 };

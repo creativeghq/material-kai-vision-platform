@@ -29,6 +29,7 @@ import { fiscalConnectorService, posTerminalService, type PosTerminal } from '@/
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { parseDecimal } from '@/utils/decimal';
 import { edgeError } from '@/utils/edgeError';
+import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 
 interface SellItem {
   id: string;
@@ -76,6 +77,7 @@ const PosPage: React.FC = () => {
   const { toast } = useToast();
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
+  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
 
   const [items, setItems] = useState<SellItem[]>([]);
   const [vatRate, setVatRate] = useState(24);
@@ -474,7 +476,10 @@ const PosPage: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('finance-send-invoice-email', {
         body: { invoice_id: result.invoiceId, ...(to ? { to } : {}) },
       });
-      if (error) throw await edgeError(error);
+      if (error) {
+        if (await handleEmailSendError(error, { workspaceId: activeWorkspaceId, feature: 'invoice' })) return;
+        throw await edgeError(error);
+      }
       const res = data as { ok?: boolean; sent_to?: string; error?: string };
       // No customer email on file → ask for an address once and retry.
       if (!res?.ok && /no customer email/i.test(res?.error ?? '')) {
@@ -976,6 +981,7 @@ const PosPage: React.FC = () => {
           </div>
         );
       })()}
+      {connectEmailGate}
     </div>
   );
 };

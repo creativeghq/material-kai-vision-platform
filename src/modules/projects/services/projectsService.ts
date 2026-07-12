@@ -2,6 +2,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { edgeError } from '@/utils/edgeError';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { EmailSendError } from '@/modules/email/services/emailService';
+import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 
 // =====================================================
 // TYPES
@@ -1254,7 +1256,8 @@ class ProjectsService {
         project_name: opts.project_name,
       },
     });
-    if (error) throw await edgeError(error, 'Purchase sheet generation failed');
+    // Typed error so UI can open the Connect-email gate on `workspace_sender_required` (send mode).
+    if (error) { const { code, message } = await unwrapEmailSendError(error); throw new EmailSendError(message, (code as any) ?? 'unknown'); }
     if (!(data as any)?.success) throw new Error((data as any)?.error || 'Purchase sheet generation failed');
     return data as { pdf_url: string; pdf_storage_path: string; page_count: number; item_count: number; mode: string };
   }

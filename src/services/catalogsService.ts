@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { EmailSendError } from '@/modules/email/services/emailService';
+import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 
 export type CatalogStatus = 'draft' | 'generating' | 'ready' | 'published' | 'archived' | 'failed';
 
@@ -687,7 +689,8 @@ class CatalogsService {
         ensure_grants: input.ensureGrants ?? true,
       },
     });
-    if (error) throw error;
+    // Typed error so UI can open the Connect-email gate on `workspace_sender_required`.
+    if (error) { const { code, message } = await unwrapEmailSendError(error); throw new EmailSendError(message, (code as any) ?? 'unknown'); }
     if (!data?.success) throw new Error(data?.error || 'Send failed');
     return data as DispatchSendResponse;
   }

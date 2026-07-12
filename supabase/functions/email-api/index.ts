@@ -386,6 +386,10 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         }
         const fromName = body.fromName || sender.fromName;
         const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+        // Reply-To default: the caller's explicit replyTo wins; otherwise the resolved sender's
+        // configured Reply-To (workspace BYOK reply_to, or the platform default_reply_to). This
+        // makes the workspace's Reply-To apply to every send automatically.
+        const replyTo = body.replyTo || sender.replyTo || undefined;
         const toAddresses = Array.isArray(body.to) ? body.to : [body.to];
 
         // Get domain for tracking
@@ -407,7 +411,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             to_email: toAddresses[0],
             cc_emails: body.cc,
             bcc_emails: body.bcc,
-            reply_to: body.replyTo,
+            reply_to: replyTo,
             subject,
             html_body: htmlBody,
             text_body: textBody,
@@ -447,7 +451,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           text: textBody,
           cc: body.cc,
           bcc: body.bcc,
-          reply_to: body.replyTo,
+          reply_to: replyTo,
           tags,
           attachments: body.attachments,
         });

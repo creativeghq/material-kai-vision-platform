@@ -17,6 +17,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { ordersService } from '@/modules/finance/services/ordersService';
 import { humanizeLabel } from '@/utils/humanize';
+import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -139,6 +140,7 @@ export const PartyAccountSummary: React.FC<{
 export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, isSupplier, ledgerHref }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
+  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState<{ invoicedTotal: number; paidTotal: number; outstandingTotal: number; quoteCount: number } | null>(null);
   const [supplierAcct, setSupplierAcct] = useState<{ billedTotal: number; paidTotal: number; outstandingTotal: number; orderedTotal: number } | null>(null);
@@ -205,6 +207,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         toast({ title: 'Could not send', description: res.error ?? 'No email on file for this customer', variant: 'destructive' });
       }
     } catch (e: any) {
+      if (await handleEmailSendError(e, { workspaceId: activeWorkspaceId, feature: 'statement' })) return;
       toast({ title: 'Failed to send', description: e?.message, variant: 'destructive' });
     } finally {
       setEmailing(false);
@@ -241,6 +244,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
 
       {/* Receivables & payables are managed PER ORDER now — open an order to add/see them.
           "Top items to push" renders separately (CustomerTopItemsCard) BELOW the orders list. */}
+      {connectEmailGate}
     </div>
   );
 };

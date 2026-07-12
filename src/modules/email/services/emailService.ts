@@ -263,6 +263,7 @@ export class EmailService {
   async getWorkspaceConfig(workspaceId: string): Promise<{
     from_email: string | null;
     from_name: string | null;
+    reply_to: string | null;
     enabled: boolean;
     has_api_key: boolean;
     effective_daily_limit: number;
@@ -272,6 +273,7 @@ export class EmailService {
     /** The platform default sender (global email_settings) — shown when source = 'platform'. */
     platform_from_email: string | null;
     platform_from_name: string | null;
+    platform_reply_to: string | null;
   } | null> {
     const { data, error } = await supabase.rpc('get_workspace_email_config_status', { p_workspace_id: workspaceId });
     if (error) throw error;
@@ -280,6 +282,7 @@ export class EmailService {
     return {
       from_email: row.from_email ?? null,
       from_name: row.from_name ?? null,
+      reply_to: row.reply_to ?? null,
       enabled: row.enabled ?? true,
       has_api_key: !!row.has_api_key,
       effective_daily_limit: row.effective_daily_limit ?? 0,
@@ -287,16 +290,36 @@ export class EmailService {
       source: row.source === 'workspace' ? 'workspace' : 'platform',
       platform_from_email: row.platform_from_email ?? null,
       platform_from_name: row.platform_from_name ?? null,
+      platform_reply_to: row.platform_reply_to ?? null,
     };
+  }
+
+  /** Send a test email to `to` using this workspace's resolved sender (BYOK when configured).
+   *  Surfaces EmailSendError (incl. `workspace_sender_required`) so the caller can react. */
+  async sendTestEmail(workspaceId: string, to: string): Promise<{ messageId: string }> {
+    const html = `<div style="font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.6;color:#222">
+      <p>This is a test email from your workspace's email sender.</p>
+      <p>If you received this, your sending identity (From address${''}, name and Reply-To) is working. 🎉</p>
+    </div>`;
+    return this.sendEmail({
+      to,
+      subject: 'Test email — your sender is working',
+      html,
+      text: 'This is a test email from your workspace email sender. If you received this, your sender is working.',
+      emailType: 'transactional',
+      workspaceId,
+      requireWorkspaceSender: true,
+    });
   }
 
   /** Save this workspace's Resend BYOK config. The API key is only written when a new value is
    *  provided — a blank key preserves the stored one (the masked form never wipes a secret). */
-  async saveWorkspaceConfig(workspaceId: string, input: { apiKey?: string; fromEmail: string; fromName?: string | null; enabled: boolean }): Promise<void> {
+  async saveWorkspaceConfig(workspaceId: string, input: { apiKey?: string; fromEmail: string; fromName?: string | null; replyTo?: string | null; enabled: boolean }): Promise<void> {
     const payload: Record<string, any> = {
       workspace_id: workspaceId,
       from_email: input.fromEmail || null,
       from_name: input.fromName || null,
+      reply_to: input.replyTo || null,
       enabled: input.enabled,
       updated_at: new Date().toISOString(),
     };

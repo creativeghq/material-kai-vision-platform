@@ -14,21 +14,25 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
 import { Badge } from '@/components/core/ui/badge';
-import { Loader2, Save, Mail, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, Mail, ExternalLink, ShieldCheck, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { emailService } from '@/modules/email/services/emailService';
+import { supabase } from '@/integrations/supabase/client';
+import { emailService, isSenderNotConfigured } from '@/modules/email/services/emailService';
 
 export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?: () => void }> = ({ workspaceId, onSaved }) => {
   const { toast } = useToast();
   const [apiKey, setApiKey] = useState('');
   const [fromEmail, setFromEmail] = useState('');
   const [fromName, setFromName] = useState('');
+  const [replyTo, setReplyTo] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [limit, setLimit] = useState<number | null>(null);
   const [sentToday, setSentToday] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testTo, setTestTo] = useState('');
+  const [testing, setTesting] = useState(false);
   // Set when sends currently resolve to the platform default sender (no own Resend in effect).
   const [platformSender, setPlatformSender] = useState<{ email: string | null; name: string | null } | null>(null);
 
@@ -40,6 +44,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
       if (cancelled) return;
       setFromEmail(c?.from_email ?? '');
       setFromName(c?.from_name ?? '');
+      setReplyTo(c?.reply_to ?? '');
       setApiKey('');
       setHasKey(!!c?.has_api_key);
       setEnabled(c?.enabled ?? true);
@@ -50,6 +55,26 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
     })();
     return () => { cancelled = true; };
   }, [workspaceId]);
+
+  // Prefill the test recipient with the signed-in user's email.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => { if (data.user?.email) setTestTo(data.user.email); });
+  }, []);
+
+  const sendTest = async () => {
+    if (!testTo.trim()) { toast({ title: 'Enter a recipient', variant: 'destructive' }); return; }
+    setTesting(true);
+    try {
+      await emailService.sendTestEmail(workspaceId, testTo.trim());
+      toast({ title: 'Test email sent', description: `Check ${testTo.trim()} (and spam).` });
+    } catch (err: any) {
+      if (isSenderNotConfigured(err)) {
+        toast({ title: 'Connect your email first', description: 'Save a Resend API key + verified sender above, then test.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Test failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
+      }
+    } finally { setTesting(false); }
+  };
 
   const save = async () => {
     if (!fromEmail.trim()) {
@@ -62,6 +87,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
         apiKey: apiKey.trim() || undefined,
         fromEmail: fromEmail.trim(),
         fromName: fromName.trim() || null,
+        replyTo: replyTo.trim() || null,
         enabled,
       });
       if (apiKey.trim()) setHasKey(true);
@@ -115,6 +141,24 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
             <Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Your Company" />
           </div>
         </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Reply-to <span className="text-muted-foreground">(optional)</span></Label>
+          <Input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="Same as From email" type="email" />
+          <p className="text-[11px] text-muted-foreground">
+            Where customer replies go. Leave blank to reply to the From email. Applied to every email
+            you send — quotes, invoices, statements, catalog and campaigns.
+          </p>
+        </div>
+        {/* What the recipient actually sees on the message. */}
+        {fromEmail.trim() && (
+          <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs space-y-0.5">
+            <div className="text-muted-foreground">Recipients will see:</div>
+            <div><span className="text-muted-foreground">From:</span>{' '}
+              <code className="font-mono">{fromName.trim() ? `${fromName.trim()} <${fromEmail.trim()}>` : fromEmail.trim()}</code></div>
+            <div><span className="text-muted-foreground">Reply-to:</span>{' '}
+              <code className="font-mono">{replyTo.trim() || fromEmail.trim()}</code></div>
+          </div>
+        )}
         <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
           <div className="text-sm">Use my Resend account</div>
           <Switch checked={enabled} onCheckedChange={setEnabled} />
@@ -128,6 +172,18 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
           <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
           </Button>
+        </div>
+
+        {/* Test send — verifies the saved sender end-to-end (uses BYOK when configured). */}
+        <div className="border-t border-border/60 pt-3 space-y-1.5">
+          <Label className="text-xs">Send a test email</Label>
+          <div className="flex items-center gap-2">
+            <Input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="you@example.com" type="email" className="flex-1" />
+            <Button size="sm" variant="outline" onClick={sendTest} disabled={testing} className="rounded-full shrink-0">
+              {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} Send test
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">Sends using your saved sender above. Save first if you just changed the key.</p>
         </div>
       </CardContent>
     </Card>

@@ -16,26 +16,30 @@ export interface ResolvedEmailSender {
   apiKey: string;
   fromEmail: string;
   fromName: string;
+  /** Reply-To to apply as the default when the caller didn't set one. '' = none (reply to From). */
+  replyTo: string;
   source: 'workspace' | 'platform';
 }
 
 const DEFAULT_DAILY_LIMIT = 300;
 
-/** Read the platform default sender from global email_settings. */
-async function platformSender(supabase: SupabaseLike): Promise<{ fromEmail: string; fromName: string }> {
+/** Read the platform default sender + reply-to from global email_settings. */
+async function platformSender(supabase: SupabaseLike): Promise<{ fromEmail: string; fromName: string; replyTo: string }> {
   let fromEmail = '';
   let fromName = 'Material Kai';
+  let replyTo = '';
   try {
     const { data } = await supabase
       .from('email_settings')
       .select('setting_key, setting_value')
-      .in('setting_key', ['default_from_email', 'default_from_name']);
+      .in('setting_key', ['default_from_email', 'default_from_name', 'default_reply_to']);
     for (const s of data ?? []) {
       if (s.setting_key === 'default_from_email') fromEmail = s.setting_value || '';
       else if (s.setting_key === 'default_from_name') fromName = s.setting_value || fromName;
+      else if (s.setting_key === 'default_reply_to') replyTo = s.setting_value || '';
     }
   } catch (_) { /* fall through to empty — caller fails loudly if no sender */ }
-  return { fromEmail, fromName };
+  return { fromEmail, fromName, replyTo };
 }
 
 /**
@@ -51,7 +55,7 @@ export async function resolveWorkspaceEmailSender(
   if (workspaceId) {
     const { data: cfg } = await supabase
       .from('workspace_email_config')
-      .select('resend_api_key, from_email, from_name, enabled')
+      .select('resend_api_key, from_email, from_name, reply_to, enabled')
       .eq('workspace_id', workspaceId)
       .maybeSingle();
     const key = (cfg?.resend_api_key ?? '').trim();
@@ -61,13 +65,14 @@ export async function resolveWorkspaceEmailSender(
         apiKey: key,
         fromEmail,
         fromName: (cfg.from_name ?? '').trim() || fromEmail,
+        replyTo: (cfg.reply_to ?? '').trim(),
         source: 'workspace',
       };
     }
   }
 
-  const { fromEmail, fromName } = await platformSender(supabase);
-  return { apiKey: platformKey, fromEmail, fromName, source: 'platform' };
+  const { fromEmail, fromName, replyTo } = await platformSender(supabase);
+  return { apiKey: platformKey, fromEmail, fromName, replyTo, source: 'platform' };
 }
 
 export interface SendQuota {

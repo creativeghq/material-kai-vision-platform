@@ -13,6 +13,9 @@ import {
 } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
+import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 
 /**
  * QuoteEmailButton — emails the quote to a recipient via the `send-quote-email`
@@ -31,6 +34,8 @@ interface Props {
 
 export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSent }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState(defaultEmail ?? '');
   const [message, setMessage] = useState('');
@@ -42,9 +47,12 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
       const { data, error } = await supabase.functions.invoke('send-quote-email', {
         body: { quote_id: quoteId, to: to.trim() || undefined, message: message.trim() || undefined },
       });
-      if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || 'Failed to send');
+      if (error) {
+        if (await handleEmailSendError(error, { workspaceId: activeWorkspaceId, feature: 'quote' })) return;
+        const { message: msg } = await unwrapEmailSendError(error);
+        throw new Error(msg);
       }
+      if (!data?.success) throw new Error(data?.error || 'Failed to send');
       toast({ title: 'Quote emailed', description: `Sent to ${data.sent_to}` });
       setOpen(false);
       setMessage('');
@@ -110,6 +118,7 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {connectEmailGate}
     </>
   );
 };

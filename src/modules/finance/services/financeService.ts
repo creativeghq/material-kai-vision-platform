@@ -12,6 +12,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { EmailSendError } from '@/modules/email/services/emailService';
+import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 
 // ─── Finance flow events (fire-and-forget) ───────────────────────────────────
 // Emitted when a document is issued or a payment is received, so seeded
@@ -417,6 +419,8 @@ const _financeServiceCore = {
   /** #204 "Send email" — email the invoice summary + MARK/QR to the customer. */
   async sendInvoiceEmail(invoiceId: string, to?: string): Promise<{ data: any; error: any }> {
     const { data, error } = await supabase.functions.invoke('finance-send-invoice-email', { body: { invoice_id: invoiceId, to } });
+    // Surface a typed error so UI can open the Connect-email gate on `workspace_sender_required`.
+    if (error) { const { code, message } = await unwrapEmailSendError(error); throw new EmailSendError(message, (code as any) ?? 'unknown'); }
     return { data, error };
   },
 
@@ -2098,13 +2102,10 @@ const _financeServiceV2 = {
       // supabase-js wraps any non-2xx as a FunctionsHttpError whose message is the
       // generic "Edge Function returned a non-2xx status code" — the real reason
       // (e.g. "Statement sending is disabled in finance settings.") lives in the
-      // response body. Surface it so callers show a truthful toast instead.
-      let message = error.message;
-      try {
-        const body = await (error as any)?.context?.json?.();
-        if (body?.error) message = body.error;
-      } catch { /* body not JSON — keep the generic message */ }
-      return { ok: false, email_sent_to: null, pdf_url: null, lines: 0, total_outstanding: 0, error: message };
+      // response body. Surface it as a typed error so UI can open the Connect-email
+      // gate on `workspace_sender_required` and show a truthful toast otherwise.
+      const { code, message } = await unwrapEmailSendError(error);
+      throw new EmailSendError(message, (code as any) ?? 'unknown');
     }
     return data as any;
   },

@@ -27,6 +27,8 @@ import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { financeService, formatMoney, paymentMethodLabel, type InvoiceWithItems } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 
 interface Props {
   invoiceId: string;
@@ -41,6 +43,8 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
   const { toast } = useToast();
   const navigate = useNavigate();
   const { isAccountant, canOperateFinance } = usePermissions();
+  const { activeWorkspaceId } = useWorkspace();
+  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   // Accountant (#202): may record payments, submit to myDATA, PDF — but not edit/create
   // documents (new invoice, credit note, template, change description/category).
   const [mark, setMark] = useState<string | null>(fiscalMark ?? null);
@@ -115,6 +119,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
       }
       toast({ title: 'Email sent', description: `To ${data?.sent_to}` });
     } catch (err: any) {
+      if (await handleEmailSendError(err, { workspaceId: activeWorkspaceId, feature: 'invoice' })) return;
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     }
   };
@@ -331,6 +336,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DialogFooter><Button onClick={() => setHistoryOpen(false)}>Close</Button></DialogFooter>
       </DialogContent>
     </Dialog>
+    {connectEmailGate}
     </>
   );
 };

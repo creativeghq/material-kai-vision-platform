@@ -16,6 +16,7 @@ import {
 import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
 import { ExternalLink } from 'lucide-react';
 import { humanizeLabel } from '@/utils/humanize';
+import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
@@ -248,6 +249,7 @@ interface DetailProps {
 
 const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose, statementsEnabled, crmBase }) => {
   const { toast } = useToast();
+  const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<SupplierBill[]>([]);
@@ -390,6 +392,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         toast({ title: 'Send failed', description: res.error ?? 'Unknown error', variant: 'destructive' });
       }
     } catch (err: any) {
+      if (await handleEmailSendError(err, { workspaceId: party.workspace_id, feature: 'statement' })) return;
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally {
       setSending(false);
@@ -397,6 +400,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -552,6 +556,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         )}
       </DialogContent>
     </Dialog>
+    {connectEmailGate}
+    </>
   );
 };
 
