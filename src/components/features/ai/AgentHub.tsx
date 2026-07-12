@@ -3061,15 +3061,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     else console.warn('[AgentHub] Unknown quickstart deep-link:', initialQuickStart);
   }, [userId, initialQuickStart, initialImages, attachedImages, handleQuickStart]);
 
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const fileArray = Array.from(files);
-    e.target.value = ''; // Reset now so the same file can be re-selected later
+  // Shared image-attach path: read a set of image File objects to data URLs and
+  // append them to the composer. Used by the file picker AND clipboard paste.
+  const attachImageFiles = useCallback((files: File[]) => {
+    const imageFiles = files.filter((f) => f.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
 
     Promise.all(
-      fileArray.map(
+      imageFiles.map(
         (file) =>
           new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -3084,14 +3083,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     ).then((urls) => {
       setAttachedImages((prev) => [...prev, ...urls]);
     }).catch((err) => {
-      console.error('[AgentHub] Failed to read uploaded image(s):', err);
+      console.error('[AgentHub] Failed to read image(s):', err);
       toast({
-        title: 'Image Upload Failed',
+        title: 'Image Attach Failed',
         description: 'One or more images could not be read. Please try again.',
         variant: 'destructive',
       });
     });
   }, []);
+
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+    e.target.value = ''; // Reset now so the same file can be re-selected later
+    attachImageFiles(fileArray);
+  }, [attachImageFiles]);
+
+  // Paste an image straight from the clipboard into the composer. Fires on the
+  // textarea's onPaste; when the clipboard carries image bytes we consume them
+  // (and suppress the default paste so a stray filename doesn't land in the text).
+  const handleComposerPaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageFiles: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    if (imageFiles.length === 0) return; // plain text paste — leave default behavior
+    e.preventDefault();
+    attachImageFiles(imageFiles);
+  }, [attachImageFiles]);
 
   const handleVoiceInput = useCallback(() => {
     if (!isVoiceSupported) {
@@ -5001,17 +5026,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   </div>
                 </div>
               ) : (
-                /* Default: plain thumbnails */
-                <div className="flex gap-2">
-                  {attachedImages.map((img, idx) => (
-                    <div key={img} className="relative w-16 h-16">
-                      <img src={img} alt="Attached" className="w-full h-full object-cover rounded-lg" />
-                      <button
-                        onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
-                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                      >×</button>
+                /* Default: framed attachments section so images read clearly
+                   against the chat area (header + count + bordered thumbnails). */
+                <div className="rounded-xl border border-border/60 bg-muted/30 p-2.5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <Paperclip className="h-3.5 w-3.5" />
+                      <span>
+                        {attachedImages.length} image{attachedImages.length === 1 ? '' : 's'} attached
+                      </span>
                     </div>
-                  ))}
+                    <button
+                      onClick={() => setAttachedImages([])}
+                      className="text-xs text-muted-foreground/70 hover:text-destructive transition-colors"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {attachedImages.map((img, idx) => (
+                      <div
+                        key={img}
+                        className="group relative h-20 w-20 overflow-hidden rounded-lg border border-border bg-background shadow-sm ring-1 ring-border/50"
+                      >
+                        <img src={img} alt={`Attachment ${idx + 1}`} className="h-full w-full object-cover" />
+                        <button
+                          onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
+                          aria-label="Remove attachment"
+                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:bg-destructive group-hover:opacity-100"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               {/* Quick action chips — interior designer only */}
@@ -5354,6 +5402,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         handleSendMessage();
                       }
                     }}
+                    onPaste={handleComposerPaste}
                     placeholder="Type your message... (Shift+Enter for new line, / for tools)"
                     className="min-h-[56px] sm:min-h-[80px] max-h-[400px] !resize-y border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 text-sm bg-transparent w-full"
                   />
