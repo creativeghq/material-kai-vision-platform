@@ -9,6 +9,7 @@ import { Label } from '@/components/core/ui/label';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/core/ui/dialog';
+import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -252,7 +253,7 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{empName(employee)}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -298,6 +299,10 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
           </div>
           <WorkingTimeFields start={workStart} end={workEnd} days={workDays} onStart={setWorkStart} onEnd={setWorkEnd} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
           <div className="space-y-1"><Label>Kiosk PIN <span className="text-muted-foreground text-xs">(optional 4–8 digits; blank = unchanged)</span></Label><Input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} className="font-mono" maxLength={8} placeholder="••••" inputMode="numeric" /></div>
+        </div>
+        {/* Employment contracts for this employee (HR context — admin-only via RLS). */}
+        <div className="border-t border-border/60 mt-4 pt-4">
+          <ContractsSection workspaceId={workspaceId} context="hr" subject={{ hr_employee_id: employee.id }} heading="Employment contracts" />
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={onClose} disabled={saving}>Cancel</Button>

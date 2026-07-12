@@ -21,6 +21,7 @@ import {
   Trash2,
   ClipboardList,
   Hammer,
+  FileSignature,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -50,6 +51,7 @@ import { TasksTab } from '../components/tabs/TasksTab';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
 import { ClientViewTab } from '../components/tabs/ClientViewTab';
+import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { ProductsTab } from '../components/tabs/ProductsTab';
 import { FinanceTab } from '../components/tabs/FinanceTab';
 import { PlanTab } from '../components/tabs/PlanTab';
@@ -80,7 +82,7 @@ export const ProjectDetailPage: React.FC = () => {
   const { can, persona } = usePermissions();
   const [project, setProject] = useState<ProjectWithClient | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'rooms' | 'products' | 'purchases' | 'plan' | 'moodboards' | 'quotes' | 'finance' | 'sheets' | 'client-view' | 'tasks' | 'timeline'>('overview');
+  const [tab, setTab] = useState<'overview' | 'rooms' | 'products' | 'purchases' | 'plan' | 'moodboards' | 'quotes' | 'finance' | 'sheets' | 'client-view' | 'contracts' | 'tasks' | 'timeline'>('overview');
   const [showInvite, setShowInvite] = useState(false);
 
   // Ownership: project.user_id is the creator. Anyone else who can read the project
@@ -274,6 +276,11 @@ export const ProjectDetailPage: React.FC = () => {
                 Client View
               </TabsTrigger>
             )}
+            {isOwner && (
+              <TabsTrigger value="contracts" className="flex items-center gap-2">
+                <FileSignature className="h-4 w-4" /> Contracts
+              </TabsTrigger>
+            )}
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <CheckSquare className="h-3.5 w-3.5" />
               Tasks
@@ -298,6 +305,7 @@ export const ProjectDetailPage: React.FC = () => {
           {canFinance && <TabsContent value="finance"><FinanceTab projectId={project.id} /></TabsContent>}
           <TabsContent value="sheets"><SheetsTab projectId={project.id} /></TabsContent>
           {isOwner && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isOwner} /></TabsContent>}
+          {isOwner && <TabsContent value="contracts"><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" /></TabsContent>}
           <TabsContent value="tasks"><TasksTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>
