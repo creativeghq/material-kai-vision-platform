@@ -677,20 +677,23 @@ function truncateText(text: string, font: PDFFont, fontSize: number, maxWidth: n
 }
 
 function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
-  const words = text.split(' ');
   const lines: string[] = [];
-  let currentLine = '';
-
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    if (font.widthOfTextAtSize(testLine, fontSize) > maxWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
+  // Honor explicit line breaks the user typed, THEN width-wrap each paragraph.
+  for (const para of String(text ?? '').split(/\r?\n/)) {
+    if (para.trim() === '') { lines.push(''); continue; }
+    const words = para.split(/[ \t]+/).filter(Boolean);
+    let currentLine = '';
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (font.widthOfTextAtSize(testLine, fontSize) > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
     }
+    if (currentLine) lines.push(currentLine);
   }
-  if (currentLine) lines.push(currentLine);
   return lines;
 }
 

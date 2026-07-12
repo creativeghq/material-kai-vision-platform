@@ -290,13 +290,17 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     page.drawText(str, { x: xRight - f.widthOfTextAtSize(str, size), y: yy, size, font: f, color });
   };
   const wrap = (s: string, f: PDFFont, size: number, maxW: number): string[] => {
-    const words = String(s ?? '').split(/\s+/);
-    const lines: string[] = []; let cur = '';
-    for (const w of words) {
-      const t = cur ? cur + ' ' + w : w;
-      if (f.widthOfTextAtSize(t, size) > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
+    const lines: string[] = [];
+    // Honor explicit line breaks the user typed, THEN width-wrap each paragraph.
+    for (const para of String(s ?? '').split(/\r?\n/)) {
+      if (para.trim() === '') { lines.push(''); continue; }
+      const words = para.split(/[ \t]+/).filter(Boolean); let cur = '';
+      for (const w of words) {
+        const t = cur ? cur + ' ' + w : w;
+        if (f.widthOfTextAtSize(t, size) > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
+      }
+      if (cur) lines.push(cur);
     }
-    if (cur) lines.push(cur);
     return lines.length ? lines : [''];
   };
 
@@ -702,7 +706,11 @@ async function buildPaymentReceiptPdf(d: {
     y -= 6;
   }
 
-  if (payment.notes) { text(`${L.notes}: ${payment.notes}`, M, y, 8.5, font, MUTED); y -= 14; }
+  if (payment.notes) {
+    text(`${L.notes}:`, M, y, 8.5, bold, MUTED); y -= 11;
+    for (const nl of wrap(payment.notes, font, 8.5, right - M)) { text(nl, M, y, 8.5, font, MUTED); y -= 11; }
+    y -= 3;
+  }
   text(L.thankYou, M, y, 9, font, MUTED);
 
   return await pdf.save();
