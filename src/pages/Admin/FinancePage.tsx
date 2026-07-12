@@ -73,7 +73,6 @@ import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import SupplierPortalPage from '@/pages/SupplierPortalPage';
 import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch } from 'lucide-react';
-import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -423,11 +422,6 @@ const FinancePage: React.FC = () => {
               </TabsTrigger>
             )}
             {!isAccountant && (
-              <TabsTrigger value="contracts" className="w-full justify-start">
-                <FileSignature className="h-4 w-4 mr-2" /> Contracts
-              </TabsTrigger>
-            )}
-            {!isAccountant && (
               <TabsTrigger value="settings" className="w-full justify-start">
                 <SettingsIcon className="h-4 w-4 mr-2" /> Settings
               </TabsTrigger>
@@ -435,10 +429,6 @@ const FinancePage: React.FC = () => {
           </TabsList>
 
           <div className="min-w-0 flex-1 space-y-4">
-          {/* ─────────── CONTRACTS ─────────── */}
-          <TabsContent value="contracts" className="space-y-4">
-            <ContractsSection workspaceId={workspaceId} context="finance" heading="Finance contracts" />
-          </TabsContent>
           {/* ─────────── DASHBOARD ─────────── */}
           <TabsContent value="dashboard" className="space-y-6">
             {/* KPI strip */}

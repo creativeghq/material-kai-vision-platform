@@ -112,7 +112,7 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
         signer_name: signerName,
         title: `Contract signed: "${c.title}"`,
         body: `${signerName} signed "${c.title}".`,
-        action_url: '/finance?tab=contracts',
+        action_url: '/contracts',
       });
     } catch { /* never fail the public sign on a flow emit */ }
 

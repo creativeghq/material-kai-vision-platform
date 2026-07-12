@@ -29,9 +29,16 @@ const TYPE_OPTIONS: Record<ContractContext, string[]> = {
 
 type Subject = Partial<Pick<Contract, 'hr_employee_id' | 'customer_company_id' | 'supplier_company_id' | 'order_id' | 'quote_id' | 'project_id'>>;
 
+const CONTEXT_BADGE: Record<ContractContext, string> = {
+  hr: 'text-violet-600 border-violet-500/40',
+  finance: 'text-sky-600 border-sky-500/40',
+  project: 'text-teal-600 border-teal-500/40',
+};
+
 export const ContractsSection: React.FC<{
   workspaceId: string;
-  context: ContractContext;
+  /** A specific context, or 'all' for a cross-context read view (create disabled). */
+  context: ContractContext | 'all';
   subject?: Subject;
   heading?: string;
 }> = ({ workspaceId, context, subject, heading = 'Contracts' }) => {
@@ -41,8 +48,13 @@ export const ContractsSection: React.FC<{
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // The context used when CREATING (finance is the only one creatable without an entity subject).
+  const createContext: ContractContext = context === 'all' ? 'finance' : context;
+  // hr/project need a subject (employee/project); finance can be created with a free-text counterparty.
+  const canCreate = context !== 'all' && (context === 'finance' || !!subject);
+
   const [title, setTitle] = useState('');
-  const [type, setType] = useState<string>(TYPE_OPTIONS[context][0]);
+  const [type, setType] = useState<string>(TYPE_OPTIONS[createContext][0]);
   const [counterparty, setCounterparty] = useState('');
   const [counterpartyEmail, setCounterpartyEmail] = useState('');
   const [effective, setEffective] = useState('');
@@ -53,7 +65,7 @@ export const ContractsSection: React.FC<{
     if (!workspaceId) return;
     setLoading(true);
     try {
-      setRows(await contractsService.list(workspaceId, { context, ...(subject ?? {}) }));
+      setRows(await contractsService.list(workspaceId, { ...(context !== 'all' ? { context } : {}), ...(subject ?? {}) }));
     } catch (err: any) {
       toast({ title: 'Failed to load contracts', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -62,19 +74,19 @@ export const ContractsSection: React.FC<{
   useEffect(() => { void load(); }, [load]);
 
   const resetForm = () => {
-    setTitle(''); setType(TYPE_OPTIONS[context][0]); setCounterparty(''); setCounterpartyEmail('');
+    setTitle(''); setType(TYPE_OPTIONS[createContext][0]); setCounterparty(''); setCounterpartyEmail('');
     setEffective(''); setExpiry(''); setBodyText('');
   };
 
   const create = async () => {
     if (!title.trim()) { toast({ title: 'Title is required', variant: 'destructive' }); return; }
-    if (context === 'finance' && !subject?.customer_company_id && !subject?.supplier_company_id && !counterparty.trim()) {
+    if (createContext === 'finance' && !subject?.customer_company_id && !subject?.supplier_company_id && !counterparty.trim()) {
       toast({ title: 'Add a counterparty name', variant: 'destructive' }); return;
     }
     setBusy(true);
     try {
       await contractsService.create(workspaceId, {
-        context, title: title.trim(), contract_type: type,
+        context: createContext, title: title.trim(), contract_type: type,
         counterparty_name: counterparty.trim() || undefined,
         counterparty_email: counterpartyEmail.trim() || undefined,
         effective_date: effective || undefined,
@@ -117,7 +129,11 @@ export const ContractsSection: React.FC<{
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2"><FileSignature className="h-4 w-4" /> {heading}</h3>
-        <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New contract</Button>
+        {canCreate
+          ? <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New contract</Button>
+          : context !== 'all'
+            ? <span className="text-xs text-muted-foreground">Create from the {context === 'hr' ? 'employee' : context} record</span>
+            : null}
       </div>
 
       {loading ? (
@@ -132,6 +148,7 @@ export const ContractsSection: React.FC<{
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium truncate">{c.title}</span>
                   <span className={`inline-flex items-center rounded-full border px-2 py-0 text-[10px] font-medium ${STATUS_TONE[c.status]}`}>{c.status}</span>
+                  {context === 'all' && <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[9px] font-medium capitalize ${CONTEXT_BADGE[c.context]}`}>{c.context}</span>}
                   {c.contract_type && <span className="text-[10px] text-muted-foreground capitalize">{c.contract_type.replace(/_/g, ' ')}</span>}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
@@ -159,17 +176,17 @@ export const ContractsSection: React.FC<{
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>New {context} contract</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>New {createContext} contract</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1 col-span-2"><Label>Title *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Framework supply agreement" /></div>
               <div className="space-y-1"><Label>Type</Label>
                 <Select value={type} onValueChange={setType}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TYPE_OPTIONS[context].map((t) => <SelectItem key={t} value={t} className="capitalize">{t.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
+                  <SelectContent>{TYPE_OPTIONS[createContext].map((t) => <SelectItem key={t} value={t} className="capitalize">{t.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>Counterparty {context === 'finance' && !subject?.customer_company_id ? '*' : ''}</Label><Input value={counterparty} onChange={(e) => setCounterparty(e.target.value)} placeholder="Signer / company name" /></div>
+              <div className="space-y-1"><Label>Counterparty {createContext === 'finance' && !subject?.customer_company_id ? '*' : ''}</Label><Input value={counterparty} onChange={(e) => setCounterparty(e.target.value)} placeholder="Signer / company name" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Counterparty email</Label><Input type="email" value={counterpartyEmail} onChange={(e) => setCounterpartyEmail(e.target.value)} placeholder="signer@example.com" /></div>
