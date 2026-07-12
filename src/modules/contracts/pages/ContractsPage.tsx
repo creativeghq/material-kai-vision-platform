@@ -39,8 +39,8 @@ export default function ContractsPage() {
       <PageHeader icon={FileSignature} title="Contracts" subtitle="Signable agreements across HR, Finance and Projects" />
       <div className="p-3 sm:p-6 max-w-4xl">
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-          <TabsList className="mb-4">
-            {TABS.map((t) => <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>)}
+          <TabsList className="mb-4 gap-1.5">
+            {TABS.map((t) => <TabsTrigger key={t.value} value={t.value} className="px-3">{t.label}</TabsTrigger>)}
           </TabsList>
           {TABS.map((t) => (
             <TabsContent key={t.value} value={t.value} className="mt-0">
