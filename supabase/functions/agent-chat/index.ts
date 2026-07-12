@@ -807,8 +807,8 @@ interface AgentConfig {
 const AGENT_CONFIGS: Record<string, AgentConfig> = {
   kai: {
     id: 'kai',
-    name: 'KAI Agent',
-    description: 'Material intelligence — search, insights, research, analytics, SEO, and B2B',
+    name: 'JARVIS',
+    description: 'Unified material-intelligence orchestrator — search, quotes, catalogs, insights, analytics, SEO, B2B, and design/3D',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       // Core tools (all users)
@@ -884,6 +884,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'add_purchase_item', 'generate_purchase_sheet',
       // Quotes (all users; 0 cr — creates real quotes + branded PDF, opens on canvas)
       'create_quote', 'generate_quote_pdf', 'list_my_quotes',
+      // Generation / design (so JARVIS handles 3D renders, lighting, and VR inline —
+      // no "switch to another agent". Interior-designer remains the specialist.)
+      'generate_3d', 'apply_lighting_preset', 'generate_vr_world',
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
@@ -1931,9 +1934,13 @@ async function executeAgent(
     // Only bind tools this agent is actually allowed to use.
     const allowedIds = def.tool_ids.filter((t) => agentFullToolIds.has(t));
     if (allowedIds.length === 0) {
+      // This capability belongs to a different specialist (e.g. the Interior agent for
+      // some design tools). Do NOT tell the user to "switch to the KAI agent" — that agent
+      // no longer exists under that name and is often the one they're already on. Handle the
+      // request with the tools you have, or explain plainly what you can't do here.
       return {
         success: false,
-        error: `The "${toolkitId}" toolkit isn't available to this agent. Tell the user to switch to the KAI agent to use it.`,
+        error: `The "${toolkitId}" toolkit isn't available in this chat. Use the tools you already have to help as much as possible; only if it's genuinely a different specialist's capability, tell the user which specialist handles it — never suggest switching to a "KAI" agent.`,
       };
     }
     mergeTools(await registerTools(new Set(allowedIds)));
