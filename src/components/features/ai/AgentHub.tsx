@@ -655,7 +655,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
   // v0.3.2 — modal form triggered by manage_job_sites agent tool when user is vague
   const [jobSitesFormState, setJobSitesFormState] = useState<JobSitesFormState>(null);
-  const [flowFormState, setFlowFormState] = useState<FlowFormState>(null);
   const [techRadarFormState, setTechRadarFormState] = useState<TechRadarFormState>(null);
   // Generic collect-then-send form for toolkit quick-starts that declare a `form`.
   const [toolkitFormState, setToolkitFormState] = useState<ToolkitFormModalState>(null);
