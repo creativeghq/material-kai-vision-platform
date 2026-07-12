@@ -7,14 +7,23 @@
  *   <EntitlementGuard moduleSlug="sales-finance" moduleName="Finance"><FinancePage /></EntitlementGuard>
  *
  * Fails OPEN while loading (returns null → no flash) and never blocks the operator root.
+ *
+ * #256 — when the module is a purchasable add-on with a price, the upsell shows the price and a
+ * direct Buy button (owner → Stripe checkout via activate-module) or a "request" button
+ * (non-owner → notify the owner), in addition to the plan-upgrade path.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, ArrowLeft, Sparkles } from 'lucide-react';
+import { Lock, ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { PageLoader } from '@/components/core/PageLoader';
+import { useToast } from '@/hooks/use-toast';
+import {
+  fetchModuleCatalog, activateModule, requestModule, formatAddonPrice, type ModuleCatalogRow,
+} from '@/services/moduleActivationService';
 
 interface Props {
   moduleSlug: string;
@@ -26,15 +35,66 @@ interface Props {
 
 export const EntitlementGuard: React.FC<Props> = ({ moduleSlug, moduleName, children, fallbackPath = '/' }) => {
   const { isModuleAvailable, tierOf, loading } = useEntitlements();
+  const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  // Show the shared loader (not a blank screen) while entitlements resolve — matches every other
-  // page's loading state and avoids the paid-module upsell flashing before the check completes.
+  const [mod, setMod] = useState<ModuleCatalogRow | null>(null);
+  const [busy, setBusy] = useState<'buy' | 'request' | null>(null);
+
+  const available = !loading && isModuleAvailable(moduleSlug);
+
+  // Load the add-on's catalog row (price/name) only when we're actually showing the upsell.
+  useEffect(() => {
+    if (loading || available) return;
+    let cancelled = false;
+    fetchModuleCatalog()
+      .then((cat) => { if (!cancelled) setMod(cat.find((m) => m.slug === moduleSlug) ?? null); })
+      .catch(() => { /* upsell still renders without price */ });
+    return () => { cancelled = true; };
+  }, [loading, available, moduleSlug]);
+
   if (loading) return <PageLoader />;
-  if (isModuleAvailable(moduleSlug)) return <>{children}</>;
+  if (available) return <>{children}</>;
 
-  const label = moduleName ?? moduleSlug;
+  const label = moduleName ?? mod?.name ?? moduleSlug;
   const tier = tierOf(moduleSlug);
+  const isOwner = workspaceRole === 'owner' || isPlatformOperator;
+  const price = mod?.is_addon ? formatAddonPrice(mod.addon_price_cents, mod.addon_currency) : null;
+
+  const onBuy = async () => {
+    if (!activeWorkspaceId) return;
+    setBusy('buy');
+    try {
+      const res = await activateModule(activeWorkspaceId, moduleSlug);
+      if (res.checkout_url) { window.location.href = res.checkout_url; return; }
+      if (res.activated) {
+        toast({ title: 'Activated', description: `${label} is now available.` });
+        window.location.reload();
+        return;
+      }
+      toast({ title: 'Could not activate', description: 'Please try again.', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Could not activate', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onRequest = async () => {
+    if (!activeWorkspaceId) return;
+    setBusy('request');
+    try {
+      await requestModule(activeWorkspaceId, moduleSlug);
+      toast({ title: 'Request sent', description: `Your workspace owner has been asked to enable ${label}.` });
+    } catch (e) {
+      toast({ title: 'Could not send request', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const purchasable = !!mod?.is_addon;
 
   return (
     <div className="container mx-auto py-12">
@@ -44,15 +104,41 @@ export const EntitlementGuard: React.FC<Props> = ({ moduleSlug, moduleName, chil
             <Lock className="h-6 w-6 text-primary" />
           </div>
           <CardTitle className="text-xl">{label} is a {tier === 'pro' ? 'Pro' : 'paid'} feature</CardTitle>
-          <CardDescription>This workspace doesn’t have the {label} package yet.</CardDescription>
+          <CardDescription>
+            This workspace doesn’t have the {label} package yet.
+            {price && <> {' '}<span className="font-medium text-foreground">{price}</span>.</>}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-center text-sm text-muted-foreground">
-            Unlock {label} to use it here. Plans add modules like this to your workspace.
-          </p>
-          <Button className="w-full" onClick={() => navigate('/billing/subscriptions')}>
-            <Sparkles className="mr-2 h-4 w-4" /> See plans &amp; unlock
-          </Button>
+          {mod?.summary && (
+            <p className="text-center text-sm text-muted-foreground">{mod.summary}</p>
+          )}
+
+          {purchasable ? (
+            isOwner ? (
+              <Button className="w-full" onClick={onBuy} disabled={busy !== null}>
+                {busy === 'buy' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                {price ? `Add ${label} — ${price}` : `Enable ${label}`}
+              </Button>
+            ) : (
+              <Button className="w-full" onClick={onRequest} disabled={busy !== null}>
+                {busy === 'request' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Ask my workspace owner to enable it
+              </Button>
+            )
+          ) : (
+            <Button className="w-full" onClick={() => navigate('/billing/subscriptions')}>
+              <Sparkles className="mr-2 h-4 w-4" /> See plans &amp; unlock
+            </Button>
+          )}
+
+          {/* Add-ons can also be plan-covered — keep the plans link as a secondary path. */}
+          {purchasable && isOwner && (
+            <Button className="w-full" variant="ghost" onClick={() => navigate('/profile?tab=modules')}>
+              Manage modules
+            </Button>
+          )}
+
           <Button className="w-full" variant="outline" onClick={() => navigate(fallbackPath)}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
