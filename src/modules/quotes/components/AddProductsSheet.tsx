@@ -18,8 +18,10 @@ import {
   Ruler,
   PenLine,
   DollarSign,
+  ImagePlus,
 } from 'lucide-react';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
+import { supabase } from '@/integrations/supabase/client';
 
 import {
   Sheet,
@@ -93,6 +95,7 @@ interface CustomProductForm {
   room: string;
   dimensions: string;
   installation_requirements: string;
+  image_url: string;
 }
 
 const EMPTY_CUSTOM: CustomProductForm = {
@@ -107,6 +110,7 @@ const EMPTY_CUSTOM: CustomProductForm = {
   room: '',
   dimensions: '',
   installation_requirements: '',
+  image_url: '',
 };
 
 interface AddProductsSheetProps {
@@ -169,6 +173,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   const [customPriceLookupOpen, setCustomPriceLookupOpen] = useState(false);
 
   const [adding, setAdding] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState<'search' | 'custom'>('search');
 
   // Debounced search
@@ -277,6 +282,37 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   };
 
   // Add custom product to quote
+  const handleCustomImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Not an image', description: 'Please choose an image file.', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Image too large', description: 'Please choose an image under 10 MB.', variant: 'destructive' });
+      return;
+    }
+    try {
+      setUploadingImage(true);
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const path = `quote-custom/${quoteId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('generation-images')
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('generation-images').getPublicUrl(path);
+      if (!pub?.publicUrl) throw new Error('Could not resolve the uploaded image URL.');
+      setCustomField('image_url', pub.publicUrl);
+    } catch (err) {
+      console.error('Custom image upload failed:', err);
+      toast({ title: 'Upload failed', description: 'The image could not be uploaded. Please try again.', variant: 'destructive' });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleAddCustomToQuote = async () => {
     if (!customForm.name.trim()) {
       toast({ title: 'Name required', description: 'Please enter a product name.', variant: 'destructive' });
@@ -291,6 +327,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
         custom_product_description: customForm.description.trim() || undefined,
         custom_sku: customForm.sku.trim() || undefined,
         custom_unit: customForm.unit.trim() || 'pcs',
+        custom_image_url: customForm.image_url || undefined,
         unit_price: unitPrice,
         quantity: customForm.quantity,
         selected_size: customForm.size.trim() || undefined,
@@ -588,6 +625,38 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                   <div className="space-y-1.5">
                     <Label htmlFor="cp-unit">Unit</Label>
                     <Input id="cp-unit" value={customForm.unit} onChange={e => setCustomField('unit', e.target.value)} placeholder="pcs / m² / kg" />
+                  </div>
+                </div>
+
+                {/* Image */}
+                <div className="space-y-1.5">
+                  <Label>Image</Label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-20 h-20 rounded-lg border border-border/60 bg-muted/30 overflow-hidden flex items-center justify-center flex-shrink-0">
+                      {customForm.image_url ? (
+                        <img src={customForm.image_url} alt="Custom product" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImagePlus className="h-6 w-6 text-muted-foreground/40" />
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label htmlFor="cp-image" className="cursor-pointer">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors">
+                          {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                          {uploadingImage ? 'Uploading…' : customForm.image_url ? 'Replace image' : 'Upload image'}
+                        </div>
+                        <input id="cp-image" type="file" accept="image/*" className="hidden" onChange={handleCustomImageUpload} disabled={uploadingImage} />
+                      </label>
+                      {customForm.image_url && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomField('image_url', '')}
+                          className="text-xs text-muted-foreground hover:text-destructive transition-colors text-left"
+                        >
+                          Remove image
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

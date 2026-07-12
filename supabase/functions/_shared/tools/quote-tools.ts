@@ -49,6 +49,7 @@ const itemSchema = z.object({
   quantity: z.number().positive().describe('Quantity (e.g. 75 for 75 sqm).'),
   unit_price: z.number().nonnegative().optional().describe('Unit price ex-VAT. Required for custom items; on a catalog line it overrides the auto-resolved price.'),
   discounted_price: z.number().nonnegative().optional().describe('Optional per-line discounted unit price; wins over unit_price for the line total.'),
+  image_url: z.string().optional().describe('Optional image URL for a custom item (ignored for catalog items, which use the product image).'),
   room: z.string().optional().describe('FF&E: room / area this item belongs to.'),
   dimensions: z.string().optional().describe('FF&E: dimensions, e.g. "120×60×45".'),
   installation_requirements: z.string().optional().describe('FF&E: installation notes shown in the Specifications section.'),
@@ -132,6 +133,7 @@ async function resolveLine(
     payload.custom_product_description = item.description ?? null;
     payload.custom_sku = item.sku ?? null;
     payload.custom_unit = item.unit || 'pcs';
+    if (item.image_url) payload.custom_image_url = item.image_url;
   }
   return { payload, line_total: lineTotal, label };
 }

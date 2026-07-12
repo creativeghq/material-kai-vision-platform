@@ -65,6 +65,7 @@ export interface QuoteItem {
   custom_product_description?: string;
   custom_sku?: string;
   custom_unit?: string;
+  custom_image_url?: string;
   // Pricing fields
   unit_price?: number;
   discounted_price?: number;
@@ -545,6 +546,7 @@ export class QuotesService {
     custom_product_description?: string;
     custom_sku?: string;
     custom_unit?: string;
+    custom_image_url?: string;
     unit_price?: number;
     quantity?: number;
     selected_size?: string;
@@ -567,6 +569,7 @@ export class QuotesService {
         custom_product_description: data.custom_product_description || null,
         custom_sku: data.custom_sku || null,
         custom_unit: data.custom_unit || null,
+        custom_image_url: data.custom_image_url || null,
         quantity: qty,
         unit_price: unitPrice,
         line_total: unitPrice != null ? Math.round(unitPrice * qty * 100) / 100 : null,
@@ -639,6 +642,7 @@ export class QuotesService {
       unit_price?: number | null;
       discounted_price?: number | null;
       custom_unit?: string;
+      custom_image_url?: string | null;
       room?: string;
       room_id?: string | null;
       dimensions?: string;

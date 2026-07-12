@@ -327,7 +327,9 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
-                              {isCustom ? (
+                              {isCustom && item.custom_image_url ? (
+                                <img src={item.custom_image_url} alt={displayName} className="w-full h-full object-cover" loading="lazy" />
+                              ) : isCustom ? (
                                 <div className="w-full h-full flex items-center justify-center bg-primary/10">
                                   <PenLine className="h-4 w-4 text-primary/60" />
                                 </div>
