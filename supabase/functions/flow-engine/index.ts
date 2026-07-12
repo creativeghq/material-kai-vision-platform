@@ -11,6 +11,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult } from '../_shared/auth.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
@@ -364,6 +365,24 @@ async function executeAction(
       const emailIsTenant = !!scope?.workspaceId && !scope?.isGlobal;
       let emailWorkspaceId: string | null = null;
       if (emailIsTenant) {
+        // A tenant automation MUST send from the workspace's own domain. If no BYOK sender is
+        // connected, FAIL LOUDLY with an actionable reason (stored on flow_runs.error_message)
+        // AND raise the seeded email_sender_not_configured bell so the owner knows to fix it —
+        // never silently fall back to the platform domain for a tenant's own mail.
+        if (!(await workspaceHasByok(supabase, scope!.workspaceId))) {
+          if (scope!.ownerUserId) {
+            await emitFlowEvent('email_sender_not_configured', {
+              workspace_id: scope!.workspaceId,
+              user_id: scope!.ownerUserId,
+              feature: 'automations',
+              action_url: '/profile?tab=keys',
+              title: 'Connect your email to send',
+              body: 'An automation tried to send an email, but this workspace hasn\'t connected its own email sender yet. Connect Resend under Profile → Keys to start sending from your own address.',
+              type: 'email_sender_not_configured',
+            }).catch(() => { /* best-effort bell */ });
+          }
+          throw new Error('email_sender_not_configured: This automation can\'t send email because your workspace has no email sender connected. Connect your Resend account under Profile → Keys, then re-run this automation.');
+        }
         emailWorkspaceId = scope!.workspaceId; // strict BYOK below
       } else {
         // Operator flow: divert to the event's workspace sender ONLY when that workspace has BYOK

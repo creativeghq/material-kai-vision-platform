@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Workflow, Play, Pause, Trash2, Sparkles, Clock, Zap, Plus, Pencil, ArrowLeft } from 'lucide-react';
+import { Workflow, Play, Pause, Trash2, Sparkles, Clock, Zap, Plus, Pencil, ArrowLeft, AlertTriangle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +61,8 @@ export default function FlowsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   // null = list view; a string = the flow id open in the builder.
   const [builderFlowId, setBuilderFlowId] = useState<string | null>(null);
+  // flow_id → last run { status, error_message } so we can surface WHY a flow failed.
+  const [lastRuns, setLastRuns] = useState<Record<string, { status: string; error: string | null }>>({});
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
@@ -73,8 +75,28 @@ export default function FlowsPage() {
       .order('created_at', { ascending: false });
     if (error) {
       toast({ title: 'Could not load automations', description: error.message, variant: 'destructive' });
+      setLoading(false);
+      return;
+    }
+    const rows = (data ?? []) as WorkspaceFlow[];
+    setFlows(rows);
+
+    // Latest run per flow → surface the last failure reason inline.
+    const ids = rows.map((f) => f.id);
+    if (ids.length) {
+      const { data: runs } = await supabase
+        .from('flow_runs')
+        .select('flow_id, status, error_message, created_at')
+        .in('flow_id', ids)
+        .order('created_at', { ascending: false })
+        .limit(300);
+      const map: Record<string, { status: string; error: string | null }> = {};
+      for (const r of (runs ?? []) as Array<{ flow_id: string; status: string; error_message: string | null }>) {
+        if (!map[r.flow_id]) map[r.flow_id] = { status: r.status, error: r.error_message };
+      }
+      setLastRuns(map);
     } else {
-      setFlows((data ?? []) as WorkspaceFlow[]);
+      setLastRuns({});
     }
     setLoading(false);
   }, [activeWorkspaceId, toast]);
@@ -200,38 +222,73 @@ export default function FlowsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {flows.map((flow) => (
-              <div
-                key={flow.id}
-                className="dashboard-card rounded-2xl border-0 shadow-sm p-4 flex items-center gap-4 hover:bg-accent transition-colors"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium truncate">{flow.name}</h3>
-                    <Badge variant="outline" className={STATUS_STYLES[flow.status] || ''}>{flow.status}</Badge>
+            {flows.map((flow) => {
+              const run = lastRuns[flow.id];
+              const failed = run?.status === 'failed';
+              const rawErr = run?.error || '';
+              const isEmailNotConfigured = /email_sender_not_configured/i.test(rawErr);
+              // Strip the machine prefix for display.
+              const errText = rawErr.replace(/^email_sender_not_configured:\s*/i, '').trim();
+              return (
+                <div
+                  key={flow.id}
+                  className="dashboard-card rounded-2xl border-0 shadow-sm p-4 hover:bg-accent transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium truncate">{flow.name}</h3>
+                        <Badge variant="outline" className={STATUS_STYLES[flow.status] || ''}>{flow.status}</Badge>
+                        {failed && (
+                          <Badge variant="outline" className="gap-1 bg-red-500/10 text-red-500">
+                            <AlertTriangle className="h-3 w-3" />
+                            Last run failed
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {TRIGGER_LABELS[flow.trigger_type] || flow.trigger_type}
+                        </span>
+                        <span>{flow.run_count} runs</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => setBuilderFlowId(flow.id)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" className="gap-1" disabled={busy === flow.id} onClick={() => toggle(flow)}>
+                        {flow.status === 'active' ? <><Pause className="h-3.5 w-3.5" />Pause</> : <><Play className="h-3.5 w-3.5" />Resume</>}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === flow.id} onClick={() => remove(flow)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {TRIGGER_LABELS[flow.trigger_type] || flow.trigger_type}
-                    </span>
-                    <span>{flow.run_count} runs</span>
-                  </div>
+
+                  {failed && errText && (
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-500">
+                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="leading-snug">{errText}</p>
+                        {isEmailNotConfigured && (
+                          <Button
+                            size="sm" variant="outline"
+                            className="mt-2 h-7 gap-1 border-red-500/30 text-red-500 hover:bg-red-500/10"
+                            onClick={() => navigate('/profile?tab=keys')}
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                            Connect your email
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => setBuilderFlowId(flow.id)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="outline" className="gap-1" disabled={busy === flow.id} onClick={() => toggle(flow)}>
-                    {flow.status === 'active' ? <><Pause className="h-3.5 w-3.5" />Pause</> : <><Play className="h-3.5 w-3.5" />Resume</>}
-                  </Button>
-                  <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === flow.id} onClick={() => remove(flow)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
