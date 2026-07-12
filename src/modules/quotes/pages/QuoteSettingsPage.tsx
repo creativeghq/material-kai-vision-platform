@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Save, Loader2, Clock, FileText, Image, X } from 'lucide-react';
+import { Save, Loader2, Clock, FileText, Image, X, Eye } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { edgeErrorMessage } from '@/utils/edgeError';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 interface PDFTemplateConfig {
@@ -56,6 +59,28 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
   const [introPreview, setIntroPreview] = useState<string | null>(null);
   const [backcoverPreview, setBackcoverPreview] = useState<string | null>(null);
   const [bgPreview, setBgPreview] = useState<string | null>(null);
+
+  // Rendered "proper view" of the whole template (a sample quote PDF).
+  const { activeWorkspaceId } = useWorkspace();
+  const [previewing, setPreviewing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const handlePreview = async () => {
+    try {
+      setPreviewing(true);
+      setPreviewUrl(null);
+      const { data, error } = await supabase.functions.invoke('generate-quote-pdf', {
+        body: { preview: true, workspace_id: activeWorkspaceId ?? undefined },
+      });
+      if (error) throw new Error(await edgeErrorMessage(error));
+      if (!(data as any)?.success || !(data as any)?.pdf_url) throw new Error((data as any)?.error || 'Preview failed');
+      setPreviewUrl((data as any).pdf_url);
+    } catch (e: any) {
+      toast({ title: 'Preview failed', description: e?.message, variant: 'destructive' });
+    } finally {
+      setPreviewing(false);
+    }
+  };
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const introInputRef = useRef<HTMLInputElement>(null);
@@ -348,12 +373,19 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
       </div>
 
       <div className="dashboard-card space-y-6">
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-          <h2 className="text-xl font-semibold">Quote PDF Template</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+            <h2 className="text-xl font-semibold">PDF Design Template</h2>
+          </div>
+          <Button variant="outline" size="sm" onClick={handlePreview} disabled={previewing}>
+            {previewing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
+            Preview
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Configure the images and company details used when generating quote PDFs.
+          The default design applied to every quote PDF — cover, intro, item pages, and back cover, plus the
+          company details shown on the document. Use <strong>Preview</strong> to see a sample quote rendered with it.
         </p>
 
         <div className="space-y-4">
@@ -603,7 +635,11 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
           </div>
         </div>
 
-        <div className="flex justify-end pt-4">
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={handlePreview} disabled={previewing}>
+            {previewing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
+            Preview
+          </Button>
           <Button
             onClick={handleSavePdfConfig}
             disabled={savingPdf}
@@ -623,6 +659,14 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
           </Button>
         </div>
       </div>
+
+      {/* Rendered preview of the PDF Design Template */}
+      <Dialog open={!!previewUrl} onOpenChange={(o) => !o && setPreviewUrl(null)}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+          <DialogHeader><DialogTitle>PDF Design Template — Preview</DialogTitle></DialogHeader>
+          {previewUrl && <iframe src={previewUrl} title="Quote template preview" className="w-full flex-1 rounded-md border" />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 

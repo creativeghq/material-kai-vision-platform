@@ -3,7 +3,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { fetchQuoteData, fetchTemplateConfig, fetchStorageFile, fetchImageBytesFromUrl, applyWorkspaceBranding } from './data-fetcher.ts';
 import { buildQuotePDF } from './pdf-builder.ts';
-import type { QuotePDFRequest, QuotePDFResponse } from './types.ts';
+import type { QuotePDFRequest, QuotePDFResponse, QuoteData, TemplateConfig } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
@@ -33,7 +33,49 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
 
   try {
     const body: QuotePDFRequest = await req.json();
-    quoteId = body.quote_id;
+
+    // ── Preview mode: render a sample quote with the current PDF Design Template.
+    // No quote row, no DB writes — just the real template output for Quote Settings.
+    if (body.preview === true) {
+      const workspaceId = body.workspace_id ?? null;
+      // If a workspace is named, the caller must belong to it (branding leak guard).
+      if (workspaceId && auth.level !== 'secret') {
+        const { data: member } = await supabase
+          .from('workspace_members').select('user_id')
+          .eq('workspace_id', workspaceId).eq('user_id', auth.userId ?? '').maybeSingle();
+        if (!member) return jsonResponse({ success: false, error: 'Forbidden' }, 403);
+      }
+      const baseTemplateConfig = await fetchTemplateConfig(supabase);
+      const templateConfig = workspaceId
+        ? await applyWorkspaceBranding(supabase, baseTemplateConfig, workspaceId)
+        : baseTemplateConfig;
+
+      let logoPath: string | null = null;
+      if (workspaceId) {
+        const { data: fs } = await supabase.from('finance_settings')
+          .select('business_logo_path').eq('workspace_id', workspaceId).maybeSingle();
+        logoPath = fs?.business_logo_path ?? null;
+      }
+      const [coverBytes, bgBytes, backcoverBytes, logoBytes] = await Promise.all([
+        fetchStorageFile(supabase, 'quote-templates', templateConfig.cover_image_path),
+        fetchStorageFile(supabase, 'quote-templates', templateConfig.items_background_path),
+        fetchStorageFile(supabase, 'quote-templates', templateConfig.backcover_image_path),
+        logoPath ? fetchStorageFile(supabase, 'generation-images', logoPath) : Promise.resolve(null),
+      ]);
+
+      const sample = buildSampleQuote(workspaceId, templateConfig);
+      const pdfBytes = await buildQuotePDF(sample, templateConfig, coverBytes, bgBytes, backcoverBytes, logoBytes, {});
+
+      const storagePath = `quote-output/_preview/${workspaceId ?? 'global'}.pdf`;
+      const { error: upErr } = await supabase.storage.from('pdf-documents')
+        .upload(storagePath, pdfBytes, { contentType: 'application/pdf', upsert: true });
+      if (upErr) throw new Error(`Failed to upload preview: ${upErr.message}`);
+      const { data: signedUrl } = await supabase.storage.from('pdf-documents')
+        .createSignedUrl(storagePath, 60 * 30);
+      return jsonResponse({ success: true, pdf_url: signedUrl?.signedUrl, pdf_storage_path: storagePath });
+    }
+
+    quoteId = body.quote_id as string;
 
     if (!quoteId) {
       return jsonResponse({ success: false, error: 'Missing quote_id' }, 400);
@@ -252,6 +294,44 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
     );
   }
 }));
+
+// A representative sample quote for the PDF Design Template preview. Covers the
+// visible surfaces (multiple line items, FF&E fields, discount, VAT, notes) so the
+// admin sees a faithful render of the template without a real quote.
+function buildSampleQuote(workspaceId: string | null, tpl: TemplateConfig): QuoteData {
+  const vatRate = Number(tpl.vat_rate_default ?? 24);
+  const items = [
+    { name: 'Porcelain Tile — Carrara', sku: 'TIL-CAR-60', size: '60×60 cm', color: 'White', qty: 40, unit: 'm²', price: 28.5, room: 'Bathroom' },
+    { name: 'Oak Engineered Flooring', sku: 'FLR-OAK-14', size: '1900×190 mm', color: 'Natural', qty: 55, unit: 'm²', price: 42.0, room: 'Living room' },
+    { name: 'Matt Black Mixer Tap', sku: 'TAP-BLK-01', size: null, color: 'Matt black', qty: 3, unit: 'pcs', price: 89.0, room: 'Kitchen' },
+  ];
+  let subtotal = 0;
+  const itemData = items.map((it, i) => {
+    const lineTotal = Math.round(it.qty * it.price * 100) / 100;
+    subtotal += lineTotal;
+    return {
+      id: `sample-${i}`, product_name: it.name, description: 'Sample line item for template preview.',
+      sku: it.sku, selected_size: it.size, selected_color: it.color, quantity: it.qty, unit: it.unit,
+      unit_price: it.price, discounted_price: null, line_total: lineTotal, notes: null,
+      image_url: null, room: it.room, dimensions: it.size, installation_requirements: null, delivery_date: null,
+    };
+  });
+  subtotal = Math.round(subtotal * 100) / 100;
+  const vatAmount = Math.round(subtotal * vatRate) / 100;
+  const grandTotal = Math.round((subtotal + vatAmount) * 100) / 100;
+  return {
+    id: 'preview', user_id: 'preview', workspace_id: workspaceId ?? undefined,
+    name: 'Sample Quote — Template Preview', quote_number: 'PREVIEW-0001', status: 'draft', notes: 'This is a preview of your PDF Design Template. Replace the images and details in Quote Settings.',
+    subtotal, vat_rate: vatRate, vat_amount: vatAmount, grand_total: grandTotal, cash_discount_pct: 0,
+    currency: 'EUR', expires_at: '2030-01-01T00:00:00.000Z', created_at: '2026-01-01T00:00:00.000Z',
+    items: itemData,
+    client: {
+      contact_name: 'Sample Client', company_name: 'Acme Interiors Ltd', email: 'client@example.com',
+      phone: '+30 210 0000000', address: '123 Sample Street', city: 'Athens', postal_code: '10431',
+      country: 'Greece', vat_number: 'EL000000000',
+    },
+  };
+}
 
 function jsonResponse(body: QuotePDFResponse, status = 200): Response {
   return new Response(JSON.stringify(body), {

@@ -1,6 +1,11 @@
 export interface QuotePDFRequest {
-  quote_id: string;
+  quote_id?: string;
   regenerate?: boolean;
+  /** Render a sample quote with the current PDF Design Template — no DB writes.
+   *  Used by the Quote Settings "Preview" so admins see the real template output. */
+  preview?: boolean;
+  /** Workspace whose branding (logo/identity) overlays the preview. */
+  workspace_id?: string;
 }
 
 export interface QuotePDFResponse {

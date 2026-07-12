@@ -35,6 +35,8 @@ import {
   Boxes,
   ChevronDown,
   Check,
+  Code2,
+  ShieldCheck,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -137,6 +139,9 @@ interface AgentDefinition {
   color: string;
   requiredRole: 'viewer' | 'member' | 'admin' | 'owner';
   available: boolean;
+  /** Registered in agent_definitions but not yet runnable (sandbox execution
+   *  tier unbuilt). Shown in the picker as a disabled "Coming soon" teaser. */
+  comingSoon?: boolean;
   defaultModel: string; // Default AI model for this agent
 }
 
@@ -215,6 +220,31 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'admin',
     available: true,
     defaultModel: 'anthropic/claude-haiku-4-5',
+  },
+  // Registered in agent_definitions but not runnable yet — execution_kind
+  // 'sandbox' with no edge function. Shown disabled so the full roster is
+  // visible; become selectable (available:true) once the sandbox tier ships.
+  {
+    id: 'developer',
+    name: 'Stark',
+    description: 'Autonomous code & build agent — writes, runs, and ships changes in a sandbox',
+    icon: Code2,
+    color: 'text-orange-500',
+    requiredRole: 'member',
+    available: false,
+    comingSoon: true,
+    defaultModel: 'anthropic/claude-opus-4-8',
+  },
+  {
+    id: 'qa-reviewer',
+    name: 'Veritas',
+    description: 'QA & code-review agent — verifies, tests, and audits work in a sandbox',
+    icon: ShieldCheck,
+    color: 'text-teal-500',
+    requiredRole: 'member',
+    available: false,
+    comingSoon: true,
+    defaultModel: 'anthropic/claude-opus-4-8',
   },
   // Hidden: the generalist that JARVIS falls back to, and the target of legacy
   // `?agent=kai` deep-links. Not shown in the picker (available:false) — users
