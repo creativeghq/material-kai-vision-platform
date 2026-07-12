@@ -90,8 +90,12 @@ async function resolveShippingCreds(svc: any, workspaceId: string): Promise<{ ke
   return { key: data.api_key, baseUrl: data.base_url ?? null };
 }
 
-/** SeaRates BYOK creds (freight-rate quotes) — the workspace's own SeaRates id + api key. */
+/** SeaRates creds — OPERATOR-ONLY. SeaRates is the operator's rate tool (they keep the shipping
+ *  margin), so only the operator root workspace can hold a key + get direct rates; tenant quote
+ *  requests always route to the operator. */
 async function resolveSearatesCreds(svc: any, workspaceId: string): Promise<SearatesCreds | null> {
+  const { data: ws } = await svc.from('workspaces').select('is_root').eq('id', workspaceId).maybeSingle();
+  if (!ws?.is_root) return null; // tenants never get direct SeaRates
   const { data } = await svc.from('workspace_shipping_credentials')
     .select('searates_platform_id, searates_api_key').eq('workspace_id', workspaceId).maybeSingle();
   if (!data?.searates_api_key) return null;

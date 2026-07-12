@@ -17,10 +17,14 @@ import { Switch } from '@/components/core/ui/switch';
 import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Save, Ship, ExternalLink, Calculator } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { stockService } from '../services/stockService';
 
 export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
+  // SeaRates is operator-only (the operator prices shipping + keeps the margin); only the root
+  // workspace configures it. Tenants get ShipsGo tracking BYOK only.
+  const { isRootWorkspace } = useWorkspace();
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [hasKey, setHasKey] = useState(false);
@@ -125,15 +129,17 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
           </Button>
         </div>
 
-        {/* SeaRates — freight-rate quotes (separate provider + key from ShipsGo tracking). */}
+        {/* SeaRates — OPERATOR ONLY (root workspace). The operator prices tenant shipping requests
+            with SeaRates and keeps the margin; tenants never call SeaRates directly. */}
+        {isRootWorkspace && (
         <div className="border-t border-border/60 pt-4 space-y-3">
           <div className="flex items-center gap-2">
             <Calculator className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Freight quotes (SeaRates)</span>
+            <span className="text-sm font-medium">Freight rates (SeaRates) — operator</span>
             {srHasKey && <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">Configured</Badge>}
           </div>
           <p className="text-xs text-muted-foreground">
-            Optional. Add your own <a href="https://www.searates.com/integrations/api-logistics-explorer/" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">SeaRates <ExternalLink className="h-3 w-3" /></a> credentials to compare shipping cost from 100+ forwarders via the "Get quote" button in the Inbound tab. Runs on your SeaRates plan — no platform key, no platform credits.
+            Operator tool. Add the platform's <a href="https://www.searates.com/integrations/api-logistics-explorer/" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">SeaRates <ExternalLink className="h-3 w-3" /></a> credentials — used in <strong>Admin → Freight quote requests</strong> to price tenant shipping requests (compares 100+ forwarders). Tenants never call SeaRates directly, so shipping quotes always come through you.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label className="text-xs">Platform ID <span className="text-muted-foreground">(optional)</span></Label><Input value={srId} onChange={(e) => setSrId(e.target.value)} placeholder="SeaRates account id" autoComplete="off" /></div>
@@ -145,6 +151,7 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
             </Button>
           </div>
         </div>
+        )}
       </CardContent>
     </Card>
   );

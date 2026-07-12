@@ -175,7 +175,7 @@ const GetQuoteModal: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
             )}
             <div className="space-y-1"><Label>Ready date</Label><Input type="date" value={readyDate} onChange={(e) => setReadyDate(e.target.value)} /></div>
           </div>
-          <p className="text-[11px] text-muted-foreground">With your own SeaRates key (Profile → Keys) you get instant offers; without one, the request goes to the operator.</p>
+          <p className="text-[11px] text-muted-foreground">Your shipping request is sent for pricing — offers appear under Shipping once ready, then add one to the quote.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
