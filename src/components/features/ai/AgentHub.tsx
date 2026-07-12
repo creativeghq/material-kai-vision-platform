@@ -1513,13 +1513,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   };
 
   // Filter agents based on user role
-  const availableAgents = AGENTS.filter((agent) => {
-    const roleHierarchy = { viewer: 0, member: 1, admin: 2, owner: 3 };
-    return (
-      agent.available &&
-      roleHierarchy[userRole] >= roleHierarchy[agent.requiredRole]
-    );
-  });
+  const roleHierarchy = { viewer: 0, member: 1, admin: 2, owner: 3 };
+  const availableAgents = AGENTS.filter(
+    (agent) => agent.available && roleHierarchy[userRole] >= roleHierarchy[agent.requiredRole],
+  );
+  // Registered-but-not-runnable agents (sandbox tier unbuilt) — rendered
+  // disabled in the picker so the full roster is visible.
+  const comingSoonAgents = AGENTS.filter(
+    (agent) => agent.comingSoon && roleHierarchy[userRole] >= roleHierarchy[agent.requiredRole],
+  );
 
   // Handle VR world generation from DesignCanvas
   const handleGenerateVR = useCallback(async (
@@ -5468,6 +5470,33 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           </DropdownMenuItem>
                         );
                       })}
+                      {comingSoonAgents.length > 0 && (
+                        <>
+                          <DropdownMenuSeparator />
+                          {comingSoonAgents.map((agent) => {
+                            const Icon = agent.icon;
+                            return (
+                              <DropdownMenuItem
+                                key={agent.id}
+                                disabled
+                                onSelect={(e) => e.preventDefault()}
+                                className="flex items-start gap-2 py-2 opacity-100 data-[disabled]:opacity-100"
+                              >
+                                <Icon className={cn('h-4 w-4 mt-0.5 shrink-0 opacity-60', agent.color)} />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-sm font-medium text-muted-foreground">{agent.name}</span>
+                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                      Coming soon
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground/70 leading-snug">{agent.description}</p>
+                                </div>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
