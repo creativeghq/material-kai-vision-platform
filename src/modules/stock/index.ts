@@ -13,7 +13,7 @@ const StockPage = lazy(() => import('./pages/StockPage'));
 const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
-    { path: '/stock', component: StockPage },
+    { path: '/warehouse', component: StockPage },
   ],
   navItems: [],
 };

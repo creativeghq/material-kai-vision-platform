@@ -68,9 +68,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // (project clients / referral members) never see CRM or Finance. Part of #174.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', description: 'Contacts, companies, and leads.' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', description: 'Invoices, payments, and reports.' },
-  // Stock Management: warehouse inventory extracted from the Finance tab into its own paid add-on.
-  // Appears only when the workspace is entitled to 'stock' AND the persona holds warehouse.manage.
-  { id: 'stock', label: 'Stock', path: '/stock', icon: Package, requireCapability: 'warehouse.manage', moduleSlug: 'stock', surface: 'app', description: 'Warehouse inventory, movements & stocktake.' },
+  // Warehouse: inventory extracted from the Finance tab into its own paid add-on (module slug stays
+  // 'stock' internally). Appears only when the workspace is entitled AND the persona holds warehouse.manage.
+  { id: 'stock', label: 'Warehouse', path: '/warehouse', icon: Package, requireCapability: 'warehouse.manage', moduleSlug: 'stock', surface: 'app', description: 'Inventory, dispatch, movements & stocktake.' },
   // #252 — HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
   // hr.view (owner/admin, not plain members — employee salary/absence data is sensitive).
   { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app', description: 'Employees, absences, and HR documents.' },

@@ -860,9 +860,9 @@ const FinancePage: React.FC = () => {
           <TabsContent value="warehouse" className="space-y-4">
             <div className="dashboard-card p-8 text-center">
               <Package className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
-              <div className="text-sm font-medium mb-1">Inventory now lives in Stock</div>
-              <p className="text-sm text-muted-foreground mb-4">Warehouse stock, movements, transfers and stocktake moved to the dedicated Stock module.</p>
-              <a href="/stock" className="text-sm text-primary hover:underline">Open Stock →</a>
+              <div className="text-sm font-medium mb-1">Inventory now lives in Warehouse</div>
+              <p className="text-sm text-muted-foreground mb-4">Warehouse stock, movements, transfers and stocktake moved to the dedicated Warehouse module.</p>
+              <a href="/warehouse" className="text-sm text-primary hover:underline">Open Warehouse →</a>
             </div>
           </TabsContent>
 

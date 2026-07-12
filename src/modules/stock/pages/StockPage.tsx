@@ -1,22 +1,23 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Package, LayoutDashboard, Boxes, ArrowLeftRight, ClipboardList, TrendingUp, Ship } from 'lucide-react';
+import { Warehouse as WarehouseIcon, LayoutDashboard, Boxes, ArrowLeftRight, ClipboardList, TrendingUp, Ship, Truck } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
+import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { StockOverviewSection } from '../components/StockOverviewSection';
 import { MovementsSection } from '../components/MovementsSection';
 import { StockCountsSection } from '../components/StockCountsSection';
 import { ResupplySection } from '../components/ResupplySection';
 import { InboundSection } from '../components/InboundSection';
 
-// Stock Management module page. Extracted from the Finance "Warehouse" tab into a first-class
-// entitlement-gated module (EntitlementGuard wraps this route). Plain Radix tabs (no forceMount) so
-// only the active panel renders — mirrors FinancePage; each tab loads its own data on open.
-const TABS = ['overview', 'inventory', 'resupply', 'inbound', 'movements', 'counts'];
+// Warehouse module page (module slug stays 'stock' internally). Extracted from the Finance "Warehouse"
+// tab into a first-class entitlement-gated module. Plain Radix tabs (no forceMount) so only the active
+// panel renders — mirrors FinancePage; each tab loads its own data on open.
+const TABS = ['overview', 'inventory', 'resupply', 'inbound', 'dispatch', 'movements', 'counts'];
 
 export default function StockPage() {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
@@ -39,10 +40,10 @@ export default function StockPage() {
   if (!can('warehouse.manage')) {
     return (
       <div className="min-h-screen">
-        <PageHeader icon={Package} title="Stock" subtitle="Inventory management" />
+        <PageHeader icon={WarehouseIcon} title="Warehouse" subtitle="Inventory management" />
         <div className="p-6">
           <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">
-            You don’t have access to Stock for this workspace. Ask a workspace owner or admin.
+            You don’t have access to the Warehouse for this workspace. Ask a workspace owner or admin.
           </div>
         </div>
       </div>
@@ -51,7 +52,7 @@ export default function StockPage() {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={Package} title="Stock" subtitle="Inventory, movements, transfers & stocktake across warehouses" />
+      <PageHeader icon={WarehouseIcon} title="Warehouse" subtitle="Inventory, movements, dispatch, resupply & stocktake" />
 
       <div className="p-3 sm:p-6">
         <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -60,6 +61,7 @@ export default function StockPage() {
             <TabsTrigger value="inventory" className="w-full justify-start"><Boxes className="h-4 w-4 mr-2" /> Inventory</TabsTrigger>
             <TabsTrigger value="resupply" className="w-full justify-start"><TrendingUp className="h-4 w-4 mr-2" /> Resupply</TabsTrigger>
             <TabsTrigger value="inbound" className="w-full justify-start"><Ship className="h-4 w-4 mr-2" /> Inbound</TabsTrigger>
+            <TabsTrigger value="dispatch" className="w-full justify-start"><Truck className="h-4 w-4 mr-2" /> Dispatch</TabsTrigger>
             <TabsTrigger value="movements" className="w-full justify-start"><ArrowLeftRight className="h-4 w-4 mr-2" /> Movements</TabsTrigger>
             <TabsTrigger value="counts" className="w-full justify-start"><ClipboardList className="h-4 w-4 mr-2" /> Stock counts</TabsTrigger>
           </TabsList>
@@ -76,6 +78,9 @@ export default function StockPage() {
             </TabsContent>
             <TabsContent value="inbound" className="mt-0 space-y-4">
               <InboundSection workspaceId={ws} />
+            </TabsContent>
+            <TabsContent value="dispatch" className="mt-0 space-y-4">
+              <DispatchBoard workspaceId={ws} readOnly={!can('finance.manage')} />
             </TabsContent>
             <TabsContent value="movements" className="mt-0 space-y-4">
               <MovementsSection workspaceId={ws} />
