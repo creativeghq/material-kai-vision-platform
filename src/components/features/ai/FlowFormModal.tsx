@@ -47,20 +47,34 @@ export type FlowFormState = {
   };
 } | null;
 
+/** The structured shape create_simple_flow expects — used by the direct (manual) create path. */
+export interface SimpleFlowPayload {
+  name: string;
+  trigger_type: string;
+  trigger_config: Record<string, unknown>;
+  actions: Array<{ action_type: string; config: Record<string, unknown> }>;
+}
+
 interface Props {
   state: FlowFormState;
   onClose: () => void;
-  /** Called with a follow-up user message that re-invokes manage_flows(create). */
-  onSubmit: (followupMessage: string) => void;
+  /** Agent round-trip: called with a follow-up user message that re-invokes manage_flows(create).
+   *  Used when the modal is opened from chat (AgentHub). */
+  onSubmit?: (followupMessage: string) => void;
+  /** Direct create: called with the structured payload. Used when the modal is opened from the
+   *  Automations page — it calls create_simple_flow itself and refreshes. Takes precedence over
+   *  onSubmit when provided. */
+  onCreate?: (payload: SimpleFlowPayload) => Promise<void> | void;
 }
 
-export function FlowFormModal({ state, onClose, onSubmit }: Props) {
+export function FlowFormModal({ state, onClose, onSubmit, onCreate }: Props) {
   const open = !!state;
 
   const [name, setName] = useState('');
   const [triggerType, setTriggerType] = useState('invoice_paid');
   const [cron, setCron] = useState('0 9 * * *');
   const [actionType, setActionType] = useState('create_notification');
+  const [submitting, setSubmitting] = useState(false);
 
   // Generic single-action config fields (only the relevant ones render per action).
   const [to, setTo] = useState('{{trigger.data.email}}');
@@ -81,10 +95,9 @@ export function FlowFormModal({ state, onClose, onSubmit }: Props) {
     }
   }, [state]);
 
-  const handleSubmit = () => {
+  const buildPayload = (): SimpleFlowPayload => {
     const flowName = name.trim() || `${TRIGGERS.find(t => t.value === triggerType)?.label} → ${ACTIONS.find(a => a.value === actionType)?.label}`;
 
-    // Build the action config object as prose the agent can transcribe verbatim.
     let config: Record<string, unknown> = {};
     if (actionType === 'send_email') config = { to: to.trim(), subject: subject.trim(), body: body.trim() };
     else if (actionType === 'create_notification') config = { user_id: userIdField.trim(), title: title.trim(), body: body.trim(), type: 'info' };
@@ -96,15 +109,34 @@ export function FlowFormModal({ state, onClose, onSubmit }: Props) {
 
     const triggerConfig = triggerType === 'scheduled' ? { cron: cron.trim(), timezone: 'UTC' } : {};
 
+    return { name: flowName, trigger_type: triggerType, trigger_config: triggerConfig, actions: [{ action_type: actionType, config }] };
+  };
+
+  const handleSubmit = async () => {
+    const payload = buildPayload();
+
+    // Direct (manual) create — the caller writes it via create_simple_flow and refreshes.
+    if (onCreate) {
+      setSubmitting(true);
+      try {
+        await onCreate(payload);
+        onClose();
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Agent round-trip — compose a message the KAI agent re-parses into manage_flows(create).
     const parts: string[] = [];
     parts.push('Please create this automation using manage_flows with action: "create".');
-    parts.push(`- name: ${flowName}`);
-    parts.push(`- trigger_type: \`${triggerType}\``);
-    if (triggerType === 'scheduled') parts.push(`- trigger_config: \`${JSON.stringify(triggerConfig)}\``);
-    parts.push(`- actions: \`${JSON.stringify([{ action_type: actionType, config }])}\``);
+    parts.push(`- name: ${payload.name}`);
+    parts.push(`- trigger_type: \`${payload.trigger_type}\``);
+    if (payload.trigger_type === 'scheduled') parts.push(`- trigger_config: \`${JSON.stringify(payload.trigger_config)}\``);
+    parts.push(`- actions: \`${JSON.stringify(payload.actions)}\``);
     parts.push('Activate it immediately. Confirm back to me once it’s created.');
 
-    onSubmit(parts.join('\n'));
+    onSubmit?.(parts.join('\n'));
     onClose();
   };
 
@@ -206,8 +238,10 @@ export function FlowFormModal({ state, onClose, onSubmit }: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={submitDisabled}>Send to agent</Button>
+          <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={submitDisabled || submitting}>
+            {submitting ? 'Creating…' : onCreate ? 'Create automation' : 'Send to agent'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

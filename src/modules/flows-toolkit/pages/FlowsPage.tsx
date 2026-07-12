@@ -13,13 +13,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Workflow, Play, Pause, Trash2, Sparkles, Clock, Zap } from 'lucide-react';
+import { Workflow, Play, Pause, Trash2, Sparkles, Clock, Zap, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { FlowFormModal, type FlowFormState, type SimpleFlowPayload } from '@/components/features/ai/FlowFormModal';
 
 interface WorkspaceFlow {
   id: string;
@@ -56,6 +57,7 @@ export default function FlowsPage() {
   const [flows, setFlows] = useState<WorkspaceFlow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [formState, setFormState] = useState<FlowFormState>(null);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
@@ -104,8 +106,28 @@ export default function FlowsPage() {
     void load();
   };
 
+  // Manual create — open the guided form; on submit it calls create_simple_flow directly.
+  const openManualForm = () => setFormState({ default_trigger_type: 'invoice_paid' });
+
+  const createFlow = async (payload: SimpleFlowPayload) => {
+    if (!activeWorkspaceId) return;
+    const { error } = await supabase.rpc('create_simple_flow', {
+      p_workspace_id: activeWorkspaceId,
+      p_name: payload.name,
+      p_trigger_type: payload.trigger_type,
+      p_trigger_config: payload.trigger_config,
+      p_actions: payload.actions,
+      p_activate: true,
+    });
+    if (error) { toast({ title: 'Could not create', description: error.message, variant: 'destructive' }); throw error; }
+    toast({ title: 'Automation created', description: `"${payload.name}" is now active.` });
+    void load();
+  };
+
+  // AI create — deep-link to the KAI agent. The page reads `?prompt=` and auto-sends it, so the
+  // agent opens the guided flow (manage_flows) in chat.
   const createViaAgent = () => {
-    navigate('/agent-hub?agent=kai&q=' + encodeURIComponent('Set up a new automation for my workspace'));
+    navigate('/agent-hub?agent=kai&prompt=' + encodeURIComponent('Set up a new automation for my workspace'));
   };
 
   return (
@@ -115,10 +137,16 @@ export default function FlowsPage() {
         title="Automations"
         subtitle="Run an action automatically when something happens in your workspace"
         actions={
-          <Button onClick={createViaAgent} className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            Create with AI
-          </Button>
+          <>
+            <Button variant="outline" onClick={createViaAgent} className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              Create with AI
+            </Button>
+            <Button onClick={openManualForm} className="gap-2">
+              <Plus className="h-4 w-4" />
+              New automation
+            </Button>
+          </>
         }
       />
 
@@ -136,12 +164,18 @@ export default function FlowsPage() {
             <Zap className="h-8 w-8 text-muted-foreground/50 mx-auto mb-3" />
             <p className="font-medium">No automations yet</p>
             <p className="text-sm text-muted-foreground mt-1 mb-4">
-              Ask the assistant, e.g. “email the customer when their invoice is paid”.
+              Build one manually, or ask the assistant — e.g. “email the customer when their invoice is paid”.
             </p>
-            <Button variant="outline" onClick={createViaAgent} className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              Create your first automation
-            </Button>
+            <div className="flex items-center justify-center gap-2">
+              <Button onClick={openManualForm} className="gap-2">
+                <Plus className="h-4 w-4" />
+                New automation
+              </Button>
+              <Button variant="outline" onClick={createViaAgent} className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Create with AI
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -176,6 +210,12 @@ export default function FlowsPage() {
           </div>
         )}
       </div>
+
+      <FlowFormModal
+        state={formState}
+        onClose={() => setFormState(null)}
+        onCreate={createFlow}
+      />
     </div>
   );
 }
