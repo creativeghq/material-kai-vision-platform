@@ -19,6 +19,7 @@ import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdent
 import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCard';
 import { InvoiceTemplateCard } from '@/modules/finance/components/InvoiceTemplateCard';
 import { PricingRulesCard } from '@/modules/finance/components/PricingRulesCard';
+import { BrandMarkupCard } from '@/modules/finance/components/BrandMarkupCard';
 import { UserLevelsCard } from '@/modules/finance/components/UserLevelsCard';
 import { LevelCategoryDiscountsCard } from '@/modules/finance/components/LevelCategoryDiscountsCard';
 import { CustomPricingRulesCard } from '@/modules/finance/components/CustomPricingRulesCard';
@@ -229,6 +230,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         <TabsContent value="pricing" className="mt-0 space-y-4">
           <PendingDiscountApprovalsCard workspaceId={workspaceId} />
           <PricingRulesCard workspaceId={workspaceId} />
+          <BrandMarkupCard workspaceId={workspaceId} />
           <UserLevelsCard workspaceId={workspaceId} />
           <LevelCategoryDiscountsCard workspaceId={workspaceId} />
           <CustomPricingRulesCard workspaceId={workspaceId} />

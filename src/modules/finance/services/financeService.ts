@@ -777,7 +777,7 @@ const _financeServiceCore = {
   },
 
   async listPricingRules(workspaceId: string): Promise<Array<{
-    id: string; scope: 'category' | 'product'; target_id: string;
+    id: string; scope: 'category' | 'product' | 'brand'; target_id: string;
     markup_pct: number | null; sell_price: number | null; currency: string;
   }>> {
     const { data, error } = await supabase
@@ -790,7 +790,7 @@ const _financeServiceCore = {
   },
 
   async upsertPricingRule(input: {
-    workspaceId: string; scope: 'category' | 'product'; targetId: string;
+    workspaceId: string; scope: 'category' | 'product' | 'brand'; targetId: string;
     markupPct?: number | null; sellPrice?: number | null; currency?: string;
   }): Promise<void> {
     const { error } = await supabase.from('pricing_rules').upsert({

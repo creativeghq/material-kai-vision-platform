@@ -192,8 +192,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   // Price lookup drawer state — one instance, reused for any row the admin clicks.
   const [lookupItem, setLookupItem] = useState<QuoteItemWithProduct | null>(null);
   // #227 — hide the per-line margin from a sales rep when sales_can_see_cost is off.
-  const { isSalesRep } = usePermissions();
+  const { isSalesRep, can } = usePermissions();
   const showMargin = !(isSalesRep && !salesCanSeeCost);
+  // #227 — per-line margin (cost → price spread) is internal-only: pricing managers/admins,
+  // and even then hidden from a sales rep who isn't cleared to see cost.
+  const canSeeLineMargin = can('pricing.manage') && showMargin;
 
   const handleViewProduct = (product: SimpleProduct) => {
     setSelectedProduct(convertToDisplayProduct(product));
@@ -504,6 +507,20 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 {fmtPrice(Number(item.unit_price) * item.quantity)}
                               </div>
                             )}
+                            {/* #227 — internal-only per-line margin: (price − cost) × qty. */}
+                            {canSeeLineMargin && (() => {
+                              const cost = (item as any).cost_snapshot != null ? Number((item as any).cost_snapshot) : null;
+                              const finalUnit = effectivePrice != null ? Number(effectivePrice) : null;
+                              if (cost == null || finalUnit == null) return null;
+                              const marginValue = (finalUnit - cost) * item.quantity;
+                              const marginPct = cost > 0 ? Math.round(((finalUnit - cost) / cost) * 100) : null;
+                              const below = marginValue < 0;
+                              return (
+                                <div className={`mt-0.5 text-[10px] ${below ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                  {below ? 'below cost ' : 'margin '}{fmtPrice(marginValue)}{marginPct != null ? ` · ${marginPct}%` : ''}
+                                </div>
+                              );
+                            })()}
                           </td>
                         )}
 

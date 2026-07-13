@@ -16,7 +16,7 @@ import { financeService } from '@/modules/finance/services/financeService';
 import { parseDecimalOr } from '@/utils/decimal';
 
 interface Rule {
-  id: string; scope: 'category' | 'product'; target_id: string;
+  id: string; scope: 'category' | 'product' | 'brand'; target_id: string;
   markup_pct: number | null; sell_price: number | null; currency: string;
 }
 
