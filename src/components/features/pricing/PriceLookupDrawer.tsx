@@ -23,6 +23,7 @@ import { AlertTriangle, FileText, Globe2, Loader2, Sparkles, X, Zap } from 'luci
 
 import { MarketPanel } from './MarketPanel';
 import { marketCheck, type MarketCheckResponse } from '@/services/priceMonitoringApi';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 import {
   Sheet,
@@ -165,6 +166,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
   const [marketLoading, setMarketLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
 
   const reset = useCallback(() => {
     setLoading(false);
@@ -199,16 +201,14 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
 
     try {
       const query = [productName, sku, manufacturer].filter(Boolean).join(' ').trim();
-      // Resolve workspace — same pattern as other admin pages
-      const { data: ws } = await supabase.from('workspaces').select('id').limit(1).maybeSingle();
-      if (!ws?.id) throw new Error('No workspace found');
+      if (!activeWorkspaceId) throw new Error('No active workspace');
 
       const { data, error } = await supabase.functions.invoke('mivaa-gateway', {
         body: {
           action: 'search_knowledge_base',
           payload: {
             query,
-            workspace_id: ws.id,
+            workspace_id: activeWorkspaceId,
             search_types: ['kb_docs'],
             top_k: 8,
             similarity_threshold: 0.35,
@@ -494,14 +494,14 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
         price_source: priceSource,
       };
 
-      // Optionally upsert to product_prices — used when triggered from product detail page
-      if (commitToProductPrices && productId) {
+      // Optionally upsert to product_prices for the ACTIVE workspace — used when
+      // triggered from the product detail page (per-workspace catalog price).
+      if (commitToProductPrices && productId && activeWorkspaceId) {
         const { data: { user } } = await supabase.auth.getUser();
-        const { data: ws } = await supabase.from('workspaces').select('id').limit(1).maybeSingle();
-        if (user && ws?.id) {
+        if (user) {
           await supabase.from('product_prices').upsert(
             {
-              workspace_id: ws.id,
+              workspace_id: activeWorkspaceId,
               product_id: productId,
               list_price: proposal?.list_price ?? null,
               discount_price,

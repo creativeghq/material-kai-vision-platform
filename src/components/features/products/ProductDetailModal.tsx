@@ -31,7 +31,7 @@ import { ProductMonitorTab } from '@/components/business/price-monitoring/Produc
 import { MentionMonitorTab } from '@/components/business/mention-monitoring/MentionMonitorTab';
 import ProductSEOTab from '@/components/business/seo-toolkit/ProductSEOTab';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
-import { WorkspaceCostBadge } from '@/components/business/marketplace/WorkspaceCostBadge';
+import { ProductPricePanel } from '@/components/features/pricing/ProductPricePanel';
 import { ProductMydataCard } from '@/components/business/marketplace/ProductMydataCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { DollarSign } from 'lucide-react';
@@ -2947,7 +2947,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <p className="text-xs text-muted-foreground -mt-2">
               Internal pricing &amp; fiscal data — visible to admins and operators only.
             </p>
-            <WorkspaceCostBadge productId={product.id} />
+            <ProductPricePanel productId={product.id} />
             <ProductPricingCard productId={product.id} />
             <ProductMydataCard productId={product.id} />
           </div>
