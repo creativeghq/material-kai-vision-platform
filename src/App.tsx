@@ -127,6 +127,8 @@ const PublicStorefrontPage = lazy(() => import('./pages/PublicStorefrontPage'));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 const PlansPage = lazy(() => import('./pages/Admin/PlansPage'));
 const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
+const TermsOfServicePage = lazy(() => import('./pages/legal/TermsOfServicePage'));
 
 // Module system — registers module routes declared in src/modules/*/index.ts
 import { buildModuleRoutes } from './modules/_core';
@@ -188,6 +190,11 @@ const App = () => (
                 <Route path="/tools/project-plan" element={<PageErrorBoundary name="Project Plan Estimator"><ProjectPlanPage /></PageErrorBoundary>} />
                 <Route path="/tools/heat-pump" element={<PageErrorBoundary name="Heat Pump Sizer"><HeatPumpToolPage /></PageErrorBoundary>} />
                 <Route path="/tools/heating-cost" element={<PageErrorBoundary name="Heating Cost Comparison"><HeatingCostPage /></PageErrorBoundary>} />
+                {/* Public legal pages — no auth required */}
+                <Route path="/privacy" element={<PageErrorBoundary name="Privacy Policy"><PrivacyPolicyPage /></PageErrorBoundary>} />
+                <Route path="/terms" element={<PageErrorBoundary name="Terms of Service"><TermsOfServicePage /></PageErrorBoundary>} />
+                <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
+                <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
                 {/* Project Workspace invitations — passwordless flow, no AuthGuard. The accept page
                     expects a Supabase session (established by the magic-link callback) — if it isn't there,
                     its internal redirect bounces back to the invite landing. */}
