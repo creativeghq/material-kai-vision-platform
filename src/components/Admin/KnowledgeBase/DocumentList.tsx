@@ -61,6 +61,11 @@ interface DocumentListProps {
   onCreate: () => void;
   searchQuery: string;
   refreshTrigger?: number;
+  /**
+   * When set (with a changing `nonce`), seed the filters to show only this
+   * category — used when the user clicks a category on the Categories tab.
+   */
+  applyCategoryFilter?: { id: string; nonce: number } | null;
 }
 
 export const DocumentList: React.FC<DocumentListProps> = ({
@@ -68,6 +73,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   onCreate,
   searchQuery,
   refreshTrigger,
+  applyCategoryFilter,
 }) => {
   const [documents, setDocuments] = useState<KBDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +103,15 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   useEffect(() => {
     loadWorkspace();
   }, []);
+
+  // Seed a single-category filter when the user clicks a category on the
+  // Categories tab. Keyed on `nonce` so re-clicking the same category re-applies.
+  useEffect(() => {
+    if (applyCategoryFilter?.id) {
+      setFilters({ ...EMPTY_KB_FILTERS, categoryIds: [applyCategoryFilter.id] });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyCategoryFilter?.nonce]);
 
   // Reset to first page whenever the result set changes (filters / search).
   useEffect(() => {

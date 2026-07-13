@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderTree, Plus, Edit, Trash2, ExternalLink, Lock } from 'lucide-react';
+import { FolderTree, Plus, Edit, Trash2, ExternalLink, Lock, ListFilter } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -39,7 +39,12 @@ const ACCESS_LEVEL_CONFIG = {
   public: { label: 'Public + Agent', emoji: '🌍', className: 'bg-green-100 text-green-800 border-green-200' },
 } as const;
 
-export const CategoryManager: React.FC = () => {
+interface CategoryManagerProps {
+  /** Jump to the Documents tab pre-filtered to this category. */
+  onViewDocuments?: (categoryId: string) => void;
+}
+
+export const CategoryManager: React.FC<CategoryManagerProps> = ({ onViewDocuments }) => {
   const [categories, setCategories] = useState<KBCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
@@ -271,13 +276,19 @@ export const CategoryManager: React.FC = () => {
                         <span className="text-2xl">{category.icon}</span>
                       </TableCell>
                       <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className={`flex items-center gap-2 text-left ${onViewDocuments ? 'hover:text-primary hover:underline' : ''}`}
+                          onClick={() => onViewDocuments?.(category.id)}
+                          title={onViewDocuments ? 'View documents in this category' : undefined}
+                          disabled={!onViewDocuments}
+                        >
                           <div
-                            className="w-3 h-3 rounded-full"
+                            className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: category.color }}
                           />
                           {category.name}
-                        </div>
+                        </button>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {category.description}
@@ -294,9 +305,29 @@ export const CategoryManager: React.FC = () => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{category.document_count || 0}</TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          className={`tabular-nums ${onViewDocuments ? 'hover:text-primary hover:underline' : ''}`}
+                          onClick={() => onViewDocuments?.(category.id)}
+                          title={onViewDocuments ? 'View documents in this category' : undefined}
+                          disabled={!onViewDocuments}
+                        >
+                          {category.document_count || 0}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {onViewDocuments && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="View documents in this category"
+                              onClick={() => onViewDocuments(category.id)}
+                            >
+                              <ListFilter className="h-4 w-4" />
+                            </Button>
+                          )}
                           {category.access_level === 'public' && (
                             <Button
                               variant="ghost"

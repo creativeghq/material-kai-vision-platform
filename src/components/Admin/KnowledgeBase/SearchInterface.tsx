@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Clock, Sparkles } from 'lucide-react';
+import { Search, Clock, Sparkles, Edit, ExternalLink } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -9,7 +9,12 @@ import { useToast } from '@/hooks/use-toast';
 import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
-export const SearchInterface: React.FC = () => {
+interface SearchInterfaceProps {
+  /** Open a document in the editor (from a search result click). */
+  onOpen?: (docId: string) => void;
+}
+
+export const SearchInterface: React.FC<SearchInterfaceProps> = ({ onOpen }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<KBDocument[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -169,12 +174,41 @@ export const SearchInterface: React.FC = () => {
       {results.length > 0 && (
         <div className="space-y-3">
           {results.map((doc) => (
-            <Card key={doc.id}>
+            <Card
+              key={doc.id}
+              className={onOpen ? 'cursor-pointer transition-colors hover:border-primary/60 hover:bg-muted/40' : undefined}
+              onClick={onOpen ? () => onOpen(doc.id) : undefined}
+              role={onOpen ? 'button' : undefined}
+              tabIndex={onOpen ? 0 : undefined}
+              onKeyDown={onOpen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(doc.id); } } : undefined}
+            >
               <CardContent className="pt-6">
                 <div className="space-y-2">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <h3 className="font-semibold text-lg">{doc.title}</h3>
-                    <Badge variant="outline">{doc.status}</Badge>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge variant="outline">{doc.status}</Badge>
+                      {doc.status === 'published' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Open on public KB"
+                          onClick={(e) => { e.stopPropagation(); window.open(`/knowledge-base?doc=${doc.id}`, '_blank'); }}
+                        >
+                          <ExternalLink className="h-4 w-4 text-blue-500" />
+                        </Button>
+                      )}
+                      {onOpen && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Edit document"
+                          onClick={(e) => { e.stopPropagation(); onOpen(doc.id); }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   {doc.summary && (
                     <p className="text-sm text-muted-foreground">{doc.summary}</p>

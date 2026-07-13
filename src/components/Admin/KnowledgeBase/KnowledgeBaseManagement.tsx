@@ -36,6 +36,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [docRefreshKey, setDocRefreshKey] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<{ id: string; nonce: number } | null>(null);
   const [stats, setStats] = useState({
     totalDocs: 0,
     totalCategories: 0,
@@ -100,6 +101,11 @@ export const KnowledgeBaseManagement: React.FC = () => {
     setSelectedDocId(null);
     setDocRefreshKey(k => k + 1);
     loadStats();
+  };
+
+  const handleViewCategoryDocuments = (categoryId: string) => {
+    setCategoryFilter({ id: categoryId, nonce: Date.now() });
+    setActiveTab('documents');
   };
 
   return (
@@ -202,15 +208,16 @@ export const KnowledgeBaseManagement: React.FC = () => {
               onCreate={handleCreateDocument}
               searchQuery={searchQuery}
               refreshTrigger={docRefreshKey}
+              applyCategoryFilter={categoryFilter}
             />
           </TabsContent>
 
           <TabsContent value="search" className="space-y-4">
-            <SearchInterface />
+            <SearchInterface onOpen={handleEditDocument} />
           </TabsContent>
 
           <TabsContent value="categories" className="space-y-4">
-            <CategoryManager />
+            <CategoryManager onViewDocuments={handleViewCategoryDocuments} />
           </TabsContent>
 
           <TabsContent value="attachments" className="space-y-4">
