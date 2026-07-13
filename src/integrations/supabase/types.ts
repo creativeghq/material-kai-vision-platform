@@ -26395,7 +26395,7 @@ export type Database = {
         Returns: string
       }
       approve_reseller_application: {
-        Args: { p_application_id: string }
+        Args: { p_application_id: string; p_discount_pct?: number }
         Returns: string
       }
       assert_workspace_member: {
@@ -26543,6 +26543,7 @@ export type Database = {
         Args: {
           p_can_supply_products?: boolean
           p_catalog_access?: string
+          p_discount_pct?: number
           p_name: string
           p_parent_id: string
         }
@@ -29407,6 +29408,7 @@ export type Database = {
         Args: {
           p_can_supply_products?: boolean
           p_catalog_access?: string
+          p_discount_pct?: number
           p_workspace_id: string
         }
         Returns: undefined

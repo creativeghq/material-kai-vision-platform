@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Store, Check, X, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -35,6 +37,7 @@ export const ResellerApplicationsTab: React.FC = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [discountPct, setDiscountPct] = useState<Record<string, string>>({});
 
   useEffect(() => { load(); }, []);
 
@@ -74,7 +77,9 @@ export const ResellerApplicationsTab: React.FC = () => {
   const approve = async (app: ResellerApplication) => {
     setBusyId(app.id);
     try {
-      await resellerApplicationsService.approve(app.id);
+      const raw = parseInt(discountPct[app.id] ?? '', 10);
+      const pct = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
+      await resellerApplicationsService.approve(app.id, pct);
       setApps((prev) => prev.map((a) => a.id === app.id ? { ...a, status: 'approved' } : a));
       toast({ title: 'Reseller approved', description: 'Their workspace is now a reseller of the operator catalog.' });
     } catch (e) {
@@ -175,15 +180,31 @@ export const ResellerApplicationsTab: React.FC = () => {
                         </Button>
                       )}
                       {app.status === 'aade_verified' && (
-                        <Button
-                          size="sm"
-                          className="h-8 bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => approve(app)}
-                          disabled={busyId === app.id}
-                        >
-                          {busyId === app.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                          <span className="ml-1.5">Approve</span>
-                        </Button>
+                        <div className="flex items-center gap-1.5">
+                          <Label htmlFor={`discount-${app.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                            Reseller discount %
+                          </Label>
+                          <Input
+                            id={`discount-${app.id}`}
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={discountPct[app.id] ?? ''}
+                            onChange={(e) => setDiscountPct((s) => ({ ...s, [app.id]: e.target.value }))}
+                            placeholder="0"
+                            title="% off your catalog retail that this reseller pays you — that's their cost, and their resale margin room."
+                            className="h-8 w-16"
+                          />
+                          <Button
+                            size="sm"
+                            className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => approve(app)}
+                            disabled={busyId === app.id}
+                          >
+                            {busyId === app.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            <span className="ml-1.5">Approve</span>
+                          </Button>
+                        </div>
                       )}
                       <Button
                         size="sm"

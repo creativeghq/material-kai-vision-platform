@@ -5,6 +5,9 @@ export interface CreateChildInput {
   parentId: string;
   canSupplyProducts: boolean;
   catalogAccess: 'operator_catalog' | 'own_products_only';
+  /** The child's discount off this workspace's catalog retail — i.e. what they pay us
+   *  (their cost basis) = their resale margin room. 0–100. */
+  discountPct?: number;
 }
 
 export const workspaceManagementService = {
@@ -15,6 +18,7 @@ export const workspaceManagementService = {
       p_parent_id: input.parentId,
       p_can_supply_products: input.canSupplyProducts,
       p_catalog_access: input.catalogAccess,
+      p_discount_pct: input.discountPct ?? 0,
     });
     if (error) throw error;
     return data as string;
@@ -30,12 +34,13 @@ export const workspaceManagementService = {
   /** Edit a direct child's per-edge settings (caller must own/admin the parent). */
   async updateChildSettings(
     workspaceId: string,
-    patch: { catalogAccess?: 'operator_catalog' | 'own_products_only'; canSupplyProducts?: boolean },
+    patch: { catalogAccess?: 'operator_catalog' | 'own_products_only'; canSupplyProducts?: boolean; discountPct?: number },
   ): Promise<void> {
     const { error } = await supabase.rpc('update_child_workspace_settings', {
       p_workspace_id: workspaceId,
       p_catalog_access: patch.catalogAccess ?? null,
       p_can_supply_products: patch.canSupplyProducts ?? null,
+      p_discount_pct: patch.discountPct ?? null,
     });
     if (error) throw error;
   },

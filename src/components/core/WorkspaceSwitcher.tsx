@@ -105,17 +105,21 @@ const CreateWorkspaceDialog: React.FC<{
   // A dealer can only create architects; an operator can create either.
   const [type, setType] = useState<'dealer' | 'architect'>(parentRank === 'operator' ? 'dealer' : 'architect');
   const [catalogAccess, setCatalogAccess] = useState<'operator_catalog' | 'own_products_only'>('operator_catalog');
+  const [discountPct, setDiscountPct] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (!parentId || !name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
     try {
       setBusy(true);
+      const raw = parseInt(discountPct, 10);
+      const pct = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
       await workspaceManagementService.createChild({
         name: name.trim(),
         parentId,
         canSupplyProducts: type === 'dealer',
         catalogAccess,
+        discountPct: pct,
       });
       setName('');
       onCreated();
@@ -156,6 +160,21 @@ const CreateWorkspaceDialog: React.FC<{
                 <SelectItem value="own_products_only">Own products only</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="child-discount-pct">Reseller discount %</Label>
+            <Input
+              id="child-discount-pct"
+              type="number"
+              min={0}
+              max={100}
+              value={discountPct}
+              onChange={(e) => setDiscountPct(e.target.value)}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              % off your catalog retail that this reseller pays you — that's their cost, and their resale margin room.
+            </p>
           </div>
         </div>
         <DialogFooter>

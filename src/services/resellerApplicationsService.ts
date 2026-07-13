@@ -84,10 +84,12 @@ export const resellerApplicationsService = {
     return data as AadeVerifyResult;
   },
 
-  /** Operator: approve (requires a passing ΑΑΔΕ check). Returns the reseller workspace id. */
-  async approve(applicationId: string): Promise<string> {
+  /** Operator: approve (requires a passing ΑΑΔΕ check). Returns the reseller workspace id.
+   *  `discountPct` = the reseller's discount off our catalog retail (their cost basis / margin room). */
+  async approve(applicationId: string, discountPct = 0): Promise<string> {
     const { data, error } = await sb.rpc('approve_reseller_application', {
       p_application_id: applicationId,
+      p_discount_pct: discountPct,
     });
     if (error) throw error;
     return data as string;

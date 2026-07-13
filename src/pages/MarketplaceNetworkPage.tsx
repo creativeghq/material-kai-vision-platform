@@ -3,6 +3,7 @@ import { Loader2, Network, Save, Link2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +19,7 @@ interface WsRow {
   kind?: 'operator' | 'reseller' | 'consumer';
   can_supply_products: boolean;
   catalog_access: 'operator_catalog' | 'own_products_only';
+  parent_discount_pct?: number | null;
 }
 
 const rankOf = (w: WsRow) =>
@@ -29,7 +31,7 @@ const MarketplaceNetworkPage: React.FC = () => {
   const { toast } = useToast();
   const { memberships, refresh } = useWorkspace();
   const [rows, setRows] = useState<WsRow[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, { catalog_access: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { catalog_access: string; discount_pct: string }>>({});
   const [einvoicing, setEinvoicing] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -50,7 +52,10 @@ const MarketplaceNetworkPage: React.FC = () => {
       ]);
       setRows(data);
       setEinvoicing(ent);
-      setDrafts(Object.fromEntries(data.map((r) => [r.id, { catalog_access: r.catalog_access }])));
+      setDrafts(Object.fromEntries(data.map((r) => [r.id, {
+        catalog_access: r.catalog_access,
+        discount_pct: r.parent_discount_pct == null ? '' : String(r.parent_discount_pct),
+      }])));
     } catch (err: any) {
       toast({ title: 'Failed to load network', description: err?.message, variant: 'destructive' });
     } finally {
@@ -64,8 +69,11 @@ const MarketplaceNetworkPage: React.FC = () => {
     const d = drafts[row.id];
     try {
       setSavingId(row.id);
+      const rawD = (d.discount_pct ?? '').trim();
+      const discountPct = rawD === '' ? null : Math.min(100, Math.max(0, parseInt(rawD, 10) || 0));
       await workspaceManagementService.updateChildSettings(row.id, {
         catalogAccess: d.catalog_access as any,
+        discountPct: discountPct ?? undefined,
       });
       toast({ title: `Updated ${row.name}` });
       await load();
@@ -123,17 +131,21 @@ const MarketplaceNetworkPage: React.FC = () => {
                   <th className="px-4 py-2 text-left">Rank</th>
                   <th className="px-4 py-2 text-left">Parent</th>
                   <th className="px-4 py-2 text-left">Catalog access</th>
+                  <th className="px-4 py-2 text-left">Discount %</th>
                   <th className="px-4 py-2 text-center">e-Invoicing</th>
                   <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.filter((r) => !r.is_root).length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No sub-workspaces yet. Create one from the workspace switcher.</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No sub-workspaces yet. Create one from the workspace switcher.</td></tr>
                 )}
                 {rows.filter((r) => !r.is_root).map((r) => {
                   const canEdit = editable(r);
-                  const d = drafts[r.id] ?? { catalog_access: r.catalog_access };
+                  const d = drafts[r.id] ?? {
+                    catalog_access: r.catalog_access,
+                    discount_pct: r.parent_discount_pct == null ? '' : String(r.parent_discount_pct),
+                  };
                   return (
                     <tr key={r.id} className="border-b border-border/30">
                       <td className="px-4 py-2 font-medium">{r.name}</td>
@@ -150,6 +162,22 @@ const MarketplaceNetworkPage: React.FC = () => {
                           </Select>
                         ) : (
                           <span className="text-muted-foreground">{r.catalog_access === 'own_products_only' ? 'Own only' : 'Full catalog'}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {canEdit ? (
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={d.discount_pct}
+                            onChange={(e) => setDrafts((s) => ({ ...s, [r.id]: { ...d, discount_pct: e.target.value } }))}
+                            placeholder="0"
+                            title="% off your catalog retail that this reseller pays you — that's their cost, and their resale margin room."
+                            className="h-8 w-16"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">{r.parent_discount_pct == null ? '—' : `${r.parent_discount_pct}%`}</span>
                         )}
                       </td>
                       <td className="px-4 py-2 text-center">
