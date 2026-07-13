@@ -458,6 +458,10 @@ export class QuotesService {
     let costSnapshot: number | null = null;
     let retailPrice: number | null = null;
     let quoteWorkspaceId: string | null = null;
+    // #237 Phase 4: line pricing state. Unpriced operator-catalog lines become
+    // "call for price" (rendered as such, excluded from totals, RFQ-able upstream)
+    // instead of a silently-broken NULL-priced line.
+    let pricingStatus: 'priced' | 'call_for_price' = 'priced';
     try {
       const { data: quote } = await supabase
         .from('quotes')
@@ -487,9 +491,13 @@ export class QuotesService {
           if (retail != null && !Number.isNaN(retail)) retailPrice = retail;
           // Snapshot the procurement cost so the margin/profit block is honest.
           if (p.mode === 'operator_catalog' && basis != null && !Number.isNaN(basis)) costSnapshot = basis;
+          // Resolver couldn't produce a sell price → flag the line for pricing.
+          if (p.unpriced === true) pricingStatus = 'call_for_price';
         }
       }
     } catch { /* non-fatal — leaves the line unpriced for manual entry */ }
+    // Any catalog line we couldn't price is a call-for-price candidate.
+    if (unitPrice == null) pricingStatus = 'call_for_price';
 
     // Layer B (#227): quote-time custom rules (volume per category, category extra) applied on
     // top of the level discount, with category-tree inheritance (most-specific-wins).
@@ -521,6 +529,7 @@ export class QuotesService {
         line_total: unitPrice != null ? Math.round(unitPrice * qtyNow * 100) / 100 : null,
         cost_snapshot: costSnapshot,
         retail_price: retailPrice,
+        pricing_status: pricingStatus,
       } as any)
       .select()
       .single();
@@ -706,6 +715,11 @@ export class QuotesService {
         payload.line_total = effectivePrice != null ? Math.round(Number(effectivePrice) * qty * 100) / 100 : null;
       }
     }
+
+    // #237 Phase 4: once a real sell price lands (manual entry, market-check accept, or a
+    // successful qty re-resolve) an unpriced "call for price" line becomes priced, so the
+    // quote can be accepted. A resolver that still can't price it stays call_for_price.
+    if (payload.unit_price != null) payload.pricing_status = 'priced';
 
     const { data: item, error } = await supabase
       .from('quote_items')
@@ -1568,6 +1582,21 @@ export class QuotesService {
         new Date((q as { expires_at: string }).expires_at).getTime() < Date.now())
     ) {
       return { success: false, error: 'This quote has expired. Please request an updated quote.' };
+    }
+
+    // #237 Phase 4: a quote with unpriced ("call for price" / awaiting-supplier) lines
+    // cannot be accepted — there is no sale price. Resolve every line first (manual,
+    // market-check, or upstream RFQ) before acceptance.
+    const { count: unpricedCount } = await supabase
+      .from('quote_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('quote_id', quoteId)
+      .neq('pricing_status', 'priced');
+    if ((unpricedCount ?? 0) > 0) {
+      return {
+        success: false,
+        error: `Please price all ${unpricedCount} "call for price" line(s) before accepting the quote.`,
+      };
     }
 
     // Get quote upsells

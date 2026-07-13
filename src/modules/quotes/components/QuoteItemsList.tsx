@@ -315,6 +315,12 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                   const hasDiscount = (item as any).discounted_price != null &&
                     (item as any).discounted_price !== item.unit_price;
 
+                  // #237 Phase 4: unpriced line — "call for price" (needs pricing) or
+                  // "awaiting supplier" (RFQ sent upstream). Rendered in place of a price.
+                  const pricingStatus = ((item as any).pricing_status ?? 'priced') as string;
+                  const callForPrice = pricingStatus !== 'priced';
+                  const awaitingSupplier = pricingStatus === 'awaiting_supplier';
+
                   const productName = isCustom ? (item.custom_product_name || 'Custom Item') : (item.product?.name || 'Unknown Product');
                   const displayName = item.dimensions ? `${productName}, ${item.dimensions}` : productName;
 
@@ -420,6 +426,13 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                           <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                             {isSavingPrice ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin ml-auto text-muted-foreground" />
+                            ) : callForPrice && !editPricing ? (
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] px-1.5 py-0 whitespace-nowrap ${awaitingSupplier ? 'border-amber-500/40 text-amber-600' : 'border-primary/30 text-primary/80'}`}
+                              >
+                                {awaitingSupplier ? 'Awaiting supplier' : 'Call for price'}
+                              </Badge>
                             ) : editPricing ? (
                               <div className="space-y-1">
                                 <PriceCell
@@ -500,7 +513,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                         {showPricing && (
                           <td className="px-4 py-3 text-right">
                             <span className="text-sm font-semibold">
-                              {fmtPrice(displayTotal)}
+                              {callForPrice ? '—' : fmtPrice(displayTotal)}
                             </span>
                             {hasDiscount && item.unit_price != null && (
                               <div className="text-xs text-muted-foreground line-through">

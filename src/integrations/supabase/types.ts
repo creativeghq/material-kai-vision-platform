@@ -18997,6 +18997,7 @@ export type Database = {
           notes: string | null
           price_lookup_call_id: string | null
           price_source: string | null
+          pricing_status: string
           product_id: string | null
           quantity: number
           quote_id: string
@@ -19029,6 +19030,7 @@ export type Database = {
           notes?: string | null
           price_lookup_call_id?: string | null
           price_source?: string | null
+          pricing_status?: string
           product_id?: string | null
           quantity?: number
           quote_id: string
@@ -19061,6 +19063,7 @@ export type Database = {
           notes?: string | null
           price_lookup_call_id?: string | null
           price_source?: string | null
+          pricing_status?: string
           product_id?: string | null
           quantity?: number
           quote_id?: string

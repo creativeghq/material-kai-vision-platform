@@ -33,6 +33,7 @@ export async function fetchQuoteData(
       unit_price,
       discounted_price,
       line_total,
+      pricing_status,
       custom_product_name,
       custom_product_description,
       custom_sku,
@@ -61,14 +62,18 @@ export async function fetchQuoteData(
     throw new HttpError(400, 'Cannot generate PDF: quote has no items.');
   }
 
-  // Validate all items have prices
-  const unpricedItems = items.filter(
-    (item: any) => item.unit_price === null || item.unit_price === undefined
+  // #237 Phase 4: "call for price" / awaiting-supplier lines legitimately carry a NULL
+  // price and render as "Call for price" (excluded from totals). Only a line that claims
+  // to be `priced` yet has no unit_price is a genuine data error worth blocking on.
+  const brokenPricedItems = items.filter(
+    (item: any) =>
+      (item.pricing_status ?? 'priced') === 'priced' &&
+      (item.unit_price === null || item.unit_price === undefined)
   );
-  if (unpricedItems.length > 0) {
+  if (brokenPricedItems.length > 0) {
     throw new HttpError(
       400,
-      `Cannot generate PDF: ${unpricedItems.length} item(s) are missing prices. Set all item prices first.`
+      `Cannot generate PDF: ${brokenPricedItems.length} item(s) are missing prices. Set all item prices first.`
     );
   }
 
@@ -123,6 +128,7 @@ export async function fetchQuoteData(
       unit_price: parseFloat(item.unit_price) || 0,
       discounted_price: item.discounted_price != null ? parseFloat(item.discounted_price) : null,
       line_total: parseFloat(item.line_total) || 0,
+      pricing_status: item.pricing_status || 'priced',
       notes: item.notes || null,
       room: item.room || null,
       dimensions: item.dimensions || null,

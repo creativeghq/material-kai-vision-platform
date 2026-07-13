@@ -461,6 +461,15 @@ function drawTableRow(
 
   // [8] Price — single column: strikethrough original + actual when discounted
   const priceColRight = x + COLUMNS[8].width - 4;
+  const unpricedLine = (item.pricing_status ?? 'priced') !== 'priced';
+  if (unpricedLine) {
+    // #237 Phase 4: unpriced line renders "Call for price" in place of a number,
+    // and no line total (it is excluded from the quote total).
+    drawRightAligned(page, 'Call for price', priceColRight, textY, fontSize - 1, font, COLOR_GRAY);
+    x += COLUMNS[8].width;
+    drawRightAligned(page, '—', x + COLUMNS[9].width - 4, textY, fontSize, font, COLOR_GRAY);
+    return;
+  }
   if (item.discounted_price != null) {
     const origStr = formatCurrency(item.unit_price);
     const origSize = fontSize - 1;

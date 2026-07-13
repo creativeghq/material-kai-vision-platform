@@ -48,6 +48,8 @@ export interface QuoteItemData {
   unit_price: number;
   discounted_price: number | null;
   line_total: number;
+  /** priced | call_for_price | awaiting_supplier — unpriced lines render "Call for price". */
+  pricing_status: string;
   notes: string | null;
   /** Resolved thumbnail: product image (catalog) or custom_image_url (custom). */
   image_url: string | null;

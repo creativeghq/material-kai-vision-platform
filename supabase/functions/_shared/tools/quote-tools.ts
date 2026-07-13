@@ -81,6 +81,7 @@ async function resolveLine(
   let unitPrice = item.unit_price ?? null;
   let retailPrice: number | null = null;
   let costSnapshot: number | null = null;
+  let unpriced = false;
 
   // Catalog line without an explicit price → resolve the seller price the same way
   // QuotesService.addItem does (audience 'seller' folds in customer discounts).
@@ -96,9 +97,14 @@ async function resolveLine(
     unitPrice = p.suggested_sell != null ? Number(p.suggested_sell) : null;
     retailPrice = p.retail != null ? Number(p.retail) : null;
     costSnapshot = p.cost_basis != null ? Number(p.cost_basis) : null;
+    unpriced = p.unpriced === true;
   }
 
-  if (unitPrice == null || Number.isNaN(unitPrice)) {
+  // #237 Phase 4: a catalog product the resolver can't price becomes a "call for price"
+  // line (NULL price, excluded from totals, RFQ-able) rather than a hard error.
+  const callForPrice = item.product_id != null && (unitPrice == null || Number.isNaN(unitPrice)) && (unpriced || item.unit_price == null);
+
+  if (!callForPrice && (unitPrice == null || Number.isNaN(unitPrice))) {
     return {
       error: item.product_id
         ? `Could not resolve a price for product ${item.product_id}. Provide a unit_price for it.`
@@ -110,14 +116,15 @@ async function resolveLine(
   }
 
   const effective = item.discounted_price != null ? item.discounted_price : unitPrice;
-  const lineTotal = round2(effective * item.quantity);
+  const lineTotal = callForPrice ? null : round2((effective as number) * item.quantity);
 
   const payload: Record<string, unknown> = {
     quote_id: quoteId,
     quantity: item.quantity,
-    unit_price: round2(unitPrice),
+    unit_price: callForPrice ? null : round2(unitPrice as number),
     discounted_price: item.discounted_price != null ? round2(item.discounted_price) : null,
     line_total: lineTotal,
+    pricing_status: callForPrice ? 'call_for_price' : 'priced',
     added_from: 'agent',
     room: item.room ?? null,
     dimensions: item.dimensions ?? null,
@@ -209,7 +216,7 @@ export const createCreateQuoteTool = (
             return JSON.stringify({ success: false, error: resolved.error });
           }
           payloads.push(resolved.payload);
-          subtotal += resolved.line_total;
+          subtotal += resolved.line_total ?? 0; // call-for-price lines contribute 0 to the total
         }
         const { error: itemsErr } = await sb.from('quote_items').insert(payloads);
         if (itemsErr) {

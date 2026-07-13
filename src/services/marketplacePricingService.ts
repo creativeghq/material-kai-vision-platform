@@ -17,6 +17,12 @@ export interface WorkspacePrice {
   margin_pct: number | null;
   currency: string;
   supply_mode?: string;
+  /** True when no sell price can be produced (no explicit list, no markupable cost).
+   *  The line becomes a "call for price" candidate. */
+  unpriced?: boolean;
+  /** The product's owning workspace (products.workspace_id) — the upstream RFQ target
+   *  when this is operator_catalog. Seller audience only. */
+  owner_workspace_id?: string | null;
 }
 
 export const marketplacePricingService = {
