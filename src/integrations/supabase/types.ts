@@ -7342,6 +7342,10 @@ export type Database = {
           personal_landline: string | null
           personal_mobile: string | null
           personal_notes: string | null
+          quote_template_backcover_path: string | null
+          quote_template_content_path: string | null
+          quote_template_cover_path: string | null
+          quote_template_intro_path: string | null
           receipt_next_number: number
           responsible_name: string | null
           risk_block_inactive_vat: boolean
@@ -7445,6 +7449,10 @@ export type Database = {
           personal_landline?: string | null
           personal_mobile?: string | null
           personal_notes?: string | null
+          quote_template_backcover_path?: string | null
+          quote_template_content_path?: string | null
+          quote_template_cover_path?: string | null
+          quote_template_intro_path?: string | null
           receipt_next_number?: number
           responsible_name?: string | null
           risk_block_inactive_vat?: boolean
@@ -7548,6 +7556,10 @@ export type Database = {
           personal_landline?: string | null
           personal_mobile?: string | null
           personal_notes?: string | null
+          quote_template_backcover_path?: string | null
+          quote_template_content_path?: string | null
+          quote_template_cover_path?: string | null
+          quote_template_intro_path?: string | null
           receipt_next_number?: number
           responsible_name?: string | null
           risk_block_inactive_vat?: boolean

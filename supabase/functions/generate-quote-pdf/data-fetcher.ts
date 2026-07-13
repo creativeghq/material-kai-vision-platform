@@ -218,37 +218,54 @@ async function fetchClientData(
 }
 
 /**
- * Fetch PDF template configuration from system_settings
+ * Fetch the PDF Design Template config for a quote's workspace: the workspace's own
+ * template (finance_settings.quote_template_*) wins per-slot, falling back to the
+ * operator's global default (system_settings.quote_pdf_template) for any unset slot.
+ * Company identity is overlaid per-workspace later by applyWorkspaceBranding.
  */
 export async function fetchTemplateConfig(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  workspaceId?: string | null,
 ): Promise<TemplateConfig> {
-  const { data, error } = await supabase
+  // Global operator default (the fallback).
+  const { data: sysRow } = await supabase
     .from('system_settings')
     .select('setting_value')
     .eq('setting_key', 'quote_pdf_template')
-    .single();
+    .maybeSingle();
+  const g = (sysRow?.setting_value ?? {}) as Record<string, any>;
 
-  if (error || !data) {
-    throw new Error('Quote PDF template configuration not found in system_settings.');
+  // Per-workspace overrides.
+  let ws: Record<string, any> = {};
+  if (workspaceId) {
+    const { data: fsRow } = await supabase
+      .from('finance_settings')
+      .select('quote_template_cover_path, quote_template_intro_path, quote_template_content_path, quote_template_backcover_path')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    ws = fsRow ?? {};
   }
 
-  const config = data.setting_value as Record<string, any>;
+  const cover = ws.quote_template_cover_path || g.first_page_path || g.cover_image_path || 'cover.png';
+  const intro = ws.quote_template_intro_path || g.intro_page_path || '';
+  const content = ws.quote_template_content_path || g.content_page_path || g.items_background_path || 'items-background.png';
+  const backcover = ws.quote_template_backcover_path || g.last_page_path || g.backcover_image_path || 'backcover.png';
 
   return {
-    cover_image_path: config.first_page_path || config.cover_image_path || 'cover.png',
-    first_page_path: config.first_page_path || config.cover_image_path,
-    company_details_page_path: config.company_details_page_path,
-    content_page_path: config.content_page_path,
-    items_background_path: config.content_page_path || config.items_background_path || 'items-background.png',
-    backcover_image_path: config.last_page_path || config.backcover_image_path || 'backcover.png',
-    last_page_path: config.last_page_path || config.backcover_image_path,
-    company_name: config.company_name || '',
-    company_address: config.company_address || '',
-    company_phone: config.company_phone || '',
-    company_email: config.company_email || '',
-    company_vat: config.company_vat || '',
-    vat_rate_default: config.vat_rate_default ?? 24,
+    cover_image_path: cover,
+    first_page_path: cover,
+    intro_page_path: intro,
+    company_details_page_path: g.company_details_page_path,
+    content_page_path: content,
+    items_background_path: content,
+    backcover_image_path: backcover,
+    last_page_path: backcover,
+    company_name: g.company_name || '',
+    company_address: g.company_address || '',
+    company_phone: g.company_phone || '',
+    company_email: g.company_email || '',
+    company_vat: g.company_vat || '',
+    vat_rate_default: g.vat_rate_default ?? 24,
   };
 }
 

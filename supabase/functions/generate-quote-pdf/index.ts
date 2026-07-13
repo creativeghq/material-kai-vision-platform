@@ -45,7 +45,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
           .eq('workspace_id', workspaceId).eq('user_id', auth.userId ?? '').maybeSingle();
         if (!member) return jsonResponse({ success: false, error: 'Forbidden' }, 403);
       }
-      const baseTemplateConfig = await fetchTemplateConfig(supabase);
+      const baseTemplateConfig = await fetchTemplateConfig(supabase, workspaceId);
       const templateConfig = workspaceId
         ? await applyWorkspaceBranding(supabase, baseTemplateConfig, workspaceId)
         : baseTemplateConfig;
@@ -139,11 +139,9 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       })
       .eq('id', quoteId);
 
-    // Fetch all data
-    const [quoteData, baseTemplateConfig] = await Promise.all([
-      fetchQuoteData(supabase, quoteId),
-      fetchTemplateConfig(supabase),
-    ]);
+    // Fetch the quote first so we can resolve THIS workspace's PDF Design Template.
+    const quoteData = await fetchQuoteData(supabase, quoteId);
+    const baseTemplateConfig = await fetchTemplateConfig(supabase, (quoteData as any).workspace_id);
 
     // White-label: render under the quote workspace's own business identity (#177).
     const templateConfig = await applyWorkspaceBranding(

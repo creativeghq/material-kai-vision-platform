@@ -37,6 +37,24 @@ const DEFAULT_PDF_CONFIG: PDFTemplateConfig = {
   vat_rate_default: 24,
 };
 
+// One of the four template slots. Maps to the PDFTemplateConfig key (root/system_settings
+// jsonb) and the per-workspace finance_settings column (non-root).
+type TemplateSlot = 'cover' | 'intro' | 'content' | 'backcover';
+
+const SLOT_TO_CONFIG_KEY: Record<TemplateSlot, keyof PDFTemplateConfig> = {
+  cover: 'first_page_path',
+  intro: 'intro_page_path',
+  content: 'content_page_path',
+  backcover: 'last_page_path',
+};
+
+const SLOT_TO_FINANCE_COL: Record<TemplateSlot, string> = {
+  cover: 'quote_template_cover_path',
+  intro: 'quote_template_intro_path',
+  content: 'quote_template_content_path',
+  backcover: 'quote_template_backcover_path',
+};
+
 interface QuoteSettingsProps {
   /** Render without the page header — used when mounted inside a Sheet panel. */
   embedded?: boolean;
@@ -61,7 +79,12 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
   const [bgPreview, setBgPreview] = useState<string | null>(null);
 
   // Rendered "proper view" of the whole template (a sample quote PDF).
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
+  // Root workspace edits the global operator default (system_settings); any other
+  // tenant self-serves its own template images stored on its finance_settings row.
+  const perWorkspace = !activeWorkspace?.isRoot;
+  const slotPath = (slot: TemplateSlot) =>
+    perWorkspace ? `${activeWorkspaceId}/quote-${slot}.png` : `template-${slot}.png`;
   const [previewing, setPreviewing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -89,8 +112,13 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
   useEffect(() => {
     loadSettings();
-    loadPDFTemplateConfig();
   }, []);
+
+  // Re-run when the active workspace resolves — non-root reads its own finance_settings row.
+  useEffect(() => {
+    loadPDFTemplateConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId]);
 
   const loadSettings = async () => {
     try {
@@ -121,6 +149,33 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
   const loadPDFTemplateConfig = async () => {
     try {
+      if (perWorkspace) {
+        // Non-root: this workspace's own 4 template paths live on finance_settings.
+        if (!activeWorkspaceId) return;
+        const { data, error } = await supabase
+          .from('finance_settings')
+          .select('quote_template_cover_path, quote_template_intro_path, quote_template_content_path, quote_template_backcover_path')
+          .eq('workspace_id', activeWorkspaceId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        const config: PDFTemplateConfig = {
+          ...DEFAULT_PDF_CONFIG,
+          first_page_path: data?.quote_template_cover_path || '',
+          intro_page_path: data?.quote_template_intro_path || '',
+          content_page_path: data?.quote_template_content_path || '',
+          last_page_path: data?.quote_template_backcover_path || '',
+        };
+        setPdfConfig(config);
+
+        config.first_page_path ? loadImagePreview(config.first_page_path, setCoverPreview) : setCoverPreview(null);
+        config.intro_page_path ? loadImagePreview(config.intro_page_path, setIntroPreview) : setIntroPreview(null);
+        config.last_page_path ? loadImagePreview(config.last_page_path, setBackcoverPreview) : setBackcoverPreview(null);
+        config.content_page_path ? loadImagePreview(config.content_page_path, setBgPreview) : setBgPreview(null);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('system_settings')
         .select('*')
@@ -208,9 +263,8 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
   const handleImageUpload = async (
     file: File,
-    targetPath: string,
+    slot: TemplateSlot,
     previewSetter: (url: string | null) => void,
-    configKey?: keyof PDFTemplateConfig,
   ) => {
     const allowedTypes = ['image/png', 'image/jpeg'];
     if (!allowedTypes.includes(file.type)) {
@@ -222,6 +276,9 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
       return;
     }
 
+    const targetPath = slotPath(slot);
+    const configKey = SLOT_TO_CONFIG_KEY[slot];
+
     try {
       setUploadingImage(targetPath);
       const { error } = await supabase.storage
@@ -232,15 +289,25 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
       await loadImagePreview(targetPath, previewSetter);
 
-      const updatedConfig = configKey
-        ? { ...pdfConfig, [configKey]: targetPath }
-        : pdfConfig;
+      const updatedConfig = { ...pdfConfig, [configKey]: targetPath };
+      setPdfConfig(updatedConfig);
 
-      if (configKey) {
-        setPdfConfig(updatedConfig);
-      }
-
-      if (pdfSettingId) {
+      if (perWorkspace) {
+        // Persist the path onto this workspace's finance_settings column.
+        const col = SLOT_TO_FINANCE_COL[slot];
+        const { data: updated, error: updErr } = await supabase
+          .from('finance_settings')
+          .update({ [col]: targetPath })
+          .eq('workspace_id', activeWorkspaceId)
+          .select('workspace_id');
+        if (updErr) throw updErr;
+        if (!updated || updated.length === 0) {
+          const { error: upErr } = await supabase
+            .from('finance_settings')
+            .upsert({ workspace_id: activeWorkspaceId, [col]: targetPath }, { onConflict: 'workspace_id' });
+          if (upErr) throw upErr;
+        }
+      } else if (pdfSettingId) {
         await supabase
           .from('system_settings')
           .update({ setting_value: updatedConfig as any, updated_at: new Date().toISOString() })
@@ -261,23 +328,27 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
   };
 
   const handleImageDelete = async (
-    storagePath: string,
+    slot: TemplateSlot,
     previewSetter: (url: string | null) => void,
-    configKey?: keyof PDFTemplateConfig,
   ) => {
+    const storagePath = slotPath(slot);
+    const configKey = SLOT_TO_CONFIG_KEY[slot];
     try {
       setUploadingImage(storagePath);
       await supabase.storage.from('quote-templates').remove([storagePath]);
 
       previewSetter(null);
 
-      const updatedConfig = configKey
-        ? { ...pdfConfig, [configKey]: '' }
-        : pdfConfig;
+      const updatedConfig = { ...pdfConfig, [configKey]: '' };
+      setPdfConfig(updatedConfig);
 
-      if (configKey) setPdfConfig(updatedConfig);
-
-      if (pdfSettingId) {
+      if (perWorkspace) {
+        const col = SLOT_TO_FINANCE_COL[slot];
+        await supabase
+          .from('finance_settings')
+          .update({ [col]: null })
+          .eq('workspace_id', activeWorkspaceId);
+      } else if (pdfSettingId) {
         await supabase
           .from('system_settings')
           .update({ setting_value: updatedConfig as any, updated_at: new Date().toISOString() })
@@ -384,8 +455,17 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          The default design applied to every quote PDF — cover, intro, item pages, and back cover, plus the
-          company details shown on the document. Use <strong>Preview</strong> to see a sample quote rendered with it.
+          {perWorkspace ? (
+            <>
+              This workspace&apos;s quote design — cover, intro, item pages, and back cover. Any slot you leave empty
+              inherits the operator default. Use <strong>Preview</strong> to see a sample quote rendered with it.
+            </>
+          ) : (
+            <>
+              The default design applied to every quote PDF — cover, intro, item pages, and back cover, plus the
+              company details shown on the document. Use <strong>Preview</strong> to see a sample quote rendered with it.
+            </>
+          )}
         </p>
 
         <div className="space-y-4">
@@ -406,7 +486,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                       <span className="text-sm">Click to upload cover</span>
                     </div>
                   )}
-                  {uploadingImage === 'template-cover.png' && (
+                  {uploadingImage === slotPath('cover') && (
                     <div className="mt-2 flex items-center justify-center gap-2 text-sm">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Uploading...
@@ -415,7 +495,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                 </div>
                 {coverPreview && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleImageDelete(pdfConfig.first_page_path || 'template-cover.png', setCoverPreview, 'first_page_path'); }}
+                    onClick={(e) => { e.stopPropagation(); handleImageDelete('cover', setCoverPreview); }}
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                     title="Delete image"
                   >
@@ -430,7 +510,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file, 'template-cover.png', setCoverPreview, 'first_page_path');
+                  if (file) handleImageUpload(file, 'cover', setCoverPreview);
                   e.target.value = '';
                 }}
               />
@@ -451,7 +531,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                       <span className="text-sm">Click to upload intro page</span>
                     </div>
                   )}
-                  {uploadingImage === 'template-intro.png' && (
+                  {uploadingImage === slotPath('intro') && (
                     <div className="mt-2 flex items-center justify-center gap-2 text-sm">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Uploading...
@@ -460,7 +540,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                 </div>
                 {introPreview && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleImageDelete(pdfConfig.intro_page_path || 'template-intro.png', setIntroPreview, 'intro_page_path'); }}
+                    onClick={(e) => { e.stopPropagation(); handleImageDelete('intro', setIntroPreview); }}
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                     title="Delete image"
                   >
@@ -475,7 +555,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file, 'template-intro.png', setIntroPreview, 'intro_page_path');
+                  if (file) handleImageUpload(file, 'intro', setIntroPreview);
                   e.target.value = '';
                 }}
               />
@@ -496,7 +576,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                       <span className="text-sm">Click to upload background</span>
                     </div>
                   )}
-                  {uploadingImage === 'template-content.png' && (
+                  {uploadingImage === slotPath('content') && (
                     <div className="mt-2 flex items-center justify-center gap-2 text-sm">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Uploading...
@@ -505,7 +585,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                 </div>
                 {bgPreview && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleImageDelete(pdfConfig.content_page_path || 'template-content.png', setBgPreview, 'content_page_path'); }}
+                    onClick={(e) => { e.stopPropagation(); handleImageDelete('content', setBgPreview); }}
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                     title="Delete image"
                   >
@@ -520,7 +600,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file, 'template-content.png', setBgPreview, 'content_page_path');
+                  if (file) handleImageUpload(file, 'content', setBgPreview);
                   e.target.value = '';
                 }}
               />
@@ -541,7 +621,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                       <span className="text-sm">Click to upload back cover</span>
                     </div>
                   )}
-                  {uploadingImage === 'template-backcover.png' && (
+                  {uploadingImage === slotPath('backcover') && (
                     <div className="mt-2 flex items-center justify-center gap-2 text-sm">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Uploading...
@@ -550,7 +630,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                 </div>
                 {backcoverPreview && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleImageDelete(pdfConfig.last_page_path || 'template-backcover.png', setBackcoverPreview, 'last_page_path'); }}
+                    onClick={(e) => { e.stopPropagation(); handleImageDelete('backcover', setBackcoverPreview); }}
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                     title="Delete image"
                   >
@@ -565,7 +645,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file, 'template-backcover.png', setBackcoverPreview, 'last_page_path');
+                  if (file) handleImageUpload(file, 'backcover', setBackcoverPreview);
                   e.target.value = '';
                 }}
               />
@@ -573,6 +653,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
           </div>
         </div>
 
+        {!perWorkspace && (
         <div className="space-y-4">
           <h3 className="text-base font-medium">Company Details (shown on PDF)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -634,29 +715,32 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
             </div>
           </div>
         </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={handlePreview} disabled={previewing}>
             {previewing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
             Preview
           </Button>
-          <Button
-            onClick={handleSavePdfConfig}
-            disabled={savingPdf}
-            style={{ backgroundColor: 'hsl(var(--primary))' }}
-          >
-            {savingPdf ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save PDF Settings
-              </>
-            )}
-          </Button>
+          {!perWorkspace && (
+            <Button
+              onClick={handleSavePdfConfig}
+              disabled={savingPdf}
+              style={{ backgroundColor: 'hsl(var(--primary))' }}
+            >
+              {savingPdf ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save PDF Settings
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
