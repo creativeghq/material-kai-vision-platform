@@ -11,8 +11,10 @@ import {
   Clock,
   CheckCircle,
   ArrowDownUp,
+  Settings,
 } from 'lucide-react';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
+import { QuoteSettingsPage } from './QuoteSettingsPage';
 import { PageHeader } from '@/components/shared/PageHeader';
 
 import { Button } from '@/components/core/ui/button';
@@ -38,7 +40,7 @@ import { RequestsInboxPanel } from '../components/RequestsInboxPanel';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
 
 type StatusFilter = 'all' | 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
-type QuotesTab = 'quotes' | 'requests';
+type QuotesTab = 'quotes' | 'requests' | 'settings';
 
 /**
  * Main Quotes Page - Customer facing
@@ -53,10 +55,12 @@ export const QuotesPage: React.FC = () => {
   // Tab state (?tab=requests deep-links the procurement inbox; #177 merged here from /requests).
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
-  const activeTab: QuotesTab = requestedTab === 'requests' && canManageNetwork ? 'requests' : 'quotes';
+  const activeTab: QuotesTab = canManageNetwork && (requestedTab === 'requests' || requestedTab === 'settings')
+    ? (requestedTab as QuotesTab)
+    : 'quotes';
   const handleTabChange = (val: string) => {
     const params = new URLSearchParams(searchParams);
-    if (val === 'requests') params.set('tab', 'requests');
+    if (val === 'requests' || val === 'settings') params.set('tab', val);
     else params.delete('tab');
     setSearchParams(params, { replace: true });
   };
@@ -160,6 +164,9 @@ export const QuotesPage: React.FC = () => {
               </TabsTrigger>
               <TabsTrigger value="requests" className="flex items-center gap-2">
                 <ArrowDownUp className="h-4 w-4" /> Requests
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" /> Settings
               </TabsTrigger>
             </TabsList>
           )}
@@ -342,6 +349,11 @@ export const QuotesPage: React.FC = () => {
           {canManageNetwork && (
             <TabsContent value="requests" className="mt-0">
               <RequestsInboxPanel />
+            </TabsContent>
+          )}
+          {canManageNetwork && (
+            <TabsContent value="settings" className="mt-0">
+              <QuoteSettingsPage embedded />
             </TabsContent>
           )}
         </Tabs>

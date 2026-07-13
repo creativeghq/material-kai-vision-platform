@@ -392,6 +392,8 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
   const content = (
     <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
+      {/* Quote expiration is a platform-global setting — only the operator (root) edits it. */}
+      {!perWorkspace && (
       <div className="dashboard-card space-y-6">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -442,6 +444,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
           </Button>
         </div>
       </div>
+      )}
 
       <div className="dashboard-card space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
