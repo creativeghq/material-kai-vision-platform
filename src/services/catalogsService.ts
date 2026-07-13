@@ -55,6 +55,8 @@ export interface PresentationCatalog {
 
 export interface CatalogTemplate {
   id: string;
+  /** null = operator global template (inherited by tenants); else the owning workspace. */
+  workspace_id: string | null;
   name: string;
   description: string | null;
   cover_image_path: string;
@@ -226,11 +228,15 @@ class CatalogsService {
 
     let templateId = input.template_id;
     if (!templateId) {
+      // Prefer this workspace's own default template, else the operator's global one
+      // (RLS scopes the visible set to global + own; own sorts first via workspace_id desc).
       const { data: tpl } = await supabase
         .from('catalog_templates')
         .select('id')
         .eq('is_default', true)
         .eq('is_active', true)
+        .order('workspace_id', { ascending: false, nullsFirst: false })
+        .limit(1)
         .maybeSingle();
       templateId = tpl?.id;
     }
@@ -303,10 +309,13 @@ class CatalogsService {
   }
 
   async listTemplates(): Promise<CatalogTemplate[]> {
+    // RLS scopes to this workspace's own templates + the operator's global ones.
+    // Own-workspace templates first, then the global default, then by name.
     const { data, error } = await supabase
       .from('catalog_templates')
       .select('*')
       .eq('is_active', true)
+      .order('workspace_id', { ascending: false, nullsFirst: false })
       .order('is_default', { ascending: false })
       .order('name');
     if (error) throw error;

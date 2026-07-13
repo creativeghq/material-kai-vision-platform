@@ -2538,6 +2538,7 @@ export type Database = {
           is_default: boolean
           name: string
           updated_at: string
+          workspace_id: string | null
         }
         Insert: {
           accent_color_hex?: string | null
@@ -2551,6 +2552,7 @@ export type Database = {
           is_default?: boolean
           name: string
           updated_at?: string
+          workspace_id?: string | null
         }
         Update: {
           accent_color_hex?: string | null
@@ -2564,6 +2566,7 @@ export type Database = {
           is_default?: boolean
           name?: string
           updated_at?: string
+          workspace_id?: string | null
         }
         Relationships: []
       }
