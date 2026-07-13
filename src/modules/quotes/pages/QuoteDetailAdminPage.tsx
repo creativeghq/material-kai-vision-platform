@@ -941,6 +941,7 @@ export const QuoteDetailPage: React.FC = () => {
                 await quotesService.removeItem(itemId);
                 await loadQuoteDetails();
               }}
+              onRefresh={loadQuoteDetails}
               editable={quote.status !== 'accepted' && quote.status !== 'rejected'}
               editPricing={false}
               editUnits={['draft', 'submitted'].includes(quote.status)}

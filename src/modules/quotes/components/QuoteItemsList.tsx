@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp, DollarSign } from 'lucide-react';
+import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp, DollarSign, Send } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -16,6 +16,9 @@ import {
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { usePermissions } from '@/hooks/usePermissions';
 import { parseDecimal } from '@/utils/decimal';
+import { masterRequestsService } from '@/services/masterRequestsService';
+import { flowEventService } from '@/services/flows/flowEventService';
+import { useToast } from '@/hooks/use-toast';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -53,6 +56,8 @@ interface QuoteItemsListProps {
   customerCompanyId?: string | null;
   /** B2C / private customer of the parent quote — same role as customerCompanyId. */
   customerContactId?: string | null;
+  /** #237 Phase 4.4 — reload the items after an upstream RFQ is sent (lines flip to awaiting_supplier). */
+  onRefresh?: () => void | Promise<void>;
 }
 
 // Convert quote product to display product format.
@@ -182,6 +187,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   editable = false,
   customerCompanyId,
   customerContactId,
+  onRefresh,
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -193,6 +199,39 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const [lookupItem, setLookupItem] = useState<QuoteItemWithProduct | null>(null);
   // #227 — hide the per-line margin from a sales rep when sales_can_see_cost is off.
   const { isSalesRep, can } = usePermissions();
+  const { toast } = useToast();
+  const [rfqBusy, setRfqBusy] = useState(false);
+  // #237 Phase 4.4 — catalog lines still needing a price that we can route upstream.
+  const callForPriceItems = items.filter(
+    (i) => ((i as any).pricing_status ?? 'priced') === 'call_for_price' && i.product_id,
+  );
+  const quoteIdForRfq = items[0]?.quote_id ?? null;
+
+  const handleRequestSupplierPrices = async () => {
+    if (!quoteIdForRfq || callForPriceItems.length === 0) return;
+    setRfqBusy(true);
+    try {
+      const reqId = await masterRequestsService.submitLineRfq(
+        quoteIdForRfq,
+        callForPriceItems.map((i) => i.id),
+      );
+      flowEventService.emit('rfq_lines_requested', {
+        master_request_id: reqId,
+        quote_id: quoteIdForRfq,
+        line_count: callForPriceItems.length,
+      });
+      toast({
+        title: `Requested prices for ${callForPriceItems.length} line(s)`,
+        description: 'Your supplier will price them and send them back.',
+      });
+      await onRefresh?.();
+    } catch (err: any) {
+      toast({ title: 'Could not send request', description: err?.message, variant: 'destructive' });
+    } finally {
+      setRfqBusy(false);
+    }
+  };
+
   const showMargin = !(isSalesRep && !salesCanSeeCost);
   // #227 — per-line margin (cost → price spread) is internal-only: pricing managers/admins,
   // and even then hidden from a sales rep who isn't cleared to see cost.
@@ -264,12 +303,28 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                 : 'Materials included in this quote'}
             </p>
           </div>
-          {showAddButton && onAddProducts && (
-            <Button onClick={onAddProducts} size="sm" className="rounded-full gap-1.5">
-              <Plus className="h-3.5 w-3.5" />
-              Add Products
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* #237 Phase 4.4 — route all unpriced catalog lines to the supplier for pricing. */}
+            {can('pricing.manage') && callForPriceItems.length > 0 && (
+              <Button
+                onClick={handleRequestSupplierPrices}
+                disabled={rfqBusy}
+                size="sm"
+                variant="outline"
+                className="rounded-full gap-1.5"
+                title="Ask the supplier to price the call-for-price lines"
+              >
+                {rfqBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                Request supplier prices ({callForPriceItems.length})
+              </Button>
+            )}
+            {showAddButton && onAddProducts && (
+              <Button onClick={onAddProducts} size="sm" className="rounded-full gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                Add Products
+              </Button>
+            )}
+          </div>
         </div>
 
         {items.length > 0 ? (

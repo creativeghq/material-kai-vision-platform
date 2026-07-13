@@ -12001,6 +12001,73 @@ export type Database = {
           },
         ]
       }
+      master_request_lines: {
+        Row: {
+          created_at: string
+          decline_reason: string | null
+          id: string
+          master_request_id: string
+          priced_at: string | null
+          priced_by: string | null
+          priced_currency: string
+          priced_unit_cost: number | null
+          product_id: string | null
+          quantity: number
+          quote_item_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          decline_reason?: string | null
+          id?: string
+          master_request_id: string
+          priced_at?: string | null
+          priced_by?: string | null
+          priced_currency?: string
+          priced_unit_cost?: number | null
+          product_id?: string | null
+          quantity?: number
+          quote_item_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          decline_reason?: string | null
+          id?: string
+          master_request_id?: string
+          priced_at?: string | null
+          priced_by?: string | null
+          priced_currency?: string
+          priced_unit_cost?: number | null
+          product_id?: string | null
+          quantity?: number
+          quote_item_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_request_lines_master_request_id_fkey"
+            columns: ["master_request_id"]
+            isOneToOne: false
+            referencedRelation: "master_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_request_lines_quote_item_id_fkey"
+            columns: ["quote_item_id"]
+            isOneToOne: false
+            referencedRelation: "quote_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_request_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_requests: {
         Row: {
           amount: number | null
@@ -14303,6 +14370,8 @@ export type Database = {
           notes: string | null
           order_number: string | null
           order_type: string
+          paired_order_id: string | null
+          paired_workspace_id: string | null
           payment_status: string
           project_id: string | null
           source_quote_id: string | null
@@ -14330,6 +14399,8 @@ export type Database = {
           notes?: string | null
           order_number?: string | null
           order_type: string
+          paired_order_id?: string | null
+          paired_workspace_id?: string | null
           payment_status?: string
           project_id?: string | null
           source_quote_id?: string | null
@@ -14357,6 +14428,8 @@ export type Database = {
           notes?: string | null
           order_number?: string | null
           order_type?: string
+          paired_order_id?: string | null
+          paired_workspace_id?: string | null
           payment_status?: string
           project_id?: string | null
           source_quote_id?: string | null
@@ -29223,6 +29296,22 @@ export type Database = {
           total_bytes: number
           total_objects: number
         }[]
+      }
+      submit_line_rfq: {
+        Args: { p_quote_id: string; p_quote_item_ids: string[] }
+        Returns: string
+      }
+      price_rfq_line: {
+        Args: { p_line_id: string; p_unit_cost: number }
+        Returns: undefined
+      }
+      decline_rfq_line: {
+        Args: { p_line_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      apply_rfq_prices_to_quote: {
+        Args: { p_master_request_id: string; p_save_back?: boolean }
+        Returns: number
       }
       submit_procurement_request: {
         Args: { p_quote_id: string }
