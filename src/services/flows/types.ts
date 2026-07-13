@@ -122,7 +122,14 @@ export type TriggerType =
   // Monitoring alerts (bridged from the Python dispatchers via DB triggers on the *_alert_log tables)
   | 'price_alert_triggered'
   | 'mention_alert_triggered'
-  | 'job_alert_triggered';
+  | 'job_alert_triggered'
+  // #237 Phase 4.4 — upstream line-level RFQ: a workspace routed unpriced quote lines up to
+  // its supplier/parent for pricing; the supplier returned prices (payload-only, dotted-free keys)
+  | 'rfq_lines_requested'
+  | 'rfq_lines_priced'
+  // #237 — a reseller accepted a quote with operator-catalog lines, auto-creating a mirrored
+  // SALES order + draft invoice in the supplier/operator workspace (notify the supplier admins)
+  | 'upstream_order_created';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
@@ -152,6 +159,9 @@ export interface QuoteSentTriggerConfig {}
 export interface PriceAlertTriggeredTriggerConfig {}
 export interface MentionAlertTriggeredTriggerConfig {}
 export interface JobAlertTriggeredTriggerConfig {}
+export interface RfqLinesRequestedTriggerConfig {}
+export interface RfqLinesPricedTriggerConfig {}
+export interface UpstreamOrderCreatedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface FreightQuoteRequestedTriggerConfig {}
 export interface OrderDispatchedTriggerConfig {}
@@ -375,6 +385,9 @@ export type TriggerConfigMap = {
   price_alert_triggered: PriceAlertTriggeredTriggerConfig;
   mention_alert_triggered: MentionAlertTriggeredTriggerConfig;
   job_alert_triggered: JobAlertTriggeredTriggerConfig;
+  rfq_lines_requested: RfqLinesRequestedTriggerConfig;
+  rfq_lines_priced: RfqLinesPricedTriggerConfig;
+  upstream_order_created: UpstreamOrderCreatedTriggerConfig;
 };
 
 // =====================================================

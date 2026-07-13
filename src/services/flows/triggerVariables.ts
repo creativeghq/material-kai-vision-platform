@@ -217,6 +217,31 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'cron', label: 'Cron expression', note: 'The schedule that fired.' },
     { key: 'timestamp', label: 'Fire time', note: 'ISO timestamp of the run.' },
   ],
+  // #237 Phase 4.4 — upstream line-level RFQ. The delivering payload (with admin_ids + the
+  // notification envelope) is enriched server-side by the master_requests DB bridge; the
+  // frontend also emits a lightweight signal carrying just the ids below.
+  rfq_lines_requested: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Array of PARENT-workspace admins to notify — iterate with a Loop ({{item}} = each admin id).' },
+    { key: 'master_request_id', label: 'Master request ID', note: 'The upstream RFQ request.' },
+    { key: 'quote_id', label: 'Quote ID', note: 'The quote whose lines were routed up.' },
+    { key: 'line_count', label: 'Line count', note: 'How many lines were routed up for pricing.' },
+  ]),
+  rfq_lines_priced: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Array of REQUESTER-workspace admins to notify — iterate with a Loop ({{item}} = each admin id).' },
+    { key: 'master_request_id', label: 'Master request ID', note: 'The upstream RFQ request.' },
+    { key: 'quote_id', label: 'Quote ID', note: 'The quote to fold the returned prices back into.' },
+    { key: 'requester_workspace_id', label: 'Requester workspace ID', note: 'The workspace that asked for pricing.' },
+    { key: 'priced_count', label: 'Priced count', note: 'How many lines the supplier priced.' },
+  ]),
+  // #237 — reseller quote acceptance mirrored an order into the supplier/operator workspace.
+  // The delivering payload (admin_ids + envelope) is enriched by the finance_orders DB bridge.
+  upstream_order_created: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Array of SUPPLIER-workspace admins to notify — iterate with a Loop ({{item}} = each admin id).' },
+    { key: 'quote_id', label: 'Quote ID', note: 'The reseller quote that was accepted.' },
+    { key: 'supplier_workspace_id', label: 'Supplier workspace ID', note: 'The recipient (operator/supplier) workspace.' },
+    { key: 'sales_order_id', label: 'Sales order ID', note: 'The mirrored sales order created in the supplier workspace.' },
+    { key: 'purchase_order_id', label: 'Purchase order ID', note: 'The reseller-side purchase order paired to the sales order.' },
+  ]),
 };
 
 /** The standard envelope every notification/email event carries. */

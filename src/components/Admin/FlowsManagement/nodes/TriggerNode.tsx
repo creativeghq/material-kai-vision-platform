@@ -107,6 +107,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   price_alert_triggered: TrendingDown,
   mention_alert_triggered: AtSign,
   job_alert_triggered: Briefcase,
+  rfq_lines_requested: Send,
+  rfq_lines_priced: CheckCircle2,
+  upstream_order_created: ShoppingCart,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

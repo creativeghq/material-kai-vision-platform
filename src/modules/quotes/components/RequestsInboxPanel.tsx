@@ -18,7 +18,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { masterRequestsService, type MasterRequest, type MasterRequestLine } from '@/services/masterRequestsService';
-import { flowEventService } from '@/services/flows/flowEventService';
 
 const money = (n: number | null, c: string | null) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
@@ -80,20 +79,8 @@ export const RequestsInboxPanel: React.FC = () => {
       setLinesLoading((s) => ({ ...s, [requestId]: false }));
     }
   }, [toast]);
-
-  // When the owner clears the last pending line, the request is complete — notify the
-  // requester via Flows (bell) so they can fold the returned prices back into the quote.
-  const notifyIfComplete = useCallback((requestId: string, lines: MasterRequestLine[]) => {
-    if (lines.length === 0 || lines.some((l) => l.status === 'pending')) return;
-    const r = incoming.find((x) => x.id === requestId);
-    if (!r) return;
-    flowEventService.emit('rfq_lines_priced', {
-      master_request_id: requestId,
-      quote_id: r.quote_id,
-      requester_workspace_id: r.requester_workspace_id,
-      priced_count: lines.filter((l) => l.status === 'priced').length,
-    });
-  }, [incoming]);
+  // Notifying the requester when the owner finishes is handled server-side by the
+  // _notify_rfq_lifecycle DB trigger (master_requests → 'priced') — no client emit needed.
 
   const toggleExpand = useCallback((requestId: string) => {
     setExpanded((s) => {
@@ -123,8 +110,7 @@ export const RequestsInboxPanel: React.FC = () => {
     setLineBusy(line.id);
     try {
       await masterRequestsService.priceLine(line.id, n);
-      const lines = await loadLines(requestId);
-      notifyIfComplete(requestId, lines);
+      await loadLines(requestId);
       await load();
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setLineBusy(null); }
@@ -133,8 +119,7 @@ export const RequestsInboxPanel: React.FC = () => {
     setLineBusy(line.id);
     try {
       await masterRequestsService.declineLine(line.id);
-      const lines = await loadLines(requestId);
-      notifyIfComplete(requestId, lines);
+      await loadLines(requestId);
       await load();
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setLineBusy(null); }
@@ -284,7 +269,7 @@ export const RequestsInboxPanel: React.FC = () => {
                         <span className="font-medium">{r.quote?.quote_number || r.quote?.name || `Quote ${r.quote_id.slice(0, 8)}`}</span>
                         <div className="text-xs text-muted-foreground">{money(r.amount, r.currency)} · {new Date(r.created_at).toLocaleDateString()}</div>
                       </div>
-                      {r.status === 'priced' && (
+                      {(r.status === 'priced' || (linesById[r.id]?.some((l) => l.status === 'priced'))) && (
                         <>
                           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                             <input

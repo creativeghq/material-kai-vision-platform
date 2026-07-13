@@ -1617,24 +1617,10 @@ export class QuotesService {
     // Initialize timeline for the quote
     await this.initializeQuoteTimeline(quoteId);
 
-    // #237 Phase 7: acceptance may have materialized an upstream purchase order (resale tree).
-    // If so, notify the supplier/operator workspace to fulfill + issue the owner→dealer invoice.
-    try {
-      const { data: po } = await supabase
-        .from('orders')
-        .select('id, paired_order_id, paired_workspace_id')
-        .eq('source_quote_id', quoteId)
-        .eq('order_type', 'purchase')
-        .maybeSingle();
-      if ((po as any)?.paired_workspace_id) {
-        flowEventService.emit('upstream_order_created', {
-          quote_id: quoteId,
-          supplier_workspace_id: (po as any).paired_workspace_id,
-          sales_order_id: (po as any).paired_order_id,
-          purchase_order_id: (po as any).id,
-        });
-      }
-    } catch { /* non-fatal — the orders/invoice still exist for the supplier to action */ }
+    // #237 Phase 7: acceptance may materialize an upstream purchase order + mirrored parent sales
+    // order (resale tree) via the accept trigger. The supplier workspace is notified server-side
+    // by the _notify_upstream_order_created DB trigger (on the mirrored sales-order insert) — no
+    // client-side emit needed here.
 
     return { success: true };
   }

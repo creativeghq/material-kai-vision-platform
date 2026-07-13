@@ -179,6 +179,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   price_alert_triggered: TrendingDown,
   mention_alert_triggered: AtSign,
   job_alert_triggered: Briefcase,
+  rfq_lines_requested: Send,
+  rfq_lines_priced: CheckCircle2,
+  upstream_order_created: ShoppingCart,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -275,6 +278,9 @@ const triggerLabels: Record<TriggerType, string> = {
   price_alert_triggered: 'Price Alert',
   mention_alert_triggered: 'Mention Alert',
   job_alert_triggered: 'Job Alert',
+  rfq_lines_requested: 'RFQ Lines Requested (upstream)',
+  rfq_lines_priced: 'RFQ Lines Priced (supplier)',
+  upstream_order_created: 'Reseller Order Created (supplier)',
 };
 
 const statusColors: Record<FlowStatus, string> = {

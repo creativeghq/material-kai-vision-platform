@@ -17,7 +17,6 @@ import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDraw
 import { usePermissions } from '@/hooks/usePermissions';
 import { parseDecimal } from '@/utils/decimal';
 import { masterRequestsService } from '@/services/masterRequestsService';
-import { flowEventService } from '@/services/flows/flowEventService';
 import { useToast } from '@/hooks/use-toast';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
@@ -211,15 +210,12 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
     if (!quoteIdForRfq || callForPriceItems.length === 0) return;
     setRfqBusy(true);
     try {
-      const reqId = await masterRequestsService.submitLineRfq(
+      await masterRequestsService.submitLineRfq(
         quoteIdForRfq,
         callForPriceItems.map((i) => i.id),
       );
-      flowEventService.emit('rfq_lines_requested', {
-        master_request_id: reqId,
-        quote_id: quoteIdForRfq,
-        line_count: callForPriceItems.length,
-      });
+      // The supplier is notified server-side by the _notify_rfq_lifecycle DB trigger
+      // (master_requests → 'in_review'); no client-side emit needed.
       toast({
         title: `Requested prices for ${callForPriceItems.length} line(s)`,
         description: 'Your supplier will price them and send them back.',

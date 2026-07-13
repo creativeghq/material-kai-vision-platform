@@ -318,6 +318,17 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Job Alert', description: 'The job-research dispatcher fired a digest/burst alert', icon: 'Briefcase', color: 'blue',
     defaultData: { label: 'Job Alert', category: 'trigger', triggerType: 'job_alert_triggered', config: {} } as TriggerNodeData },
 
+  // #237 Phase 4.4 — upstream line-level RFQ between networked workspaces
+  { type: 'triggerNode', category: 'trigger', subType: 'rfq_lines_requested', group: 'Quotes',
+    label: 'RFQ Lines Requested', description: 'A downstream workspace routed unpriced quote lines up to its supplier/parent for pricing (notify the parent admins)', icon: 'Send', color: 'emerald',
+    defaultData: { label: 'RFQ Lines Requested', category: 'trigger', triggerType: 'rfq_lines_requested', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'rfq_lines_priced', group: 'Quotes',
+    label: 'RFQ Lines Priced', description: 'A supplier finished pricing an upstream RFQ (notify the requester admins)', icon: 'CheckCircle2', color: 'emerald',
+    defaultData: { label: 'RFQ Lines Priced', category: 'trigger', triggerType: 'rfq_lines_priced', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'upstream_order_created', group: 'Finance',
+    label: 'Reseller Order Created', description: 'A reseller accepted a quote with operator-catalog lines → a mirrored sales order + draft invoice was created in the supplier workspace (notify the supplier admins)', icon: 'ShoppingCart', color: 'emerald',
+    defaultData: { label: 'Reseller Order Created', category: 'trigger', triggerType: 'upstream_order_created', config: {} } as TriggerNodeData },
+
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC
   // ════════════════════════════════════════════════════
