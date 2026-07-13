@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Eye, EyeOff, Store } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,6 +45,22 @@ export const Auth: React.FC = () => {
   // files a reseller application (VAT → operator ΑΑΔΕ check → operator approval) instead.
   const [applyAsReseller, setApplyAsReseller] = useState(false);
   const [vatNumber, setVatNumber] = useState('');
+
+  // Auth surfaces render in the light "ventureshub" palette regardless of the
+  // app's dark default. Force the light theme class on <html> while this page is
+  // mounted and restore the prior state on unmount so a signed-in user's dark
+  // preference (e.g. arriving via a password-reset link) is preserved afterwards.
+  useEffect(() => {
+    const root = document.documentElement;
+    const hadDark = root.classList.contains('dark');
+    const hadLight = root.classList.contains('light');
+    root.classList.remove('dark');
+    root.classList.add('light');
+    return () => {
+      root.classList.toggle('dark', hadDark);
+      root.classList.toggle('light', hadLight);
+    };
+  }, []);
 
   // Listen for Supabase's PASSWORD_RECOVERY event — fires after the recovery
   // link establishes a session. Belt-and-suspenders on top of URL detection.
@@ -172,9 +188,9 @@ export const Auth: React.FC = () => {
 
       <Card className="w-full max-w-md modern-card border-0 shadow-2xl">
         <CardHeader className="text-center space-y-2 pb-6">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-2">
-            <span className="text-primary-foreground font-bold text-2xl">K</span>
-          </div>
+          <Link to="/" className="mx-auto mb-4 inline-flex items-center justify-center" aria-label="materialshub home">
+            <img src="/mh-logo.png" alt="materialshub" className="h-9 w-auto" />
+          </Link>
           <CardTitle className="text-3xl font-bold">
             {isResetMode
               ? 'Set a new password'
@@ -507,9 +523,12 @@ export const Auth: React.FC = () => {
 
       {/* Footer */}
       <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-8 text-sm">
-        <a href="#" className="text-muted-foreground hover:text-foreground underline">
-          Terms & Conditions
-        </a>
+        <Link to="/terms" className="text-muted-foreground hover:text-foreground underline">
+          Terms of Service
+        </Link>
+        <Link to="/privacy" className="text-muted-foreground hover:text-foreground underline">
+          Privacy Policy
+        </Link>
       </div>
     </div>
   );
