@@ -235,21 +235,28 @@ export async function fetchTemplateConfig(
     .maybeSingle();
   const g = (sysRow?.setting_value ?? {}) as Record<string, any>;
 
-  // Per-workspace overrides.
+  const tplCols = 'quote_template_cover_path, quote_template_intro_path, quote_template_content_path, quote_template_backcover_path';
+
+  // This workspace's own template paths.
   let ws: Record<string, any> = {};
   if (workspaceId) {
-    const { data: fsRow } = await supabase
-      .from('finance_settings')
-      .select('quote_template_cover_path, quote_template_intro_path, quote_template_content_path, quote_template_backcover_path')
-      .eq('workspace_id', workspaceId)
-      .maybeSingle();
-    ws = fsRow ?? {};
+    const { data } = await supabase.from('finance_settings').select(tplCols).eq('workspace_id', workspaceId).maybeSingle();
+    ws = data ?? {};
   }
 
-  const cover = ws.quote_template_cover_path || g.first_page_path || g.cover_image_path || 'cover.png';
-  const intro = ws.quote_template_intro_path || g.intro_page_path || '';
-  const content = ws.quote_template_content_path || g.content_page_path || g.items_background_path || 'items-background.png';
-  const backcover = ws.quote_template_backcover_path || g.last_page_path || g.backcover_image_path || 'backcover.png';
+  // The operator (root) template is the default every tenant inherits.
+  let root: Record<string, any> = ws;
+  const { data: rootWs } = await supabase.from('workspaces').select('id').eq('is_root', true).limit(1).maybeSingle();
+  if (rootWs?.id && rootWs.id !== workspaceId) {
+    const { data } = await supabase.from('finance_settings').select(tplCols).eq('workspace_id', rootWs.id).maybeSingle();
+    root = data ?? {};
+  }
+
+  // Precedence: this workspace → root default → legacy system_settings → hardcoded.
+  const cover = ws.quote_template_cover_path || root.quote_template_cover_path || g.first_page_path || g.cover_image_path || 'cover.png';
+  const intro = ws.quote_template_intro_path || root.quote_template_intro_path || g.intro_page_path || '';
+  const content = ws.quote_template_content_path || root.quote_template_content_path || g.content_page_path || g.items_background_path || 'items-background.png';
+  const backcover = ws.quote_template_backcover_path || root.quote_template_backcover_path || g.last_page_path || g.backcover_image_path || 'backcover.png';
 
   return {
     cover_image_path: cover,

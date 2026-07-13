@@ -5,7 +5,6 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -16,12 +15,6 @@ interface PDFTemplateConfig {
   intro_page_path: string;
   last_page_path: string;
   content_page_path: string;
-  company_name: string;
-  company_address: string;
-  company_phone: string;
-  company_email: string;
-  company_vat: string;
-  vat_rate_default: number;
 }
 
 const DEFAULT_PDF_CONFIG: PDFTemplateConfig = {
@@ -29,16 +22,10 @@ const DEFAULT_PDF_CONFIG: PDFTemplateConfig = {
   intro_page_path: '',
   last_page_path: '',
   content_page_path: '',
-  company_name: '',
-  company_address: '',
-  company_phone: '',
-  company_email: '',
-  company_vat: '',
-  vat_rate_default: 24,
 };
 
-// One of the four template slots. Maps to the PDFTemplateConfig key (root/system_settings
-// jsonb) and the per-workspace finance_settings column (non-root).
+// One of the four template slots. Maps to the PDFTemplateConfig key and the
+// per-workspace finance_settings column. Every workspace (root included) self-serves.
 type TemplateSlot = 'cover' | 'intro' | 'content' | 'backcover';
 
 const SLOT_TO_CONFIG_KEY: Record<TemplateSlot, keyof PDFTemplateConfig> = {
@@ -69,8 +56,6 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
   // PDF Template state
   const [pdfConfig, setPdfConfig] = useState<PDFTemplateConfig>(DEFAULT_PDF_CONFIG);
-  const [pdfSettingId, setPdfSettingId] = useState<string>('');
-  const [savingPdf, setSavingPdf] = useState(false);
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
 
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -80,11 +65,9 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
   // Rendered "proper view" of the whole template (a sample quote PDF).
   const { activeWorkspaceId, activeWorkspace } = useWorkspace();
-  // Root workspace edits the global operator default (system_settings); any other
-  // tenant self-serves its own template images stored on its finance_settings row.
-  const perWorkspace = !activeWorkspace?.isRoot;
-  const slotPath = (slot: TemplateSlot) =>
-    perWorkspace ? `${activeWorkspaceId}/quote-${slot}.png` : `template-${slot}.png`;
+  // Every workspace (root included) self-serves its own template images under its
+  // own {workspace_id}/ prefix, persisted on its finance_settings row.
+  const slotPath = (slot: TemplateSlot) => `${activeWorkspaceId}/quote-${slot}.png`;
   const [previewing, setPreviewing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -114,7 +97,7 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
     loadSettings();
   }, []);
 
-  // Re-run when the active workspace resolves — non-root reads its own finance_settings row.
+  // Re-run when the active workspace resolves — reads this workspace's finance_settings row.
   useEffect(() => {
     loadPDFTemplateConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,64 +132,29 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
   const loadPDFTemplateConfig = async () => {
     try {
-      if (perWorkspace) {
-        // Non-root: this workspace's own 4 template paths live on finance_settings.
-        if (!activeWorkspaceId) return;
-        const { data, error } = await supabase
-          .from('finance_settings')
-          .select('quote_template_cover_path, quote_template_intro_path, quote_template_content_path, quote_template_backcover_path')
-          .eq('workspace_id', activeWorkspaceId)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        const config: PDFTemplateConfig = {
-          ...DEFAULT_PDF_CONFIG,
-          first_page_path: data?.quote_template_cover_path || '',
-          intro_page_path: data?.quote_template_intro_path || '',
-          content_page_path: data?.quote_template_content_path || '',
-          last_page_path: data?.quote_template_backcover_path || '',
-        };
-        setPdfConfig(config);
-
-        config.first_page_path ? loadImagePreview(config.first_page_path, setCoverPreview) : setCoverPreview(null);
-        config.intro_page_path ? loadImagePreview(config.intro_page_path, setIntroPreview) : setIntroPreview(null);
-        config.last_page_path ? loadImagePreview(config.last_page_path, setBackcoverPreview) : setBackcoverPreview(null);
-        config.content_page_path ? loadImagePreview(config.content_page_path, setBgPreview) : setBgPreview(null);
-        return;
-      }
-
+      // This workspace's own 4 template paths live on its finance_settings row.
+      if (!activeWorkspaceId) return;
       const { data, error } = await supabase
-        .from('system_settings')
-        .select('*')
-        .eq('setting_key', 'quote_pdf_template')
-        .single();
+        .from('finance_settings')
+        .select('quote_template_cover_path, quote_template_intro_path, quote_template_content_path, quote_template_backcover_path')
+        .eq('workspace_id', activeWorkspaceId)
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
 
-      if (data) {
-        const raw = data.setting_value as Record<string, any>;
-        const config: PDFTemplateConfig = {
-          ...DEFAULT_PDF_CONFIG,
-          first_page_path: raw.first_page_path || raw.cover_image_path || '',
-          intro_page_path: raw.intro_page_path || '',
-          last_page_path: raw.last_page_path || raw.backcover_image_path || '',
-          content_page_path: raw.content_page_path || raw.items_background_path || '',
-          company_name: raw.company_name || '',
-          company_address: raw.company_address || '',
-          company_phone: raw.company_phone || '',
-          company_email: raw.company_email || '',
-          company_vat: raw.company_vat || '',
-          vat_rate_default: raw.vat_rate_default ?? 24,
-        };
-        setPdfConfig(config);
-        setPdfSettingId(data.id);
+      const config: PDFTemplateConfig = {
+        ...DEFAULT_PDF_CONFIG,
+        first_page_path: data?.quote_template_cover_path || '',
+        intro_page_path: data?.quote_template_intro_path || '',
+        content_page_path: data?.quote_template_content_path || '',
+        last_page_path: data?.quote_template_backcover_path || '',
+      };
+      setPdfConfig(config);
 
-        if (config.first_page_path) loadImagePreview(config.first_page_path, setCoverPreview);
-        if (config.intro_page_path) loadImagePreview(config.intro_page_path, setIntroPreview);
-        if (config.last_page_path) loadImagePreview(config.last_page_path, setBackcoverPreview);
-        if (config.content_page_path) loadImagePreview(config.content_page_path, setBgPreview);
-      }
+      config.first_page_path ? loadImagePreview(config.first_page_path, setCoverPreview) : setCoverPreview(null);
+      config.intro_page_path ? loadImagePreview(config.intro_page_path, setIntroPreview) : setIntroPreview(null);
+      config.last_page_path ? loadImagePreview(config.last_page_path, setBackcoverPreview) : setBackcoverPreview(null);
+      config.content_page_path ? loadImagePreview(config.content_page_path, setBgPreview) : setBgPreview(null);
     } catch (error) {
       console.error('Error loading PDF template config:', error);
     }
@@ -289,29 +237,21 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
       await loadImagePreview(targetPath, previewSetter);
 
-      const updatedConfig = { ...pdfConfig, [configKey]: targetPath };
-      setPdfConfig(updatedConfig);
+      setPdfConfig({ ...pdfConfig, [configKey]: targetPath });
 
-      if (perWorkspace) {
-        // Persist the path onto this workspace's finance_settings column.
-        const col = SLOT_TO_FINANCE_COL[slot];
-        const { data: updated, error: updErr } = await supabase
+      // Persist the path onto this workspace's finance_settings column.
+      const col = SLOT_TO_FINANCE_COL[slot];
+      const { data: updated, error: updErr } = await supabase
+        .from('finance_settings')
+        .update({ [col]: targetPath })
+        .eq('workspace_id', activeWorkspaceId)
+        .select('workspace_id');
+      if (updErr) throw updErr;
+      if (!updated || updated.length === 0) {
+        const { error: upErr } = await supabase
           .from('finance_settings')
-          .update({ [col]: targetPath })
-          .eq('workspace_id', activeWorkspaceId)
-          .select('workspace_id');
-        if (updErr) throw updErr;
-        if (!updated || updated.length === 0) {
-          const { error: upErr } = await supabase
-            .from('finance_settings')
-            .upsert({ workspace_id: activeWorkspaceId, [col]: targetPath }, { onConflict: 'workspace_id' });
-          if (upErr) throw upErr;
-        }
-      } else if (pdfSettingId) {
-        await supabase
-          .from('system_settings')
-          .update({ setting_value: updatedConfig as any, updated_at: new Date().toISOString() })
-          .eq('id', pdfSettingId);
+          .upsert({ workspace_id: activeWorkspaceId, [col]: targetPath }, { onConflict: 'workspace_id' });
+        if (upErr) throw upErr;
       }
 
       toast({ title: 'Image uploaded', description: `${targetPath} saved successfully.` });
@@ -339,21 +279,13 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
       previewSetter(null);
 
-      const updatedConfig = { ...pdfConfig, [configKey]: '' };
-      setPdfConfig(updatedConfig);
+      setPdfConfig({ ...pdfConfig, [configKey]: '' });
 
-      if (perWorkspace) {
-        const col = SLOT_TO_FINANCE_COL[slot];
-        await supabase
-          .from('finance_settings')
-          .update({ [col]: null })
-          .eq('workspace_id', activeWorkspaceId);
-      } else if (pdfSettingId) {
-        await supabase
-          .from('system_settings')
-          .update({ setting_value: updatedConfig as any, updated_at: new Date().toISOString() })
-          .eq('id', pdfSettingId);
-      }
+      const col = SLOT_TO_FINANCE_COL[slot];
+      await supabase
+        .from('finance_settings')
+        .update({ [col]: null })
+        .eq('workspace_id', activeWorkspaceId);
 
       toast({ title: 'Image deleted', description: `${storagePath} removed.` });
     } catch (error) {
@@ -368,32 +300,10 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
     }
   };
 
-  const handleSavePdfConfig = async () => {
-    try {
-      setSavingPdf(true);
-      const { error } = await supabase
-        .from('system_settings')
-        .update({
-          setting_value: pdfConfig as any,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', pdfSettingId);
-
-      if (error) throw error;
-
-      toast({ title: 'Success', description: 'PDF template configuration saved.' });
-    } catch (error) {
-      console.error('Error saving PDF config:', error);
-      toast({ title: 'Error', description: 'Failed to save PDF configuration.', variant: 'destructive' });
-    } finally {
-      setSavingPdf(false);
-    }
-  };
-
   const content = (
     <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
       {/* Quote expiration is a platform-global setting — only the operator (root) edits it. */}
-      {!perWorkspace && (
+      {activeWorkspace?.isRoot && (
       <div className="dashboard-card space-y-6">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -458,17 +368,8 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          {perWorkspace ? (
-            <>
-              This workspace&apos;s quote design — cover, intro, item pages, and back cover. Any slot you leave empty
-              inherits the operator default. Use <strong>Preview</strong> to see a sample quote rendered with it.
-            </>
-          ) : (
-            <>
-              The default design applied to every quote PDF — cover, intro, item pages, and back cover, plus the
-              company details shown on the document. Use <strong>Preview</strong> to see a sample quote rendered with it.
-            </>
-          )}
+          This workspace&apos;s PDF Design Template — cover, intro, item pages, and back cover. Any slot you leave empty
+          inherits the operator default. Use <strong>Preview</strong> to see a sample quote rendered with it.
         </p>
 
         <div className="space-y-4">
@@ -656,94 +557,11 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
           </div>
         </div>
 
-        {!perWorkspace && (
-        <div className="space-y-4">
-          <h3 className="text-base font-medium">Company Details (shown on PDF)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="company-name">Company Name</Label>
-              <Input
-                id="company-name"
-                value={pdfConfig.company_name}
-                onChange={(e) => setPdfConfig(prev => ({ ...prev, company_name: e.target.value }))}
-                placeholder="Materials Hub"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="company-email">Email</Label>
-              <Input
-                id="company-email"
-                type="email"
-                value={pdfConfig.company_email}
-                onChange={(e) => setPdfConfig(prev => ({ ...prev, company_email: e.target.value }))}
-                placeholder="info@materialkai.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="company-phone">Phone</Label>
-              <Input
-                id="company-phone"
-                value={pdfConfig.company_phone}
-                onChange={(e) => setPdfConfig(prev => ({ ...prev, company_phone: e.target.value }))}
-                placeholder="+30 210 1234567"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="company-vat">VAT Number</Label>
-              <Input
-                id="company-vat"
-                value={pdfConfig.company_vat}
-                onChange={(e) => setPdfConfig(prev => ({ ...prev, company_vat: e.target.value }))}
-                placeholder="EL123456789"
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="company-address">Address</Label>
-              <Input
-                id="company-address"
-                value={pdfConfig.company_address}
-                onChange={(e) => setPdfConfig(prev => ({ ...prev, company_address: e.target.value }))}
-                placeholder="123 Main Street, Athens, 10431, Greece"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="default-vat-rate">Default VAT Rate (%)</Label>
-              <Input
-                id="default-vat-rate"
-                type="text"
-                inputMode="decimal"
-                value={pdfConfig.vat_rate_default}
-                onChange={(e) => setPdfConfig(prev => ({ ...prev, vat_rate_default: parseDecimalOr(e.target.value, 0) }))}
-              />
-            </div>
-          </div>
-        </div>
-        )}
-
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={handlePreview} disabled={previewing}>
             {previewing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
             Preview
           </Button>
-          {!perWorkspace && (
-            <Button
-              onClick={handleSavePdfConfig}
-              disabled={savingPdf}
-              style={{ backgroundColor: 'hsl(var(--primary))' }}
-            >
-              {savingPdf ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save PDF Settings
-                </>
-              )}
-            </Button>
-          )}
         </div>
       </div>
 
