@@ -129,6 +129,7 @@ const PlansPage = lazy(() => import('./pages/Admin/PlansPage'));
 const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/legal/TermsOfServicePage'));
+const HomePage = lazy(() => import('./pages/HomePage'));
 
 // Module system — registers module routes declared in src/modules/*/index.ts
 import { buildModuleRoutes } from './modules/_core';
@@ -174,6 +175,8 @@ const App = () => (
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* Public routes — no auth required */}
+                {/* Public marketing landing / OAuth branding home page (no login). */}
+                <Route path="/home" element={<PageErrorBoundary name="Home Landing"><HomePage /></PageErrorBoundary>} />
                 <Route path="/board/:id" element={<PageErrorBoundary name="Public Moodboard"><PublicMoodBoardPage /></PageErrorBoundary>} />
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
                 <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
