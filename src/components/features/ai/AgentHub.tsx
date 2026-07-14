@@ -1158,7 +1158,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const catalogPdfInputRef = useRef<HTMLInputElement>(null);
   const [uploadingCatalogPdf, setUploadingCatalogPdf] = useState(false);
 
   // Track previous agent to detect actual agent switches
@@ -3572,12 +3571,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // catalog_source_pdfs row), then prefills an instruction so the agent attaches
   // it (attach_catalog_pdfs) and extracts — keeping the admin and agent flows
   // identical. The PDF is NOT digested into the product DB.
-  const handleCatalogPdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    await processCatalogPdfFile(file);
-  }, [processCatalogPdfFile]);
 
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
   const AgentIcon = currentAgent?.icon || Bot;
@@ -5419,13 +5412,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               className="hidden"
               onChange={handleImageUpload}
             />
-            <input
-              ref={catalogPdfInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={handleCatalogPdfUpload}
-            />
 
             {/* Unified input container */}
             <TooltipProvider delayDuration={200}>
@@ -5529,25 +5515,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <TooltipTrigger asChild>
                       <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                      >
-                        <Paperclip className="h-4 w-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left"><p>Attach images or a catalog PDF</p></TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => catalogPdfInputRef.current?.click()}
                         disabled={uploadingCatalogPdf}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
                       >
-                        {uploadingCatalogPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                        {uploadingCatalogPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="left"><p>Attach catalog PDF (extract products)</p></TooltipContent>
+                    <TooltipContent side="left"><p>Attach images or a catalog PDF (extract products)</p></TooltipContent>
                   </Tooltip>
 
                   <Tooltip>
