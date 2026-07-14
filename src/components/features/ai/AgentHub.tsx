@@ -3240,13 +3240,54 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     });
   }, []);
 
+  // Core catalog-PDF ingest — uploads the source PDF, binds the catalog toolkit, and
+  // prefills the ask so the agent extracts products. Shared by the dedicated PDF button
+  // AND the general paperclip (which now also accepts PDFs), so a user can attach a
+  // catalog either way instead of hunting for the right icon.
+  const processCatalogPdfFile = useCallback(async (file: File) => {
+    if (file.type !== 'application/pdf') {
+      toast({ title: 'PDF only', description: 'Attach a PDF file for catalog extraction.', variant: 'destructive' });
+      return;
+    }
+    setUploadingCatalogPdf(true);
+    try {
+      const source = await catalogsService.uploadSourcePdf(file);
+      // Make sure the agent actually has the catalog tools bound (switches to the
+      // owning agent + enables the 'catalogs' toolkit) so the prefilled ask works.
+      const catalogToolkit = TOOLKITS.find((t) => t.id === 'catalogs');
+      if (catalogToolkit) ensureAgentAndToolkit(catalogToolkit);
+      toast({ title: 'PDF uploaded', description: file.name });
+      setInput(
+        'I uploaded a catalog source PDF.\n' +
+        `- source_pdf_id: ${source.id}\n` +
+        `- filename: ${source.original_filename}\n\n` +
+        'If we don\'t have a catalog yet, create one, then attach this PDF with attach_catalog_pdfs and help me extract products from it.',
+      );
+    } catch (err) {
+      toast({ title: 'Upload failed', description: getErrorMessage(err), variant: 'destructive' });
+    } finally {
+      setUploadingCatalogPdf(false);
+    }
+  }, [toast, ensureAgentAndToolkit]);
+
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const fileArray = Array.from(files);
     e.target.value = ''; // Reset now so the same file can be re-selected later
-    attachImageFiles(fileArray);
-  }, [attachImageFiles]);
+    // The paperclip accepts images AND catalog PDFs. Split by type: images go to the
+    // vision attachment path; a PDF is routed to catalog extraction (same as the
+    // dedicated PDF button). This removes the "can't attach a PDF" dead-end.
+    const pdfs = fileArray.filter((f) => f.type === 'application/pdf');
+    const images = fileArray.filter((f) => f.type.startsWith('image/'));
+    if (images.length > 0) attachImageFiles(images);
+    if (pdfs.length > 0) {
+      if (pdfs.length > 1) {
+        toast({ title: 'One catalog PDF at a time', description: 'Attaching the first PDF for extraction.' });
+      }
+      void processCatalogPdfFile(pdfs[0]);
+    }
+  }, [attachImageFiles, processCatalogPdfFile, toast]);
 
   // Paste an image straight from the clipboard into the composer. Fires on the
   // textarea's onPaste; when the clipboard carries image bytes we consume them
@@ -3535,30 +3576,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (file.type !== 'application/pdf') {
-      toast({ title: 'PDF only', description: 'Attach a PDF file for catalog extraction.', variant: 'destructive' });
-      return;
-    }
-    setUploadingCatalogPdf(true);
-    try {
-      const source = await catalogsService.uploadSourcePdf(file);
-      // Make sure the agent actually has the catalog tools bound (switches to the
-      // owning agent + enables the 'catalogs' toolkit) so the prefilled ask works.
-      const catalogToolkit = TOOLKITS.find((t) => t.id === 'catalogs');
-      if (catalogToolkit) ensureAgentAndToolkit(catalogToolkit);
-      toast({ title: 'PDF uploaded', description: file.name });
-      setInput(
-        'I uploaded a catalog source PDF.\n' +
-        `- source_pdf_id: ${source.id}\n` +
-        `- filename: ${source.original_filename}\n\n` +
-        'If we don\'t have a catalog yet, create one, then attach this PDF with attach_catalog_pdfs and help me extract products from it.',
-      );
-    } catch (err) {
-      toast({ title: 'Upload failed', description: getErrorMessage(err), variant: 'destructive' });
-    } finally {
-      setUploadingCatalogPdf(false);
-    }
-  }, [toast, ensureAgentAndToolkit]);
+    await processCatalogPdfFile(file);
+  }, [processCatalogPdfFile]);
 
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
   const AgentIcon = currentAgent?.icon || Bot;
@@ -5395,7 +5414,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf"
               multiple
               className="hidden"
               onChange={handleImageUpload}
@@ -5515,7 +5534,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         <Paperclip className="h-4 w-4" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="left"><p>Attach images</p></TooltipContent>
+                    <TooltipContent side="left"><p>Attach images or a catalog PDF</p></TooltipContent>
                   </Tooltip>
 
                   <Tooltip>
