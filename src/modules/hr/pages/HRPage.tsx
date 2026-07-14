@@ -100,18 +100,25 @@ export default function HRPage() {
             <TabsTrigger value="ergani" className="w-full justify-start"><Landmark className="h-4 w-4 mr-2" /> Ergani</TabsTrigger>
           </TabsList>
 
+          {/*
+            forceMount keeps a panel in the DOM across tab switches (no re-flash/refetch on revisit),
+            BUT Radix computes `hidden = !(forceMount || isSelected)`, so a forceMounted panel is NEVER
+            hidden by Radix and every mounted tab would paint at once. We hide inactive panels ourselves
+            via `data-[state=inactive]:hidden` (Radix still sets data-state correctly). This is the fix
+            for "HR tabs don't switch" — without it all preloaded tabs stack on top of each other.
+          */}
           <div className="min-w-0 flex-1 space-y-4">
-            <TabsContent value="overview" forceMount={fm('overview')} className="mt-0 space-y-4"><OverviewSection {...sectionProps} /></TabsContent>
-            <TabsContent value="employees" forceMount={fm('employees')} className="mt-0 space-y-4"><EmployeesSection {...sectionProps} /></TabsContent>
-            <TabsContent value="departments" forceMount={fm('departments')} className="mt-0 space-y-4"><DepartmentsSection {...sectionProps} /></TabsContent>
-            <TabsContent value="timeoff" forceMount={fm('timeoff')} className="mt-0 space-y-4"><TimeOffSection {...sectionProps} /></TabsContent>
-            <TabsContent value="attendance" forceMount={fm('attendance')} className="mt-0 space-y-4"><AttendanceSection {...sectionProps} /></TabsContent>
-            <TabsContent value="recruitment" forceMount={fm('recruitment')} className="mt-0 space-y-4"><RecruitmentSection {...sectionProps} /></TabsContent>
-            <TabsContent value="onboarding" forceMount={fm('onboarding')} className="mt-0 space-y-4"><OnboardingSection {...sectionProps} /></TabsContent>
-            <TabsContent value="documents" forceMount={fm('documents')} className="mt-0 space-y-4"><DocumentsSection {...sectionProps} /></TabsContent>
-            <TabsContent value="payroll" forceMount={fm('payroll')} className="mt-0 space-y-4"><PayrollSection {...sectionProps} /></TabsContent>
-            <TabsContent value="accounting" forceMount={fm('accounting')} className="mt-0 space-y-4"><AccountingSection {...sectionProps} /></TabsContent>
-            <TabsContent value="ergani" forceMount={fm('ergani')} className="mt-0 space-y-4"><ErganiSection {...sectionProps} /></TabsContent>
+            <TabsContent value="overview" forceMount={fm('overview')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><OverviewSection {...sectionProps} /></TabsContent>
+            <TabsContent value="employees" forceMount={fm('employees')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><EmployeesSection {...sectionProps} /></TabsContent>
+            <TabsContent value="departments" forceMount={fm('departments')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><DepartmentsSection {...sectionProps} /></TabsContent>
+            <TabsContent value="timeoff" forceMount={fm('timeoff')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><TimeOffSection {...sectionProps} /></TabsContent>
+            <TabsContent value="attendance" forceMount={fm('attendance')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><AttendanceSection {...sectionProps} /></TabsContent>
+            <TabsContent value="recruitment" forceMount={fm('recruitment')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><RecruitmentSection {...sectionProps} /></TabsContent>
+            <TabsContent value="onboarding" forceMount={fm('onboarding')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><OnboardingSection {...sectionProps} /></TabsContent>
+            <TabsContent value="documents" forceMount={fm('documents')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><DocumentsSection {...sectionProps} /></TabsContent>
+            <TabsContent value="payroll" forceMount={fm('payroll')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><PayrollSection {...sectionProps} /></TabsContent>
+            <TabsContent value="accounting" forceMount={fm('accounting')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><AccountingSection {...sectionProps} /></TabsContent>
+            <TabsContent value="ergani" forceMount={fm('ergani')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><ErganiSection {...sectionProps} /></TabsContent>
           </div>
         </Tabs>
       </div>
