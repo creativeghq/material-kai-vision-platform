@@ -55,6 +55,7 @@ import {
   ORDER_PAYMENT_LABEL,
   type OrderListRow,
 } from '@/modules/finance/services/ordersService';
+import { OrderAgingInlineEditor } from '@/modules/finance/components/OrderAgingInlineEditor';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
@@ -237,20 +238,32 @@ const FinancePage: React.FC = () => {
       let apWithOrders = apRows.filter((r) => r.entry_kind !== 'manual');
       try {
         const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: wsId });
+        // An un-invoiced order has no invoice due date, so it ages against its EXPECTED payment
+        // date (operator-set). No expected date yet → it can't age → 'no_due_date' (shows as
+        // "expected" money, not in a bucket). Buckets mirror vw_ar_aging exactly.
+        const agingFromExpected = (expected: string | null): { age_bucket: AgeBucket; days_overdue: number } => {
+          if (!expected) return { age_bucket: 'no_due_date', days_overdue: 0 };
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const due = new Date(`${expected}T00:00:00`);
+          const days = Math.floor((today.getTime() - due.getTime()) / 86_400_000);
+          const bucket: AgeBucket = days <= 0 ? 'current' : days <= 30 ? '0-30' : days <= 60 ? '31-60' : days <= 90 ? '61-90' : '90+';
+          return { age_bucket: bucket, days_overdue: Math.max(days, 0) };
+        };
         const toAgingRow = (o: typeof uninvoiced[number]): AgingRow => ({
           id: o.id,
           workspace_id: wsId,
           total: o.total,
           amount_paid: o.settled,
           amount_due: o.outstanding,
-          due_at: null,
+          due_at: o.expected_payment_date,
           issued_at: o.created_at,
           status: o.status,
-          age_bucket: 'no_due_date',
-          days_overdue: 0,
+          ...agingFromExpected(o.expected_payment_date),
           entry_kind: 'order',
           description: `Order ${o.order_number ?? o.id.slice(0, 8)}`,
           party_name: o.party_name,
+          category_id: o.category_id,
+          category_name: o.category_name,
         });
         arWithOrders = [...arWithOrders, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
         apWithOrders = [...apWithOrders, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
@@ -685,14 +698,26 @@ const FinancePage: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-2 text-xs">{r.party_name ?? '—'}</td>
-                        <td className="px-4 py-2 text-xs text-muted-foreground">{r.category_name ?? '—'}</td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground" onClick={(e) => isOrder && e.stopPropagation()}>
+                          {isOrder ? (
+                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
+                              {r.category_name ?? <span className="text-primary">Set category</span>}
+                            </OrderAgingInlineEditor>
+                          ) : (r.category_name ?? '—')}
+                        </td>
                         <td className="px-4 py-2">
                           <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
                         </td>
                         <td className="px-4 py-2 text-right">{formatMoney(r.total)}</td>
                         <td className="px-4 py-2 text-right">{formatMoney(r.amount_paid)}</td>
                         <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
-                        <td className="px-4 py-2 text-right">{r.due_at ?? '—'}</td>
+                        <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
+                          {isOrder ? (
+                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
+                              {r.due_at ?? <span className="text-primary">Set date</span>}
+                            </OrderAgingInlineEditor>
+                          ) : (r.due_at ?? '—')}
+                        </td>
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                           {isOrder ? (
@@ -772,14 +797,26 @@ const FinancePage: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-2 text-xs">{r.party_name ?? '—'}</td>
-                        <td className="px-4 py-2 text-xs text-muted-foreground">{r.category_name ?? '—'}</td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground" onClick={(e) => isOrder && e.stopPropagation()}>
+                          {isOrder ? (
+                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} expectedDate={r.due_at} categories={expenseCats} onSaved={() => loadAll(workspaceId)}>
+                              {r.category_name ?? <span className="text-primary">Set category</span>}
+                            </OrderAgingInlineEditor>
+                          ) : (r.category_name ?? '—')}
+                        </td>
                         <td className="px-4 py-2">
                           <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
                         </td>
                         <td className="px-4 py-2 text-right">{formatMoney(r.total)}</td>
                         <td className="px-4 py-2 text-right">{formatMoney(r.amount_paid)}</td>
                         <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
-                        <td className="px-4 py-2 text-right">{r.due_at ?? '—'}</td>
+                        <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
+                          {isOrder ? (
+                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} expectedDate={r.due_at} categories={expenseCats} onSaved={() => loadAll(workspaceId)}>
+                              {r.due_at ?? <span className="text-primary">Set date</span>}
+                            </OrderAgingInlineEditor>
+                          ) : (r.due_at ?? '—')}
+                        </td>
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
                         {!isAccountant && (
                           <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>

@@ -15,6 +15,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel } from '@/modules/finance/services/financeService';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -56,8 +57,16 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
   // What the New-order dropdown chose: sales/purchase + whether it's a draft (pre-order).
   const [createPreset, setCreatePreset] = useState<{ orderType: OrderType; draft: boolean }>({ orderType: 'sales', draft: false });
   const [openId, setOpenId] = useState<string | null>(null);
+  // Finance categories — for classifying an order (income for sales, expense for purchase). Loaded
+  // once here and passed to the create + detail dialogs so an order carries a category like invoices do.
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
   // Inside a CRM party (company/contact) the list is already scoped — hide the filter cluster.
   const embedded = !!(companyId || contactId);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    void financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+  }, [workspaceId]);
 
   const openCreate = (orderType: OrderType, draft: boolean) => { setCreatePreset({ orderType, draft }); setCreateOpen(true); };
 
@@ -194,11 +203,12 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
         lockedCompanyId={companyId}
         lockedContactId={contactId}
         preset={createPreset}
+        categories={categories}
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={() => { setCreateOpen(false); void load(); }}
       />
-      <OrderDetailDialog orderId={openId} open={openId !== null} onClose={() => setOpenId(null)} onChanged={() => void load()} />
+      <OrderDetailDialog orderId={openId} categories={categories} open={openId !== null} onClose={() => setOpenId(null)} onChanged={() => void load()} />
     </div>
   );
 };
@@ -216,10 +226,11 @@ const NewOrderModal: React.FC<{
   lockedContactId?: string;
   /** Chosen from the New-order dropdown: sell vs buy + draft (pre-order) vs confirmed. */
   preset: { orderType: OrderType; draft: boolean };
+  categories: FinanceCategory[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated: () => void;
-}> = ({ workspaceId, lockedCompanyId, lockedContactId, preset, open, onOpenChange, onCreated }) => {
+}> = ({ workspaceId, lockedCompanyId, lockedContactId, preset, categories, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const orderType = preset.orderType;
@@ -234,13 +245,18 @@ const NewOrderModal: React.FC<{
   const [projectSearch, setProjectSearch] = useState('');
   const [projectOpts, setProjectOpts] = useState<Array<{ id: string; name: string }>>([]);
   const [currency, setCurrency] = useState('EUR');
+  const [categoryId, setCategoryId] = useState('none');
+  const [expectedDate, setExpectedDate] = useState('');
 
   const isSales = orderType === 'sales';
+  // Sales orders are income, purchase orders are expense — offer the matching category kinds.
+  const catOptions = categories.filter((c) => c.kind === (isSales ? 'income' : 'expense') || c.kind === 'both');
 
   useEffect(() => {
     if (!open) return;
     setParty(null); setPartySearch(''); setPartyOpts([]); setActiveLine(null); setLineProdOpts([]);
     setProject(null); setProjectSearch(''); setProjectOpts([]); setCurrency('EUR');
+    setCategoryId('none'); setExpectedDate('');
     setItems([blankLine()]);
     // Opened from inside a CRM party → that party IS the order's party (customer for a sales
     // order, supplier for a purchase order). Pre-select + lock it so the user isn't re-searching.
@@ -366,6 +382,8 @@ const NewOrderModal: React.FC<{
         status,
         currency,
         projectId: project?.id ?? null,
+        categoryId: categoryId === 'none' ? null : categoryId,
+        expectedPaymentDate: expectedDate || null,
         customerCompanyId: isSales ? coId : null,
         customerContactId: isSales ? ctId : null,
         supplierCompanyId: !isSales ? coId : null,
@@ -453,6 +471,25 @@ const NewOrderModal: React.FC<{
                   <SelectItem value="GBP">GBP</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* Classify + set when we expect to be paid — so the order shows a category and can AGE in
+              Receivables/Payables even before it's invoiced (both carry onto the invoice/bill). */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Category</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger><SelectValue placeholder="No category" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {catOptions.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Expected payment date</Label>
+              <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
             </div>
           </div>
 
@@ -544,7 +581,7 @@ const MATCH_META: Record<ThreeWayMatchStatus, { label: string; cls: string }> = 
   variance:         { label: 'Variance',         cls: 'text-destructive border-destructive/40' },
 };
 
-const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClose: () => void; onChanged: () => void }> = ({ orderId, open, onClose, onChanged }) => {
+const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void }> = ({ orderId, categories, open, onClose, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
@@ -627,6 +664,19 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
       toast({ title: `Marked ${ORDER_STATUS_LABEL[status]}` });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  // Set the order's finance category / expected payment date (classify + let it age pre-invoice).
+  const saveMeta = async (patch: { categoryId?: string | null; expectedPaymentDate?: string | null }) => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      await ordersService.updateMeta(order.id, patch);
+      setOrder({ ...order, ...('categoryId' in patch ? { category_id: patch.categoryId ?? null } : {}), ...('expectedPaymentDate' in patch ? { expected_payment_date: patch.expectedPaymentDate ?? null } : {}) });
+      onChanged();
+    } catch (err: any) {
+      toast({ title: 'Failed to update order', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -1009,6 +1059,29 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; open: boolean; onClo
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+            </div>
+
+            {/* Classification + expected payment — settable before the order is invoiced so it shows
+                a category and ages in Receivables/Payables (both carry onto the invoice/bill). */}
+            <div className="flex flex-wrap items-end gap-4 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Category</Label>
+                <Select value={order.category_id ?? 'none'} onValueChange={(v) => void saveMeta({ categoryId: v === 'none' ? null : v })} disabled={saving}>
+                  <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="No category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No category</SelectItem>
+                    {categories.filter((c) => c.kind === (order.order_type === 'sales' ? 'income' : 'expense') || c.kind === 'both').map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Expected payment date</Label>
+                <Input type="date" className="h-8 w-44 text-xs" value={order.expected_payment_date ?? ''} disabled={saving}
+                  onChange={(e) => void saveMeta({ expectedPaymentDate: e.target.value || null })} />
+              </div>
+              <p className="text-[11px] text-muted-foreground max-w-xs">Un-invoiced orders age in Receivables/Payables against the expected payment date.</p>
             </div>
 
             {!editing ? (

@@ -31,6 +31,10 @@ export interface Order {
   vat_amount: number;
   total: number;
   notes: string | null;
+  /** Finance category (income for sales, expense for purchase). Carried onto the invoice/bill. */
+  category_id: string | null;
+  /** When we expect this order to be paid — drives AR/AP aging while it's not yet invoiced. */
+  expected_payment_date: string | null;
   /** Purchase-order 3-way match verdict (denormalized; null for sales orders). */
   three_way_match_status: ThreeWayMatchStatus | null;
   created_at: string;
@@ -159,7 +163,7 @@ export const ordersService = {
     workspaceId: string;
     companyId?: string;
     contactId?: string;
-  }): Promise<Array<{ id: string; order_number: string | null; order_type: OrderType; party_name: string | null; total: number; settled: number; outstanding: number; currency: string; status: OrderStatus; created_at: string }>> {
+  }): Promise<Array<{ id: string; order_number: string | null; order_type: OrderType; party_name: string | null; total: number; settled: number; outstanding: number; currency: string; status: OrderStatus; created_at: string; category_id: string | null; category_name: string | null; expected_payment_date: string | null }>> {
     const list = await this.list({ workspaceId: opts.workspaceId, companyId: opts.companyId, contactId: opts.contactId });
     // Candidates = every non-cancelled order. We include a draft/pre-order only once it has moved
     // real cash (a deposit received / paid) — empty drafts stay hidden, but a pre-order with a
@@ -177,6 +181,14 @@ export const ordersService = {
     ]);
     const invoiced = new Set<string>((inv.data ?? []).map((r: any) => r.order_id));
     (bills.data ?? []).forEach((r: any) => invoiced.add(r.order_id));
+
+    // Resolve category display names in one batch (orders now carry a finance category).
+    const catIds = [...new Set(candidates.map((o) => o.category_id).filter(Boolean))] as string[];
+    const catNames = new Map<string, string>();
+    if (catIds.length) {
+      const { data: cats } = await supabase.from('finance_categories').select('id, name').in('id', catIds);
+      for (const c of (cats ?? []) as Array<{ id: string; name: string }>) catNames.set(c.id, c.name);
+    }
     const settledIn = new Map<string, number>();
     const settledOut = new Map<string, number>();
     for (const p of (pays.data ?? []) as Array<{ order_id: string; direction: 'in' | 'out'; amount: number }>) {
@@ -202,6 +214,9 @@ export const ordersService = {
           currency: o.currency,
           status: o.status,
           created_at: o.created_at,
+          category_id: o.category_id ?? null,
+          category_name: o.category_id ? (catNames.get(o.category_id) ?? null) : null,
+          expected_payment_date: o.expected_payment_date ?? null,
         };
       })
       .filter((r) => r.outstanding > 0.005);
@@ -249,6 +264,8 @@ export const ordersService = {
     projectId?: string | null;
     currency?: string;
     notes?: string | null;
+    categoryId?: string | null;
+    expectedPaymentDate?: string | null;
     items: NewOrderItem[];
   }): Promise<string> {
     const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -277,6 +294,8 @@ export const ordersService = {
         vat_amount: vatTotal,
         total,
         notes: input.notes ?? null,
+        category_id: input.categoryId ?? null,
+        expected_payment_date: input.expectedPaymentDate ?? null,
       })
       .select('id, order_number')
       .single();
@@ -470,6 +489,20 @@ export const ordersService = {
       .limit(50);
     if (error) return [];
     return (data ?? []) as any;
+  },
+
+  /**
+   * Set the order's finance category and/or expected payment date. These classify the order and
+   * let it AGE in the AR/AP aging report before it's invoiced (an un-invoiced order has no invoice
+   * due date, so the expected payment date is what it ages against). Both carry onto the
+   * invoice/supplier bill when the order is invoiced. Pass a field to change it; omit to leave it.
+   */
+  async updateMeta(id: string, patch: { categoryId?: string | null; expectedPaymentDate?: string | null }): Promise<void> {
+    const clean: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (patch.categoryId !== undefined) clean.category_id = patch.categoryId;
+    if (patch.expectedPaymentDate !== undefined) clean.expected_payment_date = patch.expectedPaymentDate;
+    const { error } = await supabase.from('orders').update(clean).eq('id', id);
+    if (error) throw error;
   },
 
   async setStatus(id: string, status: OrderStatus): Promise<void> {
