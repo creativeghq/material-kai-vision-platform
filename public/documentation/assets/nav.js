@@ -91,12 +91,12 @@
     { title: "Network & Tools", items: [
       { file: "discover.html", title: "Discover & Network", icon: "🌐", children: [
         { file: "discover-profiles.html", title: "Profiles" },
-        { file: "discover-factory.html", title: "Factory" },
+        { file: "discover-factory.html", title: "Brands" },
         { file: "discover-products.html", title: "Products" },
         { file: "discover-marketplace.html", title: "Marketplace" },
         { file: "discover-network.html", title: "Network" },
       ]},
-      { file: "factory-analytics.html", title: "Factory Analytics", icon: "📊" },
+      { file: "factory-analytics.html", title: "Supplier Analytics", icon: "📊" },
       { file: "tools.html", title: "Tools", icon: "🛠️", children: [
         { file: "recognition.html", title: "Material Recognition" },
         { file: "compare.html", title: "Material Compare" },
@@ -115,8 +115,9 @@
         { file: "hr-self-service.html", title: "Employee self-service" },
       ]},
       { file: "stock.html", title: "Stock Management", icon: "📦" },
+      { file: "contracts.html", title: "Contracts & e-Signature", icon: "✍️" },
       { file: "email-marketing.html", title: "Email Marketing (BYOK)", icon: "📣" },
-      { file: "flows.html", title: "Flows", icon: "🔀" },
+      { file: "flows.html", title: "Flows (Automations)", icon: "🔀" },
       { file: "team-docs.html", title: "Team Docs", icon: "📓" },
     ]},
     { title: "Account", items: [

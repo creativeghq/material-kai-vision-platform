@@ -24,6 +24,7 @@
   <div class="table-wrap"><table>
     <thead><tr><th>Connection</th><th>What it's for</th></tr></thead>
     <tbody>
+      <tr><td><strong>Email (Resend) — required to send</strong></td><td>Connect your own <strong>Resend</strong> account (API key + verified sender). <strong>This is now required for <em>all</em> tenant business email</strong> — invoice &amp; quote emails, account statements, <a href="email-marketing.html">campaigns</a> and <a href="flows.html">flow</a> emails all send from your own domain. See the connect-email note below.</td></tr>
       <tr><td><strong>Social accounts</strong></td><td>Connect Instagram, Facebook, LinkedIn, TikTok and more (via Zernio) for publishing — see <a href="account-social.html">Social Accounts</a>.</td></tr>
       <tr><td><strong>WhatsApp</strong></td><td>Connect a WhatsApp number (via Zernio) to send &amp; receive messages in the <a href="inbox.html">Inbox</a>.</td></tr>
       <tr><td><strong>Stripe payouts</strong></td><td>Connect (onboard) your own <strong>Stripe</strong> account to <em>receive store payments into it</em> — for selling through the platform.</td></tr>
@@ -31,6 +32,8 @@
     </tbody>
   </table></div>
   <p>Each connection shows a clear <strong>Connected</strong> / <strong>Not connected</strong> state, with an onboarding/connect action where it isn't set up yet.</p>
+
+  <div class="callout warn"><p><strong>Connect email before you can send.</strong> Every place that sends business mail — emailing an invoice or quote, sharing an account statement, an <a href="email-marketing.html">Email Marketing</a> campaign, or a <a href="flows.html">flow</a> email — is now <strong>gated on a connected sender</strong>. If you haven't connected Resend yet, you'll see a <em>“Connect your email to send”</em> prompt: add your <strong>Resend API key + a verified sender</strong> (and optional Reply-To / from-name defaults, with a <strong>test send</strong> to confirm) and sending unlocks. There's no shared platform sender for tenant business mail — it always goes out as <em>you</em>.</p></div>
 
   <h2>How to connect something</h2>
   <ol>

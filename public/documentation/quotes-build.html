@@ -106,6 +106,15 @@
     <li><strong>Discount approval.</strong> If you push a discount beyond what your role is allowed (or past the guardrail), it isn't applied silently — it <strong>fans out to finance for approval</strong> (it appears under <a href="finance-settings-pricing.html">Pricing → Pending Discount Approvals</a>). You're told it's pending; once an approver releases it, the price updates.</li>
   </ul>
 
+  <h2>“Call for price” lines &amp; upstream RFQ</h2>
+  <p><strong>What it is —</strong> a line you can't price yet because you need a supplier quote first. <strong>Why it matters —</strong> you can still put the item on the quote and get everything else moving, instead of blocking the whole quote on one unknown price. <strong>How it works:</strong> mark the line <strong>“call for price”</strong> (a first-class line state — it shows as awaiting a price rather than €0). You can then send an <strong>upstream RFQ</strong> (request-for-quote) to your supplier for those lines; while it's out, the line reads <em>awaiting supplier</em>, and when the supplier's price comes back the line is priced. On acceptance, the resale tree can materialise the corresponding upstream order/invoice.</p>
+
+  <h2>Line images &amp; thumbnails</h2>
+  <p>You can <strong>upload an image for a custom line item</strong>, and item <strong>thumbnails render in the generated quote PDF</strong> — so the customer sees a picture of each product, not just a description. Catalogue lines use their existing product imagery automatically.</p>
+
+  <h2>The quote's look — PDF Design Template <span class="badge gated">Quotes → Settings</span></h2>
+  <p><strong>What it is —</strong> the Quotes hub now has a <strong>Settings</strong> tab with a per-workspace <strong>PDF Design Template</strong> you control yourself. <strong>Why it matters —</strong> your quotes go out looking like <em>your</em> brand without asking an operator to change a template — you self-serve the design and see a <strong>rendered preview</strong> before you use it. The same per-workspace template idea also covers your <a href="finance-settings.html">finance documents</a> and published <a href="knowledge-base.html">catalogues</a>. Set it once in <strong>Quotes → Settings</strong> and every quote PDF uses it.</p>
+
   <h2>Extras &amp; Timeline</h2>
   <p>Beyond the Items tab, a quote has two further tabs that round out what the customer sees.</p>
   <h3>Extras (Extras &amp; Add-ons)</h3>

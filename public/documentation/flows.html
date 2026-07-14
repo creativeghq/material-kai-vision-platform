@@ -9,11 +9,11 @@
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Flows</div>
-  <h1>Flows <span class="badge gated">Pro add-on</span></h1>
-  <div class="routes"><span class="badge route">/apps/flows</span></div>
+  <h1>Flows (Automations) <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/automations</span></div>
   <p class="lead">Flows are <strong>workspace automations</strong>: “when <em>this</em> happens, do <em>that</em>.” Pick a <strong>trigger</strong> — an invoice is paid, a payment comes in, a quote is approved, a product is added, an inbox message arrives, an appointment is booked, or a <strong>schedule</strong> — and an <strong>action</strong> — send an email, a WhatsApp, an in-app notification, an agent message, or fire an <a href="email-marketing.html">Email Marketing</a> campaign. You build them by <strong>chatting with the assistant</strong>, no builder to learn, and they run on the platform's automation engine <strong>scoped to your workspace only</strong>. This page explains the triggers, the actions, how to create one, and how runs are metered.</p>
 
-  <div class="callout"><p><strong>Where:</strong> enable <strong>Flows</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on). You create and manage flows mostly from the <a href="agent-hub.html">assistant</a> — just describe the automation you want.</p></div>
+  <div class="callout"><p><strong>Where:</strong> enable <strong>Flows</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on); it appears in your navigation as <strong>Automations</strong> at <span class="badge route">/automations</span>. Build flows in the visual builder there, or just describe one to the <a href="agent-hub.html">assistant</a>.</p></div>
 
   <h2>Triggers — when a flow fires</h2>
   <p>A flow starts from one of these:</p>
@@ -57,12 +57,13 @@
   </table></div>
   <div class="callout"><p><strong>Branch with A/B split.</strong> Between the trigger and the action you can drop an <strong>A/B Split</strong> — it randomly sends each run down path <em>A</em> or <em>B</em>, so you can test two versions (e.g. two email subjects) and compare. Each branch then runs its own action.</p></div>
 
-  <h2>How to create a flow — from chat</h2>
-  <ol>
-    <li>In the <a href="agent-hub.html">assistant</a>, describe the automation — e.g. <em>“when an invoice is paid, send the customer a thank-you email,”</em> or <em>“every Monday at 9am, send my VIP list a campaign.”</em></li>
-    <li>The assistant sets up the flow (picking the trigger and action); for anything it needs pinned down it opens a short <strong>form</strong> to confirm the details.</li>
-    <li>The flow goes live for your workspace. You can ask the assistant to <strong>list, edit, pause or delete</strong> your flows at any time.</li>
-  </ol>
+  <h2>How to create a flow</h2>
+  <p>Two ways, whichever suits you:</p>
+  <ul class="feat">
+    <li><strong>Visual builder.</strong> Build the flow on a canvas — drop a <strong>trigger</strong>, connect it to an <strong>action</strong> (with an optional <strong>A/B split</strong> in between), and configure each node. This is the primary way to create and edit tenant flows.</li>
+    <li><strong>From chat.</strong> Or just describe it to the <a href="agent-hub.html">assistant</a> — e.g. <em>“when an invoice is paid, send the customer a thank-you email,”</em> or <em>“every Monday at 9am, send my VIP list a campaign”</em> — and it sets the flow up for you. You can also ask it to <strong>list, pause or delete</strong> your flows.</li>
+  </ul>
+  <div class="callout warn"><p><strong>Email actions need a connected sender.</strong> A flow that sends email uses <em>your</em> connected email (BYOK Resend — see <a href="account-keys.html">Keys &amp; Connections</a>). If the workspace hasn't connected one, the flow can't send and tells you clearly to connect email first, rather than failing silently.</p></div>
   <div class="callout"><p><strong>Scoped &amp; safe.</strong> Chat-built flows are <strong>workspace-scoped</strong> — they only ever see and act on <em>your</em> workspace's data and run under your permissions. They're a deliberately simple, guard-railed subset of the platform's full automation engine.</p></div>
 
   <h2>Metering — what a run costs</h2>
