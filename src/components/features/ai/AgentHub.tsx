@@ -705,6 +705,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  // Catalog source PDFs attached via the paperclip. Held as chips (id + filename)
+  // instead of dumping a machine instruction into the composer; the agent
+  // instruction (with the source_pdf_id it needs for attach_catalog_pdfs) is
+  // assembled at send-time in handleSendMessage.
+  const [attachedCatalogPdfs, setAttachedCatalogPdfs] = useState<{ id: string; filename: string }[]>([]);
   const [selectedGenerationMode, setSelectedGenerationMode] = useState<string | null>(null);
   const [imageDragOverIndex, setImageDragOverIndex] = useState<number | null>(null);
   const imageDragIndexRef = useRef<number | null>(null);
@@ -1826,7 +1831,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const pendingToolkits = pendingToolkitsRef.current;
     pendingToolkitsRef.current = [];
 
-    if (!directRun && !input.trim() && attachedImages.length === 0) {
+    if (!directRun && !input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0) {
       return;
     }
     if (!userId) {
@@ -1834,8 +1839,24 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
 
     // For a direct run the chat shows a compact "▶ <label>" chip instead of typed text.
-    const userInput = directRun ? `▶ ${directRun.label}` : input;
     const userAttachedImages = directRun ? [] : [...attachedImages];
+    const userAttachedCatalogPdfs = directRun ? [] : [...attachedCatalogPdfs];
+
+    // What the user sees in their chat bubble — their own text, or a friendly
+    // default when they attached a catalog PDF and typed nothing.
+    const userInput = directRun
+      ? `▶ ${directRun.label}`
+      : (input.trim() || (userAttachedCatalogPdfs.length > 0 ? 'Extract the products from this catalog.' : input));
+
+    // What the agent actually receives — same text plus the machine context it
+    // needs to attach the uploaded source PDF(s). Kept out of the visible bubble
+    // so the composer/chat stay clean.
+    const plural = userAttachedCatalogPdfs.length > 1;
+    const apiUserInput = userAttachedCatalogPdfs.length > 0
+      ? `${userInput}\n\n[Attached catalog source PDF${plural ? 's' : ''}: ${userAttachedCatalogPdfs.map((p) => p.filename).join(', ')}. `
+        + `If we don't have a catalog yet, create one, then attach ${plural ? 'them' : 'it'} with attach_catalog_pdfs `
+        + `(source_pdf_id${plural ? 's' : ''}: ${userAttachedCatalogPdfs.map((p) => p.id).join(', ')}) and extract the products.]`
+      : userInput;
 
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
@@ -1848,6 +1869,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setAttachedImages([]);
+    setAttachedCatalogPdfs([]);
     setSelectedGenerationMode(null);
     setIsLoading(true);
     setReasoningSteps([]); // Clear reasoning steps for new message
@@ -1957,7 +1979,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           messages: messages.concat({
             id: `msg-${Date.now()}`,
             role: 'user',
-            content: userInput,
+            // apiUserInput carries the catalog source_pdf_id context (if any);
+            // the visible bubble/persisted message use the clean userInput.
+            content: apiUserInput,
             timestamp: new Date(),
           }),
           agentId: selectedAgent,
@@ -3165,7 +3189,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [input, selectedAgent, selectedModel, attachedImages, userId, currentConversationId, messages]);
+  }, [input, selectedAgent, selectedModel, attachedImages, attachedCatalogPdfs, userId, currentConversationId, messages]);
 
   // Keep ref in sync so effects can call the latest handleSendMessage without stale closures
   useEffect(() => {
@@ -3255,13 +3279,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // owning agent + enables the 'catalogs' toolkit) so the prefilled ask works.
       const catalogToolkit = TOOLKITS.find((t) => t.id === 'catalogs');
       if (catalogToolkit) ensureAgentAndToolkit(catalogToolkit);
-      toast({ title: 'PDF uploaded', description: file.name });
-      setInput(
-        'I uploaded a catalog source PDF.\n' +
-        `- source_pdf_id: ${source.id}\n` +
-        `- filename: ${source.original_filename}\n\n` +
-        'If we don\'t have a catalog yet, create one, then attach this PDF with attach_catalog_pdfs and help me extract products from it.',
-      );
+      // Show it as an attachment chip rather than pasting an instruction into the
+      // composer. The user can just hit send (or add their own note first); the
+      // agent instruction is built from these chips at send-time.
+      setAttachedCatalogPdfs((prev) => [...prev, { id: source.id, filename: source.original_filename }]);
+      toast({ title: 'Catalog PDF attached', description: file.name });
     } catch (err) {
       toast({ title: 'Upload failed', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
@@ -5143,6 +5165,31 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           )}
 
+          {/* Attached catalog source PDFs — shown as removable chips; the extraction
+              instruction is built from these at send-time (no composer text dump). */}
+          {attachedCatalogPdfs.length > 0 && (
+            <div className="pb-2 flex flex-wrap gap-2">
+              {attachedCatalogPdfs.map((pdf) => (
+                <div
+                  key={pdf.id}
+                  className="flex items-center gap-2 rounded-full border border-input bg-muted/60 pl-2.5 pr-1.5 py-1 text-xs"
+                  title={pdf.filename}
+                >
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="max-w-[200px] truncate">{pdf.filename}</span>
+                  <button
+                    type="button"
+                    onClick={() => setAttachedCatalogPdfs((prev) => prev.filter((p) => p.id !== pdf.id))}
+                    className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    aria-label={`Remove ${pdf.filename}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Attached Images */}
           {attachedImages.length > 0 && (
             <div className="pb-2 space-y-2">
@@ -5656,10 +5703,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 {/* Right panel: send button — full height */}
                 <button
                   onClick={handleSendMessage}
-                  disabled={isLoading || (!input.trim() && attachedImages.length === 0)}
+                  disabled={isLoading || (!input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0)}
                   className={cn(
                     'flex items-center justify-center px-4 border-l border-input rounded-r-xl transition-colors',
-                    isLoading || (!input.trim() && attachedImages.length === 0)
+                    isLoading || (!input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0)
                       ? 'text-muted-foreground/40 bg-muted/20 cursor-not-allowed'
                       : 'bg-primary text-primary-foreground hover:bg-primary/90',
                   )}
