@@ -43,7 +43,11 @@ export function OverviewSection({ workspaceId }: { workspaceId: string | null; c
         <Card>
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Headcount by department</CardTitle></CardHeader>
           <CardContent>
-            {byDept.length === 0 ? <EmptyState title="No employees yet" /> : (
+            {byDept.length === 0 ? (
+              // Distinguish "no staff at all" from "staff exist but none are assigned to a department"
+              // — the latter previously showed a misleading "No employees yet" while headcount ≥ 1.
+              <EmptyState title={data.headcount > 0 ? 'No department assignments yet' : 'No employees yet'} />
+            ) : (
               <div className="space-y-2">
                 {byDept.sort((a, b) => b[1] - a[1]).map(([name, n]) => {
                   const pct = data.headcount ? Math.round((n / data.headcount) * 100) : 0;

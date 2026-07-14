@@ -39,35 +39,17 @@ async function resolvePartyContactInfo(
   return { name: null, email: null, userId: null };
 }
 
-/** Emit invoice_issued / receipt_issued for a freshly-issued document. */
+/**
+ * Fire the invoice_issued / receipt_issued flow (notify workspace + email customer) for a
+ * freshly-issued document. These are SERVER_ONLY_EVENTS in flow-engine (#256) — the browser is
+ * forbidden from emitting them (a client emit 403s and is silently dropped), so we relay through
+ * the finance-issue-invoice edge function, which emits from trusted server code. Fire-and-forget:
+ * a flow hiccup must never break issuance.
+ */
 async function emitDocumentIssuedEvent(invoiceId: string): Promise<void> {
   try {
-    const { data: inv } = await supabase
-      .from('invoices')
-      .select('id, internal_number, legal_number, document_type, total, currency, customer_company_id, customer_contact_id, workspace_id')
-      .eq('id', invoiceId)
-      .maybeSingle();
-    if (!inv) return;
-    const isReceipt = String((inv as any).document_type ?? '').startsWith('11');
-    const party = await resolvePartyContactInfo((inv as any).customer_company_id, (inv as any).customer_contact_id);
-    const num = (inv as any).legal_number ?? (inv as any).internal_number ?? '';
-    const amount = `${Number((inv as any).total ?? 0).toFixed(2)} ${(inv as any).currency ?? 'EUR'}`;
-    const docWord = isReceipt ? 'Receipt' : 'Invoice';
-    flowEventService.emit(isReceipt ? 'receipt_issued' : 'invoice_issued', {
-      type: isReceipt ? 'receipt_issued' : 'invoice_issued',
-      // Bell recipient — only linked customers have a user_id; the flow skips an empty one.
-      user_id: party.userId ?? undefined,
-      customer_email: party.email ?? undefined,
-      customer_name: party.name ?? undefined,
-      invoice_id: (inv as any).id,
-      document_number: num,
-      document_type: (inv as any).document_type ?? undefined,
-      amount,
-      currency: (inv as any).currency ?? 'EUR',
-      workspace_id: (inv as any).workspace_id,
-      title: `${docWord} ${num} issued`,
-      body: `${docWord} ${num} for ${amount}${party.name ? ` to ${party.name}` : ''} has been issued.`,
-      action_url: `/finance/invoices/${(inv as any).id}`,
+    await supabase.functions.invoke('finance-issue-invoice', {
+      body: { emit_issued: { invoice_id: invoiceId } },
     });
   } catch { /* flow emit is best-effort */ }
 }

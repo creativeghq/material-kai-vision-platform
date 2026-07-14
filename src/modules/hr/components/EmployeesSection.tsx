@@ -8,7 +8,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/core/ui/dialog';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -121,7 +121,10 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Add employee</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Add employee</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Add employee</DialogTitle>
+          <DialogDescription>Create a new employee record with role, employment type and compensation.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1"><Label>Full name *</Label><Input value={f.name} onChange={(e) => upd('name', e.target.value)} placeholder="Jane Doe" /></div>
           <div className="grid grid-cols-2 gap-3">

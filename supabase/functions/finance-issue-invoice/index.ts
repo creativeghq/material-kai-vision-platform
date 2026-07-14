@@ -45,6 +45,10 @@ interface RequestBody {
   /** Read-only: report whether the master e-invoicing connector key is configured for this
    *  workspace's legal_invoice capability (drives the Finance → Settings → e-Invoicing card). */
   fiscal_status?: { workspace_id: string };
+  /** Trusted server-side relay for the invoice_issued / receipt_issued flow event. The browser
+   *  cannot emit these directly (they are in flow-engine's SERVER_ONLY_EVENTS #256), so the
+   *  manual "New invoice" path calls this after mark_invoice_issued to fire the notify/email flow. */
+  emit_issued?: { invoice_id: string };
 }
 
 // Platform cost per myDATA transmission (markup on Novus ~0.5-1 cr). Root transmits free.
@@ -285,8 +289,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const body = (await req.json()) as RequestBody;
-    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.pos_complete && !body.fiscal_status) {
-      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id, pos_complete or fiscal_status is required' }, 400);
+    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.pos_complete && !body.fiscal_status && !body.emit_issued) {
+      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id, pos_complete, fiscal_status or emit_issued is required' }, 400);
     }
 
     const supabase = createClient(
@@ -294,6 +298,23 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
+
+    // ── Trusted relay: fire invoice_issued / receipt_issued for an already-issued invoice ──────
+    // The manual NewInvoiceDialog / InvoiceDetailPage path issues via the mark_invoice_issued RPC
+    // client-side, then calls this to emit the flow event from trusted server code (the browser
+    // can't — invoice_issued/receipt_issued are SERVER_ONLY_EVENTS in flow-engine, #256). We only
+    // relay for an invoice the caller can access; no document is created or mutated here.
+    if (body.emit_issued) {
+      const invId = body.emit_issued.invoice_id;
+      if (!invId) return json({ error: 'emit_issued.invoice_id is required' }, 400);
+      const { data: invRow } = await supabase.from('invoices').select('workspace_id').eq('id', invId).maybeSingle();
+      if (!invRow) return json({ error: 'Invoice not found' }, 404);
+      if (!(await userCanAccessWorkspace(supabase, auth.user!.id, (invRow as any).workspace_id))) {
+        return json({ error: 'Forbidden' }, 404); // 404 (not 403) to avoid id enumeration
+      }
+      await emitDocumentIssued(supabase, invId);
+      return json({ ok: true });
+    }
 
     // ── Read-only e-invoicing connector status (no document, no billing) ───────
     // Tells the Finance → Settings → e-Invoicing card whether the operator master key

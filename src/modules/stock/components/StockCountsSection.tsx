@@ -5,7 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { parseDecimal } from '@/utils/decimal';
@@ -122,7 +122,10 @@ const NewCountDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => vo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>New stock count</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>New stock count</DialogTitle>
+          <DialogDescription>Start a physical stocktake for a warehouse and reconcile counted quantities.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Warehouse</Label>

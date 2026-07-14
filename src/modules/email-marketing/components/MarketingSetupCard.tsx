@@ -30,6 +30,6 @@ export const MarketingSetupCard: React.FC<{ workspaceId: string; byokReady: bool
         </div>
       </div>
     )}
-    <WorkspaceEmailConfigCard workspaceId={workspaceId} onSaved={onConfigured} />
+    <WorkspaceEmailConfigCard workspaceId={workspaceId} onSaved={onConfigured} requireOwnSender />
   </div>
 );
