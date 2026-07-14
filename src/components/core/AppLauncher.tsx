@@ -41,7 +41,7 @@ export const AppLauncher: React.FC = () => {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="w-[min(38rem,calc(100vw-1.5rem))] p-0 rounded-2xl shadow-xl border-border/60"
+        className="w-[min(44rem,calc(100vw-1.5rem))] p-0 rounded-2xl shadow-xl border-border/60"
       >
         {/* Radix caret pointing at the trigger — must sit outside the clipped wrapper below. */}
         <PopoverPrimitive.Arrow className="fill-popover" width={16} height={8} />
@@ -70,21 +70,20 @@ export const AppLauncher: React.FC = () => {
           ) : (
             <>
               {active.length > 0 && (
-                <div className="grid grid-cols-4 gap-2 p-3">
+                <div className="grid grid-cols-3 gap-1 p-3">
                   {active.map((app) => (
                     <button
                       key={app.id}
                       onClick={() => go(app.path)}
                       title={app.description || app.label}
-                      className="group relative flex flex-col gap-2 rounded-2xl border border-border/50 bg-muted/25 p-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg cursor-pointer"
+                      className="group flex flex-col gap-2.5 rounded-xl p-3 text-left transition-colors duration-200 hover:bg-accent/50 cursor-pointer"
                     >
-                      <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-primary ring-1 ring-inset ring-border/50 transition-colors group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary">
-                        <app.icon className="h-[1.05rem] w-[1.05rem]" />
-                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[hsl(var(--success))] ring-2 ring-popover" title="Active" />
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-foreground/60 transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                        <app.icon className="h-5 w-5" />
                       </span>
                       <span className="space-y-0.5">
-                        <span className="block text-[12.5px] font-medium leading-tight truncate">{app.label}</span>
-                        <span className="block text-[11px] text-muted-foreground leading-snug line-clamp-2 min-h-[1.9rem]">
+                        <span className="block text-sm font-semibold leading-tight truncate">{app.label}</span>
+                        <span className="block text-[11.5px] text-muted-foreground leading-snug line-clamp-2 min-h-[2rem]">
                           {app.description || 'Open'}
                         </span>
                       </span>
@@ -94,7 +93,7 @@ export const AppLauncher: React.FC = () => {
               )}
 
               {available.length > 0 && (
-                <div className="border-t border-border/60 px-3 pb-4 pt-3">
+                <div className="border-t border-border/60 bg-muted/30 px-3 pb-4 pt-3">
                   <div className="flex items-center gap-2 px-1 pb-2.5">
                     <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Available to add</span>
                     <span className="h-px flex-1 bg-border/60" />
