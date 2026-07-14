@@ -39,8 +39,16 @@
 
   <div class="callout tip"><p><strong>Worked example — chasing an overdue customer.</strong> Open <strong>Finance → Customers &amp; Suppliers</strong> → <strong>search</strong> the customer by name or email → <strong>click their row</strong> to see the full breakdown of what they owe → <strong>email a statement</strong>. The statement arrives branded by your <strong>Statement PDF</strong> settings, so the running total goes out looking like the rest of your paperwork.</p></div>
 
+  <h2>Shareable statement — the customer can pay it</h2>
+  <p><strong>What it is —</strong> beyond emailing a PDF, you can <strong>Share statement</strong> to give the customer a live, self-serve <strong>public statement page</strong> (from a party's account you'll see <strong>Download PDF</strong>, <strong>Share statement</strong> and <strong>View in CRM</strong>). <strong>Why it matters —</strong> the customer sees their own running account <em>and</em> can settle it, without you chasing.</p>
+  <ul class="feat">
+    <li><strong>Secure access.</strong> The public page at <span class="badge route">/statement/:token</span> <span class="badge public">Public</span> asks the customer to <em>“Enter your VAT number and email to view your statement,”</em> so only the right party can open it.</li>
+    <li><strong>The running account.</strong> It shows their <strong>opening balance</strong>, payments received, and what's outstanding — the same figures as the emailed statement.</li>
+    <li><strong>Pay the balance.</strong> The customer can <strong>pay online (Stripe)</strong> straight from the page, or use the <strong>bank details</strong> shown to pay by transfer — so a statement doubles as a payment request.</li>
+  </ul>
+
   <h2>What it affects elsewhere</h2>
-  <p>The statement that gets emailed is branded by the <strong>Statement PDF</strong> settings (cover/footer images). This tab complements the <a href="crm.html">CRM</a> rather than replacing it — the party records live there; their money side lives here.</p>
+  <p>The statement (emailed or shared) is branded by the <strong>Statement PDF</strong> settings (cover/footer images); online payment lands via your connected <a href="account-keys.html">Stripe payouts</a>. This tab complements the <a href="crm.html">CRM</a> rather than replacing it — the party records live there; their money side lives here.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

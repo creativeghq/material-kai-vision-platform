@@ -35,6 +35,24 @@
         <td>Views an invoice and <strong>pays it online</strong>. See <a href="finance.html">Finance &amp; Invoicing</a>.</td>
       </tr>
       <tr>
+        <td>Account statement</td>
+        <td><span class="badge route">/statement/:token</span></td>
+        <td><span class="badge gated">email + VAT gated</span></td>
+        <td>Enters their <strong>VAT number + email</strong>, sees their running account (opening balance, payments, outstanding), and <strong>pays the balance online</strong> or by bank transfer. See <a href="finance-op-customers-suppliers.html">Customers &amp; Suppliers</a>.</td>
+      </tr>
+      <tr>
+        <td>Signed contract</td>
+        <td><span class="badge route">/contracts</span> (signer link)</td>
+        <td><span class="badge public">public</span></td>
+        <td>Reads a contract and <strong>e-signs</strong> it; the signature is recorded with an audit trail. See <a href="contracts.html">Contracts</a>.</td>
+      </tr>
+      <tr>
+        <td>Careers &amp; apply</td>
+        <td>public careers page</td>
+        <td><span class="badge public">public</span></td>
+        <td>Browses your open roles and <strong>applies</strong> (uploads a CV). See <a href="hr-recruitment.html">HR → Recruitment</a>.</td>
+      </tr>
+      <tr>
         <td>Public moodboard</td>
         <td><span class="badge route">/board/:id</span></td>
         <td><span class="badge public">public</span></td>
@@ -100,6 +118,18 @@
     <div class="card"><h3>💬 Public inbox thread</h3><p><strong>What —</strong> a shared conversation an outside party can read and reply to without registering. <strong>When to send —</strong> when you want a customer or supplier to take part in a discussion directly, without making them create an account.</p></div>
     <div class="card"><h3>🔍 AR material preview</h3><p><strong>What —</strong> an augmented-reality view of a material. <strong>When to send —</strong> usually as a QR code on a desktop screen, so the visitor can preview the material in their own space on a phone or tablet.</p></div>
   </div>
+
+  <h2>Marketing &amp; legal pages (always public)</h2>
+  <p>Separate from the link-shared deliverables above, MaterialsHub has a few <strong>standing public pages</strong> — no token, always on — that live at fixed addresses:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Page</th><th>Route</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Home</strong></td><td><span class="badge route">/home</span></td><td>The public marketing landing page — the branded front door for prospects, with links to the free tools, the knowledge base, and sign-in. It's what OAuth/branding points at.</td></tr>
+      <tr><td><strong>Privacy Policy</strong></td><td><span class="badge route">/privacy</span></td><td>How the platform handles data — the information you provide (account/profile, business content, contacts/customers) and how it's used. Linked from sign-up and the footer.</td></tr>
+      <tr><td><strong>Terms of Service</strong></td><td><span class="badge route">/terms</span></td><td>The terms governing use of the platform. Linked from sign-up and the footer.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The <a href="tools.html">free tools</a> and public <a href="knowledge-base.html">knowledge base</a> are also public entry points reachable without an account.</p>
 
   <h2>How sharing works</h2>
   <p><strong>What it is —</strong> the one consistent mechanism behind every page above. Whatever the deliverable, sharing follows the same rules, so once you understand it for a quote you understand it for all of them. <strong>Why it works this way —</strong> the design keeps you in control: nothing is exposed until you act, links are hard to guess, and you can pull access back whenever you need to.</p>
