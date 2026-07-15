@@ -1,60 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { fetchQuoteData, fetchStorageFile, fetchImageBytesFromUrl } from './data-fetcher.ts';
-import type { QuotePDFRequest, QuotePDFResponse, QuoteData } from './types.ts';
+import { fetchQuoteData, fetchTemplateConfig, fetchStorageFile, fetchImageBytesFromUrl, applyWorkspaceBranding } from './data-fetcher.ts';
+import { buildQuotePDF } from './pdf-builder.ts';
+import type { QuotePDFRequest, QuotePDFResponse, QuoteData, TemplateConfig } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
-import { renderBrandedDocument, type BrandedDoc } from '../_shared/pdf/document.ts';
-import { fetchBrandingConfig, fetchTemplateImage, type BrandingConfig } from '../_shared/pdf/branding.ts';
-
-/** Map a quote + its resolved branding into the shared branded-document model. */
-function mapQuoteToBrandedDoc(quote: QuoteData, tpl: BrandingConfig): BrandedDoc {
-  const currency = quote.currency || 'EUR';
-  return {
-    doc_label: 'QUOTE',
-    number: quote.quote_number ?? null,
-    created_at: quote.created_at,
-    expires_at: quote.expires_at ?? null,
-    currency,
-    layout: 'list',
-    cover_optional: true, // quotes skip the cover page when no template image is set
-    company: { name: tpl.company_name, address: tpl.company_address, phone: tpl.company_phone, email: tpl.company_email, vat: tpl.company_vat },
-    client: quote.client ? {
-      contact_name: quote.client.contact_name, company_name: quote.client.company_name, email: quote.client.email,
-      phone: quote.client.phone, address: quote.client.address, city: quote.client.city,
-      postal_code: quote.client.postal_code, country: quote.client.country, vat_number: quote.client.vat_number,
-    } : null,
-    show_client_page: true,
-    notes: quote.notes ?? null,
-    sections: [{
-      title: null,
-      items: quote.items.map((it) => ({
-        image_key: it.id,
-        name: it.dimensions ? `${it.product_name}, ${it.dimensions}` : it.product_name,
-        description: it.description ?? null,
-        sku: it.sku ?? null,
-        room: it.room ?? null,
-        size_color: [it.selected_size, it.selected_color].filter(Boolean).join(' / ') || null,
-        quantity: it.quantity,
-        unit: it.unit ?? 'pcs',
-        unit_price: it.unit_price,
-        discounted_price: it.discounted_price ?? null,
-        line_total: it.line_total,
-        pricing_status: it.pricing_status,
-        installation_requirements: it.installation_requirements ?? null,
-        delivery_date: it.delivery_date ?? null,
-      })),
-    }],
-    totals: {
-      subtotal: quote.subtotal, vat_rate: quote.vat_rate, vat_amount: quote.vat_amount,
-      grand_total: quote.grand_total, cash_discount_pct: quote.cash_discount_pct, currency,
-    },
-    // Page size + orientation follow the workspace cover template image.
-    page_width: tpl.cover_width,
-    page_height: tpl.cover_height,
-  };
-}
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -94,7 +45,10 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
           .eq('workspace_id', workspaceId).eq('user_id', auth.userId ?? '').maybeSingle();
         if (!member) return jsonResponse({ success: false, error: 'Forbidden' }, 403);
       }
-      const templateConfig = await fetchBrandingConfig(supabase, workspaceId);
+      const baseTemplateConfig = await fetchTemplateConfig(supabase, workspaceId);
+      const templateConfig = workspaceId
+        ? await applyWorkspaceBranding(supabase, baseTemplateConfig, workspaceId)
+        : baseTemplateConfig;
 
       let logoPath: string | null = null;
       if (workspaceId) {
@@ -103,16 +57,14 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
         logoPath = fs?.business_logo_path ?? null;
       }
       const [coverBytes, bgBytes, backcoverBytes, logoBytes] = await Promise.all([
-        fetchTemplateImage(supabase, templateConfig.cover_image_path),
-        fetchTemplateImage(supabase, templateConfig.content_page_path),
-        fetchTemplateImage(supabase, templateConfig.backcover_image_path),
+        fetchStorageFile(supabase, 'quote-templates', templateConfig.cover_image_path),
+        fetchStorageFile(supabase, 'quote-templates', templateConfig.items_background_path),
+        fetchStorageFile(supabase, 'quote-templates', templateConfig.backcover_image_path),
         logoPath ? fetchStorageFile(supabase, 'generation-images', logoPath) : Promise.resolve(null),
       ]);
 
       const sample = buildSampleQuote(workspaceId, templateConfig);
-      const { pdfBytes } = await renderBrandedDocument(mapQuoteToBrandedDoc(sample, templateConfig), {
-        coverBytes, contentBgBytes: bgBytes, backCoverBytes: backcoverBytes, logoBytes, itemImages: {},
-      });
+      const pdfBytes = await buildQuotePDF(sample, templateConfig, coverBytes, bgBytes, backcoverBytes, logoBytes, {});
 
       const storagePath = `quote-output/_preview/${workspaceId ?? 'global'}.pdf`;
       const { error: upErr } = await supabase.storage.from('pdf-documents')
@@ -189,8 +141,14 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
 
     // Fetch the quote first so we can resolve THIS workspace's PDF Design Template.
     const quoteData = await fetchQuoteData(supabase, quoteId);
-    // Workspace-defined branding + template vault (the shared source used by all PDFs).
-    const templateConfig = await fetchBrandingConfig(supabase, (quoteData as any).workspace_id);
+    const baseTemplateConfig = await fetchTemplateConfig(supabase, (quoteData as any).workspace_id);
+
+    // White-label: render under the quote workspace's own business identity (#177).
+    const templateConfig = await applyWorkspaceBranding(
+      supabase,
+      baseTemplateConfig,
+      (quoteData as any).workspace_id,
+    );
 
     // Re-fetch quote_number (may have been generated by trigger)
     const { data: updatedQuote } = await supabase
@@ -214,9 +172,9 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
 
     // Fetch template images (+ optional workspace logo) in parallel
     const [coverBytes, bgBytes, backcoverBytes, logoBytes] = await Promise.all([
-      fetchTemplateImage(supabase, templateConfig.cover_image_path),
-      fetchTemplateImage(supabase, templateConfig.content_page_path),
-      fetchTemplateImage(supabase, templateConfig.backcover_image_path),
+      fetchStorageFile(supabase, 'quote-templates', templateConfig.cover_image_path),
+      fetchStorageFile(supabase, 'quote-templates', templateConfig.items_background_path),
+      fetchStorageFile(supabase, 'quote-templates', templateConfig.backcover_image_path),
       logoPath ? fetchStorageFile(supabase, 'generation-images', logoPath) : Promise.resolve(null),
     ]);
 
@@ -232,10 +190,16 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
         }),
     );
 
-    // Build the PDF via the shared branded-document renderer (same design as catalogs).
-    const { pdfBytes } = await renderBrandedDocument(mapQuoteToBrandedDoc(quoteData, templateConfig), {
-      coverBytes, contentBgBytes: bgBytes, backCoverBytes: backcoverBytes, logoBytes, itemImages: itemImageBytes,
-    });
+    // Build the PDF
+    const pdfBytes = await buildQuotePDF(
+      quoteData,
+      templateConfig,
+      coverBytes,
+      bgBytes,
+      backcoverBytes,
+      logoBytes,
+      itemImageBytes
+    );
 
     // Upload to storage
     const storagePath = `quote-output/${quoteId}/quote-${quoteData.quote_number || quoteId}.pdf`;
@@ -332,7 +296,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
 // A representative sample quote for the PDF Design Template preview. Covers the
 // visible surfaces (multiple line items, FF&E fields, discount, VAT, notes) so the
 // admin sees a faithful render of the template without a real quote.
-function buildSampleQuote(workspaceId: string | null, tpl: BrandingConfig): QuoteData {
+function buildSampleQuote(workspaceId: string | null, tpl: TemplateConfig): QuoteData {
   const vatRate = Number(tpl.vat_rate_default ?? 24);
   const items = [
     { name: 'Porcelain Tile — Carrara', sku: 'TIL-CAR-60', size: '60×60 cm', color: 'White', qty: 40, unit: 'm²', price: 28.5, room: 'Bathroom' },
