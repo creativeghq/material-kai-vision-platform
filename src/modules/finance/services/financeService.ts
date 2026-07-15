@@ -1655,6 +1655,8 @@ export interface FinanceSettings {
   /** Invoice design template selected for this workspace + per-role color overrides. */
   invoice_template_id: string;
   invoice_template_colors: Record<string, string>;
+  /** Default footer notes prefilled onto every new invoice (editable per-invoice). */
+  default_invoice_notes: string | null;
   /** How an approved trip card posts to the ledger: planned_payment (auto-reimburse) | none. */
   trip_expense_reimbursement_mode: 'planned_payment' | 'none';
   updated_at: string;
@@ -1900,7 +1902,7 @@ const _financeServiceV2 = {
       'risk_block_inactive_vat','risk_block_unvalidated_vat',
       'risk_warn_over_credit_limit','risk_block_over_credit_limit',
       'min_order_value','default_credit_limit','risk_block_min_order','risk_block_unpaid_invoice',
-      'invoice_template_id','invoice_template_colors',
+      'invoice_template_id','invoice_template_colors','default_invoice_notes',
       'trip_expense_reimbursement_mode',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];

@@ -4,6 +4,7 @@ import { Loader2, RotateCcw, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
+import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,6 +30,7 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
   const [saving, setSaving] = useState(false);
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [colors, setColors] = useState<InvoiceColors>(() => getTemplateSpec(DEFAULT_TEMPLATE_ID).defaultColors);
+  const [defaultNotes, setDefaultNotes] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +42,7 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
         const tid = s.invoice_template_id || DEFAULT_TEMPLATE_ID;
         setTemplateId(tid);
         setColors(resolveColors(tid, s.invoice_template_colors));
+        setDefaultNotes((s as any).default_invoice_notes ?? '');
       } catch (err: any) {
         if (!cancelled) toast({ title: 'Failed to load template settings', description: err?.message, variant: 'destructive' });
       } finally {
@@ -70,6 +73,7 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
       await financeService.updateSettings(workspaceId, {
         invoice_template_id: templateId,
         invoice_template_colors: colors,
+        default_invoice_notes: defaultNotes.trim() || null,
       });
       toast({ title: 'Invoice template saved' });
     } catch (err: any) {
@@ -132,6 +136,17 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Default invoice notes / footer</Label>
+          <Textarea
+            rows={3}
+            value={defaultNotes}
+            onChange={(e) => setDefaultNotes(e.target.value)}
+            placeholder="e.g. Payment due within 30 days. Goods remain our property until paid in full."
+          />
+          <p className="text-[11px] text-muted-foreground">Pre-fills the Notes field on every new invoice (you can still edit it per invoice). Printed at the bottom of the invoice.</p>
         </div>
 
         <div className="flex justify-end">

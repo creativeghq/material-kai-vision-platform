@@ -314,7 +314,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [allTypes, enabled, ic, cat, wh, mu, pm, feesR, stampR, otherR, fs] = await Promise.all([
+      const [allTypes, enabled, ic, cat, wh, mu, pm, feesR, stampR, otherR, fs, allSeries] = await Promise.all([
         invoicingSetupService.listReference('invoice_type'),
         invoicingSetupService.getDocTypeSettings(workspaceId),
         invoicingSetupService.listReference('income_classification_type'),
@@ -326,6 +326,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         invoicingSetupService.listReference('stamp_duty'),
         invoicingSetupService.listReference('other_taxes'),
         supabase.from('finance_settings').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+        invoicingSetupService.listSeries(workspaceId),
       ]);
       const toTaxRef = (r: { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' }): TaxRef => ({ code: r.code, description: r.description, rate: r.rate, rate_kind: r.rate_kind });
       // Only offer enabled categories — deprecated myDATA codes (e.g. other-taxes 1/2,
@@ -337,12 +338,18 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setUnits(mu.map((u) => ({ code: u.code, description: u.description })));
       setPaymentMethods(pm.map((p) => ({ code: p.code, description: p.description })));
       setIssuer(fs.data ?? null);
+      // Prefill the invoice Notes with the workspace default (editable per-invoice).
+      if ((fs.data as any)?.default_invoice_notes) setNotes(String((fs.data as any).default_invoice_notes));
       financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
       servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
       financeService.listInvoiceBankAccounts(workspaceId).then(setPreviewBanks).catch(() => setPreviewBanks([]));
       invoicingSetupService.listBranches(workspaceId).then((b) => { setBranches(b); setBranchCode(String(b.find((x) => x.branch_code === 0)?.branch_code ?? 0)); }).catch(() => setBranches([]));
-      const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
-      const visible = enabledCodes.length ? allTypes.filter((t) => enabledCodes.includes(t.code)) : allTypes;
+      // A document type is issuable ONLY when it's enabled AND has at least one active
+      // numbering series (both configured in Settings → Documents → Document Types & Series).
+      // No "show everything" fallback — you can't issue a type that isn't set up.
+      const enabledCodes = new Set(Object.values(enabled).filter((e) => e.enabled).map((e) => e.code));
+      const codesWithActiveSeries = new Set((allSeries ?? []).filter((s: any) => s.is_active).map((s: any) => s.doc_code));
+      const visible = allTypes.filter((t) => enabledCodes.has(t.code) && codesWithActiveSeries.has(t.code));
       setDocTypes(visible.map((t) => ({ code: t.code, description: t.description })));
       setIncTypes(ic.map((t) => ({ code: t.code, description: t.description })));
       setIncCats(cat.map((t) => ({ code: t.code, description: t.description })));
@@ -975,7 +982,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   {((buyerIsConsumer
                       ? [['11.1', 'Receipt'], ['9.3', 'Delivery note']]
                       : [['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']]) as ReadonlyArray<readonly [string, string]>)
-                    .filter(([code]) => !docTypes.length || docTypes.some((t) => t.code === code))
+                    .filter(([code]) => docTypes.some((t) => t.code === code))
                     .map(([code, label]) => (
                       <button
                         key={code}
@@ -988,7 +995,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     ))}
                   {(() => {
                     // Restrict the long tail to receipts + movement docs for consumers.
-                    const tail = (docTypes.length ? docTypes : [{ code: '1.1', description: 'Sales Invoice' }])
+                    const tail = docTypes
                       .filter((t) => !buyerIsConsumer || t.code.startsWith('11') || t.code.startsWith('9'));
                     return (
                       <Select value={COMMON_DOC_CODES.includes(documentType) ? '' : documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
@@ -1005,6 +1012,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     );
                   })()}
                 </div>
+                {docTypes.length === 0 && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    No document types are active. Enable a type <strong>and</strong> add an active numbering series in Settings → Documents → Document Types &amp; Series before issuing.
+                  </p>
+                )}
                 {buyerIsConsumer && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400">
                     Private individual (no VAT) — issued as a retail receipt. Invoices require a business VAT number.
@@ -1423,7 +1435,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </label>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant="outline" onClick={() => setShowPreview(true)} disabled={busy}><Eye className="h-4 w-4 mr-1.5" /> Preview</Button>
-          <Button onClick={handleSave} disabled={busy || buyerRisk.hardBlocked} title={buyerRisk.hardBlocked ? buyerRisk.blocks.join('; ') : undefined}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
+          <Button onClick={handleSave} disabled={busy || buyerRisk.hardBlocked || docTypes.length === 0} title={docTypes.length === 0 ? 'No active document type — configure one in Settings → Documents' : (buyerRisk.hardBlocked ? buyerRisk.blocks.join('; ') : undefined)}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
         </DialogFooter>
 
         {/* Full styled-template preview overlay (Oxygen-style "Προεπισκόπηση") */}

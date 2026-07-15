@@ -65,6 +65,7 @@ const ProviderKeysNote: React.FC = () => (
 
 export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged }) => {
   const { toast } = useToast();
+  const { isOperator } = usePermissions();
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(true);
@@ -247,7 +248,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="team" className="mt-0 space-y-4">
           <MembersCard workspaceId={workspaceId} />
-          <WorkspaceCreditsCard workspaceId={workspaceId} />
+          {/* The operator/root workspace mints & sells credits — it doesn't buy into a pool. */}
+          {!isOperator && <WorkspaceCreditsCard workspaceId={workspaceId} />}
           <TeamInviteCard workspaceId={workspaceId} />
         </TabsContent>
 

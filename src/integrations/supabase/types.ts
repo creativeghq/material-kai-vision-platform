@@ -7321,6 +7321,7 @@ export type Database = {
           default_credit_limit: number | null
           default_income_classification_category: string | null
           default_income_classification_type: string | null
+          default_invoice_notes: string | null
           default_markup_pct: number
           default_payment_terms_days: number
           default_vat_rate: number
@@ -7428,6 +7429,7 @@ export type Database = {
           default_credit_limit?: number | null
           default_income_classification_category?: string | null
           default_income_classification_type?: string | null
+          default_invoice_notes?: string | null
           default_markup_pct?: number
           default_payment_terms_days?: number
           default_vat_rate?: number
@@ -7535,6 +7537,7 @@ export type Database = {
           default_credit_limit?: number | null
           default_income_classification_category?: string | null
           default_income_classification_type?: string | null
+          default_invoice_notes?: string | null
           default_markup_pct?: number
           default_payment_terms_days?: number
           default_vat_rate?: number
