@@ -25,33 +25,43 @@ import { BatchCategorizationPage } from './BatchCategorizationPage';
 const TAB_VALUES = ['metadata', 'relevancy', 'duplicates', 'categorization'] as const;
 type TabValue = typeof TAB_VALUES[number];
 
-const AIDataPage: React.FC = () => {
+interface AIDataPageProps {
+  /** When embedded (e.g. as a tab inside AI Configurations), hide the page
+   *  header and use local tab state so the ?tab query param doesn't collide
+   *  with the parent page's tab routing. */
+  embedded?: boolean;
+}
+
+const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialTab: TabValue = (() => {
     const t = searchParams.get('tab');
     return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : 'metadata';
   })();
-  const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
+  const [activeTab, setActiveTab] = useState<TabValue>(embedded ? 'metadata' : initialTab);
 
   const handleTabChange = useCallback((val: string) => {
     const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'metadata';
     setActiveTab(next);
+    if (embedded) return; // don't touch the URL when embedded
     const params = new URLSearchParams(searchParams);
     if (next === 'metadata') params.delete('tab');
     else params.set('tab', next);
     setSearchParams(params, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [embedded, searchParams, setSearchParams]);
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="AI Data"
-        description="Pipeline output review — metadata, entity relationships, and duplicates"
-        badge="Admin"
-      />
+    <div className={embedded ? '' : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="AI Data"
+          description="Pipeline output review — metadata, entity relationships, and duplicates"
+          badge="Admin"
+        />
+      )}
 
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="metadata" className="flex items-center gap-2">

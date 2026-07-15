@@ -21,13 +21,11 @@ import {
   CreditCard,
   DollarSign,
   Crown,
-  Image,
   Globe,
   Mail,
   Send,
   BookOpen,
   KeyRound,
-  Store,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MIVAA_API_URL } from '@/config/mivaa';
@@ -60,7 +58,6 @@ import { Progress } from '@/components/core/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
-import { ChunkQualityDashboard } from '../ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from '../UnifiedProcessingMonitor';
 import { PriceLookupsCard } from './PriceLookupsCard';
 import { PipelineStrategyMetricsPanel } from './PipelineStrategyMetricsPanel';
@@ -88,8 +85,6 @@ import type {
   UserProfile,
   DataProcessingStats,
   AIUsageLog,
-  InteriorDesignStats,
-  ModelUsage,
   ExternalServiceUsageData,
   ResendEmailStats,
   NotificationChannelStats,
@@ -99,7 +94,7 @@ import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
 
 const VALID_OPERATIONS_TABS = new Set([
-  'system-health', 'data-processing', 'ai-performance', 'performance', 'agent-chat',
+  'system-health', 'data-processing', 'performance', 'agent-chat',
   'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
   'seo-toolkit', 'factory-onboarding', 'keys', 'modules',
 ]);
@@ -140,15 +135,8 @@ const OperationsDashboardInner: React.FC = () => {
     totalCreditsUsed: 0,
   });
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
-  const [aiUsageLogs, setAIUsageLogs] = useState<AIUsageLog[]>([]);
-  const [interiorDesignStats, setInteriorDesignStats] = useState<InteriorDesignStats>({
-    total_generations: 0,
-    total_cost: 0,
-    total_images: 0,
-    unique_users: 0,
-  });
-  const [modelUsage, setModelUsage] = useState<ModelUsage[]>([]); // AI models (Claude, GPT, SigLIP)
-  const [interiorDesignModels, setInteriorDesignModels] = useState<ModelUsage[]>([]); // Interior Design specific models
+  // AI model usage + Interior Design stats relocated to AI Configurations → Performance
+  // (2026-07-15). Only the credits total derived from ai_usage_logs is still used here.
   const [dataProcessingStats, setDataProcessingStats] = useState<DataProcessingStats>({
     pdf: { total: 0, completed: 0, failed: 0, processing: 0, avgProcessingTime: 0 },
     xml: { total: 0, completed: 0, failed: 0, processing: 0, totalProducts: 0 },
@@ -446,132 +434,15 @@ const OperationsDashboardInner: React.FC = () => {
 
         const combinedLogs: AIUsageLog[] = [...aiLogs, ...normalizedAgentLogs];
         console.log(`✅ AI Usage Logs: ${aiLogs.length} from ai_usage_logs + ${normalizedAgentLogs.length} from agent_usage_logs`);
-        setAIUsageLogs(combinedLogs);
 
-        // Calculate total credits used
+        // Total credits used — the only AI-usage figure still surfaced on this
+        // dashboard (per-model breakdown moved to AI Configurations → Performance).
         const totalCreditsUsed = combinedLogs.reduce((sum: number, log: AIUsageLog) => sum + (log.credits_debited || 0), 0);
 
         setSubscriptionStats(prev => ({
           ...prev,
           totalCreditsUsed,
         }));
-
-        // Calculate AI Model Usage Stats (Claude, GPT, SigLIP, etc.)
-        const modelStats: Record<string, {
-          call_count: number;
-          total_cost: number;
-          total_tokens: number;
-          total_input_tokens: number;
-          total_output_tokens: number;
-          avg_latency: number;
-          success_count: number;
-        }> = {};
-
-        combinedLogs.forEach((log: AIUsageLog) => {
-          const model = log.model_name || 'unknown';
-          if (!modelStats[model]) {
-            modelStats[model] = {
-              call_count: 0,
-              total_cost: 0,
-              total_tokens: 0,
-              total_input_tokens: 0,
-              total_output_tokens: 0,
-              avg_latency: 0,
-              success_count: 0,
-            };
-          }
-
-          modelStats[model].call_count++;
-          modelStats[model].total_cost += Number(log.billed_cost_usd || 0);
-          modelStats[model].total_input_tokens += Number(log.input_tokens || 0);
-          modelStats[model].total_output_tokens += Number(log.output_tokens || 0);
-          modelStats[model].total_tokens += Number(log.input_tokens || 0) + Number(log.output_tokens || 0);
-          // Assuming success - track all calls as successful for now
-          modelStats[model].success_count++;
-        });
-
-        // Convert to array and calculate averages
-        const aiModelUsageArray = Object.entries(modelStats).map(([model, stats]) => ({
-          model_name: model,
-          call_count: stats.call_count,
-          total_cost: stats.total_cost,
-          total_tokens: stats.total_tokens,
-          input_tokens: stats.total_input_tokens,
-          output_tokens: stats.total_output_tokens,
-          success_rate: stats.call_count > 0 ? (stats.success_count / stats.call_count) * 100 : 0,
-          avg_cost: stats.call_count > 0 ? stats.total_cost / stats.call_count : 0,
-        }));
-
-        // Sort by total cost descending
-        aiModelUsageArray.sort((a, b) => b.total_cost - a.total_cost);
-
-        console.log('📊 AI Model Usage Stats:', aiModelUsageArray);
-        setModelUsage(aiModelUsageArray as any);
-      }
-
-      // Fetch Interior Design Analytics
-      console.log('🔄 Fetching interior design analytics...');
-      const { data: generations, error: genError } = await supabase
-        .from('generation_3d')
-        .select('id, user_id, total_cost, models_results')
-        .eq('generation_status', 'completed')
-        .not('total_cost', 'is', null);
-
-      if (genError) {
-        console.error('❌ Error fetching interior design analytics:', genError);
-      } else if (generations) {
-        console.log('✅ Interior Design Generations:', generations.length);
-        const totalCost = generations.reduce((sum, g) => sum + (Number(g.total_cost) || 0), 0);
-        const uniqueUsers = new Set(generations.map(g => g.user_id)).size;
-
-        let totalImages = 0;
-        generations.forEach(g => {
-          if (g.models_results) {
-            Object.values(g.models_results as Record<string, any>).forEach((model: any) => {
-              if (model.status === 'completed' && model.image_urls) {
-                totalImages += model.image_urls.length;
-              }
-            });
-          }
-        });
-
-        setInteriorDesignStats({
-          total_generations: generations.length,
-          total_cost: totalCost,
-          total_images: totalImages,
-          unique_users: uniqueUsers,
-        });
-
-        // Calculate model usage
-        const modelStats: Record<string, { count: number; cost: number; successes: number; total: number }> = {};
-
-        generations.forEach(g => {
-          if (g.models_results) {
-            Object.entries(g.models_results as Record<string, any>).forEach(([modelId, modelData]: [string, any]) => {
-              if (!modelStats[modelId]) {
-                modelStats[modelId] = { count: 0, cost: 0, successes: 0, total: 0 };
-              }
-              modelStats[modelId].total++;
-              if (modelData.status === 'completed') {
-                modelStats[modelId].count++;
-                modelStats[modelId].cost += Number(modelData.cost) || 0;
-                modelStats[modelId].successes++;
-              }
-            });
-          }
-        });
-
-        const interiorDesignModelsArray: ModelUsage[] = Object.entries(modelStats).map(([modelId, data]) => ({
-          model_id: modelId,
-          model_name: modelId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-          usage_count: data.count,
-          total_cost: data.cost,
-          success_rate: data.total > 0 ? (data.successes / data.total) * 100 : 0,
-        }));
-
-        interiorDesignModelsArray.sort((a, b) => b.total_cost - a.total_cost);
-        console.log('🎨 Interior Design Models:', interiorDesignModelsArray);
-        setInteriorDesignModels(interiorDesignModelsArray);
       }
 
       // Fetch Data Processing Stats (PDF, XML, Scraping)
@@ -852,10 +723,6 @@ const OperationsDashboardInner: React.FC = () => {
               <Database className="h-4 w-4 mr-2" />
               Data Processing
             </TabsTrigger>
-            <TabsTrigger value="ai-performance">
-              <Bot className="h-4 w-4 mr-2" />
-              AI Performance
-            </TabsTrigger>
             <TabsTrigger value="performance">
               <Gauge className="h-4 w-4 mr-2" />
               Performance
@@ -878,11 +745,7 @@ const OperationsDashboardInner: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="factory-onboarding">
               <Users className="h-4 w-4 mr-2" />
-              Brand Onboarding
-            </TabsTrigger>
-            <TabsTrigger value="resellers">
-              <Store className="h-4 w-4 mr-2" />
-              Resellers
+              Onboarding
             </TabsTrigger>
             <TabsTrigger value="catalogs">
               <BookOpen className="h-4 w-4 mr-2" />
@@ -919,22 +782,20 @@ const OperationsDashboardInner: React.FC = () => {
             <SystemPerformance embedded />
           </TabsContent>
 
-          {/* Factory Onboarding — manufacturer registration approvals + access requests.
-              Salvaged from the retired /admin/training-models panel (2026-06-09). */}
+          {/* Onboarding — brand/manufacturer registration approvals + access requests
+              (salvaged from the retired /admin/training-models panel, 2026-06-09) merged with
+              VAT + ΑΑΔΕ-verified self-serve reseller applications (2026-07-15). */}
           <TabsContent value="factory-onboarding" className="space-y-4">
             <Tabs defaultValue="registrations" className="space-y-4">
               <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                <TabsTrigger value="registrations">Registrations</TabsTrigger>
+                <TabsTrigger value="registrations">Brand Registrations</TabsTrigger>
                 <TabsTrigger value="access">Access Requests</TabsTrigger>
+                <TabsTrigger value="resellers">Resellers</TabsTrigger>
               </TabsList>
               <TabsContent value="registrations"><FactoryRegistrationsTab /></TabsContent>
               <TabsContent value="access"><FactoryAccessRequestsTab /></TabsContent>
+              <TabsContent value="resellers"><ResellerApplicationsTab /></TabsContent>
             </Tabs>
-          </TabsContent>
-
-          {/* Reseller onboarding — VAT + ΑΑΔΕ-verified self-serve reseller applications. */}
-          <TabsContent value="resellers" className="space-y-4">
-            <ResellerApplicationsTab />
           </TabsContent>
 
           {/* Agent Chat Analytics Tab */}
@@ -1349,7 +1210,7 @@ const OperationsDashboardInner: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">3rd Party Services</h2>
               <p className="text-muted-foreground text-sm">
-                Live usage and cost tracking for all external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (WhatsApp + social media). For AI model costs (Anthropic, Google, OpenAI) see the AI Performance tab.
+                Live usage and cost tracking for all external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (WhatsApp + social media). For AI model costs (Anthropic, Google, OpenAI) see AI Configurations → Performance.
               </p>
             </div>
 
@@ -1782,247 +1643,6 @@ const OperationsDashboardInner: React.FC = () => {
           </TabsContent>
 
 
-          {/* AI Performance Tab - Consolidated AI Models, Interior Design, Quality Metrics */}
-          <TabsContent value="ai-performance" className="space-y-4">
-            {/* Page Header */}
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
-              <p className="text-muted-foreground text-sm">
-                Monitoring all AI models — Claude Opus 4.8 (vision + classification), Claude Sonnet 4.6 (chunking), Claude Haiku 4.5, and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
-              </p>
-            </div>
-
-            {/* AI Models Summary Cards - GPT, Claude, Interior Design, etc. */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <DollarSign className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Total AI Cost</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      ${(
-                        aiUsageLogs.reduce((sum, log) => sum + (Number(log.billed_cost_usd) || 0), 0) +
-                        interiorDesignStats.total_cost
-                      ).toFixed(2)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {aiUsageLogs.length + interiorDesignStats.total_generations} total operations
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <Zap className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Total Tokens</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {aiUsageLogs.reduce((sum, log) => sum + (Number(log.input_tokens) || 0) + (Number(log.output_tokens) || 0), 0).toLocaleString()}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Input + Output tokens
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <CreditCard className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Credits Used</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {aiUsageLogs.reduce((sum, log) => sum + (Number(log.credits_debited) || 0), 0).toFixed(0)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">Platform credits</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <Bot className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Active Models</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {new Set(aiUsageLogs.map(log => log.model_name)).size}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">Unique AI models</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Interior Design Stats - Merged into main cards */}
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <Image className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Images Generated</div>
-                    <div className="text-2xl font-bold text-foreground">{interiorDesignStats.total_images}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Avg {(interiorDesignStats.total_images / Math.max(interiorDesignStats.total_generations, 1)).toFixed(1)} per job
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <DollarSign className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Avg Cost/Generation</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      ${(interiorDesignStats.total_cost / Math.max(interiorDesignStats.total_generations, 1)).toFixed(3)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">Per generation</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <Users className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Unique Users</div>
-                    <div className="text-2xl font-bold text-foreground">{interiorDesignStats.unique_users}</div>
-                    <div className="text-xs text-muted-foreground mt-1">Active users</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <Image className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Total Generations</div>
-                    <div className="text-2xl font-bold text-foreground">{interiorDesignStats.total_generations}</div>
-                    <div className="text-xs text-muted-foreground mt-1">3D designs created</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-
-
-            {/* AI Models Usage Table - GPT, Claude, etc. */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5" />
-                  AI Model Usage & Costs
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  All AI models (GPT, Claude, etc.) - Performance and cost breakdown
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="font-semibold">Model</TableHead>
-                        <TableHead className="text-right font-semibold">API Calls</TableHead>
-                        <TableHead className="text-right font-semibold">Input Tokens</TableHead>
-                        <TableHead className="text-right font-semibold">Output Tokens</TableHead>
-                        <TableHead className="text-right font-semibold">Total Cost</TableHead>
-                        <TableHead className="text-right font-semibold">Avg Cost/Call</TableHead>
-                        <TableHead className="text-right font-semibold">Success Rate</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {modelUsage.map((model: any) => (
-                        <TableRow key={model.model_name}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <Bot className="h-4 w-4 text-blue-600" />
-                              <span className="text-gray-900">{model.model_name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {(model.call_count || model.usage_count).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm text-blue-600">
-                            {model.input_tokens ? model.input_tokens.toLocaleString() : '0'}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm text-green-600">
-                            {model.output_tokens ? model.output_tokens.toLocaleString() : '0'}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm font-semibold">
-                            ${model.total_cost.toFixed(4)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm text-gray-600">
-                            ${model.avg_cost ? model.avg_cost.toFixed(4) : (model.total_cost / Math.max(model.call_count || model.usage_count, 1)).toFixed(4)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge
-                              variant={model.success_rate >= 90 ? 'default' : model.success_rate >= 70 ? 'secondary' : 'destructive'}
-                              className="font-semibold"
-                            >
-                              {model.success_rate.toFixed(1)}%
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {modelUsage.length === 0 && (
-                        <>
-                          {/* Placeholder rows — canonical Claude models + vision/embedding */}
-                          {[
-                            { name: 'Claude Opus 4.8' },
-                            { name: 'Claude Sonnet 4.6' },
-                            { name: 'Claude Haiku 4.5' },
-                            { name: 'voyage-4' },
-                            { name: 'SLIG 768D' },
-                          ].map((m) => (
-                            <TableRow key={m.name}>
-                              <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  <Bot className="h-4 w-4 text-muted-foreground" />
-                                  <span className="text-muted-foreground">{m.name}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
-                              <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
-                              <TableCell className="text-right font-mono text-sm text-muted-foreground">0</TableCell>
-                              <TableCell className="text-right font-mono text-sm text-muted-foreground">$0.0000</TableCell>
-                              <TableCell className="text-right font-mono text-sm text-muted-foreground">$0.0000</TableCell>
-                              <TableCell className="text-right">
-                                <Badge variant="secondary">0.0%</Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
-                              No AI usage data yet. Models will show actual data once API calls are made.
-                            </TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Chunk Quality Dashboard - Consolidated from /admin/chunk-quality */}
-            <ChunkQualityDashboard />
-          </TabsContent>
 
           {/* Data Processing Tab - PDF, XML, Scraping */}
           <TabsContent value="data-processing" className="space-y-4">

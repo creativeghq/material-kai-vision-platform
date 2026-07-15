@@ -14,7 +14,7 @@ const definition: ModuleDefinition = {
   navItems: [
     {
       label: 'Job Research',
-      path: '/admin/background-agents',
+      path: '/admin/ai-configs?tab=background-agents',
       icon: Briefcase,
       location: 'admin-dashboard',
       adminCategory: 'Data Management',

@@ -62,11 +62,25 @@ interface ModelStatus {
   description: string;
 }
 
-const ModelDebuggingPanel: React.FC = () => {
+interface ModelDebuggingPanelProps {
+  /** When embedded as a tab (e.g. in AI Configurations), hide the page header
+   *  and keep tab state local so the ?tab query param doesn't collide with the
+   *  parent page's tab routing. */
+  embedded?: boolean;
+}
+
+const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = false }) => {
   // URL-synced tab so the legacy /admin/3d-suggestions route deep-links via ?tab=suggestions.
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') === 'suggestions' ? 'suggestions' : 'debug';
+  const [localTab, setLocalTab] = useState<'debug' | 'suggestions'>('debug');
+  const activeTab = embedded
+    ? localTab
+    : (searchParams.get('tab') === 'suggestions' ? 'suggestions' : 'debug');
   const handleTabChange = (val: string) => {
+    if (embedded) {
+      setLocalTab(val === 'suggestions' ? 'suggestions' : 'debug');
+      return;
+    }
     const params = new URLSearchParams(searchParams);
     if (val === 'debug') params.delete('tab');
     else params.set('tab', val);
@@ -364,16 +378,18 @@ const ModelDebuggingPanel: React.FC = () => {
   const untestedModels = models.filter((m) => m.status === 'untested').length;
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="3D Model Debugging"
-        description="Monitor and debug AI model performance for 3D generation"
-        breadcrumbs={[
-          { label: 'Admin', path: '/admin' },
-          { label: '3D Model Debugging' },
-        ]}
-      />
-      <div className="p-3 sm:p-6 space-y-6">
+    <div className={embedded ? '' : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="3D Model Debugging"
+          description="Monitor and debug AI model performance for 3D generation"
+          breadcrumbs={[
+            { label: 'Admin', path: '/admin' },
+            { label: '3D Model Debugging' },
+          ]}
+        />
+      )}
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="debug" className="flex items-center gap-2">

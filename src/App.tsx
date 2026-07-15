@@ -77,9 +77,9 @@ const MaterialsDataPage = lazy(() => import('./components/Admin/MaterialsData').
 const LogViewer = lazy(() => import('./components/Admin/LogViewer').then(m => ({ default: m.LogViewer })));
 const DataHealthPage = lazy(() => import('./components/Admin/DataHealthPage'));
 const AgentConfigsPage = lazy(() => import('./components/Admin/AgentConfigs').then(m => ({ default: m.AgentConfigsPage })));
-const ApiGatewayAdmin = lazy(() => import('./components/Admin/ApiGatewayAdmin').then(m => ({ default: m.ApiGatewayAdmin })));
+// ApiGatewayAdmin, ModelDebuggingPanel, AIDataPage, BackgroundAgentsPage moved into
+// AI Configurations tabs (2026-07-15); their old routes now redirect there.
 const OperationsDashboard = lazy(() => import('./components/Admin/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
-const ModelDebuggingPanel = lazy(() => import('./components/Admin/ModelDebuggingPanel'));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
@@ -92,7 +92,6 @@ const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
 // Email pages live in `src/modules/email/` — registered through buildModuleRoutes().
 // Messaging pages live in `src/modules/messaging/` — registered through buildModuleRoutes().
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
-const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
 const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
 const SupplierClaimsPage = lazy(() => import('./pages/Admin/SupplierClaimsPage'));
 const FreightQuoteRequestsPage = lazy(() => import('./pages/Admin/FreightQuoteRequestsPage'));
@@ -100,7 +99,6 @@ const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
-const AIDataPage = lazy(() => import('./pages/Admin/AIDataPage'));
 const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
@@ -542,18 +540,8 @@ const App = () => (
                   }
                 />
 
-                <Route
-                  path="/admin/api-gateway"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <ApiGatewayAdmin />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Relocated into AI Configurations → API Gateway tab (2026-07-15). */}
+                <Route path="/admin/api-gateway" element={<Navigate to="/admin/ai-configs?tab=api-gateway" replace />} />
 
                 {/* Redirect /search-hub to /agent-hub */}
                 <Route
@@ -602,33 +590,11 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Relocated into AI Data / 3D Model Debugging tabs (2026-06-09). */}
-                <Route path="/admin/batch-categorization" element={<Navigate to="/admin/ai-data?tab=categorization" replace />} />
-                <Route path="/admin/3d-suggestions" element={<Navigate to="/admin/3d-model-debugging?tab=suggestions" replace />} />
-                <Route
-                  path="/admin/3d-model-debugging"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <ModelDebuggingPanel />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/ai-data"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <AIDataPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Relocated into AI Configurations → AI Data / 3D Debugging tabs (2026-07-15). */}
+                <Route path="/admin/batch-categorization" element={<Navigate to="/admin/ai-configs?tab=ai-data" replace />} />
+                <Route path="/admin/3d-suggestions" element={<Navigate to="/admin/ai-configs?tab=3d-debug" replace />} />
+                <Route path="/admin/3d-model-debugging" element={<Navigate to="/admin/ai-configs?tab=3d-debug" replace />} />
+                <Route path="/admin/ai-data" element={<Navigate to="/admin/ai-configs?tab=ai-data" replace />} />
                 <Route
                   path="/admin/metadata"
                   element={
@@ -744,18 +710,8 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route
-                  path="/admin/background-agents"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <BackgroundAgentsPage />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
+                {/* Relocated into AI Configurations → Background Agents tab (2026-07-15). */}
+                <Route path="/admin/background-agents" element={<Navigate to="/admin/ai-configs?tab=background-agents" replace />} />
                 {/* #244 B — unified monitoring (Price / Mention / Job) */}
                 <Route
                   path="/admin/monitoring"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign, ListChecks } from 'lucide-react';
+import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign, ListChecks, Activity, Database, Boxes, Network, Box } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -20,8 +20,19 @@ import { ChatStartersTab } from './ChatStartersTab';
 import { ExtractionPromptsPage } from '@/components/Admin/ExtractionPrompts/ExtractionPromptsPage';
 import { PromptTemplatesPage } from '@/components/Admin/PromptTemplates/PromptTemplatesPage';
 import { AITestingPanel } from '@/components/Admin/AITestingPanel';
+// Relocated here (2026-07-15) so every AI ops/monitoring surface lives under one page.
+// Old standalone routes (/admin/api-gateway, /admin/ai-data, /admin/background-agents,
+// /admin/3d-model-debugging) + the Operations "AI Performance" tab redirect into these.
+import { AIPerformanceTab } from '@/components/Admin/AIPerformanceTab';
+import AIDataPage from '@/pages/Admin/AIDataPage';
+import { ApiGatewayAdmin } from '@/components/Admin/ApiGatewayAdmin';
+import { BackgroundAgentsPage } from '@/components/Admin/BackgroundAgents/BackgroundAgentsPage';
+import ModelDebuggingPanel from '@/components/Admin/ModelDebuggingPanel';
 
-const TAB_VALUES = ['prompts', 'extraction', 'templates', 'sandbox', 'starters', 'pricing'] as const;
+const TAB_VALUES = [
+  'prompts', 'extraction', 'templates', 'sandbox', 'starters', 'pricing',
+  'performance', 'ai-data', 'background-agents', 'api-gateway', '3d-debug',
+] as const;
 
 interface Prompt {
   id: string;
@@ -336,6 +347,26 @@ export const AgentConfigsPage: React.FC = () => {
             <TabsTrigger value="pricing" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Model Pricing
+            </TabsTrigger>
+            <TabsTrigger value="performance" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Performance
+            </TabsTrigger>
+            <TabsTrigger value="ai-data" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              AI Data
+            </TabsTrigger>
+            <TabsTrigger value="background-agents" className="flex items-center gap-2">
+              <Boxes className="h-4 w-4" />
+              Background Agents
+            </TabsTrigger>
+            <TabsTrigger value="api-gateway" className="flex items-center gap-2">
+              <Network className="h-4 w-4" />
+              API Gateway
+            </TabsTrigger>
+            <TabsTrigger value="3d-debug" className="flex items-center gap-2">
+              <Box className="h-4 w-4" />
+              3D Debugging
             </TabsTrigger>
           </TabsList>
 
@@ -752,6 +783,31 @@ export const AgentConfigsPage: React.FC = () => {
           {/* Model Pricing Tab Content */}
           <TabsContent value="pricing">
             <AIModelPricingTab />
+          </TabsContent>
+
+          {/* AI Performance — relocated from the Operations "AI Performance" tab (2026-07-15) */}
+          <TabsContent value="performance">
+            <AIPerformanceTab />
+          </TabsContent>
+
+          {/* AI Data — relocated from /admin/ai-data (metadata / relevancy / duplicates / categorization) */}
+          <TabsContent value="ai-data">
+            <AIDataPage embedded />
+          </TabsContent>
+
+          {/* Background Agents — relocated from /admin/background-agents */}
+          <TabsContent value="background-agents">
+            <BackgroundAgentsPage />
+          </TabsContent>
+
+          {/* API Gateway — relocated from /admin/api-gateway */}
+          <TabsContent value="api-gateway">
+            <ApiGatewayAdmin embedded />
+          </TabsContent>
+
+          {/* 3D Model Debugging — relocated from /admin/3d-model-debugging */}
+          <TabsContent value="3d-debug">
+            <ModelDebuggingPanel embedded />
           </TabsContent>
         </Tabs>
       </div>

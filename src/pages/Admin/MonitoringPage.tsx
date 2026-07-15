@@ -53,7 +53,7 @@ export default function MonitoringPage() {
           {enabled['job-research'] === false ? <ModuleDisabled name="Job Research" /> : (
             <div className="dashboard-card p-8 text-center space-y-3">
               <p className="text-sm text-muted-foreground">Job-research searches run as background agents.</p>
-              <Button onClick={() => navigate('/admin/background-agents')} className="rounded-full">Open Background Agents →</Button>
+              <Button onClick={() => navigate('/admin/ai-configs?tab=background-agents')} className="rounded-full">Open Background Agents →</Button>
             </div>
           )}
         </TabsContent>

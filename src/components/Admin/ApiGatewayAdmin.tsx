@@ -57,7 +57,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
-export const ApiGatewayAdmin: React.FC = () => {
+interface ApiGatewayAdminProps {
+  /** When embedded as a tab (e.g. in AI Configurations), hide the page header. */
+  embedded?: boolean;
+}
+
+export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = false }) => {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [, setSelectedApiKey] = useState<ApiKey | null>(null);
@@ -203,17 +208,19 @@ export const ApiGatewayAdmin: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="API Gateway Management"
-        description="Manage API keys and monitor API usage"
-        breadcrumbs={[
-          { label: 'Admin', path: '/admin' },
-          { label: 'API Gateway' },
-        ]}
-      />
+    <div className={embedded ? '' : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="API Gateway Management"
+          description="Manage API keys and monitor API usage"
+          breadcrumbs={[
+            { label: 'Admin', path: '/admin' },
+            { label: 'API Gateway' },
+          ]}
+        />
+      )}
 
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         <Tabs defaultValue="api-keys" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="api-keys" className="flex items-center gap-2">

@@ -71,7 +71,7 @@ export const EmbeddingBackfillCard: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => navigate('/admin/background-agents')}>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => navigate('/admin/ai-configs?tab=background-agents')}>
             View agent
           </Button>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => void load()} disabled={loading}>
