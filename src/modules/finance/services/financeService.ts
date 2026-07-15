@@ -145,6 +145,7 @@ export interface Payment {
   paid_at: string;
   counterparty_contact_id: string | null;
   counterparty_company_id: string | null;
+  bank_account_id: string | null;
   reference: string | null;
   notes: string | null;
   created_at: string;
@@ -1019,6 +1020,45 @@ const _financeServiceCore = {
     // Allocations cascade automatically; status-keeper trigger fires on each delete.
     const { error } = await supabase.from('payments').delete().eq('id', paymentId);
     if (error) throw error;
+  },
+
+  /** Correct a payment's METADATA only — bank account, method, date, reference, notes.
+   *  Amount / direction / allocations are immutable here: they drive invoice settlement
+   *  and treasury balances, so a value change goes through delete/return + re-record. */
+  async updatePayment(paymentId: string, patch: {
+    bankAccountId?: string | null; method?: PaymentMethod | null;
+    paidAt?: string; reference?: string | null; notes?: string | null;
+  }): Promise<void> {
+    const upd: Record<string, any> = {};
+    if (patch.bankAccountId !== undefined) upd.bank_account_id = patch.bankAccountId;
+    if (patch.method !== undefined) upd.method = patch.method;
+    if (patch.paidAt !== undefined) upd.paid_at = patch.paidAt;
+    if (patch.reference !== undefined) upd.reference = patch.reference;
+    if (patch.notes !== undefined) upd.notes = patch.notes;
+    if (Object.keys(upd).length === 0) return;
+    const { error } = await supabase.from('payments').update(upd).eq('id', paymentId);
+    if (error) throw error;
+  },
+
+  /** The invoices a payment is allocated to, with their myDATA transmission state.
+   *  A non-null `fiscal_mark` means the invoice is transmitted → it can't be deleted,
+   *  only reversed with a credit note (return). Drives the delete-vs-return branch. */
+  async getPaymentInvoiceAllocations(paymentId: string): Promise<Array<{
+    amount: number; invoice_id: string; internal_number: string | null;
+    currency: string | null; total: number | null; fiscal_mark: string | null; status: string | null;
+  }>> {
+    const { data, error } = await supabase
+      .from('payment_allocations')
+      .select('amount, target_type, invoice:invoices(id, internal_number, currency, total, fiscal_mark, status)')
+      .eq('payment_id', paymentId)
+      .eq('target_type', 'invoice');
+    if (error) throw error;
+    return (data ?? [])
+      .filter((r: any) => r.invoice)
+      .map((r: any) => ({
+        amount: Number(r.amount), invoice_id: r.invoice.id, internal_number: r.invoice.internal_number,
+        currency: r.invoice.currency, total: r.invoice.total, fiscal_mark: r.invoice.fiscal_mark, status: r.invoice.status,
+      }));
   },
 
   // -------- Bank / cash accounts (where money sits) --------

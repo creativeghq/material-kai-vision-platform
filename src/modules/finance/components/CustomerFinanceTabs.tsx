@@ -19,6 +19,7 @@ import { ordersService } from '@/modules/finance/services/ordersService';
 import { humanizeLabel } from '@/utils/humanize';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -305,6 +306,7 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
                 <th className="px-4 py-2 text-left">Method</th>
                 <th className="px-4 py-2 text-left">Reference</th>
                 <th className="px-4 py-2 text-right">Amount</th>
+                <th className="px-4 py-2 text-right w-16"></th>
               </tr>
             </thead>
             <tbody>
@@ -322,6 +324,9 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
                     <td className="px-4 py-2 text-muted-foreground">{p.reference || '—'}</td>
                     <td className={`px-4 py-2 text-right tabular-nums font-medium ${isIn ? 'text-emerald-500' : ''}`}>
                       {isIn ? '+' : '−'}{formatMoney(Number(p.amount), p.currency)}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {activeWorkspaceId && <PaymentRowActions payment={p} workspaceId={activeWorkspaceId} onChanged={reload} />}
                     </td>
                   </tr>
                 );
