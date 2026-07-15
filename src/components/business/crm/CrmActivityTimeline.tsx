@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Plus,
+  Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Plus, Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -29,6 +29,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   email_sent: Mail,
   company_attached: Building2,
   company_detached: Unlink,
+  company_deleted: Trash2,
   lead_status_changed: Tag,
   quote_created: ScrollText,
   invoice_created: Receipt,

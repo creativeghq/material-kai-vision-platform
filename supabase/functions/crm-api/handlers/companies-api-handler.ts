@@ -339,6 +339,21 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
+      // Capture the company name + its attached contacts BEFORE deleting — the
+      // crm_company_contacts rows cascade away with the company, so we can't read
+      // them afterwards. These feed the symmetric "Business deleted" activity that
+      // closes the loop on each affected contact's timeline (mirrors the
+      // company_attached / company_deleted pairing surfaced on the contact page).
+      const { data: companyRow } = await supabase
+        .from('crm_companies')
+        .select('name, workspace_id')
+        .eq('id', companyId)
+        .maybeSingle();
+      const { data: linkedContacts } = await supabase
+        .from('crm_company_contacts')
+        .select('contact_id')
+        .eq('company_id', companyId);
+
       const { error } = await supabase
         .from('crm_companies')
         .delete()
@@ -349,6 +364,29 @@ export async function handleCompanies(req: Request): Promise<Response> {
           JSON.stringify({ error: error.message }),
           { status: 400, headers: corsHeaders },
         );
+      }
+
+      // Best-effort audit counter-event: never let a logging failure fail the delete.
+      const contactIds = [...new Set((linkedContacts ?? []).map((r: { contact_id: string }) => r.contact_id).filter(Boolean))];
+      if (contactIds.length > 0) {
+        try {
+          const companyName = (companyRow as { name?: string } | null)?.name ?? 'Company';
+          const workspaceId = (companyRow as { workspace_id?: string } | null)?.workspace_id ?? null;
+          await supabase.from('crm_activities').insert(
+            contactIds.map((contactId) => ({
+              target_kind: 'contact',
+              target_id: contactId,
+              activity_type: 'company_deleted',
+              title: 'Business deleted',
+              description: companyName,
+              metadata: { company_id: companyId },
+              actor_user_id: user.id,
+              workspace_id: workspaceId,
+            })),
+          );
+        } catch (e) {
+          console.warn('[crm-companies-api] company_deleted activity log failed (non-fatal):', e);
+        }
       }
 
       return new Response(
