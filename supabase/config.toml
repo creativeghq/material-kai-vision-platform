@@ -54,9 +54,6 @@ verify_jwt = false
 [functions.ai-pricing-updater]
 verify_jwt = false
 
-[functions.ai-rerank]
-verify_jwt = false
-
 [functions.auto-recovery-cron]
 verify_jwt = false
 

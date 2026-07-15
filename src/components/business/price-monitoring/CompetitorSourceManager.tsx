@@ -27,7 +27,6 @@ export const CompetitorSourceManager: React.FC<CompetitorSourceManagerProps> = (
   onClose,
   onSourceAdded,
 }) => {
-  const [sourceName, setSourceName] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,19 +43,14 @@ export const CompetitorSourceManager: React.FC<CompetitorSourceManagerProps> = (
       return;
     }
 
-    if (!sourceName.trim()) {
-      setError('Please enter a source name');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       // Custom monitoring = mode='url-only' tracked_query. Firecrawl verifies
-      // the URL on every refresh; no Perplexity discovery cost.
+      // the URL on every refresh; no Perplexity discovery cost. The retailer
+      // name is derived from the URL host on read — no separate name input.
       await addUrlOnly({ productId, url: sourceUrl.trim() });
 
       // Reset form
-      setSourceName('');
       setSourceUrl('');
 
       // Notify parent
@@ -78,7 +72,6 @@ export const CompetitorSourceManager: React.FC<CompetitorSourceManagerProps> = (
   };
 
   const handleClose = () => {
-    setSourceName('');
     setSourceUrl('');
     setError(null);
     onClose();
@@ -101,17 +94,6 @@ export const CompetitorSourceManager: React.FC<CompetitorSourceManagerProps> = (
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="source-name">Source Name</Label>
-            <Input
-              id="source-name"
-              placeholder="e.g., Amazon, Competitor Store"
-              value={sourceName}
-              onChange={(e) => setSourceName(e.target.value)}
-              required
-            />
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="source-url">Product URL</Label>

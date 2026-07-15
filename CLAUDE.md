@@ -833,7 +833,7 @@ Cloned wholesale from the [[mention-monitoring]] template (subject row → histo
 - `find_jobs` — fetch recent matches for a tracked_job
 - `get_job_digest_preview` — preview today's consolidated digest content
 
-Each tool checks `is_module_enabled('job-research')` first. Chunk types streamed back to AgentHub: `job_search_created`, `job_search_updated`, `job_searches_list`, `job_listings_feed`, `job_digest_preview`. **AgentHub chunk handlers / rich card rendering for these chunk types is NOT yet wired** — the agent's text response carries the information; rich inline cards are a follow-up. The "Job Sources" page renders the same data with full interactivity.
+Each tool checks `is_module_enabled('job-research')` first. Chunk types streamed back to AgentHub: `job_search_created`, `job_search_updated`, `job_searches_list`, `job_listings_feed`, `job_digest_preview`. **These are wired** (2026-07 cleanup) via the generic `AgentResultCard` fallback — every type is registered in `AGENT_RESULT_TITLES` in [AgentHub.tsx](src/components/features/ai/AgentHub.tsx), so they render an inline card (live-stream + on reload). The "Job Sources" page renders the same data with full interactivity.
 
 **Frontend**:
 - [src/services/jobResearchService.ts](src/services/jobResearchService.ts) — single client with full CRUD + refresh + listings + summary + exclusions + per-listing action.

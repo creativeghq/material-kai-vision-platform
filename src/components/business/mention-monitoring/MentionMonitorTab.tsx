@@ -194,7 +194,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
               Mention Monitoring
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              News, blogs, Reddit, RSS, and LLM mentions of <span className="font-medium">{productName}</span>
+              News, blogs, RSS, and LLM mentions of <span className="font-medium">{productName}</span>
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -214,7 +214,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
         <Alert className="dashboard-card">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Toggle on to start tracking mentions across news, blogs, Reddit, RSS feeds, and LLM responses.
+            Toggle on to start tracking mentions across news, blogs, RSS feeds, and LLM responses.
           </AlertDescription>
         </Alert>
       )}

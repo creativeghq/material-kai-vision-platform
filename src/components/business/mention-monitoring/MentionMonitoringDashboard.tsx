@@ -76,7 +76,7 @@ const MentionMonitoringDashboard: React.FC = () => {
             <Sparkles className="h-5 w-5 text-primary" /> Mention Monitoring
           </h1>
           <p className="text-sm text-muted-foreground">
-            All tracked subjects across the catalog: news, blogs, Reddit, RSS, YouTube, and LLM visibility.
+            All tracked subjects across the catalog: news, blogs, RSS, YouTube, and LLM visibility.
           </p>
         </div>
         <Button onClick={load} disabled={loading} variant="outline" className="rounded-full">

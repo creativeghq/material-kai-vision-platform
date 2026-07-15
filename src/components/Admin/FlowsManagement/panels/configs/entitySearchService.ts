@@ -25,7 +25,6 @@ export interface EntityResult {
 const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'agent-chat', label: 'agent-chat', sublabel: 'AI agent conversation handler' },
   { id: 'ai-pricing-updater', label: 'ai-pricing-updater', sublabel: 'AI-driven price updates' },
-  { id: 'ai-rerank', label: 'ai-rerank', sublabel: 'Search result reranking' },
   { id: 'campaign-processor', label: 'campaign-processor', sublabel: 'Process messaging campaigns' },
   { id: 'email-api', label: 'email-api', sublabel: 'Send transactional emails' },
   { id: 'flow-engine', label: 'flow-engine', sublabel: 'Execute automation flows' },
