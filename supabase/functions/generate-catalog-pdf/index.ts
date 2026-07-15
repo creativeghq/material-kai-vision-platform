@@ -182,6 +182,9 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
       sections: docSections,
       totals,
       closing_message: (catalog.back_cover_data as any)?.closing_message ?? null,
+      // Page size + orientation follow the workspace's cover template image.
+      page_width: branding.cover_width,
+      page_height: branding.cover_height,
     };
 
     const { pdfBytes, pageCount } = await renderBrandedDocument(doc, {

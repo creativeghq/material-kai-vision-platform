@@ -3,24 +3,17 @@
  *
  * Renders a normalized `BrandedDoc` (quote, catalog, proforma, …) as:
  *   cover → optional client/company page → items (list-table OR grid) → optional
- *   totals → optional back cover, all under the workspace's branded template images
- *   and "FROM" identity (see branding.ts).
+ *   totals → optional back cover, under the workspace's branded template images.
  *
- * The list-table + totals design is ported verbatim from generate-quote-pdf so quotes
- * render identically; catalogs adopt the same design and add a `grid` (card) layout.
+ * PAGE SIZE + ORIENTATION FOLLOW THE TEMPLATE COVER IMAGE: the page is sized to the
+ * cover image's aspect ratio (portrait vs landscape), so a full-page template renders
+ * with no distortion and the whole layout adapts. Falls back to A4 portrait when no
+ * cover dimensions are known — in which case the geometry is identical to the old A4.
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, rgb, RGB } from 'pdf-lib';
 import { embedOpenSans } from '../fonts/open-sans.ts';
 
-// ── Page geometry ────────────────────────────────────────────────────────────
-const PAGE_W = 595.28;
-const PAGE_H = 841.89;
-const MARGIN_LEFT = 50;
-const MARGIN_RIGHT = 50;
-const MARGIN_TOP = 60;
-const CONTENT_W = PAGE_W - MARGIN_LEFT - MARGIN_RIGHT;
-
-// ── Colors ───────────────────────────────────────────────────────────────────
+// ── Colors (immutable) ─────────────────────────────────────────────────────────
 const COLOR_DARK: RGB = rgb(0.1, 0.1, 0.18);
 const COLOR_GRAY: RGB = rgb(0.42, 0.42, 0.42);
 const COLOR_LIGHT_GRAY: RGB = rgb(0.75, 0.75, 0.75);
@@ -29,17 +22,10 @@ const COLOR_WHITE: RGB = rgb(1, 1, 1);
 const COLOR_BLACK: RGB = rgb(0, 0, 0);
 const COLOR_OVERLAY: RGB = rgb(0, 0, 0);
 
-// ── Table geometry (list layout) ───────────────────────────────────────────────
-const TABLE_MARGIN_LEFT = 40;
-const TABLE_MARGIN_RIGHT = 40;
-const TABLE_W = PAGE_W - TABLE_MARGIN_LEFT - TABLE_MARGIN_RIGHT; // 515.28
-const TABLE_Y_START = PAGE_H - 120;
-const HEADER_ROW_H = 28;
-const DATA_ROW_H = 36;
-const LIST_ROWS_PER_PAGE = 15;
-const IMG_CELL = 30;
+const A4_LONG = 841.89;
+const A4_SHORT = 595.28;
 
-// The list column set (identical to the quote PDF). Catalog items map onto it.
+// The list column set. Widths are relative and re-scaled to the actual table width.
 type ColumnKey = 'index' | 'thumb' | 'name' | 'room' | 'sku' | 'size_color' | 'qty' | 'unit' | 'price' | 'total';
 interface ColumnSpec { key: ColumnKey; label: string; width: number; }
 const LIST_COLUMNS: ColumnSpec[] = [
@@ -55,10 +41,46 @@ const LIST_COLUMNS: ColumnSpec[] = [
   { key: 'total', label: 'Total', width: 89 },
 ];
 
+// ── Geometry derived from the page size ─────────────────────────────────────────
+interface Geom {
+  PAGE_W: number; PAGE_H: number;
+  MARGIN: number; MARGIN_TOP: number; CONTENT_W: number;
+  TABLE_MARGIN: number; TABLE_W: number; TABLE_Y_START: number;
+  HEADER_ROW_H: number; DATA_ROW_H: number; ROWS_PER_PAGE: number; IMG_CELL: number;
+}
+
+/** Page dimensions (points) from the cover image px, preserving aspect + orientation. */
+function pageFromCover(coverW?: number | null, coverH?: number | null): { w: number; h: number } {
+  if (!coverW || !coverH || coverW <= 0 || coverH <= 0) return { w: A4_SHORT, h: A4_LONG };
+  if (coverW >= coverH) return { w: A4_LONG, h: round2(A4_LONG * coverH / coverW) }; // landscape
+  return { h: A4_LONG, w: round2(A4_LONG * coverW / coverH) };                        // portrait
+}
+
+/** All layout constants scaled to the page. Reproduces A4 exactly for 595.28×841.89. */
+function computeGeom(PAGE_W: number, PAGE_H: number): Geom {
+  const MARGIN = Math.min(50, Math.round(PAGE_W * 0.084));
+  const TABLE_MARGIN = Math.min(40, Math.round(PAGE_W * 0.0672));
+  const TABLE_W = PAGE_W - 2 * TABLE_MARGIN;
+  const CONTENT_W = PAGE_W - 2 * MARGIN;
+  const TABLE_Y_START = PAGE_H - Math.min(120, Math.round(PAGE_H * 0.1425));
+  const HEADER_ROW_H = 28;
+  const DATA_ROW_H = 36;
+  const ROWS_PER_PAGE = Math.max(4, Math.floor((TABLE_Y_START - HEADER_ROW_H - 120) / DATA_ROW_H));
+  return { PAGE_W, PAGE_H, MARGIN, MARGIN_TOP: 60, CONTENT_W, TABLE_MARGIN, TABLE_W, TABLE_Y_START, HEADER_ROW_H, DATA_ROW_H, ROWS_PER_PAGE, IMG_CELL: 30 };
+}
+
+/** Column set for the current doc, widths scaled to fill the table width. */
+function listColumns(g: Geom, showPriceCols: boolean): ColumnSpec[] {
+  const cols = showPriceCols ? LIST_COLUMNS : LIST_COLUMNS.filter((c) => !['price', 'total', 'qty', 'unit'].includes(c.key));
+  const used = cols.reduce((a, c) => a + c.width, 0);
+  const scale = g.TABLE_W / used;
+  return cols.map((c) => ({ ...c, width: c.width * scale }));
+}
+
 // ── Model ──────────────────────────────────────────────────────────────────────
 export interface BrandedDocItem {
-  image_url?: string | null;   // resolved to bytes via assets.itemImages[key]
-  image_key?: string | null;   // key into assets.itemImages
+  image_url?: string | null;
+  image_key?: string | null;
   name: string;
   description?: string | null;
   sku?: string | null;
@@ -74,39 +96,12 @@ export interface BrandedDocItem {
   installation_requirements?: string | null;
   delivery_date?: string | null;
 }
-export interface BrandedDocSection {
-  title?: string | null;
-  intro?: string | null;
-  items: BrandedDocItem[];
-}
-export interface BrandedTotals {
-  subtotal: number;
-  vat_rate: number;
-  vat_amount: number;
-  grand_total: number;
-  cash_discount_pct?: number;
-  currency: string;
-}
-export interface BrandedClient {
-  contact_name?: string | null;
-  company_name?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  address?: string | null;
-  city?: string | null;
-  postal_code?: string | null;
-  country?: string | null;
-  vat_number?: string | null;
-}
-export interface BrandedCompany {
-  name?: string | null;
-  address?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  vat?: string | null;
-}
+export interface BrandedDocSection { title?: string | null; intro?: string | null; items: BrandedDocItem[]; }
+export interface BrandedTotals { subtotal: number; vat_rate: number; vat_amount: number; grand_total: number; cash_discount_pct?: number; currency: string; }
+export interface BrandedClient { contact_name?: string | null; company_name?: string | null; email?: string | null; phone?: string | null; address?: string | null; city?: string | null; postal_code?: string | null; country?: string | null; vat_number?: string | null; }
+export interface BrandedCompany { name?: string | null; address?: string | null; phone?: string | null; email?: string | null; vat?: string | null; }
 export interface BrandedDoc {
-  doc_label: string;                 // 'QUOTE' | 'CATALOG' | 'PROFORMA'
+  doc_label: string;
   number?: string | null;
   subtitle?: string | null;
   created_at?: string | null;
@@ -115,14 +110,15 @@ export interface BrandedDoc {
   layout: 'list' | 'grid';
   company: BrandedCompany;
   client?: BrandedClient | null;
-  show_client_page?: boolean;        // render the client/company details page
+  show_client_page?: boolean;
   notes?: string | null;
   sections: BrandedDocSection[];
-  totals?: BrandedTotals | null;     // rendered only when present
-  closing_message?: string | null;   // back cover
-  /** When true, skip the cover page entirely if no cover template image is present
-   *  (quotes do this). When false/undefined, a text cover is drawn as a fallback. */
+  totals?: BrandedTotals | null;
+  closing_message?: string | null;
   cover_optional?: boolean;
+  /** Cover image pixel dimensions — the page is sized to this aspect/orientation. */
+  page_width?: number | null;
+  page_height?: number | null;
 }
 export interface BrandedAssets {
   coverBytes?: Uint8Array | null;
@@ -137,6 +133,9 @@ export async function renderBrandedDocument(doc: BrandedDoc, assets: BrandedAsse
   const pdfDoc = await PDFDocument.create();
   const { regular: font, bold: fontBold } = await embedOpenSans(pdfDoc);
 
+  const { w: PAGE_W, h: PAGE_H } = pageFromCover(doc.page_width, doc.page_height);
+  const g = computeGeom(PAGE_W, PAGE_H);
+
   const coverImage = await embedImage(pdfDoc, assets.coverBytes ?? null);
   const bgImage = await embedImage(pdfDoc, assets.contentBgBytes ?? null);
   const backImage = await embedImage(pdfDoc, assets.backCoverBytes ?? null);
@@ -150,36 +149,25 @@ export async function renderBrandedDocument(doc: BrandedDoc, assets: BrandedAsse
 
   let pageCount = 0;
 
-  // Cover — skipped entirely when cover_optional and no template image (matches quotes).
   if (coverImage || !doc.cover_optional) {
-    drawCover(pdfDoc, doc, coverImage, logoImage, font, fontBold);
+    drawCover(pdfDoc, g, doc, coverImage, logoImage, font, fontBold);
     pageCount++;
   }
-
-  // Client / company details page
   if (doc.show_client_page) {
-    drawClientPage(pdfDoc, doc, font, fontBold);
+    drawClientPage(pdfDoc, g, doc, font, fontBold);
     pageCount++;
   }
+  pageCount += doc.layout === 'grid'
+    ? drawGridPages(pdfDoc, g, doc, bgImage, itemImages, font, fontBold)
+    : drawListPages(pdfDoc, g, doc, bgImage, itemImages, font, fontBold);
 
-  // Items
-  const allItems = doc.sections.flatMap((s) => s.items);
-  if (doc.layout === 'grid') {
-    pageCount += await drawGridPages(pdfDoc, doc, bgImage, itemImages, font, fontBold);
-  } else {
-    pageCount += await drawListPages(pdfDoc, doc, bgImage, itemImages, font, fontBold);
-  }
-  void allItems;
-
-  // Back cover
   if (backImage) {
-    const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
-    page.drawImage(backImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+    const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
+    page.drawImage(backImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
     if (doc.closing_message) {
-      page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: COLOR_OVERLAY, opacity: 0.3 });
-      const lines = wrapText(doc.closing_message, font, 14, CONTENT_W);
-      let y = PAGE_H * 0.5;
-      for (const line of lines) { page.drawText(line, { x: MARGIN_LEFT, y, size: 14, font, color: COLOR_WHITE }); y -= 20; }
+      page.drawRectangle({ x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H, color: COLOR_OVERLAY, opacity: 0.3 });
+      let y = g.PAGE_H * 0.5;
+      for (const line of wrapText(doc.closing_message, font, 14, g.CONTENT_W)) { page.drawText(line, { x: g.MARGIN, y, size: 14, font, color: COLOR_WHITE }); y -= 20; }
     }
     pageCount++;
   }
@@ -191,52 +179,44 @@ export async function renderBrandedDocument(doc: BrandedDoc, assets: BrandedAsse
 }
 
 // ── Cover ────────────────────────────────────────────────────────────────────
-function drawCover(pdfDoc: PDFDocument, doc: BrandedDoc, coverImage: PDFImage | null, logoImage: PDFImage | null, font: PDFFont, fontBold: PDFFont): void {
-  const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+function drawCover(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, coverImage: PDFImage | null, logoImage: PDFImage | null, font: PDFFont, fontBold: PDFFont): void {
+  const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
   if (coverImage) {
-    page.drawImage(coverImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+    page.drawImage(coverImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
     if (logoImage) {
       const scale = Math.min(150 / logoImage.width, 80 / logoImage.height);
       const w = logoImage.width * scale, h = logoImage.height * scale;
-      page.drawImage(logoImage, { x: (PAGE_W - w) / 2, y: PAGE_H - h - 60, width: w, height: h });
+      page.drawImage(logoImage, { x: (g.PAGE_W - w) / 2, y: g.PAGE_H - h - 60, width: w, height: h });
     }
   } else {
-    page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: COLOR_DARK });
-    // Text cover (no template image): title + meta.
+    page.drawRectangle({ x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H, color: COLOR_DARK });
     const titleSize = 34;
-    const titleLines = wrapText(doc.doc_label + (doc.number ? `  ${doc.number}` : ''), fontBold, titleSize, CONTENT_W);
-    let y = PAGE_H * 0.58;
-    for (const line of titleLines) { page.drawText(line, { x: MARGIN_LEFT, y, size: titleSize, font: fontBold, color: COLOR_WHITE }); y -= titleSize + 6; }
-    if (doc.subtitle) {
-      for (const line of wrapText(doc.subtitle, font, 16, CONTENT_W)) { page.drawText(line, { x: MARGIN_LEFT, y, size: 16, font, color: COLOR_WHITE }); y -= 20; }
-    }
-    if (doc.client?.company_name || doc.client?.contact_name) {
-      page.drawText(`Prepared for: ${doc.client.company_name || doc.client.contact_name}`, { x: MARGIN_LEFT, y: 110, size: 12, font, color: COLOR_WHITE });
-    }
-    page.drawText(formatDate(doc.created_at), { x: MARGIN_LEFT, y: 90, size: 10, font, color: COLOR_WHITE });
+    let y = g.PAGE_H * 0.58;
+    for (const line of wrapText(doc.doc_label + (doc.number ? `  ${doc.number}` : ''), fontBold, titleSize, g.CONTENT_W)) { page.drawText(line, { x: g.MARGIN, y, size: titleSize, font: fontBold, color: COLOR_WHITE }); y -= titleSize + 6; }
+    if (doc.subtitle) for (const line of wrapText(doc.subtitle, font, 16, g.CONTENT_W)) { page.drawText(line, { x: g.MARGIN, y, size: 16, font, color: COLOR_WHITE }); y -= 20; }
+    if (doc.client?.company_name || doc.client?.contact_name) page.drawText(`Prepared for: ${doc.client.company_name || doc.client.contact_name}`, { x: g.MARGIN, y: 110, size: 12, font, color: COLOR_WHITE });
+    page.drawText(formatDate(doc.created_at), { x: g.MARGIN, y: 90, size: 10, font, color: COLOR_WHITE });
   }
 }
 
-// ── Client / company details page (ported from quote) ─────────────────────────
-function drawClientPage(pdfDoc: PDFDocument, doc: BrandedDoc, font: PDFFont, fontBold: PDFFont): void {
-  const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
-  let y = PAGE_H - MARGIN_TOP;
-
-  page.drawText(doc.doc_label, { x: MARGIN_LEFT, y, size: 28, font: fontBold, color: COLOR_DARK });
+// ── Client / company details page ─────────────────────────────────────────────
+function drawClientPage(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, font: PDFFont, fontBold: PDFFont): void {
+  const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
+  let y = g.PAGE_H - g.MARGIN_TOP;
+  page.drawText(doc.doc_label, { x: g.MARGIN, y, size: 28, font: fontBold, color: COLOR_DARK });
   y -= 30;
-  if (doc.number) page.drawText(doc.number, { x: MARGIN_LEFT, y, size: 14, font: fontBold, color: COLOR_GRAY });
+  if (doc.number) page.drawText(doc.number, { x: g.MARGIN, y, size: 14, font: fontBold, color: COLOR_GRAY });
 
-  const dateY = PAGE_H - MARGIN_TOP;
-  const dateX = PAGE_W - MARGIN_RIGHT;
-  drawRightAligned(page, `Date: ${formatDate(doc.created_at)}`, dateX, dateY, 10, font, COLOR_GRAY);
-  if (doc.expires_at) drawRightAligned(page, `Expires: ${formatDate(doc.expires_at)}`, dateX, dateY - 16, 10, font, COLOR_GRAY);
+  const dateX = g.PAGE_W - g.MARGIN;
+  drawRightAligned(page, `Date: ${formatDate(doc.created_at)}`, dateX, g.PAGE_H - g.MARGIN_TOP, 10, font, COLOR_GRAY);
+  if (doc.expires_at) drawRightAligned(page, `Expires: ${formatDate(doc.expires_at)}`, dateX, g.PAGE_H - g.MARGIN_TOP - 16, 10, font, COLOR_GRAY);
 
   y -= 20;
-  page.drawLine({ start: { x: MARGIN_LEFT, y }, end: { x: PAGE_W - MARGIN_RIGHT, y }, thickness: 1, color: COLOR_LIGHT_GRAY });
+  page.drawLine({ start: { x: g.MARGIN, y }, end: { x: g.PAGE_W - g.MARGIN, y }, thickness: 1, color: COLOR_LIGHT_GRAY });
 
   y -= 35;
-  const colLeftX = MARGIN_LEFT;
-  const colRightX = MARGIN_LEFT + CONTENT_W / 2 + 15;
+  const colLeftX = g.MARGIN;
+  const colRightX = g.MARGIN + g.CONTENT_W / 2 + 15;
   const client = doc.client ?? {};
 
   let leftY = y;
@@ -246,8 +226,7 @@ function drawClientPage(pdfDoc: PDFDocument, doc: BrandedDoc, font: PDFFont, fon
   leftY = labelValue(page, 'Phone', client.phone ?? null, colLeftX, leftY, font, fontBold);
   if (client.address || client.city || client.postal_code || client.country) {
     leftY -= 8;
-    page.drawText('Address', { x: colLeftX, y: leftY, size: 8, font, color: COLOR_GRAY });
-    leftY -= 14;
+    page.drawText('Address', { x: colLeftX, y: leftY, size: 8, font, color: COLOR_GRAY }); leftY -= 14;
     if (client.address) { page.drawText(client.address, { x: colLeftX, y: leftY, size: 10, font: fontBold, color: COLOR_BLACK }); leftY -= 14; }
     const cityLine = [client.city, client.postal_code].filter(Boolean).join(', ');
     if (cityLine) { page.drawText(cityLine, { x: colLeftX, y: leftY, size: 10, font: fontBold, color: COLOR_BLACK }); leftY -= 14; }
@@ -258,7 +237,6 @@ function drawClientPage(pdfDoc: PDFDocument, doc: BrandedDoc, font: PDFFont, fon
   rightY = sectionHeader(page, 'COMPANY DETAILS', colRightX, rightY, fontBold);
   rightY = labelValue(page, 'Company', client.company_name ?? null, colRightX, rightY, font, fontBold);
   rightY = labelValue(page, 'VAT Number', client.vat_number ?? null, colRightX, rightY, font, fontBold);
-
   rightY -= 30;
   const co = doc.company;
   rightY = sectionHeader(page, 'FROM', colRightX, rightY, fontBold);
@@ -270,74 +248,61 @@ function drawClientPage(pdfDoc: PDFDocument, doc: BrandedDoc, font: PDFFont, fon
 
   if (doc.notes) {
     const notesY = Math.min(leftY, rightY) - 40;
-    page.drawLine({ start: { x: MARGIN_LEFT, y: notesY + 15 }, end: { x: PAGE_W - MARGIN_RIGHT, y: notesY + 15 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
-    sectionHeader(page, 'NOTES', MARGIN_LEFT, notesY, fontBold);
+    page.drawLine({ start: { x: g.MARGIN, y: notesY + 15 }, end: { x: g.PAGE_W - g.MARGIN, y: notesY + 15 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
+    sectionHeader(page, 'NOTES', g.MARGIN, notesY, fontBold);
     let noteY = notesY - 18;
-    for (const line of wrapText(doc.notes, font, 10, CONTENT_W)) { page.drawText(line, { x: MARGIN_LEFT, y: noteY, size: 10, font, color: COLOR_BLACK }); noteY -= 14; }
+    for (const line of wrapText(doc.notes, font, 10, g.CONTENT_W)) { page.drawText(line, { x: g.MARGIN, y: noteY, size: 10, font, color: COLOR_BLACK }); noteY -= 14; }
   }
 }
 
 // ── List (table) layout ───────────────────────────────────────────────────────
-async function drawListPages(pdfDoc: PDFDocument, doc: BrandedDoc, bgImage: PDFImage | null, itemImages: Record<string, PDFImage>, font: PDFFont, fontBold: PDFFont): Promise<number> {
-  // Flatten sections into labeled rows: a section-title row then its items.
+function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: PDFImage | null, itemImages: Record<string, PDFImage>, font: PDFFont, fontBold: PDFFont): number {
   type Row = { kind: 'section'; title: string } | { kind: 'item'; item: BrandedDocItem; num: number };
   const rows: Row[] = [];
   let n = 0;
-  const multiSection = doc.sections.length > 1 || (doc.sections[0]?.title && doc.sections.length >= 1 && doc.doc_label !== 'QUOTE');
   for (const s of doc.sections) {
-    if (multiSection && s.title) rows.push({ kind: 'section', title: s.title });
+    if (s.title) rows.push({ kind: 'section', title: s.title });
     for (const it of s.items) { n++; rows.push({ kind: 'item', item: it, num: n }); }
   }
 
   const showPriceCols = !!doc.totals || doc.sections.some((s) => s.items.some((it) => it.unit_price != null || it.line_total != null));
-  const columns = showPriceCols ? LIST_COLUMNS : LIST_COLUMNS.filter((c) => c.key !== 'price' && c.key !== 'total' && c.key !== 'qty' && c.key !== 'unit');
-  // Re-flow widths of a reduced column set to fill TABLE_W.
-  const usedW = columns.reduce((a, c) => a + c.width, 0);
-  const scale = TABLE_W / usedW;
-  const cols = columns.map((c) => ({ ...c, width: c.width * scale }));
+  const cols = listColumns(g, showPriceCols);
 
-  const perPage = LIST_ROWS_PER_PAGE;
-  let pages = 0;
-  let idx = 0;
+  let pages = 0, idx = 0;
   while (idx < rows.length || pages === 0) {
-    const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+    const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
     pages++;
-    if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
-    page.drawText(`${doc.doc_label} ITEMS`, { x: TABLE_MARGIN_LEFT, y: PAGE_H - 50, size: 18, font: fontBold, color: bgImage ? COLOR_WHITE : COLOR_DARK });
+    if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
+    page.drawText(`${doc.doc_label} ITEMS`, { x: g.TABLE_MARGIN, y: g.PAGE_H - 50, size: 18, font: fontBold, color: bgImage ? COLOR_WHITE : COLOR_DARK });
 
-    let y = TABLE_Y_START;
-    drawTableHeader(page, y, cols, fontBold);
-    y -= HEADER_ROW_H;
+    let y = g.TABLE_Y_START;
+    drawTableHeader(page, g, y, cols, fontBold);
+    y -= g.HEADER_ROW_H;
 
-    let drawn = 0;
-    let alt = 0;
-    while (idx < rows.length && drawn < perPage) {
+    let drawn = 0, alt = 0;
+    while (idx < rows.length && drawn < g.ROWS_PER_PAGE) {
       const row = rows[idx];
       if (row.kind === 'section') {
-        page.drawRectangle({ x: TABLE_MARGIN_LEFT, y: y - DATA_ROW_H, width: TABLE_W, height: DATA_ROW_H, color: COLOR_DARK, opacity: 0.85 });
-        page.drawText(row.title, { x: TABLE_MARGIN_LEFT + 6, y: y - DATA_ROW_H / 2 - 3, size: 9, font: fontBold, color: COLOR_WHITE });
-        y -= DATA_ROW_H; idx++; drawn++; alt = 0;
+        page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.DATA_ROW_H, width: g.TABLE_W, height: g.DATA_ROW_H, color: COLOR_DARK, opacity: 0.85 });
+        page.drawText(row.title, { x: g.TABLE_MARGIN + 6, y: y - g.DATA_ROW_H / 2 - 3, size: 9, font: fontBold, color: COLOR_WHITE });
+        y -= g.DATA_ROW_H; idx++; drawn++; alt = 0;
         continue;
       }
-      drawTableRow(page, y, row.num, row.item, alt % 2 === 1, cols, doc.currency, font, fontBold, itemImages[row.item.image_key ?? ''] ?? null);
-      y -= DATA_ROW_H; idx++; drawn++; alt++;
+      drawTableRow(page, g, y, row.num, row.item, alt % 2 === 1, cols, doc.currency, font, fontBold, itemImages[row.item.image_key ?? ''] ?? null);
+      y -= g.DATA_ROW_H; idx++; drawn++; alt++;
     }
 
-    page.drawLine({ start: { x: TABLE_MARGIN_LEFT, y }, end: { x: TABLE_MARGIN_LEFT + TABLE_W, y }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
+    page.drawLine({ start: { x: g.TABLE_MARGIN, y }, end: { x: g.TABLE_MARGIN + g.TABLE_W, y }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
 
     if (idx >= rows.length) {
-      if (doc.totals) { drawTotals(page, doc.totals, y, font, fontBold); y -= 110; }
-      // FF&E "Specifications & Delivery" notes (install requirements + delivery dates).
+      if (doc.totals) { drawTotals(page, g, doc.totals, y, font, fontBold); y -= 110; }
       const ffeItems = doc.sections.flatMap((s) => s.items).filter((it) => it.installation_requirements || it.delivery_date);
       if (ffeItems.length > 0) {
         if (y < 140) {
-          const ffePage = pdfDoc.addPage([PAGE_W, PAGE_H]);
-          pages++;
-          if (bgImage) ffePage.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
-          drawFFENotes(ffePage, ffeItems, PAGE_H - 80, font, fontBold);
-        } else {
-          drawFFENotes(page, ffeItems, y, font, fontBold);
-        }
+          const ffePage = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
+          if (bgImage) ffePage.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
+          drawFFENotes(ffePage, g, ffeItems, g.PAGE_H - 80, font, fontBold);
+        } else drawFFENotes(page, g, ffeItems, y, font, fontBold);
       }
       break;
     }
@@ -345,85 +310,57 @@ async function drawListPages(pdfDoc: PDFDocument, doc: BrandedDoc, bgImage: PDFI
   return pages;
 }
 
-function drawFFENotes(page: PDFPage, items: BrandedDocItem[], startY: number, font: PDFFont, fontBold: PDFFont): void {
-  let y = startY;
-  page.drawLine({ start: { x: TABLE_MARGIN_LEFT, y: y + 10 }, end: { x: TABLE_MARGIN_LEFT + TABLE_W, y: y + 10 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
-  page.drawText('SPECIFICATIONS & DELIVERY', { x: TABLE_MARGIN_LEFT, y, size: 10, font: fontBold, color: COLOR_DARK });
-  y -= 18;
-  for (const item of items) {
-    if (y < 60) break;
-    page.drawText(truncateText(item.name, fontBold, 8, TABLE_W - 20), { x: TABLE_MARGIN_LEFT, y, size: 8, font: fontBold, color: COLOR_BLACK });
-    y -= 14;
-    if (item.installation_requirements) {
-      page.drawText('Installation:', { x: TABLE_MARGIN_LEFT + 8, y, size: 7, font: fontBold, color: COLOR_GRAY });
-      for (const line of wrapText(item.installation_requirements, font, 7, TABLE_W - 80)) { page.drawText(line, { x: TABLE_MARGIN_LEFT + 70, y, size: 7, font, color: COLOR_BLACK }); y -= 11; }
-    }
-    if (item.delivery_date) {
-      page.drawText('Delivery:', { x: TABLE_MARGIN_LEFT + 8, y, size: 7, font: fontBold, color: COLOR_GRAY });
-      page.drawText(formatDate(item.delivery_date), { x: TABLE_MARGIN_LEFT + 70, y, size: 7, font, color: COLOR_BLACK });
-      y -= 11;
-    }
-    y -= 6;
-  }
-}
-
-function drawTableHeader(page: PDFPage, y: number, cols: ColumnSpec[], fontBold: PDFFont): void {
-  page.drawRectangle({ x: TABLE_MARGIN_LEFT, y: y - HEADER_ROW_H, width: TABLE_W, height: HEADER_ROW_H, color: COLOR_DARK });
-  let x = TABLE_MARGIN_LEFT;
+function drawTableHeader(page: PDFPage, g: Geom, y: number, cols: ColumnSpec[], fontBold: PDFFont): void {
+  page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.HEADER_ROW_H, width: g.TABLE_W, height: g.HEADER_ROW_H, color: COLOR_DARK });
+  let x = g.TABLE_MARGIN;
   for (const col of cols) { page.drawText(col.label, { x: x + 6, y: y - 18, size: 8, font: fontBold, color: COLOR_WHITE }); x += col.width; }
 }
 
-function drawTableRow(page: PDFPage, y: number, rowNum: number, item: BrandedDocItem, isAlt: boolean, cols: ColumnSpec[], currency: string, font: PDFFont, fontBold: PDFFont, thumb: PDFImage | null): void {
-  page.drawRectangle({ x: TABLE_MARGIN_LEFT, y: y - DATA_ROW_H, width: TABLE_W, height: DATA_ROW_H, color: isAlt ? COLOR_ROW_ALT : COLOR_WHITE, opacity: isAlt ? 1 : 0.92 });
-  const textY = y - DATA_ROW_H / 2 - 3;
-  const fontSize = 7;
-  let x = TABLE_MARGIN_LEFT;
+function drawTableRow(page: PDFPage, g: Geom, y: number, rowNum: number, item: BrandedDocItem, isAlt: boolean, cols: ColumnSpec[], currency: string, font: PDFFont, fontBold: PDFFont, thumb: PDFImage | null): void {
+  page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.DATA_ROW_H, width: g.TABLE_W, height: g.DATA_ROW_H, color: isAlt ? COLOR_ROW_ALT : COLOR_WHITE, opacity: isAlt ? 1 : 0.92 });
+  const textY = y - g.DATA_ROW_H / 2 - 3;
+  const fs = 7;
+  let x = g.TABLE_MARGIN;
   const unpriced = (item.pricing_status ?? 'priced') !== 'priced';
   for (const col of cols) {
     const w = col.width;
     switch (col.key) {
-      case 'index': page.drawText(String(rowNum), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY }); break;
-      case 'thumb': if (thumb) { const s = Math.min(IMG_CELL / thumb.width, IMG_CELL / thumb.height); const iw = thumb.width * s, ih = thumb.height * s; page.drawImage(thumb, { x: x + (w - iw) / 2, y: y - DATA_ROW_H / 2 - ih / 2, width: iw, height: ih }); } break;
-      case 'name': page.drawText(truncateText(item.name || '-', font, fontSize, w - 8), { x: x + 4, y: textY, size: fontSize, font: fontBold, color: COLOR_BLACK }); break;
-      case 'room': page.drawText(truncateText(item.room || '-', font, fontSize, w - 8), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK }); break;
-      case 'sku': page.drawText(truncateText(item.sku || '-', font, fontSize, w - 8), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY }); break;
-      case 'size_color': page.drawText(truncateText(item.size_color || '-', font, fontSize, w - 8), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK }); break;
-      case 'qty': page.drawText(String(item.quantity ?? 1), { x: x + 4, y: textY, size: fontSize, font, color: COLOR_BLACK }); break;
-      case 'unit': page.drawText(item.unit || 'pcs', { x: x + 4, y: textY, size: fontSize, font, color: COLOR_GRAY }); break;
+      case 'index': page.drawText(String(rowNum), { x: x + 4, y: textY, size: fs, font, color: COLOR_GRAY }); break;
+      case 'thumb': if (thumb) { const s = Math.min(g.IMG_CELL / thumb.width, g.IMG_CELL / thumb.height); const iw = thumb.width * s, ih = thumb.height * s; page.drawImage(thumb, { x: x + (w - iw) / 2, y: y - g.DATA_ROW_H / 2 - ih / 2, width: iw, height: ih }); } break;
+      case 'name': page.drawText(truncateText(item.name || '-', font, fs, w - 8), { x: x + 4, y: textY, size: fs, font: fontBold, color: COLOR_BLACK }); break;
+      case 'room': page.drawText(truncateText(item.room || '-', font, fs, w - 8), { x: x + 4, y: textY, size: fs, font, color: COLOR_BLACK }); break;
+      case 'sku': page.drawText(truncateText(item.sku || '-', font, fs, w - 8), { x: x + 4, y: textY, size: fs, font, color: COLOR_GRAY }); break;
+      case 'size_color': page.drawText(truncateText(item.size_color || '-', font, fs, w - 8), { x: x + 4, y: textY, size: fs, font, color: COLOR_BLACK }); break;
+      case 'qty': page.drawText(String(item.quantity ?? 1), { x: x + 4, y: textY, size: fs, font, color: COLOR_BLACK }); break;
+      case 'unit': page.drawText(truncateText(item.unit || 'pcs', font, fs, w - 6), { x: x + 4, y: textY, size: fs, font, color: COLOR_GRAY }); break;
       case 'price': {
         const right = x + w - 4;
-        if (unpriced) { drawRightAligned(page, 'Call for price', right, textY, fontSize - 1, font, COLOR_GRAY); break; }
+        if (unpriced) { drawRightAligned(page, 'Call for price', right, textY, fs - 1, font, COLOR_GRAY); break; }
         if (item.discounted_price != null && item.unit_price != null) {
           const orig = formatCurrency(item.unit_price, currency);
-          drawRightAligned(page, orig, right, textY + 4, fontSize - 1, font, COLOR_GRAY);
-          const ow = font.widthOfTextAtSize(orig, fontSize - 1);
+          drawRightAligned(page, orig, right, textY + 4, fs - 1, font, COLOR_GRAY);
+          const ow = font.widthOfTextAtSize(orig, fs - 1);
           page.drawLine({ start: { x: right - ow, y: textY + 7 }, end: { x: right, y: textY + 7 }, thickness: 0.4, color: COLOR_GRAY });
-          drawRightAligned(page, formatCurrency(item.discounted_price, currency), right, textY - 7, fontSize, fontBold, COLOR_BLACK);
+          drawRightAligned(page, formatCurrency(item.discounted_price, currency), right, textY - 7, fs, fontBold, COLOR_BLACK);
         } else {
-          drawRightAligned(page, item.unit_price != null ? formatCurrency(item.unit_price, currency) : '-', right, textY, fontSize, font, COLOR_BLACK);
+          drawRightAligned(page, item.unit_price != null ? formatCurrency(item.unit_price, currency) : '-', right, textY, fs, font, COLOR_BLACK);
         }
         break;
       }
-      case 'total': {
-        const right = x + w - 4;
-        drawRightAligned(page, unpriced ? '—' : (item.line_total != null ? formatCurrency(item.line_total, currency) : '-'), right, textY, fontSize, fontBold, COLOR_BLACK);
-        break;
-      }
+      case 'total': drawRightAligned(page, unpriced ? '—' : (item.line_total != null ? formatCurrency(item.line_total, currency) : '-'), x + w - 4, textY, fs, fontBold, COLOR_BLACK); break;
     }
     x += w;
   }
 }
 
-function drawTotals(page: PDFPage, totals: BrandedTotals, y: number, font: PDFFont, fontBold: PDFFont): void {
-  const rightEdge = TABLE_MARGIN_LEFT + TABLE_W - 6;
+function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, font: PDFFont, fontBold: PDFFont): void {
+  const rightEdge = g.TABLE_MARGIN + g.TABLE_W - 6;
   const labelX = rightEdge - 180;
   y -= 20;
   page.drawLine({ start: { x: labelX, y: y + 8 }, end: { x: rightEdge, y: y + 8 }, thickness: 1, color: COLOR_DARK });
-
   const cashPct = totals.cash_discount_pct ?? 0;
   const price = totals.subtotal;
-  const discount = Math.round(price * cashPct / 100 * 100) / 100;
-
+  const discount = round2(price * cashPct / 100);
   page.drawText('Price', { x: labelX, y, size: 10, font, color: COLOR_BLACK });
   drawRightAligned(page, formatCurrency(price, totals.currency), rightEdge, y, 10, font, COLOR_BLACK);
   y -= 18;
@@ -443,61 +380,71 @@ function drawTotals(page: PDFPage, totals: BrandedTotals, y: number, font: PDFFo
   drawRightAligned(page, formatCurrency(totals.grand_total, totals.currency), rightEdge, y, 12, fontBold, COLOR_DARK);
 }
 
-// ── Grid (card) layout — catalog-style rich cards ───────────────────────────────
-async function drawGridPages(pdfDoc: PDFDocument, doc: BrandedDoc, bgImage: PDFImage | null, itemImages: Record<string, PDFImage>, font: PDFFont, fontBold: PDFFont): Promise<number> {
-  const ROWS_PER_PAGE = 4;
+function drawFFENotes(page: PDFPage, g: Geom, items: BrandedDocItem[], startY: number, font: PDFFont, fontBold: PDFFont): void {
+  let y = startY;
+  page.drawLine({ start: { x: g.TABLE_MARGIN, y: y + 10 }, end: { x: g.TABLE_MARGIN + g.TABLE_W, y: y + 10 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
+  page.drawText('SPECIFICATIONS & DELIVERY', { x: g.TABLE_MARGIN, y, size: 10, font: fontBold, color: COLOR_DARK });
+  y -= 18;
+  for (const item of items) {
+    if (y < 60) break;
+    page.drawText(truncateText(item.name, fontBold, 8, g.TABLE_W - 20), { x: g.TABLE_MARGIN, y, size: 8, font: fontBold, color: COLOR_BLACK }); y -= 14;
+    if (item.installation_requirements) {
+      page.drawText('Installation:', { x: g.TABLE_MARGIN + 8, y, size: 7, font: fontBold, color: COLOR_GRAY });
+      for (const line of wrapText(item.installation_requirements, font, 7, g.TABLE_W - 80)) { page.drawText(line, { x: g.TABLE_MARGIN + 70, y, size: 7, font, color: COLOR_BLACK }); y -= 11; }
+    }
+    if (item.delivery_date) {
+      page.drawText('Delivery:', { x: g.TABLE_MARGIN + 8, y, size: 7, font: fontBold, color: COLOR_GRAY });
+      page.drawText(formatDate(item.delivery_date), { x: g.TABLE_MARGIN + 70, y, size: 7, font, color: COLOR_BLACK }); y -= 11;
+    }
+    y -= 6;
+  }
+}
+
+// ── Grid (card) layout ──────────────────────────────────────────────────────────
+function drawGridPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: PDFImage | null, itemImages: Record<string, PDFImage>, font: PDFFont, fontBold: PDFFont): number {
   const rowH = 150, imgSize = 130;
   let pages = 0;
   for (const section of doc.sections) {
     const materials = section.items;
-    const chunks = Math.max(1, Math.ceil(materials.length / ROWS_PER_PAGE));
+    const chunks = Math.max(1, Math.ceil(materials.length / 4));
     for (let chunk = 0; chunk < chunks; chunk++) {
-      const slice = materials.slice(chunk * ROWS_PER_PAGE, chunk * ROWS_PER_PAGE + ROWS_PER_PAGE);
-      const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
-      pages++;
-      if (bgImage) { page.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H }); page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: COLOR_WHITE, opacity: 0.92 }); }
-      let y = PAGE_H - MARGIN_TOP;
+      const slice = materials.slice(chunk * 4, chunk * 4 + 4);
+      const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
+      if (bgImage) { page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H }); page.drawRectangle({ x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H, color: COLOR_WHITE, opacity: 0.92 }); }
+      let y = g.PAGE_H - g.MARGIN_TOP;
       if (chunk === 0 && section.title) {
-        page.drawRectangle({ x: MARGIN_LEFT, y: y - 4, width: 32, height: 3, color: COLOR_DARK });
-        y -= 18;
-        page.drawText(section.title, { x: MARGIN_LEFT, y, size: 22, font: fontBold, color: COLOR_DARK });
-        y -= 28;
-        if (section.intro) { for (const line of wrapText(section.intro, font, 11, CONTENT_W).slice(0, 3)) { page.drawText(line, { x: MARGIN_LEFT, y, size: 11, font, color: COLOR_GRAY }); y -= 14; } y -= 4; }
-        page.drawLine({ start: { x: MARGIN_LEFT, y: y - 4 }, end: { x: PAGE_W - MARGIN_RIGHT, y: y - 4 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
-        y -= 18;
-      } else if (section.title) {
-        y -= 10; page.drawText(`${section.title} (continued)`, { x: MARGIN_LEFT, y, size: 12, font, color: COLOR_GRAY }); y -= 22;
-      }
+        page.drawRectangle({ x: g.MARGIN, y: y - 4, width: 32, height: 3, color: COLOR_DARK }); y -= 18;
+        page.drawText(section.title, { x: g.MARGIN, y, size: 22, font: fontBold, color: COLOR_DARK }); y -= 28;
+        if (section.intro) { for (const line of wrapText(section.intro, font, 11, g.CONTENT_W).slice(0, 3)) { page.drawText(line, { x: g.MARGIN, y, size: 11, font, color: COLOR_GRAY }); y -= 14; } y -= 4; }
+        page.drawLine({ start: { x: g.MARGIN, y: y - 4 }, end: { x: g.PAGE_W - g.MARGIN, y: y - 4 }, thickness: 0.5, color: COLOR_LIGHT_GRAY }); y -= 18;
+      } else if (section.title) { y -= 10; page.drawText(`${section.title} (continued)`, { x: g.MARGIN, y, size: 12, font, color: COLOR_GRAY }); y -= 22; }
       for (const mat of slice) {
         if (y - rowH < 60) break;
-        const imgX = MARGIN_LEFT, imgY = y - imgSize;
+        const imgX = g.MARGIN, imgY = y - imgSize;
         page.drawRectangle({ x: imgX, y: imgY, width: imgSize, height: imgSize, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_LIGHT_GRAY, borderWidth: 0.5 });
         const thumb = itemImages[mat.image_key ?? ''] ?? null;
         if (thumb) { const r = Math.min(imgSize / thumb.width, imgSize / thumb.height); const dw = thumb.width * r, dh = thumb.height * r; page.drawImage(thumb, { x: imgX + (imgSize - dw) / 2, y: imgY + (imgSize - dh) / 2, width: dw, height: dh }); }
         else page.drawText('No image', { x: imgX + 38, y: imgY + imgSize / 2, size: 10, font, color: COLOR_GRAY });
-        const textX = imgX + imgSize + 16, textW = CONTENT_W - imgSize - 16;
+        const textX = imgX + imgSize + 16, textW = g.CONTENT_W - imgSize - 16;
         let ty = y - 4;
         page.drawText(truncateText(mat.name, fontBold, 14, textW), { x: textX, y: ty, size: 14, font: fontBold, color: COLOR_DARK }); ty -= 18;
-        if (mat.description) { for (const line of wrapText(mat.description, font, 10, textW).slice(0, 3)) { page.drawText(line, { x: textX, y: ty, size: 10, font, color: COLOR_BLACK }); ty -= 13; } }
+        if (mat.description) for (const line of wrapText(mat.description, font, 10, textW).slice(0, 3)) { page.drawText(line, { x: textX, y: ty, size: 10, font, color: COLOR_BLACK }); ty -= 13; }
         if (mat.specs && Object.keys(mat.specs).length > 0) { const sl = Object.entries(mat.specs).slice(0, 4).map(([k, v]) => `${k}: ${v}`).join('  •  '); ty -= 4; page.drawText(truncateText(sl, font, 9, textW), { x: textX, y: ty, size: 9, font, color: COLOR_GRAY }); ty -= 12; }
         if (mat.unit_price != null) page.drawText(formatCurrency(mat.unit_price, doc.currency), { x: textX, y: imgY + 6, size: 14, font: fontBold, color: COLOR_DARK });
         y -= rowH;
-        page.drawLine({ start: { x: MARGIN_LEFT, y: y + 2 }, end: { x: PAGE_W - MARGIN_RIGHT, y: y + 2 }, thickness: 0.25, color: COLOR_LIGHT_GRAY });
-        y -= 8;
+        page.drawLine({ start: { x: g.MARGIN, y: y + 2 }, end: { x: g.PAGE_W - g.MARGIN, y: y + 2 }, thickness: 0.25, color: COLOR_LIGHT_GRAY }); y -= 8;
       }
     }
   }
-  // Totals on their own page (grid mode) when present.
   if (doc.totals) {
-    const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
-    pages++;
-    if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
-    drawTotals(page, doc.totals, PAGE_H - 140, font, fontBold);
+    const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
+    if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
+    drawTotals(page, g, doc.totals, g.PAGE_H - 140, font, fontBold);
   }
   return pages;
 }
 
-// ── Shared helpers ──────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────────
 async function embedImage(pdfDoc: PDFDocument, bytes: Uint8Array | null): Promise<PDFImage | null> {
   if (!bytes || bytes.length < 8) return null;
   try {
@@ -508,7 +455,6 @@ async function embedImage(pdfDoc: PDFDocument, bytes: Uint8Array | null): Promis
   } catch { /* */ }
   return null;
 }
-
 function drawRightAligned(page: PDFPage, text: string, rightX: number, y: number, size: number, font: PDFFont, color: RGB): void {
   page.drawText(text, { x: rightX - font.widthOfTextAtSize(text, size), y, size, font, color });
 }
@@ -517,8 +463,7 @@ function sectionHeader(page: PDFPage, title: string, x: number, y: number, fontB
   return y - 22;
 }
 function labelValue(page: PDFPage, label: string, value: string | null, x: number, y: number, font: PDFFont, fontBold: PDFFont): number {
-  page.drawText(label, { x, y, size: 8, font, color: COLOR_GRAY });
-  y -= 14;
+  page.drawText(label, { x, y, size: 8, font, color: COLOR_GRAY }); y -= 14;
   page.drawText(value || 'N/A', { x, y, size: 10, font: fontBold, color: COLOR_BLACK });
   return y - 18;
 }
@@ -533,9 +478,8 @@ function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: numbe
   const lines: string[] = [];
   for (const para of String(text ?? '').split(/\r?\n/)) {
     if (para.trim() === '') { lines.push(''); continue; }
-    const words = para.split(/[ \t]+/).filter(Boolean);
     let cur = '';
-    for (const word of words) {
+    for (const word of para.split(/[ \t]+/).filter(Boolean)) {
       const test = cur ? `${cur} ${word}` : word;
       if (font.widthOfTextAtSize(test, fontSize) > maxWidth && cur) { lines.push(cur); cur = word; } else cur = test;
     }
@@ -544,14 +488,15 @@ function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: numbe
   return lines;
 }
 function formatDate(iso?: string | null): string {
-  if (!iso) return formatDateObj(new Date());
+  if (!iso) return fmtDate(new Date());
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? String(iso) : formatDateObj(d);
+  return isNaN(d.getTime()) ? String(iso) : fmtDate(d);
 }
-function formatDateObj(d: Date): string {
+function fmtDate(d: Date): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 function formatCurrency(amount: number, currency = 'EUR'): string {
   const symbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : `${currency} `;
   return `${symbol}${amount.toFixed(2)}`;
 }
+function round2(n: number): number { return Math.round(n * 100) / 100; }
