@@ -1205,13 +1205,11 @@ export const CompanyDetailPage: React.FC = () => {
 
             {/* Primary Contact */}
             <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="is-primary-contact"
                 checked={isPrimaryContact}
-                onChange={(e) => setIsPrimaryContact(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
-/>
+                onCheckedChange={(checked) => setIsPrimaryContact(checked === true)}
+              />
               <Label htmlFor="is-primary-contact" className="cursor-pointer">
                 Mark as primary contact for this company
               </Label>
