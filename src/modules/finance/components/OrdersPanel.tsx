@@ -46,7 +46,13 @@ const UNIT_OPTIONS: Array<{ code: string; label: string }> = [
 const DEFAULT_UNIT = 'item';
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
-export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; contactId?: string; projectId?: string }> = ({ workspaceId, companyId, contactId, projectId }) => {
+export const OrdersPanel: React.FC<{
+  workspaceId: string; companyId?: string; contactId?: string; projectId?: string;
+  /** The embedded party's role, when mounted inside a CRM contact/company page. Gates which
+      order kinds the New-order menu offers (customer → sell, supplier → buy). Omit on the
+      global Finance list / project tab — there's no single party, so both kinds stay. */
+  partyRoles?: { customer: boolean; supplier: boolean };
+}> = ({ workspaceId, companyId, contactId, projectId, partyRoles }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +75,13 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
   }, [workspaceId]);
 
   const openCreate = (orderType: OrderType, draft: boolean) => { setCreatePreset({ orderType, draft }); setCreateOpen(true); };
+
+  // Role-aware New-order menu. No role context (global Finance list / project tab) or an
+  // unclassified party → offer both kinds, unchanged. A customer-only party can't be a
+  // supplier we buy from, so Purchase is hidden — and vice versa.
+  const roleUnset = !partyRoles || (!partyRoles.customer && !partyRoles.supplier);
+  const showSales = roleUnset || !!partyRoles?.customer;
+  const showPurchase = roleUnset || !!partyRoles?.supplier;
 
   const load = async () => {
     if (!workspaceId) return;
@@ -137,16 +150,25 @@ export const OrdersPanel: React.FC<{ workspaceId: string; companyId?: string; co
               <Button><Plus className="h-4 w-4 mr-1" /> New order <ChevronDown className="h-4 w-4 ml-1" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => openCreate('sales', false)}>
-                <ShoppingCart className="h-3.5 w-3.5 mr-2" /> Sales order
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openCreate('purchase', false)}>
-                <Package className="h-3.5 w-3.5 mr-2" /> Purchase order
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openCreate('sales', true)}>
-                <FileClock className="h-3.5 w-3.5 mr-2" /> Pre-order <span className="ml-1 text-[10px] text-muted-foreground">(draft)</span>
-              </DropdownMenuItem>
+              {showSales && (
+                <DropdownMenuItem onClick={() => openCreate('sales', false)}>
+                  <ShoppingCart className="h-3.5 w-3.5 mr-2" /> Sales order
+                </DropdownMenuItem>
+              )}
+              {showPurchase && (
+                <DropdownMenuItem onClick={() => openCreate('purchase', false)}>
+                  <Package className="h-3.5 w-3.5 mr-2" /> Purchase order
+                </DropdownMenuItem>
+              )}
+              {/* Pre-order is a sales draft — only offered where selling is offered. */}
+              {showSales && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => openCreate('sales', true)}>
+                    <FileClock className="h-3.5 w-3.5 mr-2" /> Pre-order <span className="ml-1 text-[10px] text-muted-foreground">(draft)</span>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
