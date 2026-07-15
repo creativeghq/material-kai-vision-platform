@@ -18,7 +18,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
-import { companiesAPI } from '@/services/crm.service';
+import { companiesAPI, contactsAPI } from '@/services/crm.service';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { financeService } from '@/modules/finance/services/financeService';
@@ -181,6 +181,13 @@ export const CompanyDetailPage: React.FC = () => {
   const [isPrimaryContact, setIsPrimaryContact] = useState(false);
   const [contactNotes, setContactNotes] = useState<string>('');
   const [attachingContact, setAttachingContact] = useState(false);
+  // Add-contact dialog can either link an existing contact or create a brand-new one
+  // (created then attached in one step). New-contact fields:
+  const [contactMode, setContactMode] = useState<'existing' | 'new'>('existing');
+  const [newContactName, setNewContactName] = useState<string>('');
+  const [newContactEmail, setNewContactEmail] = useState<string>('');
+  const [newContactPhone, setNewContactPhone] = useState<string>('');
+  const [newContactPosition, setNewContactPosition] = useState<string>('');
 
   useEffect(() => {
     if (id && !isNew) {
@@ -432,26 +439,50 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
+  const resetContactDialog = () => {
+    setShowAddContactDialog(false);
+    setContactMode('existing');
+    setSelectedContactId('');
+    setContactRole('');
+    setIsPrimaryContact(false);
+    setContactNotes('');
+    setNewContactName('');
+    setNewContactEmail('');
+    setNewContactPhone('');
+    setNewContactPosition('');
+  };
+
   const handleAttachContact = async () => {
-    if (!id || !selectedContactId) return;
+    if (!id) return;
+    // In "new" mode we create the contact first, then attach the resulting id.
+    if (contactMode === 'new' && !newContactName.trim()) return;
+    if (contactMode === 'existing' && !selectedContactId) return;
     try {
       setAttachingContact(true);
+      let contactId = selectedContactId;
+      if (contactMode === 'new') {
+        const created = await contactsAPI.createContact({
+          name: newContactName.trim(),
+          email: newContactEmail.trim() || undefined,
+          phone: newContactPhone.trim() || undefined,
+          position: newContactPosition.trim() || undefined,
+        });
+        contactId = created.data.id;
+      }
       await companiesAPI.attachContact(
         id,
-        selectedContactId,
+        contactId,
         contactRole,
         isPrimaryContact,
         contactNotes,
       );
       toast({
         title: 'Success',
-        description: 'Contact attached to company successfully',
+        description: contactMode === 'new'
+          ? 'Contact created and attached to company'
+          : 'Contact attached to company successfully',
       });
-      setShowAddContactDialog(false);
-      setSelectedContactId('');
-      setContactRole('');
-      setIsPrimaryContact(false);
-      setContactNotes('');
+      resetContactDialog();
       await loadCompany();
     } catch (error: any) {
       console.error('Error attaching contact:', error);
@@ -1066,7 +1097,7 @@ export const CompanyDetailPage: React.FC = () => {
                 <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
                 {/* 2 — The orders themselves (customer + supplier orders). Click an order to manage
                        its receivables/payables, invoices, supplier bills, payments and dispatch. */}
-                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} />
+                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} partyRoles={{ customer: !!company.is_customer, supplier: !!company.is_supplier }} />
                 {/* 2b — Itemised cash movements across all their orders (money in & out), so the
                        payments made to / received from this party are visible at the party level. */}
                 <PartyPaymentsCard companyId={company.id} />
@@ -1093,25 +1124,73 @@ export const CompanyDetailPage: React.FC = () => {
       />
 
       {/* Add Contact Dialog */}
-      <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>
+      <Dialog open={showAddContactDialog} onOpenChange={(o) => { if (!o) resetContactDialog(); else setShowAddContactDialog(true); }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Attach Contact to Company</DialogTitle>
+            <DialogTitle>Add Contact to Company</DialogTitle>
             <DialogDescription>
-              Link a contact to this company and specify their role
+              Link an existing contact or create a new one, then set their role
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Contact Search */}
-            <div className="space-y-2">
-              <Label>Contact *</Label>
-              <ContactSearchDropdown
-                onSelect={setSelectedContactId}
-                excludeContactIds={company?.contacts?.map((c: any) => c.contact_id) || []}
-                placeholder="Search contacts..."
-                selectedContactId={selectedContactId || null}
+            {/* Existing vs New toggle */}
+            <Tabs value={contactMode} onValueChange={(v) => setContactMode(v as 'existing' | 'new')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="existing">Existing contact</TabsTrigger>
+                <TabsTrigger value="new">New contact</TabsTrigger>
+              </TabsList>
+              <TabsContent value="existing" className="mt-4 space-y-2">
+                <Label>Contact *</Label>
+                <ContactSearchDropdown
+                  onSelect={setSelectedContactId}
+                  excludeContactIds={company?.contacts?.map((c: any) => c.contact_id) || []}
+                  placeholder="Search contacts..."
+                  selectedContactId={selectedContactId || null}
 />
-            </div>
+              </TabsContent>
+              <TabsContent value="new" className="mt-4 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="new-contact-name">Name *</Label>
+                  <Input
+                    id="new-contact-name"
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    placeholder="Jane Doe"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-contact-email">Email</Label>
+                    <Input
+                      id="new-contact-email"
+                      type="email"
+                      value={newContactEmail}
+                      onChange={(e) => setNewContactEmail(e.target.value)}
+                      placeholder="jane@company.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-contact-phone">Phone</Label>
+                    <Input
+                      id="new-contact-phone"
+                      type="tel"
+                      value={newContactPhone}
+                      onChange={(e) => setNewContactPhone(e.target.value)}
+                      placeholder="+1 (555) 123-4567"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-contact-position">Position / Title</Label>
+                  <Input
+                    id="new-contact-position"
+                    value={newContactPosition}
+                    onChange={(e) => setNewContactPosition(e.target.value)}
+                    placeholder="e.g. Procurement Manager"
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
 
             {/* Role */}
             <div className="space-y-2">
@@ -1151,23 +1230,19 @@ export const CompanyDetailPage: React.FC = () => {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowAddContactDialog(false);
-                setSelectedContactId('');
-                setContactRole('');
-                setIsPrimaryContact(false);
-                setContactNotes('');
-              }}
->
+            <Button variant="outline" onClick={resetContactDialog}>
               Cancel
             </Button>
             <Button
               onClick={handleAttachContact}
-              disabled={!selectedContactId || attachingContact}
+              disabled={
+                attachingContact ||
+                (contactMode === 'existing' ? !selectedContactId : !newContactName.trim())
+              }
 >
-              {attachingContact ? 'Attaching...' : 'Attach Contact'}
+              {attachingContact
+                ? (contactMode === 'new' ? 'Creating...' : 'Attaching...')
+                : (contactMode === 'new' ? 'Create & Attach' : 'Attach Contact')}
             </Button>
           </div>
         </DialogContent>
