@@ -839,10 +839,10 @@ export const ContactDetailPage: React.FC = () => {
                     value={contact.vat_exemption_reason ?? undefined}
                     unsetValue="__none"
                     placeholder="None"
-                    options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))}
-                    displayValue={contact.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{contact.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === contact.vat_exemption_reason)?.label}</span> : undefined}
+                    options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span><span className="font-mono text-[10px] mr-2 text-muted-foreground">0%</span>{c.label}</span> }))}
+                    displayValue={contact.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{contact.vat_exemption_reason}</span><span className="font-mono text-[10px] mr-2 text-muted-foreground">0%</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === contact.vat_exemption_reason)?.label}</span> : undefined}
                     onSave={(v) => patchInline({ vat_exemption_reason: v })}
-                    hint="Pre-fills the myDATA exemption category on 0%-VAT lines."
+                    hint="Exemption reason for 0%-VAT lines — every category here is 0%. The actual rate (24/13/6%) is set per product/line, not on the customer."
                   />
                 </div>
                 <div className="flex items-center justify-between gap-4">
