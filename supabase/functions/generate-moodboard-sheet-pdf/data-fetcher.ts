@@ -42,22 +42,63 @@ export async function fetchClientName(
   return branding?.client_fallback_name;
 }
 
-/** Pull the sheet creator's profile + studio branding for the title block. */
+/**
+ * Branding for the sheet title block. Prefers the workspace's finance_settings business
+ * identity (business_name + logo + contact) — the SAME source invoices/quotes/catalogs
+ * use — so the logo/company match every other document. Falls back to the creator's
+ * profile studio branding when finance isn't set up. The client-name fallback always
+ * comes from the profile.
+ */
 export async function fetchOwnerBranding(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<OwnerBranding | undefined> {
-  const { data } = await supabase
+  const { data: profile } = await supabase
     .from('user_profiles')
     .select('full_name, email, branding_logo_url, branding_company_name, branding_contact_line')
     .eq('id', userId)
     .maybeSingle();
-  if (!data) return undefined;
+
+  // Unified branding source: the creator's workspace finance_settings identity.
+  let fsLogoUrl: string | undefined;
+  let fsCompany: string | undefined;
+  let fsContact: string | undefined;
+  try {
+    const { data: mem } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    const wsId = (mem as { workspace_id?: string } | null)?.workspace_id;
+    if (wsId) {
+      const { data: fs } = await supabase
+        .from('finance_settings')
+        .select('business_name, business_logo_path, business_phone, business_email, contact_phone, contact_email')
+        .eq('workspace_id', wsId)
+        .maybeSingle();
+      if (fs) {
+        const f = fs as Record<string, string | null>;
+        fsCompany = f.business_name || undefined;
+        if (f.business_logo_path) {
+          // business_logo_path lives in the public generation-images bucket.
+          const base = Deno.env.get('SUPABASE_URL') || '';
+          fsLogoUrl = `${base}/storage/v1/object/public/generation-images/${f.business_logo_path}`;
+        }
+        const phone = f.business_phone || f.contact_phone;
+        const email = f.business_email || f.contact_email;
+        fsContact = [phone, email].filter(Boolean).join('  ·  ') || undefined;
+      }
+    }
+  } catch { /* finance branding optional — fall back to profile below */ }
+
+  const p = profile as Record<string, string | null> | null;
+  if (!p && !fsCompany && !fsLogoUrl) return undefined;
   return {
-    client_fallback_name: (data as any).full_name || (data as any).email || undefined,
-    logo_url: (data as any).branding_logo_url || undefined,
-    company_name: (data as any).branding_company_name || undefined,
-    contact_line: (data as any).branding_contact_line || undefined,
+    client_fallback_name: p?.full_name || p?.email || undefined,
+    logo_url: fsLogoUrl || p?.branding_logo_url || undefined,
+    company_name: fsCompany || p?.branding_company_name || undefined,
+    contact_line: fsContact || p?.branding_contact_line || undefined,
   };
 }
 
