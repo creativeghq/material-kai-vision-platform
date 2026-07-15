@@ -95,6 +95,8 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
     let imgCount = 0;
     const docSections: BrandedDocSection[] = [];
     let subtotalNet = 0;
+    let grossSum = 0;
+    let discountSum = 0;
     let vatSum = 0;
     let anyPriced = false;
     let matIdx = 0;
@@ -107,19 +109,24 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
         const qty = specs.quantity_tmet != null ? Number(specs.quantity_tmet)
           : specs.quantity_tem != null ? Number(specs.quantity_tem)
           : specs.quantity != null ? Number(specs.quantity) : 1;
-        // Line total = net_value if present, else qty × unit price.
+        // Net line value (after discount) = net_value if present, else qty × unit price.
         const netValue = specs.net_value != null ? Number(specs.net_value)
           : (unitPrice != null ? round2(unitPrice * qty) : null);
         const lineVatPct = specs.vat_pct != null ? Number(specs.vat_pct) : vatRate;
+        const discountPct = specs.discount_pct != null ? Number(specs.discount_pct) : 0;
+        // Pre-discount value = net + discount, else unit × qty; discount = the difference.
+        let discountValue = specs.discount_value != null ? Number(specs.discount_value) : null;
+        const grossVal = (netValue != null && discountValue != null) ? round2(netValue + discountValue)
+          : (unitPrice != null ? round2(unitPrice * qty) : netValue);
+        if (discountValue == null && grossVal != null && netValue != null) discountValue = round2(grossVal - netValue);
+
         if (netValue != null && !Number.isNaN(netValue)) {
           subtotalNet += netValue;
           vatSum += netValue * lineVatPct / 100;
           anyPriced = true;
         }
-        // Effective unit price after discount, so the Price column shows 14.75 → 11.80
-        // (struck) and the math reconciles: qty × discounted = net_value.
-        const discountedUnit = (netValue != null && qty > 0) ? round2(netValue / qty) : null;
-        const showDiscount = discountedUnit != null && unitPrice != null && Math.abs(discountedUnit - unitPrice) > 0.01;
+        if (grossVal != null && !Number.isNaN(grossVal)) grossSum += grossVal;
+        if (discountValue != null && !Number.isNaN(discountValue)) discountSum += discountValue;
 
         const key = mat.id || `m${matIdx}`;
         matIdx++;
@@ -136,7 +143,9 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
           quantity: qty,
           unit: specs.unit ?? 'pcs',
           unit_price: unitPrice,
-          discounted_price: showDiscount ? discountedUnit : null,
+          discount_pct: discountPct,
+          discount_value: discountValue,
+          vat_pct: lineVatPct,
           line_total: netValue,
           specs,
         });
@@ -153,6 +162,8 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
     const totals = (isProforma && anyPriced)
       ? {
           subtotal: round2(subtotalNet),
+          gross_subtotal: round2(grossSum),
+          discount_total: round2(discountSum),
           vat_rate: vatRate,
           vat_amount: round2(vatSum),
           grand_total: round2(subtotalNet + vatSum),

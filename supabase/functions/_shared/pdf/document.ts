@@ -29,20 +29,26 @@ const CELL_PAD = 6; // horizontal padding, shared by header + data so columns li
 
 // The list column set. Widths are relative and re-scaled to the actual table width.
 // `align` is used for BOTH the header label and the cell, so they never drift apart.
-type ColumnKey = 'index' | 'thumb' | 'name' | 'room' | 'sku' | 'size_color' | 'qty' | 'unit' | 'price' | 'total';
+// Column ORDER mirrors a supplier proforma line: Code · Description · Unit · Qty ·
+// Price · Discount% · Discount · VAT% · Net. Discount/VAT columns are dynamic (only
+// rendered when the data carries them) so a plain price list stays lean.
+type ColumnKey = 'index' | 'thumb' | 'sku' | 'name' | 'room' | 'size_color' | 'unit' | 'qty' | 'price' | 'disc_pct' | 'disc_val' | 'vat_pct' | 'total';
 type Align = 'left' | 'right' | 'center';
 interface ColumnSpec { key: ColumnKey; label: string; width: number; align: Align; }
 const LIST_COLUMNS: ColumnSpec[] = [
   { key: 'index', label: '#', width: 20, align: 'left' },
-  { key: 'thumb', label: '', width: 34, align: 'center' },
-  { key: 'name', label: 'Product', width: 110, align: 'left' },
-  { key: 'room', label: 'Room', width: 52, align: 'left' },
-  { key: 'sku', label: 'SKU', width: 58, align: 'left' },
-  { key: 'size_color', label: 'Size / Color', width: 58, align: 'left' },
-  { key: 'qty', label: 'Qty', width: 34, align: 'right' },
-  { key: 'unit', label: 'Unit', width: 38, align: 'left' },
-  { key: 'price', label: 'Price', width: 66, align: 'right' },
-  { key: 'total', label: 'Total', width: 80, align: 'right' },
+  { key: 'thumb', label: '', width: 30, align: 'center' },
+  { key: 'sku', label: 'Code', width: 58, align: 'left' },
+  { key: 'name', label: 'Description', width: 120, align: 'left' },
+  { key: 'room', label: 'Room', width: 50, align: 'left' },
+  { key: 'size_color', label: 'Size / Color', width: 55, align: 'left' },
+  { key: 'unit', label: 'Unit', width: 40, align: 'left' },
+  { key: 'qty', label: 'Qty', width: 38, align: 'right' },
+  { key: 'price', label: 'Price', width: 52, align: 'right' },
+  { key: 'disc_pct', label: 'Disc %', width: 34, align: 'right' },
+  { key: 'disc_val', label: 'Discount', width: 54, align: 'right' },
+  { key: 'vat_pct', label: 'VAT %', width: 34, align: 'right' },
+  { key: 'total', label: 'Net', width: 60, align: 'right' },
 ];
 
 // ── Geometry derived from the page size ─────────────────────────────────────────
@@ -102,6 +108,8 @@ function listColumns(g: Geom, items: BrandedDocItem[], showPriceCols: boolean, h
       case 'room': return items.some((it) => cellPresent(it.room));
       case 'sku': return items.some((it) => cellPresent(it.sku));
       case 'size_color': return items.some((it) => cellPresent(it.size_color));
+      case 'disc_pct': case 'disc_val': return showPriceCols && items.some((it) => (it.discount_value ?? 0) > 0 || (it.discount_pct ?? 0) > 0);
+      case 'vat_pct': return showPriceCols && items.some((it) => (it.vat_pct ?? 0) > 0);
       case 'qty': case 'unit': case 'price': case 'total': return showPriceCols;
     }
   };
@@ -124,14 +132,26 @@ export interface BrandedDocItem {
   unit?: string | null;
   unit_price?: number | null;
   discounted_price?: number | null;
-  line_total?: number | null;
+  discount_pct?: number | null;
+  discount_value?: number | null;
+  vat_pct?: number | null;
+  line_total?: number | null;   // NET line value (after discount)
   pricing_status?: string;
   specs?: Record<string, unknown> | null;
   installation_requirements?: string | null;
   delivery_date?: string | null;
 }
 export interface BrandedDocSection { title?: string | null; intro?: string | null; items: BrandedDocItem[]; }
-export interface BrandedTotals { subtotal: number; vat_rate: number; vat_amount: number; grand_total: number; cash_discount_pct?: number; currency: string; }
+export interface BrandedTotals {
+  subtotal: number;               // NET subtotal (after line discounts) — legacy field
+  vat_rate: number;
+  vat_amount: number;
+  grand_total: number;
+  cash_discount_pct?: number;
+  gross_subtotal?: number;        // value BEFORE discount (Σ price×qty) — proforma breakdown
+  discount_total?: number;        // Σ line discounts
+  currency: string;
+}
 export interface BrandedClient { contact_name?: string | null; company_name?: string | null; email?: string | null; phone?: string | null; address?: string | null; city?: string | null; postal_code?: string | null; country?: string | null; vat_number?: string | null; }
 export interface BrandedCompany { name?: string | null; address?: string | null; phone?: string | null; email?: string | null; vat?: string | null; }
 export interface BrandedDoc {
@@ -385,21 +405,14 @@ function drawTableRow(page: PDFPage, g: Geom, y: number, rowNum: number, item: B
       case 'size_color': drawInCell(page, truncateText(item.size_color || '-', font, fs, w - pad), x, w, textY, fs, font, COLOR_BLACK, col.align); break;
       case 'qty': drawInCell(page, formatQty(item.quantity), x, w, textY, fs, font, COLOR_BLACK, col.align); break;
       case 'unit': drawInCell(page, truncateText(item.unit || 'pcs', font, fs, w - pad), x, w, textY, fs, font, COLOR_GRAY, col.align); break;
-      case 'price': {
-        const right = x + w - CELL_PAD;
-        if (unpriced) { drawRightAligned(page, 'Call for price', right, textY, fs - 1, font, COLOR_GRAY); break; }
-        if (item.discounted_price != null && item.unit_price != null) {
-          const orig = formatCurrency(item.unit_price, currency);
-          drawRightAligned(page, orig, right, textY + 4, fs - 1, font, COLOR_GRAY);
-          const ow = font.widthOfTextAtSize(orig, fs - 1);
-          page.drawLine({ start: { x: right - ow, y: textY + 7 }, end: { x: right, y: textY + 7 }, thickness: 0.4, color: COLOR_GRAY });
-          drawRightAligned(page, formatCurrency(item.discounted_price, currency), right, textY - 7, fs, fontBold, COLOR_BLACK);
-        } else {
-          drawRightAligned(page, item.unit_price != null ? formatCurrency(item.unit_price, currency) : '-', right, textY, fs, font, COLOR_BLACK);
-        }
+      case 'price':
+        if (unpriced) drawInCell(page, 'Call for price', x, w, textY, fs - 1, font, COLOR_GRAY, col.align);
+        else drawInCell(page, item.unit_price != null ? formatCurrency(item.unit_price, currency) : '-', x, w, textY, fs, font, COLOR_BLACK, col.align);
         break;
-      }
-      case 'total': drawRightAligned(page, unpriced ? '—' : (item.line_total != null ? formatCurrency(item.line_total, currency) : '-'), x + w - CELL_PAD, textY, fs, fontBold, COLOR_BLACK); break;
+      case 'disc_pct': drawInCell(page, (item.discount_pct ?? 0) > 0 ? `${formatQty(item.discount_pct)}%` : '-', x, w, textY, fs, font, COLOR_GRAY, col.align); break;
+      case 'disc_val': drawInCell(page, (item.discount_value ?? 0) > 0 ? formatCurrency(item.discount_value as number, currency) : '-', x, w, textY, fs, font, COLOR_GRAY, col.align); break;
+      case 'vat_pct': drawInCell(page, (item.vat_pct ?? 0) > 0 ? `${formatQty(item.vat_pct)}%` : '-', x, w, textY, fs, font, COLOR_GRAY, col.align); break;
+      case 'total': drawInCell(page, unpriced ? '—' : (item.line_total != null ? formatCurrency(item.line_total, currency) : '-'), x, w, textY, fs, fontBold, COLOR_BLACK, col.align); break;
     }
     x += w;
   }
@@ -413,29 +426,37 @@ function formatQty(q: number | null | undefined): string {
 
 function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, font: PDFFont, fontBold: PDFFont): void {
   const rightEdge = g.TABLE_MARGIN + g.TABLE_W - 6;
-  const labelX = rightEdge - 180;
+  const labelX = rightEdge - 200;
+  const cur = totals.currency;
+  const line = (label: string, value: string, bold = false, gray = false) => {
+    page.drawText(label, { x: labelX, y, size: bold ? 12 : 10, font: bold ? fontBold : font, color: gray ? COLOR_GRAY : (bold ? COLOR_DARK : COLOR_BLACK) });
+    drawRightAligned(page, value, rightEdge, y, bold ? 12 : 10, bold ? fontBold : font, gray ? COLOR_GRAY : (bold ? COLOR_DARK : COLOR_BLACK));
+    y -= bold ? 0 : 18;
+  };
   y -= 20;
   page.drawLine({ start: { x: labelX, y: y + 8 }, end: { x: rightEdge, y: y + 8 }, thickness: 1, color: COLOR_DARK });
-  const cashPct = totals.cash_discount_pct ?? 0;
-  const price = totals.subtotal;
-  const discount = round2(price * cashPct / 100);
-  page.drawText('Price', { x: labelX, y, size: 10, font, color: COLOR_BLACK });
-  drawRightAligned(page, formatCurrency(price, totals.currency), rightEdge, y, 10, font, COLOR_BLACK);
-  y -= 18;
-  if (discount > 0) {
-    page.drawText('Discount', { x: labelX, y, size: 10, font, color: COLOR_GRAY });
-    drawRightAligned(page, `- ${formatCurrency(discount, totals.currency)}`, rightEdge, y, 10, font, COLOR_GRAY);
-    y -= 18;
-    page.drawText('Price after Discount', { x: labelX, y, size: 10, font, color: COLOR_BLACK });
-    drawRightAligned(page, formatCurrency(price - discount, totals.currency), rightEdge, y, 10, font, COLOR_BLACK);
-    y -= 18;
+
+  // Detailed proforma breakdown when the line-level discount data is present:
+  //   Value before discount → Discount → Net value → VAT → Total payable.
+  const hasDiscount = (totals.discount_total ?? 0) > 0 && totals.gross_subtotal != null;
+  if (hasDiscount) {
+    line('Value before discount', formatCurrency(totals.gross_subtotal as number, cur));
+    line('Discount', `- ${formatCurrency(totals.discount_total as number, cur)}`, false, true);
+    line('Net value', formatCurrency(totals.subtotal, cur));
+  } else {
+    // Fall back to the older cash-discount / plain-net presentation.
+    const cashPct = totals.cash_discount_pct ?? 0;
+    const discount = round2(totals.subtotal * cashPct / 100);
+    line('Price', formatCurrency(totals.subtotal, cur));
+    if (discount > 0) {
+      line('Discount', `- ${formatCurrency(discount, cur)}`, false, true);
+      line('Price after Discount', formatCurrency(totals.subtotal - discount, cur));
+    }
   }
-  page.drawText(`VAT (${totals.vat_rate}%)`, { x: labelX, y, size: 10, font, color: COLOR_GRAY });
-  drawRightAligned(page, formatCurrency(totals.vat_amount, totals.currency), rightEdge, y, 10, font, COLOR_GRAY);
-  y -= 22;
+  line(`VAT (${totals.vat_rate}%)`, formatCurrency(totals.vat_amount, cur), false, true);
+  y -= 4;
   page.drawLine({ start: { x: labelX, y: y + 8 }, end: { x: rightEdge, y: y + 8 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
-  page.drawText('FINAL', { x: labelX, y, size: 12, font: fontBold, color: COLOR_DARK });
-  drawRightAligned(page, formatCurrency(totals.grand_total, totals.currency), rightEdge, y, 12, fontBold, COLOR_DARK);
+  line(hasDiscount ? 'Total payable' : 'FINAL', formatCurrency(totals.grand_total, cur), true);
 }
 
 function drawFFENotes(page: PDFPage, g: Geom, items: BrandedDocItem[], startY: number, font: PDFFont, fontBold: PDFFont): void {
