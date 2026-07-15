@@ -78,8 +78,9 @@ export const AppLauncher: React.FC = () => {
                       title={app.description || app.label}
                       className="group flex flex-col gap-2.5 rounded-xl p-3 text-left transition-colors duration-200 hover:bg-accent/50 cursor-pointer"
                     >
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-foreground/60 transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                      <span className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-foreground/60 transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                         <app.icon className="h-5 w-5" />
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[hsl(var(--success))] ring-2 ring-popover" title="Active" />
                       </span>
                       <span className="space-y-0.5">
                         <span className="block text-sm font-semibold leading-tight truncate">{app.label}</span>
