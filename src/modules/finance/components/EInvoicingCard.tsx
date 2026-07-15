@@ -21,7 +21,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Loader2, Save, FileSignature, CheckCircle2, XCircle, AlertTriangle, ExternalLink, KeyRound } from 'lucide-react';
+import { Loader2, Save, FileSignature, CheckCircle2, XCircle, AlertTriangle, ExternalLink, KeyRound, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
@@ -50,9 +50,13 @@ const AUTH_STEPS = [
 
 type AuthStatus = 'not_requested' | 'requested' | 'awaiting_authorization' | 'approved' | 'rejected';
 
-interface Props { workspaceId: string }
+interface Props {
+  workspaceId: string;
+  /** Jump to the Business Identity settings tab (where the missing issuer fields live). */
+  onGoToIdentity?: () => void;
+}
 
-export const EInvoicingCard: React.FC<Props> = ({ workspaceId }) => {
+export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -168,9 +172,20 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId }) => {
             <p className="text-xs text-emerald-500 flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> All mandatory issuer fields are filled.</p>
           ) : (
             <>
-              <p className="text-xs text-amber-500 flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" /> {missing.length} mandatory field{missing.length > 1 ? 's' : ''} missing — myDATA will reject transmission until filled.
-              </p>
+              {onGoToIdentity ? (
+                <button
+                  type="button"
+                  onClick={onGoToIdentity}
+                  className="group flex items-center gap-1.5 text-left text-xs text-amber-500 hover:underline"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {missing.length} mandatory field{missing.length > 1 ? 's' : ''} missing — myDATA will reject transmission until filled.
+                  <ArrowRight className="h-3 w-3 shrink-0 opacity-70 transition-transform group-hover:translate-x-0.5" />
+                </button>
+              ) : (
+                <p className="text-xs text-amber-500 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" /> {missing.length} mandatory field{missing.length > 1 ? 's' : ''} missing — myDATA will reject transmission until filled.
+                </p>
+              )}
               <div className="flex flex-wrap gap-1.5">
                 {missing.map((f) => (
                   <span key={f.key} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
@@ -178,7 +193,14 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId }) => {
                   </span>
                 ))}
               </div>
-              <p className="text-[11px] text-muted-foreground">Fill these in the <strong>Business Identity</strong> tab (it has a “Fetch from ΑΑΔΕ” button to auto-fill).</p>
+              <p className="text-[11px] text-muted-foreground">
+                {onGoToIdentity ? (
+                  <button type="button" onClick={onGoToIdentity} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                    Go to Business Identity <ArrowRight className="h-3 w-3" />
+                  </button>
+                ) : <span>Fill these in the <strong>Business Identity</strong> tab</span>}
+                {' '}— it has a “Fetch from ΑΑΔΕ” button to auto-fill.
+              </p>
             </>
           )}
         </div>

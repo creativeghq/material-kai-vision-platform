@@ -66,6 +66,7 @@ const ProviderKeysNote: React.FC = () => (
 export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged }) => {
   const { toast } = useToast();
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
+  const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<'cover' | 'footer' | null>(null);
@@ -196,7 +197,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
   }
 
   return (
-    <Tabs defaultValue="general" className="space-y-4">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
       <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
         {SETTINGS_SECTIONS.map((s) => (
           <TabsTrigger
@@ -224,7 +225,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         </TabsContent>
 
         <TabsContent value="einvoicing" className="mt-0">
-          <EInvoicingCard workspaceId={workspaceId} />
+          <EInvoicingCard workspaceId={workspaceId} onGoToIdentity={() => setActiveTab('identity')} />
         </TabsContent>
 
         <TabsContent value="pricing" className="mt-0 space-y-4">
