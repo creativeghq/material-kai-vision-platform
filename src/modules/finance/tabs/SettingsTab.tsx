@@ -267,6 +267,113 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Module Settings</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Default payment terms (days)</Label>
+              <Input type="number" min="0" value={settings.default_payment_terms_days}
+                onChange={(e) => set('default_payment_terms_days', parseInt(e.target.value, 10) || 0)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Default VAT %</Label>
+              <Input type="text" inputMode="decimal" value={settings.default_vat_rate}
+                onChange={(e) => set('default_vat_rate', parseDecimalOr(e.target.value, 0))} />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Default catalog markup %</Label>
+            <Input type="text" inputMode="decimal" value={settings.default_markup_pct ?? 0}
+              onChange={(e) => set('default_markup_pct', parseDecimalOr(e.target.value, 0))} />
+            <p className="text-[11px] text-muted-foreground">
+              Blanket sell uplift applied over your cost when you add a catalog product to a quote (you can still edit each line).
+            </p>
+          </div>
+
+          {/* Buyer risk checks enforced at invoice issuance (ΑΑΔΕ status + credit limit). */}
+          <div className="rounded-md border border-border/60 p-3 space-y-3">
+            <div>
+              <div className="text-sm font-medium">Buyer risk checks</div>
+              <p className="text-xs text-muted-foreground">
+                Checked when you issue an invoice against a CRM customer. Uses the buyer's AADE status and credit limit (set per-company in CRM).
+              </p>
+            </div>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs">Block issuance when the buyer VAT number is <strong>AADE-inactive</strong></span>
+              <Switch checked={settings.risk_block_inactive_vat} onCheckedChange={(v) => set('risk_block_inactive_vat', v)} />
+            </label>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs">Block issuance when the buyer VAT was <strong>never validated</strong> <span className="text-muted-foreground">(stricter)</span></span>
+              <Switch checked={settings.risk_block_unvalidated_vat} onCheckedChange={(v) => set('risk_block_unvalidated_vat', v)} />
+            </label>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs"><strong>Warn</strong> when the invoice pushes the buyer over their credit limit</span>
+              <Switch checked={settings.risk_warn_over_credit_limit} onCheckedChange={(v) => set('risk_warn_over_credit_limit', v)} />
+            </label>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs"><strong>Block</strong> (instead of warn) when over the credit limit</span>
+              <Switch checked={settings.risk_block_over_credit_limit} onCheckedChange={(v) => set('risk_block_over_credit_limit', v)} />
+            </label>
+
+            <div className="pt-2 border-t border-border/60 space-y-3">
+              <p className="text-xs font-medium">Order rules <span className="text-muted-foreground font-normal">— defaults; each customer can override these in CRM</span></p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1">
+                  <span className="block text-[11px] text-muted-foreground">Default credit / balance hold (€)</span>
+                  <input type="text" inputMode="decimal" value={settings.default_credit_limit ?? ''}
+                    onChange={(e) => set('default_credit_limit', e.target.value === '' ? null : parseDecimal(e.target.value))}
+                    placeholder="No limit" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
+                </label>
+                <label className="space-y-1">
+                  <span className="block text-[11px] text-muted-foreground">Minimum order value (€)</span>
+                  <input type="text" inputMode="decimal" value={settings.min_order_value ?? ''}
+                    onChange={(e) => set('min_order_value', e.target.value === '' ? null : parseDecimal(e.target.value))}
+                    placeholder="No minimum" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
+                </label>
+              </div>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs"><strong>Block</strong> issuance when the order is below the minimum value</span>
+                <Switch checked={settings.risk_block_min_order} onCheckedChange={(v) => set('risk_block_min_order', v)} />
+              </label>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs"><strong>Block</strong> issuance while the buyer has an <strong>unpaid / overdue</strong> invoice</span>
+                <Switch checked={settings.risk_block_unpaid_invoice} onCheckedChange={(v) => set('risk_block_unpaid_invoice', v)} />
+              </label>
+              <p className="text-[11px] text-muted-foreground">A blocked issuance raises an approval request and notifies the responsible sales team via Flows; an approver can release it.</p>
+            </div>
+          </div>
+
+          {/* Expense cards — how an approved expense card (trip, monthly, …) posts to the ledger. */}
+          <div className="rounded-md border border-border/60 p-3 space-y-3">
+            <div>
+              <div className="text-sm font-medium">Expense cards (team expenses)</div>
+              <p className="text-xs text-muted-foreground">
+                When finance approves a team member's expense card (trip, monthly expenses, …), decide whether the approved total is auto-posted as a reimbursement payable (shows in Planning / Payables and can be marked paid).
+              </p>
+            </div>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs">
+                <strong>Auto-create a reimbursement payable</strong> on approval
+                <span className="block text-muted-foreground">Off = approval-only; finance handles reimbursement outside the platform.</span>
+              </span>
+              <Switch
+                checked={settings.trip_expense_reimbursement_mode === 'planned_payment'}
+                onCheckedChange={(v) => set('trip_expense_reimbursement_mode', v ? 'planned_payment' : 'none')}
+              />
+            </label>
+          </div>
+
+          <Button onClick={save} disabled={saving} className="w-full">
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Save settings
+          </Button>
+        </CardContent>
+      </Card>
+        </TabsContent>
+
+        <TabsContent value="digest" className="mt-0 space-y-4">
+      <Card>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Account statements</CardTitle></CardHeader>
+        <CardContent className="space-y-4 p-5">
           <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
             <div>
               <div className="text-sm font-medium">Account statements</div>
@@ -381,110 +488,13 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Default payment terms (days)</Label>
-              <Input type="number" min="0" value={settings.default_payment_terms_days}
-                onChange={(e) => set('default_payment_terms_days', parseInt(e.target.value, 10) || 0)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Default VAT %</Label>
-              <Input type="text" inputMode="decimal" value={settings.default_vat_rate}
-                onChange={(e) => set('default_vat_rate', parseDecimalOr(e.target.value, 0))} />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <Label>Default catalog markup %</Label>
-            <Input type="text" inputMode="decimal" value={settings.default_markup_pct ?? 0}
-              onChange={(e) => set('default_markup_pct', parseDecimalOr(e.target.value, 0))} />
-            <p className="text-[11px] text-muted-foreground">
-              Blanket sell uplift applied over your cost when you add a catalog product to a quote (you can still edit each line).
-            </p>
-          </div>
-
-          {/* Buyer risk checks enforced at invoice issuance (ΑΑΔΕ status + credit limit). */}
-          <div className="rounded-md border border-border/60 p-3 space-y-3">
-            <div>
-              <div className="text-sm font-medium">Buyer risk checks</div>
-              <p className="text-xs text-muted-foreground">
-                Checked when you issue an invoice against a CRM customer. Uses the buyer's AADE status and credit limit (set per-company in CRM).
-              </p>
-            </div>
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-xs">Block issuance when the buyer VAT number is <strong>AADE-inactive</strong></span>
-              <Switch checked={settings.risk_block_inactive_vat} onCheckedChange={(v) => set('risk_block_inactive_vat', v)} />
-            </label>
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-xs">Block issuance when the buyer VAT was <strong>never validated</strong> <span className="text-muted-foreground">(stricter)</span></span>
-              <Switch checked={settings.risk_block_unvalidated_vat} onCheckedChange={(v) => set('risk_block_unvalidated_vat', v)} />
-            </label>
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-xs"><strong>Warn</strong> when the invoice pushes the buyer over their credit limit</span>
-              <Switch checked={settings.risk_warn_over_credit_limit} onCheckedChange={(v) => set('risk_warn_over_credit_limit', v)} />
-            </label>
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-xs"><strong>Block</strong> (instead of warn) when over the credit limit</span>
-              <Switch checked={settings.risk_block_over_credit_limit} onCheckedChange={(v) => set('risk_block_over_credit_limit', v)} />
-            </label>
-
-            <div className="pt-2 border-t border-border/60 space-y-3">
-              <p className="text-xs font-medium">Order rules <span className="text-muted-foreground font-normal">— defaults; each customer can override these in CRM</span></p>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="space-y-1">
-                  <span className="block text-[11px] text-muted-foreground">Default credit / balance hold (€)</span>
-                  <input type="text" inputMode="decimal" value={settings.default_credit_limit ?? ''}
-                    onChange={(e) => set('default_credit_limit', e.target.value === '' ? null : parseDecimal(e.target.value))}
-                    placeholder="No limit" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
-                </label>
-                <label className="space-y-1">
-                  <span className="block text-[11px] text-muted-foreground">Minimum order value (€)</span>
-                  <input type="text" inputMode="decimal" value={settings.min_order_value ?? ''}
-                    onChange={(e) => set('min_order_value', e.target.value === '' ? null : parseDecimal(e.target.value))}
-                    placeholder="No minimum" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
-                </label>
-              </div>
-              <label className="flex items-center justify-between gap-3">
-                <span className="text-xs"><strong>Block</strong> issuance when the order is below the minimum value</span>
-                <Switch checked={settings.risk_block_min_order} onCheckedChange={(v) => set('risk_block_min_order', v)} />
-              </label>
-              <label className="flex items-center justify-between gap-3">
-                <span className="text-xs"><strong>Block</strong> issuance while the buyer has an <strong>unpaid / overdue</strong> invoice</span>
-                <Switch checked={settings.risk_block_unpaid_invoice} onCheckedChange={(v) => set('risk_block_unpaid_invoice', v)} />
-              </label>
-              <p className="text-[11px] text-muted-foreground">A blocked issuance raises an approval request and notifies the responsible sales team via Flows; an approver can release it.</p>
-            </div>
-          </div>
-
-          {/* Expense cards — how an approved expense card (trip, monthly, …) posts to the ledger. */}
-          <div className="rounded-md border border-border/60 p-3 space-y-3">
-            <div>
-              <div className="text-sm font-medium">Expense cards (team expenses)</div>
-              <p className="text-xs text-muted-foreground">
-                When finance approves a team member's expense card (trip, monthly expenses, …), decide whether the approved total is auto-posted as a reimbursement payable (shows in Planning / Payables and can be marked paid).
-              </p>
-            </div>
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-xs">
-                <strong>Auto-create a reimbursement payable</strong> on approval
-                <span className="block text-muted-foreground">Off = approval-only; finance handles reimbursement outside the platform.</span>
-              </span>
-              <Switch
-                checked={settings.trip_expense_reimbursement_mode === 'planned_payment'}
-                onCheckedChange={(v) => set('trip_expense_reimbursement_mode', v ? 'planned_payment' : 'none')}
-              />
-            </label>
-          </div>
-
           <Button onClick={save} disabled={saving} className="w-full">
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save settings
           </Button>
         </CardContent>
       </Card>
-        </TabsContent>
 
-        <TabsContent value="digest" className="mt-0 space-y-4">
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
           <CardTitle className="text-sm flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Statement PDF design</CardTitle>
