@@ -333,11 +333,11 @@ export const createExtractFromCatalogPdfsTool = (userId: string, userJwt: string
           });
         }
 
-        // Forward the caller's user JWT so catalog-extract-from-pdfs' authenticate()
-        // resolves the REAL user. Without it the invoke carries only the service-role
-        // key → authenticate() returns userId:null → the function's per-PDF workspace
-        // ownership check (userCanAccessWorkspace) fails closed with 403 before Anthropic
-        // is ever called (the tenancy invariant forbids trusting body-supplied ids).
+        // The real workspace binding is done in catalog-extract-from-pdfs via caller_user_id,
+        // which it trusts ONLY at service-key ('secret') auth level (act-on-behalf-of pattern).
+        // We also forward the user JWT as belt-and-braces, but note it's typically inert here:
+        // supabase-js puts the service key on the `apikey` header, and authenticate() resolves
+        // that to 'secret' before it would validate this Authorization token.
         const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
           'catalog-extract-from-pdfs',
           {

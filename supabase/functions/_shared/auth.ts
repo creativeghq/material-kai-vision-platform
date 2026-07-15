@@ -385,9 +385,15 @@ export function isAdminAccess(auth: AuthResult): boolean {
  * cannot trigger privileged platform-wide work.
  */
 export function isServiceRoleRequest(req: Request): boolean {
-  const bearer = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim();
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  return !!key && !!bearer && bearer === key;
+  if (!key) return false;
+  const bearer = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim();
+  // supabase-js functions.invoke() with the new opaque sb_secret_ service key places it on
+  // the `apikey` header, NOT Authorization. Accept the service key on EITHER header so
+  // server-to-server invokes (agent-chat tools, other edge fns) are recognized — otherwise
+  // Authorization-only checks 401 on exactly these calls. pg_cron sends it on Authorization.
+  const apiKeyHeader = (req.headers.get('apikey') || req.headers.get('x-api-key'))?.trim();
+  return bearer === key || apiKeyHeader === key;
 }
 
 /**

@@ -11,8 +11,15 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 async function authenticate(req: Request): Promise<{ ok: boolean; userId?: string; isService?: boolean; error?: string }> {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  // Internal server-to-server callers (agent-chat + other edge fns using the service-role
+  // client) authenticate with the platform service key, which supabase-js places on the
+  // `apikey` header rather than Authorization. Accept the service key on EITHER header —
+  // mirrors _shared/auth.ts, which is why the shared helper worked here and this one 401'd.
+  const apiKeyHeader = (req.headers.get('apikey') || req.headers.get('x-api-key') || '').trim();
+  if (token === supabaseServiceKey || (apiKeyHeader && apiKeyHeader === supabaseServiceKey)) {
+    return { ok: true, isService: true };
+  }
   if (!token) return { ok: false, error: 'Missing Authorization header' };
-  if (token === supabaseServiceKey) return { ok: true, isService: true };
 
   try {
     const admin = createClient(supabaseUrl, supabaseServiceKey);

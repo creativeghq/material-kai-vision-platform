@@ -134,9 +134,21 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
     // service-role load bypasses RLS. Without this, any authenticated user could pass
     // another tenant's source_pdf_ids and exfiltrate their private catalog PDFs. Bind
     // the caller to every referenced PDF's workspace before downloading any bytes.
+    //
+    // "Act on behalf of": agent-chat invokes this server-to-server with the platform
+    // service key, so authenticate() resolves to level 'secret' with userId=null — the
+    // real acting user rides in body.caller_user_id. Honor it ONLY at secret level (a
+    // direct user call must bind to its own verified JWT, never a body-supplied id —
+    // tenancy invariant #8). This mirrors agent-chat's own body.user_id handling.
+    const effectiveUserId = auth.level === 'secret' && body.caller_user_id
+      ? body.caller_user_id
+      : auth.userId;
+    if (!effectiveUserId) {
+      return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    }
     const pdfWorkspaceIds = Array.from(new Set(pdfs.map((p) => p.workspace_id)));
     for (const wsId of pdfWorkspaceIds) {
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, wsId))) {
+      if (!(await userCanAccessWorkspace(supabase, effectiveUserId, wsId))) {
         return jsonResponse({ success: false, error: 'Not authorized for one or more source PDFs' }, 403);
       }
     }
