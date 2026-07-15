@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, ShoppingCart, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
   CustomerTopItemsCard,
@@ -719,7 +720,7 @@ export const CompanyDetailPage: React.FC = () => {
                     label="VAT Country"
                     value={company.country_code ?? undefined}
                     placeholder="Not set"
-                    options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, label: <span className="flex items-center gap-2"><span className="font-mono text-[10px] w-7">{o.code}</span>{o.name}{o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}</span> }))}
+                    options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span className="flex items-center gap-2"><span className="font-mono text-[10px] w-7">{o.code}</span>{o.name}{o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}</span> }))}
                     displayValue={company.country_code ? <span className="font-mono">{company.country_code}</span> : undefined}
                     onSave={(v) => patchInline({ country_code: v })}
                   />
@@ -865,16 +866,16 @@ export const CompanyDetailPage: React.FC = () => {
                     value={company.vat_exemption_reason ?? undefined}
                     unsetValue="__none"
                     placeholder="None"
-                    options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span><span className="font-mono text-[10px] mr-2 text-muted-foreground">0%</span>{c.label}</span> }))}
-                    displayValue={company.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{company.vat_exemption_reason}</span><span className="font-mono text-[10px] mr-2 text-muted-foreground">0%</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === company.vat_exemption_reason)?.label}</span> : undefined}
+                    options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))}
+                    displayValue={company.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{company.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === company.vat_exemption_reason)?.label}</span> : undefined}
                     onSave={(v) => patchInline({ vat_exemption_reason: v })}
-                    hint="Exemption reason for 0%-VAT lines — every category here is 0%. The actual rate (24/13/6%) is set per product/line, not on the customer."
+                    hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here."
                   />
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <Label htmlFor="include_in_myf" className="cursor-pointer">Include in ΜΥΦ</Label>
-                    <p className="text-xs text-muted-foreground">Default for the “Include in MYF report” toggle when invoicing this party.</p>
+                    <Label htmlFor="include_in_myf" className="cursor-pointer">Include in MYF report</Label>
+                    <p className="text-xs text-muted-foreground">Default for the “Include in MYF report” toggle when invoicing this party (the ΜΥΦ client/supplier ledger summary).</p>
                   </div>
                   <Switch
                     id="include_in_myf"
@@ -883,25 +884,30 @@ export const CompanyDetailPage: React.FC = () => {
 />
                 </div>
 
-                {/* Separate billing identity */}
-                <div className="rounded-md border border-border/60 p-3 space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    <span className="text-foreground font-medium">Separate billing identity</span> — fill only when invoices must be issued to a different legal entity than above (different ΑΦΜ / name / address). Leave blank to invoice the party as-is.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                {/* Separate billing identity — collapsed by default (edge case); auto-opens when any billing field is set. */}
+                <Collapsible defaultOpen={!!(company.billing_name || company.billing_vat || company.billing_tax_office || company.billing_country_code || company.billing_street || company.billing_city || company.billing_postal_code)}>
+                  <div className="rounded-md border border-border/60">
+                    <CollapsibleTrigger className="group/bill flex w-full items-center justify-between gap-2 p-3 text-left">
+                      <span className="text-xs"><span className="text-foreground font-medium">Separate billing identity</span> <span className="text-muted-foreground">— only when invoices go to a different legal entity (different ΑΦΜ / name / address)</span></span>
+                      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/bill:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 pt-0">
                     <InlineText alwaysEdit={isNew} label="Billing name" value={company.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
                     <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={company.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
                     <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={company.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} />
                     <InlineSelect alwaysEdit={isNew} label="VAT country" value={company.billing_country_code ?? undefined} placeholder="Not set"
-                      options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))}
+                      options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))}
                       displayValue={company.billing_country_code ? <span className="font-mono">{company.billing_country_code}</span> : undefined}
                       onSave={(v) => patchInline({ billing_country_code: v })} />
                     <InlineText alwaysEdit={isNew} label="Street" value={company.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
                     <InlineText alwaysEdit={isNew} label="Number" value={company.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
                     <InlineText alwaysEdit={isNew} label="Postal code" value={company.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
                     <InlineText alwaysEdit={isNew} label="City" value={company.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                </div>
+                </Collapsible>
               </CardContent>
             </Card>
             </div>

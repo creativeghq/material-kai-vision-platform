@@ -8,12 +8,13 @@
  * Used by ContactDetailPage / CompanyDetailPage.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Pencil, Copy, Check, Loader2 } from 'lucide-react';
+import { Pencil, Copy, Check, Loader2, ChevronsUpDown } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/core/ui/select';
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from '@/components/core/ui/command';
 import { useToast } from '@/hooks/use-toast';
 
 type SaveFn = (value: any) => Promise<void> | void;
@@ -175,6 +176,7 @@ export const InlineText: React.FC<InlineTextProps> = ({
 interface InlineSelectProps {
   value: string | null | undefined;
   onSave: SaveFn;
+  /** `searchText` drives the type-to-filter box; falls back to `value` when omitted. */
   options: Array<{ value: string; label: React.ReactNode; searchText?: string }>;
   label?: string;
   hint?: string;
@@ -186,41 +188,71 @@ interface InlineSelectProps {
   copyValue?: string | null;
   /** Always render the dropdown (no view mode) — used for the create-new form. */
   alwaysEdit?: boolean;
+  /** Show the search box once the list reaches this many options (default 6). */
+  searchThreshold?: number;
 }
 
 /**
- * Inline select. Renders a single always-mounted Radix Select so there is no
- * view↔edit state to race with the dropdown's open/close (an earlier version used
- * `defaultOpen` + `onOpenChange→setEditing(false)` which collapsed before a pick
- * could register). In view mode the trigger is borderless and reads like text,
- * with the chevron fading in on hover; `alwaysEdit` (create form) shows a normal
- * bordered control.
+ * Inline select rendered as a searchable combobox (Popover + cmdk Command) so any
+ * long list (VAT-exemption reasons, countries, …) is type-to-filter. The search
+ * box appears automatically once the list reaches `searchThreshold` options; short
+ * lists stay a plain click-list. In view mode the trigger is borderless and reads
+ * like text, with the chevron fading in on hover; `alwaysEdit` (create form) shows
+ * a normal bordered control. Picking is a single closure (no reliance on cmdk's
+ * lowercased value) so labels can be rich ReactNodes.
  */
 export const InlineSelect: React.FC<InlineSelectProps> = ({
-  value, onSave, options, label, hint, placeholder = 'Not set', displayValue, unsetValue = '__unset', copyValue, alwaysEdit,
+  value, onSave, options, label, hint, placeholder = 'Not set', displayValue, copyValue, alwaysEdit, searchThreshold = 6,
 }) => {
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const selected = value != null ? options.find((o) => o.value === value) : undefined;
+  const current = displayValue ?? selected?.label;
+  const showSearch = options.length >= searchThreshold;
+
+  const pick = async (v: string | null) => {
+    setOpen(false);
+    if (v === (value ?? null)) return;
+    setSaving(true);
+    try { await onSave(v); } finally { setSaving(false); }
+  };
+
   const triggerClass = alwaysEdit
-    ? ''
-    : 'border-0 shadow-none h-auto py-1 px-2 hover:bg-muted/40 focus:ring-0 focus:ring-offset-0 [&>svg]:opacity-0 group-hover:[&>svg]:opacity-50';
+    ? 'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
+    : 'group/trigger flex min-h-[28px] w-full items-center justify-between gap-2 rounded px-2 py-1 text-sm hover:bg-muted/40 focus:outline-none';
+
   return (
     <Field label={label} hint={hint}>
       <div className="group flex items-center gap-1">
-        <Select
-          value={value ?? unsetValue}
-          onValueChange={async (v) => {
-            setSaving(true);
-            try { await onSave(v === unsetValue ? null : v); } finally { setSaving(false); }
-          }}
-        >
-          <SelectTrigger className={triggerClass}>
-            <SelectValue placeholder={placeholder}>{displayValue}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={unsetValue}>{placeholder}</SelectItem>
-            {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className={triggerClass}>
+              <span className={`flex-1 truncate text-left ${current ? '' : 'text-muted-foreground'}`}>{current ?? placeholder}</span>
+              <ChevronsUpDown className={`h-3.5 w-3.5 shrink-0 opacity-50 ${alwaysEdit ? '' : 'opacity-0 group-hover:opacity-50'}`} />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[220px] p-0" align="start">
+            <Command>
+              {showSearch && <CommandInput placeholder="Search…" />}
+              <CommandList>
+                <CommandEmpty>No match.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem value="__unset__ none clear" onSelect={() => pick(null)}>
+                    <Check className={`mr-2 h-3.5 w-3.5 shrink-0 ${value == null ? 'opacity-100' : 'opacity-0'}`} />
+                    <span className="text-muted-foreground">{placeholder}</span>
+                  </CommandItem>
+                  {options.map((o) => (
+                    <CommandItem key={o.value} value={`${o.value} ${o.searchText ?? ''}`} onSelect={() => pick(o.value)}>
+                      <Check className={`mr-2 h-3.5 w-3.5 shrink-0 ${value === o.value ? 'opacity-100' : 'opacity-0'}`} />
+                      <span className="flex-1">{o.label}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
         {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />}
         {!alwaysEdit && copyValue && <CopyButton value={copyValue} />}
       </div>
