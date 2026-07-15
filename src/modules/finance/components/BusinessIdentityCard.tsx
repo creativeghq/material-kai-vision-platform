@@ -13,10 +13,9 @@
  * Per-workspace (finance_settings); each business fills its own.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Save, Upload, Building2, ImageIcon, Copy, Plus, Trash2, Landmark, Sparkles } from 'lucide-react';
+import { Loader2, Save, Upload, Building2, ImageIcon, Copy, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/core/ui/accordion';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -25,26 +24,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { aadeService } from '@/modules/myaade';
-
-// ── Payment accounts (multiple banks + PayPal / other) ──────────────────────
-type AccountType = 'bank' | 'paypal' | 'other';
-interface PaymentAccount {
-  id: string;
-  type: AccountType;
-  label: string;
-  bank_name?: string;
-  iban?: string;
-  bic?: string;
-  beneficiary?: string;
-  paypal_email?: string;
-  url?: string;
-  notes?: string;
-}
-const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = { bank: 'Bank account', paypal: 'PayPal', other: 'Other' };
-const newAccount = (type: AccountType): PaymentAccount => ({
-  id: (globalThis.crypto?.randomUUID?.() ?? `acc-${Math.random().toString(36).slice(2)}`),
-  type, label: ACCOUNT_TYPE_LABEL[type],
-});
 
 type Lang = 'en' | 'gr';
 type Field = { key: string; label: string; bilingual?: boolean; textarea?: boolean; placeholder?: string };
@@ -112,15 +91,6 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
       .then(({ data: row }) => {
         if (cancelled) return;
         const r: Record<string, any> = row ?? { workspace_id: workspaceId };
-        // Seed the accounts list from the legacy single-bank columns the first time
-        // (display only — persisted on next save).
-        if ((!Array.isArray(r.bank_accounts) || r.bank_accounts.length === 0) && (r.bank_name || r.bank_iban)) {
-          r.bank_accounts = [{
-            id: 'legacy', type: 'bank', label: 'Main account',
-            bank_name: r.bank_name ?? '', iban: r.bank_iban ?? '', bic: r.bank_bic ?? '', beneficiary: r.bank_beneficiary ?? '',
-          }];
-        }
-        if (!Array.isArray(r.bank_accounts)) r.bank_accounts = [];
         setData(r);
         setLoading(false);
       });
@@ -140,16 +110,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
       patch.business_company_type = data.business_company_type ?? null;
       patch.business_seasonal = !!data.business_seasonal;
       patch.main_activity = data.main_activity ?? null;
-      // Multiple payment accounts (banks + PayPal + other).
-      const accounts: PaymentAccount[] = Array.isArray(data.bank_accounts) ? data.bank_accounts : [];
-      patch.bank_accounts = accounts;
-      // Mirror the primary bank account into the legacy columns so the existing
-      // invoice PDF (and any other legacy reader) keeps showing a bank.
-      const primaryBank = accounts.find((a) => a.type === 'bank');
-      patch.bank_name = primaryBank?.bank_name || null;
-      patch.bank_iban = primaryBank?.iban || null;
-      patch.bank_bic = primaryBank?.bic || null;
-      patch.bank_beneficiary = primaryBank?.beneficiary || null;
+      // Bank accounts are managed in Settings → Bank accounts (single source), not here.
       const { error } = await supabase.from('finance_settings').upsert(patch, { onConflict: 'workspace_id' });
       if (error) throw error;
       toast({ title: 'Business profile saved' });
@@ -237,7 +198,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
       <CardContent className="p-5">
         <Tabs defaultValue="billing" className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            {[['billing', '1. Billing'], ['contact', '2. Customer Contact'], ['personal', '3. Personal'], ['company', '4. My Company'], ['bank', 'Bank & Logo']].map(([v, l]) => (
+            {[['billing', '1. Billing'], ['contact', '2. Customer Contact'], ['personal', '3. Personal'], ['company', '4. My Company']].map(([v, l]) => (
               <TabsTrigger key={v} value={v}>{l}</TabsTrigger>
             ))}
           </TabsList>
@@ -297,14 +258,10 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
                 </SelectContent>
               </Select>
             </div>
-          </TabsContent>
 
-          <TabsContent value="bank" className="space-y-4">
-            <BankAccountsEditor
-              accounts={Array.isArray(data.bank_accounts) ? data.bank_accounts : []}
-              onChange={(a) => set('bank_accounts', a)}
-            />
-            <div className="space-y-2">
+            {/* Logo lives here now (the separate "Bank & Logo" tab was retired — bank
+                details are managed in Settings → Bank accounts and print from there). */}
+            <div className="space-y-2 pt-2 border-t border-border/60">
               <Label>Logo (printed on invoices)</Label>
               <div className="flex items-center gap-4">
                 <div className="h-20 w-40 rounded-md border border-border/60 bg-muted/20 flex items-center justify-center overflow-hidden">
@@ -338,116 +295,6 @@ const LangToggle: React.FC<{ lang: Lang; onChange: (l: Lang) => void }> = ({ lan
   </div>
 );
 
-/** Manage multiple payment accounts (banks + PayPal + other) as an accordion.
- *  Stored as the `bank_accounts` jsonb array; the primary bank is mirrored into
- *  the legacy bank_* columns on save for the invoice PDF. */
-const BankAccountsEditor: React.FC<{ accounts: PaymentAccount[]; onChange: (a: PaymentAccount[]) => void }> = ({ accounts, onChange }) => {
-  const add = (type: AccountType) => onChange([...accounts, newAccount(type)]);
-  const update = (id: string, patch: Partial<PaymentAccount>) =>
-    onChange(accounts.map((a) => (a.id === id ? { ...a, ...patch } : a)));
-  const remove = (id: string) => onChange(accounts.filter((a) => a.id !== id));
-
-  const summary = (a: PaymentAccount) => {
-    if (a.type === 'bank') return [a.bank_name, a.iban].filter(Boolean).join(' · ') || 'New bank account';
-    if (a.type === 'paypal') return a.paypal_email || a.url || 'New PayPal account';
-    return a.url || a.notes || 'New account';
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Label className="text-xs flex items-center gap-1"><Landmark className="h-3.5 w-3.5" /> Payment accounts (shown on invoices)</Label>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => add('bank')}><Plus className="h-3.5 w-3.5 mr-1" /> Bank</Button>
-          <Button size="sm" variant="outline" onClick={() => add('paypal')}><Plus className="h-3.5 w-3.5 mr-1" /> PayPal</Button>
-          <Button size="sm" variant="outline" onClick={() => add('other')}><Plus className="h-3.5 w-3.5 mr-1" /> Other</Button>
-        </div>
-      </div>
-
-      {accounts.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No payment accounts yet. Add a bank account, PayPal, or another method above.</p>
-      ) : (
-        <Accordion type="multiple" className="space-y-2">
-          {accounts.map((a) => (
-            <AccordionItem key={a.id} value={a.id} className="rounded-md border border-border/60 px-3">
-              <AccordionTrigger className="py-2 hover:no-underline">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{ACCOUNT_TYPE_LABEL[a.type]}</span>
-                  <span className="font-medium">{a.label || ACCOUNT_TYPE_LABEL[a.type]}</span>
-                  <span className="text-xs text-muted-foreground">— {summary(a)}</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pb-3">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="space-y-1 md:col-span-2">
-                    <Label className="text-xs">Label</Label>
-                    <Input value={a.label ?? ''} placeholder="e.g. Main account, EUR account" onChange={(e) => update(a.id, { label: e.target.value })} />
-                  </div>
-
-                  {a.type === 'bank' && (
-                    <>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Bank name</Label>
-                        <Input value={a.bank_name ?? ''} placeholder="Piraeus Bank" onChange={(e) => update(a.id, { bank_name: e.target.value })} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">IBAN</Label>
-                        <Input value={a.iban ?? ''} placeholder="GR16 0110 1250 0000 0001 2300 695" onChange={(e) => update(a.id, { iban: e.target.value })} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">BIC / SWIFT</Label>
-                        <Input value={a.bic ?? ''} placeholder="PIRBGRAA" onChange={(e) => update(a.id, { bic: e.target.value })} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Beneficiary</Label>
-                        <Input value={a.beneficiary ?? ''} placeholder="Acme Tiles S.A." onChange={(e) => update(a.id, { beneficiary: e.target.value })} />
-                      </div>
-                    </>
-                  )}
-
-                  {a.type === 'paypal' && (
-                    <>
-                      <div className="space-y-1">
-                        <Label className="text-xs">PayPal email</Label>
-                        <Input value={a.paypal_email ?? ''} placeholder="billing@acme.gr" onChange={(e) => update(a.id, { paypal_email: e.target.value })} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">PayPal.me link (optional)</Label>
-                        <Input value={a.url ?? ''} placeholder="https://paypal.me/acme" onChange={(e) => update(a.id, { url: e.target.value })} />
-                      </div>
-                    </>
-                  )}
-
-                  {a.type === 'other' && (
-                    <>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Link (optional)</Label>
-                        <Input value={a.url ?? ''} placeholder="https://revolut.me/…" onChange={(e) => update(a.id, { url: e.target.value })} />
-                      </div>
-                      <div className="space-y-1 md:col-span-2">
-                        <Label className="text-xs">Details / notes</Label>
-                        <Input value={a.notes ?? ''} placeholder="Account number, instructions, etc." onChange={(e) => update(a.id, { notes: e.target.value })} />
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="mt-3 flex justify-end">
-                  <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => remove(a.id)}>
-                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                  </Button>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      )}
-      <p className="text-[11px] text-muted-foreground">The first <strong>bank</strong> account is used as the primary on invoices; all accounts are listed in the payment details.</p>
-    </div>
-  );
-};
-
-/** Single-column field grid. Bilingual fields bind to `${key}_en` (EN) or `${key}` (GR)
- *  per the top language toggle; others always bind to `${key}`. */
 const FieldGrid: React.FC<{ fields: Field[]; data: Record<string, any>; set: (k: string, v: any) => void; lang: Lang }> = ({ fields, data, set, lang }) => (
   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
     {fields.map((f) => {

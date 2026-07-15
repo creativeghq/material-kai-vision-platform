@@ -200,6 +200,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }
   };
   const [issuer, setIssuer] = useState<any>(null);
+  const [previewBanks, setPreviewBanks] = useState<Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>>([]);
   // Inline "add client"
   const [addingClient, setAddingClient] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', vat: '', email: '' });
@@ -339,6 +340,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setIssuer(fs.data ?? null);
       financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
       servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
+      financeService.listInvoiceBankAccounts(workspaceId).then(setPreviewBanks).catch(() => setPreviewBanks([]));
       invoicingSetupService.listBranches(workspaceId).then((b) => { setBranches(b); setBranchCode(String(b.find((x) => x.branch_code === 0)?.branch_code ?? 0)); }).catch(() => setBranches([]));
       const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
       const visible = enabledCodes.length ? allTypes.filter((t) => enabledCodes.includes(t.code)) : allTypes;
@@ -857,8 +859,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }),
     settings: issuer,
     customer: customerAddr ?? (customer ? { name: customer.label.replace(' (company)', '') } : null),
-    branch: null, logoUrl: null,
-  }), [issuer, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr]);
+    branch: null, logoUrl: null, bankAccounts: previewBanks,
+  }), [issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr]);
 
   const itemCount = useMemo(() => lines.filter((l) => l.description.trim()).length, [lines]);
 

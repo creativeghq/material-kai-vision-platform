@@ -217,11 +217,10 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
 
     const { data: fs } = await supabase.from('finance_settings').select('*').eq('workspace_id', inv.workspace_id).maybeSingle();
 
-    // #1 — the bank details printed on the invoice prefer the treasury accounts flagged
-    // "Show on invoice" (Settings → Bank accounts), so there's a single bank list instead
-    // of a separate one under Business Identity. Falls back to the legacy
-    // finance_settings.bank_accounts list when no treasury account is flagged, so nothing
-    // changes for workspaces that haven't opted in.
+    // Bank details printed on the invoice come SOLELY from the treasury accounts flagged
+    // "Show on invoice" (Settings → Bank accounts) — the single source of truth. The old
+    // Business Identity list + legacy bank_* columns were retired. Always override so the
+    // legacy finance_settings.bank_accounts jsonb is never printed.
     if (fs) {
       const { data: treasuryAccts } = await supabase
         .from('finance_bank_accounts')
@@ -230,13 +229,11 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
         .eq('is_active', true)
         .eq('show_on_invoice', true)
         .order('sort_order', { ascending: true });
-      if (Array.isArray(treasuryAccts) && treasuryAccts.length > 0) {
-        (fs as any).bank_accounts = treasuryAccts.map((a: any) =>
-          a.kind === 'bank'
-            ? { type: 'bank', bank_name: a.name, iban: a.iban ?? '', beneficiary: (fs as any).business_name ?? '' }
-            : { type: 'other', label: a.name, notes: a.account_ref ?? a.iban ?? '' },
-        );
-      }
+      (fs as any).bank_accounts = (treasuryAccts ?? []).map((a: any) =>
+        a.kind === 'bank'
+          ? { type: 'bank', bank_name: a.name, iban: a.iban ?? '', beneficiary: (fs as any).business_name ?? '' }
+          : { type: 'other', label: a.name, notes: a.account_ref ?? a.iban ?? '' },
+      );
     }
 
     let customer: any = null;
@@ -563,25 +560,20 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   const payBits: string[] = [];
   if (inv.payment_method_code) payBits.push(`${L.paymentMethod}: ${PAY_LABELS[Number(inv.payment_method_code)] ?? inv.payment_method_code}`);
   if (inv.payment_method_info) payBits.push(String(inv.payment_method_info));
-  // Multiple payment accounts (banks + PayPal + other) from fs.bank_accounts;
-  // fall back to the legacy single-bank columns when the array is empty.
+  // Payment accounts to print — sourced solely from the treasury accounts flagged
+  // "Show on invoice" (mapped onto fs.bank_accounts above). No legacy fallback.
   const accounts: any[] = Array.isArray(fs?.bank_accounts) ? fs.bank_accounts : [];
   const accountLines: string[] = [];
-  if (accounts.length > 0) {
-    for (const a of accounts) {
-      let detail = '';
-      if (a?.type === 'bank') {
-        detail = [a.bank_name, a.iban ? `IBAN ${a.iban}` : '', a.bic ? `BIC ${a.bic}` : '', a.beneficiary].filter(Boolean).join('  ·  ');
-      } else if (a?.type === 'paypal') {
-        detail = ['PayPal', a.paypal_email, a.url].filter(Boolean).join('  ·  ');
-      } else {
-        detail = [a.url, a.notes].filter(Boolean).join('  ·  ');
-      }
-      if (detail) accountLines.push(a?.label ? `${a.label}: ${detail}` : detail);
+  for (const a of accounts) {
+    let detail = '';
+    if (a?.type === 'bank') {
+      detail = [a.bank_name, a.iban ? `IBAN ${a.iban}` : '', a.bic ? `BIC ${a.bic}` : '', a.beneficiary].filter(Boolean).join('  ·  ');
+    } else if (a?.type === 'paypal') {
+      detail = ['PayPal', a.paypal_email, a.url].filter(Boolean).join('  ·  ');
+    } else {
+      detail = [a.url, a.notes].filter(Boolean).join('  ·  ');
     }
-  } else {
-    const legacy = [fs?.bank_name, fs?.bank_iban ? `IBAN ${fs.bank_iban}` : '', fs?.bank_bic ? `BIC ${fs.bank_bic}` : '', fs?.bank_beneficiary].filter(Boolean).join('  ·  ');
-    if (legacy) accountLines.push(legacy);
+    if (detail) accountLines.push(a?.label ? `${a.label}: ${detail}` : detail);
   }
   if (payBits.length || accountLines.length) {
     if (y < M + 110) newPage();

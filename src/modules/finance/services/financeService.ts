@@ -1073,6 +1073,17 @@ const _financeServiceCore = {
     return (data ?? []) as BankAccount[];
   },
 
+  /** Treasury accounts flagged "Show on invoice" — the single source of the bank details
+   *  printed on invoices / statements / the on-screen preview. Ordered as configured. */
+  async listInvoiceBankAccounts(workspaceId: string): Promise<Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>> {
+    const { data, error } = await supabase.from('finance_bank_accounts')
+      .select('name, kind, iban, account_ref')
+      .eq('workspace_id', workspaceId).eq('is_active', true).eq('show_on_invoice', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>;
+  },
+
   /** Per-account running balances (opening + Σ in − Σ out). */
   async getBankAccountBalances(workspaceId: string): Promise<BankAccountBalance[]> {
     const { data, error } = await supabase.from('vw_bank_account_balances').select('*')

@@ -70,32 +70,26 @@ const LABELS: Record<Lang, Record<string, string>> = {
   },
 };
 
-// Customer-facing payment accounts, read from the SAME source invoices use —
-// finance_settings.bank_accounts (jsonb array of bank/PayPal/other), with a legacy
-// fallback to the flat bank_* columns. One line per account so multiple accounts are
-// preserved as separate rows; free-form `notes` on an "other" account keep their
-// newlines. Mirrors finance-invoice-pdf so statements and invoices always agree.
-function paymentAccountLines(fs: any): string[] {
-  const accounts: any[] = Array.isArray(fs?.bank_accounts) ? fs.bank_accounts : [];
+// Customer-facing payment accounts — read from the SAME single source invoices use:
+// the treasury accounts flagged "Show on invoice" (finance_bank_accounts). Mirrors
+// finance-invoice-pdf so statements and invoices always agree. One line per account.
+async function loadInvoiceBankAccounts(
+  supabase: SupabaseClient, workspaceId: string,
+): Promise<Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>> {
+  const { data } = await supabase.from('finance_bank_accounts')
+    .select('name, kind, iban, account_ref')
+    .eq('workspace_id', workspaceId).eq('is_active', true).eq('show_on_invoice', true)
+    .order('sort_order', { ascending: true });
+  return (data ?? []) as Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>;
+}
+
+function paymentAccountLines(accts: Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>): string[] {
   const lines: string[] = [];
-  if (accounts.length > 0) {
-    for (const a of accounts) {
-      let detail = '';
-      if (a?.type === 'bank') {
-        detail = [a.bank_name, a.iban ? `IBAN ${a.iban}` : '', a.bic ? `BIC ${a.bic}` : '', a.beneficiary].filter(Boolean).join('  ·  ');
-      } else if (a?.type === 'paypal') {
-        detail = ['PayPal', a.paypal_email, a.url].filter(Boolean).join('  ·  ');
-      } else {
-        detail = [a.url, a.notes].filter(Boolean).join('  ·  ');
-      }
-      if (!detail) continue;
-      const labelled = a?.label ? `${a.label}: ${detail}` : detail;
-      // Preserve newlines a user typed into a free-form account (e.g. `notes`).
-      for (const ln of labelled.split(/\r?\n/)) { if (ln.trim()) lines.push(ln.trim()); }
-    }
-  } else {
-    const legacy = [fs?.bank_name, fs?.bank_iban ? `IBAN ${fs.bank_iban}` : '', fs?.bank_bic ? `BIC ${fs.bank_bic}` : '', fs?.bank_beneficiary].filter(Boolean).join('  ·  ');
-    if (legacy) lines.push(legacy);
+  for (const a of accts) {
+    const detail = a.kind === 'bank'
+      ? [a.name, a.iban ? `IBAN ${a.iban}` : ''].filter(Boolean).join('  ·  ')
+      : [a.name, a.account_ref ?? a.iban ?? ''].filter(Boolean).join('  ·  ');
+    if (detail) lines.push(detail);
   }
   return lines;
 }
@@ -485,7 +479,7 @@ async function sendOneStatement(
     if (fData?.signedUrl) footerImg = await loadBackdrop(fData.signedUrl);
   }
   const logo = await loadLogo(supabase, settings.business_logo_path);
-  const payment = paymentAccountLines(settings);
+  const payment = paymentAccountLines(await loadInvoiceBankAccounts(supabase, party.workspace_id));
 
   const { bytes } = await buildStatementPdf({ party, details, settings, ledger, side: opts.side, from: opts.from, to: opts.to, lang: opts.lang, backdrop, logo, footer: footerImg, payment });
 
@@ -845,7 +839,7 @@ async function resolveShareView(
     const { data: fData } = await supabase.storage.from('quote-templates').createSignedUrl(set.statement_template_footer_path, 60 * 30);
     if (fData?.signedUrl) footerImg = await loadBackdrop(fData.signedUrl);
   }
-  const payment = paymentAccountLines(set);
+  const payment = paymentAccountLines(await loadInvoiceBankAccounts(supabase, share.workspace_id));
 
   const L = LABELS[lang];
   const owes = side === 'customer' ? closing > 0 : closing < 0;

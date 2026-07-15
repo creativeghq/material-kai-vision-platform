@@ -17,6 +17,9 @@ export interface BuildRenderInput {
   branch?: Record<string, any> | null;
   /** Public/signed URL for the business logo, if available. */
   logoUrl?: string | null;
+  /** Treasury accounts flagged "Show on invoice" — the single source of printed bank
+   *  details (finance_bank_accounts). When omitted, no bank lines are shown. */
+  bankAccounts?: Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>;
 }
 
 export function formatInvoiceMoney(value: any, currency: string, lang: Lang): string {
@@ -29,7 +32,7 @@ export function formatInvoiceMoney(value: any, currency: string, lang: Lang): st
 }
 
 export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderData {
-  const { invoice: inv, items, settings: fs, customer, branch, logoUrl } = input;
+  const { invoice: inv, items, settings: fs, customer, branch, logoUrl, bankAccounts } = input;
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
   const L = INVOICE_LABELS[lang];
@@ -127,24 +130,13 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   if (deductions > 0) extras.push({ label: L.deductions, value: deductions, negative: true });
   if (withheld > 0) extras.push({ label: L.withheld, value: withheld, negative: true });
 
-  // ── Payment + bank accounts ──
+  // ── Payment + bank accounts (treasury accounts flagged "Show on invoice" only) ──
   const accounts: string[] = [];
-  const arr: any[] = Array.isArray(fs?.bank_accounts) ? fs.bank_accounts : [];
-  if (arr.length > 0) {
-    for (const a of arr) {
-      let detail = '';
-      if (a?.type === 'bank') {
-        detail = [a.bank_name, a.iban ? `IBAN ${a.iban}` : '', a.bic ? `BIC ${a.bic}` : '', a.beneficiary].filter(Boolean).join('  ·  ');
-      } else if (a?.type === 'paypal') {
-        detail = ['PayPal', a.paypal_email, a.url].filter(Boolean).join('  ·  ');
-      } else {
-        detail = [a.url, a.notes].filter(Boolean).join('  ·  ');
-      }
-      if (detail) accounts.push(a?.label ? `${a.label}: ${detail}` : detail);
-    }
-  } else {
-    const legacy = [fs?.bank_name, fs?.bank_iban ? `IBAN ${fs.bank_iban}` : '', fs?.bank_bic ? `BIC ${fs.bank_bic}` : '', fs?.bank_beneficiary].filter(Boolean).join('  ·  ');
-    if (legacy) accounts.push(legacy);
+  for (const a of bankAccounts ?? []) {
+    const detail = a.kind === 'bank'
+      ? [a.name, a.iban ? `IBAN ${a.iban}` : ''].filter(Boolean).join('  ·  ')
+      : [a.name, a.account_ref ?? a.iban ?? ''].filter(Boolean).join('  ·  ');
+    if (detail) accounts.push(detail);
   }
 
   // ── Shipping / movement ──

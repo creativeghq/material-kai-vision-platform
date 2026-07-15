@@ -86,7 +86,8 @@ export function InvoicePreviewModal({
         const templateId = invoice.template_id || settings?.invoice_template_id || DEFAULT_TEMPLATE_ID;
         const spec = getTemplateSpec(templateId);
         const colors = resolveColors(templateId, invoice.template_colors ?? settings?.invoice_template_colors);
-        const data = buildInvoiceRenderData({ invoice, items: items ?? [], settings, customer, branch, logoUrl });
+        const bankAccounts = await financeService.listInvoiceBankAccounts(workspaceId);
+        const data = buildInvoiceRenderData({ invoice, items: items ?? [], settings, customer, branch, logoUrl, bankAccounts });
 
         if (!cancelled) setResolved({ spec, colors, data });
       } catch (err: any) {
