@@ -906,7 +906,7 @@ export const ContactDetailPage: React.FC = () => {
             {contact.id ? (
               <>
                 <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
-                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} />
+                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} partyRoles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }} />
                 {/* Itemised cash movements (money in & out) across all this party's orders. */}
                 <PartyPaymentsCard contactId={contact.id} />
                 {/* Repeat-buy suggestions (in-stock), below the orders list. */}
