@@ -14,31 +14,35 @@ import { PDFDocument, PDFFont, PDFImage, PDFPage, rgb, RGB } from 'pdf-lib';
 import { embedOpenSans } from '../fonts/open-sans.ts';
 
 // ── Colors (immutable) ─────────────────────────────────────────────────────────
-const COLOR_DARK: RGB = rgb(0.1, 0.1, 0.18);
+// Neutral greys + black only — no accent hue, so the table sits on any template.
+const COLOR_DARK: RGB = rgb(0.13, 0.13, 0.13);
 const COLOR_GRAY: RGB = rgb(0.42, 0.42, 0.42);
 const COLOR_LIGHT_GRAY: RGB = rgb(0.75, 0.75, 0.75);
-const COLOR_ROW_ALT: RGB = rgb(0.97, 0.97, 0.98);
+const COLOR_ROW_ALT: RGB = rgb(0.96, 0.96, 0.96);
 const COLOR_WHITE: RGB = rgb(1, 1, 1);
 const COLOR_BLACK: RGB = rgb(0, 0, 0);
 const COLOR_OVERLAY: RGB = rgb(0, 0, 0);
 
 const A4_LONG = 841.89;
 const A4_SHORT = 595.28;
+const CELL_PAD = 6; // horizontal padding, shared by header + data so columns line up
 
 // The list column set. Widths are relative and re-scaled to the actual table width.
+// `align` is used for BOTH the header label and the cell, so they never drift apart.
 type ColumnKey = 'index' | 'thumb' | 'name' | 'room' | 'sku' | 'size_color' | 'qty' | 'unit' | 'price' | 'total';
-interface ColumnSpec { key: ColumnKey; label: string; width: number; }
+type Align = 'left' | 'right' | 'center';
+interface ColumnSpec { key: ColumnKey; label: string; width: number; align: Align; }
 const LIST_COLUMNS: ColumnSpec[] = [
-  { key: 'index', label: '#', width: 20 },
-  { key: 'thumb', label: '', width: 34 },
-  { key: 'name', label: 'Product', width: 98 },
-  { key: 'room', label: 'Room', width: 52 },
-  { key: 'sku', label: 'SKU', width: 48 },
-  { key: 'size_color', label: 'Size / Color', width: 52 },
-  { key: 'qty', label: 'Qty', width: 28 },
-  { key: 'unit', label: 'Unit', width: 30 },
-  { key: 'price', label: 'Price', width: 64 },
-  { key: 'total', label: 'Total', width: 89 },
+  { key: 'index', label: '#', width: 20, align: 'left' },
+  { key: 'thumb', label: '', width: 34, align: 'center' },
+  { key: 'name', label: 'Product', width: 110, align: 'left' },
+  { key: 'room', label: 'Room', width: 52, align: 'left' },
+  { key: 'sku', label: 'SKU', width: 58, align: 'left' },
+  { key: 'size_color', label: 'Size / Color', width: 58, align: 'left' },
+  { key: 'qty', label: 'Qty', width: 34, align: 'right' },
+  { key: 'unit', label: 'Unit', width: 38, align: 'left' },
+  { key: 'price', label: 'Price', width: 66, align: 'right' },
+  { key: 'total', label: 'Total', width: 80, align: 'right' },
 ];
 
 // ── Geometry derived from the page size ─────────────────────────────────────────
@@ -56,22 +60,52 @@ function pageFromCover(coverW?: number | null, coverH?: number | null): { w: num
   return { h: A4_LONG, w: round2(A4_LONG * coverW / coverH) };                        // portrait
 }
 
-/** All layout constants scaled to the page. Reproduces A4 exactly for 595.28×841.89. */
+/**
+ * All layout constants scaled to the page. The table is inset generously from every
+ * edge so it lands inside the template's "safe area" (clear of the design's border /
+ * side bands), with a comfortable bottom gap so the totals never spill onto the frame.
+ */
 function computeGeom(PAGE_W: number, PAGE_H: number): Geom {
-  const MARGIN = Math.min(50, Math.round(PAGE_W * 0.084));
-  const TABLE_MARGIN = Math.min(40, Math.round(PAGE_W * 0.0672));
+  const MARGIN = Math.round(PAGE_W * 0.084);
+  // ~7.5% side inset (≈63pt on landscape, ≈45pt on A4) so the table clears the frame.
+  const TABLE_MARGIN = Math.round(PAGE_W * 0.075);
   const TABLE_W = PAGE_W - 2 * TABLE_MARGIN;
   const CONTENT_W = PAGE_W - 2 * MARGIN;
-  const TABLE_Y_START = PAGE_H - Math.min(120, Math.round(PAGE_H * 0.1425));
-  const HEADER_ROW_H = 28;
-  const DATA_ROW_H = 36;
-  const ROWS_PER_PAGE = Math.max(4, Math.floor((TABLE_Y_START - HEADER_ROW_H - 120) / DATA_ROW_H));
-  return { PAGE_W, PAGE_H, MARGIN, MARGIN_TOP: 60, CONTENT_W, TABLE_MARGIN, TABLE_W, TABLE_Y_START, HEADER_ROW_H, DATA_ROW_H, ROWS_PER_PAGE, IMG_CELL: 30 };
+  // Start the table below the template's top band; bottom gap reserved via BOTTOM_GAP.
+  const TABLE_Y_START = PAGE_H - Math.round(PAGE_H * 0.15);
+  const BOTTOM_GAP = Math.round(PAGE_H * 0.16); // room for totals + template footer
+  const HEADER_ROW_H = 26;
+  const DATA_ROW_H = 30;
+  const ROWS_PER_PAGE = Math.max(4, Math.floor((TABLE_Y_START - HEADER_ROW_H - BOTTOM_GAP) / DATA_ROW_H));
+  return { PAGE_W, PAGE_H, MARGIN, MARGIN_TOP: 60, CONTENT_W, TABLE_MARGIN, TABLE_W, TABLE_Y_START, HEADER_ROW_H, DATA_ROW_H, ROWS_PER_PAGE, IMG_CELL: 26 };
 }
 
-/** Column set for the current doc, widths scaled to fill the table width. */
-function listColumns(g: Geom, showPriceCols: boolean): ColumnSpec[] {
-  const cols = showPriceCols ? LIST_COLUMNS : LIST_COLUMNS.filter((c) => !['price', 'total', 'qty', 'unit'].includes(c.key));
+/** A cell value counts as "present" when it's non-empty and not a bare placeholder. */
+function cellPresent(v: unknown): boolean {
+  if (v == null) return false;
+  const s = String(v).trim();
+  return s !== '' && s !== '-';
+}
+
+/**
+ * Dynamic column set for THIS doc: only render columns that actually carry data, so the
+ * table adapts to the source (a plain price list has no Room/Size, an image catalog has
+ * thumbnails, etc.) instead of showing a wall of empty "-" columns. Widths are then
+ * re-scaled to fill the table width, so the surviving columns spread out and align.
+ */
+function listColumns(g: Geom, items: BrandedDocItem[], showPriceCols: boolean, hasThumbs: boolean): ColumnSpec[] {
+  const keep = (k: ColumnKey): boolean => {
+    switch (k) {
+      case 'index':
+      case 'name': return true;                                   // always
+      case 'thumb': return hasThumbs;                             // only when images exist
+      case 'room': return items.some((it) => cellPresent(it.room));
+      case 'sku': return items.some((it) => cellPresent(it.sku));
+      case 'size_color': return items.some((it) => cellPresent(it.size_color));
+      case 'qty': case 'unit': case 'price': case 'total': return showPriceCols;
+    }
+  };
+  const cols = LIST_COLUMNS.filter((c) => keep(c.key));
   const used = cols.reduce((a, c) => a + c.width, 0);
   const scale = g.TABLE_W / used;
   return cols.map((c) => ({ ...c, width: c.width * scale }));
@@ -273,15 +307,16 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
     for (const it of s.items) { n++; rows.push({ kind: 'item', item: it, num: n }); }
   }
 
-  const showPriceCols = !!doc.totals || doc.sections.some((s) => s.items.some((it) => it.unit_price != null || it.line_total != null));
-  const cols = listColumns(g, showPriceCols);
+  const allItems = doc.sections.flatMap((s) => s.items);
+  const showPriceCols = !!doc.totals || allItems.some((it) => it.unit_price != null || it.line_total != null);
+  const hasThumbs = allItems.some((it) => !!itemImages[it.image_key ?? '']);
+  const cols = listColumns(g, allItems, showPriceCols, hasThumbs);
 
   let pages = 0, idx = 0;
   while (idx < rows.length || pages === 0) {
     const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
     pages++;
     if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
-    page.drawText(`${doc.doc_label} ITEMS`, { x: g.TABLE_MARGIN, y: g.PAGE_H - 50, size: 18, font: fontBold, color: bgImage ? COLOR_WHITE : COLOR_DARK });
 
     let y = g.TABLE_Y_START;
     drawTableHeader(page, g, y, cols, fontBold);
@@ -320,29 +355,38 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
 
 function drawTableHeader(page: PDFPage, g: Geom, y: number, cols: ColumnSpec[], fontBold: PDFFont): void {
   page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.HEADER_ROW_H, width: g.TABLE_W, height: g.HEADER_ROW_H, color: COLOR_DARK });
+  const ty = y - g.HEADER_ROW_H / 2 - 3;
   let x = g.TABLE_MARGIN;
-  for (const col of cols) { page.drawText(col.label, { x: x + 6, y: y - 18, size: 8, font: fontBold, color: COLOR_WHITE }); x += col.width; }
+  for (const col of cols) { if (col.label) drawInCell(page, col.label, x, col.width, ty, 8, fontBold, COLOR_WHITE, col.align); x += col.width; }
+}
+
+/** Draw text inside a column cell honoring its alignment (left/right/center). */
+function drawInCell(page: PDFPage, text: string, x: number, w: number, y: number, size: number, font: PDFFont, color: RGB, align: Align): void {
+  const tw = font.widthOfTextAtSize(text, size);
+  const tx = align === 'right' ? x + w - CELL_PAD - tw : align === 'center' ? x + (w - tw) / 2 : x + CELL_PAD;
+  page.drawText(text, { x: tx, y, size, font, color });
 }
 
 function drawTableRow(page: PDFPage, g: Geom, y: number, rowNum: number, item: BrandedDocItem, isAlt: boolean, cols: ColumnSpec[], currency: string, font: PDFFont, fontBold: PDFFont, thumb: PDFImage | null): void {
-  page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.DATA_ROW_H, width: g.TABLE_W, height: g.DATA_ROW_H, color: isAlt ? COLOR_ROW_ALT : COLOR_WHITE, opacity: isAlt ? 1 : 0.92 });
+  page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.DATA_ROW_H, width: g.TABLE_W, height: g.DATA_ROW_H, color: isAlt ? COLOR_ROW_ALT : COLOR_WHITE, opacity: isAlt ? 1 : 0.9 });
   const textY = y - g.DATA_ROW_H / 2 - 3;
   const fs = 7;
+  const pad = 2 * CELL_PAD;
   let x = g.TABLE_MARGIN;
   const unpriced = (item.pricing_status ?? 'priced') !== 'priced';
   for (const col of cols) {
     const w = col.width;
     switch (col.key) {
-      case 'index': page.drawText(String(rowNum), { x: x + 4, y: textY, size: fs, font, color: COLOR_GRAY }); break;
+      case 'index': drawInCell(page, String(rowNum), x, w, textY, fs, font, COLOR_GRAY, col.align); break;
       case 'thumb': if (thumb) { const s = Math.min(g.IMG_CELL / thumb.width, g.IMG_CELL / thumb.height); const iw = thumb.width * s, ih = thumb.height * s; page.drawImage(thumb, { x: x + (w - iw) / 2, y: y - g.DATA_ROW_H / 2 - ih / 2, width: iw, height: ih }); } break;
-      case 'name': page.drawText(truncateText(item.name || '-', font, fs, w - 8), { x: x + 4, y: textY, size: fs, font: fontBold, color: COLOR_BLACK }); break;
-      case 'room': page.drawText(truncateText(item.room || '-', font, fs, w - 8), { x: x + 4, y: textY, size: fs, font, color: COLOR_BLACK }); break;
-      case 'sku': page.drawText(truncateText(item.sku || '-', font, fs, w - 8), { x: x + 4, y: textY, size: fs, font, color: COLOR_GRAY }); break;
-      case 'size_color': page.drawText(truncateText(item.size_color || '-', font, fs, w - 8), { x: x + 4, y: textY, size: fs, font, color: COLOR_BLACK }); break;
-      case 'qty': page.drawText(String(item.quantity ?? 1), { x: x + 4, y: textY, size: fs, font, color: COLOR_BLACK }); break;
-      case 'unit': page.drawText(truncateText(item.unit || 'pcs', font, fs, w - 6), { x: x + 4, y: textY, size: fs, font, color: COLOR_GRAY }); break;
+      case 'name': drawInCell(page, truncateText(item.name || '-', fontBold, fs, w - pad), x, w, textY, fs, fontBold, COLOR_BLACK, col.align); break;
+      case 'room': drawInCell(page, truncateText(item.room || '-', font, fs, w - pad), x, w, textY, fs, font, COLOR_BLACK, col.align); break;
+      case 'sku': drawInCell(page, truncateText(item.sku || '-', font, fs, w - pad), x, w, textY, fs, font, COLOR_GRAY, col.align); break;
+      case 'size_color': drawInCell(page, truncateText(item.size_color || '-', font, fs, w - pad), x, w, textY, fs, font, COLOR_BLACK, col.align); break;
+      case 'qty': drawInCell(page, formatQty(item.quantity), x, w, textY, fs, font, COLOR_BLACK, col.align); break;
+      case 'unit': drawInCell(page, truncateText(item.unit || 'pcs', font, fs, w - pad), x, w, textY, fs, font, COLOR_GRAY, col.align); break;
       case 'price': {
-        const right = x + w - 4;
+        const right = x + w - CELL_PAD;
         if (unpriced) { drawRightAligned(page, 'Call for price', right, textY, fs - 1, font, COLOR_GRAY); break; }
         if (item.discounted_price != null && item.unit_price != null) {
           const orig = formatCurrency(item.unit_price, currency);
@@ -355,10 +399,16 @@ function drawTableRow(page: PDFPage, g: Geom, y: number, rowNum: number, item: B
         }
         break;
       }
-      case 'total': drawRightAligned(page, unpriced ? '—' : (item.line_total != null ? formatCurrency(item.line_total, currency) : '-'), x + w - 4, textY, fs, fontBold, COLOR_BLACK); break;
+      case 'total': drawRightAligned(page, unpriced ? '—' : (item.line_total != null ? formatCurrency(item.line_total, currency) : '-'), x + w - CELL_PAD, textY, fs, fontBold, COLOR_BLACK); break;
     }
     x += w;
   }
+}
+
+/** Quantity without float noise: 28.98 → "28.98", 6.0000001 → "6", 174 → "174". */
+function formatQty(q: number | null | undefined): string {
+  if (q == null) return '1';
+  return String(Math.round(q * 1000) / 1000);
 }
 
 function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, font: PDFFont, fontBold: PDFFont): void {
