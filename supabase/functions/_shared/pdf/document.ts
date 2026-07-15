@@ -120,6 +120,9 @@ export interface BrandedDoc {
   sections: BrandedDocSection[];
   totals?: BrandedTotals | null;     // rendered only when present
   closing_message?: string | null;   // back cover
+  /** When true, skip the cover page entirely if no cover template image is present
+   *  (quotes do this). When false/undefined, a text cover is drawn as a fallback. */
+  cover_optional?: boolean;
 }
 export interface BrandedAssets {
   coverBytes?: Uint8Array | null;
@@ -147,9 +150,11 @@ export async function renderBrandedDocument(doc: BrandedDoc, assets: BrandedAsse
 
   let pageCount = 0;
 
-  // Cover
-  drawCover(pdfDoc, doc, coverImage, logoImage, font, fontBold);
-  pageCount++;
+  // Cover — skipped entirely when cover_optional and no template image (matches quotes).
+  if (coverImage || !doc.cover_optional) {
+    drawCover(pdfDoc, doc, coverImage, logoImage, font, fontBold);
+    pageCount++;
+  }
 
   // Client / company details page
   if (doc.show_client_page) {
@@ -320,10 +325,46 @@ async function drawListPages(pdfDoc: PDFDocument, doc: BrandedDoc, bgImage: PDFI
 
     page.drawLine({ start: { x: TABLE_MARGIN_LEFT, y }, end: { x: TABLE_MARGIN_LEFT + TABLE_W, y }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
 
-    if (idx >= rows.length && doc.totals) drawTotals(page, doc.totals, y, font, fontBold);
-    if (idx >= rows.length) break;
+    if (idx >= rows.length) {
+      if (doc.totals) { drawTotals(page, doc.totals, y, font, fontBold); y -= 110; }
+      // FF&E "Specifications & Delivery" notes (install requirements + delivery dates).
+      const ffeItems = doc.sections.flatMap((s) => s.items).filter((it) => it.installation_requirements || it.delivery_date);
+      if (ffeItems.length > 0) {
+        if (y < 140) {
+          const ffePage = pdfDoc.addPage([PAGE_W, PAGE_H]);
+          pages++;
+          if (bgImage) ffePage.drawImage(bgImage, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+          drawFFENotes(ffePage, ffeItems, PAGE_H - 80, font, fontBold);
+        } else {
+          drawFFENotes(page, ffeItems, y, font, fontBold);
+        }
+      }
+      break;
+    }
   }
   return pages;
+}
+
+function drawFFENotes(page: PDFPage, items: BrandedDocItem[], startY: number, font: PDFFont, fontBold: PDFFont): void {
+  let y = startY;
+  page.drawLine({ start: { x: TABLE_MARGIN_LEFT, y: y + 10 }, end: { x: TABLE_MARGIN_LEFT + TABLE_W, y: y + 10 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
+  page.drawText('SPECIFICATIONS & DELIVERY', { x: TABLE_MARGIN_LEFT, y, size: 10, font: fontBold, color: COLOR_DARK });
+  y -= 18;
+  for (const item of items) {
+    if (y < 60) break;
+    page.drawText(truncateText(item.name, fontBold, 8, TABLE_W - 20), { x: TABLE_MARGIN_LEFT, y, size: 8, font: fontBold, color: COLOR_BLACK });
+    y -= 14;
+    if (item.installation_requirements) {
+      page.drawText('Installation:', { x: TABLE_MARGIN_LEFT + 8, y, size: 7, font: fontBold, color: COLOR_GRAY });
+      for (const line of wrapText(item.installation_requirements, font, 7, TABLE_W - 80)) { page.drawText(line, { x: TABLE_MARGIN_LEFT + 70, y, size: 7, font, color: COLOR_BLACK }); y -= 11; }
+    }
+    if (item.delivery_date) {
+      page.drawText('Delivery:', { x: TABLE_MARGIN_LEFT + 8, y, size: 7, font: fontBold, color: COLOR_GRAY });
+      page.drawText(formatDate(item.delivery_date), { x: TABLE_MARGIN_LEFT + 70, y, size: 7, font, color: COLOR_BLACK });
+      y -= 11;
+    }
+    y -= 6;
+  }
 }
 
 function drawTableHeader(page: PDFPage, y: number, cols: ColumnSpec[], fontBold: PDFFont): void {

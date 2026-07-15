@@ -1,5 +1,4 @@
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { BookOpen } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -20,17 +19,10 @@ const definition: ModuleDefinition = {
     { path: '/admin/catalogs/sources', component: CatalogSourcesPage, requireAdmin: true },
     { path: '/admin/catalogs/:id', component: CatalogBuilderPage, requireAdmin: true },
   ],
-  navItems: [
-    {
-      label: 'Presentation Catalogs',
-      path: '/admin/catalogs',
-      icon: BookOpen,
-      location: 'admin-dashboard',
-      adminCategory: 'Communications',
-      adminDescription: 'Build email-gated catalog landing pages and PDFs from manufacturer source PDFs.',
-      adminCount: 'Catalogs',
-    },
-  ],
+  // Single entry point: catalogs are surfaced under Operations → Catalogs
+  // (/admin/operations?tab=catalogs), which links into the builder routes above.
+  // The standalone admin-dashboard grid item was removed to avoid a duplicate entry.
+  navItems: [],
 };
 
 export default definition;

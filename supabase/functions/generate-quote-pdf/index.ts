@@ -2,10 +2,55 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { fetchQuoteData, fetchTemplateConfig, fetchStorageFile, fetchImageBytesFromUrl, applyWorkspaceBranding } from './data-fetcher.ts';
-import { buildQuotePDF } from './pdf-builder.ts';
 import type { QuotePDFRequest, QuotePDFResponse, QuoteData, TemplateConfig } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { renderBrandedDocument, type BrandedDoc } from '../_shared/pdf/document.ts';
+
+/** Map a quote + its resolved template into the shared branded-document model. */
+function mapQuoteToBrandedDoc(quote: QuoteData, tpl: TemplateConfig): BrandedDoc {
+  const currency = quote.currency || 'EUR';
+  return {
+    doc_label: 'QUOTE',
+    number: quote.quote_number ?? null,
+    created_at: quote.created_at,
+    expires_at: quote.expires_at ?? null,
+    currency,
+    layout: 'list',
+    cover_optional: true, // quotes skip the cover page when no template image is set
+    company: { name: tpl.company_name, address: tpl.company_address, phone: tpl.company_phone, email: tpl.company_email, vat: tpl.company_vat },
+    client: quote.client ? {
+      contact_name: quote.client.contact_name, company_name: quote.client.company_name, email: quote.client.email,
+      phone: quote.client.phone, address: quote.client.address, city: quote.client.city,
+      postal_code: quote.client.postal_code, country: quote.client.country, vat_number: quote.client.vat_number,
+    } : null,
+    show_client_page: true,
+    notes: quote.notes ?? null,
+    sections: [{
+      title: null,
+      items: quote.items.map((it) => ({
+        image_key: it.id,
+        name: it.dimensions ? `${it.product_name}, ${it.dimensions}` : it.product_name,
+        description: it.description ?? null,
+        sku: it.sku ?? null,
+        room: it.room ?? null,
+        size_color: [it.selected_size, it.selected_color].filter(Boolean).join(' / ') || null,
+        quantity: it.quantity,
+        unit: it.unit ?? 'pcs',
+        unit_price: it.unit_price,
+        discounted_price: it.discounted_price ?? null,
+        line_total: it.line_total,
+        pricing_status: it.pricing_status,
+        installation_requirements: it.installation_requirements ?? null,
+        delivery_date: it.delivery_date ?? null,
+      })),
+    }],
+    totals: {
+      subtotal: quote.subtotal, vat_rate: quote.vat_rate, vat_amount: quote.vat_amount,
+      grand_total: quote.grand_total, cash_discount_pct: quote.cash_discount_pct, currency,
+    },
+  };
+}
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -64,7 +109,9 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       ]);
 
       const sample = buildSampleQuote(workspaceId, templateConfig);
-      const pdfBytes = await buildQuotePDF(sample, templateConfig, coverBytes, bgBytes, backcoverBytes, logoBytes, {});
+      const { pdfBytes } = await renderBrandedDocument(mapQuoteToBrandedDoc(sample, templateConfig), {
+        coverBytes, contentBgBytes: bgBytes, backCoverBytes: backcoverBytes, logoBytes, itemImages: {},
+      });
 
       const storagePath = `quote-output/_preview/${workspaceId ?? 'global'}.pdf`;
       const { error: upErr } = await supabase.storage.from('pdf-documents')
@@ -190,16 +237,10 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
         }),
     );
 
-    // Build the PDF
-    const pdfBytes = await buildQuotePDF(
-      quoteData,
-      templateConfig,
-      coverBytes,
-      bgBytes,
-      backcoverBytes,
-      logoBytes,
-      itemImageBytes
-    );
+    // Build the PDF via the shared branded-document renderer (same design as catalogs).
+    const { pdfBytes } = await renderBrandedDocument(mapQuoteToBrandedDoc(quoteData, templateConfig), {
+      coverBytes, contentBgBytes: bgBytes, backCoverBytes: backcoverBytes, logoBytes, itemImages: itemImageBytes,
+    });
 
     // Upload to storage
     const storagePath = `quote-output/${quoteId}/quote-${quoteData.quote_number || quoteId}.pdf`;

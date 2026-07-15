@@ -64,28 +64,45 @@ export const CatalogOperationsTab: React.FC = () => {
   }, [range]);
 
   const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [s, e, g] = await Promise.all([
-        catalogsService.listOperationsSummary(),
-        catalogsService.listViewEvents({
-          catalogId: selectedCatalogId === 'all' ? undefined : selectedCatalogId,
-          eventType: eventFilter,
-          emailContains: emailContains.trim() || undefined,
-          sinceIso,
-          limit: 200,
-        }),
-        catalogsService.listAccessLogCrossCatalog({
-          catalogId: selectedCatalogId === 'all' ? undefined : selectedCatalogId,
-          emailContains: emailContains.trim() || undefined,
-          sinceIso,
-          limit: 200,
-        }),
-      ]);
-      setSummary(s);
-      setEvents(e);
-      setGateLog(g);
+    setLoading(true);
+    // Resilient load: each analytics source is independent, so one failing query
+    // (e.g. a permission hiccup on the events table) degrades that section only
+    // instead of blanking the whole tab. A single failing source shows a toast but
+    // the rest still render.
+    const [sRes, eRes, gRes] = await Promise.allSettled([
+      catalogsService.listOperationsSummary(),
+      catalogsService.listViewEvents({
+        catalogId: selectedCatalogId === 'all' ? undefined : selectedCatalogId,
+        eventType: eventFilter,
+        emailContains: emailContains.trim() || undefined,
+        sinceIso,
+        limit: 200,
+      }),
+      catalogsService.listAccessLogCrossCatalog({
+        catalogId: selectedCatalogId === 'all' ? undefined : selectedCatalogId,
+        emailContains: emailContains.trim() || undefined,
+        sinceIso,
+        limit: 200,
+      }),
+    ]);
 
+    const s = sRes.status === 'fulfilled' ? sRes.value : [];
+    const e = eRes.status === 'fulfilled' ? eRes.value : [];
+    const g = gRes.status === 'fulfilled' ? gRes.value : [];
+    setSummary(s);
+    setEvents(e);
+    setGateLog(g);
+
+    const failed = [sRes, eRes, gRes].filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (failed.length > 0) {
+      toast({
+        title: 'Some analytics could not load',
+        description: failed[0]?.reason instanceof Error ? failed[0].reason.message : String(failed[0]?.reason ?? 'Unknown error'),
+        variant: 'destructive',
+      });
+    }
+
+    try {
       const userIds = Array.from(new Set([
         ...e.map((row) => row.matched_user_id).filter(Boolean) as string[],
         ...g.map((row) => row.matched_user_id).filter(Boolean) as string[],
@@ -94,15 +111,9 @@ export const CatalogOperationsTab: React.FC = () => {
         const map = await catalogsService.getUserProfilesByIds(userIds);
         setProfiles(map);
       }
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to load catalog operations',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* profile enrichment is best-effort */ }
+
+    setLoading(false);
   }, [selectedCatalogId, eventFilter, emailContains, sinceIso, toast]);
 
   useEffect(() => { load(); }, [load]);
@@ -268,7 +279,7 @@ export const CatalogOperationsTab: React.FC = () => {
                         <td className="px-3 py-2">
                           <Badge variant={e.event_type === 'pdf_download' ? 'default' : 'secondary'} className="text-[10px] py-0">
                             {e.event_type === 'pdf_download' ? <FileDown className="h-3 w-3 mr-1 inline" /> : <Eye className="h-3 w-3 mr-1 inline" />}
-                            {e.event_type.replace(/_/g, ' ')}
+                            {(e.event_type ?? 'event').replace(/_/g, ' ')}
                           </Badge>
                         </td>
                         <td className="px-3 py-2 font-medium">{e.email || '—'}</td>
