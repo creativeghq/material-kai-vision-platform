@@ -1,6 +1,12 @@
 export interface CatalogPDFRequest {
   catalog_id: string;
   regenerate?: boolean;
+  /** 'list' = quote-style table (default), 'grid' = image cards. */
+  layout?: 'list' | 'grid';
+  /** When true (or body_data.proforma), render a Προσφορά with totals (subtotal/VAT/final). */
+  proforma?: boolean;
+  /** VAT % override; else body_data.vat_rate, else the workspace finance_settings default. */
+  vat_rate?: number;
 }
 
 export interface CatalogPDFResponse {
@@ -47,6 +53,7 @@ export interface CatalogBackCoverData {
 export interface CatalogRow {
   id: string;
   owner_user_id: string;
+  workspace_id: string | null;
   template_id: string | null;
   title: string;
   subtitle: string | null;

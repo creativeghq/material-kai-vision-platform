@@ -1,26 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { fetchCatalog, fetchTemplate, fetchOwnerBranding, fetchStorageFile } from './data-fetcher.ts';
-import { buildCatalogPDF } from './pdf-builder.ts';
+import { fetchCatalog } from './data-fetcher.ts';
 import type { CatalogPDFRequest, CatalogPDFResponse } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { fetchBrandingConfig, fetchTemplateImage, fetchImageBytesFromUrl } from '../_shared/pdf/branding.ts';
+import { renderBrandedDocument, type BrandedDoc, type BrandedDocSection } from '../_shared/pdf/document.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+// Cap embedded product images so a huge catalog can't blow the request budget.
+const MAX_ITEM_IMAGES = 60;
 
 async function authenticate(req: Request): Promise<{ ok: boolean; userId?: string; isService?: boolean; error?: string }> {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   // Internal server-to-server callers (agent-chat + other edge fns using the service-role
   // client) authenticate with the platform service key, which supabase-js places on the
-  // `apikey` header rather than Authorization. Accept the service key on EITHER header —
-  // mirrors _shared/auth.ts, which is why the shared helper worked here and this one 401'd.
+  // `apikey` header rather than Authorization. Accept the service key on EITHER header.
   const apiKeyHeader = (req.headers.get('apikey') || req.headers.get('x-api-key') || '').trim();
   if (token === supabaseServiceKey || (apiKeyHeader && apiKeyHeader === supabaseServiceKey)) {
     return { ok: true, isService: true };
   }
   if (!token) return { ok: false, error: 'Missing Authorization header' };
-
   try {
     const admin = createClient(supabaseUrl, supabaseServiceKey);
     const { data, error } = await admin.auth.getUser(token);
@@ -32,12 +35,8 @@ async function authenticate(req: Request): Promise<{ ok: boolean; userId?: strin
 }
 
 Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-  if (req.method !== 'POST') {
-    return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
   const auth = await authenticate(req);
   if (!auth.ok) return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
@@ -56,9 +55,8 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
       return jsonResponse({ success: false, error: 'Not authorized for this catalog' }, 403);
     }
 
-    const totalMaterials = (catalog.body_data?.sections || []).reduce(
-      (acc, s) => acc + (s.materials?.length || 0), 0,
-    );
+    const sections = (catalog.body_data?.sections || []) as Array<{ title?: string; intro?: string | null; materials?: any[] }>;
+    const totalMaterials = sections.reduce((acc, s) => acc + (s.materials?.length || 0), 0);
     if (totalMaterials === 0) {
       await supabase.from('presentation_catalogs')
         .update({ status: 'failed', status_message: 'No materials in catalog body' })
@@ -70,42 +68,106 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
       .update({ status: 'generating', status_message: null })
       .eq('id', catalogId);
 
-    const template = await fetchTemplate(supabase, catalog.template_id);
-    const branding = await fetchOwnerBranding(supabase, catalog.owner_user_id);
+    // Layout + proforma resolution: request param wins, else the catalog's own body_data
+    // hint, else defaults. "list" (quote-style table) is the default; "grid" keeps cards.
+    const bodyMeta = (catalog.body_data ?? {}) as Record<string, any>;
+    const layout: 'list' | 'grid' = body.layout === 'grid' ? 'grid' : body.layout === 'list' ? 'list' : (bodyMeta.layout === 'grid' ? 'grid' : 'list');
+    const isProforma = body.proforma === true || bodyMeta.proforma === true;
+    const currency = (bodyMeta.currency as string) || firstMaterialCurrency(sections) || 'EUR';
 
+    // Workspace-defined branding (finance_settings) — the same source quotes use.
+    const branding = await fetchBrandingConfig(supabase, catalog.workspace_id ?? null);
+    const vatRate = body.vat_rate ?? (bodyMeta.vat_rate as number) ?? branding.vat_rate_default ?? 24;
+
+    // Template images (cover / content bg / back cover) from the branded template.
     const [coverBytes, bgBytes, backBytes] = await Promise.all([
-      fetchStorageFile(supabase, 'quote-templates', template.cover_image_path),
-      template.content_background_path
-        ? fetchStorageFile(supabase, 'quote-templates', template.content_background_path)
-        : Promise.resolve(null),
-      fetchStorageFile(supabase, 'quote-templates', template.back_cover_image_path),
+      fetchTemplateImage(supabase, branding.cover_image_path),
+      fetchTemplateImage(supabase, branding.content_page_path),
+      fetchTemplateImage(supabase, branding.backcover_image_path),
     ]);
 
-    const { pdfBytes, pageCount } = await buildCatalogPDF({
-      catalog,
-      coverImageBytes: coverBytes,
-      bgImageBytes: bgBytes,
-      backCoverImageBytes: backBytes,
-      accentHex: template.accent_color_hex,
-      branding,
+    // Map sections → normalized doc sections; collect item images (capped).
+    const itemImages: Record<string, Uint8Array> = {};
+    let imgCount = 0;
+    const docSections: BrandedDocSection[] = [];
+    let subtotal = 0;
+    let anyPriced = false;
+    for (const s of sections) {
+      const items = [];
+      for (const mat of (s.materials || [])) {
+        const price = mat.price != null ? Number(mat.price) : null;
+        if (price != null && !Number.isNaN(price)) { subtotal += price; anyPriced = true; }
+        const key = mat.id || `${docSections.length}-${items.length}`;
+        if (mat.image_url && imgCount < MAX_ITEM_IMAGES) {
+          const bytes = await fetchImageBytesFromUrl(mat.image_url);
+          if (bytes) { itemImages[key] = bytes; imgCount++; }
+        }
+        items.push({
+          image_key: key,
+          name: mat.name || 'Item',
+          description: mat.description ?? null,
+          sku: mat.specs?.sku ?? mat.specs?.code ?? null,
+          size_color: sizeColorFromSpecs(mat.specs),
+          quantity: 1,
+          unit: mat.specs?.unit ?? 'pcs',
+          unit_price: price,
+          line_total: price,
+          specs: mat.specs ?? null,
+        });
+      }
+      docSections.push({ title: s.title ?? null, intro: s.intro ?? null, items });
+    }
+
+    // Totals only when this is a proforma AND at least one material is priced.
+    const totals = (isProforma && anyPriced)
+      ? {
+          subtotal: round2(subtotal),
+          vat_rate: vatRate,
+          vat_amount: round2(subtotal * vatRate / 100),
+          grand_total: round2(subtotal * (1 + vatRate / 100)),
+          currency,
+        }
+      : null;
+
+    const cover = (catalog.cover_data ?? {}) as Record<string, any>;
+    const doc: BrandedDoc = {
+      doc_label: isProforma ? 'PROFORMA' : 'CATALOG',
+      number: cover.number ?? null,
+      subtitle: cover.subtitle ?? catalog.subtitle ?? null,
+      created_at: cover.date ?? new Date().toISOString(),
+      currency,
+      layout,
+      company: {
+        name: branding.company_name || null,
+        address: branding.company_address || null,
+        phone: branding.company_phone || null,
+        email: branding.company_email || null,
+        vat: branding.company_vat || null,
+      },
+      client: cover.client_name ? { contact_name: cover.client_name } : null,
+      // Show the client/company page for proformas (a Προσφορά needs a FROM + totals);
+      // a plain presentation catalog goes straight cover → items → back.
+      show_client_page: isProforma,
+      notes: (catalog.body_data as any)?.notes ?? null,
+      sections: docSections,
+      totals,
+      closing_message: (catalog.back_cover_data as any)?.closing_message ?? null,
+    };
+
+    const { pdfBytes, pageCount } = await renderBrandedDocument(doc, {
+      coverBytes,
+      contentBgBytes: bgBytes,
+      backCoverBytes: backBytes,
+      itemImages,
     });
 
-    // Clear any previous output for this catalog before writing the new one, so
-    // a rebuild deletes the prior PDF instead of accumulating timestamped files
-    // under catalog-output/{catalogId}/ (2026-05-31 storage reorg).
+    // Clear previous output before writing the new one (rebuild replaces, not accumulates).
     try {
-      const { data: existing } = await supabase.storage
-        .from('pdf-documents')
-        .list(`catalog-output/${catalogId}`);
+      const { data: existing } = await supabase.storage.from('pdf-documents').list(`catalog-output/${catalogId}`);
       if (existing && existing.length > 0) {
-        await supabase.storage
-          .from('pdf-documents')
-          .remove(existing.map((f) => `catalog-output/${catalogId}/${f.name}`));
+        await supabase.storage.from('pdf-documents').remove(existing.map((f) => `catalog-output/${catalogId}/${f.name}`));
       }
-    } catch (_) {
-      // Best-effort: a failed cleanup should not block regeneration. The orphan
-      // cron's grace sweep + the presentation_catalogs delete trigger backstop it.
-    }
+    } catch (_) { /* best-effort */ }
 
     const storagePath = `catalog-output/${catalogId}/catalog-${Date.now()}.pdf`;
     const { error: upErr } = await supabase.storage
@@ -113,9 +175,7 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
       .upload(storagePath, pdfBytes, { contentType: 'application/pdf', upsert: true });
     if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
 
-    const { data: signed } = await supabase.storage
-      .from('pdf-documents')
-      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(storagePath, 60 * 60 * 24 * 7);
 
     await supabase.from('presentation_catalogs')
       .update({
@@ -128,12 +188,7 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
       })
       .eq('id', catalogId);
 
-    return jsonResponse({
-      success: true,
-      pdf_url: signed?.signedUrl,
-      pdf_storage_path: storagePath,
-      page_count: pageCount,
-    });
+    return jsonResponse({ success: true, pdf_url: signed?.signedUrl, pdf_storage_path: storagePath, page_count: pageCount });
   } catch (err) {
     console.error('[generate-catalog-pdf] error:', err);
     if (catalogId) {
@@ -141,16 +196,21 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
         .update({ status: 'failed', status_message: err instanceof Error ? err.message : String(err) })
         .eq('id', catalogId);
     }
-    return jsonResponse({
-      success: false,
-      error: err instanceof Error ? err.message : 'PDF generation failed',
-    }, 500);
+    return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'PDF generation failed' }, 500);
   }
 }));
 
+function sizeColorFromSpecs(specs: Record<string, any> | null | undefined): string | null {
+  if (!specs) return null;
+  const parts = [specs.size, specs.dimensions, specs.color, specs.finish].filter(Boolean);
+  return parts.length ? parts.join(' / ') : null;
+}
+
+function firstMaterialCurrency(sections: Array<{ materials?: any[] }>): string | null {
+  for (const s of sections) for (const m of (s.materials || [])) if (m.currency) return m.currency;
+  return null;
+}
+
 function jsonResponse(body: CatalogPDFResponse, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }

@@ -208,7 +208,11 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
       name: 'create_catalog',
       description:
         'Create a new presentation catalog (admin-only). Returns the catalog_id used by every other catalog tool. ' +
-        'Use this BEFORE attaching PDFs, extracting sections, or adding materials.',
+        'Use this BEFORE attaching PDFs, extracting sections, or adding materials. ' +
+        'COPY-ON-MODIFY: when the user asks to take an existing document, proforma (Προσφορά), or catalog and change ' +
+        'it, ALWAYS create a NEW catalog here and COPY all of the source content into it (every section, material, ' +
+        'price, spec and image) before applying the changes — never mutate or reference the original. The source must ' +
+        'stay intact. If the source is a PDF, extract/translate it into the new catalog first, then modify.',
       schema: z.object({
         title: z.string().describe('Catalog display title, e.g. "Spring 2026 — Porcelain Range"'),
         subtitle: z.string().optional().describe('Optional subtitle / tagline'),
@@ -874,7 +878,7 @@ export const createGenerateCatalogPdfTool = (userId: string, onChunk: ChunkSink)
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   return tool(
-    async (input: { catalog_id: string; regenerate?: boolean }) => {
+    async (input: { catalog_id: string; regenerate?: boolean; layout?: 'list' | 'grid'; proforma?: boolean; vat_rate?: number }) => {
       try {
         emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'generate', status: 'running', status_line: 'Rendering A4 PDF…' });
         const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
@@ -893,7 +897,13 @@ export const createGenerateCatalogPdfTool = (userId: string, onChunk: ChunkSink)
 
         const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
           'generate-catalog-pdf',
-          { body: { catalog_id: input.catalog_id, regenerate: !!input.regenerate } },
+          { body: {
+            catalog_id: input.catalog_id,
+            regenerate: !!input.regenerate,
+            ...(input.layout ? { layout: input.layout } : {}),
+            ...(input.proforma != null ? { proforma: input.proforma } : {}),
+            ...(input.vat_rate != null ? { vat_rate: input.vat_rate } : {}),
+          } },
         );
 
         if (invokeErr || !invokeData?.success) {
@@ -929,12 +939,17 @@ export const createGenerateCatalogPdfTool = (userId: string, onChunk: ChunkSink)
     {
       name: 'generate_catalog_pdf',
       description:
-        'Render the catalog body as a PDF using its picked template (cover + body + back cover). ' +
-        'Returns a signed URL to the generated PDF (7-day expiry) and page count. Refuses to render ' +
-        'an empty catalog. Pass regenerate:true to force a fresh render even if a recent PDF exists.',
+        'Render the catalog as a PDF using the workspace-branded design (same design/branding as quotes). ' +
+        'layout: "list" = a compact quote-style table (default), "grid" = large image cards — ask the user which they want. ' +
+        'proforma:true renders a Προσφορά/offer with a totals block (subtotal → VAT → final), computed from the ' +
+        'material prices (VAT % from vat_rate or the workspace default); totals are shown only when materials are priced. ' +
+        'Returns a signed URL (7-day expiry) + page count. Pass regenerate:true to force a fresh render.',
       schema: z.object({
         catalog_id: z.string().uuid(),
         regenerate: z.boolean().optional(),
+        layout: z.enum(['list', 'grid']).optional().describe('"list" = quote-style table (default), "grid" = image cards.'),
+        proforma: z.boolean().optional().describe('Render as a Προσφορά/offer with a totals block (needs priced materials).'),
+        vat_rate: z.number().optional().describe('VAT % for proforma totals; defaults to the workspace finance setting.'),
       }),
     },
   );
