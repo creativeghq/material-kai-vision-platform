@@ -19,7 +19,11 @@ interface Props { embedded?: boolean }
 
 export const StripeConfigPanel: React.FC<Props> = (_props) => {
   const { toast } = useToast();
-  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+  // Use the same var the whole app resolves the project URL from — Vite injects
+  // `process.env.SUPABASE_URL` (from SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL);
+  // `import.meta.env.VITE_SUPABASE_URL` is never populated in this project, so
+  // reading it left the placeholder `<your-project>` host in the webhook URL.
+  const supabaseUrl = (process.env.SUPABASE_URL as string | undefined) || '';
   const webhookUrl = supabaseUrl
     ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/stripe-webhooks`
     : 'https://<your-project>.supabase.co/functions/v1/stripe-webhooks';
