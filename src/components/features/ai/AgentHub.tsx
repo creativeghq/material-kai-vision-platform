@@ -3570,6 +3570,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.heatPumpData) return { id: m.id, kind: 'calc', title: 'Heat-pump sizing' };
     if (m.heatingCostData) return { id: m.id, kind: 'calc', title: 'Heating cost comparison' };
     if (m.sheetPdfData) return { id: m.id, kind: 'sheet', title: m.sheetPdfData.title || 'Presentation sheet' };
+    if (m.sheetCanvasData) return { id: m.id, kind: 'sheet', title: m.sheetCanvasData.title || 'Presentation sheet' };
     if (m.quoteData) return { id: m.id, kind: 'quote', title: m.quoteData.quote_number ? `Quote ${m.quoteData.quote_number}` : (m.quoteData.name || 'Quote') };
     if (m.virtualStagingData) return { id: m.id, kind: 'staging', title: 'Virtual staging' };
     if (m.materialData?.products && m.materialData.products.length > 0) {
@@ -3593,6 +3594,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.mentionFeedData) return { id: m.id, kind: 'mentions', title: 'Mention feed' };
     if (m.seoResearchData) return { id: m.id, kind: 'seo', title: 'SEO research' };
     if (m.seoGenericData) return { id: m.id, kind: 'seo', title: 'SEO' };
+    if (m.articleData) return { id: m.id, kind: 'seo', title: 'SEO article' };
     if (m.catalogExtractionData) return { id: m.id, kind: 'catalog', title: 'Catalog candidates' };
     if (m.catalogImageCandidatesData) return { id: m.id, kind: 'catalog', title: m.catalogImageCandidatesData.material_name ? `Images · ${m.catalogImageCandidatesData.material_name}` : 'Catalog images' };
     return null;
@@ -4053,6 +4055,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       );
     }
     if (message.quoteData) return <QuoteCanvasCard data={message.quoteData} />;
+    if (message.sheetCanvasData) {
+      return (
+        <SheetCanvasCard
+          sheetId={message.sheetCanvasData.sheet_id}
+          sheetType={message.sheetCanvasData.sheet_type}
+          moodboardId={message.sheetCanvasData.moodboard_id}
+          initialData={message.sheetCanvasData.initial_data}
+          title={message.sheetCanvasData.title}
+        />
+      );
+    }
+    if (message.articleData) return <SEOArticleViewer articleId={message.articleData.article_id} />;
     if (message.virtualStagingData) {
       return (
         <VirtualStagingViewer
@@ -4072,15 +4086,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     if (message.materialData?.products && message.materialData.products.length > 0) {
       return (
-        <ProductStrip
-          products={message.materialData.products}
-          title={`Found ${message.materialData.products.length} products`}
-          onReplaceInImage={(product) => {
-            const primaryImage = product.images?.find((img: any) => img.isPrimary) || product.images?.[0];
-            setPendingReplacement({ id: product.id, name: product.name, imageUrl: primaryImage?.url });
-          }}
-          onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
-        />
+        <div className="space-y-4">
+          {/* Explainable search spec rides with the products artifact (issue #253) */}
+          {message.searchSpec && (
+            <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
+          )}
+          <ProductStrip
+            products={message.materialData.products}
+            title={`Found ${message.materialData.products.length} products`}
+            onReplaceInImage={(product) => {
+              const primaryImage = product.images?.find((img: any) => img.isPrimary) || product.images?.[0];
+              setPendingReplacement({ id: product.id, name: product.name, imageUrl: primaryImage?.url });
+            }}
+            onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
+          />
+        </div>
       );
     }
     if (message.worldData) {
@@ -4602,7 +4622,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-primary text-white shadow-sm'
@@ -4757,8 +4777,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.materialData ? (
                       <div className="space-y-4">
-                        {/* Explainable search spec — shows how KAI interpreted the query */}
-                        {message.searchSpec && (
+                        {/* Explainable search spec — shows how KAI interpreted the query.
+                            When the canvas is shown, it rides with the products artifact there
+                            (renderCanvasArtifact), so suppress the inline copy to avoid a duplicate. */}
+                        {message.searchSpec && !(canvasShown && (message.materialData?.products?.length ?? 0) > 0) && (
                           <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
                         )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
@@ -4866,13 +4888,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     ) : message.sheetCanvasData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        <SheetCanvasCard
-                          sheetId={message.sheetCanvasData.sheet_id}
-                          sheetType={message.sheetCanvasData.sheet_type}
-                          moodboardId={message.sheetCanvasData.moodboard_id}
-                          initialData={message.sheetCanvasData.initial_data}
-                          title={message.sheetCanvasData.title}
-                        />
+                        {canvasShown ? (
+                          <ArtifactChip
+                            kind="sheet"
+                            title={message.sheetCanvasData.title || 'Presentation sheet'}
+                            active={activeCanvasId === message.id}
+                            onOpen={() => focusCanvas(message.id)}
+                          />
+                        ) : (
+                          <SheetCanvasCard
+                            sheetId={message.sheetCanvasData.sheet_id}
+                            sheetType={message.sheetCanvasData.sheet_type}
+                            moodboardId={message.sheetCanvasData.moodboard_id}
+                            initialData={message.sheetCanvasData.initial_data}
+                            title={message.sheetCanvasData.title}
+                          />
+                        )}
                       </div>
                     ) : message.sheetPdfData ? (
                       <div className="space-y-3">
@@ -5077,9 +5108,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           )
                         )}
 
-                        {/* Show SEOArticleViewer for async SEO article pipeline */}
+                        {/* SEO article pipeline — opens in the canvas; chip stands in when it's shown */}
                         {message.role === 'assistant' && message.articleData && (
-                          <SEOArticleViewer articleId={message.articleData.article_id} />
+                          canvasShown ? (
+                            <ArtifactChip
+                              kind="seo"
+                              title="SEO article"
+                              active={activeCanvasId === message.id}
+                              onOpen={() => focusCanvas(message.id)}
+                            />
+                          ) : (
+                            <SEOArticleViewer articleId={message.articleData.article_id} />
+                          )
                         )}
 
                       </div>
