@@ -1,11 +1,75 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { fetchQuoteData, fetchTemplateConfig, fetchStorageFile, fetchImageBytesFromUrl, applyWorkspaceBranding } from './data-fetcher.ts';
-import { buildQuotePDF } from './pdf-builder.ts';
-import type { QuotePDFRequest, QuotePDFResponse, QuoteData, TemplateConfig } from './types.ts';
+import { fetchQuoteData, fetchStorageFile, fetchImageBytesFromUrl } from './data-fetcher.ts';
+import type { QuotePDFRequest, QuotePDFResponse, QuoteData } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+// Unified branded-document renderer — the SAME module catalogs use, so quotes,
+// catalogs (and other branded sales docs) share one control + workspace branding.
+import { fetchBrandingConfig, fetchTemplateImage, type BrandingConfig } from '../_shared/pdf/branding.ts';
+import { renderBrandedDocument, type BrandedDoc, type BrandedDocItem } from '../_shared/pdf/document.ts';
+
+/** Map a quote + resolved branding into the shared branded-document model. */
+function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): BrandedDoc {
+  const items: BrandedDocItem[] = quote.items.map((it) => ({
+    image_key: it.image_url ? it.id : null,
+    name: it.product_name,
+    description: it.description,
+    sku: it.sku,
+    room: it.room,
+    size_color: [it.selected_size, it.selected_color].filter(Boolean).join(' · ') || null,
+    quantity: it.quantity,
+    unit: it.unit,
+    unit_price: it.unit_price,
+    discounted_price: it.discounted_price,
+    line_total: it.line_total,
+    pricing_status: it.pricing_status,
+    installation_requirements: it.installation_requirements,
+    delivery_date: it.delivery_date,
+  }));
+  const anyPriced = items.some((i) => Number(i.line_total ?? 0) > 0);
+  return {
+    doc_label: 'QUOTE',
+    number: quote.quote_number ?? null,
+    subtitle: quote.name ?? null,
+    created_at: quote.created_at ?? null,
+    expires_at: quote.expires_at ?? null,
+    currency: quote.currency || 'EUR',
+    layout: 'list',
+    company: {
+      name: branding.company_name || null,
+      address: branding.company_address || null,
+      phone: branding.company_phone || null,
+      email: branding.company_email || null,
+      vat: branding.company_vat || null,
+    },
+    client: {
+      contact_name: quote.client?.contact_name ?? null,
+      company_name: quote.client?.company_name ?? null,
+      email: quote.client?.email ?? null,
+      phone: quote.client?.phone ?? null,
+      address: quote.client?.address ?? null,
+      city: quote.client?.city ?? null,
+      postal_code: quote.client?.postal_code ?? null,
+      country: quote.client?.country ?? null,
+      vat_number: quote.client?.vat_number ?? null,
+    },
+    show_client_page: true,
+    notes: quote.notes ?? null,
+    sections: [{ items }],
+    totals: anyPriced ? {
+      subtotal: quote.subtotal,
+      vat_rate: quote.vat_rate,
+      vat_amount: quote.vat_amount,
+      grand_total: quote.grand_total,
+      cash_discount_pct: quote.cash_discount_pct ?? 0,
+      currency: quote.currency || 'EUR',
+    } : null,
+    page_width: branding.cover_width ?? null,
+    page_height: branding.cover_height ?? null,
+  };
+}
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -45,10 +109,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
           .eq('workspace_id', workspaceId).eq('user_id', auth.userId ?? '').maybeSingle();
         if (!member) return jsonResponse({ success: false, error: 'Forbidden' }, 403);
       }
-      const baseTemplateConfig = await fetchTemplateConfig(supabase, workspaceId);
-      const templateConfig = workspaceId
-        ? await applyWorkspaceBranding(supabase, baseTemplateConfig, workspaceId)
-        : baseTemplateConfig;
+      const branding = await fetchBrandingConfig(supabase, workspaceId);
 
       let logoPath: string | null = null;
       if (workspaceId) {
@@ -56,15 +117,18 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
           .select('business_logo_path').eq('workspace_id', workspaceId).maybeSingle();
         logoPath = fs?.business_logo_path ?? null;
       }
-      const [coverBytes, bgBytes, backcoverBytes, logoBytes] = await Promise.all([
-        fetchStorageFile(supabase, 'quote-templates', templateConfig.cover_image_path),
-        fetchStorageFile(supabase, 'quote-templates', templateConfig.items_background_path),
-        fetchStorageFile(supabase, 'quote-templates', templateConfig.backcover_image_path),
+      const [coverBytes, introBytes, bgBytes, backBytes, logoBytes] = await Promise.all([
+        fetchTemplateImage(supabase, branding.cover_image_path),
+        fetchTemplateImage(supabase, branding.intro_page_path),
+        fetchTemplateImage(supabase, branding.content_page_path),
+        fetchTemplateImage(supabase, branding.backcover_image_path),
         logoPath ? fetchStorageFile(supabase, 'generation-images', logoPath) : Promise.resolve(null),
       ]);
 
-      const sample = buildSampleQuote(workspaceId, templateConfig);
-      const pdfBytes = await buildQuotePDF(sample, templateConfig, coverBytes, bgBytes, backcoverBytes, logoBytes, {});
+      const sample = buildSampleQuote(workspaceId, Number(branding.vat_rate_default ?? 24));
+      const { pdfBytes } = await renderBrandedDocument(mapQuoteToBrandedDoc(sample, branding), {
+        coverBytes, introBytes, contentBgBytes: bgBytes, backCoverBytes: backBytes, logoBytes,
+      });
 
       const storagePath = `quote-output/_preview/${workspaceId ?? 'global'}.pdf`;
       const { error: upErr } = await supabase.storage.from('pdf-documents')
@@ -139,16 +203,10 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
       })
       .eq('id', quoteId);
 
-    // Fetch the quote first so we can resolve THIS workspace's PDF Design Template.
+    // Fetch the quote first so we can resolve THIS workspace's branding + template.
     const quoteData = await fetchQuoteData(supabase, quoteId);
-    const baseTemplateConfig = await fetchTemplateConfig(supabase, (quoteData as any).workspace_id);
-
-    // White-label: render under the quote workspace's own business identity (#177).
-    const templateConfig = await applyWorkspaceBranding(
-      supabase,
-      baseTemplateConfig,
-      (quoteData as any).workspace_id,
-    );
+    // Unified branding: workspace business identity + PDF template, one source (#177).
+    const branding = await fetchBrandingConfig(supabase, (quoteData as any).workspace_id);
 
     // Re-fetch quote_number (may have been generated by trigger)
     const { data: updatedQuote } = await supabase
@@ -171,10 +229,11 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
     } catch { /* logo optional */ }
 
     // Fetch template images (+ optional workspace logo) in parallel
-    const [coverBytes, bgBytes, backcoverBytes, logoBytes] = await Promise.all([
-      fetchStorageFile(supabase, 'quote-templates', templateConfig.cover_image_path),
-      fetchStorageFile(supabase, 'quote-templates', templateConfig.items_background_path),
-      fetchStorageFile(supabase, 'quote-templates', templateConfig.backcover_image_path),
+    const [coverBytes, introBytes, bgBytes, backBytes, logoBytes] = await Promise.all([
+      fetchTemplateImage(supabase, branding.cover_image_path),
+      fetchTemplateImage(supabase, branding.intro_page_path),
+      fetchTemplateImage(supabase, branding.content_page_path),
+      fetchTemplateImage(supabase, branding.backcover_image_path),
       logoPath ? fetchStorageFile(supabase, 'generation-images', logoPath) : Promise.resolve(null),
     ]);
 
@@ -190,16 +249,11 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
         }),
     );
 
-    // Build the PDF
-    const pdfBytes = await buildQuotePDF(
-      quoteData,
-      templateConfig,
-      coverBytes,
-      bgBytes,
-      backcoverBytes,
-      logoBytes,
-      itemImageBytes
-    );
+    // Build the PDF via the unified branded-document renderer.
+    const { pdfBytes } = await renderBrandedDocument(mapQuoteToBrandedDoc(quoteData, branding), {
+      coverBytes, introBytes, contentBgBytes: bgBytes, backCoverBytes: backBytes, logoBytes,
+      itemImages: itemImageBytes,
+    });
 
     // Upload to storage
     const storagePath = `quote-output/${quoteId}/quote-${quoteData.quote_number || quoteId}.pdf`;
@@ -296,8 +350,7 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
 // A representative sample quote for the PDF Design Template preview. Covers the
 // visible surfaces (multiple line items, FF&E fields, discount, VAT, notes) so the
 // admin sees a faithful render of the template without a real quote.
-function buildSampleQuote(workspaceId: string | null, tpl: TemplateConfig): QuoteData {
-  const vatRate = Number(tpl.vat_rate_default ?? 24);
+function buildSampleQuote(workspaceId: string | null, vatRate: number): QuoteData {
   const items = [
     { name: 'Porcelain Tile — Carrara', sku: 'TIL-CAR-60', size: '60×60 cm', color: 'White', qty: 40, unit: 'm²', price: 28.5, room: 'Bathroom' },
     { name: 'Oak Engineered Flooring', sku: 'FLR-OAK-14', size: '1900×190 mm', color: 'Natural', qty: 55, unit: 'm²', price: 42.0, room: 'Living room' },
@@ -310,7 +363,7 @@ function buildSampleQuote(workspaceId: string | null, tpl: TemplateConfig): Quot
     return {
       id: `sample-${i}`, product_name: it.name, description: 'Sample line item for template preview.',
       sku: it.sku, selected_size: it.size, selected_color: it.color, quantity: it.qty, unit: it.unit,
-      unit_price: it.price, discounted_price: null, line_total: lineTotal, notes: null,
+      unit_price: it.price, discounted_price: null, line_total: lineTotal, notes: null, pricing_status: 'priced',
       image_url: null, room: it.room, dimensions: it.size, installation_requirements: null, delivery_date: null,
     };
   });
