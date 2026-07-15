@@ -35,15 +35,26 @@ interface TemplateRow {
 
 const BUCKET = 'quote-templates';
 
-/** Read a File's pixel dimensions (best-effort). */
-function readImageSize(file: File): Promise<{ w: number; h: number } | null> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => { resolve({ w: img.naturalWidth, h: img.naturalHeight }); URL.revokeObjectURL(url); };
-    img.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
-    img.src = url;
-  });
+/**
+ * Downscale + re-encode to JPEG before upload. Full-page template images are often huge
+ * (e.g. 4200px photos); pdf-lib decodes PNGs fully into memory when embedding, which OOMs
+ * the PDF worker. Capping the long edge (~2000px) as JPEG keeps the aspect ratio (so the
+ * page size stays correct) while making the file tiny and cheap to embed.
+ */
+async function downscaleToJpeg(file: File, maxEdge = 2000): Promise<{ blob: Blob; w: number; h: number }> {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * scale));
+  const h = Math.max(1, Math.round(bmp.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas not available');
+  ctx.drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob((b) => res(b), 'image/jpeg', 0.85));
+  if (!blob) throw new Error('Could not encode image');
+  return { blob, w, h };
 }
 
 export const WorkspacePdfTemplateCard: React.FC = () => {
@@ -87,17 +98,14 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
     }
     try {
       setBusy(slot);
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-      const path = `${activeWorkspaceId}/pdf-${slot}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type });
+      // Downscale + JPEG-encode before upload so large template photos don't OOM the PDF worker.
+      const { blob, w, h } = await downscaleToJpeg(file);
+      const path = `${activeWorkspaceId}/pdf-${slot}-${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
       if (upErr) throw upErr;
 
       const patch: Record<string, unknown> = { workspace_id: activeWorkspaceId, [SLOT_COL[slot]]: path, updated_at: new Date().toISOString() };
-      if (slot === 'cover') {
-        const size = await readImageSize(file);
-        patch.cover_width = size?.w ?? null;
-        patch.cover_height = size?.h ?? null;
-      }
+      if (slot === 'cover') { patch.cover_width = w; patch.cover_height = h; }
       // Remove the previous file for this slot (best-effort) before repointing.
       const prev = row ? (row[SLOT_COL[slot]] as string | null) : null;
       const { error: dbErr } = await (supabase as any).from('workspace_pdf_templates').upsert(patch, { onConflict: 'workspace_id' });
