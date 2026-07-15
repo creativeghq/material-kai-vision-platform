@@ -1,7 +1,8 @@
 /**
- * Profile → Document Templates: the per-workspace PDF design used by EVERY generated
- * PDF (quotes, catalogs, proformas, invoices, statements). Owner-managed, workspace-
- * scoped. Uploads are free-form (any image you want) — no hardcoded filenames.
+ * Profile → Document Templates: the per-workspace PDF design for the presentation/sales
+ * documents (quotes, catalogs, proformas). Invoices + receipts are fiscal documents and
+ * keep their own compliant design. Owner-managed, workspace-scoped. Uploads are free-form
+ * (any image you want) — no hardcoded filenames.
  *
  * Backend: `workspace_pdf_templates` (workspace_id PK; cover/background/backcover paths
  * + cover dimensions). Files live in the private `quote-templates` bucket under the
@@ -147,8 +148,8 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
           <div className="min-w-0">
             <div className="text-sm font-semibold">Document Templates</div>
             <p className="text-xs text-muted-foreground">
-              The branded design used by every PDF this workspace generates — quotes, catalogs,
-              proformas, invoices and statements. Upload any image; the cover's size sets the page size.
+              The branded cover / background / back cover for your <strong>quotes, catalogs &amp; proformas</strong>.
+              (Invoices and receipts are fiscal documents and keep their own design.) Upload any image; the cover's size sets the page size and orientation.
             </p>
           </div>
         </div>

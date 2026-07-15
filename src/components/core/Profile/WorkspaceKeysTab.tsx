@@ -104,7 +104,7 @@ export const WorkspaceKeysTab: React.FC = () => {
           <h2 className="text-base font-semibold">Document templates</h2>
         </div>
         <p className="text-sm text-muted-foreground -mt-2">
-          The branded cover / background / back-cover used by every PDF this workspace generates.
+          The branded cover / background / back-cover for your quotes, catalogs and proformas.
         </p>
         <WorkspacePdfTemplateCard />
       </section>
