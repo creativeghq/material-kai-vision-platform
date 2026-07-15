@@ -740,7 +740,25 @@ async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise
     contactName = data?.name ?? null;
   }
   const { data: ws } = await admin.from('workspaces').select('name').eq('id', order.workspace_id).maybeSingle();
-  const buyerName = ws?.name || 'Our company';
+  // Unified branding: the buyer (us) identity comes from finance_settings — the SAME
+  // source invoices/quotes/catalogs use — falling back to the workspace name.
+  const { data: fsRow } = await admin.from('finance_settings')
+    .select('business_name, business_logo_path, business_vat, business_address, business_street_number, business_postal_code, business_city')
+    .eq('workspace_id', order.workspace_id).maybeSingle();
+  const f = (fsRow ?? {}) as Record<string, string | null>;
+  const buyerName = f.business_name || ws?.name || 'Our company';
+  const buyerVat = f.business_vat || null;
+  const buyerAddress = [
+    [f.business_address, f.business_street_number].filter(Boolean).join(' '),
+    [f.business_postal_code, f.business_city].filter(Boolean).join(', '),
+  ].filter(Boolean).join(', ') || null;
+  let buyerLogo: Uint8Array | null = null;
+  if (f.business_logo_path) {
+    try {
+      const { data: lf } = await admin.storage.from('generation-images').download(f.business_logo_path);
+      if (lf) buyerLogo = new Uint8Array(await lf.arrayBuffer());
+    } catch { /* logo optional */ }
+  }
   // Actor (who clicked send) — best-effort; null on service-role calls. Lets the
   // default `purchase_order.sent` flow notify the sender.
   let actorId: string | null = null;
@@ -752,8 +770,8 @@ async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise
   // ---- render ----
   const pdf = await PDFDocument.create();
   const { regular: font, bold } = await embedOpenSans(pdf);
-  drawPurchaseOrderDoc(pdf, font, bold, {
-    orderNumber, buyerName,
+  await drawPurchaseOrderDoc(pdf, font, bold, {
+    orderNumber, buyerName, buyerVat, buyerAddress, buyerLogo,
     supplierName: supplier?.name || contactName || 'Supplier',
     supplierVat: supplier?.vat_number || null,
     supplierEmail: contactEmail || supplier?.email || null,
@@ -859,15 +877,22 @@ async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise
 
 interface POLine { description: string; qty: number; unitCost: number; lineTotal: number; }
 interface POCtx {
-  orderNumber: string; buyerName: string; supplierName: string; supplierVat: string | null;
+  orderNumber: string; buyerName: string; buyerVat: string | null; buyerAddress: string | null;
+  buyerLogo: Uint8Array | null; supplierName: string; supplierVat: string | null;
   supplierEmail: string | null; deliverNote: string | null; message: string | null;
   currency: string; subtotal: number; vat: number; total: number; lines: POLine[];
 }
 
-function drawPurchaseOrderDoc(pdf: PDFDocument, font: any, bold: any, ctx: POCtx) {
+async function drawPurchaseOrderDoc(pdf: PDFDocument, font: any, bold: any, ctx: POCtx) {
   const W = 595.28, H = 841.89, M = 42;
   const money = (n: number) => `${n.toFixed(2)} ${ctx.currency}`;
   const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max - 1) + '…' : s);
+  // Our logo (top-right of the header) — from finance_settings.business_logo_path.
+  let logoImg: any = null;
+  if (ctx.buyerLogo) {
+    try { logoImg = await pdf.embedPng(ctx.buyerLogo); }
+    catch { try { logoImg = await pdf.embedJpg(ctx.buyerLogo); } catch { /* skip */ } }
+  }
   const cols = [
     { key: 'idx', label: '#', w: 24, align: 'left' as const },
     { key: 'desc', label: 'DESCRIPTION', w: 271, align: 'left' as const },
@@ -880,11 +905,22 @@ function drawPurchaseOrderDoc(pdf: PDFDocument, font: any, bold: any, ctx: POCtx
   let page = pdf.addPage([W, H]);
   const drawHeader = (p: any): number => {
     let y = H - M;
+    if (logoImg) {
+      const s = Math.min(120 / logoImg.width, 40 / logoImg.height);
+      p.drawImage(logoImg, { x: W - M - logoImg.width * s, y: y - logoImg.height * s + 4, width: logoImg.width * s, height: logoImg.height * s });
+    }
     p.drawText('PURCHASE ORDER', { x: M, y: y - 6, size: 20, font: bold, color: INK });
-    p.drawText(`No. ${ctx.orderNumber}`, { x: W - M - bold.widthOfTextAtSize(`No. ${ctx.orderNumber}`, 11), y: y - 2, size: 11, font: bold, color: INK });
-    y -= 34;
-    p.drawText(`From: ${clip(ctx.buyerName, 60)}`, { x: M, y, size: 10, font, color: GRAY });
-    y -= 16;
+    y -= 24;
+    p.drawText(`No. ${ctx.orderNumber}`, { x: M, y, size: 10, font, color: GRAY });
+    y -= 18;
+    // From (buyer) identity — name + VAT + address from finance_settings.
+    p.drawText(`From: ${clip(ctx.buyerName, 60)}`, { x: M, y, size: 10, font: bold, color: INK });
+    y -= 13;
+    const fromSub: string[] = [];
+    if (ctx.buyerVat) fromSub.push(`VAT ${ctx.buyerVat}`);
+    if (ctx.buyerAddress) fromSub.push(ctx.buyerAddress);
+    if (fromSub.length) { p.drawText(clip(fromSub.join('  ·  '), 82), { x: M, y, size: 9, font, color: GRAY }); y -= 14; }
+    y -= 2;
     p.drawText(`To (Supplier): ${clip(ctx.supplierName, 50)}`, { x: M, y, size: 11, font: bold, color: INK });
     y -= 14;
     const sub: string[] = [];
