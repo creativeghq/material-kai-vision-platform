@@ -14,20 +14,23 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { Dialog, DialogContent } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 
-type Slot = 'cover' | 'background' | 'backcover';
-const SLOT_COL: Record<Slot, 'cover_path' | 'background_path' | 'backcover_path'> = {
-  cover: 'cover_path', background: 'background_path', backcover: 'backcover_path',
+type Slot = 'cover' | 'intro' | 'background' | 'backcover';
+const SLOT_COL: Record<Slot, 'cover_path' | 'intro_path' | 'background_path' | 'backcover_path'> = {
+  cover: 'cover_path', intro: 'intro_path', background: 'background_path', backcover: 'backcover_path',
 };
 const SLOTS: Array<{ slot: Slot; label: string; hint: string }> = [
-  { slot: 'cover', label: 'Cover', hint: 'First page. Its dimensions set the PDF page size.' },
+  { slot: 'cover', label: 'Cover', hint: 'Page 1. Its size sets the PDF page size & orientation.' },
+  { slot: 'intro', label: 'Introduction', hint: 'Optional page 2 — leave empty for no intro page.' },
   { slot: 'background', label: 'Background', hint: 'Full-page background behind the item pages.' },
-  { slot: 'backcover', label: 'Back cover', hint: 'Closing page.' },
+  { slot: 'backcover', label: 'Back cover', hint: 'Last page.' },
 ];
 
 interface TemplateRow {
   cover_path: string | null;
+  intro_path: string | null;
   background_path: string | null;
   backcover_path: string | null;
   cover_width: number | null;
@@ -65,17 +68,23 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<Slot | null>(null);
   const [previews, setPreviews] = useState<Partial<Record<Slot, string>>>({});
-  const inputs = { cover: useRef<HTMLInputElement>(null), background: useRef<HTMLInputElement>(null), backcover: useRef<HTMLInputElement>(null) };
+  const [enlarged, setEnlarged] = useState<string | null>(null);
+  const inputs = {
+    cover: useRef<HTMLInputElement>(null),
+    intro: useRef<HTMLInputElement>(null),
+    background: useRef<HTMLInputElement>(null),
+    backcover: useRef<HTMLInputElement>(null),
+  };
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
     setLoading(true);
     const { data } = await (supabase as any)
       .from('workspace_pdf_templates')
-      .select('cover_path, background_path, backcover_path, cover_width, cover_height')
+      .select('cover_path, intro_path, background_path, backcover_path, cover_width, cover_height')
       .eq('workspace_id', activeWorkspaceId)
       .maybeSingle();
-    setRow((data as TemplateRow) ?? { cover_path: null, background_path: null, backcover_path: null, cover_width: null, cover_height: null });
+    setRow((data as TemplateRow) ?? { cover_path: null, intro_path: null, background_path: null, backcover_path: null, cover_width: null, cover_height: null });
     // Sign preview URLs for whatever's set.
     const next: Partial<Record<Slot, string>> = {};
     for (const { slot } of SLOTS) {
@@ -159,21 +168,32 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {SLOTS.map(({ slot, label, hint }) => {
               const url = previews[slot];
               const isBusy = busy === slot;
+              const optional = slot === 'intro';
               return (
-                <div key={slot} className="rounded-lg border border-border/60 p-3 space-y-2">
-                  <div className="text-xs font-medium">{label}</div>
-                  <div className="aspect-[3/4] w-full overflow-hidden rounded border border-dashed border-border/60 bg-muted/30 flex items-center justify-center">
-                    {url ? (
-                      <img src={url} alt={label} className="h-full w-full object-contain" />
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground px-2 text-center">No image</span>
-                    )}
+                <div key={slot} className="rounded-md border border-border/60 p-2 space-y-1.5">
+                  <div className="text-[11px] font-medium flex items-center gap-1">
+                    {label}{optional && <span className="text-[9px] text-muted-foreground font-normal">(optional)</span>}
                   </div>
-                  <p className="text-[11px] text-muted-foreground leading-snug">{hint}</p>
+                  <button
+                    type="button"
+                    onClick={() => url && setEnlarged(url)}
+                    className="aspect-[3/4] w-full overflow-hidden rounded border border-dashed border-border/60 bg-muted/30 flex items-center justify-center group relative"
+                    title={url ? 'Click to enlarge' : undefined}
+                  >
+                    {url ? (
+                      <>
+                        <img src={url} alt={label} className="h-full w-full object-contain" />
+                        <span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/30 text-[10px] text-white">Click to enlarge</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground px-1 text-center">No image</span>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-muted-foreground leading-tight">{hint}</p>
                   <input
                     ref={inputs[slot]}
                     type="file"
@@ -181,14 +201,14 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
                     className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void onPick(slot, f); }}
                   />
-                  <div className="flex gap-1.5">
-                    <Button size="sm" variant="outline" className="flex-1 rounded-full h-8" disabled={isBusy} onClick={() => inputs[slot].current?.click()}>
-                      {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1" />}
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" className="flex-1 rounded-full h-7 text-[11px] px-2" disabled={isBusy} onClick={() => inputs[slot].current?.click()}>
+                      {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3 mr-1" />}
                       {url ? 'Replace' : 'Upload'}
                     </Button>
                     {url && (
-                      <Button size="sm" variant="ghost" className="rounded-full h-8 w-8 p-0 text-muted-foreground hover:text-destructive" disabled={isBusy} onClick={() => onClear(slot)}>
-                        <Trash2 className="h-3.5 w-3.5" />
+                      <Button size="sm" variant="ghost" className="rounded-full h-7 w-7 p-0 text-muted-foreground hover:text-destructive" disabled={isBusy} onClick={() => onClear(slot)}>
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     )}
                   </div>
@@ -198,8 +218,14 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
           </div>
         )}
         {row?.cover_width && row?.cover_height && (
-          <p className="text-[11px] text-muted-foreground">Cover size: {row.cover_width}×{row.cover_height}px — PDFs use this aspect ratio.</p>
+          <p className="text-[11px] text-muted-foreground">Cover size: {row.cover_width}×{row.cover_height}px — PDFs use this aspect ratio &amp; orientation.</p>
         )}
+
+        <Dialog open={!!enlarged} onOpenChange={(o) => !o && setEnlarged(null)}>
+          <DialogContent className="max-w-4xl p-2 bg-transparent border-0 shadow-none">
+            {enlarged && <img src={enlarged} alt="Template preview" className="w-full h-auto max-h-[85vh] object-contain rounded-md" />}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

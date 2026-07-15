@@ -19,6 +19,7 @@ export interface BrandingConfig {
   // the owner uploaded; null when unset. Read from workspace_pdf_templates (per-workspace,
   // owner-managed under Profile), falling back to the operator root's template.
   cover_image_path: string | null;
+  intro_page_path: string | null;    // optional page 2 — no page rendered when null
   content_page_path: string | null;
   backcover_image_path: string | null;
   // Cover image pixel dimensions (cached) so the PDF page size can match the design.
@@ -38,6 +39,7 @@ const TEMPLATE_BUCKET = 'quote-templates';
 
 interface WpsTemplateRow {
   cover_path: string | null;
+  intro_path: string | null;
   background_path: string | null;
   backcover_path: string | null;
   cover_width: number | null;
@@ -46,7 +48,8 @@ interface WpsTemplateRow {
 
 /** The workspace's own PDF template, falling back per-slot to the operator root's. */
 async function fetchWorkspaceTemplate(supabase: SupabaseClient, workspaceId?: string | null): Promise<WpsTemplateRow> {
-  const cols = 'cover_path, background_path, backcover_path, cover_width, cover_height';
+  const cols = 'cover_path, intro_path, background_path, backcover_path, cover_width, cover_height';
+  const empty: WpsTemplateRow = { cover_path: null, intro_path: null, background_path: null, backcover_path: null, cover_width: null, cover_height: null };
   let row: WpsTemplateRow | null = null;
   if (workspaceId) {
     const { data } = await supabase.from('workspace_pdf_templates').select(cols).eq('workspace_id', workspaceId).maybeSingle();
@@ -61,6 +64,7 @@ async function fetchWorkspaceTemplate(supabase: SupabaseClient, workspaceId?: st
       if (r) {
         row = {
           cover_path: row?.cover_path ?? r.cover_path,
+          intro_path: row?.intro_path ?? r.intro_path,
           background_path: row?.background_path ?? r.background_path,
           backcover_path: row?.backcover_path ?? r.backcover_path,
           cover_width: row?.cover_width ?? r.cover_width,
@@ -69,7 +73,7 @@ async function fetchWorkspaceTemplate(supabase: SupabaseClient, workspaceId?: st
       }
     }
   }
-  return row ?? { cover_path: null, background_path: null, backcover_path: null, cover_width: null, cover_height: null };
+  return row ?? empty;
 }
 
 /**
@@ -92,6 +96,7 @@ export async function fetchBrandingConfig(
 
   const base: BrandingConfig = {
     cover_image_path: tpl.cover_path,
+    intro_page_path: tpl.intro_path,
     content_page_path: tpl.background_path,
     backcover_image_path: tpl.backcover_path,
     cover_width: tpl.cover_width,

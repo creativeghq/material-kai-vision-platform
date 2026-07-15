@@ -122,6 +122,7 @@ export interface BrandedDoc {
 }
 export interface BrandedAssets {
   coverBytes?: Uint8Array | null;
+  introBytes?: Uint8Array | null;   // optional page 2 — no page when absent
   contentBgBytes?: Uint8Array | null;
   backCoverBytes?: Uint8Array | null;
   logoBytes?: Uint8Array | null;
@@ -137,6 +138,7 @@ export async function renderBrandedDocument(doc: BrandedDoc, assets: BrandedAsse
   const g = computeGeom(PAGE_W, PAGE_H);
 
   const coverImage = await embedImage(pdfDoc, assets.coverBytes ?? null);
+  const introImage = await embedImage(pdfDoc, assets.introBytes ?? null);
   const bgImage = await embedImage(pdfDoc, assets.contentBgBytes ?? null);
   const backImage = await embedImage(pdfDoc, assets.backCoverBytes ?? null);
   const logoImage = await embedImage(pdfDoc, assets.logoBytes ?? null);
@@ -151,6 +153,12 @@ export async function renderBrandedDocument(doc: BrandedDoc, assets: BrandedAsse
 
   if (coverImage || !doc.cover_optional) {
     drawCover(pdfDoc, g, doc, coverImage, logoImage, font, fontBold);
+    pageCount++;
+  }
+  // Introduction — optional full-page image (page 2). No page when not uploaded.
+  if (introImage) {
+    const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
+    page.drawImage(introImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
     pageCount++;
   }
   if (doc.show_client_page) {

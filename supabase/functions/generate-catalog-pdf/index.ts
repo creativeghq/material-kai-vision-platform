@@ -79,9 +79,10 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
     const branding = await fetchBrandingConfig(supabase, catalog.workspace_id ?? null);
     const vatRate = body.vat_rate ?? (bodyMeta.vat_rate as number) ?? branding.vat_rate_default ?? 24;
 
-    // Template images (cover / content bg / back cover) from the branded template.
-    const [coverBytes, bgBytes, backBytes] = await Promise.all([
+    // Template images (cover / intro / content bg / back cover) from the branded template.
+    const [coverBytes, introBytes, bgBytes, backBytes] = await Promise.all([
       fetchTemplateImage(supabase, branding.cover_image_path),
+      fetchTemplateImage(supabase, branding.intro_page_path),
       fetchTemplateImage(supabase, branding.content_page_path),
       fetchTemplateImage(supabase, branding.backcover_image_path),
     ]);
@@ -189,6 +190,7 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
 
     const { pdfBytes, pageCount } = await renderBrandedDocument(doc, {
       coverBytes,
+      introBytes,
       contentBgBytes: bgBytes,
       backCoverBytes: backBytes,
       itemImages,
