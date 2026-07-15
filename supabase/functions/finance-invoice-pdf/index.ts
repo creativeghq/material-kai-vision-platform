@@ -217,6 +217,28 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
 
     const { data: fs } = await supabase.from('finance_settings').select('*').eq('workspace_id', inv.workspace_id).maybeSingle();
 
+    // #1 — the bank details printed on the invoice prefer the treasury accounts flagged
+    // "Show on invoice" (Settings → Bank accounts), so there's a single bank list instead
+    // of a separate one under Business Identity. Falls back to the legacy
+    // finance_settings.bank_accounts list when no treasury account is flagged, so nothing
+    // changes for workspaces that haven't opted in.
+    if (fs) {
+      const { data: treasuryAccts } = await supabase
+        .from('finance_bank_accounts')
+        .select('name, kind, iban, account_ref')
+        .eq('workspace_id', inv.workspace_id)
+        .eq('is_active', true)
+        .eq('show_on_invoice', true)
+        .order('sort_order', { ascending: true });
+      if (Array.isArray(treasuryAccts) && treasuryAccts.length > 0) {
+        (fs as any).bank_accounts = treasuryAccts.map((a: any) =>
+          a.kind === 'bank'
+            ? { type: 'bank', bank_name: a.name, iban: a.iban ?? '', beneficiary: (fs as any).business_name ?? '' }
+            : { type: 'other', label: a.name, notes: a.account_ref ?? a.iban ?? '' },
+        );
+      }
+    }
+
     let customer: any = null;
     if (inv.customer_company_id) {
       const { data } = await supabase.from('crm_companies').select('*').eq('id', inv.customer_company_id).maybeSingle();

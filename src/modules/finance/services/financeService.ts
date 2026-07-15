@@ -163,6 +163,7 @@ export interface BankAccount {
   opening_balance: number;
   is_default: boolean;
   is_active: boolean;
+  show_on_invoice: boolean;
   sort_order: number;
   notes: string | null;
   created_at: string;
@@ -181,6 +182,7 @@ export interface BankAccountBalance {
   is_default: boolean;
   sort_order: number;
   opening_balance: number;
+  show_on_invoice: boolean;
   total_in: number;
   total_out: number;
   current_balance: number;
@@ -1042,7 +1044,7 @@ const _financeServiceCore = {
   async createBankAccount(input: {
     workspaceId: string; name: string; kind?: BankAccountKind; currency?: string;
     iban?: string | null; accountRef?: string | null; openingBalance?: number;
-    isDefault?: boolean; notes?: string | null;
+    isDefault?: boolean; notes?: string | null; showOnInvoice?: boolean;
   }): Promise<BankAccount> {
     if (!input.name?.trim()) throw new Error('Account name is required');
     // First account in a workspace becomes the default automatically.
@@ -1060,6 +1062,7 @@ const _financeServiceCore = {
       account_ref: input.accountRef ?? null,
       opening_balance: input.openingBalance ?? 0,
       is_default: makeDefault,
+      show_on_invoice: input.showOnInvoice ?? false,
       sort_order: existing.length,
     }).select('*').single();
     if (error) throw error;
@@ -1067,7 +1070,7 @@ const _financeServiceCore = {
   },
 
   async updateBankAccount(id: string, patch: Partial<Pick<BankAccount,
-    'name' | 'kind' | 'currency' | 'iban' | 'account_ref' | 'opening_balance' | 'is_active' | 'sort_order' | 'notes'>>): Promise<void> {
+    'name' | 'kind' | 'currency' | 'iban' | 'account_ref' | 'opening_balance' | 'is_active' | 'show_on_invoice' | 'sort_order' | 'notes'>>): Promise<void> {
     const { error } = await supabase.from('finance_bank_accounts')
       .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;

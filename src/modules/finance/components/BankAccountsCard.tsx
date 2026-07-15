@@ -43,12 +43,13 @@ interface FormState {
   accountRef: string;
   openingBalance: string;
   isActive: boolean;
+  showOnInvoice: boolean;
   notes: string;
 }
 
 const EMPTY_FORM: FormState = {
   name: '', kind: 'bank', currency: 'EUR', iban: '', accountRef: '',
-  openingBalance: '', isActive: true, notes: '',
+  openingBalance: '', isActive: true, showOnInvoice: false, notes: '',
 };
 
 export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -77,6 +78,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       accountRef: r.account_ref ?? '',
       openingBalance: String(r.opening_balance ?? ''),
       isActive: r.is_active,
+      showOnInvoice: r.show_on_invoice,
       notes: '',
     });
     setEditing({ id: r.bank_account_id });
@@ -103,10 +105,11 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         await financeService.updateBankAccount(editing.id, {
           name: common.name, kind: common.kind, currency: common.currency,
           iban: common.iban, account_ref: common.accountRef,
-          opening_balance: common.openingBalance, is_active: form.isActive, notes: common.notes,
+          opening_balance: common.openingBalance, is_active: form.isActive,
+          show_on_invoice: form.showOnInvoice, notes: common.notes,
         });
       } else {
-        await financeService.createBankAccount({ workspaceId, ...common });
+        await financeService.createBankAccount({ workspaceId, ...common, showOnInvoice: form.showOnInvoice });
       }
       setEditing(null);
       await load();
@@ -169,6 +172,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium truncate">{r.name}</span>
                         {r.is_default && <Badge variant="outline" className="text-[10px]">Default</Badge>}
+                        {r.show_on_invoice && <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-500">On invoice</Badge>}
                         {!r.is_active && <Badge variant="secondary" className="text-[10px]">Inactive</Badge>}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
@@ -252,6 +256,10 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
               <Label className="text-xs">Notes</Label>
               <Textarea rows={2} className="text-sm" value={form.notes} onChange={(e) => patch('notes', e.target.value)} placeholder="Optional" />
             </div>
+            <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2">
+              <span className="text-xs">Show on invoice <span className="text-muted-foreground">— prints this account's name &amp; IBAN in the payment details on your invoices</span></span>
+              <Switch checked={form.showOnInvoice} onCheckedChange={(v) => patch('showOnInvoice', v)} />
+            </label>
             {editing?.id && (
               <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2">
                 <span className="text-xs">Active <span className="text-muted-foreground">— inactive accounts are hidden from payment pickers</span></span>

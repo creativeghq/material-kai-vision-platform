@@ -7125,6 +7125,7 @@ export type Database = {
           name: string
           notes: string | null
           opening_balance: number
+          show_on_invoice: boolean
           sort_order: number
           updated_at: string
           workspace_id: string
@@ -7139,6 +7140,7 @@ export type Database = {
           is_default?: boolean
           kind?: string
           name: string
+          show_on_invoice?: boolean
           notes?: string | null
           opening_balance?: number
           sort_order?: number
@@ -7157,6 +7159,7 @@ export type Database = {
           name?: string
           notes?: string | null
           opening_balance?: number
+          show_on_invoice?: boolean
           sort_order?: number
           updated_at?: string
           workspace_id?: string
