@@ -709,6 +709,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'adjust_catalog_pricing', name: 'Adjust Pricing', category: 'Catalogs',
+    adminOnly: true, moduleSlug: 'presentation-catalogs',
+    workflowOf: 'catalog',
+    desc: 'Optional (run any time before Generate) — re-price the whole catalog/proforma proportionally to a target: set the total ("€2,438"), add/subtract ("+€400"), or a percent ("+15%"). Every line scales together (discount % + VAT kept) and the rounding lands the total exactly. Only touches this catalog, never the source.',
+    examples: [
+      'Re-price catalog <catalog_id> so the payable total is €2,438',
+      'Add €400 to catalog <catalog_id>',
+      'Increase every price in catalog <catalog_id> by 15%',
+    ],
+  },
+  {
     id: 'generate_catalog_pdf', name: 'Generate PDF', category: 'Catalogs',
     adminOnly: true, moduleSlug: 'presentation-catalogs',
     workflowOf: 'catalog', workflowStep: 7,
@@ -1053,14 +1064,14 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'catalogs',
     name: 'Catalogs',
-    description: 'Build email-gated catalog landing pages from manufacturer PDFs. 8-step workflow.',
+    description: 'Build email-gated catalog landing pages from manufacturer PDFs. 8-step workflow + optional re-pricing.',
     icon: 'BookOpen',
     adminOnly: true,
     moduleSlug: 'presentation-catalogs',
     tool_ids: [
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
       'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
-      'generate_catalog_pdf', 'publish_catalog',
+      'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
     ],
     quick_starts: [
       {
@@ -1095,6 +1106,21 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Show me my published catalogs so I can pick one to send to selected CRM categories.',
         icon: 'Send',
         workflow_id: 'catalog-send',
+      },
+      {
+        label: 'Adjust pricing',
+        description: 'Re-price a catalog / proforma to a target total, +€, or +%',
+        icon: 'Percent',
+        prompt: 'Re-price one of my catalogs to a target total.',
+        promptTemplate: 'Re-price catalog "{{catalog}}" so the {{basis}} total becomes {{target}}. Scale every line proportionally, keep each line\'s discount %, then regenerate the PDF.',
+        form: [
+          { key: 'catalog', label: 'Which catalog / proforma?', kind: 'text', required: true, placeholder: 'Προσφορά ΠΡΦ-20-01645' },
+          { key: 'basis', label: 'Which total?', kind: 'select', default: 'payable (VAT included)', options: [
+            { value: 'payable (VAT included)', label: 'Payable — VAT included' },
+            { value: 'net (before VAT)', label: 'Net — before VAT' },
+          ] },
+          { key: 'target', label: 'Target total or change', kind: 'text', required: true, placeholder: '€2,438   (or "+400", or "+15%")' },
+        ],
       },
     ],
   },
