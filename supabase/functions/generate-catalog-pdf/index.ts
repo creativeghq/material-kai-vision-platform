@@ -87,17 +87,41 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
     ]);
 
     // Map sections → normalized doc sections; collect item images (capped).
+    // Pricing lives in material.specs, NOT the top-level `price`:
+    //   quantity_tmet / quantity_tem = billed quantity, net_value = line total
+    //   (qty × unit price − discount), discount_pct, vat_pct. `price` is the UNIT price.
     const itemImages: Record<string, Uint8Array> = {};
     let imgCount = 0;
     const docSections: BrandedDocSection[] = [];
-    let subtotal = 0;
+    let subtotalNet = 0;
+    let vatSum = 0;
     let anyPriced = false;
+    let matIdx = 0;
     for (const s of sections) {
       const items = [];
       for (const mat of (s.materials || [])) {
-        const price = mat.price != null ? Number(mat.price) : null;
-        if (price != null && !Number.isNaN(price)) { subtotal += price; anyPriced = true; }
-        const key = mat.id || `${docSections.length}-${items.length}`;
+        const specs = (mat.specs ?? {}) as Record<string, any>;
+        const unitPrice = mat.price != null ? Number(mat.price)
+          : specs.unit_price != null ? Number(specs.unit_price) : null;
+        const qty = specs.quantity_tmet != null ? Number(specs.quantity_tmet)
+          : specs.quantity_tem != null ? Number(specs.quantity_tem)
+          : specs.quantity != null ? Number(specs.quantity) : 1;
+        // Line total = net_value if present, else qty × unit price.
+        const netValue = specs.net_value != null ? Number(specs.net_value)
+          : (unitPrice != null ? round2(unitPrice * qty) : null);
+        const lineVatPct = specs.vat_pct != null ? Number(specs.vat_pct) : vatRate;
+        if (netValue != null && !Number.isNaN(netValue)) {
+          subtotalNet += netValue;
+          vatSum += netValue * lineVatPct / 100;
+          anyPriced = true;
+        }
+        // Effective unit price after discount, so the Price column shows 14.75 → 11.80
+        // (struck) and the math reconciles: qty × discounted = net_value.
+        const discountedUnit = (netValue != null && qty > 0) ? round2(netValue / qty) : null;
+        const showDiscount = discountedUnit != null && unitPrice != null && Math.abs(discountedUnit - unitPrice) > 0.01;
+
+        const key = mat.id || `m${matIdx}`;
+        matIdx++;
         if (mat.image_url && imgCount < MAX_ITEM_IMAGES) {
           const bytes = await fetchImageBytesFromUrl(mat.image_url);
           if (bytes) { itemImages[key] = bytes; imgCount++; }
@@ -106,25 +130,31 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
           image_key: key,
           name: mat.name || 'Item',
           description: mat.description ?? null,
-          sku: mat.specs?.sku ?? mat.specs?.code ?? null,
-          size_color: sizeColorFromSpecs(mat.specs),
-          quantity: 1,
-          unit: mat.specs?.unit ?? 'pcs',
-          unit_price: price,
-          line_total: price,
-          specs: mat.specs ?? null,
+          sku: specs.sku ?? specs.code ?? null,
+          size_color: sizeColorFromSpecs(specs),
+          quantity: qty,
+          unit: specs.unit ?? 'pcs',
+          unit_price: unitPrice,
+          discounted_price: showDiscount ? discountedUnit : null,
+          line_total: netValue,
+          specs,
         });
       }
-      docSections.push({ title: s.title ?? null, intro: s.intro ?? null, items });
+      // Drop the translate step's page-split section titles ("Page 1 — … (Items 1–6)")
+      // — they're pagination artifacts, not real categories. Keeps one clean list.
+      const rawTitle = s.title ?? null;
+      const title = rawTitle && /^\s*(page|σελ[ίι]δα)\s*\d+/i.test(rawTitle) ? null : rawTitle;
+      docSections.push({ title, intro: s.intro ?? null, items });
     }
 
     // Totals only when this is a proforma AND at least one material is priced.
+    // Subtotal = Σ net line values; VAT summed per line (handles mixed rates).
     const totals = (isProforma && anyPriced)
       ? {
-          subtotal: round2(subtotal),
+          subtotal: round2(subtotalNet),
           vat_rate: vatRate,
-          vat_amount: round2(subtotal * vatRate / 100),
-          grand_total: round2(subtotal * (1 + vatRate / 100)),
+          vat_amount: round2(vatSum),
+          grand_total: round2(subtotalNet + vatSum),
           currency,
         }
       : null;
