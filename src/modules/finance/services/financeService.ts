@@ -647,6 +647,9 @@ const _financeServiceCore = {
     categoryId?: string | null;
     /** Which bank/cash account the money moved through (in → deposited to / out → paid from). */
     bankAccountId?: string | null;
+    /** Money-in only: generate + email the receipt to the customer (default true). When
+     *  false, the payment is recorded silently — no receipt, no customer notification. */
+    sendReceipt?: boolean;
     /** Link the payment to an order (drives orders.payment_status). Optional — also back-filled
      *  by the DB when the payment is allocated to that order's invoice/bill. */
     orderId?: string | null;
@@ -684,9 +687,10 @@ const _financeServiceCore = {
       p_order_id: input.orderId ?? null,
     });
     if (error) throw error;
-    // Payment received → notify + email the customer via the seeded flow (fire-and-forget).
-    // Only for inbound money (a customer paying us); outbound is us paying a supplier.
-    if (input.direction === 'in') {
+    // Payment received → generate the receipt + notify/email the customer via the seeded
+    // flow (fire-and-forget). Only for inbound money, and only when sendReceipt isn't
+    // opted out — when false the payment is recorded silently.
+    if (input.direction === 'in' && input.sendReceipt !== false) {
       const paymentId = data as string;
       void (async () => {
         try {

@@ -53,6 +53,7 @@ export const RecordPaymentDialog: React.FC<{
   const [invoiceId, setInvoiceId] = useState<string>(''); // refund target
   const [targetInvoiceId, setTargetInvoiceId] = useState<string>(''); // received allocation target
   const [issueCreditNote, setIssueCreditNote] = useState(true);
+  const [sendReceipt, setSendReceipt] = useState(true);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -68,6 +69,7 @@ export const RecordPaymentDialog: React.FC<{
     setTargetInvoiceId(preset && preset.direction === 'received' ? preset.targetId : '');
     setInvoiceId(preset?.direction === 'refund' ? preset.targetId : '');
     setIssueCreditNote(true);
+    setSendReceipt(true);
     (async () => {
       const [cats, invs, banks] = await Promise.all([
         financeCategoriesService.list(workspaceId).catch(() => []),
@@ -164,6 +166,7 @@ export const RecordPaymentDialog: React.FC<{
         counterpartyContactId,
         allocations,
         bankAccountId: bankAccountId || null,
+        sendReceipt: kind === 'received' ? sendReceipt : false,
       });
       if (creditNoteFiscalError) {
         // Cash-out logged + credit note created, but myDATA transmission failed —
@@ -223,6 +226,13 @@ export const RecordPaymentDialog: React.FC<{
               </Select>
               {selectedTarget && <p className="text-[11px] text-muted-foreground">Settling this invoice will mark it paid when fully covered.</p>}
             </div>
+          )}
+
+          {kind === 'received' && (
+            <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
+              <span className="text-xs">Send receipt to customer <span className="text-muted-foreground">— emails the payment receipt &amp; notifies them. Off = record it silently.</span></span>
+              <Switch checked={sendReceipt} onCheckedChange={setSendReceipt} />
+            </label>
           )}
 
           {kind === 'paid_out' && (
