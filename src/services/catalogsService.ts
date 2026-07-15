@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 
 export type CatalogStatus = 'draft' | 'generating' | 'ready' | 'published' | 'archived' | 'failed';
 
@@ -339,6 +340,10 @@ class CatalogsService {
       .insert({
         id,
         uploaded_by: user.id,
+        // Stamp the active workspace so the source PDF is workspace-scoped (the
+        // catalog-extract ownership check binds on this; historically left null,
+        // which forced a fallback to uploaded_by).
+        workspace_id: getActiveWorkspaceId(user.id) ?? null,
         original_filename: file.name,
         storage_path: path,
         file_size_bytes: file.size,

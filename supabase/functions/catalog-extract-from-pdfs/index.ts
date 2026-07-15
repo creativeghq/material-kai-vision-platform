@@ -124,7 +124,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
 
     const { data: pdfs, error: pdfErr } = await supabase
       .from('catalog_source_pdfs')
-      .select('id, workspace_id, original_filename, manufacturer_name, storage_path, page_count')
+      .select('id, workspace_id, uploaded_by, original_filename, manufacturer_name, storage_path, page_count')
       .in('id', body.source_pdf_ids);
 
     if (pdfErr) return jsonResponse({ success: false, error: pdfErr.message }, 500);
@@ -146,9 +146,17 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
     if (!effectiveUserId) {
       return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
     }
-    const pdfWorkspaceIds = Array.from(new Set(pdfs.map((p) => p.workspace_id)));
-    for (const wsId of pdfWorkspaceIds) {
-      if (!(await userCanAccessWorkspace(supabase, effectiveUserId, wsId))) {
+    // Bind the caller to every source PDF. Prefer the PDF's workspace, but fall back to the
+    // uploader: chat-uploaded source PDFs are stamped `uploaded_by` and historically NOT
+    // `workspace_id` (it was left null), so a workspace-only check can never pass for them.
+    // Both columns are server-set at upload, so this remains a real tenancy check — not a
+    // body-supplied id. (New uploads now stamp workspace_id too; this keeps old rows working.)
+    for (const pdf of pdfs) {
+      const okByWorkspace = pdf.workspace_id
+        ? await userCanAccessWorkspace(supabase, effectiveUserId, pdf.workspace_id)
+        : false;
+      const okByUploader = !!pdf.uploaded_by && pdf.uploaded_by === effectiveUserId;
+      if (!okByWorkspace && !okByUploader) {
         return jsonResponse({ success: false, error: 'Not authorized for one or more source PDFs' }, 403);
       }
     }
