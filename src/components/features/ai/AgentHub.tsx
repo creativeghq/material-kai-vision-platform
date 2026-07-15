@@ -710,6 +710,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // instruction (with the source_pdf_id it needs for attach_catalog_pdfs) is
   // assembled at send-time in handleSendMessage.
   const [attachedCatalogPdfs, setAttachedCatalogPdfs] = useState<{ id: string; filename: string }[]>([]);
+  // Readable PDFs (quotes / invoices / specs) attached via the paperclip. Held as
+  // { name, dataUrl } chips and sent to agent-chat as base64 `documents` so Opus reads
+  // them natively — the "rebuild this quote / summarize this invoice" path. Distinct
+  // from attachedCatalogPdfs (which upload a catalog_source_pdfs row for extraction).
+  const [attachedDocuments, setAttachedDocuments] = useState<{ name: string; dataUrl: string }[]>([]);
   const [selectedGenerationMode, setSelectedGenerationMode] = useState<string | null>(null);
   const [imageDragOverIndex, setImageDragOverIndex] = useState<number | null>(null);
   const imageDragIndexRef = useRef<number | null>(null);
@@ -1831,7 +1836,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const pendingToolkits = pendingToolkitsRef.current;
     pendingToolkitsRef.current = [];
 
-    if (!directRun && !input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0) {
+    if (!directRun && !input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0 && attachedDocuments.length === 0) {
       return;
     }
     if (!userId) {
@@ -1841,12 +1846,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // For a direct run the chat shows a compact "▶ <label>" chip instead of typed text.
     const userAttachedImages = directRun ? [] : [...attachedImages];
     const userAttachedCatalogPdfs = directRun ? [] : [...attachedCatalogPdfs];
+    // Readable PDFs (quotes/invoices/specs) — sent as base64 data URLs so Opus reads them natively.
+    const userAttachedDocuments = directRun ? [] : attachedDocuments.map((d) => d.dataUrl);
 
     // What the user sees in their chat bubble — their own text, or a friendly
     // default when they attached a catalog PDF and typed nothing.
     const userInput = directRun
       ? `▶ ${directRun.label}`
-      : (input.trim() || (userAttachedCatalogPdfs.length > 0 ? 'Extract the products from this catalog.' : input));
+      : (input.trim()
+          || (userAttachedCatalogPdfs.length > 0 ? 'Extract the products from this catalog.' : '')
+          || (userAttachedDocuments.length > 0 ? 'Read the attached document.' : input));
 
     // What the agent actually receives — same text plus the machine context it
     // needs to attach the uploaded source PDF(s). Kept out of the visible bubble
@@ -1870,6 +1879,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setInput('');
     setAttachedImages([]);
     setAttachedCatalogPdfs([]);
+    setAttachedDocuments([]);
     setSelectedGenerationMode(null);
     setIsLoading(true);
     setReasoningSteps([]); // Clear reasoning steps for new message
@@ -1987,6 +1997,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           agentId: selectedAgent,
           model: selectedModel,
           images: resolvedImageUrls,
+          ...(userAttachedDocuments.length > 0 ? { documents: userAttachedDocuments } : {}),
           // Use the local `conversationId` (already includes a freshly-created id),
           // not the React state `currentConversationId` — state updates from
           // setCurrentConversationId above haven't committed yet on the first
@@ -3291,24 +3302,55 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [toast, ensureAgentAndToolkit]);
 
+  // Attach a PDF as a *readable document* — base64 data URL sent to agent-chat as a
+  // `document` block so Opus reads it natively (quotes, invoices, specs). This is the
+  // "read this and rebuild/summarize it" path, distinct from catalog product-extraction.
+  const attachDocumentFiles = useCallback((files: File[]) => {
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise<{ name: string; dataUrl: string }>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              if (ev.target?.result) resolve({ name: file.name, dataUrl: ev.target.result as string });
+              else reject(new Error('Failed to read file'));
+            };
+            reader.onerror = () => reject(new Error('FileReader error'));
+            reader.readAsDataURL(file);
+          }),
+      ),
+    ).then((docs) => {
+      setAttachedDocuments((prev) => [...prev, ...docs]);
+      toast({ title: docs.length > 1 ? `${docs.length} documents attached` : 'Document attached', description: docs.map((d) => d.name).join(', ') });
+    }).catch(() => {
+      toast({ title: 'Attach failed', description: 'The PDF could not be read. Please try again.', variant: 'destructive' });
+    });
+  }, [toast]);
+
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const fileArray = Array.from(files);
     e.target.value = ''; // Reset now so the same file can be re-selected later
-    // The paperclip accepts images AND catalog PDFs. Split by type: images go to the
-    // vision attachment path; a PDF is routed to catalog extraction (same as the
-    // dedicated PDF button). This removes the "can't attach a PDF" dead-end.
+    // The paperclip accepts images AND PDFs. Images → vision attachment path. A PDF's
+    // intent depends on context: while the Catalogs toolkit is active the user is
+    // building a catalog, so the PDF is a catalog *source* for product-extraction;
+    // otherwise it's a document to READ (quote/invoice/spec) — Claude reads it directly.
     const pdfs = fileArray.filter((f) => f.type === 'application/pdf');
     const images = fileArray.filter((f) => f.type.startsWith('image/'));
     if (images.length > 0) attachImageFiles(images);
     if (pdfs.length > 0) {
-      if (pdfs.length > 1) {
-        toast({ title: 'One catalog PDF at a time', description: 'Attaching the first PDF for extraction.' });
+      const catalogContext = (activeToolkits || []).includes('catalogs');
+      if (catalogContext) {
+        if (pdfs.length > 1) {
+          toast({ title: 'One catalog PDF at a time', description: 'Attaching the first PDF for extraction.' });
+        }
+        void processCatalogPdfFile(pdfs[0]);
+      } else {
+        attachDocumentFiles(pdfs);
       }
-      void processCatalogPdfFile(pdfs[0]);
     }
-  }, [attachImageFiles, processCatalogPdfFile, toast]);
+  }, [attachImageFiles, processCatalogPdfFile, attachDocumentFiles, activeToolkits, toast]);
 
   // Paste an image straight from the clipboard into the composer. Fires on the
   // textarea's onPaste; when the clipboard carries image bytes we consume them
@@ -5190,6 +5232,30 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           )}
 
+          {/* Attached readable documents (PDFs Claude reads directly) */}
+          {attachedDocuments.length > 0 && (
+            <div className="pb-2 flex flex-wrap gap-2">
+              {attachedDocuments.map((doc, i) => (
+                <div
+                  key={`${doc.name}-${i}`}
+                  className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 pl-2.5 pr-1.5 py-1 text-xs"
+                  title={`${doc.name} — Claude will read this document`}
+                >
+                  <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="max-w-[200px] truncate">{doc.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setAttachedDocuments((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    aria-label={`Remove ${doc.name}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Attached Images */}
           {attachedImages.length > 0 && (
             <div className="pb-2 space-y-2">
@@ -5703,10 +5769,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 {/* Right panel: send button — full height */}
                 <button
                   onClick={handleSendMessage}
-                  disabled={isLoading || (!input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0)}
+                  disabled={isLoading || (!input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0 && attachedDocuments.length === 0)}
                   className={cn(
                     'flex items-center justify-center px-4 border-l border-input rounded-r-xl transition-colors',
-                    isLoading || (!input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0)
+                    isLoading || (!input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0 && attachedDocuments.length === 0)
                       ? 'text-muted-foreground/40 bg-muted/20 cursor-not-allowed'
                       : 'bg-primary text-primary-foreground hover:bg-primary/90',
                   )}

@@ -752,11 +752,14 @@ function shouldRouteToHaiku(
   agentId: string,
   messages: any[],
   images: string[],
+  hasDocuments: boolean = false,
 ): boolean {
   if (agentId === 'demo') return true;
   if (agentId === 'interior-designer') return false;
 
   if (images && images.length > 0) return false;
+  // A PDF/document attachment needs a document-capable model (Opus reads PDFs natively).
+  if (hasDocuments) return false;
 
   const lastUserMsg = [...messages]
     .reverse()
@@ -777,8 +780,9 @@ function getModelForAgent(
   agentId: string,
   messages: any[] = [],
   images: string[] = [],
+  hasDocuments: boolean = false,
 ): ChatAnthropic {
-  return shouldRouteToHaiku(agentId, messages, images) ? modelHaiku : modelOpus;
+  return shouldRouteToHaiku(agentId, messages, images, hasDocuments) ? modelHaiku : modelOpus;
 }
 
 // Get model name for logging/tracking — must stay in sync with router above
@@ -786,8 +790,9 @@ function getModelNameForAgent(
   agentId: string,
   messages: any[] = [],
   images: string[] = [],
+  hasDocuments: boolean = false,
 ): string {
-  return shouldRouteToHaiku(agentId, messages, images)
+  return shouldRouteToHaiku(agentId, messages, images, hasDocuments)
     ? 'claude-haiku-4-5'
     : 'claude-opus-4-8';
 }
@@ -1085,6 +1090,7 @@ async function executeAgent(
   selectedToolkits?: string[] | null, // Per-turn user-selected toolkit IDs (resolved server-side to tool IDs)
   directTool?: { name: string; input: Record<string, any> } | null, // Deterministic single-tool run — skips the LLM entirely
   userJwt?: string, // Caller's Supabase user JWT — threaded to user-scoped MIVAA/edge tools (mentions, job-research, seo-article) so they authenticate AS the user, not the opaque service key
+  documents: string[] = [], // User-attached PDFs as data URLs (data:application/pdf;base64,...) — read natively by Opus so the agent can quote/summarize/extract from them
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -2025,7 +2031,7 @@ async function executeAgent(
       tools.push(createAttachCatalogPdfsTool(userId, onChunk));
     }
     if (config.tools.includes('extract_from_catalog_pdfs') && createExtractFromCatalogPdfsTool) {
-      tools.push(createExtractFromCatalogPdfsTool(userId, onChunk));
+      tools.push(createExtractFromCatalogPdfsTool(userId, userJwt, onChunk));
     }
     if (config.tools.includes('translate_pdf_to_catalog') && createTranslatePdfToCatalogTool) {
       tools.push(createTranslatePdfToCatalogTool(userId, workspaceId, onChunk));
@@ -2167,8 +2173,9 @@ async function executeAgent(
   }
 
   // Select model based on agent + per-turn complexity heuristic
-  const selectedModel = getModelForAgent(agentId, messages, images);
-  const modelName = getModelNameForAgent(agentId, messages, images);
+  const hasDocuments = Array.isArray(documents) && documents.length > 0;
+  const selectedModel = getModelForAgent(agentId, messages, images, hasDocuments);
+  const modelName = getModelNameForAgent(agentId, messages, images, hasDocuments);
 
   // 🔷 LangGraph StateGraph-based execution with checkpointing
 
@@ -2199,6 +2206,7 @@ async function executeAgent(
   if (
     messages.length > COMPACT_THRESHOLD &&
     images.length === 0 &&
+    !hasDocuments &&
     modelHaiku
   ) {
     try {
@@ -2244,8 +2252,8 @@ async function executeAgent(
 
   const langchainMessages = messages.map((msg: any, idx: number) => {
     if (msg.role === 'user') {
-      // For the last user message, attach images as multimodal content blocks
-      if (idx === lastUserMsgIndex && images.length > 0) {
+      // For the last user message, attach images AND/OR PDFs as multimodal content blocks.
+      if (idx === lastUserMsgIndex && (images.length > 0 || hasDocuments)) {
         const content: any[] = [];
         if (msg.content?.trim()) content.push({ type: 'text', text: msg.content });
         for (const img of images) {
@@ -2265,6 +2273,25 @@ async function executeAgent(
             content.push({
               type: 'image',
               source: { type: 'url', url: img },
+            });
+          }
+        }
+        // PDF document blocks — Opus reads these natively (no OCR pipeline). Enables
+        // "read this quote/invoice/spec and rebuild/summarize it" straight from chat.
+        for (const doc of documents) {
+          if (typeof doc !== 'string') continue;
+          if (doc.startsWith('data:')) {
+            const commaIdx = doc.indexOf(',');
+            const data = doc.slice(commaIdx + 1); // raw base64
+            content.push({
+              type: 'document',
+              source: { type: 'base64', media_type: 'application/pdf', data },
+            });
+          } else {
+            // HTTP(S) URL to a PDF — Anthropic supports url document sources.
+            content.push({
+              type: 'document',
+              source: { type: 'url', url: doc },
             });
           }
         }
@@ -2559,7 +2586,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
     //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
@@ -2858,6 +2885,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               selected_toolkits, // Per-turn user-selected toolkit IDs (primary toolkit-level gating)
               isDirectTool ? { name: direct_tool.name, input: direct_tool.input } : null, // Deterministic single-tool run
               auth.level === 'user' ? (req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim() || undefined) : undefined, // user JWT for user-scoped tools
+              Array.isArray(documents) ? documents : [], // User-attached PDFs as data URLs — read natively by Opus
             );
             if (finalResult) {
             }

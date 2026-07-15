@@ -307,7 +307,7 @@ export const createAttachCatalogPdfsTool = (userId: string, onChunk: ChunkSink) 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. extract_from_catalog_pdfs
 // ─────────────────────────────────────────────────────────────────────────────
-export const createExtractFromCatalogPdfsTool = (userId: string, onChunk: ChunkSink) => {
+export const createExtractFromCatalogPdfsTool = (userId: string, userJwt: string | undefined, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   return tool(
@@ -333,9 +333,15 @@ export const createExtractFromCatalogPdfsTool = (userId: string, onChunk: ChunkS
           });
         }
 
+        // Forward the caller's user JWT so catalog-extract-from-pdfs' authenticate()
+        // resolves the REAL user. Without it the invoke carries only the service-role
+        // key → authenticate() returns userId:null → the function's per-PDF workspace
+        // ownership check (userCanAccessWorkspace) fails closed with 403 before Anthropic
+        // is ever called (the tenancy invariant forbids trusting body-supplied ids).
         const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
           'catalog-extract-from-pdfs',
           {
+            ...(userJwt ? { headers: { Authorization: `Bearer ${userJwt}` } } : {}),
             body: {
               catalog_id: input.catalog_id,
               source_pdf_ids: catalog.source_pdf_ids,
