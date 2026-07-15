@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { KeyRound, Plug, CreditCard, Share2, MessageCircle, ArrowRight } from 'lucide-react';
+import { KeyRound, Plug, CreditCard, Share2, MessageCircle, ArrowRight, FileImage } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -19,6 +19,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
+import { WorkspacePdfTemplateCard } from '@/components/core/Profile/WorkspacePdfTemplateCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentialsCard';
 import { ShippingCredentialsCard } from '@/modules/stock/components/ShippingCredentialsCard';
@@ -94,6 +95,18 @@ export const WorkspaceKeysTab: React.FC = () => {
         <InboundSetupCard workspaceId={activeWorkspaceId} />
         <ErganiCredentialsCard workspaceId={activeWorkspaceId} />
         {stockModule.enabled && <ShippingCredentialsCard workspaceId={activeWorkspaceId} />}
+      </section>
+
+      {/* Document design — the branded PDF template used by every generated document */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileImage className="h-4 w-4 text-primary" />
+          <h2 className="text-base font-semibold">Document templates</h2>
+        </div>
+        <p className="text-sm text-muted-foreground -mt-2">
+          The branded cover / background / back-cover used by every PDF this workspace generates.
+        </p>
+        <WorkspacePdfTemplateCard />
       </section>
 
       {/* Connections */}

@@ -15,12 +15,16 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
 export interface BrandingConfig {
-  // Template image storage paths (in the `quote-templates` bucket).
-  cover_image_path: string;
-  intro_page_path: string;
-  content_page_path: string;
-  backcover_image_path: string;
-  // "FROM" company identity.
+  // Template image storage paths (in the `quote-templates` bucket). Free-form — whatever
+  // the owner uploaded; null when unset. Read from workspace_pdf_templates (per-workspace,
+  // owner-managed under Profile), falling back to the operator root's template.
+  cover_image_path: string | null;
+  content_page_path: string | null;
+  backcover_image_path: string | null;
+  // Cover image pixel dimensions (cached) so the PDF page size can match the design.
+  cover_width: number | null;
+  cover_height: number | null;
+  // "FROM" company identity (from finance_settings business identity).
   company_name: string;
   company_address: string;
   company_phone: string;
@@ -32,14 +36,51 @@ export interface BrandingConfig {
 
 const TEMPLATE_BUCKET = 'quote-templates';
 
+interface WpsTemplateRow {
+  cover_path: string | null;
+  background_path: string | null;
+  backcover_path: string | null;
+  cover_width: number | null;
+  cover_height: number | null;
+}
+
+/** The workspace's own PDF template, falling back per-slot to the operator root's. */
+async function fetchWorkspaceTemplate(supabase: SupabaseClient, workspaceId?: string | null): Promise<WpsTemplateRow> {
+  const cols = 'cover_path, background_path, backcover_path, cover_width, cover_height';
+  let row: WpsTemplateRow | null = null;
+  if (workspaceId) {
+    const { data } = await supabase.from('workspace_pdf_templates').select(cols).eq('workspace_id', workspaceId).maybeSingle();
+    row = (data as WpsTemplateRow) ?? null;
+  }
+  // Operator root template = the default every tenant inherits when a slot is unset.
+  if (!row || !row.cover_path) {
+    const { data: rootWs } = await supabase.from('workspaces').select('id').eq('is_root', true).limit(1).maybeSingle();
+    if (rootWs?.id && rootWs.id !== workspaceId) {
+      const { data } = await supabase.from('workspace_pdf_templates').select(cols).eq('workspace_id', rootWs.id).maybeSingle();
+      const r = data as WpsTemplateRow | null;
+      if (r) {
+        row = {
+          cover_path: row?.cover_path ?? r.cover_path,
+          background_path: row?.background_path ?? r.background_path,
+          backcover_path: row?.backcover_path ?? r.backcover_path,
+          cover_width: row?.cover_width ?? r.cover_width,
+          cover_height: row?.cover_height ?? r.cover_height,
+        };
+      }
+    }
+  }
+  return row ?? { cover_path: null, background_path: null, backcover_path: null, cover_width: null, cover_height: null };
+}
+
 /**
- * Resolve the branded template config for a workspace. Per-slot precedence:
- * workspace finance_settings → operator root default → legacy system_settings → hardcoded.
+ * Resolve the branded config for a workspace: template images from the per-workspace
+ * PDF template vault (workspace → operator root), company identity from finance_settings.
  */
 export async function fetchBrandingConfig(
   supabase: SupabaseClient,
   workspaceId?: string | null,
 ): Promise<BrandingConfig> {
+  // Company identity default (legacy operator-wide setting).
   const { data: sysRow } = await supabase
     .from('system_settings')
     .select('setting_value')
@@ -47,33 +88,14 @@ export async function fetchBrandingConfig(
     .maybeSingle();
   const g = (sysRow?.setting_value ?? {}) as Record<string, any>;
 
-  const tplCols =
-    'quote_template_cover_path, quote_template_intro_path, quote_template_content_path, quote_template_backcover_path';
-
-  let ws: Record<string, any> = {};
-  if (workspaceId) {
-    const { data } = await supabase.from('finance_settings').select(tplCols).eq('workspace_id', workspaceId).maybeSingle();
-    ws = data ?? {};
-  }
-
-  // Operator root template = the default every tenant inherits.
-  let root: Record<string, any> = ws;
-  const { data: rootWs } = await supabase.from('workspaces').select('id').eq('is_root', true).limit(1).maybeSingle();
-  if (rootWs?.id && rootWs.id !== workspaceId) {
-    const { data } = await supabase.from('finance_settings').select(tplCols).eq('workspace_id', rootWs.id).maybeSingle();
-    root = data ?? {};
-  }
-
-  const cover = ws.quote_template_cover_path || root.quote_template_cover_path || g.first_page_path || g.cover_image_path || 'cover.png';
-  const intro = ws.quote_template_intro_path || root.quote_template_intro_path || g.intro_page_path || '';
-  const content = ws.quote_template_content_path || root.quote_template_content_path || g.content_page_path || g.items_background_path || 'items-background.png';
-  const backcover = ws.quote_template_backcover_path || root.quote_template_backcover_path || g.last_page_path || g.backcover_image_path || 'backcover.png';
+  const tpl = await fetchWorkspaceTemplate(supabase, workspaceId);
 
   const base: BrandingConfig = {
-    cover_image_path: cover,
-    intro_page_path: intro,
-    content_page_path: content,
-    backcover_image_path: backcover,
+    cover_image_path: tpl.cover_path,
+    content_page_path: tpl.background_path,
+    backcover_image_path: tpl.backcover_path,
+    cover_width: tpl.cover_width,
+    cover_height: tpl.cover_height,
     company_name: g.company_name || '',
     company_address: g.company_address || '',
     company_phone: g.company_phone || '',
