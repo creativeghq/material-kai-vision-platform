@@ -928,7 +928,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Presentation catalogs (admin/owner only — gated at injection time)
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
       'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
-      'generate_catalog_pdf', 'publish_catalog',
+      'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
@@ -990,7 +990,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog',
-      'add_material_to_catalog', 'find_image_for_material', 'generate_catalog_pdf', 'publish_catalog',
+      'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery',
       'email_validate', 'save_to_crm',
       'product_provenance', 'product_price_history', 'products_by_brand', 'brand_overview',
@@ -1163,7 +1163,7 @@ async function executeAgent(
       tool_ids: [
         'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
         'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
-        'generate_catalog_pdf', 'publish_catalog',
+        'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
       ],
     },
     'mentions': {
@@ -1451,7 +1451,7 @@ async function executeAgent(
   const CATALOG_TOOL_NAMES = [
     'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
     'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
-    'generate_catalog_pdf', 'publish_catalog',
+    'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
@@ -1588,6 +1588,7 @@ async function executeAgent(
   const createTranslatePdfToCatalogTool = catalogMod?.createTranslatePdfToCatalogTool;
   const createAddMaterialToCatalogTool = catalogMod?.createAddMaterialToCatalogTool;
   const createFindImageForMaterialTool = catalogMod?.createFindImageForMaterialTool;
+  const createAdjustCatalogPricingTool = catalogMod?.createAdjustCatalogPricingTool;
   const createGenerateCatalogPdfTool = catalogMod?.createGenerateCatalogPdfTool;
   const createPublishCatalogTool = catalogMod?.createPublishCatalogTool;
 
@@ -2041,6 +2042,9 @@ async function executeAgent(
     }
     if (config.tools.includes('find_image_for_material') && createFindImageForMaterialTool) {
       tools.push(createFindImageForMaterialTool(userId, onChunk));
+    }
+    if (config.tools.includes('adjust_catalog_pricing') && createAdjustCatalogPricingTool) {
+      tools.push(createAdjustCatalogPricingTool(userId, onChunk));
     }
     if (config.tools.includes('generate_catalog_pdf') && createGenerateCatalogPdfTool) {
       tools.push(createGenerateCatalogPdfTool(userId, onChunk));

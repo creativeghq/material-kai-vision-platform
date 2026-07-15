@@ -1,13 +1,14 @@
 /**
  * Catalog Tools — admin-only (gated at agent-chat injection layer).
  *
- * 8 tools for the presentation_catalogs flow:
+ * 9 tools for the presentation_catalogs flow:
  *   create_catalog              — initialize a new catalog row
  *   attach_catalog_pdfs         — link uploaded source PDFs to a catalog
  *   extract_from_catalog_pdfs   — free-form Vision query over attached PDFs
  *   translate_pdf_to_catalog    — PDF-to-PDF whole-catalog translation pass
  *   add_material_to_catalog     — explicit add (with price/image source)
  *   find_image_for_material     — DB visual_search → web image fallback
+ *   adjust_catalog_pricing      — proportional re-price to a target total / delta / %
  *   generate_catalog_pdf        — invokes generate-catalog-pdf edge function
  *   publish_catalog             — flips status, mints slug
  *
@@ -212,7 +213,9 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
         'COPY-ON-MODIFY: when the user asks to take an existing document, proforma (Προσφορά), or catalog and change ' +
         'it, ALWAYS create a NEW catalog here and COPY all of the source content into it (every section, material, ' +
         'price, spec and image) before applying the changes — never mutate or reference the original. The source must ' +
-        'stay intact. If the source is a PDF, extract/translate it into the new catalog first, then modify.',
+        'stay intact. If the source is a PDF, extract/translate it into the new catalog first, then modify. ' +
+        'To change prices or hit a total ("+€400", "make the total €2,438", "raise everything 15%"), use ' +
+        'adjust_catalog_pricing on the NEW catalog — never edit individual line prices by hand or invent numbers.',
       schema: z.object({
         title: z.string().describe('Catalog display title, e.g. "Spring 2026 — Porcelain Range"'),
         subtitle: z.string().optional().describe('Optional subtitle / tagline'),
@@ -956,7 +959,118 @@ export const createGenerateCatalogPdfTool = (userId: string, onChunk: ChunkSink)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 8. publish_catalog
+// 8. adjust_catalog_pricing — proportional re-price to a target (no invented numbers)
+// ─────────────────────────────────────────────────────────────────────────────
+export const createAdjustCatalogPricingTool = (userId: string, onChunk: ChunkSink) => {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  return tool(
+    async (input: { catalog_id: string; mode: 'target_total' | 'delta' | 'percent'; amount: number; basis?: 'payable' | 'net' }) => {
+      try {
+        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
+        if (error || !catalog) return JSON.stringify({ error: error || 'Catalog not found' });
+
+        const body = catalog.body_data || {};
+        const sections = Array.isArray(body.sections) ? body.sections : [];
+        const mats: any[] = [];
+        for (const s of sections) for (const m of (s.materials || [])) mats.push(m);
+        // A line is "priced" if it carries a net value or a unit price we can scale.
+        const priced = mats.filter((m) => m?.specs?.net_value != null || m?.price != null);
+        if (priced.length === 0) return JSON.stringify({ error: 'No priced materials to adjust.' });
+
+        const netOf = (m: any): number => {
+          const sp = m.specs || {};
+          if (sp.net_value != null) return Number(sp.net_value);
+          const qty = Number(sp.quantity_tmet ?? sp.quantity_tem ?? sp.quantity ?? 1);
+          return m.price != null ? Number(m.price) * qty : 0;
+        };
+        const vatMultOf = (m: any): number => 1 + (Number(m?.specs?.vat_pct ?? 0) / 100);
+
+        const currentNet = r2(priced.reduce((a, m) => a + netOf(m), 0));
+        const currentPayable = r2(priced.reduce((a, m) => a + netOf(m) * vatMultOf(m), 0));
+        if (currentNet <= 0) return JSON.stringify({ error: 'Current net total is zero; cannot scale.' });
+
+        const basis = input.basis ?? 'payable';
+        // Everything reduces to a target NET total; the scale factor comes from the
+        // ACTUAL current totals so VAT (even mixed rates) stays proportional.
+        let targetNet: number;
+        if (input.mode === 'percent') {
+          targetNet = r2(currentNet * (1 + input.amount / 100));
+        } else if (input.mode === 'delta') {
+          const base = basis === 'payable' ? currentPayable : currentNet;
+          const targetBasis = base + input.amount;
+          targetNet = basis === 'payable' ? r2(targetBasis * currentNet / currentPayable) : r2(targetBasis);
+        } else {
+          targetNet = basis === 'payable' ? r2(input.amount * currentNet / currentPayable) : r2(input.amount);
+        }
+        if (targetNet <= 0) return JSON.stringify({ error: 'Resulting total must be positive.' });
+
+        const factor = targetNet / currentNet;
+
+        // Scale every priced line by the SAME factor — unit price, net, and discount
+        // value all move together, so each line keeps its discount % and it reads as a
+        // genuine re-quote (never a single hand-edited line).
+        for (const m of priced) {
+          const sp = m.specs || (m.specs = {});
+          if (m.price != null) m.price = r2(Number(m.price) * factor);
+          sp.net_value = r2((sp.net_value != null ? Number(sp.net_value) : netOf(m)) * factor);
+          if (sp.discount_value != null) sp.discount_value = r2(Number(sp.discount_value) * factor);
+        }
+
+        // Absorb the sub-cent rounding remainder onto the largest lines (±0.01 each)
+        // so the total lands EXACTLY on target — standard ERP rounding, invisible.
+        let remainderCents = Math.round((targetNet - priced.reduce((a, m) => a + Number(m.specs.net_value), 0)) * 100);
+        const byNetDesc = [...priced].sort((a, b) => Number(b.specs.net_value) - Number(a.specs.net_value));
+        let i = 0;
+        while (remainderCents !== 0 && byNetDesc.length > 0) {
+          const m = byNetDesc[i % byNetDesc.length];
+          m.specs.net_value = r2(Number(m.specs.net_value) + (remainderCents > 0 ? 0.01 : -0.01));
+          remainderCents += remainderCents > 0 ? -1 : 1;
+          i++;
+        }
+
+        await persistBody(supabase, input.catalog_id, body);
+
+        const newNet = r2(priced.reduce((a, m) => a + Number(m.specs.net_value), 0));
+        const newPayable = r2(priced.reduce((a, m) => a + Number(m.specs.net_value) * vatMultOf(m), 0));
+
+        return JSON.stringify({
+          success: true,
+          catalog_id: input.catalog_id,
+          lines_adjusted: priced.length,
+          scale_factor: Math.round(factor * 1e5) / 1e5,
+          before: { net: currentNet, payable: currentPayable },
+          after: { net: newNet, payable: newPayable },
+          note: 'All lines scaled proportionally (discount % preserved). Now call generate_catalog_pdf to re-render.',
+        });
+      } catch (err) {
+        return JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    },
+    {
+      name: 'adjust_catalog_pricing',
+      description:
+        'Re-price a whole catalog/proforma proportionally to hit a pricing target, WITHOUT inventing numbers. ' +
+        'Every line is scaled by the same factor so it reads as a genuine re-quote — each line keeps its discount % ' +
+        'and VAT, and the 1–2 cent rounding remainder is absorbed into the largest lines so the total lands EXACTLY. ' +
+        'Use this for requests like "make the total €2,438", "add €400", or "increase everything by 15%" — never edit ' +
+        'individual line prices by hand. mode: "target_total" (amount = the total you want) / "delta" (amount = € to ' +
+        'add or subtract, negative lowers) / "percent" (amount = ± percent). basis: "payable" = VAT-inclusive total ' +
+        '(default) / "net" = pre-VAT subtotal. Only mutates THIS catalog, never the source. After adjusting, call ' +
+        'generate_catalog_pdf to re-render.',
+      schema: z.object({
+        catalog_id: z.string().uuid(),
+        mode: z.enum(['target_total', 'delta', 'percent']),
+        amount: z.number().describe('target total (target_total), € to add/subtract (delta; negative lowers), or ± percent (percent).'),
+        basis: z.enum(['payable', 'net']).optional().describe('"payable" = VAT-included total (default), "net" = pre-VAT subtotal.'),
+      }),
+    },
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. publish_catalog
 // ─────────────────────────────────────────────────────────────────────────────
 export const createPublishCatalogTool = (userId: string, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
