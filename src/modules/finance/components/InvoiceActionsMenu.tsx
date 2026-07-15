@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
-import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, MessageSquare, Pencil, Tag, History, Info } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -124,16 +124,6 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     }
   };
 
-  const sendSms = async () => {
-    try {
-      const res = await financeService.sendInvoiceSms(invoiceId);
-      if (!res.ok) { toast({ title: 'SMS not sent', description: res.error, variant: 'destructive' }); return; }
-      toast({ title: 'SMS sent', description: `To ${res.sent_to}` });
-    } catch (err: any) {
-      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
-    }
-  };
-
   // ---- Tools: change description (notes) ----
   const openDesc = async () => {
     const inv = detail ?? await loadDetail();
@@ -227,7 +217,6 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         {!isAccountant && <DropdownMenuItem onClick={() => go()}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={useAsTemplate}><Files className="h-4 w-4 mr-2" /> Use as template</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={sendEmail}><Mail className="h-4 w-4 mr-2" /> Send email</DropdownMenuItem>}
-        {!isAccountant && <DropdownMenuItem onClick={sendSms}><MessageSquare className="h-4 w-4 mr-2" /> Send SMS</DropdownMenuItem>}
       </DropdownMenuContent>
     </DropdownMenu>
 

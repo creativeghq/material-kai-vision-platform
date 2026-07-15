@@ -292,38 +292,6 @@ export class AICallLogger {
   }
 
   /**
-   * Log Qwen (HuggingFace) API call
-   */
-  async logQwenCall(
-    task: string,
-    model: string,
-    response: any,
-    latencyMs: number,
-    confidenceScore?: number,
-    confidenceBreakdown?: ConfidenceBreakdown,
-    action?: 'use_ai_result' | 'fallback_to_rules',
-    jobId?: string,
-    fallbackReason?: string
-  ): Promise<void> {
-    const inputTokens = response.usage?.prompt_tokens || 0;
-    const outputTokens = response.usage?.completion_tokens || 0;
-
-    await this.logAICall({
-      job_id: jobId,
-      task,
-      model,
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      latency_ms: latencyMs,
-      confidence_score: confidenceScore,
-      confidence_breakdown: confidenceBreakdown,
-      action,
-      fallback_reason: fallbackReason,
-      response_data: { output: response.output },
-    });
-  }
-
-  /**
    * Log embedding generation call
    */
   async logEmbeddingCall(

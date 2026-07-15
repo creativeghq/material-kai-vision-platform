@@ -439,32 +439,6 @@ const _financeServiceCore = {
     return { pdf_url: data?.pdf_url ?? null, pdf_storage_path: data?.pdf_storage_path ?? null, receipt_number: data?.receipt_number ?? null };
   },
 
-  /** #204 "Send SMS" — text the invoice number + total (+ QR) to the customer via messaging-api. */
-  async sendInvoiceSms(invoiceId: string): Promise<{ ok: boolean; sent_to?: string; error?: string }> {
-    const { data: inv } = await supabase
-      .from('invoices')
-      .select('internal_number, legal_number, total, currency, fiscal_qr_url, customer_company_id, customer_contact_id')
-      .eq('id', invoiceId).maybeSingle();
-    if (!inv) return { ok: false, error: 'Invoice not found' };
-    let phone: string | null = null;
-    if ((inv as any).customer_company_id) {
-      const { data: c } = await supabase.from('crm_companies').select('phone').eq('id', (inv as any).customer_company_id).maybeSingle();
-      phone = (c as any)?.phone ?? null;
-    } else if ((inv as any).customer_contact_id) {
-      const { data: c } = await supabase.from('crm_contacts').select('phone').eq('id', (inv as any).customer_contact_id).maybeSingle();
-      phone = (c as any)?.phone ?? null;
-    }
-    if (!phone) return { ok: false, error: 'No customer phone on file.' };
-    const number = (inv as any).legal_number || (inv as any).internal_number;
-    const total = formatMoney(Number((inv as any).total ?? 0), (inv as any).currency);
-    const content = `Invoice ${number}: ${total}.` + ((inv as any).fiscal_qr_url ? ` ${(inv as any).fiscal_qr_url}` : '');
-    const { data, error } = await supabase.functions.invoke('messaging-api', {
-      body: { action: 'send', channel: 'sms', to: phone, content, messageType: 'transactional' },
-    });
-    if (error || (data as any)?.success === false) return { ok: false, error: error?.message ?? 'SMS send failed' };
-    return { ok: true, sent_to: phone };
-  },
-
   /** #204 "Use as template" — clone an invoice into a fresh DRAFT (no fiscal/MARK). */
   async duplicateInvoice(invoiceId: string): Promise<string> {
     const src = await this.getInvoice(invoiceId);

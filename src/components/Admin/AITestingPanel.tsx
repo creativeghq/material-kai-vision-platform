@@ -523,8 +523,7 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
     }
   };
 
-  // 3D generation is handled by MaterialAgent3DGenerationAPI on the frontend
-  // (BrowserApiIntegrationService.generateInteriorDesign).
+  // 3D generation is handled by MaterialAgent3DGenerationAPI on the frontend.
 
   const getSampleImageUrls = () => [
     'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800',

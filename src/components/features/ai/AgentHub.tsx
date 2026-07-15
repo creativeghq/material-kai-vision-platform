@@ -297,6 +297,18 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   stock_adjusted: 'Stock updated',
   stock_reordered: 'Reorder drafted',
   stock_forecast: 'Resupply forecast',
+  // HR management
+  hr_employees: 'Employees',
+  hr_overview: 'HR overview',
+  hr_on_leave: 'On leave',
+  hr_absence_recorded: 'Absence recorded',
+  hr_employee_added: 'Employee added',
+  // Social management
+  social_accounts: 'Social accounts',
+  social_post: 'Social post',
+  social_best_time: 'Best time to post',
+  social_insights: 'Social insights',
+  social_post_analytics: 'Post analytics',
   // Misc
   price_lookup_matches: 'Price lookup matches',
   project_created: 'Project created',
