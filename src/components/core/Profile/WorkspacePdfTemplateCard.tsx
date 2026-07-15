@@ -180,9 +180,10 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => url && setEnlarged(url)}
-                    className="aspect-[3/4] w-full overflow-hidden rounded border border-dashed border-border/60 bg-muted/30 flex items-center justify-center group relative"
-                    title={url ? 'Click to enlarge' : undefined}
+                    disabled={isBusy}
+                    onClick={() => (url ? setEnlarged(url) : inputs[slot].current?.click())}
+                    className="aspect-[3/4] w-full overflow-hidden rounded border border-dashed border-border/60 bg-muted/30 flex items-center justify-center group relative hover:border-primary/50 transition-colors"
+                    title={url ? 'Click to enlarge' : 'Click to upload'}
                   >
                     {url ? (
                       <>
@@ -190,7 +191,10 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
                         <span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/30 text-[10px] text-white">Click to enlarge</span>
                       </>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground px-1 text-center">No image</span>
+                      <span className="text-[10px] text-muted-foreground px-1 text-center flex flex-col items-center gap-1 group-hover:text-primary">
+                        <Upload className="h-4 w-4 opacity-70" />
+                        Click to upload
+                      </span>
                     )}
                   </button>
                   <p className="text-[10px] text-muted-foreground leading-tight">{hint}</p>
