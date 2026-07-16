@@ -97,9 +97,9 @@ https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/generation-ima
 
 ---
 
-## Integration with KAI Agent
+## Integration with JARVIS agent
 
-The `generate-virtual-staging` function is accessible as a KAI agent tool. When the agent detects a staging request in conversation, it calls this function with the user's image and infers room type / style from context.
+The `generate-virtual-staging` function is accessible as a JARVIS agent tool. When the agent detects a staging request in conversation, it calls this function with the user's image and infers room type / style from context.
 
 ---
 
@@ -117,7 +117,7 @@ The viewer includes an interactive **comparison slider** that lets users drag be
 
 ### Quality Analysis
 
-An **"Analyze Quality"** button triggers a Claude Vision assessment of the staging result. The system sends both the original and staged images to the KAI agent, which evaluates:
+An **"Analyze Quality"** button triggers a Claude Vision assessment of the staging result. The system sends both the original and staged images to the JARVIS agent, which evaluates:
 
 | Dimension | What is assessed |
 |-----------|-----------------|

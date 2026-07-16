@@ -29,7 +29,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 🎨 **Interior Design**: 20+ AI generation modes (image, video, VR, staging, region edit)
 - 🔍 **Smart Search Management**: AI-powered search deduplication + re-ranking
 - 🥽 **VR World Generation**: WorldLabs Marble 3D Gaussian Splat worlds from interior images
-- 🤖 **Unified KAI Agent**: Merged Search + Insights + SEO into one intelligent agent
+- 🤖 **Unified JARVIS Agent**: Merged Search + Insights + SEO into one intelligent agent
 - 🔍 **B2B Manufacturer Search**: Claude built-in web search (no separate API key)
 - ⚡ **Flow Engine**: Visual drag-and-drop workflow automation (triggers, conditions, actions)
 - 🎬 **Interior Video Generation**: 4 AI models — Veo-2, Kling, Wan, Runway Gen4
@@ -114,7 +114,7 @@ Real-time updates → Frontend displays results
 #### 1. Anthropic Claude Models
 
 **Claude Opus 4.7** (Vision + Deep Analysis):
-- **Use Cases**: Material image analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`), deep product analysis, quality validation, KAI agent
+- **Use Cases**: Material image analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`), deep product analysis, quality validation, JARVIS agent
 - **Context**: 200,000 tokens
 - **Vision**: Sole vision engine post-2026-05-01. Sends base64 images with `tool_choice={'type':'tool','name':...}` forcing structured `VisionAnalysis` JSON output. Pre-2026-05-01 the stack said "Qwen for vision, Claude for validation" — but the Qwen HF endpoint had been 404-ing for months and silently falling through to Claude. The migration made the architecture honest. `qwen_endpoint_manager.py` and `QWEN_*` env vars deleted 2026-05-01.
 - **Pipeline Stages**: Image Analysis (Stages 6, 8, 9), product discovery
@@ -534,7 +534,7 @@ The platform uses **7 embedding types** for comprehensive search:
 - ✨ AI Re-ranking — Claude-powered post-retrieval result re-ordering (2026-03)
 - ✨ Billing & Credits — Stripe subscriptions + credit packages (2026-03)
 - ✨ CRM System — Contacts, companies, user management (2026-02)
-- ✨ Unified KAI Agent — Search + Insights + SEO merged into one agent (2026-02-19)
+- ✨ Unified JARVIS Agent — Search + Insights + SEO merged into one agent (2026-02-19)
 - ✨ VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer (2026-02-10)
 - ✨ halfvec migration — All vector columns float16, 50% storage savings (2026-02-07)
 - ✨ 7-vector fusion search with query-adaptive weight profiles

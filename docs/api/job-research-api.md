@@ -30,19 +30,19 @@ Three related fixes addressing "how do I stop a search?" and "where do platform 
 - 🆕 **Scoped pause.** `track_job_search` action `pause` (and `resume`) now accept `pause_scope: 'all' | 'digests_only'`.
   - `all` (default): flips `tracked_jobs.is_active=false` → stops both refresh and digest.
   - `digests_only`: flips `tracked_jobs.digest_enabled=false` → refresh keeps running; just no emails/chat-posts at digest tick. User can still call `find_jobs` to see what's accumulated.
-- 🆕 **Broader stop vocabulary.** KAI prompt addendum extended — "stop", "cancel", "turn off", "kill", "snooze", "disable" all map to pause. "got a job, stop looking" confirms then maps to delete. "stop emailing me but keep tracking" → pause with `pause_scope=digests_only`.
+- 🆕 **Broader stop vocabulary.** JARVIS prompt addendum extended — "stop", "cancel", "turn off", "kill", "snooze", "disable" all map to pause. "got a job, stop looking" confirms then maps to delete. "stop emailing me but keep tracking" → pause with `pause_scope=digests_only`.
 - ✏️ **KB category renamed** `Job Sources` → `Internal Configuration` (slug `internal-configuration`, icon ⚙️). Generic name so future internal config pages (mention outlets, price retailers, etc.) can live as sibling docs in the same category.
 - ✏️ **KB docs consolidated**: three per-site_type docs → one `Job Research Sites` doc with three sections. `job_sites_kb_sync.sync_one_site_type()` is now a backwards-compatible alias for `sync_all()` which always re-renders the single consolidated doc.
 
 ### v0.3.2 — 2026-05-15 — Sites list lives in a KB category (access_level='agent') + agent-driven flow with modal (superseded by v0.3.3)
 
-Architectural correction to v0.3.1. Standalone admin page deleted; the sites list is now a proper KB category (`access_level='agent'` → agent reads it, public KB filters it out, admin sees it via the regular KB admin UI). All add/edit/remove goes through the KAI agent.
+Architectural correction to v0.3.1. Standalone admin page deleted; the sites list is now a proper KB category (`access_level='agent'` → agent reads it, public KB filters it out, admin sees it via the regular KB admin UI). All add/edit/remove goes through the JARVIS agent.
 
 - ❌ **Deleted** the standalone admin page `/admin/knowledge-base/job-sources` (the route from v0.3.1). Operators don't open a custom page anymore.
 - 🆕 **KB category "Job Sources"** with three child kb_docs (one per `site_type`: Perplexity domain filter / Default RSS feeds / Default career pages). Bodies are auto-rendered Markdown tables, regenerated on every CRUD via the sync helper.
-- 🆕 **KAI agent tool `manage_job_sites`** — replaces the deep-link. Actions: `list` / `add` / `remove` / `toggle` / `open_form`. When the user is vague ("add a job site"), `open_form` emits a `job_sites_form_open` chunk; AgentHub mounts a modal with type/URL/country/category/notes fields. On submit, the modal populates the input box with a structured prose message that re-invokes the tool with concrete fields.
+- 🆕 **JARVIS agent tool `manage_job_sites`** — replaces the deep-link. Actions: `list` / `add` / `remove` / `toggle` / `open_form`. When the user is vague ("add a job site"), `open_form` emits a `job_sites_form_open` chunk; AgentHub mounts a modal with type/URL/country/category/notes fields. On submit, the modal populates the input box with a structured prose message that re-invokes the tool with concrete fields.
 - ✏️ **Sites CRUD endpoints** (`/api/v1/job-research/sites`) unchanged in signature, but each write now calls `_sync_kb(site_type)` to refresh the corresponding kb_doc.
-- ✏️ **KAI prompt addendum** rewritten — drops the dead deep-link, teaches the agent the new tool + the NL→action mappings + when to call `open_form` vs `add` with specifics.
+- ✏️ **JARVIS prompt addendum** rewritten — drops the dead deep-link, teaches the agent the new tool + the NL→action mappings + when to call `open_form` vs `add` with specifics.
 
 ### v0.3.1 — 2026-05-15 — Operator-curated job-sites list at /admin/knowledge-base/job-sources (superseded by v0.3.2)
 
@@ -54,7 +54,7 @@ The Perplexity domain filter and the default RSS / career-page lists are now edi
 - 🆕 `DELETE /api/v1/job-research/sites/{id}` — remove (admin-only).
 - ✏️ `search_via_perplexity()` now loads the domain filter from the DB; falls back to the hardcoded constant only on DB-read failure.
 
-**Where the page lives:** `/admin/knowledge-base/job-sources` (hidden — no nav entry; deep-linked from the KAI agent or hand-typed). Three tabs:
+**Where the page lives:** `/admin/knowledge-base/job-sources` (hidden — no nav entry; deep-linked from the JARVIS agent or hand-typed). Three tabs:
 1. **Perplexity domain filter** — the global list Sonar searches across. Capped at 10 by Perplexity; extras displayed with a warning.
 2. **Default RSS feeds** — feeds offered as defaults when a new tracked_job enables `sources_enabled.rss_feeds`.
 3. **Default career pages** — same for `sources_enabled.careers_pages`.
@@ -80,9 +80,9 @@ Closes the v0.2 follow-up backlog. **Two breaking-ish changes for new fields, no
 Three architecture corrections on top of v0.1.0. **No breaking changes for the documented endpoints** (additive only) but the runtime behavior changes meaningfully.
 
 - 🆕 **Background-agents framework integration.** Every `tracked_jobs` row now also gets a `background_agents` row (`agent_type='job-research'`) so the search appears in `/admin/background-agents` alongside other background agents. New FK column `tracked_jobs.background_agent_id`. Each refresh inserts one `agent_runs` row (with input/output stats + duration_ms + token counts) and per-source `agent_run_logs` entries. `deactivate()` mirrors `enabled=false` onto the linked agent.
-- 🆕 **Chat-posting (primary user surface).** New column `tracked_jobs.source_conversation_id` (FK → `agent_chat_conversations`). When the KAI agent creates a tracked_job, it captures the current conversation id automatically. After every daily digest tick, the dispatcher inserts an assistant message into THAT conversation thread with `metadata.chunk_type = 'job_findings'`. Frontend (AgentHub) renders it as a rich card with per-listing details. The user reopens the conversation and sees the running history of findings. Email digest still goes out in parallel.
+- 🆕 **Chat-posting (primary user surface).** New column `tracked_jobs.source_conversation_id` (FK → `agent_chat_conversations`). When the JARVIS agent creates a tracked_job, it captures the current conversation id automatically. After every daily digest tick, the dispatcher inserts an assistant message into THAT conversation thread with `metadata.chunk_type = 'job_findings'`. Frontend (AgentHub) renders it as a rich card with per-listing details. The user reopens the conversation and sees the running history of findings. Email digest still goes out in parallel.
 - 🆕 **Default-on keyword expansion via Haiku.** `JobResearchService.create()` now synchronously calls Haiku tool-use to expand the user's keywords into `{title_variants, seniority_variants, abbreviations}`. Persisted on new column `tracked_jobs.expanded_keywords text[]`. Discovery uses `keywords ∪ expanded_keywords`. So "Product Manager" automatically catches "Senior PM", "Product Lead", "Principal PM" without the user listing them. Re-runnable via the new endpoint `POST /track/{id}/regenerate-keywords`.
-- 🆕 **Synchronous first refresh.** `POST /track` now runs the full discovery + classifier pipeline inline before returning. Response includes `first_refresh: { discovered, persisted, matches, by_source }` so the caller (typically the KAI agent) can confirm real findings to the user instead of "wait an hour for the cron". Pass `run_first_refresh: false` to opt out.
+- 🆕 **Synchronous first refresh.** `POST /track` now runs the full discovery + classifier pipeline inline before returning. Response includes `first_refresh: { discovered, persisted, matches, by_source }` so the caller (typically the JARVIS agent) can confirm real findings to the user instead of "wait an hour for the cron". Pass `run_first_refresh: false` to opt out.
 - 🆕 **Weekly cadence.** New column `tracked_jobs.digest_day_of_week int|null` (0=Sunday..6=Saturday, NULL=daily). The `get_tracked_jobs_due_for_digest` RPC was rewritten to honor it. Lets the user say "every Monday morning" and have the digest fire only on Mondays.
 - 🆕 **`POST /api/v1/job-research/track/{id}/regenerate-keywords`** — re-runs Haiku expansion. Response: `{ expanded: string[], rejected: string[], raw: {...} }`. Useful when the user updates their `keywords` and wants the variants refreshed too.
 - ✏️ **`POST /track` request body additions**: `source_conversation_id` (string, optional), `digest_day_of_week` (int 0-6 or null, optional), `run_first_refresh` (bool, default `true`).
@@ -101,7 +101,7 @@ Three architecture corrections on top of v0.1.0. **No breaking changes for the d
 - 🚀 **Haiku batched classifier** (`claude-haiku-4-5-20251001`) with rule shortcut + 7-day verdict cache. ~95% cache hit on stable searches across daily refreshes.
 - 🚀 **Volatility-adaptive cadence**: ≥5 new matches → next check in 6h; 1–4 → 24h; stable → 48h → 72h → 168h.
 - 🚀 **Consolidated daily digest**: one email per user at their `digest_hour_utc`, covering all tracked searches in one body. Channels: bell (free), email (1 cr), webhook (free, per-tracked_job).
-- 🚀 **Internal flow** (session JWT) — 12 endpoints under `/api/v1/job-research/*` for the platform's own UI + KAI agent tools.
+- 🚀 **Internal flow** (session JWT) — 12 endpoints under `/api/v1/job-research/*` for the platform's own UI + JARVIS agent tools.
 - 📋 **External `api_keys` flow** (`/api/v1/jobs/track/*`) — **NOT YET WIRED**. Schema and `JOB_OP_CREDIT_COST` table support partner billing; just needs a sister router file. Will land in v0.2.0.
 
 ---
@@ -386,7 +386,7 @@ Create a new tracked job search. Eligible for the next cron tick immediately (`n
 | `alert_webhook_url` | string | | `null` | Per-tracked_job webhook URL (POST) |
 | `refresh_interval_hours` | integer | | `24` | 1–168; cron stretches this on stable searches |
 | `digest_day_of_week` | integer | | `null` | 0=Sunday..6=Saturday. NULL = daily. Set when the user wants weekly digest on a specific day. |
-| `source_conversation_id` | string | | `null` | UUID of the `agent_chat_conversations` row where the user set up the search via KAI; daily digest will chat-post into it. |
+| `source_conversation_id` | string | | `null` | UUID of the `agent_chat_conversations` row where the user set up the search via JARVIS; daily digest will chat-post into it. |
 | `run_first_refresh` | boolean | | `true` | If true, the create endpoint runs discovery + classifier inline before returning (synchronous first refresh). |
 
 **Response:** `{ "tracked_job": <row> }` — see [TrackedJob schema](#trackedjob).
@@ -713,9 +713,9 @@ External-API partner billing is documented in [JOB_OP_CREDIT_COST](../../mivaa-p
 
 ---
 
-## KAI agent surface
+## JARVIS agent surface
 
-The KAI agent (`agentType: 'kai'`) exposes 4 tools backed by this API:
+The JARVIS agent (`agentType: 'kai'`) exposes 4 tools backed by this API:
 
 | Tool | Purpose | Credits |
 |---|---|---|
@@ -743,7 +743,7 @@ The agent can also deep-link the user to the hidden Knowledge Base "Job Sources"
 
 The job-research module exposes **two** user-facing surfaces, both auto-wired:
 
-1. **The KAI agent conversation.** When the user creates a search via the agent, the conversation_id is captured on `tracked_jobs.source_conversation_id`. After every daily digest tick, the dispatcher inserts a new assistant message into that conversation thread with `metadata.chunk_type = 'job_findings'` carrying the new listings. AgentHub renders it as a rich card (per-listing url / company / location / salary / source). The user reopens the conversation and sees the running history of findings.
+1. **The JARVIS agent conversation.** When the user creates a search via the agent, the conversation_id is captured on `tracked_jobs.source_conversation_id`. After every daily digest tick, the dispatcher inserts a new assistant message into that conversation thread with `metadata.chunk_type = 'job_findings'` carrying the new listings. AgentHub renders it as a rich card (per-listing url / company / location / salary / source). The user reopens the conversation and sees the running history of findings.
 2. **The email digest** at `digest_hour_utc` (or only on `digest_day_of_week` if set). One consolidated email per user covering all of their tracked searches. The "Open" link deep-links to the conversation.
 
 Operations visibility lives at `/admin/background-agents`: every tracked_job has a corresponding `background_agents` row, and every refresh writes an `agent_runs` row + per-source `agent_run_logs`. Admins see job-research runs alongside other background agents — no module-specific UI required.

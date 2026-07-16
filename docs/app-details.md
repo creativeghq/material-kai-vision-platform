@@ -185,7 +185,7 @@ After retrieval, a secondary AI re-ranking pass scores results on visual, unders
 
 ---
 
-### Feature 3 — KAI Agent Hub (Three AI Agents)
+### Feature 3 — Agent Hub (Three AI Agents)
 
 The Agent Hub (`/agent-hub`) is the conversational AI interface with memory, multi-turn context, image uploads, and tool-use.
 
@@ -249,7 +249,7 @@ The Gemini system uses a two-step style-transfer pipeline — an inspiration ima
 
 **C. Virtual Staging (with Before/After QA)**
 
-Empty room photos → furnished renders via Replicate `proplabs/virtual-staging` (~56 seconds). 8 room types, 8 furniture styles. 20 credits per run. Accessible as both a standalone tool and a KAI agent tool.
+Empty room photos → furnished renders via Replicate `proplabs/virtual-staging` (~56 seconds). 8 room types, 8 furniture styles. 20 credits per run. Accessible as both a standalone tool and a JARVIS agent tool.
 
 Virtual staging results now include a **before/after comparison viewer** (`VirtualStagingViewer` component) with an interactive slider that lets users drag between the original empty room and the staged result. An "Analyze Quality" button triggers a Claude Vision assessment of the staging quality — evaluating lighting consistency, perspective accuracy, furniture scale, material realism, and edge blending — each scored 1–10.
 
@@ -782,7 +782,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 ### Near-Term
 - Sourcing Agent elevated B2B tools (without requiring full admin role)
 - Credit quota differentiation by user tier
-- Verified factory elevated KAI agent tools
+- Verified factory elevated JARVIS agent tools
 - User onboarding flow with professional type self-selection
 - Hire Me transaction fee monetization layer
 - Featured listing placements in Discover directory (paid)

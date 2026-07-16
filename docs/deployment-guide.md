@@ -1109,7 +1109,7 @@ This section covers all third-party services used by the platform, their pricing
 
 ### 🤖 Anthropic (Claude AI)
 
-**Role**: Core AI model for KAI agent, SEO article writing, B2B research, and various AI pipelines.
+**Role**: Core AI model for JARVIS agent, SEO article writing, B2B research, and various AI pipelines.
 
 **Dashboard**: https://console.anthropic.com
 **Pricing**: https://www.anthropic.com/pricing
@@ -1118,7 +1118,7 @@ This section covers all third-party services used by the platform, their pricing
 
 | Model | Input | Output | Used For |
 |-------|-------|--------|---------|
-| Claude Opus 4.7 | $15/M tokens | $75/M tokens | KAI agent, SEO writing, complex reasoning |
+| Claude Opus 4.7 | $15/M tokens | $75/M tokens | JARVIS agent, SEO writing, complex reasoning |
 | Claude Haiku 4.5 | $0.80/M tokens | $4/M tokens | Demo agent, B2B web search |
 
 ---
@@ -1287,7 +1287,7 @@ Credits are refunded on generation failure.
 > **Cost optimization tips:**
 > - Modal endpoints (SLIG + PaddleOCR-VL) scale to zero — $0 idle, billed only while serving requests
 > - Resend Free plan covers 3,000 emails/month; upgrade to Pro only when needed
-> - Monitor Anthropic token usage in the console — KAI agent is the largest consumer
+> - Monitor Anthropic token usage in the console — JARVIS agent is the largest consumer
 > - Supabase PITR ($100/month) is optional but recommended for production data safety
 
 ---

@@ -43,7 +43,7 @@ chain triggers: child agents with parent_agent_id auto-dispatch on completion
 
 | Agent Type | Name | Description |
 |---|---|---|
-| `kai-task` | KAI Task Agent | Runs arbitrary KAI agent tool calls autonomously |
+| `kai-task` | JARVIS Task Agent | Runs arbitrary JARVIS agent tool calls autonomously |
 | `product-enrichment` | Product Enrichment | Fills missing product metadata using Claude + web search |
 | `material-tagger` | Material Tagger | Auto-tags products with structured material classifications |
 | `social-analytics-sync` | Social Analytics Sync | Syncs per-post engagement metrics from Zernio |

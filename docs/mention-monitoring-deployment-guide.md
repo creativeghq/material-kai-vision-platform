@@ -168,7 +168,7 @@ Until both are flipped on:
 
 ### Quick check — Agent flow
 
-In KAI agent chat:
+In JARVIS agent chat:
 
 ```
 Track mentions for product <product_id>

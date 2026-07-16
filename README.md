@@ -33,7 +33,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Search Accuracy**: 85%+
 - **Uptime**: 99.5%+
 - **API Endpoints**: 150+
-- **AI Models**: 12+ across 6 providers (Anthropic, OpenAI, Voyage AI, Modal, HuggingFace, WorldLabs)
+- **AI Models**: 12+ across 5 providers (Anthropic, OpenAI, Voyage AI, Modal, WorldLabs)
 
 ---
 
@@ -67,7 +67,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 2. **OpenAI**: GPT-4o (alternative discovery), GPT-4o-mini (query parsing)
 3. **PaddleOCR-VL (Modal)**: `PaddlePaddle/PaddleOCR-VL-1.6` (0.9B) — two-stage document parser (PP-DocLayoutV2 detector + 0.9B VLM) that is the PDF/catalog layout + OCR backbone (structure-first, runs before discovery)
 4. **Voyage AI**: voyage-4 (primary text + understanding embeddings, 1024D)
-5. **SigLIP2 (HuggingFace)**: 5 visual embedding types (visual, color, texture, style, material — 768D each) — the only model still hosted on HuggingFace
+5. **SLIG / SigLIP2 (Modal)**: `google/siglip2-base-patch16-512` — the visual encoder (768D `visual` vector) plus zero-shot + text→visual query embedding. Moved off HuggingFace onto Modal 2026-06-14; the 4 aspect vectors (color, texture, style, material — 1024D each) are Voyage-embedded from the vision analysis, not SLIG
 6. **Replicate**: 14 interior design models (FLUX, SDXL, Stable Diffusion 3, etc.)
 7. **WorldLabs Marble**: 3D Gaussian Splat world generation (mini + plus models)
 
@@ -91,7 +91,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
                     ┌─────────────────────┼─────────────────────┐
                     │                     │                     │
     ┌──────▼──────┐ ┌────▼─────┐ ┌────▼─────┐ ┌──────▼──────┐
-    │  Voyage AI  │ │ Anthropic│ │   Modal  │ │ HuggingFace │
+    │  Voyage AI  │ │ Anthropic│ │   Modal  │ │    Modal    │
     │  Embeddings │ │ Claude   │ │ PaddleOCR│ │ SLIG SigLIP2│
     │             │ │ Opus 4.7 │ │ -VL 1.6  │ │             │
     └─────────────┘ └──────────┘ └──────────┘ └─────────────┘
@@ -106,7 +106,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - Python 3.9+ (Backend)
 - UV package manager (Backend)
 - Supabase account
-- API keys: OpenAI, Anthropic, Voyage AI, HuggingFace
+- API keys: OpenAI, Anthropic, Voyage AI, Modal
 
 ### **Frontend Setup**
 ```bash
@@ -174,9 +174,9 @@ VOYAGE_API_KEY=your_voyage_key
 # Layout + OCR backbone (Modal — PaddleOCR-VL)
 PADDLEOCR_MODAL_API_KEY=...   # only required runtime secret; Modal URL is baked as the config default
 
-# Visual Embedding Endpoint (HuggingFace — SLIG only)
-SLIG_ENDPOINT_URL=https://your-slig-endpoint.aws.endpoints.huggingface.cloud
-SLIG_ENDPOINT_TOKEN=hf_...
+# Visual Embedding Endpoint (Modal — SLIG / SigLIP2)
+# Shares the PaddleOCR Modal bearer; the URL is baked as the config default.
+SLIG_MODAL_API_KEY=...
 
 # Application
 ENVIRONMENT=production
@@ -506,8 +506,7 @@ This project is proprietary software owned by Creative GHQ.
 
 - **OpenAI**: GPT models and embeddings
 - **Anthropic**: Claude 4.5 models + built-in web search
-- **Modal**: PaddleOCR-VL layout + OCR backbone
-- **HuggingFace**: SLIG SigLIP2 visual embeddings
+- **Modal**: PaddleOCR-VL layout + OCR backbone; SLIG SigLIP2 visual embeddings
 - **Voyage AI**: voyage-4 text embeddings
 - **WorldLabs**: Marble 3D Gaussian Splat generation
 - **Supabase**: Database and backend infrastructure

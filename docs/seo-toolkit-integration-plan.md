@@ -10,7 +10,7 @@ This doc lays out where else in the frontend these surfaces should appear beyond
 
 | Surface | Where | Status |
 |---|---|---|
-| Chat-driven SEO research | `/agent-hub` → KAI agent → `seo_research_keyword` (and 36 others) | ✓ live in this branch |
+| Chat-driven SEO research | `/agent-hub` → JARVIS agent → `seo_research_keyword` (and 36 others) | ✓ live in this branch |
 | Inline cards for every tool | `SEOResearchCard.tsx` + `SEOGenericCard.tsx` (one component handles 36 chunk types) | ✓ |
 | Conversation history persists chat-driven SEO calls | metadata.seoResearchData / seoGenericData | ✓ |
 
@@ -183,7 +183,7 @@ Plus a row in `public.modules` table (`slug='seo', enabled=true`).
 
 ## What I would NOT build right now
 
-- **A standalone "SEO mode" agent** — KAI already routes well to all 37 tools. A separate agent fragments the experience and the routing accuracy gain is marginal.
+- **A standalone "SEO mode" agent** — JARVIS already routes well to all 37 tools. A separate agent fragments the experience and the routing accuracy gain is marginal.
 - **Mobile-app version of the dashboard** — admin tools live on desktop. No need.
 - **Public-facing SEO research API** — currently the toolkit is internal-only (cron-secret auth). Exposing it would require new credit accounting + rate limits + per-API-key tracking. Could come later if there's customer demand.
 - **Stand-alone notification system for SEO** — mention-monitoring's alerts (spike, sentiment, new outlet, LLM visibility change) already cover the most-relevant alerts. SEO ranking change alerts are a separate v2 feature with its own historical-snapshot table requirement.

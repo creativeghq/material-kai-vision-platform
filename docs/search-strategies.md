@@ -186,7 +186,7 @@ Search results include variety while maintaining relevance:
 
 ## Explainable Search Spec
 
-When the KAI agent calls `material_search`, it now provides a structured **search specification** that decomposes the user's query across all 7 embedding dimensions. This spec is displayed as a collapsible `SearchSpecCard` above the product results in the chat.
+When the JARVIS agent calls `material_search`, it now provides a structured **search specification** that decomposes the user's query across all 7 embedding dimensions. This spec is displayed as a collapsible `SearchSpecCard` above the product results in the chat.
 
 **Fields in the search spec:**
 - `intent` — brief description of what the user is looking for

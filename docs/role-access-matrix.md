@@ -83,7 +83,7 @@ Notes:
    - `admin` / `super_admin` / `owner` → all admin/CRM/email/messaging functions.
    - `crm-api` also allows `factory`.
    - Finance functions allow `finance`; issuing also allows `accountant`.
-   - Agents: KAI / Interior Designer → `viewer/member/admin/owner`; Demo + `insights`/`seo` aliases → `admin/owner` only.
+   - Agents: JARVIS / Interior Designer → `viewer/member/admin/owner`; Demo + `insights`/`seo` aliases → `admin/owner` only.
 5. **Postgres RLS** — `is_admin_user()` (account role = **`admin`** only — note: not `super_admin`), `is_workspace_member(workspace_id)` (row belongs to a workspace you're in). Used by CRM/activity/notes/finance tables.
 
 ---

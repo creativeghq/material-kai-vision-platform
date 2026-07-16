@@ -1,6 +1,6 @@
 # Moodboard Presentation Sheets
 
-Nine client-ready sheet types attached to a moodboard, generated through the KAI agent chat and exported as A3-landscape PDFs. Sheets are persistent and editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing their inputs.
+Nine client-ready sheet types attached to a moodboard, generated through the JARVIS agent chat and exported as A3-landscape PDFs. Sheets are persistent and editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing their inputs.
 
 Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views** (a project-scoped deliverable that bundles sheets across moodboards) landed 2026-06-01 — see [§ Project Client Views](#project-client-views).
 
@@ -48,7 +48,7 @@ Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views**
                    │                  USER (browser)                     │
                    │  /moodboard/:id  →  Sheets tab  →  + New Sheet     │
                    │  ↓ navigates to /agent-hub?agent=kai&q=...          │
-                   │  /agent-hub  ←  chat with KAI agent                 │
+                   │  /agent-hub  ←  chat with JARVIS agent                 │
                    └────────────────────────────────────────────────────┘
                                          │
                                          ▼
@@ -102,7 +102,7 @@ Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views**
 
 1. User opens moodboard → Sheets tab → clicks "New Sheet" → picks "Material Board".
 2. Frontend calls `navigate('/agent-hub?agent=kai&q=Create a Material Board for moodboard <uuid>...')`.
-3. KAI agent loads with the seeded prompt. The system prompt addendum (applied by the second migration) tells it to call `generate_presentation_sheet` with the appropriate `sheet_type` and inputs. The agent asks the user to confirm which products to include.
+3. JARVIS agent loads with the seeded prompt. The system prompt addendum (applied by the second migration) tells it to call `generate_presentation_sheet` with the appropriate `sheet_type` and inputs. The agent asks the user to confirm which products to include.
 4. Agent calls `generate_presentation_sheet({moodboard_id, sheet_type: 'material_board', title, initial_data: {product_ids: [...]}})`.
 5. Tool validates the user owns the moodboard, debits 0 credits (no-op), inserts a row, calls `supabase.functions.invoke('generate-moodboard-sheet-pdf', {body: {sheet_id}})`.
 6. Edge function fetches the sheet + moodboard + product chips (with thumbnails from `image_product_associations`), builds the PDF, uploads to storage, returns signed URL.
@@ -259,8 +259,8 @@ The render branches in the message switch (around line 2526) check `message.shee
 
 - Lists sheets for the moodboard with status badges (`draft / generating / ready / failed`), page count, credit count, last-updated date, and (if `failed`) the error message.
 - "+ New Sheet" dropdown grouped: **Boards** (material_board, color_palette, concept_board), **Plans** (lighting_plan, annotated_render, elevation_render_pair), **Schedules** (ffe_schedule), **Decks** (full_deck). Each item shows label, credit cost, and a one-line description.
-- Picking a type calls `navigate('/agent-hub?agent=kai&q=<seeded prompt>')` so the KAI agent picks up the request.
-- Per-sheet actions: **Open** (signed-URL refresh + opens PDF), **Edit** (re-routes to KAI to continue), **Delete** (hard delete with confirm).
+- Picking a type calls `navigate('/agent-hub?agent=kai&q=<seeded prompt>')` so the JARVIS agent picks up the request.
+- Per-sheet actions: **Open** (signed-URL refresh + opens PDF), **Edit** (re-routes to JARVIS to continue), **Delete** (hard delete with confirm).
 
 ### Moodboard page — [`src/components/business/moodboard/MoodBoardDetailPage.tsx`](../src/components/business/moodboard/MoodBoardDetailPage.tsx)
 
@@ -277,7 +277,7 @@ Existing page wrapped in `Tabs` with two tabs:
 1. Open any moodboard at `/moodboard/:id`.
 2. Click the **Sheets** tab.
 3. Click **+ New Sheet** and pick a type from the dropdown.
-4. The KAI agent opens with a context-rich prompt; answer its questions.
+4. The JARVIS agent opens with a context-rich prompt; answer its questions.
 5. For passive sheets, the PDF appears in the chat within seconds.
 6. For interactive sheets (lighting / annotated / elevation), the canvas widget opens — finish the inputs there, click **Render PDF**.
 7. The sheet is saved to the moodboard's Sheets tab; come back any time to open or edit.
@@ -399,7 +399,7 @@ Deliberately mirrors the quote PDF/share pattern and is **folded into the existi
 4. Extend the zod schema in `presentation-sheet-tool.ts` with the new type and any new `initial_data` fields.
 5. Add to `SHEET_TYPE_CREDITS`, `SHEET_TYPE_LABELS` (frontend) and `SHEET_GROUPS` in `MoodboardSheetsTab.tsx`.
 6. If interactive, add a new canvas widget under `src/components/features/sheets/` and dispatch in `SheetCanvasCard.tsx`.
-7. Update the prompt addendum (write a new addendum migration with a new marker) so KAI knows when to use it.
+7. Update the prompt addendum (write a new addendum migration with a new marker) so JARVIS knows when to use it.
 
 ### Plug in AI region detection for `annotated_render`
 
@@ -437,7 +437,7 @@ Should not happen — the tool short-circuits the debit when `creditCost <= 0`. 
 Coordinates probably aren't normalized [0..1]. Check that the canvas widget converts client coords via `AnnotationLayer.toNormalized` (or its own equivalent for `kind: 'rect'` lighting plans), not raw pixel offsets.
 
 **Agent calls the tool with the wrong sheet type.**
-The KAI prompt addendum needs to be applied. Run the second migration. Check the prompts table:
+The JARVIS prompt addendum needs to be applied. Run the second migration. Check the prompts table:
 ```sql
 SELECT system_prompt FROM prompts
 WHERE prompt_type = 'agent' AND category = 'kai' AND is_active = true;

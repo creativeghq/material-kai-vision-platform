@@ -1,6 +1,6 @@
 # Agent Chat — Partner API (kai_* keys)
 
-Conversational access to the **KAI agent** (material intelligence, search, insights, research, analytics, SEO, B2B) and the **Interior Designer agent** (spatial analysis + room generation) over HTTP. Streaming NDJSON response. Multimodal — accepts user-attached images. Optional partner-supplied knowledge-base context block in the user message.
+Conversational access to the **JARVIS agent** (material intelligence, search, insights, research, analytics, SEO, B2B) and the **Interior Designer agent** (spatial analysis + room generation) over HTTP. Streaming NDJSON response. Multimodal — accepts user-attached images. Optional partner-supplied knowledge-base context block in the user message.
 
 > This is the **partner-facing** doc for integrations using a `kai_*` Bearer key, parallel to the Price Tracking + Mention Tracking APIs.
 > For the **internal** session-JWT version of the same endpoint (used by our own web app), see [`agent-chat-api.md`](./agent-chat-api.md).

@@ -182,7 +182,7 @@ Flows are no longer only global/admin — they are **tenant-scoped**. Each `flow
 
 The engine then matches on `trigger_type` + `status = 'active'` with a scoped filter: **all `is_global` flows PLUS the resolved workspace's own non-global flows** — never another tenant's rows. When no trustworthy workspace is established, only `is_global` flows run.
 
-**Chat-driven tenant automations.** Workspace owners can build simple flows from chat (no `/admin/flows` access needed) via the KAI agent's **`manage_flows`** tool (`supabase/functions/_shared/tools/flow-tools.ts`). It writes real workspace-scoped rows through the SECURITY DEFINER allowlist RPCs **`create_simple_flow` / `toggle_simple_flow` / `delete_simple_flow`**, which enforce a tenant-safe trigger/action vocabulary server-side (the tool/UI restriction is not the security line):
+**Chat-driven tenant automations.** Workspace owners can build simple flows from chat (no `/admin/flows` access needed) via the JARVIS agent's **`manage_flows`** tool (`supabase/functions/_shared/tools/flow-tools.ts`). It writes real workspace-scoped rows through the SECURITY DEFINER allowlist RPCs **`create_simple_flow` / `toggle_simple_flow` / `delete_simple_flow`**, which enforce a tenant-safe trigger/action vocabulary server-side (the tool/UI restriction is not the security line):
 
 - Allowed triggers: `scheduled`, `quote_approved`, `invoice_paid`, `payment_received`, `inbox.message_received`.
 - Allowed actions: `send_email`, `send_whatsapp`, `create_notification`, `send_agent_message`, `send_campaign`.

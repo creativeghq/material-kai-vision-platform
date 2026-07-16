@@ -18,7 +18,7 @@
   - Quality validation
   - Web scraping product discovery
   - XML field mapping
-  - KAI agent (default)
+  - JARVIS agent (default)
 - **Schema enforcement**: `VisionAnalysis` Pydantic model + `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`)
 - **Context**: 200,000 tokens (1M with extended context)
 - **Cost**: $5 input / $25 output per 1M tokens
@@ -224,7 +224,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 - Vision analysis (tool-use schema enforcement)
 - Complex reasoning, high accuracy
 - Detailed metadata extraction
-- KAI agent default
+- JARVIS agent default
 
 ### When to Use Claude Sonnet 4.6
 - Chunking (default since 2026-05-01)

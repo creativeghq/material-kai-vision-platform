@@ -316,7 +316,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    ↓
 3. Frontend calls `zernio-api action=callback` → account stored in `social_accounts` (`zernio_account_id`)
    ↓
-4. User (or KAI agent) generates content:
+4. User (or JARVIS agent) generates content:
    - Caption: `generate-social-content` (2cr) → 3 variants
    - Image: `generate-social-image` (5-10cr) → stored in Supabase Storage
    - Video: `generate-social-video` (15-30cr) → stored in Supabase Storage

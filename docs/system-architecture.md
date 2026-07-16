@@ -241,7 +241,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 ### Production AI Stack (post-2026-05-01)
 
 **Anthropic** (vision + chunking + agents, post-Qwen-removal):
-- **Claude Opus 4.7** — vision analysis (PRIMARY, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`); product discovery; KAI agent default
+- **Claude Opus 4.7** — vision analysis (PRIMARY, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`); product discovery; JARVIS agent default
 - **Claude Sonnet 4.6** — chunking (PRIMARY, was Qwen pre-2026-05-01 but Qwen had been silently 404-ing for months)
 - **Claude Haiku 4.5** — fast classification, demo agent, price-monitoring identity classifier
 

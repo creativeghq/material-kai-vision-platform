@@ -30,7 +30,7 @@ Shipped 2026-05-08.
 
 Two interlocking flows behind one entity (`presentation_catalogs`):
 
-- **Admin flow** — KAI agent + admin UI work together to build a catalog from manufacturer PDFs. The admin uploads source PDFs, then asks the agent to extract sections (free-form Vision query) or translate the whole PDF. Materials can also be added manually with prices pulled from the catalog / price-monitoring / market-check / manual entry. Every material can have an image lifted from the source PDF (auto-rasterized via PyMuPDF on MIVAA), pulled from our DB (visual search), or fetched from the web (DataForSEO Images) and approved inline in chat.
+- **Admin flow** — JARVIS agent + admin UI work together to build a catalog from manufacturer PDFs. The admin uploads source PDFs, then asks the agent to extract sections (free-form Vision query) or translate the whole PDF. Materials can also be added manually with prices pulled from the catalog / price-monitoring / market-check / manual entry. Every material can have an image lifted from the source PDF (auto-rasterized via PyMuPDF on MIVAA), pulled from our DB (visual search), or fetched from the web (DataForSEO Images) and approved inline in chat.
 - **Public flow** — published catalogs render as a web page at `/c/:slug` behind an email-gate. Visitor enters email → matched against `auth.users` + `crm_contacts` + `crm_companies` + a per-catalog `catalog_email_grants` allowlist → signed cookie issued → page rendered. Same JSONB body that drives the PDF also drives the web page, so updates to the catalog show up live without regenerating anything.
 
 Module slug: `presentation-catalogs`. Disabled by toggling the row in `public.modules`.
@@ -119,7 +119,7 @@ Loaded in [supabase/functions/agent-chat/index.ts](../supabase/functions/agent-c
 
 Tool entries also live in [src/components/features/ai/agentToolsCatalog.ts](../src/components/features/ai/agentToolsCatalog.ts) so the PromptBuilderModal + ToolkitPickerModal can browse them.
 
-The KAI prompt got an addendum (idempotent migration `20260508_kai_prompt_catalogs_addendum.sql`) explaining the order of tool calls and policy: never invent product names, prices, or images.
+The JARVIS prompt got an addendum (idempotent migration `20260508_kai_prompt_catalogs_addendum.sql`) explaining the order of tool calls and policy: never invent product names, prices, or images.
 
 ### Inline approval cards in AgentHub
 
@@ -271,14 +271,14 @@ Single endpoint: `POST /api/internal/catalog/rasterize-pdf-page`. Auth: `x-cron-
 End-to-end admin journey, driven by KAI in chat:
 
 1. **Upload source PDFs** — admin opens `/admin/catalogs/sources`, uploads one or more manufacturer PDFs with optional manufacturer name + URL + notes. `catalogsService.uploadSourcePdf(file, opts)` writes to `pdf-documents` bucket under `catalog-source/<user_id>/<uuid>.pdf` + inserts `catalog_source_pdfs` row. Admin copies the IDs (or notes them).
-2. **Create the catalog** — admin opens `/admin/catalogs`, clicks "+ New Catalog", fills the modal. Or in chat: `Start a new catalog called "Spring 2026 Range" for Vasilis Imports`. KAI calls `create_catalog` → returns `catalog_id`.
-3. **Attach PDFs** — `Attach source PDFs <id1>, <id2> to catalog <catalog_id>`. KAI calls `attach_catalog_pdfs`. Catalog now references those source PDFs.
-4. **Extract sections** — `From the attached PDFs, pull all white porcelain tiles in 600×600 format`. KAI calls `extract_from_catalog_pdfs`. Edge function runs Sonnet Vision + auto-rasterizes bbox crops via MIVAA. Chat surface renders `CatalogExtractionCandidatesCard` with thumbnails. Admin reviews, edits the section title input, clicks ✓ on the ones to keep, hits "Add to catalog" (calls `catalogsService.approveExtractionCandidates`).
-5. **(Alternate) Translate the entire PDF** — `Translate this manufacturer PDF into a new catalog grouped by category`. KAI calls `translate_pdf_to_catalog`. Single Vision pass, hundreds of materials at once, auto-rasterized.
-6. **Add manual materials** — `Also add Crema Marfil 600×600 at €24.50 to the Porcelain section`. KAI calls `add_material_to_catalog` with `price_source='manual'`. If `needs_image:true` came back (no image yet), KAI calls `find_image_for_material` next; admin clicks ✓ on a candidate.
-7. **Pricing from existing data** — `Add product <id> to the Wood section, pulling price from the cheapest verified retailer`. KAI uses `price_source='price_monitoring'` + `price_source_ref=<tracked_query_id>`. The tool reads `tracked_queries.current_price` directly.
+2. **Create the catalog** — admin opens `/admin/catalogs`, clicks "+ New Catalog", fills the modal. Or in chat: `Start a new catalog called "Spring 2026 Range" for Vasilis Imports`. JARVIS calls `create_catalog` → returns `catalog_id`.
+3. **Attach PDFs** — `Attach source PDFs <id1>, <id2> to catalog <catalog_id>`. JARVIS calls `attach_catalog_pdfs`. Catalog now references those source PDFs.
+4. **Extract sections** — `From the attached PDFs, pull all white porcelain tiles in 600×600 format`. JARVIS calls `extract_from_catalog_pdfs`. Edge function runs Sonnet Vision + auto-rasterizes bbox crops via MIVAA. Chat surface renders `CatalogExtractionCandidatesCard` with thumbnails. Admin reviews, edits the section title input, clicks ✓ on the ones to keep, hits "Add to catalog" (calls `catalogsService.approveExtractionCandidates`).
+5. **(Alternate) Translate the entire PDF** — `Translate this manufacturer PDF into a new catalog grouped by category`. JARVIS calls `translate_pdf_to_catalog`. Single Vision pass, hundreds of materials at once, auto-rasterized.
+6. **Add manual materials** — `Also add Crema Marfil 600×600 at €24.50 to the Porcelain section`. JARVIS calls `add_material_to_catalog` with `price_source='manual'`. If `needs_image:true` came back (no image yet), JARVIS calls `find_image_for_material` next; admin clicks ✓ on a candidate.
+7. **Pricing from existing data** — `Add product <id> to the Wood section, pulling price from the cheapest verified retailer`. JARVIS uses `price_source='price_monitoring'` + `price_source_ref=<tracked_query_id>`. The tool reads `tracked_queries.current_price` directly.
 8. **Edit cover/back** — admin opens the builder page, Cover & Back tab. Title / subtitle / description / client name / closing message / contact line are all `onBlur` saves directly to `presentation_catalogs.cover_data` / `back_cover_data`.
-9. **Generate PDF** — admin clicks "Generate PDF" in the builder header (or KAI calls `generate_catalog_pdf`). PDF preview iframe renders inline in the PDF tab.
+9. **Generate PDF** — admin clicks "Generate PDF" in the builder header (or JARVIS calls `generate_catalog_pdf`). PDF preview iframe renders inline in the PDF tab.
 10. **Publish** — admin clicks "Publish" (or `publish_catalog` from chat). Slug auto-generated from title; admin can override. Status flips to `published`, public URL surfaced as `/c/<slug>`.
 
 Throughout, every chunk emitted by the agent (`catalog_extraction_candidates`, `catalog_pdf_ready`, etc.) renders as an inline message in AgentHub so the admin doesn't context-switch between chat and the admin UI.

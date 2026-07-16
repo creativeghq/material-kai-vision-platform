@@ -54,7 +54,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 - Product discovery from PDFs / web scraping
 - XML field mapping
 - Quality validation
-- KAI agent (default model)
+- JARVIS agent (default model)
 
 **Performance**:
 - Vision accuracy: schema-locked (no malformed payloads)
@@ -110,7 +110,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 **Capabilities**:
 - Product discovery (alternative to Claude Opus 4.7)
-- KAI Agent Hub (optional)
+- Agent Hub (optional)
 
 **Performance**:
 - Accuracy: 94%+
@@ -338,7 +338,7 @@ The model configuration maps each task to its designated model:
 3. Skip + flag if all fail
 
 ### Text Generation
-1. **Claude Opus 4.7** — Vision, complex reasoning, KAI agent
+1. **Claude Opus 4.7** — Vision, complex reasoning, JARVIS agent
 2. **Claude Sonnet 4.6** — Chunking, mid-tier
 3. **Claude Haiku 4.5** — Fast classification, demo agent
 4. **GPT-4o / GPT-5** — Alternative discovery (not vision)

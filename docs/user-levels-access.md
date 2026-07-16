@@ -102,7 +102,7 @@ Personas are computed from these sources:
 
 ---
 
-### KAI Agent Tools (RBAC via edge function)
+### JARVIS agent Tools (RBAC via edge function)
 
 | Tool | All Authenticated Users | Admin / Owner Only |
 |------|:---:|:---:|
@@ -167,6 +167,6 @@ The following access questions are **not yet implemented** and will be defined i
 
 - [ ] How users self-select their professional type (onboarding flow vs profile edit)
 - [ ] Whether Sourcing Agents get access to B2B manufacturer search tools
-- [ ] Whether Verified Factories get any elevated KAI agent tools beyond standard
+- [ ] Whether Verified Factories get any elevated JARVIS agent tools beyond standard
 - [ ] Credit quota differences per user level
 - [ ] Public profile visibility rules (who can be discovered on `/discover`)

@@ -310,7 +310,7 @@ All POST, all JWT-authenticated.
 | `seo-api` | Consolidated SEO toolkit router (research/plan/write/analyze/pipeline + toolkit audit/research handlers) |
 | `crawl-user-website` | Sitemap-driven crawler (JWT owner / `x-cron-secret`). Firecrawl-scrapes a user's own site into `user_website_pages` with Voyage 1024D embeddings for SEO interlinking. `mode:'preview'` samples 5 URLs; `mode:'full'` crawls up to `min(max_pages,1000)`. |
 
-Reference: the KAI agent exposes `seo_*` sub-agent tools that call these.
+Reference: the JARVIS agent exposes `seo_*` sub-agent tools that call these.
 
 ### 1.4 Knowledge Base & Embeddings
 

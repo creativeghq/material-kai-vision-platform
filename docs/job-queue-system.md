@@ -254,7 +254,7 @@ The `JobMonitorService` is configured with `check_interval_seconds=60` (check ev
 ## 📚 Related Documentation
 
 - [PDF Processing Pipeline](pdf-processing-pipeline.md)
-- [Database Schema](database-schema-complete.md)
+- [Unified Job Tracking](unified-job-tracking.md)
 - [API Endpoints](api-endpoints.md)
 - [Troubleshooting Guide](troubleshooting-guide.md)
 - [Unified Job Tracking](unified-job-tracking.md) ✨ NEW

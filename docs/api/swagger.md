@@ -102,7 +102,7 @@ All edge functions accept `*` for `Access-Control-Allow-Origin`. Send `OPTIONS` 
 
 | `agentId` | Description | Required Role |
 |-----------|-------------|--------------|
-| `kai` | Default general-purpose KAI agent (Claude Opus) | Any authenticated user |
+| `kai` | Default general-purpose JARVIS agent (Claude Opus) | Any authenticated user |
 | `interior-designer` | Interior design specialist | Any authenticated user |
 | `demo` | Demo agent (Claude Haiku, cheaper) | Any authenticated user |
 | `search` | Legacy alias resolves to `kai` | Any authenticated user |
@@ -2809,8 +2809,8 @@ The platform uses a credit system for AI operations. Credits are debited per ope
 
 | Operation Type | Approximate Cost |
 |---------------|-----------------|
-| KAI agent message (Opus) | 0.5-5 credits depending on length |
-| KAI agent message (Haiku) | 0.1-1 credit |
+| JARVIS agent message (Opus) | 0.5-5 credits depending on length |
+| JARVIS agent message (Haiku) | 0.1-1 credit |
 | VR World generation (marble-1.0-draft) | 18 credits |
 | VR World generation (marble-1.1) | 190 credits |
 | RAG text search | 0.5 credits |

@@ -367,12 +367,12 @@ Platform notifications, emails, and automations run through the **Flows** engine
 - `b2b_manufacturer_search` tool uses Anthropic's built-in `web_search_20250305` tool (claude-haiku-4-5, beta header `web-search-2025-03-05`). No extra API key — uses `ANTHROPIC_API_KEY`.
 - Flow engine: `case 'web_search': case 'perplexity_search':` fallthrough keeps old saved flows working
 
-## Unified KAI Agent Architecture
+## Unified JARVIS Agent Architecture
 - **3 agents**: `kai` (default), `interior-designer`, `demo`
 - **Legacy aliases**: `search`, `insights`, `seo` resolve to `kai` via AGENT_CONFIGS in edge function
 - **RBAC tool gating**: Core tools for all users. Sub-agents/B2B/SEO gated to admin/owner only.
 - **Multimodal**: Frontend sends `images: string[]` (data URLs) → edge function attaches as `image_url` content blocks
-- **Model selection**: KAI uses Opus, Demo uses Haiku
+- **Model selection**: JARVIS uses Opus, Demo uses Haiku
 - **DB prompt key**: `kai` in prompts table (prompt_type='agent', category='kai')
 
 ## Background Agent Framework
@@ -654,26 +654,26 @@ Three corrections on top of v0.3.2:
 
 3. **Scoped pause.** `track_job_search` action=pause now accepts `pause_scope: 'all' | 'digests_only'`. Default `all` flips `is_active=false` (stops refresh + digest). `digests_only` flips `digest_enabled=false` (refresh keeps running silently; user can still ask "what new jobs did you find?" via `find_jobs` and gets the AgentHub triage panel; just no emails/chat-posts at digest tick). Broader NL vocab in the prompt — "stop", "cancel", "turn off", "kill", "snooze", "disable" all map to pause; "got a job, stop" confirms then maps to delete.
 
-**KAI prompt addendum** rewritten with explicit two-scope STOP section + the new generic category name.
+**JARVIS prompt addendum** rewritten with explicit two-scope STOP section + the new generic category name.
 
 ---
 
 ## Job Research v0.3.2 (2026-05-15 — sites list moved to KB category + agent-driven flow with modal — superseded by v0.3.3)
 
-Correction to v0.3.1. The previous attempt added a standalone admin page at `/admin/knowledge-base/job-sources`. That was wrong — operator wanted (a) the list as a proper KB category with `access_level='agent'` so the agent reads it but the public KB hides it, and (b) all add/edit flows to go through the KAI agent (with a modal for vague requests), not through a dedicated admin page.
+Correction to v0.3.1. The previous attempt added a standalone admin page at `/admin/knowledge-base/job-sources`. That was wrong — operator wanted (a) the list as a proper KB category with `access_level='agent'` so the agent reads it but the public KB hides it, and (b) all add/edit flows to go through the JARVIS agent (with a modal for vague requests), not through a dedicated admin page.
 
 **What changed vs v0.3.1:**
 - ❌ **Deleted**: `src/pages/Admin/JobResearchSitesPage.tsx` + its route in `src/App.tsx`. No more standalone admin page.
 - 🆕 **KB category `Job Sources`** ([kb_categories](src/components/Admin/KnowledgeBase/CategoryManager.tsx) with `access_level='agent'`, trigger_keyword='job sources'). Three child kb_docs (one per `site_type`) auto-rendered as Markdown tables of the current sites. Visible in admin KB; hidden from `PublicKnowledgeBasePage` which filters `access_level='public'`. Agent can search them via the standard KB search tool.
 - 🆕 **Sync helper** [job_sites_kb_sync.py](mivaa-pdf-extractor/app/services/integrations/job_sites_kb_sync.py) — after every CRUD on `job_research_sites`, calls `sync_one_site_type(site_type)` which rewrites the corresponding kb_doc body with a fresh Markdown table (enabled rows in a table, disabled in a strike-through list, with timestamp). Wired into `POST/PUT/DELETE /api/v1/job-research/sites[/{id}]` endpoints.
-- 🆕 **KAI tool `manage_job_sites`** ([job-research-tools.ts](supabase/functions/_shared/tools/job-research-tools.ts)). Actions: `list`, `add`, `remove`, `toggle`, `open_form`. Registered on the `kai` agent. Writes 401 for non-admins (RLS enforced at DB layer). When the user gives vague input ("add a job site"), the tool emits a `job_sites_form_open` chunk instead of guessing.
+- 🆕 **JARVIS tool `manage_job_sites`** ([job-research-tools.ts](supabase/functions/_shared/tools/job-research-tools.ts)). Actions: `list`, `add`, `remove`, `toggle`, `open_form`. Registered on the `kai` agent. Writes 401 for non-admins (RLS enforced at DB layer). When the user gives vague input ("add a job site"), the tool emits a `job_sites_form_open` chunk instead of guessing.
 - 🆕 **AgentHub modal** [JobSitesFormModal.tsx](src/components/features/ai/JobSitesFormModal.tsx) — triggered by the `job_sites_form_open` chunk. Select site_type + fill URL/domain/country/category/notes → on submit, populates the input box with a structured prose message ("Please add this job site using manage_job_sites... site_type: …, url_or_domain: …") which the user reviews and sends. Re-invokes the tool with the concrete fields.
-- 🆕 **KAI prompt addendum** updated — drops the dead `/admin/knowledge-base/job-sources` deep-link; teaches the agent the new `manage_job_sites` tool with NL→action mappings ("add kariera.gr" → action=add; vague "add a job site" → action=open_form to mount the modal).
+- 🆕 **JARVIS prompt addendum** updated — drops the dead `/admin/knowledge-base/job-sources` deep-link; teaches the agent the new `manage_job_sites` tool with NL→action mappings ("add kariera.gr" → action=add; vague "add a job site" → action=open_form to mount the modal).
 
 **User flow now:**
-1. User (in chat): *"add kariera.gr to the search"* → KAI calls `manage_job_sites(action=add, site_type=perplexity_domain, url_or_domain=kariera.gr)` → row inserted → kb_doc resync → confirmation in chat.
-2. User (vague): *"I want to add a job site"* → KAI calls `manage_job_sites(action=open_form)` → AgentHub mounts the modal → user fills fields → submits → input box populated → user reviews + sends → tool runs.
-3. User (read): *"which job boards do you search?"* → KAI calls `manage_job_sites(action=list)` → enumerates from KB doc / DB.
+1. User (in chat): *"add kariera.gr to the search"* → JARVIS calls `manage_job_sites(action=add, site_type=perplexity_domain, url_or_domain=kariera.gr)` → row inserted → kb_doc resync → confirmation in chat.
+2. User (vague): *"I want to add a job site"* → JARVIS calls `manage_job_sites(action=open_form)` → AgentHub mounts the modal → user fills fields → submits → input box populated → user reviews + sends → tool runs.
+3. User (read): *"which job boards do you search?"* → JARVIS calls `manage_job_sites(action=list)` → enumerates from KB doc / DB.
 
 **RLS model** (unchanged from v0.3.1):
 - `job_research_sites`: reads open to authenticated, writes admin-only via role check.
@@ -686,14 +686,14 @@ Correction to v0.3.1. The previous attempt added a standalone admin page at `/ad
 Late-day follow-up after the v0.3 ship. The Perplexity domain filter had been hardcoded in `_DEFAULT_JOB_DOMAINS` since v0.1 — no way to add country-specific job boards (e.g. `kariera.gr`, `jobs.gr` for the Greek market) without a code change. **Fixed by moving the list into the DB with a hidden admin editor.**
 
 - 🆕 **`job_research_sites` table** — operator-curated list with `site_type ∈ {perplexity_domain, rss_feed_default, careers_page_default}`, `url_or_domain`, optional `country_code` + `category`, `is_enabled` toggle, `notes`. RLS: reads open to authenticated, writes admin-only. Seeded with the previous 10 hardcoded domains.
-- 🆕 **Hidden admin page** at `/admin/knowledge-base/job-sources` ([JobResearchSitesPage.tsx](src/pages/Admin/JobResearchSitesPage.tsx)). Three tabs (one per `site_type`), per-site enable/disable toggle, add-site dialog with country/category metadata. NOT registered in any nav config — reachable only via direct URL, KB-admin sidebar (if linked), or the KAI agent deep-link.
+- 🆕 **Hidden admin page** at `/admin/knowledge-base/job-sources` ([JobResearchSitesPage.tsx](src/pages/Admin/JobResearchSitesPage.tsx)). Three tabs (one per `site_type`), per-site enable/disable toggle, add-site dialog with country/category metadata. NOT registered in any nav config — reachable only via direct URL, KB-admin sidebar (if linked), or the JARVIS agent deep-link.
 - 🆕 **CRUD endpoints** at `GET/POST/PUT/DELETE /api/v1/job-research/sites[/{id}]`. Reads return all rows for any authenticated user; writes 401 for non-admins (RLS enforced).
 - ✏️ **`search_via_perplexity()`** now calls `_load_perplexity_domains_from_db()` first; falls back to the hardcoded constant only if the DB read fails or returns nothing. Perplexity's 10-domain cap is still enforced — extras are truncated alphabetically.
-- ✏️ **KAI prompt addendum** updated with a "Job source sites configuration" paragraph instructing the agent to deep-link admins to `/admin/knowledge-base/job-sources` when they ask "which sites do you search?" / "add kariera.gr to the search" / "where do I configure job boards?".
+- ✏️ **JARVIS prompt addendum** updated with a "Job source sites configuration" paragraph instructing the agent to deep-link admins to `/admin/knowledge-base/job-sources` when they ask "which sites do you search?" / "add kariera.gr to the search" / "where do I configure job boards?".
 - 📋 **Per-tracked_job overrides still win.** Setting `tracked_jobs.careers_page_urls` or `rss_feed_urls` per-search overrides the defaults. The DB list is for the *platform-wide* defaults.
 
 **Where to add a new job board (operator workflow):**
-1. Navigate to `/admin/knowledge-base/job-sources` (or ask KAI: "open the job sources admin page").
+1. Navigate to `/admin/knowledge-base/job-sources` (or ask JARVIS: "open the job sources admin page").
 2. Pick the right tab (`perplexity_domain` for Sonar's filter, `rss_feed_default` for a feed-aggregator, `careers_page_default` for a specific company).
 3. Click "Add site" → fill URL/domain + optional display name + country + category.
 4. Toggle enabled. Takes effect on the next refresh tick.
@@ -745,15 +745,15 @@ Closed out the v0.2 follow-up backlog. Changes since v0.2:
 Architecture rework on top of v0.1.0. Three corrections:
 
 1. **Background-agents bookkeeping** — every `tracked_jobs` row now also gets a `background_agents` row (type=`job-research`) so the search appears in `/admin/background-agents` alongside other background agents. Each refresh writes one `agent_runs` row + per-source `agent_run_logs` entries (DataForSEO / Sonar / Firecrawl outcomes, dedupe counts, persisted+match counts). FK on `tracked_jobs.background_agent_id`. Helpers in [mivaa-pdf-extractor/app/services/integrations/job_agent_runs.py](mivaa-pdf-extractor/app/services/integrations/job_agent_runs.py) — start_run / append_log / complete_run / fail_run.
-2. **Chat-posting (primary user surface)** — when the KAI agent creates a tracked_job via `track_job_search`, the current `conversation_id` is captured on `tracked_jobs.source_conversation_id`. After every daily digest tick, the dispatcher inserts a new assistant message into THAT `agent_chat_messages` thread with `metadata.chunk_type = 'job_findings'` carrying the listings. The user reopens the conversation and sees the running history of findings rendered as a rich card by AgentHub. Email digest still goes out in parallel — chat is the in-product surface, email is the outside-the-app surface.
+2. **Chat-posting (primary user surface)** — when the JARVIS agent creates a tracked_job via `track_job_search`, the current `conversation_id` is captured on `tracked_jobs.source_conversation_id`. After every daily digest tick, the dispatcher inserts a new assistant message into THAT `agent_chat_messages` thread with `metadata.chunk_type = 'job_findings'` carrying the listings. The user reopens the conversation and sees the running history of findings rendered as a rich card by AgentHub. Email digest still goes out in parallel — chat is the in-product surface, email is the outside-the-app surface.
 3. **Auto keyword expansion (default-on, was opt-in)** — `JobResearchService.create()` now synchronously calls Haiku tool-use ([job_keyword_expansion_service.py](mivaa-pdf-extractor/app/services/integrations/job_keyword_expansion_service.py)) which returns `{title_variants, seniority_variants, abbreviations, rejected_terms}`. Persisted on `tracked_jobs.expanded_keywords`. Discovery uses `keywords ∪ expanded_keywords`. Re-runnable via `POST /track/{id}/regenerate-keywords`. So "Product Manager" automatically catches "Senior PM", "Product Lead", "Principal PM", etc.
 
 **Other v0.2 changes:**
-- **Synchronous first refresh**: `create()` now runs the full discovery + classifier pipeline inline before returning. The KAI agent's tool reply contains real findings counts on first save instead of "wait an hour for the cron".
+- **Synchronous first refresh**: `create()` now runs the full discovery + classifier pipeline inline before returning. The JARVIS agent's tool reply contains real findings counts on first save instead of "wait an hour for the cron".
 - **Weekly cadence support**: new `tracked_jobs.digest_day_of_week` column (0=Sunday..6=Saturday, NULL=daily). The `get_tracked_jobs_due_for_digest` RPC was rewritten to honor it. Lets the user say "every Monday morning" and have the digest only fire on Mondays.
 - **Hidden KB page DROPPED**: `/knowledge-base/job-sources` is gone. The chat is the user surface; `/admin/background-agents` is the ops surface. The page added churn for no value once chat-posting was wired.
 - **Action URL**: bell-notification + email "Open" links now deep-link to the conversation (`/agent-hub?conversation=<id>`) instead of the deleted KB page. Falls back to `/agent-hub?q=...` when no source_conversation_id is set.
-- **KAI agent prompt addendum** added to the live `prompts` row (key='kai') with idempotent `--BEGIN_JOB_RESEARCH_ADDENDUM--` markers. Tells the agent how to map NL phrases ("daily" / "weekly" / "every Monday morning" / "twice a day") to the structured `digest_hour_utc` + `digest_day_of_week` + `refresh_interval_hours` fields, and instructs it to confirm scope before saving.
+- **JARVIS agent prompt addendum** added to the live `prompts` row (key='kai') with idempotent `--BEGIN_JOB_RESEARCH_ADDENDUM--` markers. Tells the agent how to map NL phrases ("daily" / "weekly" / "every Monday morning" / "twice a day") to the structured `digest_hour_utc` + `digest_day_of_week` + `refresh_interval_hours` fields, and instructs it to confirm scope before saving.
 - **AgentHub `job_findings` card**: type definition + metadata restore + render block in [src/components/features/ai/AgentHub.tsx](src/components/features/ai/AgentHub.tsx). Renders per-listing url/company/location/salary/source. The cron-posted message arrives via the conversation-load metadata path, not the live streaming chunk handler — the `chunk_type === 'job_findings'` discriminator on stored metadata routes it into `jobFindingsData`.
 
 **Removed in v0.2** (tracked_jobs columns no longer used in code paths but retained in schema):
@@ -764,7 +764,7 @@ Architecture rework on top of v0.1.0. Three corrections:
 - New: `POST /api/v1/job-research/track/{id}/regenerate-keywords` — re-runs Haiku expansion.
 - `PUT /api/v1/job-research/track/{id}` accepts `digest_day_of_week`.
 
-**KAI tool** now takes a 5th parameter `conversationId` from the agent-chat runtime; passes it as `source_conversation_id` on create. The tool description is rewritten with explicit NL-scheduling translation table.
+**JARVIS tool** now takes a 5th parameter `conversationId` from the agent-chat runtime; passes it as `source_conversation_id` on create. The tool description is rewritten with explicit NL-scheduling translation table.
 
 ---
 
@@ -772,7 +772,7 @@ Architecture rework on top of v0.1.0. Three corrections:
 
 Per-user background agent that discovers job postings across **DataForSEO Google Jobs**, **Perplexity Sonar** (with `search_domain_filter` pinned to LinkedIn / Indeed / Glassdoor / WeWorkRemotely / RemoteOK / Wellfound / Dice / Monster / StackOverflow / YC), and **Firecrawl scraping of user-pinned career pages**. Runs hourly on a volatility-adaptive cadence (6h / 24h / 48h / 72h / 168h). Sends **ONE consolidated email per user per day** at the user's chosen `digest_hour_utc` covering all of their tracked job searches — not per-event alerts.
 
-Cloned wholesale from the [[mention-monitoring]] template (subject row → history rows → cron-driven refresh → classifier verdict cache → adaptive cadence → email digest dispatcher → KAI agent tool surface). What's net-new: the 3 job-source adapters and the consolidated-digest dispatcher.
+Cloned wholesale from the [[mention-monitoring]] template (subject row → history rows → cron-driven refresh → classifier verdict cache → adaptive cadence → email digest dispatcher → JARVIS agent tool surface). What's net-new: the 3 job-source adapters and the consolidated-digest dispatcher.
 
 **Tables** (applied 2026-05-14 via `mcp__supabase__apply_migration`):
 - `tracked_jobs` — subject. XOR check: internal flow has `user_id` set + `api_key_id IS NULL`; external API flow has `api_key_id` set + `user_id IS NULL`. CHECK constraint enforces exactly one. Includes denormalized snapshot (`current_listing_count_24h`, `current_listing_count_7d`, `current_top_companies`).
@@ -827,7 +827,7 @@ Cloned wholesale from the [[mention-monitoring]] template (subject row → histo
 - `job-research` — main module
 - `job-research-notifications` — gates digest dispatch (`is_module_enabled` check at top of `dispatch_due_users`)
 
-**KAI agent tools** ([supabase/functions/_shared/tools/job-research-tools.ts](supabase/functions/_shared/tools/job-research-tools.ts)) — registered on the `kai` agent for **all users** (not admin-gated). All 0-credit (refresh runs on cron, not on-demand):
+**JARVIS agent tools** ([supabase/functions/_shared/tools/job-research-tools.ts](supabase/functions/_shared/tools/job-research-tools.ts)) — registered on the `kai` agent for **all users** (not admin-gated). All 0-credit (refresh runs on cron, not on-demand):
 - `track_job_search` — create / update / pause / resume / delete (resolves target by `tracked_job_id` or by label)
 - `list_my_job_searches` — read user's tracked_jobs
 - `find_jobs` — fetch recent matches for a tracked_job
@@ -840,7 +840,7 @@ Each tool checks `is_module_enabled('job-research')` first. Chunk types streamed
 - [src/pages/KnowledgeBase/JobSourcesPage.tsx](src/pages/KnowledgeBase/JobSourcesPage.tsx) — **hidden KB page** at `/knowledge-base/job-sources?tracked_job=<id>`. NOT registered in any nav config. Reachable only via:
   1. The "Open Job Sources →" link in the daily digest email (`PUBLIC_APP_URL` env var on MIVAA backend points to it).
   2. The bell-notification action_url from a delivered digest.
-  3. Deep-link emitted by the KAI agent when it creates / updates a tracked_job (chunk handler can navigate to it).
+  3. Deep-link emitted by the JARVIS agent when it creates / updates a tracked_job (chunk handler can navigate to it).
 - Layout: tracked-jobs sidebar on the left, listings table on the right with All / New / Saved / Applied filters. Per-listing actions: open external URL, save, apply, dismiss.
 - Route registered in [src/App.tsx](src/App.tsx) under `AuthGuard` so unauthenticated users get redirected to login.
 
@@ -954,7 +954,7 @@ Channels (CHANNEL_CREDIT_COST): bell (0 cr), email (1 cr via `email-api` edge fu
 - [src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx](src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx) — admin cross-catalog view at `/admin/mention-monitoring`.
 - Module folders [src/modules/mention-monitoring/](src/modules/mention-monitoring/) and [src/modules/mention-monitoring-notifications/](src/modules/mention-monitoring-notifications/) for the registry.
 
-**Agent tools** ([supabase/functions/_shared/tools/mention-tools.ts](supabase/functions/_shared/tools/mention-tools.ts)) — registered on the KAI agent:
+**Agent tools** ([supabase/functions/_shared/tools/mention-tools.ts](supabase/functions/_shared/tools/mention-tools.ts)) — registered on the JARVIS agent:
 - `track_product_mentions` — start/stop tracking (0 cr)
 - `get_mention_summary` — pull rolling snapshot (0 cr)
 - `check_llm_visibility` — read latest snapshot or fire fresh probe with `force_run=true` (2 cr)
@@ -981,9 +981,9 @@ Each tool checks `is_module_enabled('mention-monitoring')` first. Chunk types st
 
 Full reference: [docs/api/mention-monitoring-api.md](docs/api/mention-monitoring-api.md) (versioned changelog at top). Auto-generated OpenAPI spec at `https://v1api.materialshub.gr/openapi.json`; interactive Swagger UI at `https://v1api.materialshub.gr/docs` (filter by tag: `Mention Tracking (Public API)` for the partner endpoints, `Mention Monitoring` for the internal-flow endpoints).
 
-## Presentation Sheets — moodboard sheets via the KAI agent (2026-05-02)
+## Presentation Sheets — moodboard sheets via the JARVIS agent (2026-05-02)
 
-Eight client-ready sheet types attached to a moodboard. Generated through the KAI agent chat (`generate_presentation_sheet` tool), output as A3-landscape PDFs in the `pdf-documents` storage bucket under the `moodboard-output/` prefix. Editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing inputs.
+Eight client-ready sheet types attached to a moodboard. Generated through the JARVIS agent chat (`generate_presentation_sheet` tool), output as A3-landscape PDFs in the `pdf-documents` storage bucket under the `moodboard-output/` prefix. Editable: every sheet is a row in `moodboard_presentation_sheets` with a JSONB `data` payload, so users can re-open and re-render without redoing inputs.
 
 **Sheet types + credit cost** (debited from user balance via `debit_user_credits` RPC, mirrored to `ai_usage_logs.operation_type='presentation_sheet_<type>'`):
 
@@ -1013,7 +1013,7 @@ Eight client-ready sheet types attached to a moodboard. Generated through the KA
 - Frontend service: [`src/services/moodboardSheetsService.ts`](src/services/moodboardSheetsService.ts) — `list/get/create/update/remove/refreshPdfUrl/generatePdf`. Exports `SHEET_TYPE_LABELS` and `SHEET_TYPE_CREDITS`.
 - Frontend widgets: [`src/components/features/sheets/`](src/components/features/sheets/) — `AnnotationLayer` (shared backdrop with normalized-coord render-prop API), `CalloutCanvas` (annotated_render — drag anchor + endpoint, edit labels), `DimensionCanvas` (elevation_render_pair — two-click dimensions, single-click tile callouts), `FixtureSymbolCanvas` (lighting_plan — fixture palette + drag placement, supports both upload and rectangle backdrops), `SheetCanvasCard` (chat dispatcher → mounts the right canvas), `SheetPreviewCard` (chat preview with iframe + download).
 - Frontend chat surface: [`src/components/features/ai/AgentHub.tsx`](src/components/features/ai/AgentHub.tsx) — handles `sheet_created` (log only), `sheet_canvas_open` (creates `sheetCanvasData` message → renders `SheetCanvasCard`), `sheet_pdf_ready` (creates `sheetPdfData` message → renders `SheetPreviewCard`).
-- Moodboard tab: [`src/components/business/moodboard/MoodboardSheetsTab.tsx`](src/components/business/moodboard/MoodboardSheetsTab.tsx) — sheet list with status badges, "+ New Sheet" dropdown grouped (Boards / Plans / Schedules / Decks). Clicking a sheet type navigates to `/agent-hub?agent=kai&q=<seeded-prompt>` so the KAI agent can drive the flow.
+- Moodboard tab: [`src/components/business/moodboard/MoodboardSheetsTab.tsx`](src/components/business/moodboard/MoodboardSheetsTab.tsx) — sheet list with status badges, "+ New Sheet" dropdown grouped (Boards / Plans / Schedules / Decks). Clicking a sheet type navigates to `/agent-hub?agent=kai&q=<seeded-prompt>` so the JARVIS agent can drive the flow.
 - Moodboard page: [`src/components/business/moodboard/MoodBoardDetailPage.tsx`](src/components/business/moodboard/MoodBoardDetailPage.tsx) — wrapped in `Tabs` (Items / Sheets).
 
 **Chunk types** (agent → AgentHub):
@@ -1159,7 +1159,7 @@ Self-contained module that wraps ΑΑΔΕ web services (SOAP 1.2 + WS-Security U
 - **Env vars**: `PINTEREST_APP_ID`, `PINTEREST_APP_SECRET`, `PINTEREST_REDIRECT_URI`
 
 ## Design Inspiration URL Finder
-- **Tool**: `analyze_inspiration_url` in `_shared/tools/search-tools.ts` — available to all users (KAI + Interior Designer agents)
+- **Tool**: `analyze_inspiration_url` in `_shared/tools/search-tools.ts` — available to all users (JARVIS + Interior Designer agents)
 - **Pipeline**: Firecrawl scrape URL → Claude Haiku extracts design tokens (colors, hex codes, materials, textures, styles, room type) → MIVAA 7-vector search for matching products
 - **Frontend modal**: `InspirationUrlModal.tsx` — Globe icon button in chat toolbar, all agents
 - **Frontend card**: `InspirationCard.tsx` — renders extracted palette swatches, material/style tags, hero image, source link
@@ -1178,7 +1178,7 @@ Self-contained module that wraps ΑΑΔΕ web services (SOAP 1.2 + WS-Security U
 - **Component**: `VirtualStagingViewer.tsx` — replaces old static image display for virtual staging results
 - **Before/After slider**: CSS clip-path based, pointer-drag interaction, no external dependency
 - **Source image**: `source_image_url` now included in `virtualStagingData` (from both edge function chunk and frontend direct call)
-- **Quality analysis**: "Analyze Quality" button sends both images to KAI for Claude Vision assessment (lighting, perspective, scale, materials, edge blending — scored 1-10)
+- **Quality analysis**: "Analyze Quality" button sends both images to JARVIS for Claude Vision assessment (lighting, perspective, scale, materials, edge blending — scored 1-10)
 - **Toggle**: "Before / After" button shows/hides the comparison slider
 
 ## Social publishing — Zernio (renamed from Late.dev, 2026-05-30)

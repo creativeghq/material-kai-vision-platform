@@ -87,7 +87,7 @@ Complete reference of all platform features and capabilities.
 - Cost: 1 credit (Firecrawl scrape) + Haiku token cost
 
 **8. Explainable Search Spec** ✅
-- KAI agent provides structured interpretation of every search query
+- JARVIS agent provides structured interpretation of every search query
 - Decomposes query across 7 dimensions: colors, materials, styles, textures, specs
 - Displayed as collapsible SearchSpecCard above product results
 - Shows color swatches with hex codes, material/style pill tags, spec details
@@ -623,7 +623,7 @@ Complete reference of all platform features and capabilities.
 **Documentation**: [background-agents.md](background-agents.md)
 
 **Agent Types:**
-- ✅ `kai-task` — Runs arbitrary KAI tool calls autonomously
+- ✅ `kai-task` — Runs arbitrary JARVIS tool calls autonomously
 - ✅ `product-enrichment` — Fills missing product metadata via Claude + web search
 - ✅ `material-tagger` — Auto-classifies products with material tags
 - ✅ `social-analytics-sync` — Syncs engagement metrics from Zernio
@@ -676,7 +676,7 @@ Complete reference of all platform features and capabilities.
 - ✅ Room types: living_room, bedroom, dining_room, kitchen, bathroom, home_office, kids_room, outdoor
 - ✅ Styles: modern, scandinavian, industrial, traditional, bohemian, minimalist, luxury, rustic
 - ✅ Optional free-text `furniture_items` override
-- ✅ Accessible as KAI agent tool
+- ✅ Accessible as JARVIS agent tool
 
 ---
 

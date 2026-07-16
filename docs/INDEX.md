@@ -104,7 +104,7 @@ Complete documentation for Material Kai Vision Platform.
 - Cosine similarity and matrix factorization algorithms
 
 **[social-media-system.md](social-media-system.md)** - Social media creation & monitoring system
-- KAI agent tools for social content (captions, images, videos)
+- JARVIS agent tools for social content (captions, images, videos)
 - Zernio OAuth integration for per-user platform connections
 - Publishing, scheduling, analytics via Zernio API
 - xAI Aurora / Gemini Flash / FLUX Dev image generation routing
@@ -144,13 +144,13 @@ Complete documentation for Material Kai Vision Platform.
 **[moodboard-presentation-sheets.md](moodboard-presentation-sheets.md)** - Moodboard Presentation Sheets ✨ NEW (2026-05-02)
 - 8 client-ready sheet types: Material Board, Color Palette, Concept Board, Lighting Plan, Annotated Render, Elevation+Render Pair, FF&E Schedule, Full Deck
 - A3-landscape PDFs via pdf-lib in `generate-moodboard-sheet-pdf` edge function
-- Generated through KAI agent chat via `generate_presentation_sheet` tool (0/2/3 cr per type)
+- Generated through JARVIS agent chat via `generate_presentation_sheet` tool (0/2/3 cr per type)
 - Interactive types open canvas widgets in chat (CalloutCanvas, DimensionCanvas, FixtureSymbolCanvas)
 - Persistent + editable: every sheet is a row in `moodboard_presentation_sheets` with JSONB `data`
 - Sheets tab on every moodboard at `/moodboard/:id`
 
 **[presentation-catalogs.md](presentation-catalogs.md)** - Presentation Catalogs ✨ NEW (2026-05-08)
-- Admin-only catalog builder driven by 8 KAI tools: create / attach_pdfs / extract / translate / add_material / find_image / generate_pdf / publish
+- Admin-only catalog builder driven by 8 JARVIS tools: create / attach_pdfs / extract / translate / add_material / find_image / generate_pdf / publish
 - Source PDFs uploaded to `pdf-documents/catalog-source/` (post 2026-05-23 consolidation); Sonnet 4.6 PDF Vision extracts sections + bbox per material
 - Per-candidate page rasterization via MIVAA PyMuPDF (`/api/internal/catalog/rasterize-pdf-page`) — every extracted material has a real cropped image
 - Editable JSONB body renders BOTH as A4 PDF (cover + body + back cover via pdf-lib) AND as live web page at `/c/:slug`
@@ -391,7 +391,7 @@ Complete documentation for Material Kai Vision Platform.
 - Human-in-the-loop patterns (planned)
 - Database schema (agent_checkpoints, agent_memories)
 
-**[agent-and-tools-reference.md](agent-and-tools-reference.md)** - Reference for the KAI agents and their tool surfaces
+**[agent-and-tools-reference.md](agent-and-tools-reference.md)** - Reference for the JARVIS agents and their tool surfaces
 
 **[prompt-enhancement-system.md](prompt-enhancement-system.md)** - Dynamic prompt system ✨ NEW
 - Database-driven extraction prompts (extraction_prompts table)
@@ -524,7 +524,7 @@ Complete documentation for Material Kai Vision Platform.
 **[workspace-shared-credits.md](workspace-shared-credits.md)** - Workspace shared credits ✨ NEW (2026-07) — pooled credits (owner funds, members draw with optional per-member caps)
 
 **[trip-expense-cards.md](trip-expense-cards.md)** - Trip/expense cards & customer AR aging ✨ NEW (2026-06)
-- Expense cards with per-line finance approval + reimbursement→planned_payment; receipts via `trip-expense-ops`; KAI tools
+- Expense cards with per-line finance approval + reimbursement→planned_payment; receipts via `trip-expense-ops`; JARVIS tools
 - `vw_customer_aging_buckets` (not_due / 0–30 / 31–90 / 90+) across the finance Parties views
 
 **[surplus-marketplace.md](surplus-marketplace.md)** - 0%-commission last-stock marketplace (#219) ✨ NEW (2026-06)
@@ -636,7 +636,7 @@ Complete documentation for Material Kai Vision Platform.
 - **170+** API endpoints (20 categories)
 - **60+** Supabase Edge Functions
 - **7** embedding types with dynamic weight profiles (halfvec float16 storage)
-- **3** active agents: KAI (unified), Interior Designer, Demo
+- **3** active agents: JARVIS (unified), Interior Designer, Demo
 - **6** background agent types
 - **200+** metafield types
 - **95%+** product detection accuracy
@@ -706,7 +706,7 @@ All documentation follows these standards:
 **Recent Changes (2026-04-25):**
 - ✨ **NEW**: **Modular Architecture** — platform now ships as 7 toggleable modules. Each module owns its routes/services/agents/admin-cards and is gated by a row in `public.modules`. Toggle from `/admin/modules`. Modules: `greek-marketplaces`, `crm`, `email`, `messaging`, `quotes`, `notifications`, `social-media`. See `.claude/plans/modular-architecture.md` + `.claude/plans/modules-extraction-roadmap.md`.
 - ✨ **NEW**: `POST /api/v1/modules/_invalidate` — admin endpoint that drops MIVAA's enabled-flag cache so toggle changes propagate in ~1s. Documented in `api-master-reference.md` §2.1.
-- ✨ **CHANGED**: Frontend module file paths — Email moved to `src/modules/email/`, Messaging to `src/modules/messaging/`, CRM to `src/modules/crm/`, Quotes to `src/modules/quotes/`, In-App Notifications panel to `src/modules/notifications/`, Social Media admin UI + the 11 KAI agent tools + 2 background agents to `src/modules/social-media/` and `supabase/functions/_shared/modules/social-media/`. Old paths under `src/services/email/`, `src/services/messaging/`, `src/components/Admin/{CRMManagement,EmailManagement,MessagingManagement,SocialMedia}/`, etc. are deleted.
+- ✨ **CHANGED**: Frontend module file paths — Email moved to `src/modules/email/`, Messaging to `src/modules/messaging/`, CRM to `src/modules/crm/`, Quotes to `src/modules/quotes/`, In-App Notifications panel to `src/modules/notifications/`, Social Media admin UI + the 11 JARVIS agent tools + 2 background agents to `src/modules/social-media/` and `supabase/functions/_shared/modules/social-media/`. Old paths under `src/services/email/`, `src/services/messaging/`, `src/components/Admin/{CRMManagement,EmailManagement,MessagingManagement,SocialMedia}/`, etc. are deleted.
 
 **Recent Changes (2026-04):**
 - ✨ **NEW**: AR Material Preview — WebXR + 3D swatch + PBR maps (`ar-material-preview.md`)
@@ -727,7 +727,7 @@ All documentation follows these standards:
 - ✨ **NEW**: AI Re-ranking — Claude post-retrieval result re-ordering (`ai-reranking.md`)
 - ✨ **NEW**: Billing & Credits — Stripe subscriptions + credit packages (`billing-credits-system.md`)
 - ✨ **NEW**: CRM System — Contacts, companies, users (`crm-system.md`)
-- ✨ **UPDATED** (2026-02-19): Unified KAI Agent — Search + Insights + SEO merged
+- ✨ **UPDATED** (2026-02-19): Unified JARVIS Agent — Search + Insights + SEO merged
 - ✨ **NEW** (2026-02-10): VR World Generation — WorldLabs Marble + Spark.js
 - ✨ **UPDATED** (2026-02-07): halfvec migration — all vector columns float16
 - ✨ **NEW**: Understanding embeddings, query-adaptive weight profiles, B2B web search

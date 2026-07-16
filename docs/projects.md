@@ -20,7 +20,7 @@ Before Projects, moodboards and quotes were standalone objects scoped to one use
 
 **External API:** [docs/api/projects-api.md](api/projects-api.md) (`/api/v1/projects/*` — Bearer `kai_*` partner integrations).
 
-**KAI agent surface:** four tools on the `kai` + `interior-designer` agents — `create_project`, `list_my_projects`, `find_project`, `add_task`. See [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts).
+**JARVIS agent surface:** four tools on the `kai` + `interior-designer` agents — `create_project`, `list_my_projects`, `find_project`, `add_task`. See [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts).
 
 ---
 
@@ -204,7 +204,7 @@ It talks to Supabase directly (anon key for authenticated user reads/writes, RLS
 
 ---
 
-## KAI agent integration
+## JARVIS agent integration
 
 Four tools on the `kai` + `interior-designer` agents. Source: [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts). All are 0 credits (DB-only) and module-gated on `projects`.
 
@@ -215,7 +215,7 @@ Four tools on the `kai` + `interior-designer` agents. Source: [supabase/function
 | `find_project(query)` | Before any project-scoped action when project is referenced by name | Fuzzy name match, max 5 results. |
 | `add_task(project_id ∣ project_name, title, parent_task_id?, room_name?, due_date?, visibility?)` | "remind me to X for [project]" | Resolves project + room by name internally. Pass `parent_task_id` for subtasks. |
 
-A KAI prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--`) teaches both agents the natural-language mappings to these tools.
+A JARVIS prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--`) teaches both agents the natural-language mappings to these tools.
 
 ---
 
@@ -243,7 +243,7 @@ A KAI prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--`) 
 | **Quotes** | `quotes.project_id` column. `CreateQuoteModal` shows the project picker. `QuotesTab` groups quotes by revision chain. Quote acceptance feeds `projects.actual_amount` via trigger. |
 | **CRM** | `projects.client_company_id` XOR `client_contact_id` (mirrors `quotes` pattern). Owner picker hits the full CRM; non-admin picker is scoped to the user's own contacts with inline add-new. |
 | **Presentation sheets** | `SheetsTab` rolls up `moodboard_presentation_sheets` across every moodboard attached to the project. |
-| **KAI agent** | Four tools listed above + system-prompt addendum on `kai` + `interior-designer`. |
+| **JARVIS agent** | Four tools listed above + system-prompt addendum on `kai` + `interior-designer`. |
 | **email-api** | Used by both the frontend service AND the MIVAA wrapper to send branded HTML invite emails. No template needed (HTML is rendered inline). |
 
 ---
@@ -264,7 +264,7 @@ A KAI prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--`) 
 - The MIVAA wrapper at `/api/v1/projects/*` requires `PUBLIC_APP_URL` env var on the MIVAA host so the invite emails point at production (falls back to `https://app.materialshub.gr`).
 - Frontend invite emails read `VITE_PUBLIC_APP_URL` (build-time env var, falls back to `window.location.origin`).
 - After applying any migration touching projects, regenerate `src/integrations/supabase/types.ts` to drop the `as any` casts in `projectsService.ts` — non-blocking, runtime works without it.
-- Edge functions touched: `agent-chat` (added 4 KAI tools) + `email-api` (used for invites, no changes). Deploy `agent-chat` to bring the agent tools live.
+- Edge functions touched: `agent-chat` (added 4 JARVIS tools) + `email-api` (used for invites, no changes). Deploy `agent-chat` to bring the agent tools live.
 
 ---
 
@@ -282,7 +282,7 @@ A KAI prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--`) 
 
 - [docs/api/projects-api.md](api/projects-api.md) — full external API reference (Bearer `kai_*` partner endpoints).
 - [src/modules/projects/](../src/modules/projects/) — frontend source.
-- [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts) — KAI agent tools.
+- [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts) — JARVIS agent tools.
 - [mivaa-pdf-extractor/app/api/project_tracking_routes.py](../mivaa-pdf-extractor/app/api/project_tracking_routes.py) — Python MIVAA wrapper.
 - Phase 1 → 4 migrations (apply order):
   - `projects_module_phase_1` — tables, columns, triggers, RLS.

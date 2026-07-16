@@ -1,6 +1,6 @@
 # Interior Design AI Models — Complete List
 
-This is the canonical inventory of every model the Interior Designer / KAI agent can call, and what each is for. Source of truth for the variations grid is `mivaa-pdf-extractor/app/api/interior_design_routes.py` (`TEXT_TO_IMAGE_MODELS` + `IMAGE_TO_IMAGE_MODELS`). Source of truth for pricing is `mivaa-pdf-extractor/app/config/ai_pricing.py` (`REPLICATE_PRICING`).
+This is the canonical inventory of every model the Interior Designer / JARVIS agent can call, and what each is for. Source of truth for the variations grid is `mivaa-pdf-extractor/app/api/interior_design_routes.py` (`TEXT_TO_IMAGE_MODELS` + `IMAGE_TO_IMAGE_MODELS`). Source of truth for pricing is `mivaa-pdf-extractor/app/config/ai_pricing.py` (`REPLICATE_PRICING`).
 
 There are two distinct entry points:
 

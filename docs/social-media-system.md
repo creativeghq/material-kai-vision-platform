@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Social Media system is built as **KAI agent tools** (same pattern as B2B/SEO tools) using [Zernio](https://docs.zernio.com/) as the publishing backbone. Each user connects their own social accounts from their profile — accounts are per-user, not per-workspace-admin.
+The Social Media system is built as **JARVIS agent tools** (same pattern as B2B/SEO tools) using [Zernio](https://docs.zernio.com/) as the publishing backbone. Each user connects their own social accounts from their profile — accounts are per-user, not per-workspace-admin.
 
 ---
 
@@ -12,7 +12,7 @@ The Social Media system is built as **KAI agent tools** (same pattern as B2B/SEO
 User Profile → SocialAccountsTab → zernio-api (action=connect) → Zernio authUrl
             ← Zernio redirects back to the app with ?connected&accountId
             → zernio-api (action=callback) → upsert social_accounts
-KAI Agent   → Social Tools       → zernio-api (publish/schedule/analytics) → Zernio API
+JARVIS agent   → Social Tools       → zernio-api (publish/schedule/analytics) → Zernio API
 Zernio      → zernio-webhook-handler → reconcile social_posts / social_accounts
 Admin Panel → /admin/social-media/* → Direct DB queries (social_posts, social_accounts)
 ```
@@ -62,7 +62,7 @@ Resolution is **env-first, then `platform_secrets` (DB)** — set via edge-funct
 | `GOOGLE_AI_API_KEY` | Google AI Studio or Google Cloud → Gemini API |
 | `REPLICATE_API_TOKEN` | [replicate.com/account/api-tokens](https://replicate.com/account/api-tokens) |
 
-> **Note**: `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are already set if KAI agent is working.
+> **Note**: `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are already set if JARVIS agent is working.
 
 ---
 
@@ -99,7 +99,7 @@ Replicate calls are async — if they exceed 50s the function stores the `replic
 
 ---
 
-## KAI Agent Tools (11 social tools)
+## JARVIS agent Tools (11 social tools)
 
 All injected in `agent-chat/index.ts` under the `if (isAdmin)` RBAC gate:
 
@@ -138,7 +138,7 @@ Both registered in `supabase/functions/_shared/agents/registry.ts`.
 |-------|-----------|
 | `/admin/social-media/accounts` | `SocialMediaAccountsPage` — read-only workspace overview of all connected accounts |
 
-> **Note:** The Dashboard, Create, Calendar, and Analytics pages were removed. Social content creation is handled via the KAI agent (`/kai`). Account connection is per-user via **My Profile → Social Accounts**.
+> **Note:** The Dashboard, Create, Calendar, and Analytics pages were removed. Social content creation is handled via the JARVIS agent (`/kai`). Account connection is per-user via **My Profile → Social Accounts**.
 
 ## Per-User Account Connection
 

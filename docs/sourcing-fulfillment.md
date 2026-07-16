@@ -4,7 +4,7 @@ The **sourcing spine** answers one operational question: *for a customer demand,
 
 It sits **on top of** the [Orders System](orders-system.md): the order (sales) is the demand; sourcing is how that demand is satisfied. A purchase order to a supplier is an `orders` row with `order_type='purchase'` — **not** a separate table. (The legacy `purchase_orders`/`purchase_order_items` tables were retired 2026-06-28; everything runs on the live `orders(purchase)` surface.)
 
-> Scope: this documents the **shipped** spine (#237 A0–A4). Marketplace sourcing, the KAI agent tools, the sales-scoped board view, and the global-supplier-identity/portal are tracked in **#243/#244/#245** and are not yet built.
+> Scope: this documents the **shipped** spine (#237 A0–A4). Marketplace sourcing, the JARVIS agent tools, the sales-scoped board view, and the global-supplier-identity/portal are tracked in **#243/#244/#245** and are not yet built.
 
 ## The boundary
 
@@ -54,7 +54,7 @@ It sits **on top of** the [Orders System](orders-system.md): the order (sales) i
 
 ## Agent surface (drive sourcing from chat)
 
-KAI tools in [`sourcing-tools.ts`](../supabase/functions/_shared/tools/sourcing-tools.ts), registered on the `kai` agent: `source_product` (→ `resolve_sourcing_options`), `create_purchase_order` (→ `commit_sourcing_options`), `send_purchase_order` (→ the `{order_id}` send mode). Called with the **user's JWT** so the RPC gates resolve (resolve = member, create-PO = finance-manager). AgentHub renders `sourcing_options` / `purchase_order_created` / `purchase_order_sent` cards.
+JARVIS tools in [`sourcing-tools.ts`](../supabase/functions/_shared/tools/sourcing-tools.ts), registered on the `kai` agent: `source_product` (→ `resolve_sourcing_options`), `create_purchase_order` (→ `commit_sourcing_options`), `send_purchase_order` (→ the `{order_id}` send mode). Called with the **user's JWT** so the RPC gates resolve (resolve = member, create-PO = finance-manager). AgentHub renders `sourcing_options` / `purchase_order_created` / `purchase_order_sent` cards.
 
 ## Monitoring & market intel
 

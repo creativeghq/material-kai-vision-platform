@@ -83,7 +83,7 @@ An alternative entry point to the interior design workflow — users paste a des
 1. **User clicks Globe icon** in the chat toolbar → `InspirationUrlModal` opens
 2. **User pastes URL** + optional surface focus (floor/wall/countertop/all) → submits
 3. **Input set in chat** → `"Find materials matching this design inspiration: <url> (focus on <surface>)"`
-4. **KAI agent detects URL** → calls `analyze_inspiration_url` tool
+4. **JARVIS agent detects URL** → calls `analyze_inspiration_url` tool
 
 ### Tool Pipeline (search-tools.ts)
 

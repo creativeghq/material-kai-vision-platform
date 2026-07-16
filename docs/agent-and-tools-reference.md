@@ -7,7 +7,7 @@ Single source of truth: [`src/components/features/ai/agentToolsCatalog.ts`](../s
 The catalog has three layers:
 
 1. **Tools** (`KAI_TOOLS`, `INTERIOR_DESIGNER_TOOLS`) — individual capabilities (~60 total). Each tool has `id`, `name`, `desc`, `category`, `adminOnly`, `moduleSlug`, `credits`, `examples[]`, optional `workflowOf` + `workflowStep` for multi-step bundles.
-2. **Agents** (`AGENTS`) — KAI / Interior Designer / Demo. Each owns a subset of tools.
+2. **Agents** (`AGENTS`) — JARVIS / Interior Designer / Demo. Each owns a subset of tools.
 3. **Toolkits** (`TOOLKITS`) — the cluster layer. Bundles related tool_ids with a name, icon, description, optional `adminOnly` / `moduleSlug` / `alwaysOn`, and **`quick_starts`** (1-4 starter prompts that fire workflows). This is what the user actually sees in the discovery UI.
 
 Helpers exposed from the catalog:
@@ -33,13 +33,13 @@ The platform has **3 agents**. There is **no separate "B2B Agent" or "SEO Agent"
 
 | Agent ID | Name | Roles allowed | Description |
 |---|---|---|---|
-| `kai` | KAI Agent | viewer, member, admin, owner | Material intelligence — search, sub-agents, B2B, SEO, mentions, presentation sheets, pricing. The default agent for most queries. |
+| `kai` | JARVIS agent | viewer, member, admin, owner | Material intelligence — search, sub-agents, B2B, SEO, mentions, presentation sheets, pricing. The default agent for most queries. |
 | `interior-designer` | Interior Designer | viewer, member, admin, owner | AI-powered interior design with spatial analysis and material matching. 3D + lighting + VR generation. |
 | `demo` | Demo Agent | admin, owner only | Platform showcase. |
 
 **Legacy aliases** (resolved server-side to `kai`): `search`, `insights`, `seo`. Old frontends sending these agent IDs continue to work.
 
-## KAI tool inventory (by category)
+## JARVIS tool inventory (by category)
 
 Each tool has: `name` · `id` · `desc` · `adminOnly` flag · optional `moduleSlug` (gates on `public.modules.enabled`) · optional `credits` cost · 1-3 starter prompts.
 
@@ -167,7 +167,7 @@ Each tool has: `name` · `id` · `desc` · `adminOnly` flag · optional `moduleS
 2. Add a route to `seo_agent_routes.py` (or whitelist the kind for the generic dispatcher).
 3. Add an agent tool factory in `seo-agent-tools.ts` (or appropriate tool file).
 4. Register in `agent-chat/index.ts`: add to `SEO_AGENT_TOOL_NAMES`, lazy-import factory, push when included.
-5. Add to KAI's `tools` array in `AGENT_CONFIGS`.
+5. Add to JARVIS's `tools` array in `AGENT_CONFIGS`.
 6. **Add an entry to `agentToolsCatalog.ts`** — this is what makes it discoverable in the Browse Tools modal.
 7. Add a card renderer case in `SEOGenericCard.tsx` (or use the fallback raw-payload card).
 

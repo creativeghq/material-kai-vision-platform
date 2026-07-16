@@ -118,17 +118,6 @@
 - Duplicate Detection Routes (7)
 - Data Import Routes (4) ✨ NEW
 
-**[database-schema-complete.md](database-schema-complete.md)** - Database schema
-- Core tables (products, chunks, images, document_entities)
-- Products + Metadata architecture (JSONB)
-- Document entities (certificates, logos, specifications)
-- Product-document relationships
-- Relationship tables with relevance scores
-- Row-Level Security (RLS)
-- Indexes & performance
-- Storage capacity
-- Backup & recovery
-
 **[relevancy-system.md](relevancy-system.md)** - Relevancy & entity linking
 - Chunk → Product relationships
 - Product → Image relationships
@@ -237,14 +226,6 @@
 - Metadata API endpoints
 - Integration with PDF processing pipeline
 
-**[metadata-normalization-system.md](metadata-normalization-system.md)** - Metadata normalization system ✨ NEW
-- Two-layer normalization architecture (prevention + correction)
-- Semantic similarity-based field standardization (60% threshold)
-- Automatic consolidation (individual fields → objects, single → arrays)
-- Integrated into extraction pipeline
-- Migration script for existing products
-- 95%+ field standardization accuracy
-
 **[prompt-enhancement-system.md](prompt-enhancement-system.md)** - Dynamic prompt system ✨ NEW
 - Database-driven extraction prompts (extraction_prompts table)
 - Custom vs default prompt priority (is_custom flag)
@@ -305,15 +286,14 @@ The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#1
 ### For API Integration
 1. [api-endpoints.md](api-endpoints.md) - All endpoints
 2. [ai-models-guide.md](ai-models-guide.md) - AI models used
-3. [database-schema-complete.md](database-schema-complete.md) - Data structure
-4. [system-architecture.md](system-architecture.md) - Authentication
+3. [system-architecture.md](system-architecture.md) - Authentication
 
 ### For Operations
 1. [deployment-guide.md](deployment-guide.md) - Deployment process
 2. [job-queue-system.md](job-queue-system.md) - Job monitoring & recovery
 3. [troubleshooting-guide.md](troubleshooting-guide.md) - Common issues
 4. [system-architecture.md](system-architecture.md) - Monitoring
-5. [database-schema-complete.md](database-schema-complete.md) - Backup strategy
+5. [data-retention-policy.md](data-retention-policy.md) - Retention & backup
 
 ### For Product Managers
 1. [overview.md](overview.md) - Platform overview
@@ -397,7 +377,7 @@ For questions or issues:
 
 ---
 
-**Last Updated**: January 18, 2026
+**Last Updated**: July 16, 2026
 **Version**: 3.0.0
 **Status**: Production
 **Total Documentation**: 55+ comprehensive guides
@@ -406,7 +386,6 @@ For questions or issues:
 **API Endpoints**: 150+ across 16 categories
 
 **Recent Additions**:
-- ✨ **NEW**: web-scraping-integration.md - Firecrawl integration guide
 - ✨ **NEW**: price-monitoring-system.md - Competitive price tracking
 - ✨ **NEW**: price-monitoring-deployment-guide.md - Setup instructions
 - ✨ **NEW**: saved-searches-deduplication.md - AI-powered search deduplication

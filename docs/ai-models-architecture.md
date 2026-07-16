@@ -134,7 +134,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ AGENTS: KAI Agent Hub                                                    │
+│ AGENTS: Agent Hub                                                    │
 │ Models Available:                                                       │
 │   - Claude Opus 4.7 (kai default)                                       │
 │   - Claude Haiku 4.5 (demo agent, fast responses)                       │
@@ -160,7 +160,7 @@ The vision pipeline calls `claude-opus-4-7` via Anthropic tool use. The tool sch
 - Segmentation
 - Stage 4 product validation / enrichment
 - Product discovery (Stage 0, alternative to GPT-5)
-- KAI agent (Mastra)
+- JARVIS agent (Mastra)
 
 **Cost**: $5.00 per 1M input tokens, $25.00 per 1M output tokens
 **Speed**: 3-8 seconds per image
@@ -306,7 +306,7 @@ The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at t
 
 ### Search & Agents
 
-7-vector RAG uses Voyage AI voyage-4 for text + understanding (1024D), 5× SLIG specialized 768D for visual, and Claude Opus 4.7 for synthesis. The KAI Agent Hub supports Claude Opus 4.7 (default), Claude Haiku 4.5 (demo), and GPT-5 (optional).
+7-vector RAG uses Voyage AI voyage-4 for text + understanding (1024D), 5× SLIG specialized 768D for visual, and Claude Opus 4.7 for synthesis. The Agent Hub supports Claude Opus 4.7 (default), Claude Haiku 4.5 (demo), and GPT-5 (optional).
 
 ---
 
