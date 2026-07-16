@@ -267,7 +267,7 @@ ZEROBOUNCE_API_KEY=your_zerobounce_key  # Required for email validation
 - **API Docs**: https://v1api.materialshub.gr/docs (Swagger UI)
 - **ReDoc**: https://v1api.materialshub.gr/redoc (Alternative API docs)
 - **OpenAPI Schema**: https://v1api.materialshub.gr/openapi.json
-- **Documentation Site**: https://basilakis.github.io
+- **Platform docs**: [`docs/`](docs/) in this repo (see [docs/INDEX.md](docs/INDEX.md))
 
 ### **Health Checks**
 ```bash
@@ -495,7 +495,7 @@ This project is proprietary software owned by Creative GHQ.
 
 ## 📞 Support
 
-- **Documentation**: https://basilakis.github.io
+- **Documentation**: [`docs/`](docs/) in this repo
 - **API Docs**: https://v1api.materialshub.gr/docs
 - **Issues**: GitHub Issues
 - **Email**: support@materialshub.gr
