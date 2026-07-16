@@ -10,6 +10,8 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 //     the old two-call client flow stranded an orphan contact when the attach leg failed.
 //
 // Runs against the deployed crm-api with a real user JWT, so it exercises auth + scope too.
+// Editing this file is enough to run it: tests/** is in the deploy workflow's push paths and
+// integration-tests gates on the `tests` filter, so a test-only commit still executes here.
 const suite = hasCreds ? describe : describe.skip;
 
 suite('crm-api · company contacts', () => {

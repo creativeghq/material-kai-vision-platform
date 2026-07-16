@@ -13,6 +13,10 @@ on:
       - 'tsconfig.json'
       - 'index.html'
       - 'vercel.json'
+      # Test-only commits must run too: without this a change to tests/** never
+      # triggered the workflow, so a new or edited live suite reported green
+      # having never executed.
+      - 'tests/**'
   workflow_dispatch:
     inputs:
       deployment_reason:
@@ -41,6 +45,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       functions: ${{ steps.filter.outputs.functions }}
       shared: ${{ steps.filter.outputs.shared }}
+      tests: ${{ steps.filter.outputs.tests }}
       changed_functions: ${{ steps.changed-functions.outputs.list }}
       changed_functions_count: ${{ steps.changed-functions.outputs.count }}
     steps:
@@ -67,6 +72,8 @@ jobs:
               - 'supabase/functions/**'
             shared:
               - 'supabase/functions/_shared/**'
+            tests:
+              - 'tests/**'
 
       - name: 🧮 Compute changed functions
         id: changed-functions
@@ -360,9 +367,12 @@ jobs:
   # cleanup_test_artifacts is the backstop. The tenancy suite self-SKIPs unless
   # BOTH SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY are set, so a missing
   # secret degrades to "contract test only" instead of a red deploy.
+  # A test-only commit deploys nothing, so both deploy jobs skip and the two result
+  # checks below are false — gate on changes.tests as well, or an edited suite would
+  # skip silently and report green having never run.
   integration-tests:
-    needs: [deploy-frontend, deploy-functions]
-    if: ${{ always() && (needs.deploy-frontend.result == 'success' || needs.deploy-functions.result == 'success') }}
+    needs: [changes, deploy-frontend, deploy-functions]
+    if: ${{ always() && (needs.deploy-frontend.result == 'success' || needs.deploy-functions.result == 'success' || needs.changes.outputs.tests == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
