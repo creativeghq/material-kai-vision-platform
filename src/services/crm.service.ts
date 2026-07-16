@@ -525,6 +525,43 @@ export const companiesAPI = {
     return response.json();
   },
 
+  /**
+   * Create a contact and attach it to the company in ONE request. The server rolls the
+   * contact back if the attach fails, so this never strands an orphan contact the way
+   * a client-side createContact() + attachContact() pair did. The new contact is created
+   * in the company's workspace.
+   */
+  async createAndAttachContact(
+    companyId: string,
+    contact: { name: string; email?: string; phone?: string; position?: string },
+    role?: string,
+    isPrimary?: boolean,
+    notes?: string,
+  ) {
+    const token = await getAuthToken();
+
+    const response = await fetch(`${getApiBase()}/crm-api/companies/${companyId}/contacts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contact,
+        role,
+        is_primary: isPrimary,
+        notes,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create and attach contact');
+    }
+
+    return response.json();
+  },
+
   async detachContact(companyId: string, relationshipId: string) {
     const token = await getAuthToken();
 

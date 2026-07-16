@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows } from './_scope.ts';
+import { pickContactFields } from './contacts-api-handler.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -74,6 +75,22 @@ async function companyInScope(
   return !!data;
 }
 
+/** companyInScope + the company's workspace_id, for the create-and-attach path: a contact
+ * created from a company page belongs in THAT company's workspace, not whichever workspace
+ * happens to be first in the caller's membership list. */
+async function companyWorkspaceInScope(
+  companyId: string,
+  scope: import('./_scope.ts').CrmScope,
+): Promise<string | null> {
+  let q = supabase.from('crm_companies').select('workspace_id').eq('id', companyId);
+  if (!scope.isGlobalOperator) {
+    if (scope.workspaceIds.length === 0) return null;
+    q = q.in('workspace_id', scope.workspaceIds);
+  }
+  const { data } = await q.maybeSingle<{ workspace_id: string }>();
+  return data?.workspace_id ?? null;
+}
+
 // Pentest #250 H7: mirror of companyInScope for contacts. The company↔contact link
 // insert verified the company but NOT the contact, so a caller could attach another
 // tenant's contact_id to their own company and then read that contact's PII via the
@@ -129,6 +146,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
     }
 
     const user = auth.user;
+    const userId = auth.userId;
 
     // Workspace scoping: the handler runs under the service role (RLS bypassed), so we
     // must constrain every read/write to the caller's member workspaces (mirrors the
@@ -418,11 +436,16 @@ export async function handleCompanies(req: Request): Promise<Response> {
       );
     }
 
-    // POST /api/companies/{id}/contacts - Attach contact to company
+    // POST /api/companies/{id}/contacts - Attach a contact to a company.
+    // Takes EITHER an existing `contact_id`, OR a `contact: {name, ...}` object to create
+    // and attach in one request. The two-call client flow (create contact, then attach)
+    // left an orphan contact — invisible on both pages — whenever the attach leg failed.
     if (method === 'POST' && path.length === 2 && path[1] === 'contacts') {
       const companyId = path[0];
       const body = await req.json();
-      const { contact_id, role, is_primary, notes } = body;
+      const { role, is_primary, notes } = body;
+      const newContact = body.contact as Record<string, unknown> | undefined;
+      let contact_id = body.contact_id as string | undefined;
 
       // Validate ids up front so a malformed value returns a clear 400 rather than a
       // raw Postgres "invalid input syntax for type uuid" surfaced as an opaque error.
@@ -432,33 +455,66 @@ export async function handleCompanies(req: Request): Promise<Response> {
           { status: 400, headers: corsHeaders },
         );
       }
-      if (!contact_id) {
+      if (!contact_id && !newContact) {
         return new Response(
-          JSON.stringify({ error: 'contact_id is required' }),
+          JSON.stringify({ error: 'Either contact_id or contact is required' }),
           { status: 400, headers: corsHeaders },
         );
       }
-      if (!isUuid(contact_id)) {
+      if (contact_id && !isUuid(contact_id)) {
         return new Response(
           JSON.stringify({ error: 'Invalid contact id' }),
           { status: 400, headers: corsHeaders },
         );
       }
 
-      if (!(await companyInScope(companyId, scope))) {
+      const companyWs = await companyWorkspaceInScope(companyId, scope);
+      if (!companyWs) {
         return new Response(
           JSON.stringify({ error: 'Company not found' }),
           { status: 404, headers: corsHeaders },
         );
       }
 
-      // Pentest #250 H7: the contact must also be in the caller's scope, else attaching
-      // a foreign contact_id leaks that tenant's contact PII via the company's join.
-      if (!(await contactInScope(contact_id, scope))) {
-        return new Response(
-          JSON.stringify({ error: 'Contact not found' }),
-          { status: 404, headers: corsHeaders },
-        );
+      // Create-and-attach: the contact lands in the company's workspace, and is rolled
+      // back below if the join insert fails, so the two writes succeed or fail together.
+      let createdContactId: string | null = null;
+      if (!contact_id) {
+        const name = typeof newContact?.name === 'string' ? newContact.name.trim() : '';
+        if (!name) {
+          return new Response(
+            JSON.stringify({ error: 'contact.name is required' }),
+            { status: 400, headers: corsHeaders },
+          );
+        }
+        const { data: created, error: createErr } = await supabase
+          .from('crm_contacts')
+          .insert({
+            ...pickContactFields(newContact ?? {}),
+            name,
+            workspace_id: companyWs,
+            created_by: userId || 'system',
+          })
+          .select()
+          .single();
+
+        if (createErr || !created) {
+          return new Response(
+            JSON.stringify({ error: createErr?.message || 'Failed to create contact' }),
+            { status: 400, headers: corsHeaders },
+          );
+        }
+        contact_id = created.id;
+        createdContactId = created.id;
+      } else {
+        // Pentest #250 H7: an existing contact must also be in the caller's scope, else
+        // attaching a foreign contact_id leaks that tenant's contact PII via the join.
+        if (!(await contactInScope(contact_id, scope))) {
+          return new Response(
+            JSON.stringify({ error: 'Contact not found' }),
+            { status: 404, headers: corsHeaders },
+          );
+        }
       }
 
       const { data, error } = await supabase
@@ -473,10 +529,40 @@ export async function handleCompanies(req: Request): Promise<Response> {
         .select();
 
       if (error) {
+        // Compensating delete — without it a failed attach strands the contact we just
+        // created with no company link and no way to reach it from the company page.
+        if (createdContactId) {
+          const { error: rollbackErr } = await supabase
+            .from('crm_contacts').delete().eq('id', createdContactId);
+          if (rollbackErr) {
+            console.error(
+              '[crm-companies-api] attach failed AND contact rollback failed — orphan contact',
+              createdContactId, rollbackErr,
+            );
+          }
+        }
         return new Response(
           JSON.stringify({ error: error.message }),
           { status: 400, headers: corsHeaders },
         );
+      }
+
+      // Flows — parity with POST /contacts, which emits this for every new contact.
+      // Only after the attach commits, so a rolled-back create never fires an event.
+      if (createdContactId) {
+        try {
+          const name = typeof newContact?.name === 'string' ? newContact.name.trim() : '';
+          await emitFlowEvent('crm_contact_created', {
+            type: 'crm_contact_created', workspace_id: companyWs, user_id: userId || undefined,
+            contact_id: createdContactId, contact_name: name,
+            email: (newContact?.email as string | undefined) ?? null,
+            lead_source: (newContact?.lead_source as string | undefined) ?? null,
+            lead_status: (newContact?.lead_status as string | undefined) ?? null,
+            title: `New contact: ${name}`,
+            body: `${name} was added to your CRM.`,
+            action_url: `/crm/contacts/${createdContactId}`,
+          });
+        } catch { /* best-effort */ }
       }
 
       return new Response(

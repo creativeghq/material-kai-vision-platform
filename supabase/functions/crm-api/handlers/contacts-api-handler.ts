@@ -45,7 +45,9 @@ const CONTACT_WRITABLE_COLUMNS = [
   'finance_statement_opt_out', 'responsible_sales_user_ids', 'tags',
 ] as const;
 
-function pickContactFields(body: Record<string, unknown>): Record<string, unknown> {
+/** Exported so the companies handler's create-and-attach path writes the exact same
+ * allowlisted column set (BOPLA — never spread a request body into the insert). */
+export function pickContactFields(body: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const col of CONTACT_WRITABLE_COLUMNS) {
     if (body[col] !== undefined) out[col] = body[col];

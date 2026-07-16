@@ -18,7 +18,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
-import { companiesAPI, contactsAPI } from '@/services/crm.service';
+import { companiesAPI } from '@/services/crm.service';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { financeService } from '@/modules/finance/services/financeService';
@@ -459,23 +459,30 @@ export const CompanyDetailPage: React.FC = () => {
     if (contactMode === 'existing' && !selectedContactId) return;
     try {
       setAttachingContact(true);
-      let contactId = selectedContactId;
       if (contactMode === 'new') {
-        const created = await contactsAPI.createContact({
-          name: newContactName.trim(),
-          email: newContactEmail.trim() || undefined,
-          phone: newContactPhone.trim() || undefined,
-          position: newContactPosition.trim() || undefined,
-        });
-        contactId = created.data.id;
+        // Single round trip: the server creates the contact in this company's workspace
+        // and attaches it, rolling the contact back if the attach fails.
+        await companiesAPI.createAndAttachContact(
+          id,
+          {
+            name: newContactName.trim(),
+            email: newContactEmail.trim() || undefined,
+            phone: newContactPhone.trim() || undefined,
+            position: newContactPosition.trim() || undefined,
+          },
+          contactRole,
+          isPrimaryContact,
+          contactNotes,
+        );
+      } else {
+        await companiesAPI.attachContact(
+          id,
+          selectedContactId,
+          contactRole,
+          isPrimaryContact,
+          contactNotes,
+        );
       }
-      await companiesAPI.attachContact(
-        id,
-        contactId,
-        contactRole,
-        isPrimaryContact,
-        contactNotes,
-      );
       toast({
         title: 'Success',
         description: contactMode === 'new'
