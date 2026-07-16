@@ -517,6 +517,10 @@ Complete documentation for Material Kai Vision Platform.
 
 **[hr-system.md](hr-system.md)** - HR module ✨ NEW (2026-07) — first paid tenant add-on; employees as tagged `crm_contacts` + `hr_employees`/`hr_absences`, gated `hr-api`
 
+**[contracts-system.md](contracts-system.md)** - Contracts & e-signature ✨ NEW (2026-07) — one entity across `hr`/`finance`/`project` contexts, public `/sign/:token` page, context-branched RLS
+
+**[blueprint-estimating.md](blueprint-estimating.md)** - Blueprint estimating & project plans ✨ NEW (2026-07) — parametric formula-driven templates → priced plans → quotes, plus the public `/tools/project-plan` estimator
+
 **[inbox-system.md](inbox-system.md)** - Multi-tenant Inbox ✨ NEW — unified customer conversation inbox with agent takeover
 
 **[email-marketing.md](email-marketing.md)** - Email Marketing add-on ✨ NEW (2026-07) — tenant GrapesJS campaigns, Resend BYOK, workspace-scoped

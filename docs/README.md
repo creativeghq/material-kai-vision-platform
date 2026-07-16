@@ -241,6 +241,16 @@
 
 The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#194). **Tenant = workspace.**
 
+**[contracts-system.md](contracts-system.md)** — Contracts & e-signature ✨ NEW
+- One entity, three contexts (`hr` | `finance` | `project`) — context branches the RLS
+- Public `/sign/:token` page (no account); allowlisted writes, user-context client
+- `contract_signed` flow event; `contract_signatures` captures ip/user-agent as the audit record
+
+**[blueprint-estimating.md](blueprint-estimating.md)** — Blueprint estimating & project plans ✨ NEW
+- Parametric templates + safe formula evaluator → priced plan trees → quotes
+- `project-plan-engine` is the ONLY writer of persisted plan money
+- Public anonymous estimator at `/tools/project-plan` (Turnstile + shared 2/day IP quota)
+
 **[finance-system.md](finance-system.md)** — Greek e-invoicing core
 - AADE/myDATA via the **Novus** connector (master-key model, per-tenant issuer VAT)
 - Issue → series/AA allocation → transmit → MARK / offline-recovery state machine

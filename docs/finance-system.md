@@ -48,7 +48,16 @@ All live under `supabase/functions/`. Full request/response detail in [api/finan
 | `finance-fiscal-offline-recovery` | `x-cron-secret` | Backfill MARK on `fiscal_status='offline'` documents via `RequestTransmittedDocs` |
 | `finance-digest-aggregate` | Flows / `x-cron-secret` / admin `mode:'now'` | Email AR/AP + P&L + follow-up digest; dispatch quote follow-up reminders |
 | `finance-storefront` | none (public, slug-keyed) | Anonymous mini-store meta/products/checkout → draft retail receipt + pay link |
+| `finance-customer-documents` | buyer session JWT (not a workspace member) | Customer self-service: list **their own** invoices / retail receipts / payment receipts with fresh signed PDF links |
 | `parse-supplier-cost-list` | `admin/super_admin/owner` JWT | Apply a supplier price list (KB doc) → `products.cost` (procurement cost maintenance) |
+
+### `finance-customer-documents` — customer self-service
+
+A **buyer** with an app account (their `auth.users.id` linked to one or more `crm_contacts`) can see their own issued invoices, retail receipts, and payment receipts, each with a freshly-signed PDF link.
+
+Why an edge function rather than direct table reads: `invoices` RLS is `is_workspace_member(workspace_id)`, and **a customer is not a workspace member** — so they cannot read the table at all. This function runs under the service role and scopes **strictly** to documents whose counterparty is one of the caller's own linked CRM contacts. That scoping is the entire security control: it is the "service-role client + must re-derive identity from the JWT" case from [invariant 1](../CLAUDE.md), so never let a body-supplied contact/company id widen it.
+
+Frontend: [`MyDocumentsTab.tsx`](../src/components/core/Profile/MyDocumentsTab.tsx) (Profile) and [`ClientPortalPage.tsx`](../src/pages/ClientPortalPage.tsx), via [`customerDocumentsService.ts`](../src/services/customerDocumentsService.ts). PDF links are signed on read, never persisted (invariant 8 of the pipeline conventions).
 
 ### `finance-issue-invoice` — the central document engine
 
