@@ -1053,10 +1053,14 @@ export async function buildFullDeckCover(
   fonts: SheetFonts,
   td: TitleBlockData,
   cover: { title: string; description?: string; client_name?: string; cover_image_url?: string; date: string },
+  /** Workspace branded cover (Profile → Keys → Document templates). Used full-bleed when
+   *  the deck has no custom cover image, so the deliverable matches quotes/catalogs. */
+  brandCoverBytes?: Uint8Array | null,
 ): Promise<void> {
   const page = newSheetPage(pdfDoc);
 
-  // Optional full-bleed cover image
+  // Cover artwork: a user-picked photo is a backdrop (dimmed so the title reads); the
+  // workspace's branded template cover is a designed page, so it renders full strength.
   if (cover.cover_image_url) {
     const bytes = await fetchImageBytes(cover.cover_image_url);
     const img = bytes ? await embedImageBytes(pdfDoc, bytes) : null;
@@ -1068,6 +1072,17 @@ export async function buildFullDeckCover(
         width: d.width,
         height: d.height,
         opacity: 0.45,
+      });
+    }
+  } else if (brandCoverBytes) {
+    const img = await embedImageBytes(pdfDoc, brandCoverBytes);
+    if (img) {
+      const d = img.scaleToFit(PAGE_W, PAGE_H);
+      page.drawImage(img, {
+        x: (PAGE_W - d.width) / 2,
+        y: (PAGE_H - d.height) / 2,
+        width: d.width,
+        height: d.height,
       });
     }
   }

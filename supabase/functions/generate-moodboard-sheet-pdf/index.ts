@@ -45,6 +45,7 @@ import {
   fetchQuoteFfeItems,
   fetchSheet,
   fetchSheets,
+  fetchWorkspaceCoverBytes,
   resolveBrandingWorkspaceId,
 } from './data-fetcher.ts';
 import {
@@ -312,7 +313,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
           description: moodboard.description || '',
           date: new Date().toISOString(),
         };
-        await buildFullDeckCover(pdfDoc, fonts, td, cover);
+        await buildFullDeckCover(pdfDoc, fonts, td, cover, await fetchWorkspaceCoverBytes(supabase, brandingWsId));
 
         for (let i = 0; i < subSheets.length; i++) {
           await buildSheetForDeck(
@@ -505,7 +506,12 @@ async function buildClientViewPdf(
       branding_contact_line: branding?.contact_line,
     };
 
-    await buildFullDeckCover(pdfDoc, fonts, td, cover);
+    // Deliverable cover falls back to the workspace's branded template cover (Keys →
+    // Document templates), matching the quotes/catalogs the client also receives.
+    const brandCoverBytes = await fetchWorkspaceCoverBytes(
+      supabase, (project as { workspace_id?: string } | null)?.workspace_id,
+    );
+    await buildFullDeckCover(pdfDoc, fonts, td, cover, brandCoverBytes);
     for (let i = 0; i < sheets.length; i++) {
       await buildSheetForDeck(
         pdfDoc, fonts,

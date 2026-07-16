@@ -97,7 +97,8 @@ export const WorkspaceKeysTab: React.FC = () => {
         {stockModule.enabled && <ShippingCredentialsCard workspaceId={activeWorkspaceId} />}
       </section>
 
-      {/* Document design — the branded PDF template used by every generated document */}
+      {/* Document design — the branded PDF template used by the presentation/sales docs
+          (quotes, catalogs, proformas). Invoices/receipts keep their own fiscal design. */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">
           <FileImage className="h-4 w-4 text-primary" />

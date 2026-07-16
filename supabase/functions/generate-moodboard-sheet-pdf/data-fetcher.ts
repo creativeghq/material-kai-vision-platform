@@ -28,6 +28,31 @@ export async function fetchMoodboard(
 }
 
 /**
+ * The workspace's branded PDF cover (Profile → Keys → Document templates), used as the
+ * deck cover when a client view has no custom cover image — so a deliverable's front page
+ * matches the quotes/catalogs rendered by the shared PDF module. Null when unset.
+ */
+export async function fetchWorkspaceCoverBytes(
+  supabase: SupabaseClient,
+  workspaceId: string | null | undefined,
+): Promise<Uint8Array | null> {
+  if (!workspaceId) return null;
+  try {
+    const { data: tpl } = await supabase
+      .from('workspace_pdf_templates')
+      .select('cover_path')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    const path = (tpl as { cover_path?: string | null } | null)?.cover_path;
+    if (!path) return null;
+    const { data } = await supabase.storage.from('quote-templates').download(path);
+    return data ? new Uint8Array(await data.arrayBuffer()) : null;
+  } catch {
+    return null; // template optional — the deck just renders its plain cover
+  }
+}
+
+/**
  * Resolve WHICH workspace's branding a sheet/client view renders under.
  * Deterministic order:
  *   1. the owning project's workspace (projects.workspace_id) — the real answer;
