@@ -295,7 +295,7 @@ class HrService {
   async listEmployees(workspaceId: string): Promise<{ employees: Employee[] }> {
     const [{ data: emps, error }, { data: sums }] = await Promise.all([
       sb.from('hr_employees')
-        .select(`*, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name, first_name, last_name, email, phone, mobile, position, department, date_of_birth, vat_number ), manager:crm_contacts!hr_employees_manager_contact_id_fkey ( id, name )`)
+        .select('*, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name, first_name, last_name, email, phone, mobile, position, department, date_of_birth, vat_number ), manager:crm_contacts!hr_employees_manager_contact_id_fkey ( id, name )')
         .eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
       sb.from('vw_hr_employee_absence_summary').select('*').eq('workspace_id', workspaceId),
     ]);
@@ -384,7 +384,7 @@ class HrService {
   generateJobDescription(ws: string, input: { title: string; seniority?: string; department?: string; employment_type?: string; location?: string; keywords?: string; company?: string }): Promise<{ generated: { description: string; requirements: string; suggested_salary_min?: number; suggested_salary_max?: number }; credits_used: number }> { return call(ws, 'generate-job-description', input); }
   async listApplications(ws: string, filters: { job_posting_id?: string; stage?: AppStage } = {}): Promise<{ applications: Application[] }> {
     let q = sb.from('hr_applications')
-      .select(`*, candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email, phone, headline, resume_path ), posting:hr_job_postings!hr_applications_job_posting_id_fkey ( id, title )`)
+      .select('*, candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email, phone, headline, resume_path ), posting:hr_job_postings!hr_applications_job_posting_id_fkey ( id, title )')
       .eq('workspace_id', ws).order('applied_at', { ascending: false });
     if (filters.job_posting_id) q = q.eq('job_posting_id', filters.job_posting_id);
     if (filters.stage) q = q.eq('stage', filters.stage);

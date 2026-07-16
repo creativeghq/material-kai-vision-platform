@@ -1566,7 +1566,6 @@ function buildMarkdownComponents(opts: { dense?: boolean } = {}): Components {
     ),
     img: ({ src, alt }) => (
       <figure className="my-7">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt || ''} className="w-full rounded-lg border border-border/60 shadow-sm" loading="lazy" />
         {alt && <figcaption className="mt-2 text-center text-xs text-muted-foreground italic font-serif">{alt}</figcaption>}
       </figure>

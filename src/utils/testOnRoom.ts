@@ -21,8 +21,8 @@ export function buildTestOnRoomUrl(args: {
     pinned_product_name: productName,
     prompt:
       `I want to see "${productName}" applied on a real room. ` +
-      `I'll upload a photo of my room — apply this material onto a surface ` +
-      `(floor or wall) and show me the result, keeping everything else in place.`,
+      'I\'ll upload a photo of my room — apply this material onto a surface ' +
+      '(floor or wall) and show me the result, keeping everything else in place.',
   });
   if (productImage) params.set('pinned_product_image', productImage);
   return `/agent-hub?${params.toString()}`;

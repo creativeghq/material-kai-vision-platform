@@ -71,7 +71,11 @@ interface Props {
 
 export const WorkflowWizardCard: React.FC<Props> = ({ runtime, onAdvance, onSkip, onDismiss }) => {
   const definition = getWorkflow(runtime.definition_id);
-  if (!definition) return null;
+
+  // NOTE: both useMemos must run before the `if (!definition) return null` bail-out —
+  // they only depend on `runtime`, so hoisting is safe. Bailing out first made the hook
+  // count vary between renders (React: "Rendered more hooks than during the previous
+  // render") the moment an unknown definition_id resolved.
 
   // Resolve the active step. Priority:
   //   1. The step the agent is asking for input on (awaiting_input_step_id)
@@ -98,6 +102,9 @@ export const WorkflowWizardCard: React.FC<Props> = ({ runtime, onAdvance, onSkip
       return s === 'done' || s === 'skipped';
     });
   }, [runtime]);
+
+  // Bail-out AFTER the hooks (see note above) — everything below dereferences `definition`.
+  if (!definition) return null;
 
   if (allDone) {
     return <WorkflowCompleteCard runtime={runtime} definition={definition} onDismiss={onDismiss} />;

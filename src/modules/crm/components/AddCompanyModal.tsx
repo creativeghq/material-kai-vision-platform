@@ -143,7 +143,7 @@ export const AddCompanyModal: React.FC<{
       }
       // EU (non-Greek) → VIES. Non-EU countries are skipped (no registry to hit).
       if (!isEu(cc)) {
-        toast({ title: 'No registry lookup', description: `${cc} is outside VIES/ΑΑΔΕ — fill the details manually.`, });
+        toast({ title: 'No registry lookup', description: `${cc} is outside VIES/ΑΑΔΕ — fill the details manually.` });
         return;
       }
       const res = await validateVatViaVies({ countryCode: cc, vatNumber: vat });

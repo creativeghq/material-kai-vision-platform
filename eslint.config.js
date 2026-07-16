@@ -34,6 +34,11 @@ export default [
       'src/api/**',
       'src/pages/PDFProcessing.tsx',
       'src/debug/**',
+      // GENERATED — `npm run types:generate` (supabase gen types) overwrites this
+      // wholesale with double-quoted output. It accounted for 3007 of the 3014
+      // `quotes` errors; auto-fixing it is pure churn that reverts on the next
+      // schema change and would re-break the lint gate. Never lint generated code.
+      'src/integrations/supabase/types.ts',
     ],
   },
 

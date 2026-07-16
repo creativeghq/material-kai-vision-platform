@@ -328,7 +328,11 @@ function InboxCard() {
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
-const _MyOverview: React.FC = () => {
+// Named MyOverviewBase, NOT _MyOverview: eslint-plugin-react-hooks only treats a
+// PascalCase function as a component, so the leading underscore silently exempted
+// this component from rules-of-hooks entirely (it reported the hooks below as
+// "called in a function that is neither a component nor a custom hook").
+const MyOverviewBase: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -356,4 +360,4 @@ const _MyOverview: React.FC = () => {
     </div>
   );
 };
-export const MyOverview = React.memo(_MyOverview);
+export const MyOverview = React.memo(MyOverviewBase);

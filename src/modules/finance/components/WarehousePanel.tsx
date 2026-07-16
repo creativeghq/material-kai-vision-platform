@@ -245,7 +245,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                         <Button size="sm" variant="ghost" title="Edit codes & myDATA classification" onClick={() => setEditItem(it)}><Tag className="h-4 w-4" /></Button>
                         {listed ? (
                           <>
-                            <Button size="sm" variant="ghost" title={`Record a marketplace sale (decrements stock)`} onClick={() => sellListing(it)}><Coins className="h-4 w-4 text-emerald-500" /></Button>
+                            <Button size="sm" variant="ghost" title={'Record a marketplace sale (decrements stock)'} onClick={() => sellListing(it)}><Coins className="h-4 w-4 text-emerald-500" /></Button>
                             <Button size="sm" variant="ghost" title={`Listed €${listed.price} · ${listed.qty_remaining} ${it.unit} — withdraw`} onClick={() => unlist(it)}><Store className="h-4 w-4 text-emerald-500" /></Button>
                           </>
                         ) : (

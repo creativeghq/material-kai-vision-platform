@@ -120,11 +120,10 @@ interface SheetTypePreviewModalProps {
 }
 
 export function SheetTypePreviewModal({ open, sheetType, onCancel, onContinue }: SheetTypePreviewModalProps) {
-  if (!sheetType) return null;
-  const meta = SHEET_TYPE_META[sheetType];
-  const Icon = meta.icon;
-  const credits = SHEET_TYPE_CREDITS[sheetType];
-
+  // NOTE: every hook must run before the `if (!sheetType) return null` bail-out below.
+  // They used to sit after it, so a null→set transition changed the hook count between
+  // renders and React threw "Rendered more hooks than during the previous render".
+  //
   // Reference image with cache-busting. We fetch the bucket's file list once
   // per modal mount and use each file's updated_at as a `?v=` query string —
   // when admins regenerate, the URL changes and browsers refetch instantly.
@@ -148,6 +147,12 @@ export function SheetTypePreviewModal({ open, sheetType, onCancel, onContinue }:
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Bail-out AFTER the hooks (see note above) — everything below dereferences sheetType.
+  if (!sheetType) return null;
+  const meta = SHEET_TYPE_META[sheetType];
+  const Icon = meta.icon;
+  const credits = SHEET_TYPE_CREDITS[sheetType];
 
   const fileName = `${sheetType}.png`;
   const { data: imgData } = supabase.storage

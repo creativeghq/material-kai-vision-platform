@@ -42,7 +42,7 @@ export const MYDATA_EXEMPTION_CATEGORIES: MydataExemptionCategory[] = [
   { code: 25, label: 'No VAT — ΠΟΛ.1029/1995' },
   { code: 26, label: 'No VAT — ΠΟΛ.1167/2015' },
   { code: 27, label: 'Other VAT exemptions' },
-  { code: 28, label: "No VAT — art. 24 §1(b) — export outside the EU" },
+  { code: 28, label: 'No VAT — art. 24 §1(b) — export outside the EU' },
   { code: 29, label: 'No VAT — art. 47b — intra-community distance sales of goods' },
   { code: 30, label: 'No VAT — art. 47c — goods imported from third countries/territories' },
   { code: 31, label: 'No VAT — art. 47d — OSS non-union scheme (services)' },

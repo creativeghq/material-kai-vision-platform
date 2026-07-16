@@ -179,6 +179,13 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm test
+      # Lint is a gate as of 2026-07-16 (it never was, so 3468 errors accumulated
+      # unnoticed — including 9 real react-hooks/rules-of-hooks violations).
+      # `npm run lint` = eslint . --max-warnings 316 → ZERO errors tolerated; the
+      # 316 remaining no-unused-vars WARNINGS are ratcheted at today's count so
+      # they can only go down. When you clear some, lower the number in
+      # package.json; never raise it.
+      - run: npm run lint
 
   # ────────────────────────────────────────────────────────────────────
   # deploy-frontend: prebuilt Vercel upload (no double build).

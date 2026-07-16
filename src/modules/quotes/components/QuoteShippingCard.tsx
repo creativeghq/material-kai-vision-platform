@@ -138,7 +138,7 @@ const GetQuoteModal: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
         container_type: mode === 'fcl' ? container : undefined, ready_date: readyDate || undefined, quote_id: quoteId,
       });
       onDone();
-      if (q.status === 'pending') toast({ title: 'Request sent to the operator', description: "Offers will appear under Shipping once they respond." });
+      if (q.status === 'pending') toast({ title: 'Request sent to the operator', description: 'Offers will appear under Shipping once they respond.' });
       else if (q.offer_count === 0) toast({ title: 'No offers found', description: 'Try a different route or mode.' });
       else toast({ title: `${q.offer_count} offer(s) found`, description: 'Add one to the quote below.' });
       onOpenChange(false);

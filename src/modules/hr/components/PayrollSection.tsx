@@ -347,7 +347,7 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
                 value={JSON.stringify(s.income_tax_brackets)}
                 onChange={(e) => { try { upd('income_tax_brackets', JSON.parse(e.target.value)); } catch { /* keep typing */ } }}
               />
-              <p className="text-[11px] text-muted-foreground">Array of {`{up_to, rate}`}; last entry uses <code>up_to: null</code> for the top band. Rates are fractions (0.09 = 9%).</p>
+              <p className="text-[11px] text-muted-foreground">Array of {'{up_to, rate}'}; last entry uses <code>up_to: null</code> for the top band. Rates are fractions (0.09 = 9%).</p>
             </div>
             {s.country_code !== 'none' && (
               <div className="space-y-2 rounded-md border border-input p-3">
