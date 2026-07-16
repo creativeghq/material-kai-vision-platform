@@ -1,6 +1,6 @@
 # Design System
 
-The full reference lives at [`.claude/design-system.md`](../.claude/design-system.md) (1060 lines — every token, component, pattern). This doc is the high-level summary plus the most recent layout/theme changes that anyone touching the UI needs to know.
+The full reference lives at `.claude/design-system.md` (1060 lines — every token, component, pattern). It is **not linkable from here — `.claude/` is gitignored**, so open it from a local checkout. This doc is the high-level summary plus the most recent layout/theme changes that anyone touching the UI needs to know.
 
 ---
 
@@ -145,6 +145,6 @@ Used by: `ProductCard`, `SearchResultCard`, `MoodBoardDetailPage`, `ProgressiveI
 
 ## Related
 
-- [`.claude/design-system.md`](../.claude/design-system.md) — full token reference and component recipes
+- `.claude/design-system.md` — full token reference and component recipes (local checkout only; `.claude/` is gitignored)
 - [`src/index.css`](../src/index.css) — CSS variable definitions
 - [CLAUDE.md](../CLAUDE.md) — "Design System Summary" section

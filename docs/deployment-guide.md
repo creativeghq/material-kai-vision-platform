@@ -110,7 +110,7 @@ The catalog pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/
 | `MODAL_TOKEN_ID` | **Secret** | **GitHub Actions only** | Modal token id for the `deploy-modal` CI job (`modal deploy`). https://modal.com/settings/tokens | *(required for CI deploy)* |
 | `MODAL_TOKEN_SECRET` | **Secret** | **GitHub Actions only** | Modal token secret (pairs with `MODAL_TOKEN_ID`) | *(required for CI deploy)* |
 
-**Deploy / redeploy**: pushing a change under `mivaa-pdf-extractor/modal_app/**` to `main` auto-runs `modal deploy modal_app/paddleocr_vl.py` via the `deploy-modal` workflow job (gated on a `modal_app/**` paths-filter). Manual: `modal deploy modal_app/paddleocr_vl.py`. Full reference: [`mivaa-pdf-extractor/modal_app/README.md`](../mivaa-pdf-extractor/modal_app/README.md).
+**Deploy / redeploy**: pushing a change under `mivaa-pdf-extractor/modal_app/**` to `main` auto-runs `modal deploy modal_app/paddleocr_vl.py` via the `deploy-modal` workflow job (gated on a `modal_app/**` paths-filter). Manual: `modal deploy modal_app/paddleocr_vl.py`. Full reference: [`modal_app/README.md`](https://github.com/creativeghq/mivaa-pdf-extractor/blob/main/modal_app/README.md).
 
 ### **AI Service API Keys**
 
@@ -186,7 +186,7 @@ MODAL_TOKEN_ID  MODAL_TOKEN_SECRET   ← GitHub Actions only; let the deploy-mod
 3. **Manual**: `modal deploy modal_app/paddleocr_vl.py`.
 4. Set `PADDLEOCR_MODAL_API_KEY` in GitHub Actions secrets so the next MIVAA deploy writes it to the systemd unit.
 
-Full reference + tuning env vars: [`mivaa-pdf-extractor/modal_app/README.md`](../mivaa-pdf-extractor/modal_app/README.md).
+Full reference + tuning env vars: [`modal_app/README.md`](https://github.com/creativeghq/mivaa-pdf-extractor/blob/main/modal_app/README.md).
 
 #### **Operate:**
 ```bash
