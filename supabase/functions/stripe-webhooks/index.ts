@@ -69,13 +69,17 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
     let event: Stripe.Event;
     eventIsBilling = false;
     stripe = _stripe;
+    // constructEventAsync (NOT constructEvent) is mandatory here: verification runs on
+    // Web Crypto's SubtleCrypto, which is async-only in the Deno edge runtime. The sync
+    // variant throws "SubtleCryptoProvider cannot be used in a synchronous context"
+    // before it ever checks the signature, so every delivery 400s regardless of secret.
     try {
-      event = _stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      event = await _stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
     } catch (primaryErr) {
       const billingSecret = platformBillingWebhookSecret();
       const billingStripe = getPlatformBillingStripe();
       if (billingSecret && billingSecret !== webhookSecret && billingStripe) {
-        event = billingStripe.webhooks.constructEvent(body, signature, billingSecret);
+        event = await billingStripe.webhooks.constructEventAsync(body, signature, billingSecret);
         eventIsBilling = true;
         stripe = billingStripe;
       } else {
