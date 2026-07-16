@@ -179,7 +179,7 @@ Track push notification performance:
 
 ## Related Documentation
 
-- [Notification Service](./notifications-system.md)
-- [Messaging Management](./messaging-admin-guide.md)
+- [Flows Notification System](./flows-notification-system.md) - how notifications are delivered
+- [Messaging API](./api/messaging-api.md) - WhatsApp / messaging channels
 - [Deployment Guide](./deployment-guide.md) - VAPID configuration
-- [Edge Functions](./edge-functions.md) - notification-dispatcher
+- [System Architecture](./system-architecture.md) - edge functions (notification-dispatcher)

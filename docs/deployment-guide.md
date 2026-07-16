@@ -1346,8 +1346,7 @@ The response summary reports: rows deleted, tables affected, storage files remov
 
 ## 🔗 Related Documentation
 
-- [Setup & Configuration](./setup-configuration.md) - Environment setup
-- [Security & Authentication](./security-authentication.md) - Security configuration
-- [Testing Strategy](./testing-strategy.md) - Pre-deployment testing
-- [Troubleshooting](./troubleshooting.md) - Issue resolution
-- [Job Recovery & Signal Handling](../mivaa-pdf-extractor/docs/JOB-RECOVERY-AND-SIGNAL-HANDLING.md) - Job persistence
+- [Platform Secrets](./platform-secrets.md) - Environment & key configuration
+- [Role Access Matrix](./role-access-matrix.md) - Security & authorization
+- [Troubleshooting Guide](./troubleshooting-guide.md) - Issue resolution
+- [Unified Job Tracking](./unified-job-tracking.md) - Job persistence & recovery

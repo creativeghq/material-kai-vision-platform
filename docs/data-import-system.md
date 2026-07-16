@@ -4,7 +4,6 @@ Complete documentation for the unified data import system supporting XML files a
 
 > **📚 Related Documentation:**
 > - [Async Processing & Limits](./async-processing-and-limits.md) - Concurrency limits and async architecture
-> - [Web Scraping Integration](./web-scraping-integration.md) - Web scraping details
 > - [Product Discovery Architecture](./product-discovery-architecture.md) - AI-powered product extraction
 
 ---
@@ -487,7 +486,6 @@ For detailed implementation, see:
 - [Unified Product Generation Flow](./unified-product-generation-flow.md)
 - [PDF Processing Pipeline](./pdf-processing-pipeline.md)
 - [XML Import Orchestrator](./xml-import-orchestrator.md)
-- [Web Scraping Integration](./web-scraping-integration.md)
 
 ---
 

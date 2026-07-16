@@ -449,7 +449,6 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 |----------|--------|------|---------|
 | `xml-import-orchestrator` | POST | JWT | Intelligent XML imports with AI field mapping. See [xml-import-orchestrator-api](api/xml-import-orchestrator-api.md) |
 | `scheduled-import-runner` | POST | service-role | Cron runner (see §1.6) |
-| `scrape-session-manager` | POST | JWT | Multi-page scrape sessions (start/pause/resume/stop). See [scrape-session-manager-api](api/scrape-session-manager-api.md) |
 | `scrape-preview` | POST | JWT | Preview materials from URL before full import |
 | `scrape-single-page` | POST | JWT | Extract materials from a single URL with custom schema |
 | `parse-sitemap` | POST | JWT | Parse `sitemap.xml` and enumerate URLs |
@@ -539,7 +538,7 @@ The platform is divided into 7 toggleable modules. Frontend modules live in `src
 | `GET` | `/api/v1/modules/greek-marketplaces/status` | JWT (admin) | Source credential check + 7-day usage stats (Skroutz / Bestprice / Shopflix) |
 | `POST` | `/api/v1/modules/greek-marketplaces/search` | JWT (admin) | One-off admin test query against all 3 adapters in parallel |
 
-For the platform-wide architecture (manifest contract, slot patterns, agent gating), see [.claude/plans/modular-architecture.md](../.claude/plans/modular-architecture.md) and [.claude/plans/modules-extraction-roadmap.md](../.claude/plans/modules-extraction-roadmap.md).
+For the platform-wide architecture (manifest contract, slot patterns, agent gating), see the module plans under `.claude/plans/`.
 
 ---
 

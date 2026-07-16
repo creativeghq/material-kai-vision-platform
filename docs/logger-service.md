@@ -321,10 +321,9 @@ Create with `createLogger('ServiceName')` then call methods on the returned logg
 
 ## Related Documentation
 
-- [Environment Configuration](./environment-configuration.md) (coming soon)
-- [Migration Guide](../MIGRATION_GUIDE.md)
-- [Integration Complete](../INTEGRATION_COMPLETE.md)
-- [Code Review Report](../CODE_REVIEW_REPORT.md)
+- [Platform Secrets](./platform-secrets.md) - Environment & key configuration
+- [Monitoring & Alerting](./monitoring-and-alerting.md)
+- [AI Usage Logging](./ai-usage-logging-guide.md)
 
 ---
 
@@ -335,7 +334,6 @@ If you have questions or issues:
 1. Check this documentation
 2. Review examples above
 3. Check [`src/services/logger.service.ts`](../src/services/logger.service.ts) implementation
-4. Refer to [`MIGRATION_GUIDE.md`](../MIGRATION_GUIDE.md)
 
 ---
 

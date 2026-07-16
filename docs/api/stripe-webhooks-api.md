@@ -202,7 +202,7 @@ Monitor webhook processing:
 
 ## Related Documentation
 
-- [Subscription Management](../subscription-management.md)
-- [Payment Processing](../payment-processing.md)
+- [Billing & Credits](../billing-credits-system.md)
+- [Payments](../payments.md)
 - [Credits System](../internal-pricing-credit-system.md)
 

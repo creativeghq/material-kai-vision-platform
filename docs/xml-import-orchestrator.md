@@ -241,7 +241,7 @@ Comprehensive error tracking and performance monitoring using Sentry transaction
 
 ## Related Documentation
 
-- [Data Import Hub Architecture](../../../docs/data-import-hub.md)
-- [Python API Import Endpoints](../../../mivaa-pdf-extractor/docs/import-api.md)
-- [Database Schema](../../../supabase/migrations/20251110_create_data_import_tables.sql)
-- [Unified Product Generation Flow](../../../docs/unified-product-generation-flow.md) - Complete production hardening details
+- [Data Import System](./data-import-system.md)
+- [XML Import Orchestrator API](./api/xml-import-orchestrator-api.md)
+- [Database Schema](../supabase/migrations/20251110_create_data_import_tables.sql)
+- [Unified Product Generation Flow](./unified-product-generation-flow.md) - Complete production hardening details

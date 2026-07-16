@@ -103,12 +103,6 @@ Batch processing of PDF documents.
 - **Features:** Batch extraction, status tracking, priority processing
 - **Access:** Authenticated users
 
-#### [Scrape Session Manager API](./scrape-session-manager-api.md)
-Web scraping session control and management.
-- **Function:** `scrape-session-manager`
-- **Features:** Start, pause, resume, stop scraping sessions
-- **Access:** Authenticated users
-
 #### [XML Import Orchestrator API](./xml-import-orchestrator-api.md)
 Intelligent XML file imports with AI-powered field mapping.
 - **Function:** `xml-import-orchestrator`

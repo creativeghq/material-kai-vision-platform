@@ -146,7 +146,7 @@ All endpoints return JSON with a consistent structure indicating success/failure
 ## 📖 Additional Resources
 
 - **Search Strategies Guide**: [docs/search-strategies.md](./search-strategies.md)
-- **Multi-Vector Enhancement Summary**: [docs/multi-vector-enhancement-summary.md](./multi-vector-enhancement-summary.md)
+- **Multi-Vector Enhancement Summary**: [docs/embedding-generation-improvements.md](./embedding-generation-improvements.md)
 - **Platform Overview**: [docs/README.md](./README.md)
 - **Deployment Guide**: [docs/deployment-guide.md](./deployment-guide.md)
 

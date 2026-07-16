@@ -5,7 +5,6 @@ Complete documentation for all three product generation methods and their unifie
 > **📚 Related Documentation:**
 > - [Async Processing & Limits](./async-processing-and-limits.md) - Concurrency limits and async architecture
 > - [PDF Processing Pipeline](./pdf-processing-pipeline.md) - PDF processing details
-> - [Web Scraping Integration](./web-scraping-integration.md) - Web scraping details
 > - [Data Import System](./data-import-system.md) - XML import details
 
 ---

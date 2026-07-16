@@ -4,7 +4,6 @@ Complete documentation for the email campaign management system with audience ta
 
 > **📚 Related Documentation:**
 > - [Email System](./email-system.md) - Email sending and template management
-> - [SES Webhook Setup](./ses-webhook-setup.md) - Bounce and complaint handling
 > - [System Architecture](./system-architecture.md) - Platform overview
 > - [API Endpoints](./api-endpoints.md) - Complete API reference
 
@@ -590,7 +589,7 @@ React Email templates are managed in `/admin/emails` → Templates tab. Each cam
 
 ### SES Webhooks
 
-SES webhook processing automatically updates campaign_recipients status when bounces, complaints, or deliveries are reported by Amazon SES via SNS. No manual intervention is needed. See docs/ses-webhook-setup.md for configuration details.
+SES webhook processing automatically updates campaign_recipients status when bounces, complaints, or deliveries are reported by Amazon SES via SNS. No manual intervention is needed.
 
 ---
 
@@ -638,7 +637,6 @@ Campaign event webhooks are planned and will deliver JSON payloads containing th
 
 For questions or issues:
 - Check [Email System](./email-system.md) documentation
-- Review [SES Webhook Setup](./ses-webhook-setup.md) guide
 - Check [Troubleshooting](#troubleshooting) section
 - Contact: support@materialkaivision.com
 

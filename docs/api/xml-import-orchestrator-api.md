@@ -331,5 +331,5 @@ console.log('Progress:', job.processed_count, '/', job.total_count);
 
 - [XML Import Orchestrator](../xml-import-orchestrator.md)
 - [Data Import System](../data-import-system.md)
-- [Field Templates](../field-templates.md)
+- [Category Field Registry](../category-field-registry.md)
 

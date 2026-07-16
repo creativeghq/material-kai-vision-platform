@@ -1131,19 +1131,19 @@ Self-contained module that wraps ΑΑΔΕ web services (SOAP 1.2 + WS-Security U
 
 ## AR Material Preview (Plan 8)
 - **Components**: `src/components/features/ar/` — ARPreviewModal, ViewInARButton, ARPage, useARSupport
-- **Edge function**: `generate-pbr-maps/index.ts` — generates PBR texture maps (albedo, normal, roughness, metalness) via Replicate API
+- **⚠️ No PBR generation (corrected 2026-07-16)**: `generate-pbr-maps` was **deleted** in `75e9e843` — it had zero callers, so `metadata.pbr_maps` was never populated and AR/Lighting have always fallen back to the plain image. AR/Lighting only ever **read** `metadata.pbr_maps`; nothing writes it. There is no PBR credit cost because there is no PBR generation. Re-adding real PBR means rebuilding the generator, not just re-linking a viewer.
 - **AR detection**: `useARSupport()` returns 'webxr' | 'quicklook' | 'desktop' | 'none'
 - **Route**: `/ar/:productId` — standalone AR page for QR handoff from desktop
 - **Integration**: ProductCard shows "AR View" button, opens ARPreviewModal (3D material swatch viewer)
 - **Future**: @react-three/xr for full WebXR on Android, @google/model-viewer for iOS USDZ Quick Look
-- **Credits**: 8 credits per PBR map generation, AR viewing is free
+- **Credits**: AR viewing is free
 
 ## Lighting Simulation (Plan 10)
 - **Layer 1 (AI)**: "Lighting Variants" dropdown on ProgressiveImageGrid — generates same room under 6 lighting presets via Gemini edit
 - **Layer 2 (3D)**: `src/components/features/lighting/` — MaterialLightingViewer, LightingPreviewModal, lightingPresets, useSunPosition
 - **Presets**: Natural Daylight, Golden Hour, Overcast, Showroom Spots, Warm Evening, Night
 - **Controls**: Preset selector, time-of-day slider (6AM-9PM), room orientation (N/E/S/W), surface type (wall/floor/column/curved)
-- **PBR**: Uses MeshPhysicalMaterial with albedo + normal + roughness + metalness maps from SVBRDF or generate-pbr-maps
+- **PBR**: `MeshPhysicalMaterial` supports albedo + normal + roughness + metalness maps, but **nothing populates `metadata.pbr_maps`** (see the AR note above — `generate-pbr-maps` was deleted in `75e9e843`), so in practice the viewer always uses the plain-image fallback
 - **Integration**: ProductCard shows "Lighting" button, opens LightingPreviewModal
 - **Sun calculation**: Built-in simplified solar position (no suncalc dependency) — altitude peaks at noon, color temp shifts warm↔cool
 

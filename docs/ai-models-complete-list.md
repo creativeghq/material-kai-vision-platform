@@ -326,7 +326,6 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 - [AI Models Architecture](./ai-models-architecture.md) — Architecture flow + provider table
 - [Embedding Generation Improvements](./embedding-generation-improvements.md) — Voyage understanding pipeline
 - [Interior Design Models](./interior-design-models.md) — 14 Replicate models
-- [Web Scraping Integration](./web-scraping-integration.md) — AI-powered product discovery
 
 ---
 
