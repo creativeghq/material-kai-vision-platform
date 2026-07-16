@@ -966,7 +966,7 @@ export const createAdjustCatalogPricingTool = (userId: string, onChunk: ChunkSin
   const r2 = (n: number) => Math.round(n * 100) / 100;
 
   return tool(
-    async (input: { catalog_id: string; mode: 'target_total' | 'delta' | 'percent'; amount: number; basis?: 'payable' | 'net' }) => {
+    async (input: { catalog_id: string; mode: 'target_total' | 'delta' | 'percent' | 'per_item'; amount: number; basis?: 'payable' | 'net' }) => {
       try {
         const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
         if (error || !catalog) return JSON.stringify({ error: error || 'Catalog not found' });
@@ -990,6 +990,40 @@ export const createAdjustCatalogPricingTool = (userId: string, onChunk: ChunkSin
         const currentNet = r2(priced.reduce((a, m) => a + netOf(m), 0));
         const currentPayable = r2(priced.reduce((a, m) => a + netOf(m) * vatMultOf(m), 0));
         if (currentNet <= 0) return JSON.stringify({ error: 'Current net total is zero; cannot scale.' });
+
+        // per_item is ADDITIVE, not proportional: add `amount` to every line's unit
+        // price, so a line's value grows by amount x quantity. Each line keeps its
+        // discount % (recomputed on the new gross) so Price / Discount / Net still
+        // reconcile. Use for "add EUR25 per item" — unlike delta/target_total, the
+        // increase does NOT depend on how expensive the line already is.
+        if (input.mode === 'per_item') {
+          for (const m of priced) {
+            const sp = m.specs || (m.specs = {});
+            const qty = Number(sp.quantity_tmet ?? sp.quantity_tem ?? sp.quantity ?? 1) || 1;
+            const curUnit = m.price != null ? Number(m.price) : netOf(m) / qty;
+            const newUnit = r2(curUnit + input.amount);
+            if (newUnit < 0) return JSON.stringify({ error: `Line "${m.name}" would go negative (${newUnit}). Use a smaller reduction.` });
+            m.price = newUnit;
+            const gross = r2(newUnit * qty);
+            const pct = Number(sp.discount_pct ?? 0);
+            const disc = r2(gross * pct / 100);
+            if (sp.discount_value != null || pct > 0) sp.discount_value = disc;
+            sp.net_value = r2(gross - disc);
+          }
+          await persistBody(supabase, input.catalog_id, body);
+          const perItemNet = r2(priced.reduce((a, m) => a + Number(m.specs.net_value), 0));
+          const perItemPayable = r2(priced.reduce((a, m) => a + Number(m.specs.net_value) * vatMultOf(m), 0));
+          return JSON.stringify({
+            success: true,
+            catalog_id: input.catalog_id,
+            mode: 'per_item',
+            amount_per_item: input.amount,
+            lines_adjusted: priced.length,
+            before: { net: currentNet, payable: currentPayable },
+            after: { net: perItemNet, payable: perItemPayable },
+            note: `Added ${input.amount} per unit to all ${priced.length} lines (discount % preserved). Now call generate_catalog_pdf to re-render.`,
+          });
+        }
 
         const basis = input.basis ?? 'payable';
         // Everything reduces to a target NET total; the scale factor comes from the
@@ -1054,15 +1088,16 @@ export const createAdjustCatalogPricingTool = (userId: string, onChunk: ChunkSin
         'Re-price a whole catalog/proforma proportionally to hit a pricing target, WITHOUT inventing numbers. ' +
         'Every line is scaled by the same factor so it reads as a genuine re-quote — each line keeps its discount % ' +
         'and VAT, and the 1–2 cent rounding remainder is absorbed into the largest lines so the total lands EXACTLY. ' +
-        'Use this for requests like "make the total €2,438", "add €400", or "increase everything by 15%" — never edit ' +
-        'individual line prices by hand. mode: "target_total" (amount = the total you want) / "delta" (amount = € to ' +
-        'add or subtract, negative lowers) / "percent" (amount = ± percent). basis: "payable" = VAT-inclusive total ' +
-        '(default) / "net" = pre-VAT subtotal. Only mutates THIS catalog, never the source. After adjusting, call ' +
-        'generate_catalog_pdf to re-render.',
+        'Use this for requests like "make the total €2,438", "add €400", "increase everything by 15%", or "add €25 per ' +
+        'item" — never edit individual line prices by hand. mode: "target_total" (amount = the total you want) / ' +
+        '"delta" (amount = € to add or subtract across the whole doc, negative lowers) / "percent" (amount = ± percent) / ' +
+        '"per_item" (amount = € added to EVERY line\'s unit price — a €25/item bump on 12 lines adds €300; negative ' +
+        'lowers). basis applies to target_total + delta only: "payable" = VAT-inclusive total (default) / "net" = ' +
+        'pre-VAT subtotal. Only mutates THIS catalog, never the source. After adjusting, call generate_catalog_pdf.',
       schema: z.object({
         catalog_id: z.string().uuid(),
-        mode: z.enum(['target_total', 'delta', 'percent']),
-        amount: z.number().describe('target total (target_total), € to add/subtract (delta; negative lowers), or ± percent (percent).'),
+        mode: z.enum(['target_total', 'delta', 'percent', 'per_item']),
+        amount: z.number().describe('target total (target_total), € across the doc (delta), ± percent (percent), or € added to each line\'s unit price (per_item). Negative lowers.'),
         basis: z.enum(['payable', 'net']).optional().describe('"payable" = VAT-included total (default), "net" = pre-VAT subtotal.'),
       }),
     },

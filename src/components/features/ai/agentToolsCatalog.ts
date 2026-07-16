@@ -712,11 +712,12 @@ const KAI_TOOLS: AgentToolEntry[] = [
     id: 'adjust_catalog_pricing', name: 'Adjust Pricing', category: 'Catalogs',
     adminOnly: true, moduleSlug: 'presentation-catalogs',
     workflowOf: 'catalog',
-    desc: 'Optional (run any time before Generate) — re-price the whole catalog/proforma proportionally to a target: set the total ("€2,438"), add/subtract ("+€400"), or a percent ("+15%"). Every line scales together (discount % + VAT kept) and the rounding lands the total exactly. Only touches this catalog, never the source.',
+    desc: 'Optional (run any time before Generate) — re-price the whole catalog/proforma without inventing numbers: set the total ("€2,438"), add/subtract across the doc ("+€400"), a percent ("+15%"), or a flat amount on every line ("+€25 per item"). Discount % + VAT are preserved and the rounding lands the total exactly. Only touches this catalog, never the source.',
     examples: [
       'Re-price catalog <catalog_id> so the payable total is €2,438',
       'Add €400 to catalog <catalog_id>',
       'Increase every price in catalog <catalog_id> by 15%',
+      'Add €25 per item to catalog <catalog_id>',
     ],
   },
   {
@@ -1137,7 +1138,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: 'payable (VAT included)', label: 'Payable — VAT included' },
             { value: 'net (before VAT)', label: 'Net — before VAT' },
           ] },
-          { key: 'target', label: 'Target total or change', kind: 'text', required: true, placeholder: '€2,438   (or "+400", or "+15%")' },
+          { key: 'target', label: 'Target total or change', kind: 'text', required: true, placeholder: '€2,438  ·  +400  ·  +15%  ·  +25 per item' },
         ],
       },
     ],
