@@ -1101,6 +1101,24 @@ export const TOOLKITS: ToolkitDefinition[] = [
         workflow_id: 'catalog-resume',
       },
       {
+        label: 'Generate PDF (grid or list)',
+        description: 'Render the catalog PDF — pick a table list or an image grid',
+        icon: 'FileText',
+        prompt: 'Generate the PDF for one of my catalogs.',
+        promptTemplate: 'Generate the PDF for catalog "{{catalog}}" using the {{layout}} layout{{proforma}}.',
+        form: [
+          { key: 'catalog', label: 'Which catalog?', kind: 'text', required: true, placeholder: 'Spring 2026 — Porcelain Range' },
+          { key: 'layout', label: 'Layout', kind: 'select', default: 'table list', options: [
+            { value: 'table list', label: 'Table list (quote-style)' },
+            { value: 'image grid', label: 'Image grid (cards)' },
+          ] },
+          { key: 'proforma', label: 'Totals block?', kind: 'select', default: '', options: [
+            { value: '', label: 'No — plain catalog' },
+            { value: ', as a proforma with a totals block', label: 'Yes — proforma with totals' },
+          ] },
+        ],
+      },
+      {
         label: 'Send a published catalog',
         description: 'Email a published catalog to CRM categories',
         prompt: 'Show me my published catalogs so I can pick one to send to selected CRM categories.',
