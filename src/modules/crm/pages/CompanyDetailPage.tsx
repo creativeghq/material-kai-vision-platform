@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, Globe, FileText, Save, Users, Trash2, Plus, Receipt, CreditCard, ScrollText, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, ShoppingCart, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
@@ -51,13 +51,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/core/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
