@@ -1,177 +1,49 @@
-import {
-  FileText,
-  Database,
-  Brain,
-  Sparkles,
-  Upload,
-  Star,
-  Palette,
-  Target,
-  TrendingUp,
-  Shield,
-} from 'lucide-react';
+import { FileText, Database, Sparkles, Palette, Target } from 'lucide-react';
 
 // Hero Section Configuration
 export const heroConfig = {
   badge: {
     icon: Sparkles,
-    text: 'Powered by Advanced AI',
+    text: 'Material intelligence',
   },
-  title: 'Material Intelligence',
-  subtitle: 'Agent Platform',
-  description:
-    'Transform your material workflows with AI-powered PDF knowledge extraction, intelligent search, and autonomous 3D design generation',
-  actions: [
-    {
-      type: 'primary' as const,
-      icon: Brain,
-      text: 'Start Exploring',
-      path: '/agent-hub',
-    },
-  ],
+  title: "Let's find the right",
+  subtitle: 'material for the job.',
+  searchPlaceholder: 'Code, description, model, brand or barcode…',
+  searchHints: ['code', 'description', 'model', 'brand', 'barcode'],
 };
 
-// Feature Cards Configuration
-export const featuresConfig = {
-  sectionHeader: {
-    title: 'Intelligent Material Processing',
-    description:
-      'Harness the power of AI to revolutionize your material research and design workflows',
+// Hero task tiles — the four jobs the dashboard exists to start.
+// Every path is a route registered in App.tsx.
+export const heroTasks: HeroTask[] = [
+  {
+    icon: FileText,
+    title: 'Prepare a quote',
+    description: 'Build a priced proposal with JARVIS',
+    path: '/agent-hub?q=Help%20me%20prepare%20a%20quote%20for%20a%20customer',
   },
-  cards: [
-    {
-      id: 'pdf-processing',
-      icon: FileText,
-      iconColor: 'primary' as const,
-      badge: 'Core Engine',
-      title: 'PDF Knowledge Extraction',
-      description:
-        'Advanced AI-powered document processing with intelligent material recognition and semantic understanding',
-      action: {
-        icon: Upload,
-        text: 'Process Documents →',
-        color: 'primary' as const,
-      },
-      path: '/pdf-processing',
-    },
-    {
-      id: 'interior-designer-agent',
-      icon: Sparkles,
-      iconColor: 'purple' as const,
-      badge: 'AI Designer',
-      title: 'Interior Designer Agent',
-      description:
-        'AI-powered interior design with 3D generation, spatial analysis, and intelligent material matching',
-      action: {
-        icon: Brain,
-        text: 'Start Designing →',
-        color: 'purple' as const,
-      },
-      path: '/agent-hub?agent=interior-designer',
-    },
-    {
-      id: 'moodboard',
-      icon: Palette,
-      iconColor: 'orange' as const,
-      badge: 'Collections',
-      title: 'Smart MoodBoards',
-      description:
-        'Curate and organize materials with AI-powered recommendations and collaborative features',
-      action: {
-        icon: Star,
-        text: 'Build Collection →',
-        color: 'orange' as const,
-      },
-      path: '/moodboard',
-    },
-  ],
-};
-
-// Metrics Configuration
-export const metricsConfig = {
-  sectionHeader: {
-    title: 'Platform Performance',
-    description: 'Real-time insights into our AI-powered processing engine',
+  {
+    icon: Database,
+    title: 'Browse the catalog',
+    description: 'Materials, brands and specs',
+    path: '/discover',
   },
-  metrics: [
-    {
-      id: 'documents',
-      icon: Database,
-      iconColor: 'text-primary',
-      value: '1,247',
-      valueColor: 'cyan' as const,
-      label: 'Documents Processed',
-      change: '+12% this week',
-    },
-    {
-      id: 'queries',
-      icon: Target,
-      iconColor: 'text-primary',
-      value: '8,432',
-      valueColor: 'green' as const,
-      label: 'Search Queries',
-      change: '+24% this week',
-    },
-    {
-      id: 'accuracy',
-      icon: TrendingUp,
-      iconColor: 'text-primary',
-      value: '94.2%',
-      valueColor: 'blue' as const,
-      label: 'AI Accuracy',
-      change: '+2.1% improved',
-    },
-    {
-      id: 'uptime',
-      icon: Shield,
-      iconColor: 'text-primary',
-      value: '99.8%',
-      valueColor: 'purple' as const,
-      label: 'System Uptime',
-      change: 'Excellent',
-    },
-  ],
-};
-
-// SearchHub Configuration
-export const searchHubConfig = {
-  onMaterialSelect: (materialId: string) => {
-    console.log('Material selected:', materialId);
+  {
+    icon: Target,
+    title: 'Compare products',
+    description: 'Specs and pricing side by side',
+    path: '/compare',
   },
-};
+  {
+    icon: Palette,
+    title: 'Build a moodboard',
+    description: 'Curate materials for a project',
+    path: '/moodboard',
+  },
+];
 
-// Type definitions for better TypeScript support
-export type ColorVariant = 'primary' | 'cyan' | 'green' | 'blue' | 'purple';
-export type ButtonType = 'primary' | 'outline';
-
-export interface HeroAction {
-  type: ButtonType;
+export interface HeroTask {
   icon: React.ComponentType<{ className?: string }>;
-  text: string;
-  path: string;
-}
-
-export interface FeatureCard {
-  id: string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconColor: ColorVariant;
-  badge: string;
   title: string;
   description: string;
-  action: {
-    icon: React.ComponentType<{ className?: string }>;
-    text: string;
-    color: ColorVariant;
-  };
   path: string;
-}
-
-export interface Metric {
-  id: string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconColor: string;
-  value: string;
-  valueColor: ColorVariant;
-  label: string;
-  change: string;
 }
