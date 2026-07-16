@@ -28,6 +28,8 @@ import {
   AlertCircle, Coins, RotateCcw, Briefcase, FolderKanban,
   Users, CalendarOff, CalendarPlus, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,
+  Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
+  Pencil, PencilLine, Percent, Send, Image as ImageIcon,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -39,11 +41,16 @@ import {
 } from './agentToolsCatalog';
 import { Play } from 'lucide-react';
 
+// Every `icon:` referenced by TOOLKITS (cluster + quick_start) must resolve here —
+// an unknown name silently degrades to a generic Wrench rather than failing, so
+// tests/unit/toolkitCoverage.test.ts asserts this map covers the catalog.
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Compass, BookOpen, Megaphone, LayoutTemplate, Sparkles, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Briefcase, FolderKanban,
   Users, CalendarOff, CalendarPlus, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,
+  Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
+  Pencil, PencilLine, Percent, Send, ImageIcon, AlertCircle,
 };
 
 interface Props {

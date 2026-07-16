@@ -1298,11 +1298,156 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'knowledge-graph',
+    name: 'Product Intelligence',
+    // All users, 0 credits — DB-only RPC reads over relationships that already exist.
+    // NOTE: supplier_overview is finance data and is admin/owner-gated at the agent-chat
+    // push site; the rest bind for everyone, so the cluster itself is not adminOnly.
+    description: 'Answer "where did this come from?" from data you already have: provenance, price history, which projects use a product, and brand / customer / supplier overviews.',
+    icon: 'Network',
+    tool_ids: [
+      'product_provenance', 'product_price_history', 'projects_using_product',
+      'products_in_project', 'customer_overview', 'supplier_overview',
+      'products_by_brand', 'brand_overview', 'related_products', 'find_products_by_spec',
+    ],
+    quick_starts: [
+      {
+        label: 'Product provenance', description: 'Where a product came from', icon: 'Network',
+        prompt: 'Show the provenance of a product.',
+        promptTemplate: 'Where did "{{product}}" come from? Show its provenance.',
+        run: { tool: 'product_provenance' },
+        form: [
+          { key: 'product', label: 'Product name or SKU', kind: 'text', required: true, placeholder: 'White tile 60x60' },
+        ],
+      },
+      {
+        label: 'Brand overview', description: 'Everything about one brand', icon: 'Building2',
+        prompt: 'Give me an overview of a brand.',
+        promptTemplate: 'Give me a brand overview for "{{brand}}".',
+        run: { tool: 'brand_overview' },
+        form: [
+          { key: 'brand', label: 'Brand', kind: 'text', required: true, placeholder: 'Marazzi' },
+        ],
+      },
+      {
+        label: 'Find by spec', description: 'Look products up by specification', icon: 'FileSearch',
+        prompt: 'Find products by spec.',
+        promptTemplate: 'Find products matching this spec: {{spec}}',
+        run: { tool: 'find_products_by_spec' },
+        form: [
+          { key: 'spec', label: 'Specification', kind: 'text', required: true, placeholder: 'R11 slip resistance, frost resistant' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'flows-toolkit',
+    name: 'Flows',
+    // Module-gated flows-toolkit + per-workspace entitlement enforced inside the tool.
+    description: 'Manage workspace automations from chat: list your flows, create a simple trigger → action flow, pause/resume one, or remove it.',
+    icon: 'Workflow',
+    moduleSlug: 'flows-toolkit',
+    tool_ids: ['manage_flows'],
+    quick_starts: [
+      {
+        label: 'My flows', description: 'List automations in this workspace', icon: 'ListChecks',
+        prompt: 'List my flows.',
+        run: { tool: 'manage_flows', fixedArgs: { action: 'list' } },
+      },
+      {
+        label: 'Create a flow', description: 'Trigger → action automation', icon: 'Plus',
+        prompt: 'Create a new flow.',
+        promptTemplate: 'Create a flow named "{{name}}" that runs when {{trigger}} and then {{action}}.',
+        run: { tool: 'manage_flows', fixedArgs: { action: 'create' } },
+        form: [
+          { key: 'name', label: 'Flow name', kind: 'text', required: true, placeholder: 'Notify me on new quote' },
+          { key: 'trigger', label: 'When should it run?', kind: 'text', required: true, placeholder: 'a quote is approved' },
+          { key: 'action', label: 'What should it do?', kind: 'text', required: true, placeholder: 'send me a notification' },
+        ],
+      },
+      {
+        label: 'Pause a flow', description: 'Turn an automation off', icon: 'CalendarOff',
+        prompt: 'Pause one of my flows.',
+        promptTemplate: 'Pause the flow "{{name}}".',
+        run: { tool: 'manage_flows', fixedArgs: { action: 'toggle' } },
+        form: [
+          { key: 'name', label: 'Flow name', kind: 'text', required: true, placeholder: 'Notify me on new quote' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'social',
+    name: 'Social',
+    description: 'Publish and schedule posts to your connected social accounts, find the best time to post, and pull post / account analytics.',
+    icon: 'Share2',
+    moduleSlug: 'social-media',
+    tool_ids: ['manage_social'],
+    quick_starts: [
+      {
+        label: 'My accounts', description: 'Connected social accounts', icon: 'Users',
+        prompt: 'List my connected social accounts.',
+        run: { tool: 'manage_social', fixedArgs: { action: 'list_accounts' } },
+      },
+      {
+        label: 'Publish a post', description: 'Post now to a connected account', icon: 'Megaphone',
+        prompt: 'Publish a social post.',
+        promptTemplate: 'Publish this post: {{content}}',
+        run: { tool: 'manage_social', fixedArgs: { action: 'publish' } },
+        form: [
+          { key: 'content', label: 'Post content', kind: 'text', required: true, placeholder: 'Our new porcelain range just landed…' },
+        ],
+      },
+      {
+        label: 'Best time to post', description: 'When your audience is active', icon: 'CalendarPlus',
+        prompt: 'When is the best time to post?',
+        run: { tool: 'manage_social', fixedArgs: { action: 'best_time' } },
+      },
+    ],
+  },
+  {
+    id: 'tech-radar',
+    name: 'Tech Radar',
+    // adminOnly mirrors the server: needsTechRadar = isAdmin && (…) in agent-chat/index.ts.
+    description: 'Review a proposed solution against the platform stack and keep the findings: browse the radar, track a new entry, update a finding.',
+    icon: 'Radar',
+    adminOnly: true,
+    tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
+    quick_starts: [
+      {
+        label: 'Browse the radar', description: 'Current tracked findings', icon: 'Radar',
+        prompt: 'Show me the tech radar.',
+        run: { tool: 'list_tech_radar' },
+      },
+      {
+        label: 'Review a solution', description: 'Assess it against our stack', icon: 'BadgeCheck',
+        prompt: 'Review a solution against our stack.',
+        promptTemplate: 'Review "{{solution}}" against our current stack and tell me if we should adopt it.',
+        run: { tool: 'review_solution' },
+        form: [
+          { key: 'solution', label: 'Solution / library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
+        ],
+      },
+      {
+        label: 'Track an entry', description: 'Add something to the radar', icon: 'Plus',
+        prompt: 'Track something on the tech radar.',
+        promptTemplate: 'Track "{{solution}}" on the tech radar.',
+        run: { tool: 'track_tech_radar' },
+        form: [
+          { key: 'solution', label: 'Solution / library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'projects',
     name: 'Projects',
-    description: 'Organize work into projects + tasks. Create, browse, and add tasks straight from chat.',
+    description: 'Organize work into projects + tasks. Create, browse, add tasks, and spec purchase items (doors/windows) straight from chat.',
     icon: 'FolderKanban',
-    tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task'],
+    tool_ids: [
+      'create_project', 'list_my_projects', 'find_project', 'add_task',
+      'add_purchase_item', 'generate_purchase_sheet',
+    ],
     quick_starts: [
       {
         label: 'New project', description: 'Create a project', icon: 'Plus',

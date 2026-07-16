@@ -37,18 +37,15 @@ const QUOTED_RE = /'([a-z][a-z0-9_]+)'/g;
 // from the ToolkitPickerModal. Each one is a missing ToolkitDefinition in
 // agentToolsCatalog.ts, NOT a missing tool. SHRINK by adding the picker entry;
 // never grow (a newly-orphaned cluster should fail the build). See #266.
-const KNOWN_PICKERLESS_CLUSTERS = new Set([
-  'flows-toolkit',    // manage_flows
-  'knowledge-graph',  // 10 product-intelligence tools
-  'social',           // manage_social
-  'tech-radar',       // review_solution, track_tech_radar, list_tech_radar, update_finding
-]);
+//
+// Emptied 2026-07-16: flows-toolkit / knowledge-graph / social / tech-radar were
+// all given picker entries. Keep at zero.
+const KNOWN_PICKERLESS_CLUSTERS = new Set<string>([]);
 
 // Per-cluster tool_ids the server binds that the picker's same-named cluster omits.
-// Same rule: shrink only.
-const KNOWN_MIRROR_GAPS: Record<string, string[]> = {
-  projects: ['add_purchase_item', 'generate_purchase_sheet'],
-};
+// Same rule: shrink only. Emptied 2026-07-16 (projects gained add_purchase_item +
+// generate_purchase_sheet).
+const KNOWN_MIRROR_GAPS: Record<string, string[]> = {};
 
 // Genuinely not user-facing: runtime meta-tools, status pollers, and Anthropic
 // structured-output schemas that only LOOK like tools to the extractor.
@@ -66,22 +63,27 @@ const INTERNAL_TOOLS = new Set([
 // giving each a cluster; never grow it (a new orphan should fail the build instead).
 const KNOWN_UNCLUSTERED = new Set([
   // Purchasing / sourcing
-  'add_purchase_item', 'create_purchase_order', 'send_purchase_order', 'generate_purchase_sheet', 'source_product',
+  'create_purchase_order', 'send_purchase_order', 'source_product',
   // Trip expenses (submit_trip_card is user-facing: "submit a DRAFT card to finance")
   'add_trip_expense', 'create_trip_card', 'list_trip_cards', 'submit_trip_card',
-  // Product intelligence
-  'brand_overview', 'customer_overview', 'supplier_overview', 'find_products_by_spec', 'related_products',
-  'products_by_brand', 'products_in_project', 'projects_using_product', 'product_price_history', 'product_provenance',
-  // Automation / social
-  'manage_flows', 'manage_social',
   // Generation extras (belong in the Interior Design cluster)
   'generate_gemini', 'generate_video', 'virtual_staging',
   // HVAC / energy calculators
   'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
   // Docs / misc
   'search_workspace_docs', 'estimate_cost', 'web_search',
-  // Tech Radar — confirmed USER-facing (workspace-scoped findings), needs a cluster
-  'list_tech_radar', 'track_tech_radar', 'review_solution', 'update_finding',
+  // ─── Cleared 2026-07-16 (#266) ───────────────────────────────────────
+  // 18 entries were removed here, not by 18 separate judgement calls but by
+  // adding the 4 ToolkitDefinitions the SERVER already defined + the 2 tools
+  // the picker's projects cluster omitted:
+  //   knowledge-graph → product_provenance, product_price_history,
+  //     projects_using_product, products_in_project, customer_overview,
+  //     supplier_overview, products_by_brand, brand_overview,
+  //     related_products, find_products_by_spec
+  //   tech-radar      → review_solution, track_tech_radar, list_tech_radar, update_finding
+  //   flows-toolkit   → manage_flows
+  //   social          → manage_social
+  //   projects        → add_purchase_item, generate_purchase_sheet
 ]);
 
 function implementedTools(): Set<string> {
@@ -269,6 +271,29 @@ describe('toolkit mirror parity (SERVER_TOOLKITS ⇄ TOOLKITS)', () => {
   it('KNOWN_PICKERLESS_CLUSTERS stays honest — prune once a picker entry exists', () => {
     const stale = [...KNOWN_PICKERLESS_CLUSTERS].filter((k) => !server[k] || front[k]).sort();
     expect(stale, `Prune from KNOWN_PICKERLESS_CLUSTERS (now surfaced or removed): ${stale.join(', ')}`).toEqual([]);
+  });
+
+  it('every icon referenced by TOOLKITS resolves in the picker ICON_MAP', () => {
+    // ICON_MAP[toolkit.icon] || Wrench — an unknown name degrades silently to a
+    // generic wrench instead of failing, so nothing surfaced 11 pre-existing
+    // misses (incl. 'Plus' and 'Percent'). Assert coverage instead.
+    const catalogSrc = read(CATALOG);
+    const tk = catalogSrc.slice(catalogSrc.indexOf('export const TOOLKITS'));
+    const used = new Set([...tk.matchAll(/icon: '([A-Za-z0-9]+)'/g)].map((m) => m[1]));
+
+    const pickerSrc = read(join(ROOT, 'src/components/features/ai/ToolkitPickerModal.tsx'));
+    const mapStart = pickerSrc.indexOf('const ICON_MAP');
+    const mapBody = pickerSrc.slice(mapStart, pickerSrc.indexOf('};', mapStart));
+    const registered = new Set(mapBody.match(/[A-Z][A-Za-z0-9]+/g) ?? []);
+
+    expect(used.size, 'no toolkit icons parsed — regex broke').toBeGreaterThan(20);
+    const missing = [...used].filter((i) => !registered.has(i)).sort();
+    expect(
+      missing,
+      `Icon(s) referenced by TOOLKITS but absent from ICON_MAP (they render as a ` +
+        `generic Wrench): ${missing.join(', ')}. Import them in ToolkitPickerModal.tsx ` +
+        `and add them to ICON_MAP.`,
+    ).toEqual([]);
   });
 
   it('KNOWN_MIRROR_GAPS stays honest — prune once the picker lists the tool', () => {
