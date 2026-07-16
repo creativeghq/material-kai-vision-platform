@@ -130,9 +130,22 @@ async function generatePdf(body: Body, reader: any, admin: any): Promise<Respons
   const { data: items } = await reader.from('trip_expense_items').select('*')
     .eq('report_id', body.report_id).order('expense_date', { ascending: true }).order('sort_order', { ascending: true });
 
+  // Company identity from finance_settings — the same source every other document uses.
+  const { data: fsRow } = await admin.from('finance_settings')
+    .select('business_name, business_logo_path')
+    .eq('workspace_id', report.workspace_id).maybeSingle();
+  const fsF = (fsRow ?? {}) as Record<string, string | null>;
+  let companyLogo: Uint8Array | null = null;
+  if (fsF.business_logo_path) {
+    try {
+      const { data: lf } = await admin.storage.from('generation-images').download(fsF.business_logo_path);
+      if (lf) companyLogo = new Uint8Array(await lf.arrayBuffer());
+    } catch { /* logo optional */ }
+  }
+
   const pdf = await PDFDocument.create();
   const { regular: font, bold } = await embedOpenSans(pdf);
-  drawReport(pdf, font, bold, report, items || []);
+  await drawReport(pdf, font, bold, report, items || [], { name: fsF.business_name || null, logo: companyLogo });
   const bytes = await pdf.save();
 
   const path = `trip-expenses/${report.id}/report-${Date.now()}.pdf`;
@@ -145,9 +158,18 @@ async function generatePdf(body: Body, reader: any, admin: any): Promise<Respons
 // ---------------------------------------------------------------------------
 // PDF layout (A4 portrait)
 // ---------------------------------------------------------------------------
-function drawReport(pdf: PDFDocument, font: any, bold: any, r: any, items: any[]) {
+async function drawReport(
+  pdf: PDFDocument, font: any, bold: any, r: any, items: any[],
+  company?: { name: string | null; logo: Uint8Array | null },
+) {
   const W = 595.28, H = 841.89, M = 42;
   const cur = r.currency || 'EUR';
+  // Employer identity (finance_settings) on the report header.
+  let logoImg: any = null;
+  if (company?.logo) {
+    try { logoImg = await pdf.embedPng(company.logo); }
+    catch { try { logoImg = await pdf.embedJpg(company.logo); } catch { /* skip */ } }
+  }
   const cols = [
     { key: 'date', label: 'DATE', w: 62, align: 'left' as const },
     { key: 'cat', label: 'CATEGORY', w: 78, align: 'left' as const },
@@ -166,6 +188,13 @@ function drawReport(pdf: PDFDocument, font: any, bold: any, r: any, items: any[]
     const heading = r.card_type === 'monthly' ? 'MONTHLY EXPENSE REPORT'
       : r.card_type === 'other' ? 'EXPENSE REPORT' : 'TRIP EXPENSE REPORT';
     p.drawText(heading, { x: M, y: H - M, size: 14, font: bold, color: INK });
+    // Company identity, top-right: logo when set, else the business name.
+    if (logoImg) {
+      const s = Math.min(100 / logoImg.width, 32 / logoImg.height);
+      p.drawImage(logoImg, { x: W - M - logoImg.width * s, y: H - M - logoImg.height * s + 10, width: logoImg.width * s, height: logoImg.height * s });
+    } else if (company?.name) {
+      p.drawText(truncate(company.name, 34), { x: W - M - textW(bold, truncate(company.name, 34), 10), y: H - M, size: 10, font: bold, color: GRAY });
+    }
     const sub = [r.destination, r.purpose].filter(Boolean).join(' · ');
     p.drawText(truncate(r.title + (sub ? ' — ' + sub : ''), 78), { x: M, y: H - M - 16, size: 9, font, color: GRAY });
     const dates = [r.trip_start, r.trip_end].filter(Boolean).join('  →  ') || '—';

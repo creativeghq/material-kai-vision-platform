@@ -17,6 +17,8 @@ async function buildPayslip(opts: {
   company: string; period: string; employeeName: string; currency: string;
   gross: number; employeeEfka: number; incomeTax: number; net: number; employerEfka: number; employerCost: number;
   basisLabel: string;
+  /** Employer identity from finance_settings — same source as every other document. */
+  companyVat?: string | null; companyAddress?: string | null; companyLogo?: Uint8Array | null;
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const { regular: font, bold } = await embedOpenSans(pdf, { subset: false }); // text drawn after embed; keep all glyphs (Greek ΦΜΥ, −, ×)
@@ -27,7 +29,25 @@ async function buildPayslip(opts: {
   const text = (s: string, x: number, yy: number, size = 10, f = font, color = ink) => page.drawText(s, { x, y: yy, size, font: f, color });
   const right = (s: string, xRight: number, yy: number, size = 10, f = font, color = ink) => page.drawText(s, { x: xRight - f.widthOfTextAtSize(s, size), y: yy, size, font: f, color });
 
-  text(opts.company, 40, y, 15, bold); text('PAYSLIP', W - 40 - bold.widthOfTextAtSize('PAYSLIP', 15), y, 15, bold, muted);
+  // Employer logo (top-right, above the PAYSLIP label) when the business has one set.
+  let logoH = 0;
+  if (opts.companyLogo) {
+    try {
+      const img = await (async () => {
+        try { return await pdf.embedPng(opts.companyLogo as Uint8Array); }
+        catch { return await pdf.embedJpg(opts.companyLogo as Uint8Array); }
+      })();
+      const s = Math.min(110 / img.width, 36 / img.height);
+      page.drawImage(img, { x: W - 40 - img.width * s, y: y - img.height * s + 12, width: img.width * s, height: img.height * s });
+      logoH = img.height * s;
+    } catch { /* logo optional */ }
+  }
+  text(opts.company, 40, y, 15, bold);
+  if (!logoH) text('PAYSLIP', W - 40 - bold.widthOfTextAtSize('PAYSLIP', 15), y, 15, bold, muted);
+  // Employer identity (VAT / address) — a payslip names the employer.
+  const idBits = [opts.companyVat ? `VAT ${opts.companyVat}` : '', opts.companyAddress || ''].filter(Boolean).join('  ·  ');
+  if (idBits) { y -= 13; text(idBits, 40, y, 8, font, muted); }
+  if (logoH) { y -= 4; text('PAYSLIP', W - 40 - bold.widthOfTextAtSize('PAYSLIP', 11), y, 11, bold, muted); }
   y -= 18; text(`Pay period ${opts.period}`, 40, y, 10, font, muted);
   y -= 26; page.drawLine({ start: { x: 40, y }, end: { x: W - 40, y }, thickness: 1, color: line });
   y -= 22; text('Employee', 40, y, 9, font, muted); text(opts.employeeName, 40, y - 14, 12, bold);
@@ -63,7 +83,25 @@ export async function generatePayslips(supabase: any, workspaceId: string, userI
   if (run.status === 'draft') return json({ error: 'Approve the run before generating payslips.' }, 400);
 
   const { data: ws } = await supabase.from('workspaces').select('name').eq('id', workspaceId).maybeSingle();
-  const company = ws?.name || 'Company';
+  // Employer identity = finance_settings business identity (the SAME source invoices,
+  // quotes and receipts use), falling back to the workspace name.
+  const { data: fsRow } = await supabase.from('finance_settings')
+    .select('business_name, business_logo_path, business_vat, business_address, business_street_number, business_postal_code, business_city')
+    .eq('workspace_id', workspaceId).maybeSingle();
+  const f = (fsRow ?? {}) as Record<string, string | null>;
+  const company = f.business_name || ws?.name || 'Company';
+  const companyVat = f.business_vat || null;
+  const companyAddress = [
+    [f.business_address, f.business_street_number].filter(Boolean).join(' '),
+    [f.business_postal_code, f.business_city].filter(Boolean).join(', '),
+  ].filter(Boolean).join(', ') || null;
+  let companyLogo: Uint8Array | null = null;
+  if (f.business_logo_path) {
+    try {
+      const { data: lf } = await supabase.storage.from('generation-images').download(f.business_logo_path);
+      if (lf) companyLogo = new Uint8Array(await lf.arrayBuffer());
+    } catch { /* logo optional */ }
+  }
   const { data: items } = await supabase.from('hr_payroll_items')
     .select('employee_id, gross, net, employee_contributions, income_tax, employer_contributions, employer_cost, currency, basis, rate, hours_per_day, days_worked, employee:hr_employees!hr_payroll_items_employee_id_fkey ( contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name ) )')
     .eq('run_id', runId);
@@ -76,7 +114,8 @@ export async function generatePayslips(supabase: any, workspaceId: string, userI
       ? `${money(Number(it.rate ?? 0), cur)}/h × ${it.hours_per_day ?? 8}h × ${it.days_worked ?? 0}d`
       : 'Monthly';
     const bytes = await buildPayslip({
-      company, period: run.period, employeeName: name, currency: cur,
+      company, companyVat, companyAddress, companyLogo,
+      period: run.period, employeeName: name, currency: cur,
       gross: Number(it.gross), employeeEfka: Number(it.employee_contributions), incomeTax: Number(it.income_tax),
       net: Number(it.net), employerEfka: Number(it.employer_contributions), employerCost: Number(it.employer_cost),
       basisLabel,
