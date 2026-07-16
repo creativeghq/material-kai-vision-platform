@@ -283,6 +283,29 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
+      // Flatten the contact attachments (crm_company_contacts) into the `contacts`
+      // shape the company detail page reads — { relationship_id, contact_id,
+      // contact_name, contact_email, contact_phone, role, is_primary, notes }.
+      // Mirrors the inverse flatten in contacts-api-handler's GET /contacts/{id}.
+      const attachments = (data as { crm_company_contacts?: Array<{
+        id: string; contact_id: string; role: string | null; is_primary: boolean;
+        notes: string | null; created_at: string;
+        crm_contacts?: { id: string; name: string; email: string | null; phone: string | null } | null;
+      }> }).crm_company_contacts ?? [];
+      const contacts = attachments.map((a) => ({
+        relationship_id: a.id,
+        contact_id: a.contact_id,
+        contact_name: a.crm_contacts?.name ?? null,
+        contact_email: a.crm_contacts?.email ?? null,
+        contact_phone: a.crm_contacts?.phone ?? null,
+        role: a.role,
+        is_primary: a.is_primary,
+        notes: a.notes,
+        created_at: a.created_at,
+      }));
+      delete (data as { crm_company_contacts?: unknown }).crm_company_contacts;
+      (data as { contacts?: unknown }).contacts = contacts;
+
       return new Response(
         JSON.stringify({ data }),
         { status: 200, headers: corsHeaders },
