@@ -45,6 +45,7 @@ import {
   fetchQuoteFfeItems,
   fetchSheet,
   fetchSheets,
+  resolveBrandingWorkspaceId,
 } from './data-fetcher.ts';
 import {
   buildAnnotatedRender,
@@ -191,7 +192,12 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       .eq('id', sheetId);
 
     const moodboard = await fetchMoodboard(supabase, sheet.moodboard_id);
-    const branding = sheet.created_by ? await fetchOwnerBranding(supabase, sheet.created_by) : undefined;
+    // Brand under the owning PROJECT's workspace (deterministic); fall back to the
+    // creator's oldest membership only when the moodboard isn't project-linked.
+    const brandingWsId = await resolveBrandingWorkspaceId(supabase, moodboard.project_id, sheet.created_by);
+    const branding = sheet.created_by
+      ? await fetchOwnerBranding(supabase, sheet.created_by, brandingWsId)
+      : undefined;
     const clientName = branding?.client_fallback_name;
 
     // Refuse to render an empty/no-content PDF. Same content rules as the
@@ -451,7 +457,7 @@ async function buildClientViewPdf(
 
     const { data: project } = await supabase
       .from('projects')
-      .select('id, name, user_id')
+      .select('id, name, user_id, workspace_id')
       .eq('id', view.project_id)
       .single();
 
@@ -474,7 +480,10 @@ async function buildClientViewPdf(
     sheets.sort((a, b) => sheetIds.indexOf(a.id) - sheetIds.indexOf(b.id));
 
     const ownerId = view.created_by || project?.user_id;
-    const branding = ownerId ? await fetchOwnerBranding(supabase, ownerId) : undefined;
+    // A client view is always project-scoped → brand under that project's workspace.
+    const branding = ownerId
+      ? await fetchOwnerBranding(supabase, ownerId, (project as { workspace_id?: string } | null)?.workspace_id)
+      : undefined;
 
     const cover = (view.cover && Object.keys(view.cover).length > 0)
       ? { ...view.cover }

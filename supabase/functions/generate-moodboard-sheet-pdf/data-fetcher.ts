@@ -20,11 +20,46 @@ export async function fetchMoodboard(
 ): Promise<MoodboardRow> {
   const { data, error } = await supabase
     .from('moodboards')
-    .select('id, user_id, title, description')
+    .select('id, user_id, title, description, project_id')
     .eq('id', moodboardId)
     .single();
   if (error || !data) throw new Error(`Moodboard not found: ${moodboardId}`);
   return data as MoodboardRow;
+}
+
+/**
+ * Resolve WHICH workspace's branding a sheet/client view renders under.
+ * Deterministic order:
+ *   1. the owning project's workspace (projects.workspace_id) — the real answer;
+ *   2. else the creator's OLDEST workspace membership (stable across renders).
+ * Never an unordered `limit(1)` — that could flip the logo between regenerations
+ * for anyone who belongs to more than one workspace.
+ */
+export async function resolveBrandingWorkspaceId(
+  supabase: SupabaseClient,
+  projectId: string | null | undefined,
+  userId: string | null | undefined,
+): Promise<string | undefined> {
+  if (projectId) {
+    const { data } = await supabase
+      .from('projects')
+      .select('workspace_id')
+      .eq('id', projectId)
+      .maybeSingle();
+    const wsId = (data as { workspace_id?: string } | null)?.workspace_id;
+    if (wsId) return wsId;
+  }
+  if (userId) {
+    const { data } = await supabase
+      .from('workspace_members')
+      .select('workspace_id, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    const wsId = (data as Array<{ workspace_id?: string }> | null)?.[0]?.workspace_id;
+    if (wsId) return wsId;
+  }
+  return undefined;
 }
 
 export interface OwnerBranding {
@@ -52,6 +87,7 @@ export async function fetchClientName(
 export async function fetchOwnerBranding(
   supabase: SupabaseClient,
   userId: string,
+  workspaceId?: string,
 ): Promise<OwnerBranding | undefined> {
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -59,18 +95,12 @@ export async function fetchOwnerBranding(
     .eq('id', userId)
     .maybeSingle();
 
-  // Unified branding source: the creator's workspace finance_settings identity.
+  // Unified branding source: the resolved workspace's finance_settings identity.
   let fsLogoUrl: string | undefined;
   let fsCompany: string | undefined;
   let fsContact: string | undefined;
   try {
-    const { data: mem } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', userId)
-      .limit(1)
-      .maybeSingle();
-    const wsId = (mem as { workspace_id?: string } | null)?.workspace_id;
+    const wsId = workspaceId ?? await resolveBrandingWorkspaceId(supabase, null, userId);
     if (wsId) {
       const { data: fs } = await supabase
         .from('finance_settings')

@@ -24,6 +24,8 @@ export interface MoodboardRow {
   user_id: string;
   title: string;
   description: string | null;
+  /** Owning project (nullable) — resolves which workspace's branding to render under. */
+  project_id: string | null;
 }
 
 export interface SheetPdfRequest {
