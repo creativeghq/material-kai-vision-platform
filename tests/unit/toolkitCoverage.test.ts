@@ -32,10 +32,15 @@ const NAME_RE = /name: '([a-z][a-z0-9_]+)',/g;
 const TOOL_IDS_RE = /tool_ids:\s*\[([^\]]*)\]/g;
 const QUOTED_RE = /'([a-z][a-z0-9_]+)'/g;
 
-// Meta-tools / sub-agent callbacks / status pollers — never meant to be a picker card.
+// Genuinely not user-facing: runtime meta-tools, status pollers, and Anthropic
+// structured-output schemas that only LOOK like tools to the extractor.
 const INTERNAL_TOOLS = new Set([
   'load_toolkit', 'load_skill', 'check_generation_status',
-  'submit_findings', 'update_finding', 'review_solution', 'submit_trip_card',
+  // NOT an agent tool: an Anthropic `tool_choice` structured-output schema used
+  // inside the tech-radar review call (tech-radar-tools.ts). The `name:` regex
+  // can't tell it apart from a LangChain tool — the Phase 0 manifest generator
+  // must exclude `input_schema` blocks or it will emit phantom tools. See #266.
+  'submit_findings',
 ]);
 
 // Implemented + agent-bound tools that DON'T yet belong to a toolkit cluster — reachable
@@ -44,8 +49,8 @@ const INTERNAL_TOOLS = new Set([
 const KNOWN_UNCLUSTERED = new Set([
   // Purchasing / sourcing
   'add_purchase_item', 'create_purchase_order', 'send_purchase_order', 'generate_purchase_sheet', 'source_product',
-  // Trip expenses
-  'add_trip_expense', 'create_trip_card', 'list_trip_cards',
+  // Trip expenses (submit_trip_card is user-facing: "submit a DRAFT card to finance")
+  'add_trip_expense', 'create_trip_card', 'list_trip_cards', 'submit_trip_card',
   // Product intelligence
   'brand_overview', 'customer_overview', 'supplier_overview', 'find_products_by_spec', 'related_products',
   'products_by_brand', 'products_in_project', 'projects_using_product', 'product_price_history', 'product_provenance',
@@ -57,8 +62,8 @@ const KNOWN_UNCLUSTERED = new Set([
   'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
   // Docs / misc
   'search_workspace_docs', 'estimate_cost', 'web_search',
-  // Tech radar (admin-only, no cluster yet)
-  'list_tech_radar', 'track_tech_radar',
+  // Tech Radar — confirmed USER-facing (workspace-scoped findings), needs a cluster
+  'list_tech_radar', 'track_tech_radar', 'review_solution', 'update_finding',
 ]);
 
 function implementedTools(): Set<string> {
