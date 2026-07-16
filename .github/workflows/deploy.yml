@@ -17,6 +17,17 @@ on:
       # triggered the workflow, so a new or edited live suite reported green
       # having never executed.
       - 'tests/**'
+      # Same trap, same fix, for the two guards whose INPUT lives outside src/:
+      #  - docs/**   → tests/unit/docLinks.test.ts. A docs-only commit is exactly
+      #    when a link breaks, and it was the one commit shape that never ran the
+      #    link guard.
+      #  - scripts/**→ tests/unit/edgeEndpointsCoverage.test.ts. edge-endpoints.json
+      #    is the source of the PUBLIC OpenAPI spec; editing it alone must re-check
+      #    it against the real functions.
+      # Cheap: deploy-frontend/typecheck stay gated on changes.outputs.frontend, so
+      # a docs-only push runs the guards and skips every deploy job.
+      - 'docs/**'
+      - 'scripts/**'
   workflow_dispatch:
     inputs:
       deployment_reason:

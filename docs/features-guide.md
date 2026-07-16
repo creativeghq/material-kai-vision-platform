@@ -150,6 +150,13 @@ Complete reference of all platform features and capabilities.
 
 ### 5. Admin Dashboard
 
+**AI Insights panel** (home dashboard) — [`dashboard-insights`](../supabase/functions/dashboard-insights/index.ts):
+- A short, personalised insight set derived from a live snapshot of the caller's workspace activity (projects, finance / AR, tasks, inbox, quotes).
+- **Cached 15 days** per `(user, workspace)` in `dashboard_insights_cache`; a warm cache returns instantly with **no LLM call**.
+- **Never errors.** If the LLM call fails (out of credits, timeout, bad output), it falls back to a deterministic, numbers-driven insight set built from the same snapshot — cached with a *short* TTL so the next visit re-attempts the AI path. The endpoint always returns 200 with usable insights (auth failures aside).
+- Auth: user JWT. Body `{ workspace_id, force? }` → `{ insights, model, source: 'ai'|'fallback', generated_at, expires_at, cached }`. The `source` field is what tells you whether you're looking at AI or the fallback.
+- Frontend: [`Dashboard.tsx`](../src/components/features/dashboard/Dashboard.tsx) via [`dashboardInsightsService.ts`](../src/services/dashboardInsightsService.ts).
+
 **Monitoring**:
 - Real-time job tracking
 - Progress visualization
