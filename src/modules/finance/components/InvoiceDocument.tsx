@@ -1,5 +1,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Home, ClipboardList, User, Truck } from 'lucide-react';
 
 import {
   formatInvoiceMoney,
@@ -318,6 +319,139 @@ export function InvoiceDocument({
       <Fiscal />
     </>
   );
+
+  // Commercial: Greek delivery-style receipt — logo left / QR right, three icon party
+  // columns (order · bill-to · ship-to), code+comment line items, large amount-due.
+  if (spec.headerStyle === 'commercial') {
+    const badge = (icon: React.ReactNode) => (
+      <div style={{ width: 22, height: 22, borderRadius: '50%', border: `1px solid ${colors.accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {icon}
+      </div>
+    );
+    const cth: React.CSSProperties = { fontSize: 8.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em', padding: '6px 6px', textAlign: 'left', background: colors.tableHeaderBg };
+    const cthR: React.CSSProperties = { ...cth, textAlign: 'right' };
+    const ctd: React.CSSProperties = { fontSize: 9, padding: '6px 6px', verticalAlign: 'top', borderBottom: `1px solid ${colors.line}` };
+    const ctdR: React.CSSProperties = { ...ctd, textAlign: 'right', whiteSpace: 'nowrap' };
+    const columns = [
+      { icon: <ClipboardList size={12} color={colors.accent} />, header: L.orderDetails, name: '', lines: data.meta.map((m) => `${m.label}: ${m.value}`) },
+      { icon: <User size={12} color={colors.accent} />, header: L.billTo, name: data.customer.name, lines: data.customer.lines },
+      { icon: <Truck size={12} color={colors.accent} />, header: L.shipTo, name: '', lines: data.shipping?.rows ?? data.customer.lines },
+    ];
+    return (
+      <div style={sheet} data-invoice-template={spec.id}>
+        {/* Header: logo left, title + QR right */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+          <div>
+            {data.issuer.logoUrl && (
+              <img src={data.issuer.logoUrl} alt="" style={{ maxHeight: 54, maxWidth: 180, objectFit: 'contain', display: 'block' }} />
+            )}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: colors.accent }}>{data.title}</div>
+            {data.fiscal?.qrUrl && (
+              <div style={{ marginTop: 6, display: 'inline-block' }}>
+                <QRCodeSVG value={data.fiscal.qrUrl} size={72} level="M" />
+                <div style={{ fontSize: 7, ...muted }}>{L.verify}</div>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Issuer identity with home badge */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 10 }}>
+          {badge(<Home size={13} color={colors.accent} />)}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{data.issuer.name}</div>
+            <div style={{ fontSize: 9, ...muted }}>{data.issuer.lines.map((l, i) => <div key={i}>{l}</div>)}</div>
+          </div>
+        </div>
+        <div style={{ borderTop: `0.8px solid ${colors.line}`, margin: '10px 0 14px' }} />
+        {/* Three party columns */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+          {columns.map((c, i) => (
+            <div key={i} style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                {badge(c.icon)}
+                <div style={{ fontSize: 8.5, fontWeight: 700, color: colors.accent, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{c.header}</div>
+              </div>
+              {c.name && <div style={{ fontSize: 9.5, fontWeight: 700, marginBottom: 2 }}>{c.name}</div>}
+              {c.lines.map((l, j) => <div key={j} style={{ fontSize: 8.5, ...muted }}>{l}</div>)}
+            </div>
+          ))}
+        </div>
+        {/* Items table */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+          <thead>
+            <tr>
+              <th style={cth}>{L.itemCode}</th>
+              <th style={cth}>{L.itemDescr}</th>
+              <th style={cth}>{L.itemComment}</th>
+              <th style={cthR}>{L.unitPrice}</th>
+              <th style={cthR}>{L.qty}</th>
+              <th style={cth}>{L.unit}</th>
+              <th style={cthR}>{L.net}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((it, i) => (
+              <tr key={i}>
+                <td style={{ ...ctd, ...muted }}>{it.sku ?? '—'}</td>
+                <td style={ctd}>{it.description}</td>
+                <td style={{ ...ctd, ...muted }}>{it.detail ?? ''}</td>
+                <td style={ctdR}>{money(it.unitPrice)}</td>
+                <td style={ctdR}>{it.qty}</td>
+                <td style={ctd}>{it.unit}</td>
+                <td style={ctdR}>{money(it.net)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {/* Notes (left) + totals with large amount-due (right) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, alignItems: 'flex-start', marginBottom: 14 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {data.notes && (
+              <>
+                <div style={{ fontSize: 9, fontWeight: 700, ...muted, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{L.notes}</div>
+                <div style={{ fontSize: 9, ...muted, whiteSpace: 'pre-wrap' }}>{data.notes}</div>
+              </>
+            )}
+          </div>
+          <div style={{ width: 250 }}>
+            {data.totals.discount > 0 ? (
+              <>
+                {totalRow(L.price, money(data.totals.subtotalNet))}
+                {totalRow(L.discount, `- ${money(data.totals.discount)}`)}
+                {totalRow(L.priceAfterDiscount, money(data.totals.priceAfterDiscount))}
+              </>
+            ) : (
+              totalRow(L.subtotalNet, money(data.totals.subtotalNet))
+            )}
+            {data.totals.extras.map((e, i) => (
+              <React.Fragment key={i}>{totalRow(e.label, `${e.negative ? '- ' : ''}${money(e.value)}`)}</React.Fragment>
+            ))}
+            {totalRow(L.totalVat, money(data.totals.totalVat))}
+            <div style={{ borderTop: `0.8px solid ${colors.line}`, marginTop: 6, paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+              <span style={{ fontSize: 10, fontWeight: 700 }}>{L.total}</span>
+              <span style={{ fontSize: 24, fontWeight: 800, whiteSpace: 'nowrap' }}>{money(data.totals.grand)}</span>
+            </div>
+            {data.totals.amountPaid > 0 && (
+              <div style={{ marginTop: 4 }}>
+                {totalRow(L.paid, `- ${money(data.totals.amountPaid)}`)}
+                {totalRow(L.due2, money(data.totals.amountDue), { bold: true })}
+              </div>
+            )}
+          </div>
+        </div>
+        <Payment />
+        {data.fiscal && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, ...muted }}>{L.mark}</div>
+            <div style={{ fontSize: 11, fontWeight: 700 }}>{data.fiscal.mark}</div>
+            {data.fiscal.uid && <div style={{ fontSize: 9, ...muted }}>{L.uid}: {data.fiscal.uid}</div>}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // Sidebar (Modern): a narrow left gutter holding the vertical accent wordmark, body to its right.
   if (spec.headerStyle === 'sidebar') {

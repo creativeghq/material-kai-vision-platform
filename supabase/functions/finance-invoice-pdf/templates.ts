@@ -2,7 +2,7 @@
 // same ids, layout flags, and default colors — so the PDF matches the HTML preview.
 import { rgb, type RGB } from 'pdf-lib';
 
-export type HeaderStyle = 'split' | 'band' | 'stacked' | 'minimal' | 'sidebar';
+export type HeaderStyle = 'split' | 'band' | 'stacked' | 'minimal' | 'sidebar' | 'commercial';
 export type TitleStyle = 'right' | 'left-xl' | 'on-band' | 'center';
 export type TotalsBoxStyle = 'plain' | 'boxed' | 'accent' | 'accent-text';
 
@@ -33,6 +33,12 @@ export const TEMPLATES: Record<string, TemplateSpec> = {
   minimal: {
     id: 'minimal', headerStyle: 'minimal', titleStyle: 'left-xl', tableHeaderFill: false, totalsBoxStyle: 'plain',
     defaultColors: { accent: '#111111', headerBg: '#ffffff', headerText: '#111111', tableHeaderBg: '#f7f6f4', text: '#1a1a1a', muted: '#8a8a8a', line: '#e5e5e5' },
+  },
+  // Greek delivery-style receipt: logo left / QR right, three icon-headed party columns
+  // (order · bill-to · ship-to), a code+comment line-item table, and a large amount-due.
+  commercial: {
+    id: 'commercial', headerStyle: 'commercial', titleStyle: 'right', tableHeaderFill: false, totalsBoxStyle: 'plain',
+    defaultColors: { accent: '#0e7490', headerBg: '#ffffff', headerText: '#111111', tableHeaderBg: '#f4f7f8', text: '#1c1c1c', muted: '#6b6b6b', line: '#e2e2e2' },
   },
 };
 

@@ -20,7 +20,8 @@ export type HeaderStyle =
   | 'band'     // full-width colored band with title + issuer inside
   | 'stacked'  // issuer block, big title below
   | 'minimal'  // oversized title, issuer small underneath
-  | 'sidebar'; // vertical accent wordmark gutter on the left, title right
+  | 'sidebar'  // vertical accent wordmark gutter on the left, title right
+  | 'commercial'; // logo left / QR right, three icon party columns, code+comment items, large amount-due
 
 export type TitleStyle = 'right' | 'left-xl' | 'on-band' | 'center';
 export type TotalsBoxStyle = 'plain' | 'boxed' | 'accent' | 'accent-text';

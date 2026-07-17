@@ -44,6 +44,19 @@ export const INVOICE_TEMPLATES: Record<string, InvoiceTemplateSpec> = {
       tableHeaderBg: '#f7f6f4', text: '#1a1a1a', muted: '#8a8a8a', line: '#e5e5e5',
     },
   },
+  commercial: {
+    id: 'commercial',
+    label: 'Commercial',
+    description: 'Logo left / QR right, three icon columns (order · bill-to · ship-to), code+comment line items, and a large amount-due. Modeled on a Greek delivery-style receipt.',
+    headerStyle: 'commercial',
+    titleStyle: 'right',
+    tableHeaderFill: false,
+    totalsBoxStyle: 'plain',
+    defaultColors: {
+      accent: '#0e7490', headerBg: '#ffffff', headerText: '#111111',
+      tableHeaderBg: '#f4f7f8', text: '#1c1c1c', muted: '#6b6b6b', line: '#e2e2e2',
+    },
+  },
 };
 
 export const TEMPLATE_OPTIONS: { value: string; label: string; description: string }[] =

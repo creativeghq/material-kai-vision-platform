@@ -9,7 +9,7 @@
 // explicitly asked for a per-invoice GR/EN choice. A Unicode font is embedded so Greek
 // glyphs (and Greek customer names/addresses, regardless of language) render correctly.
 import { createClient } from '@supabase/supabase-js';
-import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -56,6 +56,8 @@ const LABELS: Record<Lang, Record<string, string>> = {
     appliedTo: 'Εξόφληση', reference: 'Αναφορά', thankYou: 'Ευχαριστούμε για την πληρωμή σας.',
     contact: 'Επικοινωνία', office: 'Έδρα', value: 'Αξία', amountPaid: 'Ποσό πληρωμής',
     inWords: 'Ολογράφως', receivedBy: 'Ο λαβών', newBalance: 'Νέο υπόλοιπο', serial: 'Α/Α', code: 'Κωδ.',
+    orderDetails: 'ΣΤΟΙΧΕΙΑ ΠΑΡΑΓΓΕΛΙΑΣ', billTo: 'ΣΤΟΙΧΕΙΑ ΧΡΕΩΣΗΣ', shipTo: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ',
+    itemCode: 'Κωδ. Είδους', itemDescr: 'Περιγραφή Είδους', itemComment: 'Σχόλιο Είδους',
   },
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
@@ -78,6 +80,8 @@ const LABELS: Record<Lang, Record<string, string>> = {
     appliedTo: 'Applied to', reference: 'Reference', thankYou: 'Thank you for your payment.',
     contact: 'Contact', office: 'Registered office', value: 'Value', amountPaid: 'Amount paid',
     inWords: 'In words', receivedBy: 'Received by', newBalance: 'New balance', serial: 'No.', code: 'Code',
+    orderDetails: 'ORDER DETAILS', billTo: 'BILL TO', shipTo: 'SHIP TO',
+    itemCode: 'Item code', itemDescr: 'Description', itemComment: 'Comment',
   },
 };
 
@@ -316,6 +320,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
 async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors }): Promise<Uint8Array> {
   const { inv, items, fs, customer, branch, lang, logo, spec, colors } = d;
   const L = LABELS[lang];
+  const isCommercial = spec.headerStyle === 'commercial';
   const currency = inv.currency ?? 'EUR';
   const money = (n: any) => fmtMoney(n, currency, lang);
   // Template colors shadow the monochrome defaults so the rest of the layout code is unchanged.
@@ -409,7 +414,26 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     });
   }
 
-  if (spec.headerStyle === 'band') {
+  if (spec.headerStyle === 'commercial') {
+    // Logo top-left, document title + QR top-right, issuer identity block (home badge) below.
+    const topY = y;
+    let leftBottom = topY;
+    if (logoImg) { page.drawImage(logoImg, { x: M, y: topY - logoH, width: logoW, height: logoH }); leftBottom = topY - logoH; }
+    textR(title, right, topY - 11, 12, bold, colors.accent);
+    let qrBottom = topY - 18;
+    if (inv.fiscal_qr_url && inv.print_online_code !== false) {
+      const qs = 68;
+      drawQr(page, String(inv.fiscal_qr_url), right - qs, topY - 22 - qs, qs);
+      textR(L.verify, right, topY - 22 - qs - 9, 6.5, font, MUTED);
+      qrBottom = topY - 22 - qs - 12;
+    }
+    const iy = Math.min(logoImg ? leftBottom - 16 : topY - 20, topY - 20);
+    drawBadge(page, 'home', M + 9, iy - 9, 9, colors.accent);
+    text(issuerName, M + 26, iy - 12, 15, bold, INK);
+    let jy = iy - 26;
+    for (const l of issuerLines) { text(l, M + 26, jy, 8.5, font, MUTED); jy -= 11; }
+    y = Math.min(jy, qrBottom) - 6;
+  } else if (spec.headerStyle === 'band') {
     const bandH = 70;
     page.drawRectangle({ x: 0, y: A4.h - bandH, width: A4.w, height: bandH, color: colors.headerBg });
     let nx = M;
@@ -441,24 +465,70 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.7, color: LINE });
   y -= 16;
 
-  // ── Customer block ──
-  text(L.customer, M, y, 9, bold, MUTED);
-  y -= 13;
+  // ── Customer / parties block ──
   const custName = customer ? (customer.name || [customer.first_name, customer.last_name].filter(Boolean).join(' ')) : '—';
-  text(custName, M, y, 11, bold);
-  y -= 13;
   const custLines = customer ? [
     [customer.street ?? customer.address, customer.street_number].filter(Boolean).join(' '),
     [customer.postal_code, customer.city].filter(Boolean).join(' '),
     customer.vat_number ? `${L.vatNo}: ${customer.vat_number}` : '',
     customer.tax_office ? `${L.taxOffice}: ${customer.tax_office}` : '',
   ].filter(Boolean) : [];
-  for (const l of custLines) { text(l, M, y, 8.5, font, MUTED); y -= 11; }
-  y -= 8;
+
+  if (isCommercial) {
+    // Three icon-headed columns: order details · bill-to · ship-to (reference layout).
+    const colW = (right - M - 20) / 3;
+    const colX = [M, M + colW + 10, M + 2 * colW + 20];
+    const orderLines = metaRows.map(([k, v]) => `${k}: ${v}`);
+    const shipLines = inv.has_shipping
+      ? [
+          inv.ship_to ? `${L.deliveryPlace}: ${inv.ship_to}` : '',
+          inv.ship_from ? `${L.loadingPlace}: ${inv.ship_from}` : '',
+          inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
+        ].filter(Boolean)
+      : custLines;
+    const columns: [BadgeGlyph, string, string, string[]][] = [
+      ['order', L.orderDetails, '', orderLines],
+      ['bill', L.billTo, custName, custLines],
+      ['ship', L.shipTo, '', shipLines],
+    ];
+    let colBottom = y;
+    for (let i = 0; i < columns.length; i++) {
+      const [glyph, header, name, lines] = columns[i];
+      const cx = colX[i];
+      drawBadge(page, glyph, cx + 8, y - 8, 8, colors.accent);
+      text(header, cx + 22, y - 11, 8, bold, colors.accent);
+      let cyy = y - 26;
+      if (name) { text(name, cx, cyy, 9, bold, INK); cyy -= 12; }
+      for (const l of lines) {
+        for (const wl of wrap(l, font, 8, colW - 4)) { text(wl, cx, cyy, 8, font, MUTED); cyy -= 10; }
+      }
+      colBottom = Math.min(colBottom, cyy);
+    }
+    y = colBottom - 8;
+  } else {
+    text(L.customer, M, y, 9, bold, MUTED);
+    y -= 13;
+    text(custName, M, y, 11, bold);
+    y -= 13;
+    for (const l of custLines) { text(l, M, y, 8.5, font, MUTED); y -= 11; }
+    y -= 8;
+  }
 
   // ── Items table ──
   const cols = { descr: M, qty: 300, unit: 340, price: 390, net: 450, vatp: 500, total: right };
   const drawHead = () => {
+    if (isCommercial) {
+      page.drawRectangle({ x: M, y: y - 3, width: right - M, height: 15, color: HEADBG });
+      text(L.itemCode, M + 2, y, 7.5, bold);
+      text(L.itemDescr, 112, y, 7.5, bold);
+      text(L.itemComment, 240, y, 7.5, bold);
+      textR(L.unitPrice, 400, y, 7.5, bold);
+      textR(L.qty, 442, y, 7.5, bold);
+      text(L.unit, 450, y, 7.5, bold);
+      textR(L.net, right, y, 7.5, bold);
+      y -= 18;
+      return;
+    }
     if (spec.tableHeaderFill) {
       page.drawRectangle({ x: M, y: y - 3, width: right - M, height: 16, color: HEADBG });
     }
@@ -494,6 +564,26 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     vatByRate[key] = vatByRate[key] || { net: 0, vat: 0 };
     vatByRate[key].net += net; vatByRate[key].vat += vat;
 
+    if (isCommercial) {
+      const detailC = [[it.selected_color, it.selected_size].filter(Boolean).join(' / '), it.line_comments].filter(Boolean).join(' — ');
+      const unitLabelC = it.unit ?? (it.measurement_unit_code != null ? UNIT_LABEL[Number(it.measurement_unit_code)] : '') ?? '';
+      const codeLines = wrap(String(it.sku ?? '—'), font, 8, 64);
+      const dLinesC = wrap(it.description ?? 'Item', font, 8, 118);
+      const cLinesC = detailC ? wrap(detailC, font, 7.5, 88) : [];
+      const rowHC = Math.max(13, Math.max(codeLines.length, dLinesC.length, cLinesC.length, 1) * 10 + 4);
+      if (y - rowHC < M + 150) { newPage(); drawHead(); }
+      let cyCode = y; for (const l of codeLines) { text(l, M + 2, cyCode, 8, font, MUTED); cyCode -= 10; }
+      let cyD = y; for (const l of dLinesC) { text(l, 112, cyD, 8); cyD -= 10; }
+      let cyK = y; for (const l of cLinesC) { text(l, 240, cyK, 7.5, font, MUTED); cyK -= 10; }
+      textR(money(it.unit_price ?? 0), 400, y, 8);
+      textR(qty, 442, y, 8);
+      text(unitLabelC, 450, y, 8);
+      textR(money(net), right, y, 8);
+      y -= rowHC;
+      page.drawLine({ start: { x: M, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.4, color: LINE });
+      continue;
+    }
+
     const dLines = wrap(it.description ?? 'Item', font, 8.5, cols.qty - cols.descr - 10);
     const detail = [[it.selected_color, it.selected_size].filter(Boolean).join(' / '), it.line_comments].filter(Boolean).join(' — ');
     const rowH = Math.max(13, dLines.length * 10 + (detail ? 10 : 0) + 3);
@@ -515,12 +605,20 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   // ── Totals + VAT analysis ──
   if (y < M + 170) newPage();
   y -= 14;
-  // VAT analysis (left)
+  // Left column: notes (commercial — matches the reference's bottom-left Παρατηρήσεις),
+  // otherwise the multi-rate VAT analysis.
   let vy = y;
-  text(L.vatAnalysis, M, vy, 8, bold, MUTED); vy -= 12;
-  for (const [pct, agg] of Object.entries(vatByRate)) {
-    text(`${L.net} ${pct}%: ${money(agg.net)}   ${L.vatAmt}: ${money(agg.vat)}`, M, vy, 8, font, MUTED);
-    vy -= 11;
+  if (isCommercial) {
+    if (inv.print_terms !== false && inv.notes) {
+      text(L.notes, M, vy, 8, bold, MUTED); vy -= 13;
+      for (const nl of wrap(inv.notes, font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
+    }
+  } else {
+    text(L.vatAnalysis, M, vy, 8, bold, MUTED); vy -= 12;
+    for (const [pct, agg] of Object.entries(vatByRate)) {
+      text(`${L.net} ${pct}%: ${money(agg.net)}   ${L.vatAmt}: ${money(agg.vat)}`, M, vy, 8, font, MUTED);
+      vy -= 11;
+    }
   }
 
   // Totals (right box)
@@ -557,7 +655,14 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   if (deductions > 0) row(L.deductions, `- ${money(deductions)}`);
   if (withheld > 0) row(L.withheld, `- ${money(withheld)}`);
   // Grand total — presentation per template.
-  if (spec.totalsBoxStyle === 'accent') {
+  if (isCommercial) {
+    // Large amount-due like the reference receipt.
+    page.drawLine({ start: { x: boxX, y: y + 6 }, end: { x: right, y: y + 6 }, thickness: 0.8, color: LINE });
+    y -= 4;
+    text(L.total, boxX, y - 10, 10, bold, INK);
+    textR(money(grand), right, y - 16, 22, bold, INK);
+    y -= 28;
+  } else if (spec.totalsBoxStyle === 'accent') {
     page.drawRectangle({ x: boxX, y: y - 4, width: right - boxX, height: 18, color: colors.accent });
     textR(L.total, right - 110, y + 1, 10, bold, WHITE);
     textR(money(grand), right, y + 1, 11, bold, WHITE);
@@ -617,8 +722,8 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     y -= 4;
   }
 
-  // ── Movement block (9.3 / invoice-with-shipping) ──
-  if (inv.has_shipping) {
+  // ── Movement block (9.3 / invoice-with-shipping) ── (commercial shows ship-to in header columns)
+  if (!isCommercial && inv.has_shipping) {
     if (y < M + 120) newPage();
     page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.5, color: LINE }); y -= 14;
     text(L.movement, M, y, 9, bold, MUTED); y -= 13;
@@ -632,8 +737,8 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     y -= 4;
   }
 
-  // ── Notes / terms (gated by print_terms) + info box ──
-  if (inv.print_terms !== false && inv.notes) {
+  // ── Notes / terms (gated by print_terms) + info box ── (commercial renders notes on the left)
+  if (!isCommercial && inv.print_terms !== false && inv.notes) {
     if (y < M + 90) newPage();
     text(L.notes, M, y, 8, bold, MUTED); y -= 12;
     for (const nl of wrap(inv.notes, font, 8.5, right - M - 130)) { text(nl, M, y, 8.5, font, MUTED); y -= 11; }
@@ -650,7 +755,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     text(L.mark, M, qy + 28, 8, bold, MUTED);
     text(String(inv.fiscal_mark), M, qy + 16, 10, bold);
     if (inv.fiscal_uid) { text(`${L.uid}: ${inv.fiscal_uid}`, M, qy + 4, 8, font, MUTED); }
-    if (inv.fiscal_qr_url && inv.print_online_code !== false) {
+    if (inv.fiscal_qr_url && inv.print_online_code !== false && !isCommercial) {
       drawQr(page, String(inv.fiscal_qr_url), right - 90, qy - 10, 86);
       textR(L.verify, right, qy - 22, 7, font, MUTED);
     }
@@ -893,6 +998,39 @@ async function buildPaymentReceiptPdf(d: {
   }
 
   return await pdf.save();
+}
+
+// Small line-art glyph inside a circular badge, echoing the reference receipt's section
+// icons (home / order / bill-to / ship-to). Drawn from primitives — no icon font needed.
+type BadgeGlyph = 'home' | 'order' | 'bill' | 'ship';
+function drawBadge(page: PDFPage, glyph: BadgeGlyph, cx: number, cy: number, r: number, color: RGB) {
+  page.drawCircle({ x: cx, y: cy, size: r, borderColor: color, borderWidth: 1 });
+  const s = r * 0.5; // glyph half-extent
+  const line = (x1: number, y1: number, x2: number, y2: number, t = 0.9) =>
+    page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: t, color });
+  if (glyph === 'home') {
+    line(cx - s, cy, cx, cy + s);                       // left roof
+    line(cx, cy + s, cx + s, cy);                       // right roof
+    line(cx - s * 0.66, cy, cx - s * 0.66, cy - s);     // left wall
+    line(cx + s * 0.66, cy, cx + s * 0.66, cy - s);     // right wall
+    line(cx - s * 0.66, cy - s, cx + s * 0.66, cy - s); // floor
+  } else if (glyph === 'order') {
+    line(cx, cy + s, cx, cy - s * 0.2);                 // stem
+    line(cx - s * 0.55, cy - s * 0.15, cx, cy - s * 0.6); // arrowhead left
+    line(cx + s * 0.55, cy - s * 0.15, cx, cy - s * 0.6); // arrowhead right
+    line(cx - s * 0.85, cy - s * 0.9, cx + s * 0.85, cy - s * 0.9); // tray base
+  } else if (glyph === 'bill') {
+    page.drawCircle({ x: cx, y: cy + s * 0.45, size: s * 0.4, color }); // head (filled)
+    line(cx - s * 0.62, cy - s * 0.15, cx - s * 0.62, cy - s * 0.9);    // left shoulder
+    line(cx + s * 0.62, cy - s * 0.15, cx + s * 0.62, cy - s * 0.9);    // right shoulder
+    line(cx - s * 0.62, cy - s * 0.15, cx + s * 0.62, cy - s * 0.15);   // shoulders top
+  } else {
+    // ship: truck (cargo box + cab + two wheels)
+    page.drawRectangle({ x: cx - s, y: cy - s * 0.15, width: s * 1.05, height: s * 0.9, borderColor: color, borderWidth: 0.9 });
+    page.drawRectangle({ x: cx + s * 0.1, y: cy - s * 0.15, width: s * 0.7, height: s * 0.55, borderColor: color, borderWidth: 0.9 });
+    page.drawCircle({ x: cx - s * 0.5, y: cy - s * 0.32, size: s * 0.22, color });
+    page.drawCircle({ x: cx + s * 0.5, y: cy - s * 0.32, size: s * 0.22, color });
+  }
 }
 
 // Draw a QR code (from a URL) as filled squares — no image dependency.
