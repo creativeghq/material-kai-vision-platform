@@ -10,6 +10,29 @@ import { isUnnamedLineName } from './types.ts';
 import { resolveContactBillingSource } from '../crm/party-inheritance.ts';
 
 /**
+ * Fail loudly before a fiscal document is built from an unconfirmed line-item read.
+ *
+ * All three builders below used to destructure `{ data: items }` WITHOUT `error` and
+ * then do `(items ?? []).map(...)`. `supabase-js` returns `{data: null, error}` rather
+ * than throwing, so any failure — RLS, a renamed column, a transport blip — silently
+ * became "this document has no lines": totalNet 0, totalVat 0. `finance-issue-invoice`
+ * then TRANSMITTED that to AADE/myDATA as a legally-binding zero-value document.
+ *
+ * A read we didn't confirm must never become a legal filing. A genuine invoice /
+ * credit note / delivery note also cannot have zero lines, so an empty list is treated
+ * as a hard error rather than a valid document.
+ */
+function assertFiscalLines(items: unknown, err: unknown, subject: string): void {
+  if (err) {
+    const msg = (err as { message?: string })?.message ?? String(err);
+    throw new Error(`refusing to build ${subject}: line-item read failed (${msg})`);
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error(`refusing to build ${subject}: it has no line items`);
+  }
+}
+
+/**
  * Fold a line's variant selections (color / size / free-form attributes) into the
  * transmitted product name so the myDATA line + the provider-rendered legal document read
  * "Base name — Red, 60×60" instead of just the base product name. No-op when the line
@@ -153,10 +176,16 @@ export async function buildInvoiceInputFromDb(
   const { data: inv, error: invErr } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
   if (invErr || !inv) throw new Error(`invoice ${invoiceId} not found`);
 
-  const [{ data: items }, { data: fs }] = await Promise.all([
+  const [{ data: items, error: itemsErr }, { data: fs }] = await Promise.all([
     supabase.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('added_at'),
     supabase.from('finance_settings').select('*').eq('workspace_id', inv.workspace_id).maybeSingle(),
   ]);
+  // FISCAL SAFETY: the header above throws on error, but this read used to drop `error`
+  // and fall through to `(items ?? [])` — so a failed/RLS-blocked invoice_items read
+  // produced lines=[], totalNet=0, totalVat=0, and finance-issue-invoice TRANSMITTED A
+  // LEGALLY-BINDING ZERO-VALUE DOCUMENT to AADE/myDATA. Never let a transmission be
+  // built from a read we didn't confirm. A real invoice also cannot have zero lines.
+  assertFiscalLines(items, itemsErr, `invoice ${invoiceId}`);
 
   const issuer: FiscalParty = {
     vatNumber: fs?.business_vat ?? '',
@@ -369,12 +398,13 @@ export async function buildCreditNoteInputFromDb(
   const { data: cn, error: cnErr } = await supabase.from('credit_notes').select('*').eq('id', creditNoteId).single();
   if (cnErr || !cn) throw new Error(`credit note ${creditNoteId} not found`);
 
-  const [{ data: items }, { data: inv }, { data: fs }] = await Promise.all([
+  const [{ data: items, error: itemsErr }, { data: inv }, { data: fs }] = await Promise.all([
     supabase.from('credit_note_items').select('*').eq('credit_note_id', creditNoteId).order('created_at'),
     supabase.from('invoices').select('*').eq('id', cn.invoice_id).single(),
     supabase.from('finance_settings').select('*').eq('workspace_id', cn.workspace_id).maybeSingle(),
   ]);
   if (!inv) throw new Error(`source invoice for credit note ${creditNoteId} not found`);
+  assertFiscalLines(items, itemsErr, `credit note ${creditNoteId}`);
 
   const issuer: FiscalParty = {
     vatNumber: fs?.business_vat ?? '',
@@ -476,10 +506,11 @@ export async function buildDeliveryNoteInputFromDb(
   const { data: dn, error: dnErr } = await supabase.from('delivery_notes').select('*').eq('id', deliveryNoteId).single();
   if (dnErr || !dn) throw new Error(`delivery note ${deliveryNoteId} not found`);
 
-  const [{ data: items }, { data: fs }] = await Promise.all([
+  const [{ data: items, error: itemsErr }, { data: fs }] = await Promise.all([
     supabase.from('delivery_note_items').select('*').eq('delivery_note_id', deliveryNoteId).order('created_at'),
     supabase.from('finance_settings').select('*').eq('workspace_id', dn.workspace_id).maybeSingle(),
   ]);
+  assertFiscalLines(items, itemsErr, `delivery note ${deliveryNoteId}`);
 
   const issuer: FiscalParty = {
     vatNumber: fs?.business_vat ?? '',
