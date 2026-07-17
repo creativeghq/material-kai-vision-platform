@@ -23,6 +23,7 @@ const PublicStorefrontPage: React.FC = () => {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
   const [checkingOut, setCheckingOut] = useState(false);
 
   useEffect(() => {
@@ -62,7 +63,7 @@ const PublicStorefrontPage: React.FC = () => {
       const res = await storefrontService.checkout(
         slug,
         cartLines.map(([product_id, qty]) => ({ product_id, qty })),
-        { name: name.trim(), email: email.trim() },
+        { name: name.trim(), email: email.trim(), note: note.trim() || undefined },
       );
       // Hand off to the existing pay page → Stripe Connect checkout.
       window.location.href = res.pay_url;
@@ -162,6 +163,10 @@ const PublicStorefrontPage: React.FC = () => {
                   <div className="space-y-1">
                     <Label className="text-xs">Email</Label>
                     <Input className="h-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Note <span className="text-muted-foreground">(optional)</span></Label>
+                    <Input className="h-9" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. I'll pick up today" maxLength={500} />
                   </div>
                 </div>
                 {error && <p className="text-xs text-destructive">{error}</p>}

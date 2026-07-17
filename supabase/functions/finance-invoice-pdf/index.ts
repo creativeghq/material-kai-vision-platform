@@ -15,7 +15,7 @@ import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { getSpec, resolveColorsHex, toPdfColors, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
+import { getSpec, resolveColorsHex, toPdfColors, hexToRgb, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
 
 // Open Sans — the platform-wide typeface. Static TTFs cover full Greek + Latin +
 // Cyrillic + Euro (verified), so Greek invoice text renders correctly. SemiBold is
@@ -58,6 +58,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     inWords: 'Ολογράφως', receivedBy: 'Ο λαβών', newBalance: 'Νέο υπόλοιπο', serial: 'Α/Α', code: 'Κωδ.',
     orderDetails: 'ΣΤΟΙΧΕΙΑ ΠΑΡΑΓΓΕΛΙΑΣ', billTo: 'ΣΤΟΙΧΕΙΑ ΧΡΕΩΣΗΣ', shipTo: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ',
     itemCode: 'Κωδ. Είδους', itemDescr: 'Περιγραφή Είδους', itemComment: 'Σχόλιο Είδους',
+    order: 'Παραγγελία', invoiceNo: 'Τιμολόγιο', orderNotes: 'Σημείωση παραγγελίας',
   },
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
@@ -82,6 +83,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     inWords: 'In words', receivedBy: 'Received by', newBalance: 'New balance', serial: 'No.', code: 'Code',
     orderDetails: 'ORDER DETAILS', billTo: 'BILL TO', shipTo: 'SHIP TO',
     itemCode: 'Item code', itemDescr: 'Description', itemComment: 'Comment',
+    order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order note',
   },
 };
 
@@ -162,11 +164,14 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     //    not a VAT invoice. Settles inbound money against one or more invoices. ──
     if (kind === 'payment_receipt') {
       const receiptNumber = (row as any).receipt_number || `PR-${String(docId).slice(0, 8).toUpperCase()}`;
-      const [{ data: fsP }, { data: allocs }] = await Promise.all([
+      const [{ data: fsP }, { data: allocs }, { data: orderP }] = await Promise.all([
         supabase.from('finance_settings').select('*').eq('workspace_id', row.workspace_id).maybeSingle(),
         supabase.from('payment_allocations')
-          .select('amount, invoice:invoices(internal_number, legal_number), supplier_bill:supplier_bills(supplier_bill_number)')
+          .select('amount, invoice:invoices(internal_number, legal_number, fiscal_mark), supplier_bill:supplier_bills(supplier_bill_number)')
           .eq('payment_id', docId),
+        row.order_id
+          ? supabase.from('orders').select('order_number, notes').eq('id', row.order_id).maybeSingle()
+          : Promise.resolve({ data: null } as any),
       ]);
       let custP: any = null;
       if (row.counterparty_company_id) {
@@ -209,9 +214,12 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
         } catch { /* balance optional */ }
       }
       const langP: Lang = fsP?.default_doc_language === 'el' ? 'el' : 'en';
+      // Same primary/accent color as the workspace's invoices, so the receipt is on-brand.
+      const accentHex = resolveColorsHex(fsP?.invoice_template_id, fsP?.invoice_template_colors).accent;
       const bytes = await buildPaymentReceiptPdf({
         payment: row, allocations: allocs ?? [], fs: fsP, customer: custP, lang: langP, logo: logoP,
-        receiptNumber, bankAccountName, newBalance,
+        receiptNumber, bankAccountName, newBalance, accentHex,
+        orderNumber: orderP?.order_number ?? null, orderNotes: orderP?.notes ?? null,
       });
       const pPath = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
       const { error: upPErr } = await supabase.storage.from('pdf-documents').upload(pPath, bytes, { upsert: true, contentType: 'application/pdf' });
@@ -282,6 +290,14 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     if (Number(inv.branch_code ?? 0) > 0) {
       const { data } = await supabase.from('finance_branches').select('*').eq('workspace_id', inv.workspace_id).eq('branch_code', inv.branch_code).maybeSingle();
       branch = data;
+    }
+
+    // Linked order — surface its number on the document and carry the customer's
+    // order note (entered when the order was placed) onto the printed notes.
+    if (inv.order_id) {
+      const { data: ord } = await supabase.from('orders').select('order_number, notes').eq('id', inv.order_id).maybeSingle();
+      if (ord?.order_number) inv.order_number = ord.order_number;
+      if (ord?.notes) inv.order_notes = ord.notes;
     }
 
     // Business logo (generation-images/business-logos/…) — embedded in the header.
@@ -376,6 +392,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     [L.number, String(inv.internal_number ?? inv.legal_number ?? '')],
     inv.series ? [L.series, String(inv.series)] : ['', ''],
     [L.date, inv.issued_at ? new Date(inv.issued_at).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') : ''],
+    inv.order_number ? [L.order, String(inv.order_number)] : ['', ''],
     inv.due_at ? [L.due, String(inv.due_at)] : ['', ''],
     inv.related_document ? [L.related, String(inv.related_document)] : ['', ''],
   ].filter((r) => r[0]) as [string, string][];
@@ -613,6 +630,11 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
       text(L.notes, M, vy, 8, bold, MUTED); vy -= 13;
       for (const nl of wrap(inv.notes, font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
     }
+    if (inv.order_notes) {
+      vy -= 3;
+      text(L.orderNotes, M, vy, 8, bold, colors.accent); vy -= 12;
+      for (const nl of wrap(String(inv.order_notes), font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
+    }
   } else {
     text(L.vatAnalysis, M, vy, 8, bold, MUTED); vy -= 12;
     for (const [pct, agg] of Object.entries(vatByRate)) {
@@ -744,6 +766,12 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     for (const nl of wrap(inv.notes, font, 8.5, right - M - 130)) { text(nl, M, y, 8.5, font, MUTED); y -= 11; }
     y -= 2;
   }
+  if (!isCommercial && inv.order_notes) {
+    if (y < M + 80) newPage();
+    text(L.orderNotes, M, y, 8, bold, MUTED); y -= 12;
+    for (const nl of wrap(String(inv.order_notes), font, 8.5, right - M - 130)) { text(nl, M, y, 8.5, font, MUTED); y -= 11; }
+    y -= 2;
+  }
   if (inv.info_box) {
     if (y < M + 80) newPage();
     for (const nl of wrap(inv.info_box, font, 8, right - M - 130)) { text(nl, M, y, 8, font, MUTED); y -= 10; }
@@ -857,13 +885,15 @@ function amountInWords(amount: number, currency: string, lang: Lang): string {
 async function buildPaymentReceiptPdf(d: {
   payment: any; allocations: any[]; fs: any; customer: any; lang: Lang; logo?: Uint8Array | null;
   receiptNumber: string; bankAccountName?: string | null; newBalance?: number | null;
+  accentHex?: string | null; orderNumber?: string | null; orderNotes?: string | null;
 }): Promise<Uint8Array> {
-  const { payment, allocations, fs, customer, lang, logo, receiptNumber, bankAccountName, newBalance } = d;
+  const { payment, allocations, fs, customer, lang, logo, receiptNumber, bankAccountName, newBalance, accentHex, orderNumber, orderNotes } = d;
   const L = LABELS[lang];
   const currency = payment.currency ?? 'EUR';
   const money = (n: any) => fmtMoney(n, currency, lang);
   const num = (n: any) => new Intl.NumberFormat(lang === 'el' ? 'el-GR' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n ?? 0));
   const INK = rgb(0.11, 0.11, 0.13), SUB = rgb(0.43, 0.43, 0.47);
+  const ACC = hexToRgb(accentHex || '#0e7490'); // workspace invoice primary color
   const BAND = rgb(0.93, 0.93, 0.94), BAND2 = rgb(0.965, 0.965, 0.97), HAIR = rgb(0.84, 0.84, 0.86);
 
   const fonts = await loadFonts();
@@ -917,12 +947,12 @@ async function buildPaymentReceiptPdf(d: {
   }
 
   y = Math.min(logoBottom, cy) - 6;
-  page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.8, color: HAIR });
+  page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 1, color: ACC });
   y -= 22;
 
   // ── Title = payment method (BANK TRANSFER / ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ …) ──
   const title = payment.method ? (PAYMENT_METHOD_TITLE[String(payment.method)]?.[lang] ?? L.paymentReceipt) : L.paymentReceipt;
-  text(title, M, y, 13, bold, INK);
+  text(title, M, y, 13, bold, ACC);
   y -= 22;
 
   // ── Customer band (Customer · No. · Date) ──
@@ -941,7 +971,19 @@ async function buildPaymentReceiptPdf(d: {
   if (custCode) text(`${L.code} ${custCode}`, M + 8, y - 25, 8, font, SUB);
   text(receiptNumber, noColX + 8, y - 14, 9.5, font, INK);
   textR(payment.paid_at ? new Date(payment.paid_at).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') : '', right - 8, y - 14, 9.5, font, INK);
-  y -= DH + 16;
+  y -= DH + 14;
+
+  // ── Reference row — order + settled invoice(s) + myDATA MARK (when transmitted) ──
+  const invRefs = (allocations ?? []).map((a: any) => a.invoice?.legal_number || a.invoice?.internal_number).filter(Boolean);
+  const marks = (allocations ?? []).map((a: any) => a.invoice?.fiscal_mark).filter(Boolean);
+  const refBits: string[] = [];
+  if (orderNumber) refBits.push(`${L.order}: ${orderNumber}`);
+  if (invRefs.length) refBits.push(`${L.invoiceNo}: ${[...new Set(invRefs)].join(', ')}`);
+  if (marks.length) refBits.push(`${L.mark}: ${[...new Set(marks)].join(', ')}`);
+  if (refBits.length) {
+    for (const rl of wrapText(refBits.join('   ·   '), font, 8.5, contentW)) { text(rl, M, y, 8.5, font, SUB); y -= 11; }
+    y -= 5;
+  }
 
   // ── Payment method band (method + bank · value), with a filler area below ──
   fill(y, HH, BAND);
@@ -975,6 +1017,11 @@ async function buildPaymentReceiptPdf(d: {
   if (payment.notes) {
     for (const nl of wrapText(String(payment.notes), font, 8.5, contentW)) { text(nl, M, y, 8.5, font, SUB); y -= 11; }
   }
+  if (orderNotes) {
+    y -= 2;
+    text(`${L.orderNotes}:`, M, y, 8.5, bold, ACC); y -= 11;
+    for (const nl of wrapText(String(orderNotes), font, 8.5, contentW)) { text(nl, M, y, 8.5, font, SUB); y -= 11; }
+  }
 
   // ── Foot: amount paid (words + big total) · received-by signature ──
   y -= 26;
@@ -986,7 +1033,7 @@ async function buildPaymentReceiptPdf(d: {
   for (const wl of wrapText(words, font, 10, contentW - 190)) { text(wl, M, y, 10, font, INK); y -= 13; }
   y -= 6;
   text(money(payment.amount), M + 2, y - 15, 20, bold, INK);
-  page.drawLine({ start: { x: M, y: y - 21 }, end: { x: M + 190, y: y - 21 }, thickness: 1.4, color: INK });
+  page.drawLine({ start: { x: M, y: y - 21 }, end: { x: M + 190, y: y - 21 }, thickness: 1.4, color: ACC });
   y -= 21;
 
   // ── New balance ──

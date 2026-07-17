@@ -88,6 +88,8 @@ export interface InvoiceRenderData {
   payment: { method?: string; info?: string; accounts: string[] };
   shipping?: { rows: string[] } | null;
   notes?: string | null;
+  /** Customer note entered when the order was placed (shown under the invoice notes). */
+  orderNotes?: string | null;
   infoBox?: string | null;
   fiscal?: { mark?: string; uid?: string; qrUrl?: string | null } | null;
 }

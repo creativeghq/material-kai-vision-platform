@@ -274,7 +274,7 @@ export function InvoiceDocument({
   };
 
   const Notes = () => {
-    if (!data.notes && !data.infoBox) return null;
+    if (!data.notes && !data.orderNotes && !data.infoBox) return null;
     return (
       <div style={{ marginBottom: 12 }}>
         {data.notes && (
@@ -282,6 +282,12 @@ export function InvoiceDocument({
             <div style={{ fontSize: 9, fontWeight: 700, ...muted, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{L.notes}</div>
             <div style={{ fontSize: 9.5, ...muted, whiteSpace: 'pre-wrap' }}>{data.notes}</div>
           </>
+        )}
+        {data.orderNotes && (
+          <div style={{ marginTop: data.notes ? 6 : 0 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: colors.accent, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{L.orderNotes}</div>
+            <div style={{ fontSize: 9.5, ...muted, whiteSpace: 'pre-wrap' }}>{data.orderNotes}</div>
+          </div>
         )}
         {data.infoBox && <div style={{ fontSize: 9, ...muted, marginTop: 4, whiteSpace: 'pre-wrap' }}>{data.infoBox}</div>}
       </div>
@@ -413,6 +419,12 @@ export function InvoiceDocument({
                 <div style={{ fontSize: 9, fontWeight: 700, ...muted, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{L.notes}</div>
                 <div style={{ fontSize: 9, ...muted, whiteSpace: 'pre-wrap' }}>{data.notes}</div>
               </>
+            )}
+            {data.orderNotes && (
+              <div style={{ marginTop: data.notes ? 8 : 0 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: colors.accent, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{L.orderNotes}</div>
+                <div style={{ fontSize: 9, ...muted, whiteSpace: 'pre-wrap' }}>{data.orderNotes}</div>
+              </div>
             )}
           </div>
           <div style={{ width: 250 }}>

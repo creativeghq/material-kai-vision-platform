@@ -4,6 +4,7 @@ import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText,
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Label } from '@/components/core/ui/label';
@@ -269,6 +270,9 @@ const NewOrderModal: React.FC<{
   const [currency, setCurrency] = useState('EUR');
   const [categoryId, setCategoryId] = useState('none');
   const [expectedDate, setExpectedDate] = useState('');
+  // Order note from whoever places the order (e.g. delivery/pickup instructions). Prints on the
+  // invoice + payment receipt and is visible on the order in the backend.
+  const [notes, setNotes] = useState('');
 
   const isSales = orderType === 'sales';
   // Sales orders are income, purchase orders are expense — offer the matching category kinds.
@@ -406,6 +410,7 @@ const NewOrderModal: React.FC<{
         projectId: project?.id ?? null,
         categoryId: categoryId === 'none' ? null : categoryId,
         expectedPaymentDate: expectedDate || null,
+        notes: notes.trim() || null,
         customerCompanyId: isSales ? coId : null,
         customerContactId: isSales ? ctId : null,
         supplierCompanyId: !isSales ? coId : null,
@@ -573,6 +578,17 @@ const NewOrderModal: React.FC<{
             <p className="text-[11px] text-muted-foreground">{isSales ? 'Pick a catalog product to auto-fill the customer’s price, cost & unit (this customer’s discount is applied). Editable.' : 'A purchase order’s unit price is what we pay the supplier (= our cost). Pick a catalog product to auto-fill it.'} Catalog lines link to the warehouse — delivery moves stock.</p>
           </div>
 
+          <div className="space-y-1">
+            <Label>Order note (optional)</Label>
+            <Textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={isSales ? 'e.g. Customer will pick up today — call on arrival.' : 'e.g. Deliver to the back entrance before noon.'}
+            />
+            <p className="text-[11px] text-muted-foreground">Prints on the invoice and the payment receipt, and stays visible on the order here.</p>
+          </div>
+
           <div className="flex justify-end gap-4 text-sm">
             <span className="text-muted-foreground">Net {formatMoney(netTotal)}</span>
             <span className="text-muted-foreground">VAT {formatMoney(vatTotal)}</span>
@@ -689,13 +705,18 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     } finally { setSaving(false); }
   };
 
-  // Set the order's finance category / expected payment date (classify + let it age pre-invoice).
-  const saveMeta = async (patch: { categoryId?: string | null; expectedPaymentDate?: string | null }) => {
+  // Set the order's finance category / expected payment date / note (classify + let it age pre-invoice).
+  const saveMeta = async (patch: { categoryId?: string | null; expectedPaymentDate?: string | null; notes?: string | null }) => {
     if (!order) return;
     setSaving(true);
     try {
       await ordersService.updateMeta(order.id, patch);
-      setOrder({ ...order, ...('categoryId' in patch ? { category_id: patch.categoryId ?? null } : {}), ...('expectedPaymentDate' in patch ? { expected_payment_date: patch.expectedPaymentDate ?? null } : {}) });
+      setOrder({
+        ...order,
+        ...('categoryId' in patch ? { category_id: patch.categoryId ?? null } : {}),
+        ...('expectedPaymentDate' in patch ? { expected_payment_date: patch.expectedPaymentDate ?? null } : {}),
+        ...('notes' in patch ? { notes: patch.notes ?? null } : {}),
+      });
       onChanged();
     } catch (err: any) {
       toast({ title: 'Failed to update order', description: err?.message, variant: 'destructive' });
@@ -1104,6 +1125,23 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                   onChange={(e) => void saveMeta({ expectedPaymentDate: e.target.value || null })} />
               </div>
               <p className="text-[11px] text-muted-foreground max-w-xs">Un-invoiced orders age in Receivables/Payables against the expected payment date.</p>
+            </div>
+
+            {/* Order note — captured when the order is placed; prints on the invoice + receipt. */}
+            <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+              <Label className="text-[10px] text-muted-foreground">Order note</Label>
+              <Textarea
+                key={order.id}
+                rows={2}
+                defaultValue={order.notes ?? ''}
+                disabled={saving}
+                placeholder="Note from whoever placed the order — e.g. pickup / delivery instructions. Prints on the invoice & receipt."
+                className="text-sm"
+                onBlur={(e) => {
+                  const v = e.target.value.trim() || null;
+                  if (v !== (order.notes ?? null)) void saveMeta({ notes: v });
+                }}
+              />
             </div>
 
             {!editing ? (

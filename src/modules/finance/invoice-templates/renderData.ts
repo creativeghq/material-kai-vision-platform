@@ -15,6 +15,8 @@ export interface BuildRenderInput {
   customer: Record<string, any> | null;
   /** finance_branches row when invoice.branch_code > 0. */
   branch?: Record<string, any> | null;
+  /** Linked order (orders row) when invoice.order_id is set — for the order number + note. */
+  order?: Record<string, any> | null;
   /** Public/signed URL for the business logo, if available. */
   logoUrl?: string | null;
   /** Treasury accounts flagged "Show on invoice" — the single source of printed bank
@@ -32,7 +34,7 @@ export function formatInvoiceMoney(value: any, currency: string, lang: Lang): st
 }
 
 export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderData {
-  const { invoice: inv, items, settings: fs, customer, branch, logoUrl, bankAccounts } = input;
+  const { invoice: inv, items, settings: fs, customer, branch, order, logoUrl, bankAccounts } = input;
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
   const L = INVOICE_LABELS[lang];
@@ -68,6 +70,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   meta.push({ label: L.number, value: String(inv.internal_number ?? inv.legal_number ?? '') });
   if (inv.series) meta.push({ label: L.series, value: String(inv.series) });
   if (inv.issued_at) meta.push({ label: L.date, value: new Date(inv.issued_at).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') });
+  if (order?.order_number) meta.push({ label: L.order, value: String(order.order_number) });
   if (inv.due_at) meta.push({ label: L.due, value: String(inv.due_at) });
   if (inv.related_document) meta.push({ label: L.related, value: String(inv.related_document) });
 
@@ -172,6 +175,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     },
     shipping,
     notes: inv.print_terms !== false ? (inv.notes || null) : null,
+    orderNotes: order?.notes || null,
     infoBox: inv.info_box || null,
     fiscal: inv.fiscal_mark ? {
       mark: String(inv.fiscal_mark),

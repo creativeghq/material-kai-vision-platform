@@ -497,10 +497,11 @@ export const ordersService = {
    * due date, so the expected payment date is what it ages against). Both carry onto the
    * invoice/supplier bill when the order is invoiced. Pass a field to change it; omit to leave it.
    */
-  async updateMeta(id: string, patch: { categoryId?: string | null; expectedPaymentDate?: string | null }): Promise<void> {
+  async updateMeta(id: string, patch: { categoryId?: string | null; expectedPaymentDate?: string | null; notes?: string | null }): Promise<void> {
     const clean: Record<string, any> = { updated_at: new Date().toISOString() };
     if (patch.categoryId !== undefined) clean.category_id = patch.categoryId;
     if (patch.expectedPaymentDate !== undefined) clean.expected_payment_date = patch.expectedPaymentDate;
+    if (patch.notes !== undefined) clean.notes = patch.notes;
     const { error } = await supabase.from('orders').update(clean).eq('id', id);
     if (error) throw error;
   },

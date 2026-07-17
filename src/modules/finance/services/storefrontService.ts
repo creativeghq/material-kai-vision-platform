@@ -51,7 +51,7 @@ export const storefrontService = {
   // ── Public (anonymous) ──
   getMeta(slug: string) { return callFn<StorefrontMeta & { ok: boolean }>({ action: 'meta', slug }); },
   getProducts(slug: string) { return callFn<{ ok: boolean; products: StorefrontProduct[] }>({ action: 'products', slug }); },
-  checkout(slug: string, items: { product_id: string; qty: number }[], customer: { name: string; email: string }) {
+  checkout(slug: string, items: { product_id: string; qty: number }[], customer: { name: string; email: string; note?: string }) {
     return callFn<{ ok: boolean; invoice_id: string; pay_token: string; pay_url: string; total: number; currency: string }>(
       { action: 'checkout', slug, items, customer },
     );

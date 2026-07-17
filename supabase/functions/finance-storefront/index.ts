@@ -164,6 +164,12 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: ws.id });
       if (numErr) return json({ error: `numbering failed: ${numErr.message}` }, 500);
 
+      // Optional note the shopper typed at checkout (pickup/delivery instructions, etc.).
+      const shopperNote = typeof (body?.note ?? customer?.note) === 'string'
+        ? String(body?.note ?? customer?.note).trim().slice(0, 500) : '';
+      const orderNotes = `Online store order — ${String(customer.name).slice(0, 120)} <${String(customer.email).slice(0, 160)}>`
+        + (shopperNote ? `\nCustomer note: ${shopperNote}` : '');
+
       const payToken = crypto.randomUUID().replace(/-/g, '');
       const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
         workspace_id: ws.id,
@@ -175,7 +181,7 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         subtotal_net: totalNet, vat_rate: vatRate, vat_amount: totalVat, total: totalGross,
         prices_include_vat: true,
         payment_method_code: 7, // card (online)
-        notes: `Online store order — ${String(customer.name).slice(0, 120)} <${String(customer.email).slice(0, 160)}>`,
+        notes: orderNotes,
         pay_token: payToken,
         pay_token_expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
         issued_at: null, due_at: null,

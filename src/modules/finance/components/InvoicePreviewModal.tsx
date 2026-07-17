@@ -75,6 +75,12 @@ export function InvoicePreviewModal({
           branch = data;
         }
 
+        let order: Record<string, any> | null = null;
+        if (invoice.order_id) {
+          const { data } = await supabase.from('orders').select('order_number, notes').eq('id', invoice.order_id).maybeSingle();
+          order = data;
+        }
+
         let logoUrl: string | null = null;
         if (settings?.business_logo_path) {
           const { data: signed } = await supabase.storage.from('generation-images')
@@ -87,7 +93,7 @@ export function InvoicePreviewModal({
         const spec = getTemplateSpec(templateId);
         const colors = resolveColors(templateId, invoice.template_colors ?? settings?.invoice_template_colors);
         const bankAccounts = await financeService.listInvoiceBankAccounts(workspaceId);
-        const data = buildInvoiceRenderData({ invoice, items: items ?? [], settings, customer, branch, logoUrl, bankAccounts });
+        const data = buildInvoiceRenderData({ invoice, items: items ?? [], settings, customer, branch, order, logoUrl, bankAccounts });
 
         if (!cancelled) setResolved({ spec, colors, data });
       } catch (err: any) {
