@@ -59,36 +59,52 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
     );
   }
 
+  const body = await req.text();
+
+  // ── Signature verification ────────────────────────────────────────────────
+  // Kept in its OWN try/catch, separate from handler dispatch. A verification
+  // failure is a client error (400, never going to succeed on retry); a handler
+  // fault is a server error (5xx, must be retried AND reported to Sentry). The
+  // two used to share one catch that returned 400 for both, which made a real
+  // failure indistinguishable from a bad signature and hid the cause for weeks.
+  //
+  // #200 — the same webhook URL receives events from BOTH the default account (tenant
+  // payments) and, when configured, the dedicated platform-billing account. Verify against
+  // the default secret first; on failure try the billing secret. Whichever verifies decides
+  // which Stripe client downstream API calls use (subscriptions.retrieve, etc.) and which
+  // customer-id column we persist.
+  let event: Stripe.Event;
+  eventIsBilling = false;
+  stripe = _stripe;
   try {
-    const body = await req.text();
-    // #200 — the same webhook URL receives events from BOTH the default account (tenant
-    // payments) and, when configured, the dedicated platform-billing account. Verify against
-    // the default secret first; on failure try the billing secret. Whichever verifies decides
-    // which Stripe client downstream API calls use (subscriptions.retrieve, etc.) and which
-    // customer-id column we persist.
-    let event: Stripe.Event;
-    eventIsBilling = false;
-    stripe = _stripe;
     // constructEventAsync (NOT constructEvent) is mandatory here: verification runs on
     // Web Crypto's SubtleCrypto, which is async-only in the Deno edge runtime. The sync
     // variant throws "SubtleCryptoProvider cannot be used in a synchronous context"
     // before it ever checks the signature, so every delivery 400s regardless of secret.
-    try {
-      event = await _stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
-    } catch (primaryErr) {
-      const billingSecret = platformBillingWebhookSecret();
-      const billingStripe = getPlatformBillingStripe();
-      if (billingSecret && billingSecret !== webhookSecret && billingStripe) {
+    event = await _stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+  } catch (primaryErr) {
+    const billingSecret = platformBillingWebhookSecret();
+    const billingStripe = getPlatformBillingStripe();
+    if (billingSecret && billingSecret !== webhookSecret && billingStripe) {
+      try {
         event = await billingStripe.webhooks.constructEventAsync(body, signature, billingSecret);
         eventIsBilling = true;
         stripe = billingStripe;
-      } else {
-        throw primaryErr;
+      } catch (billingErr) {
+        return signatureFailure(primaryErr, billingErr);
       }
+    } else {
+      return signatureFailure(primaryErr);
     }
+  }
 
-    console.log(`Received Stripe event: ${event.type}${eventIsBilling ? ' [billing account]' : ''}`);
+  console.log(`Received Stripe event: ${event.type}${eventIsBilling ? ' [billing account]' : ''}`);
 
+  // ── Handler dispatch ──────────────────────────────────────────────────────
+  // Deliberately NOT wrapped in a catch-and-400. Handlers throw on purpose (e.g.
+  // grant_credits failure) so the event is retried; letting it propagate means
+  // withApiLogging returns 500 AND reports it to Sentry (4xx are never reported).
+  try {
     switch (event.type) {
       // ============================================
       // Customer Events
@@ -135,16 +151,42 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
-
-    return new Response(JSON.stringify({ received: true }), { status: 200 });
   } catch (error) {
-    console.error('Webhook error:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Webhook error' }),
-      { status: 400 }
-    );
+    // Re-throw with the event pinned to the message so Sentry/logs identify the
+    // exact delivery. withApiLogging turns this into a 500 (retried + reported).
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[stripe-webhooks] handler failed for ${event.type} (${event.id}):`, error);
+    throw new Error(`${event.type} (${event.id}) handler failed: ${msg}`);
   }
+
+  return new Response(JSON.stringify({ received: true }), { status: 200 });
 }));
+
+/**
+ * 400 for a delivery whose signature we could not verify. Surfaces the real Stripe
+ * message (e.g. "No signatures found matching the expected signature for payload")
+ * in BOTH the response body Stripe shows in the Dashboard and the function log, so
+ * a secret mismatch is never again mistaken for something else. Retrying cannot fix
+ * it, hence 4xx (and hence intentionally not reported to Sentry).
+ */
+function signatureFailure(primaryErr: unknown, billingErr?: unknown): Response {
+  const primary = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+  const billing = billingErr === undefined
+    ? undefined
+    : billingErr instanceof Error ? billingErr.message : String(billingErr);
+  console.error(
+    `[stripe-webhooks] signature verification failed — default secret: ${primary}` +
+    (billing ? ` | billing secret: ${billing}` : ' (no distinct billing secret configured)'),
+  );
+  return new Response(
+    JSON.stringify({
+      error: `Stripe signature verification failed: ${primary}`,
+      code: 'signature_verification_failed',
+      billing_secret_error: billing,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } },
+  );
+}
 
 // ============================================
 // Handler Functions
