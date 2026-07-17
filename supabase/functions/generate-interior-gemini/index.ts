@@ -377,10 +377,22 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Fetch a remote image and return as Uint8Array */
+/** Fetch a remote image and return as Uint8Array.
+ *
+ * SSRF-guarded (invariant 7, pentest #250 C23/C24). `url` originates from
+ * `body.reference_image_url`, so a raw fetch let any authenticated user reach
+ * cloud metadata (169.254.169.254), loopback or RFC1918 — and the old error text
+ * echoed the URL and upstream status back, making it a usable response oracle.
+ * `redirect: 'error'` is required by the guard's contract (a public URL can 302
+ * to a blocked address after the check). The message no longer leaks status/URL.
+ *
+ * NOTE: `reference_image_url` is ALSO passed to Replicate (callFluxDepthPro),
+ * which fetches it from Replicate's own network — validate before it leaves here.
+ */
 async function fetchImageBuffer(url: string): Promise<Uint8Array> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch image: ${url} (${res.status})`);
+  const safeUrl = await assertSafeUrl(url);
+  const res = await fetch(safeUrl, { redirect: 'error' });
+  if (!res.ok) throw new Error('Failed to fetch the reference image');
   const buf = await res.arrayBuffer();
   return new Uint8Array(buf);
 }

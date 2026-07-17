@@ -24,6 +24,7 @@ import { editImageWithGrok } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -37,10 +38,20 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Fetch a remote image and return raw bytes + detected mime type */
+/** Fetch a remote image and return raw bytes + detected mime type.
+ *
+ * SSRF-guarded (invariant 7, pentest #250 C23/C24). `url` is caller-supplied
+ * (`body.image_url`), so a raw fetch here was a working internal port scanner:
+ * an authenticated user could point it at 169.254.169.254 (cloud metadata),
+ * loopback or RFC1918, and the thrown message below leaks the upstream status
+ * back to them — a response oracle. `redirect: 'error'` is REQUIRED by the
+ * guard's contract: a public URL can 302 to a blocked address after the check.
+ * On failure we deliberately do NOT echo the status or URL back to the caller.
+ */
 async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; mimeType: string }> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch image (${res.status}): ${url}`);
+  const safeUrl = await assertSafeUrl(url);
+  const res = await fetch(safeUrl, { redirect: 'error' });
+  if (!res.ok) throw new Error('Failed to fetch the source image');
   const mimeType = res.headers.get('content-type') || 'image/jpeg';
   return { bytes: new Uint8Array(await res.arrayBuffer()), mimeType };
 }
