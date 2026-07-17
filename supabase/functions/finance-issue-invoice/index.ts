@@ -125,7 +125,7 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
 
   const { data: s } = await supabase
     .from('finance_settings')
-    .select('risk_block_inactive_vat, risk_block_unvalidated_vat, risk_warn_over_credit_limit, risk_block_over_credit_limit')
+    .select('risk_block_inactive_vat, risk_block_unvalidated_vat, risk_warn_over_credit_limit, risk_block_over_credit_limit, risk_block_min_order, risk_block_unpaid_invoice, min_order_value')
     .eq('workspace_id', inv.workspace_id)
     .maybeSingle();
   // No settings row ⇒ safe defaults (block inactive only).
@@ -133,9 +133,27 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     block_inactive: s?.risk_block_inactive_vat ?? true,
     block_unvalidated: s?.risk_block_unvalidated_vat ?? false,
     block_over: s?.risk_block_over_credit_limit ?? false,
+    // Wired 2026-07-17. These two were offered in Finance → Settings → "Buyer risk
+    // rules" as **Block** switches (and persisted fine) but NOTHING read them — this
+    // select listed only the four columns above, so an operator could enable
+    // "Block issuance while the buyer has an unpaid / overdue invoice" and every
+    // invoice issued regardless. A financial control that reported active while
+    // being absent. Default false: enabling stays an explicit operator choice, so
+    // this cannot start blocking issuance for anyone who has not asked for it.
+    block_min_order: s?.risk_block_min_order ?? false,
+    block_unpaid: s?.risk_block_unpaid_invoice ?? false,
   };
 
   const blocks: string[] = [];
+
+  // Minimum order value — depends only on the invoice total, so it is checked before
+  // the buyer lookup (it must apply to buyer-less documents too). Guarded on > 0: a
+  // null/0 minimum means "no minimum", never "block everything".
+  const minOrderValue = Number(s?.min_order_value ?? 0);
+  if (rules.block_min_order && minOrderValue > 0 && (Number(inv.total) || 0) < minOrderValue) {
+    blocks.push(`this document is below the minimum order value (${minOrderValue})`);
+  }
+
   const isCompany = !!inv.customer_company_id;
   const buyerId = inv.customer_company_id ?? inv.customer_contact_id;
   if (!buyerId) return blocks;
@@ -165,16 +183,39 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     if (rules.block_unvalidated && (buyer.vat_validated === null || buyer.vat_validated === undefined)) blocks.push('the buyer VAT has never been validated');
   }
 
-  if (rules.block_over && buyer.credit_limit != null && Number(buyer.credit_limit) > 0) {
+  // Both the credit-limit and the unpaid-invoice rule need the buyer's OPEN documents.
+  // Fetch once and share rather than querying twice when both are enabled.
+  // `['issued','partially_paid','overdue']` is this function's existing definition of
+  // "outstanding" (it backed the credit-limit rule); reused verbatim so "unpaid /
+  // overdue" in the settings copy means exactly the same thing everywhere.
+  const needsOpenDocs =
+    (rules.block_over && buyer.credit_limit != null && Number(buyer.credit_limit) > 0) ||
+    rules.block_unpaid;
+
+  let openRows: any[] = [];
+  if (needsOpenDocs) {
     const col = isCompany ? 'customer_company_id' : 'customer_contact_id';
-    const { data: openRows } = await supabase
+    const { data } = await supabase
       .from('invoices')
-      .select('amount_due')
+      .select('amount_due, status')
       .eq('workspace_id', inv.workspace_id)
       .eq(col, buyerId)
       .neq('id', invoiceId)
       .in('status', ['issued', 'partially_paid', 'overdue']);
-    const outstanding = (openRows ?? []).reduce((acc: number, r: any) => acc + (Number(r.amount_due) || 0), 0);
+    openRows = data ?? [];
+  }
+
+  if (rules.block_unpaid && openRows.length > 0) {
+    const overdue = openRows.filter((r: any) => r.status === 'overdue').length;
+    blocks.push(
+      overdue > 0
+        ? `the buyer has ${overdue} overdue invoice(s)`
+        : `the buyer has ${openRows.length} unpaid invoice(s)`,
+    );
+  }
+
+  if (rules.block_over && buyer.credit_limit != null && Number(buyer.credit_limit) > 0) {
+    const outstanding = openRows.reduce((acc: number, r: any) => acc + (Number(r.amount_due) || 0), 0);
     if (outstanding + (Number(inv.total) || 0) > Number(buyer.credit_limit)) {
       blocks.push('this invoice exceeds the buyer credit limit');
     }

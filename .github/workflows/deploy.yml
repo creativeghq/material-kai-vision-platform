@@ -311,14 +311,20 @@ jobs:
           if [ -s "$FAILED_FILE" ]; then
             echo "❌ Failed functions:"
             cat "$FAILED_FILE"
-            # Critical functions fail the workflow; others log a warning.
-            if grep -qx 'agent-chat' "$FAILED_FILE"; then
-              echo ""
-              echo "💥 Critical function agent-chat failed — failing the job"
-              exit 1
-            fi
             echo ""
-            echo "⚠️  Non-critical failures — workflow continues"
+            # ANY failed function fails the job (2026-07-17). This used to fail only
+            # when `agent-chat` was in the list and log "non-critical, continuing" for
+            # everything else — so 94 of 95 functions could fail to deploy and the
+            # workflow still reported success, leaving prod on old code. That is the
+            # exact outcome the sequential-deploy comment above exists to prevent
+            # (the 2026-06-01 "reported deployed but ran old code" incident); the
+            # failure handler was quietly re-opening the same hole for stripe-webhooks,
+            # finance-*, hr-api and every other function.
+            # A failed deploy is never non-critical: the repo and prod have diverged.
+            echo "💥 $(wc -l < "$FAILED_FILE" | tr -d ' ') function(s) failed to deploy — failing the job."
+            echo "   Prod is now running OLD code for the functions listed above."
+            echo "   Re-run the workflow; if it persists, deploy that function manually and investigate."
+            exit 1
           else
             echo "✅ All $(echo "$FUNCS" | wc -w | tr -d ' ') functions deployed"
           fi

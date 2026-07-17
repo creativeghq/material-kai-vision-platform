@@ -14,7 +14,15 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
   test: {
     environment: 'node',
-    include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
+    // tests/security/** was missing until 2026-07-17, so the #183 inbound-credential
+    // isolation guard sat uncollected — and unrun — since 2026-06-07. It is hermetic
+    // (source-level greps, no network), so it belongs with the unit tier.
+    // If you add a new tests/<tier>/ directory, add it here or it silently never runs.
+    include: [
+      'tests/unit/**/*.test.ts',
+      'tests/security/**/*.test.ts',
+      'tests/integration/**/*.test.ts',
+    ],
     // Integration tests hit prod; give them room. Unit tests finish in ms regardless.
     testTimeout: 30_000,
     hookTimeout: 30_000,
