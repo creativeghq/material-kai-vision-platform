@@ -15,6 +15,8 @@ import {
   Package,
   Workflow,
   Headset,
+  Search,
+  Sofa,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -89,6 +91,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // ── Top bar: universal surfaces every user relies on ──
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
+  // Material Search is the platform's most-used, cross-cutting capability, so it lives in the
+  // lean top bar (always one click away) rather than inside a single Hub. 7-vector fusion search
+  // over materials/catalogs/KB — the same MIVAA backend the agent's material_search tool uses.
+  { id: 'search', label: 'Search', path: '/search', icon: Search },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireCapability: 'marketplace.browse' },
 
   // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251),
@@ -99,6 +105,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // MoodBoards moved off the lean top bar into Studio Hub (#251 follow-up) — it's creative
   // delivery work, grouped alongside Projects and client presentations.
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette, surface: 'app', hub: 'studio', description: 'Curate materials and design inspiration.' },
+  // Interior Design is agent-first (the Vision agent + generation toolkit on the canvas), so the
+  // Studio Hub entry deep-links into the Agent Hub with Vision pre-selected rather than a static page.
+  { id: 'interior', label: 'Interior Design', path: '/agent-hub?agent=interior-designer', icon: Sofa, surface: 'app', hub: 'studio', description: 'Design, render & stage rooms with the AI studio.' },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', hub: 'sales', description: 'Build and send client quotes.' },
   // #201 — Sales portal for invited reps (persona 'sales').
   { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', hub: 'sales', description: 'Sales-rep portal for quotes.' },
@@ -180,6 +189,6 @@ export function filterNavItems(
 export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'dashboard',
   'agent-hub',
-  'moodboard',
+  'search',
   'discover',
 ];
