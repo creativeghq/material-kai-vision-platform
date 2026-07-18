@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ClipboardList, CheckCircle2, XCircle, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -24,6 +25,17 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
   const [openCountId, setOpenCountId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // #251 App Launcher deep-link: /warehouse?tab=counts&new=count opens the New stocktake dialog.
+  useEffect(() => {
+    if (searchParams.get('new') === 'count') {
+      setNewOpen(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const load = async () => {
     setLoading(true);
