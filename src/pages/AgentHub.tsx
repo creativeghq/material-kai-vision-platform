@@ -12,7 +12,11 @@ import { supabase } from '@/integrations/supabase/client';
 const AgentHubPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialPrompt = searchParams.get('prompt') ?? undefined;
+  // `q` is honored as an alias of `prompt` — ~8 handoff call sites across the app
+  // (dashboard hero, SEO dashboard, catalogs, Pinterest import, …) navigate with
+  // `?q=…`, which was silently dropped before. Rail #1 of the Capability Fabric (#275):
+  // every page→agent handoff carries its seed text reliably.
+  const initialPrompt = searchParams.get('prompt') ?? searchParams.get('q') ?? undefined;
   const initialConversationId = searchParams.get('conversation') ?? undefined;
   const initialMoodboardId = searchParams.get('moodboard') ?? undefined;
   const initialAgent = searchParams.get('agent') ?? undefined;
