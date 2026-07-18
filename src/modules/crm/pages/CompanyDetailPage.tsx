@@ -170,7 +170,8 @@ export const CompanyDetailPage: React.FC = () => {
   const [viesBusy, setViesBusy] = useState(false);
   const [aadeBusy, setAadeBusy] = useState(false);
   // Which top-level record tab is showing (activity-first record layout, 2026-07).
-  const [mainTab, setMainTab] = useState('notes');
+  // Companies open on Contacts (always present; Account only renders for customers/suppliers).
+  const [mainTab, setMainTab] = useState('contacts');
   const [company, setCompany] = useState<Company | null>(isNew ? {
     id: '',
     name: '',
