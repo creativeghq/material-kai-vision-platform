@@ -109,6 +109,16 @@ const InboxPage: React.FC = () => {
   const [showNew, setShowNew] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+
+  // #251 App Launcher deep-link: /inbox?new=conversation opens the New (internal) thread dialog.
+  useEffect(() => {
+    if (activeWorkspaceId && searchParams.get('new') === 'conversation') {
+      setShowNew(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [activeWorkspaceId, searchParams, setSearchParams]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 

@@ -5,6 +5,7 @@
  * surfaces the "configure Resend" state.
  */
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Send, Calendar, Users, Play, Pause, Ban, Trash2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -30,6 +31,17 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [statsFor, setStatsFor] = useState<MarketingCampaign | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // #251 App Launcher deep-link: /marketing/email?new=campaign opens the Create Campaign modal.
+  useEffect(() => {
+    if (searchParams.get('new') === 'campaign') {
+      setShowCreate(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const load = async () => {
     setLoading(true);

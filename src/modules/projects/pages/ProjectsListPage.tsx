@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FolderKanban,
   Plus,
@@ -71,6 +71,17 @@ export const ProjectsListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // #251 App Launcher deep-link: /projects?new=project opens the New Project modal.
+  useEffect(() => {
+    if (searchParams.get('new') === 'project') {
+      setShowCreate(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const load = useCallback(async () => {
     try {

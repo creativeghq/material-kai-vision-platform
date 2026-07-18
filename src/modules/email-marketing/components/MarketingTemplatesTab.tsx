@@ -3,7 +3,7 @@
  * open the shared GrapesJS builder. Reuses email_templates (workspace_id set, is_system=false).
  */
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Pencil, Trash2, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -22,6 +22,17 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // #251 App Launcher deep-link: /marketing/email?tab=templates&new=template opens the create modal.
+  useEffect(() => {
+    if (searchParams.get('new') === 'template') {
+      setShowCreate(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [creating, setCreating] = useState(false);
 
   const load = async () => {

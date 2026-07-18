@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, ExternalLink, Loader2, Pencil, Users, Mail } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -92,7 +92,18 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', weekly: '40', vat: '', amka: '', children: '0', workStart: '', workEnd: '' });
+
+  // #251 App Launcher deep-link: /hr?tab=employees&new=employee opens this Add-employee dialog.
+  useEffect(() => {
+    if (searchParams.get('new') === 'employee') {
+      setOpen(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [workDays, setWorkDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const upd = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
   const reset = () => { setF({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time', start_date: '', allowance: '20', pay_basis: 'monthly', salary: '', hourly: '', weekly: '40', vat: '', amka: '', children: '0', workStart: '', workEnd: '' }); setWorkDays([1, 2, 3, 4, 5]); };

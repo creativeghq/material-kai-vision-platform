@@ -5,7 +5,7 @@
 // the catalog (cascade pricing applies there). RLS (`consolidated_quotes_select_public`)
 // already scopes a non-admin to their OWN quotes, so a rep never sees other reps' orders.
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Briefcase, Plus, Loader2, Eye, ShoppingCart, Clock, CheckCircle, FileText, User, Building2, Search, UserPlus } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -30,8 +30,19 @@ export const SalesPage: React.FC = () => {
   const [orders, setOrders] = useState<QuoteWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   // Per-order customer label + CRM deep-link, resolved after load.
   const [customers, setCustomers] = useState<Record<string, { label: string; href: string }>>({});
+
+  // #251 App Launcher deep-link: /sales?new=order opens the New Order dialog.
+  useEffect(() => {
+    if (searchParams.get('new') === 'order') {
+      setDialogOpen(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const loadOrders = useCallback(async () => {
     try {
