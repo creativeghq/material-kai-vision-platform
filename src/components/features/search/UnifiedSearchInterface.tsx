@@ -30,6 +30,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   MaterialFiltersPanel,
   type MaterialFilters,
@@ -98,6 +99,10 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 }) => {
   // Using modern MaterialSearchService
   // const materialSearchService is imported as singleton
+
+  // Search is scoped to the ACTIVE workspace (respects the workspace switcher) rather than an
+  // arbitrary `.maybeSingle()` membership row — so multi-workspace users search the right tenant.
+  const { activeWorkspaceId } = useWorkspace();
 
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -328,20 +333,16 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     setIsSearching(true);
 
     try {
-      // Get workspace_id from user's session
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
+      // Prefer the active workspace (switcher-aware); fall back to a membership lookup.
+      let workspaceId = activeWorkspaceId;
+      if (!workspaceId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+        const { data: wd } = await supabase
+          .from('workspace_members').select('workspace_id').eq('user_id', user.id).maybeSingle();
+        workspaceId = wd?.workspace_id ?? null;
       }
-
-      // Get user's workspace
-      const { data: workspaceData } = await supabase
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!workspaceData?.workspace_id) {
+      if (!workspaceId) {
         throw new Error('No workspace found for user');
       }
 
@@ -363,7 +364,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       // color, texture, style, and material searches.
       searchResponse = await UnifiedSearchService.searchMultiVector({
         query: searchType === 'text' ? query.trim() : (selectedImage?.name || `${searchType}_search`),
-        workspace_id: workspaceData.workspace_id,
+        workspace_id: workspaceId,
         limit: 15,
         image_base64: imageBase64,
         enableQueryUnderstanding: true,
@@ -422,6 +423,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     detectQueryType,
     onResultsFound,
     toast,
+    activeWorkspaceId,
   ]);
 
   const handleQuickSearch = useCallback(
@@ -430,27 +432,23 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
       setIsSearching(true);
       try {
-        // Get workspace_id from user's session
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          throw new Error('User not authenticated');
+        // Prefer the active workspace (switcher-aware); fall back to a membership lookup.
+        let workspaceId = activeWorkspaceId;
+        if (!workspaceId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('User not authenticated');
+          const { data: wd } = await supabase
+            .from('workspace_members').select('workspace_id').eq('user_id', user.id).maybeSingle();
+          workspaceId = wd?.workspace_id ?? null;
         }
-
-        // Get user's workspace
-        const { data: workspaceData } = await supabase
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (!workspaceData?.workspace_id) {
+        if (!workspaceId) {
           throw new Error('No workspace found for user');
         }
 
         // Quick text-based search using multi_vector strategy
         const quickResponse = await UnifiedSearchService.search({
           query: searchQuery,
-          workspace_id: workspaceData.workspace_id,
+          workspace_id: workspaceId,
           strategy: 'multi_vector',
           top_k: 8,
         });
@@ -488,7 +486,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         setIsSearching(false);
       }
     },
-    [onResultsFound, toast],
+    [onResultsFound, toast, activeWorkspaceId],
   );
 
   const getResultIcon = (type: string) => {
