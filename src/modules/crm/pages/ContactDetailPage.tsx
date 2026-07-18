@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, X, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -168,6 +168,8 @@ export const ContactDetailPage: React.FC = () => {
   const [creatingBusiness, setCreatingBusiness] = useState(false);
   // Bump to force the Activity timeline to reload after we log a new activity.
   const [activityRefresh, setActivityRefresh] = useState(0);
+  // Which top-level record tab is showing (activity-first record layout, 2026-07).
+  const [mainTab, setMainTab] = useState('activity');
   const bumpActivity = () => setActivityRefresh((n) => n + 1);
   const logActivity = (activity_type: string, title: string, description?: string, metadata?: Record<string, unknown>) => {
     if (!id || isNew) return;
@@ -504,16 +506,11 @@ export const ContactDetailPage: React.FC = () => {
   // A contact attached to a business has no separate commercial identity — the
   // business owns pricing / VAT / tax, so those sections are hidden when attached.
   const hasCompany = !!primaryCompany;
+  const initials = (contact.name || '?').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader
-        title={isNew ? 'New Contact' : contact.name || 'Untitled Contact'}
-        description={contact.company || 'Contact Details'}
-        badge="CRM"
-      />
-
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-5">
         {/* Header Actions */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
@@ -533,43 +530,53 @@ export const ContactDetailPage: React.FC = () => {
           )}
         </div>
 
-        {/* Main Content */}
-        <Tabs defaultValue="overview" className="space-y-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-          <TabsList className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview">
-              <User className="h-4 w-4 mr-2" />
-              Overview
-            </TabsTrigger>
-            {/* When the contact belongs to a business, every financial surface lives on
-                the company — use the "Check Company" link. Standalone contacts get the
-                same single Orders-first Account tab as a company (orders drive invoices /
-                payments / receivables, all viewed by opening an order). */}
-            {!hasCompany && (
-              <TabsTrigger value="account">
-                <Wallet className="h-4 w-4 mr-2" />
-                Account
-              </TabsTrigger>
-            )}
-          </TabsList>
-          {hasCompany && primaryCompany?.id && (
-            <Button variant="outline" size="sm" className="gap-1.5"
-              onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}>
-              <Building2 className="h-4 w-4" /> {primaryCompany.name}
-            </Button>
-          )}
-          </div>
+        {/* Record layout: identity + Contact Details anchored on the left; activity-first
+            tabbed main (Activity · Details · Account/Company) on the right. */}
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start">
+          {/* ── SIDEBAR: identity, quick actions, Contact Details ── */}
+          <aside className="space-y-3 lg:sticky lg:top-4">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground text-lg font-medium">{initials}</div>
+                  <div className="min-w-0">
+                    <div className="text-lg font-medium leading-tight truncate">{contact.name || 'Untitled Contact'}</div>
+                    <div className="text-sm text-muted-foreground truncate">{[contact.position, primaryCompany?.name].filter(Boolean).join(' · ') || 'Contact'}</div>
+                  </div>
+                </div>
+                {(contact.lead_status || (!hasCompany && (contact.is_client || contact.is_supplier))) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {contact.lead_status && <Badge variant="secondary" className="capitalize">{contact.lead_status}</Badge>}
+                    {!hasCompany && contact.is_client && <Badge variant="secondary">Customer</Badge>}
+                    {!hasCompany && contact.is_supplier && <Badge variant="secondary">Supplier</Badge>}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowEmailDialog(true)} disabled={!contact.email}>
+                    <Mail className="h-4 w-4 mr-1.5" /> Email
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setMainTab('activity')}>
+                    <MessageSquare className="h-4 w-4 mr-1.5" /> Note
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Overview Tab — CRM two-column layout: a compact info column on the
-              left, the commercial detail on the right. */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* Sidebar of independently collapsible info cards on the left; the Activity
-                feed (+ commercial when there's no business) is the main column. */}
-            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
-              {/* LEFT — identity & quick info (collapsible cards) */}
-              <div className="space-y-3 lg:sticky lg:top-4">
-              {/* Contact Information — open by default */}
-              <CollapsibleCard title="Contact Information" icon={User} defaultOpen contentClassName="space-y-4">
+            {/* When attached to a business, financials live there — surface the company. */}
+            {hasCompany && primaryCompany?.id && (
+              <button type="button" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}
+                className="w-full flex items-center gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary/50">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Building2 className="h-4.5 w-4.5" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium truncate">{primaryCompany.name}</span>
+                  <span className="block text-xs text-muted-foreground">Orders, invoices &amp; balance</span>
+                </span>
+                <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+              </button>
+            )}
+
+            {/* Contact Details — the anchor of the record. */}
+            <CollapsibleCard title="Contact Details" icon={User} defaultOpen contentClassName="space-y-4">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-2">
                     <div>
                       <InlineText alwaysEdit={isNew} label="Full Name *" value={contact.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Jane Smith" copy={false} />
@@ -590,334 +597,259 @@ export const ContactDetailPage: React.FC = () => {
                     <InlineText alwaysEdit={isNew} type="date" label="Birthday" value={contact.date_of_birth} onSave={(v) => patchInline({ date_of_birth: v })} placeholder="" copy={false} />
                   </div>
 
-                  {/* Role — only for contacts NOT attached to a business. A person who
-                      belongs to a company has no separate role/billing identity; the
-                      business owns it, so the whole section is hidden when attached. */}
-                  {!hasCompany && (
-                  <div className="pt-4 border-t space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Tag className="h-3.5 w-3.5" /> Role
-                    </div>
-                    {/* Customer / Supplier — checkboxes (a sole trader can be both),
-                        matching the company page. */}
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                      <label htmlFor="is_client" className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Checkbox id="is_client" checked={!!contact.is_client} onCheckedChange={(v) => patchInline({ is_client: v === true })} />
-                        Customer
-                      </label>
-                      <label htmlFor="is_supplier" className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Checkbox id="is_supplier" checked={!!contact.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v === true })} />
-                        Supplier
-                      </label>
-                    </div>
-                    <div className="flex items-center justify-between gap-4 pt-2 border-t">
-                      <div className="space-y-1">
-                        <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
-                        <p className="text-xs text-muted-foreground">Drives B2C vs B2B VAT logic.</p>
-                      </div>
-                      <Select
-                        value={contact.contact_type ?? '__unset'}
-                        onValueChange={(v) => patchInline({ contact_type: v === '__unset' ? null : v })}
-                      >
-                        <SelectTrigger id="contact_type" className="w-44">
-                          <SelectValue placeholder="Not set" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__unset">Not set</SelectItem>
-                          <SelectItem value="private">Private (B2C)</SelectItem>
-                          <SelectItem value="company">Company (B2B)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  )}
-              </CollapsibleCard>
+                  {/* Role / pricing / VAT / billing moved to the Details → Commercial &amp; VAT tab. */}
+            </CollapsibleCard>
 
-              {/* Lead Information */}
-              <CollapsibleCard title="Lead Information" icon={FileText} defaultOpen={isNew} contentClassName="space-y-4">
-                  {/* item 5 — attach a company right here (replaces the separate Companies tab). */}
-                  <div>
-                    <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Company</Label>
-                    <div className="mt-1.5 space-y-2">
-                      {/* Once a company is attached, hide the search and show it with an
-                          X to remove. Removing it brings the search back (no point showing
-                          a search bar when the slot is already filled). */}
-                      {(contact.companies ?? []).length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {(contact.companies ?? []).map((c: any) => (
-                            <Badge key={c.relationship_id} variant="secondary" className="gap-1.5 py-1 pl-2.5 pr-1.5">
-                              <button type="button" onClick={() => navigate(`/admin/crm/companies/${c.company_id}`)} className="hover:underline">
-                                {c.company_name}
-                              </button>
-                              {c.is_primary && <span className="text-[9px] uppercase opacity-70">primary</span>}
-                              <button type="button" onClick={() => handleDetachCompany(c.relationship_id)} aria-label="Remove company" className="rounded-full p-0.5 opacity-70 hover:bg-muted hover:opacity-100">
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
+            <div className="px-1 text-xs text-muted-foreground">
+              Created {new Date(contact.created_at).toLocaleDateString()}{contact.updated_at ? ` · Updated ${new Date(contact.updated_at).toLocaleDateString()}` : ''}
+            </div>
+          </aside>
+
+          {/* ── MAIN: activity-first tabs ── */}
+          <div className="min-w-0">
+            <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
+              <TabsList className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+                <TabsTrigger value="activity" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Clock className="h-4 w-4 mr-2" />Activity</TabsTrigger>
+                <TabsTrigger value="details" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><User className="h-4 w-4 mr-2" />Details</TabsTrigger>
+                {!hasCompany && (
+                  <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wallet className="h-4 w-4 mr-2" />Account</TabsTrigger>
+                )}
+                {hasCompany && (
+                  <TabsTrigger value="company" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Building2 className="h-4 w-4 mr-2" />Company</TabsTrigger>
+                )}
+              </TabsList>
+
+              {/* Activity — the unified feed (notes live here). */}
+              <TabsContent value="activity" className="space-y-4">
+                {contact.id ? (
+                  <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} />
+                ) : (
+                  <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Create this contact to start logging activity.</CardContent></Card>
+                )}
+              </TabsContent>
+
+              {/* Details — section nav (left) + property panel (right). */}
+              <TabsContent value="details">
+                <Tabs defaultValue="lead" orientation="vertical" className="flex flex-col gap-6 sm:flex-row sm:items-start">
+                  <TabsList className="h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
+                    <TabsTrigger value="lead" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FileText className="h-4 w-4 mr-2" />Lead</TabsTrigger>
+                    <TabsTrigger value="address" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><MapPin className="h-4 w-4 mr-2" />Address</TabsTrigger>
+                    {contact.id && (
+                      <TabsTrigger value="categories" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Tags className="h-4 w-4 mr-2" />Categories</TabsTrigger>
+                    )}
+                    <TabsTrigger value="linked" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><LinkIcon className="h-4 w-4 mr-2" />Linked account</TabsTrigger>
+                    {!hasCompany && (
+                      <TabsTrigger value="commercial" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Receipt className="h-4 w-4 mr-2" />Commercial &amp; VAT</TabsTrigger>
+                    )}
+                  </TabsList>
+
+                  <div className="min-w-0 w-full flex-1 space-y-4">
+                    <TabsContent value="lead" className="mt-0">
+                      <Card><CardContent className="p-4 space-y-4">
+                        <div>
+                          <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Company</Label>
+                          <div className="mt-1.5 space-y-2">
+                            {(contact.companies ?? []).length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {(contact.companies ?? []).map((c: any) => (
+                                  <Badge key={c.relationship_id} variant="secondary" className="gap-1.5 py-1 pl-2.5 pr-1.5">
+                                    <button type="button" onClick={() => navigate(`/admin/crm/companies/${c.company_id}`)} className="hover:underline">
+                                      {c.company_name}
+                                    </button>
+                                    {c.is_primary && <span className="text-[9px] uppercase opacity-70">primary</span>}
+                                    <button type="button" onClick={() => handleDetachCompany(c.relationship_id)} aria-label="Remove company" className="rounded-full p-0.5 opacity-70 hover:bg-muted hover:opacity-100">
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <>
+                                <CompanySearchDropdown
+                                  onSelect={attachCompanyById}
+                                  excludeCompanyIds={(contact.companies ?? []).map((c: any) => c.company_id)}
+                                  placeholder="Search & attach a company…"
+                                  selectedCompanyId={isNew ? (pendingCompanyId || null) : null}
+                                />
+                                {!isNew && (
+                                  <button type="button" onClick={createBusinessFromContact} disabled={creatingBusiness} className="text-xs text-primary hover:underline disabled:opacity-50">
+                                    {creatingBusiness ? 'Creating business…' : '+ Open a business from this contact'}
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <>
-                          <CompanySearchDropdown
-                            onSelect={attachCompanyById}
-                            excludeCompanyIds={(contact.companies ?? []).map((c: any) => c.company_id)}
-                            placeholder="Search & attach a company…"
-                            selectedCompanyId={isNew ? (pendingCompanyId || null) : null}
-                          />
-                          {/* Solopreneur opening a business: spin up a company from this
-                              contact's details + move their existing quotes/invoices to it. */}
-                          {!isNew && (
-                            <button
-                              type="button"
-                              onClick={createBusinessFromContact}
-                              disabled={creatingBusiness}
-                              className="text-xs text-primary hover:underline disabled:opacity-50"
-                            >
-                              {creatingBusiness ? 'Creating business…' : '+ Open a business from this contact'}
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-2">
-                    <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => { patchInline({ lead_status: v }); if (v) logActivity('lead_status_changed', `Lead status set to "${v}"`); }} placeholder="Not set" />
-                    <LeadFieldSelect alwaysEdit={isNew} kind="lead_source" label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="Not set" />
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">Created</div>
-                      <div className="flex items-center gap-2 mt-0.5 text-sm text-muted-foreground"><Calendar className="h-3.5 w-3.5" />{new Date(contact.created_at).toLocaleDateString()}</div>
-                    </div>
-                    {contact.updated_at && (
-                      <div>
-                        <div className="text-xs font-medium text-muted-foreground">Last Updated</div>
-                        <div className="flex items-center gap-2 mt-0.5 text-sm text-muted-foreground"><Calendar className="h-3.5 w-3.5" />{new Date(contact.updated_at).toLocaleDateString()}</div>
-                      </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                          <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => { patchInline({ lead_status: v }); if (v) logActivity('lead_status_changed', `Lead status set to "${v}"`); }} placeholder="Not set" />
+                          <LeadFieldSelect alwaysEdit={isNew} kind="lead_source" label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="Not set" />
+                        </div>
+                      </CardContent></Card>
+                    </TabsContent>
+
+                    <TabsContent value="address" className="mt-0">
+                      <Card><CardContent className="p-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                          <div className="sm:col-span-2">
+                            <InlineText alwaysEdit={isNew} label="Street Address" value={contact.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
+                          </div>
+                          <InlineText alwaysEdit={isNew} label="City" value={contact.city} onSave={(v) => patchInline({ city: v })} placeholder="London" />
+                          <InlineText alwaysEdit={isNew} label="Postal Code" value={contact.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="N21 1QP" />
+                          <InlineText alwaysEdit={isNew} label="State / Province" value={contact.state} onSave={(v) => patchInline({ state: v })} placeholder="Greater London" />
+                          <InlineText alwaysEdit={isNew} label="Country" value={contact.country} onSave={(v) => patchInline({ country: v })} placeholder="United Kingdom" />
+                        </div>
+                      </CardContent></Card>
+                    </TabsContent>
+
+                    {contact.id && (
+                      <TabsContent value="categories" className="mt-0">
+                        <Card><CardContent className="p-4">
+                          <CategoryAssignmentPicker bare target={{ kind: 'contact', id: contact.id }} />
+                        </CardContent></Card>
+                      </TabsContent>
+                    )}
+
+                    <TabsContent value="linked" className="mt-0">
+                      <Card><CardContent className="p-4">
+                        {linkedUser ? (
+                          <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="text-sm font-medium truncate">{linkedUser.email}</span>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={handleUnlinkUser} disabled={linking} title="Unlink user" className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-transparent hover:text-foreground">
+                              <Unlink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Button size="sm" onClick={openInviteDialog} className="w-full" disabled={!contact.email && !isNew}>
+                              <UserPlus className="h-3.5 w-3.5 mr-2" /> Create &amp; invite user
+                            </Button>
+                            <UserSearchDropdown onSelect={handleLinkUser} placeholder="…or link an existing user" selectedUserId={null} />
+                          </div>
+                        )}
+                      </CardContent></Card>
+                    </TabsContent>
+
+                    {!hasCompany && (
+                      <TabsContent value="commercial" className="mt-0 space-y-4">
+                        <Card><CardContent className="p-4 space-y-3">
+                          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5" /> Role</div>
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                            <label htmlFor="is_client" className="flex items-center gap-2 text-sm cursor-pointer">
+                              <Checkbox id="is_client" checked={!!contact.is_client} onCheckedChange={(v) => patchInline({ is_client: v === true })} />
+                              Customer
+                            </label>
+                            <label htmlFor="is_supplier" className="flex items-center gap-2 text-sm cursor-pointer">
+                              <Checkbox id="is_supplier" checked={!!contact.is_supplier} onCheckedChange={(v) => patchInline({ is_supplier: v === true })} />
+                              Supplier
+                            </label>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 pt-2 border-t">
+                            <div className="space-y-1">
+                              <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
+                              <p className="text-xs text-muted-foreground">Drives B2C vs B2B VAT logic.</p>
+                            </div>
+                            <Select value={contact.contact_type ?? '__unset'} onValueChange={(v) => patchInline({ contact_type: v === '__unset' ? null : v })}>
+                              <SelectTrigger id="contact_type" className="w-44"><SelectValue placeholder="Not set" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__unset">Not set</SelectItem>
+                                <SelectItem value="private">Private (B2C)</SelectItem>
+                                <SelectItem value="company">Company (B2B)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </CardContent></Card>
+
+                        <Card>
+                          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Percent className="h-4 w-4" />Pricing</CardTitle></CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                              <InlineSelect alwaysEdit={isNew} label="Pricing level" value={contact.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
+                              <InlineText alwaysEdit={isNew} type="number" label="Customer discount % (override)" value={contact.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 30" copy={false} hint="Applied automatically by the AI price lookup. Empty = none." />
+                              <div className="md:col-span-2">
+                                <InlineText alwaysEdit={isNew} multiline label="Discount notes" value={contact.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 30% per 2025 agreement." copy={false} />
+                              </div>
+                            </div>
+                            <InlineText alwaysEdit={isNew} type="number" label="Credit limit" value={contact.credit_limit ?? undefined} onSave={(v) => patchInline({ credit_limit: v })} placeholder="e.g. 5000" copy={false} hint="Max outstanding receivable; finance flags this customer when exceeded." />
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4" />Invoicing &amp; VAT</CardTitle></CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                              <InlineSelect alwaysEdit={isNew} label="Segment" value={contact.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />
+                              <InlineSelect alwaysEdit={isNew} label="Default VAT-exemption category" value={contact.vat_exemption_reason ?? undefined} unsetValue="__none" placeholder="None" options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))} displayValue={contact.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{contact.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === contact.vat_exemption_reason)?.label}</span> : undefined} onSave={(v) => patchInline({ vat_exemption_reason: v })} hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here." />
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="space-y-1">
+                                <Label htmlFor="include_in_myf" className="cursor-pointer">Include in MYF report</Label>
+                                <p className="text-xs text-muted-foreground">Default for the “Include in MYF report” toggle when invoicing this party (the ΜΥΦ client/supplier ledger summary).</p>
+                              </div>
+                              <Switch id="include_in_myf" checked={contact.include_in_myf !== false} onCheckedChange={(v) => patchInline({ include_in_myf: v })} />
+                            </div>
+                            <Collapsible defaultOpen={!!(contact.billing_name || contact.billing_vat || contact.billing_tax_office || contact.billing_country_code || contact.billing_street || contact.billing_city || contact.billing_postal_code)}>
+                              <div className="rounded-md border border-border/60">
+                                <CollapsibleTrigger className="group/bill flex w-full items-center justify-between gap-2 p-3 text-left">
+                                  <span className="text-xs"><span className="text-foreground font-medium">Separate billing identity</span> <span className="text-muted-foreground">— only when invoices go to a different legal entity (different ΑΦΜ / name / address)</span></span>
+                                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/bill:rotate-180" />
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 pt-0">
+                                    <InlineText alwaysEdit={isNew} label="Billing name" value={contact.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
+                                    <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={contact.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
+                                    <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={contact.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} placeholder="e.g. Tax Office Chalandriou" />
+                                    <InlineSelect alwaysEdit={isNew} label="VAT country" value={contact.billing_country_code ?? undefined} placeholder="Not set" options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))} displayValue={contact.billing_country_code ? <span className="font-mono">{contact.billing_country_code}</span> : undefined} onSave={(v) => patchInline({ billing_country_code: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Street" value={contact.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Number" value={contact.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Postal code" value={contact.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
+                                    <InlineText alwaysEdit={isNew} label="City" value={contact.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
+                                  </div>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
+                          </CardContent>
+                        </Card>
+
+                        <ContactTaxVatCard vatNumber={contact.vat_number ?? null} countryCode={contact.country_code ?? null} taxOffice={contact.tax_office ?? null} onPatch={(updates) => patchInline(updates as Partial<Contact>)} />
+                      </TabsContent>
                     )}
                   </div>
-              </CollapsibleCard>
+                </Tabs>
+              </TabsContent>
 
-              {/* Address */}
-              <CollapsibleCard title="Address" icon={MapPin} defaultOpen={isNew}>
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-2">
-                    <div>
-                      <InlineText alwaysEdit={isNew} label="Street Address" value={contact.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
-                    </div>
-                    <InlineText alwaysEdit={isNew} label="City" value={contact.city} onSave={(v) => patchInline({ city: v })} placeholder="London" />
-                    <InlineText alwaysEdit={isNew} label="Postal Code" value={contact.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="N21 1QP" />
-                    <InlineText alwaysEdit={isNew} label="State / Province" value={contact.state} onSave={(v) => patchInline({ state: v })} placeholder="Greater London" />
-                    <InlineText alwaysEdit={isNew} label="Country" value={contact.country} onSave={(v) => patchInline({ country: v })} placeholder="United Kingdom" />
-                  </div>
-              </CollapsibleCard>
-
-              {/* CRM Categories — moved here, below the Address */}
-              {contact.id && (
-                <CollapsibleCard title="CRM Categories" icon={Tags}>
-                  <CategoryAssignmentPicker bare target={{ kind: 'contact', id: contact.id }} />
-                </CollapsibleCard>
+              {/* Account — standalone contacts only (business-linked financials live on the company). */}
+              {!hasCompany && (
+                <TabsContent value="account" className="space-y-4">
+                  {contact.id ? (
+                    <>
+                      <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
+                      <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} partyRoles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }} />
+                      <PartyPaymentsCard contactId={contact.id} />
+                      <CustomerTopItemsCard contactId={contact.id} />
+                      <CustomerFinanceRulesCard contactId={contact.id} />
+                    </>
+                  ) : (
+                    <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to see their account &amp; orders.</CardContent></Card>
+                  )}
+                </TabsContent>
               )}
 
-              {/* Linked User Account */}
-              <CollapsibleCard title="Linked User Account" icon={LinkIcon} defaultOpen={isNew}>
-                  {linkedUser ? (
-                    <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="text-sm font-medium truncate">{linkedUser.email}</span>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={handleUnlinkUser} disabled={linking}
-                        title="Unlink user" className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-transparent hover:text-foreground">
-                        <Unlink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Button size="sm" onClick={openInviteDialog} className="w-full" disabled={!contact.email && !isNew}>
-                        <UserPlus className="h-3.5 w-3.5 mr-2" /> Create &amp; invite user
-                      </Button>
-                      <UserSearchDropdown
-                        onSelect={handleLinkUser}
-                        placeholder="…or link an existing user"
-                        selectedUserId={null}
-                      />
-                    </div>
-                  )}
-              </CollapsibleCard>
-              </div>
-
-              {/* RIGHT — main column: commercial (only when no business) + Activity feed. */}
-              <div className="space-y-4">
-            {!hasCompany && (
-              <>
-            {/* commercial info (Pricing + Invoicing & VAT) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Percent className="h-4 w-4" />
-                  Pricing
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                    {/* Pricing level + discount route through the approval RPC (savePricing), not patchInline. */}
-                    <InlineSelect
-                      alwaysEdit={isNew}
-                      label="Pricing level"
-                      value={contact.user_level_key ?? undefined}
-                      unsetValue="__default__"
-                      placeholder="Standard"
-                      options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))}
-                      onSave={(v) => savePricing({ user_level_key: v })}
-                      hint="Tier this customer buys at — discount applies off retail on quotes."
-                    />
-                    <InlineText
-                      alwaysEdit={isNew}
-                      type="number"
-                      label="Customer discount % (override)"
-                      value={contact.discount_percent ?? undefined}
-                      onSave={(v) => savePricing({ discount_percent: v })}
-                      placeholder="e.g. 30"
-                      copy={false}
-                      hint="Applied automatically by the AI price lookup. Empty = none."
-                    />
-                    <div className="md:col-span-2">
-                      <InlineText
-                        alwaysEdit={isNew}
-                        multiline
-                        label="Discount notes"
-                        value={contact.discount_notes}
-                        onSave={(v) => patchInline({ discount_notes: v })}
-                        placeholder="e.g. Long-term partner — 30% per 2025 agreement."
-                        copy={false}
-                      />
-                    </div>
-                  </div>
-                {/* Credit limit — contact-specific risk control. */}
-                <InlineText
-                  alwaysEdit={isNew}
-                  type="number"
-                  label="Credit limit"
-                  value={contact.credit_limit ?? undefined}
-                  onSave={(v) => patchInline({ credit_limit: v })}
-                  placeholder="e.g. 5000"
-                  copy={false}
-                  hint="Max outstanding receivable; finance flags this customer when exceeded."
-                />
-              </CardContent>
-            </Card>
-
-            {/* Invoicing & VAT (commercial) — #207 parity: segment, ΜΥΦ inclusion,
-                default on-invoice VAT-exemption reason, and a separate billing identity
-                (used on the myDATA counterpart when set). */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Receipt className="h-4 w-4" />
-                  Invoicing &amp; VAT
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                  <InlineSelect
-                    alwaysEdit={isNew}
-                    label="Segment"
-                    value={contact.contact_group ?? undefined}
-                    unsetValue="none"
-                    placeholder="Unsegmented"
-                    options={[
-                      { value: 'b2b', label: 'B2B' },
-                      { value: 'retail', label: 'Retail' },
-                      { value: 'wholesale', label: 'Wholesale' },
-                      { value: 'public_sector', label: 'Public sector' },
-                    ]}
-                    onSave={(v) => patchInline({ contact_group: v })}
-                    hint="Groups this party for filtering and statement batches."
-                  />
-                  <InlineSelect
-                    alwaysEdit={isNew}
-                    label="Default VAT-exemption category"
-                    value={contact.vat_exemption_reason ?? undefined}
-                    unsetValue="__none"
-                    placeholder="None"
-                    options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))}
-                    displayValue={contact.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{contact.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === contact.vat_exemption_reason)?.label}</span> : undefined}
-                    onSave={(v) => patchInline({ vat_exemption_reason: v })}
-                    hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here."
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="include_in_myf" className="cursor-pointer">Include in MYF report</Label>
-                    <p className="text-xs text-muted-foreground">Default for the “Include in MYF report” toggle when invoicing this party (the ΜΥΦ client/supplier ledger summary).</p>
-                  </div>
-                  <Switch
-                    id="include_in_myf"
-                    checked={contact.include_in_myf !== false}
-                    onCheckedChange={(v) => patchInline({ include_in_myf: v })}
-                  />
-                </div>
-                <Collapsible defaultOpen={!!(contact.billing_name || contact.billing_vat || contact.billing_tax_office || contact.billing_country_code || contact.billing_street || contact.billing_city || contact.billing_postal_code)}>
-                  <div className="rounded-md border border-border/60">
-                    <CollapsibleTrigger className="group/bill flex w-full items-center justify-between gap-2 p-3 text-left">
-                      <span className="text-xs"><span className="text-foreground font-medium">Separate billing identity</span> <span className="text-muted-foreground">— only when invoices go to a different legal entity (different ΑΦΜ / name / address)</span></span>
-                      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/bill:rotate-180" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 pt-0">
-                    <InlineText alwaysEdit={isNew} label="Billing name" value={contact.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
-                    <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={contact.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
-                    <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={contact.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} placeholder="e.g. Tax Office Chalandriou" />
-                    <InlineSelect alwaysEdit={isNew} label="VAT country" value={contact.billing_country_code ?? undefined} placeholder="Not set"
-                      options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))}
-                      displayValue={contact.billing_country_code ? <span className="font-mono">{contact.billing_country_code}</span> : undefined}
-                      onSave={(v) => patchInline({ billing_country_code: v })} />
-                    <InlineText alwaysEdit={isNew} label="Street" value={contact.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
-                    <InlineText alwaysEdit={isNew} label="Number" value={contact.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
-                    <InlineText alwaysEdit={isNew} label="Postal code" value={contact.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
-                    <InlineText alwaysEdit={isNew} label="City" value={contact.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
-                      </div>
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-              </CardContent>
-            </Card>
-            </div>
-
-            {/* Tax & VAT — the contact's own identity (B2C / sole trader). */}
-            <ContactTaxVatCard
-              vatNumber={contact.vat_number ?? null}
-              countryCode={contact.country_code ?? null}
-              taxOffice={contact.tax_office ?? null}
-              onPatch={(updates) => patchInline(updates as Partial<Contact>)}
-            />
-              </>
-            )}
-            {/* Unified Activity feed (notes live here too — "Add note" button). */}
-            {contact.id && <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} />}
-              </div>
-            </div>
-          </TabsContent>
-
-
-          {/* Account = one flow (same model as the company page): money summary up top, then the
-              Orders list. Receivables/payables are managed PER ORDER — open an order to see them. */}
-          <TabsContent value="account" className="space-y-4">
-            {contact.id ? (
-              <>
-                <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
-                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} partyRoles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }} />
-                {/* Itemised cash movements (money in & out) across all this party's orders. */}
-                <PartyPaymentsCard contactId={contact.id} />
-                {/* Repeat-buy suggestions (in-stock), below the orders list. */}
-                <CustomerTopItemsCard contactId={contact.id} />
-                <CustomerFinanceRulesCard contactId={contact.id} />
-              </>
-            ) : (
-              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to see their account &amp; orders.</CardContent></Card>
-            )}
-          </TabsContent>
-        </Tabs>
+              {/* Company — business-linked: financials are managed on the company. */}
+              {hasCompany && primaryCompany?.id && (
+                <TabsContent value="company" className="space-y-4">
+                  <Card><CardContent className="p-4 flex items-start gap-3">
+                    <Wallet className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <p className="text-sm text-muted-foreground">This contact belongs to <button type="button" className="font-medium text-primary hover:underline" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}>{primaryCompany.name}</button> — orders, invoices, VAT &amp; balance are managed on the company record.</p>
+                  </CardContent></Card>
+                  <Button variant="outline" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}><Building2 className="h-4 w-4 mr-2" />Open {primaryCompany.name}</Button>
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
+        </div>
       </div>
 
       {/* Send Email Dialog */}
