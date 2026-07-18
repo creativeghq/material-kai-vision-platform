@@ -2045,6 +2045,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           throw new Error('Not authenticated');
         }
 
+        // Tell the agent which workspace to act in — the switcher-active one — so a
+        // multi-workspace user's chat writes land in the workspace they're viewing.
+        // The server validates this against membership before trusting it (#275 per-workspace).
+        requestBody.workspace_id = getActiveWorkspaceId(session.user?.id)
+          ?? workspaceId
+          ?? session.user?.user_metadata?.workspace_id;
+
         // Get Supabase URL from the client
         const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
 
@@ -4474,7 +4481,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           })()}
 
           {messages.length === 0 && Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center">
+            <div className="min-h-full flex flex-col items-center justify-center py-6">
               <div className="text-center space-y-4 mb-6">
                 <div className="w-16 h-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center">
                   <AgentIcon className={`h-8 w-8 ${currentAgent?.color}`} />

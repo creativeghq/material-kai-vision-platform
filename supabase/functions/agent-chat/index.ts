@@ -2388,19 +2388,30 @@ async function executeAgent(
  * Get user workspace membership (role + workspace_id) in a single query.
  * Replaces the previous two-query pattern (checkAgentAccess + getUserWorkspaceId).
  */
-async function getUserWorkspaceMembership(userId: string): Promise<{ role: string; workspaceId: string | null }> {
+async function getUserWorkspaceMembership(
+  userId: string,
+  preferredWorkspaceId?: string | null,
+): Promise<{ role: string; workspaceId: string | null }> {
   try {
+    // Fetch ALL memberships — never `.single()` (it errors for multi-workspace users, which
+    // made the agent unusable for them). We then choose the workspace to run in.
     const { data, error } = await supabase
       .from('workspace_members')
       .select('role, workspace_id')
-      .eq('user_id', userId)
-      .single();
+      .eq('user_id', userId);
 
-    if (error || !data) {
+    if (error || !data || data.length === 0) {
       return { role: 'viewer', workspaceId: null };
     }
 
-    return { role: data.role, workspaceId: data.workspace_id };
+    // Honor the client's active workspace (switcher) ONLY if the user is actually a member of it
+    // — a body-supplied id is never trusted blind (CLAUDE.md invariant 1). Otherwise fall back to
+    // the user's first membership (stable; matches prior single-workspace behavior).
+    if (preferredWorkspaceId) {
+      const match = data.find((m) => m.workspace_id === preferredWorkspaceId);
+      if (match) return { role: match.role, workspaceId: match.workspace_id };
+    }
+    return { role: data[0].role, workspaceId: data[0].workspace_id };
   } catch (error) {
     console.error('Error getting workspace membership:', error);
     return { role: 'viewer', workspaceId: null };
@@ -2599,7 +2610,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
     //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
@@ -2727,8 +2738,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
       membership = { role: 'member', workspaceId: auth.apiKey?.workspace_id ?? null };
     } else {
       // Both user-JWT and admin-secret-on-behalf-of paths land here with a
-      // concrete userId — look up that user's real workspace + role.
-      membership = await getUserWorkspaceMembership(userId!);
+      // concrete userId — look up that user's real workspace + role, preferring the
+      // client's active workspace (validated against membership inside the helper).
+      membership = await getUserWorkspaceMembership(userId!, bodyWorkspaceId);
     }
 
     // Check agent access (skipped for partner mode — already allow-listed above).
