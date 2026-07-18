@@ -38,6 +38,8 @@ export interface InboxThread {
   agent_state: string;
   created_at: string;
   archived_at?: string | null;
+  /** Denormalized snippet of the latest visible message (for mailbox list rows). */
+  last_message_preview?: string | null;
   unread?: boolean;
   /** Labels assigned to this thread (returned by list_threads). */
   labels?: InboxLabel[];

@@ -415,6 +415,11 @@ const InboxPage: React.FC = () => {
     [threads, activeId],
   );
 
+  const inboxUnread = useMemo(
+    () => (showArchived ? 0 : threads.filter((t) => t.unread).length),
+    [threads, showArchived],
+  );
+
   const threadDisplayName = (t: InboxThread) => t.subject || (t.channel === 'whatsapp' ? 'WhatsApp contact' : 'Conversation');
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
@@ -507,54 +512,122 @@ const InboxPage: React.FC = () => {
         title="Inbox"
         subtitle="Team conversations, WhatsApp and customer chats — all in one place."
         actions={
-          <>
-            {isPlatformOperator && (
-              <Button
-                variant={allWorkspaces ? 'default' : 'outline'}
-                size="sm" className="rounded-full"
-                title="Show conversations across every workspace on the platform"
-                onClick={() => setAllWorkspaces((v) => !v)}
-              >
-                <Globe className="w-4 h-4 mr-1.5" /> All workspaces
-              </Button>
-            )}
-            {isMember && (
-              <Button size="sm" className="rounded-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
-                <Plus className="w-4 h-4 mr-1.5" /> New conversation
-              </Button>
-            )}
-          </>
+          isPlatformOperator ? (
+            <Button
+              variant={allWorkspaces ? 'default' : 'outline'}
+              size="sm" className="rounded-full"
+              title="Show conversations across every workspace on the platform"
+              onClick={() => setAllWorkspaces((v) => !v)}
+            >
+              <Globe className="w-4 h-4 mr-1.5" /> All workspaces
+            </Button>
+          ) : undefined
         }
       />
 
       {/* Desktop: 3-pane grid. Mobile: single-pane drill-in (list ↔ conversation),
           with the details rail moved into a slide-up sheet. */}
       <div className="flex flex-col md:grid md:grid-cols-12 gap-4 flex-1 min-h-0 px-4 sm:px-6 py-4">
-        {/* ── Column 1 · Conversations ── */}
-        <div className={`dashboard-card rounded-2xl border-0 md:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
-          <div className="p-3 border-b border-white/10 space-y-3">
-            {/* Inbox vs Archived (30-day restore window) */}
-            <div className="flex items-center gap-1 p-0.5 rounded-full bg-muted/40">
-              <button
-                onClick={() => setShowArchived(false)}
-                className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-full transition-colors ${!showArchived ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                <InboxIcon className="w-3.5 h-3.5" /> Inbox
-              </button>
-              <button
-                onClick={() => setShowArchived(true)}
-                className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-full transition-colors ${showArchived ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                <Archive className="w-3.5 h-3.5" /> Archived
-              </button>
+        {/* ── Column 0 · Mailbox sidebar (Compose · folders · labels) ── */}
+        <aside className={`dashboard-card rounded-2xl border-0 md:col-span-2 hidden md:flex flex-col overflow-hidden p-0`}>
+          {isMember && (
+            <div className="p-3">
+              <Button className="w-full rounded-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
+                <Plus className="w-4 h-4 mr-1.5" /> Compose
+              </Button>
             </div>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              <Input
-                value={query} onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search conversations"
-                className="pl-9 h-10 rounded-lg"
+          )}
+          <nav className="px-2 space-y-0.5">
+            <button
+              onClick={() => setShowArchived(false)}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${!showArchived ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
+            >
+              <InboxIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Inbox</span>
+              {!showArchived && inboxUnread > 0 && (
+                <span className="text-[11px] rounded-full bg-primary text-primary-foreground px-1.5 min-w-5 text-center">{inboxUnread}</span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowArchived(true)}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${showArchived ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
+            >
+              <Archive className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Archived</span>
+            </button>
+          </nav>
+
+          <div className="px-3 pt-4 pb-1.5 flex items-center justify-between">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium">Labels</span>
+            {canManageLabels && activeWorkspaceId && (
+              <LabelManagerPopover
+                workspaceId={activeWorkspaceId}
+                labels={wsLabels}
+                onChanged={() => { loadLabels(); loadThreads(); }}
               />
+            )}
+          </div>
+          <div className="px-2 pb-3 space-y-0.5 overflow-y-auto flex-1">
+            <button
+              onClick={() => setLabelFilter(null)}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${!labelFilter ? 'bg-accent text-foreground' : 'text-foreground/70 hover:bg-accent'}`}
+            >
+              <Tag className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-left">All labels</span>
+            </button>
+            {wsLabels.map((l) => {
+              const on = labelFilter === l.id;
+              const dot = (LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot;
+              return (
+                <button
+                  key={l.id}
+                  onClick={() => setLabelFilter(on ? null : l.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${on ? 'bg-accent text-foreground font-medium' : 'text-foreground/70 hover:bg-accent'}`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
+                  <span className="flex-1 text-left truncate">{l.name}</span>
+                </button>
+              );
+            })}
+            {wsLabels.length === 0 && (
+              <div className="text-[11px] text-muted-foreground px-2.5 py-2">
+                {canManageLabels ? 'Create labels with the + above.' : 'No labels yet.'}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* ── Column 1 · Message list ── */}
+        <div className={`dashboard-card rounded-2xl border-0 md:col-span-4 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
+          <div className="p-3 border-b border-white/10 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={query} onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search mail"
+                  className="pl-9 h-10 rounded-lg"
+                />
+              </div>
+              {/* Mobile compose — the sidebar (with its Compose) is desktop-only */}
+              {isMember && (
+                <Button size="icon" className="rounded-full h-10 w-10 shrink-0 md:hidden" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId} title="Compose">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            {/* Mobile folder + label filters (they live in the sidebar on desktop) */}
+            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-0.5">
+              <button onClick={() => setShowArchived(false)} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${!showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><InboxIcon className="w-3 h-3" />Inbox</button>
+              <button onClick={() => setShowArchived(true)} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Archive className="w-3 h-3" />Archived</button>
+              {wsLabels.map((l) => {
+                const on = labelFilter === l.id;
+                return (
+                  <button key={l.id} onClick={() => setLabelFilter(on ? null : l.id)} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${labelChipClass(l.color)} ${on ? 'ring-1 ring-inset ring-current' : 'opacity-70'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} />{l.name}
+                  </button>
+                );
+              })}
             </div>
             <Tabs value={filter} onValueChange={(v) => setFilter(v as ChannelFilter)}>
               <TabsList className="h-auto flex-wrap justify-start gap-1.5 bg-transparent p-0">
@@ -563,31 +636,6 @@ const InboxPage: React.FC = () => {
                 <TabsTrigger value="whatsapp" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>WhatsApp</TabsTrigger>
               </TabsList>
             </Tabs>
-            {/* Label filter pills */}
-            {wsLabels.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  onClick={() => setLabelFilter(null)}
-                  className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-colors ${!labelFilter ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground hover:bg-accent'}`}
-                >
-                  <Tag className="w-3 h-3" /> All
-                </button>
-                {wsLabels.map((l) => {
-                  const on = labelFilter === l.id;
-                  const dot = (LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot;
-                  return (
-                    <button
-                      key={l.id}
-                      onClick={() => setLabelFilter(on ? null : l.id)}
-                      className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-colors ${labelChipClass(l.color)} ${on ? 'ring-1 ring-inset ring-current' : 'opacity-70 hover:opacity-100'}`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-                      {l.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {loadingThreads ? (
@@ -601,7 +649,7 @@ const InboxPage: React.FC = () => {
               </div>
             ) : groupedThreads.map(([bucket, items]) => (
               <div key={bucket}>
-                <div className="px-3 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium">{bucket}</div>
+                <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium">{bucket}</div>
                 {items.map((t) => {
                   const name = threadDisplayName(t);
                   const active = activeId === t.id;
@@ -610,7 +658,7 @@ const InboxPage: React.FC = () => {
                     <button
                       key={t.id}
                       onClick={() => openThread(t.id)}
-                      className={`w-full text-left px-3 py-2.5 flex gap-3 border-l-2 border-b border-white/5 transition-colors ${active ? 'bg-accent border-l-primary' : 'border-l-transparent hover:bg-accent'}`}
+                      className={`w-full text-left px-4 py-3 flex gap-3 border-l-2 border-b border-white/5 transition-colors ${active ? 'bg-accent border-l-primary' : 'border-l-transparent hover:bg-accent'}`}
                     >
                       <div className="relative shrink-0 mt-0.5">
                         <Avatar className="h-9 w-9">
@@ -623,10 +671,13 @@ const InboxPage: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                          <span className={`flex-1 truncate text-sm ${t.unread ? 'font-medium text-foreground' : 'text-foreground/90'}`}>{name}</span>
+                          <span className={`flex-1 truncate text-sm ${t.unread ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>{name}</span>
                           <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(t.last_message_at)}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {t.last_message_preview && (
+                          <div className={`text-xs truncate mt-0.5 ${t.unread ? 'text-foreground/70' : 'text-muted-foreground'}`}>{t.last_message_preview}</div>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                           <span className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded-full border ${srcClass}`}>
                             <SrcIcon className="w-2.5 h-2.5" /> {srcLabel}
                           </span>
@@ -685,12 +736,13 @@ const InboxPage: React.FC = () => {
                 </div>
                 {/* Desktop: inline member controls. Mobile: collapsed into the details sheet. */}
                 {memberControls && <div className="hidden md:flex items-center gap-1.5">{memberControls}</div>}
-                {/* Mobile: open the contact/details rail as a sheet */}
+                {/* Open the contact / CRM details rail as a slide-over */}
                 <button
                   type="button"
                   onClick={() => setShowDetails(true)}
                   aria-label="Conversation details"
-                  className="md:hidden shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+                  title="Contact, quotes, invoices & projects"
+                  className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
                   <PanelRight className="w-5 h-5" />
                 </button>
@@ -780,23 +832,6 @@ const InboxPage: React.FC = () => {
           )}
         </div>
 
-        {/* ── Column 3 · Details (desktop only; mobile uses the sheet below) ── */}
-        <div className="dashboard-card rounded-2xl border-0 md:col-span-3 hidden md:flex flex-col overflow-hidden p-0">
-          {!activeThread ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-xs px-6 text-center gap-2">
-              <UserIcon className="w-8 h-8 opacity-30" />
-              Contact details, quotes and projects appear here.
-            </div>
-          ) : (
-            <DetailsRail
-              thread={activeThread}
-              context={context}
-              participants={participants}
-              labels={labels}
-              isMember={isMember}
-            />
-          )}
-        </div>
       </div>
 
       {showNew && activeWorkspaceId && (
@@ -814,12 +849,17 @@ const InboxPage: React.FC = () => {
         />
       )}
 
-      {/* Mobile: contact/details rail + member controls in a slide-up sheet */}
-      {isMobile && activeThread && (
+      {/* Contact / CRM details rail — a slide-over on every breakpoint (bottom on mobile,
+          right on desktop). Member controls are only surfaced here on mobile, where the
+          conversation header hides them. */}
+      {activeThread && (
         <Sheet open={showDetails} onOpenChange={setShowDetails}>
-          <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-2xl bg-card overflow-hidden flex flex-col">
+          <SheetContent
+            side={isMobile ? 'bottom' : 'right'}
+            className={`p-0 bg-card overflow-hidden flex flex-col ${isMobile ? 'h-[85vh] rounded-t-2xl' : 'h-full w-full sm:max-w-md'}`}
+          >
             {memberControls && (
-              <div className="flex flex-wrap items-center gap-1.5 px-4 py-3 border-b border-white/10 shrink-0">
+              <div className="md:hidden flex flex-wrap items-center gap-1.5 px-4 py-3 border-b border-white/10 shrink-0">
                 {memberControls}
               </div>
             )}
@@ -1207,6 +1247,109 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
               )}
             </>
           )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+/** Sidebar label management (owner/admin): create, recolor, delete workspace labels. */
+const LabelManagerPopover: React.FC<{
+  workspaceId: string;
+  labels: InboxLabel[];
+  onChanged: () => void;
+}> = ({ workspaceId, labels, onChanged }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newColor, setNewColor] = useState(LABEL_COLORS[0].key);
+
+  const create = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    setBusy(true);
+    try { await inboxApi.createLabel(workspaceId, name, newColor); setNewName(''); onChanged(); }
+    catch (e) { toast({ title: 'Could not create label', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const recolor = async (id: string, color: string) => {
+    setBusy(true);
+    try { await inboxApi.updateLabel(id, { color }); onChanged(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const remove = async (id: string) => {
+    setBusy(true);
+    try { await inboxApi.deleteLabel(id); onChanged(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="text-muted-foreground hover:text-foreground p-0.5 rounded" title="Manage labels">
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-0">
+        <div className="p-3 border-b border-border">
+          <div className="text-sm font-medium">Manage labels</div>
+          <div className="text-xs text-muted-foreground">Create, recolor, or delete workspace labels.</div>
+        </div>
+        <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5">
+          {labels.length === 0 ? (
+            <div className="text-xs text-muted-foreground px-2 py-2">No labels yet.</div>
+          ) : labels.map((l) => (
+            <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent group">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className={`w-3 h-3 rounded-full shrink-0 ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} title="Change color" />
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-auto p-2">
+                  <div className="flex items-center gap-1.5">
+                    {LABEL_COLORS.map((c) => (
+                      <button
+                        key={c.key}
+                        onClick={() => recolor(l.id, c.key)}
+                        title={c.label}
+                        className={`w-4 h-4 rounded-full ${c.dot} ${l.color === c.key ? 'ring-2 ring-offset-1 ring-offset-background ring-foreground/50' : ''}`}
+                      />
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <span className="text-sm flex-1 truncate">{l.name}</span>
+              <button onClick={() => remove(l.id)} disabled={busy} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive shrink-0" title="Delete">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="p-3 border-t border-border space-y-2">
+          <div className="flex items-center gap-1.5">
+            {LABEL_COLORS.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setNewColor(c.key)}
+                title={c.label}
+                className={`w-4 h-4 rounded-full ${c.dot} ${newColor === c.key ? 'ring-2 ring-offset-1 ring-offset-background ring-foreground/50' : ''}`}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(); } }}
+              placeholder="New label"
+              className="h-8 text-sm"
+            />
+            <Button size="sm" className="rounded-full h-8 shrink-0" onClick={create} disabled={busy || !newName.trim()}>
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

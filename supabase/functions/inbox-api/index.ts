@@ -618,9 +618,18 @@ async function insertMessageAndNotify(
     .single();
   if (error) throw new HttpError(500, `Failed to store message: ${error.message}`);
 
+  // Denormalized last-message snippet for the mailbox list. Notes are private (never shown to
+  // customers) and system events aren't content, so neither updates the preview.
+  const preview = (messageType === 'note' || messageType === 'system')
+    ? undefined
+    : (body ? body.replace(/\s+/g, ' ').slice(0, 140) : '[attachment]');
   await db
     .from('inbox_threads')
-    .update({ last_message_at: new Date().toISOString(), status: 'open' })
+    .update({
+      last_message_at: new Date().toISOString(),
+      status: 'open',
+      ...(preview !== undefined ? { last_message_preview: preview } : {}),
+    })
     .eq('id', threadId);
 
   // Channel relay (notes never leave the inbox). Member replies + agent replies both relay.
