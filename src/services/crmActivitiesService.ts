@@ -111,6 +111,22 @@ class CrmActivitiesService {
     if (error) throw error;
   }
 
+  /**
+   * Manually log a typed activity (a call, a meeting/event, …) from the timeline
+   * composer. Unlike `log`, this THROWS on failure so the composer can surface an
+   * error — it's a deliberate user action, not fire-and-forget bookkeeping.
+   */
+  async addActivity(target: CrmActivityTarget, activity_type: string, title: string, description: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    const { error } = await supabase.from('crm_activities').insert({
+      target_kind: target.kind, target_id: target.id,
+      activity_type, title, description, metadata: {},
+      actor_user_id: user.id, workspace_id: null,
+    });
+    if (error) throw error;
+  }
+
   async listForTarget(target: CrmActivityTarget, limit = 100): Promise<CrmActivity[]> {
     const { data, error } = await supabase
       .from('crm_activities')

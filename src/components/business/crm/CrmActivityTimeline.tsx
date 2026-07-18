@@ -1,19 +1,17 @@
 /**
  * CrmActivityTimeline — unified feed for a CRM contact / company: tracked actions
  * (quote/invoice created, email sent, company attach, lead status change) merged
- * with the party's internal notes, newest-first. Notes are added via the inline
- * "Add note" modal here — there is no separate Notes tab any more.
+ * with the party's internal notes, newest-first. New entries are logged from the
+ * inline composer at the top — pick a type (Note / Call / Meeting) and write; notes
+ * go to crm_notes, calls/meetings to crm_activities. No modal.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Plus, Trash2,
+  Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Trash2, Phone, CalendarDays,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
-import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { crmActivitiesService, type TimelineItem, type CrmActivityTarget } from '@/services/crmActivitiesService';
 import { getErrorMessage } from '@/core/errors/utils';
@@ -26,6 +24,8 @@ interface Props {
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   note_added: FileText,
+  call_logged: Phone,
+  meeting_logged: CalendarDays,
   email_sent: Mail,
   company_attached: Building2,
   company_detached: Unlink,
@@ -35,6 +35,18 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   invoice_created: Receipt,
   payment_received: CreditCard,
 };
+
+// Composer entry types. `note` persists to crm_notes; the rest log a typed row to
+// crm_activities (activity_type / title) — all merge back into the timeline below.
+type ComposerKey = 'note' | 'call' | 'meeting';
+const COMPOSER: Array<{
+  key: ComposerKey; label: string; icon: React.ComponentType<{ className?: string }>;
+  placeholder: string; submit: string; activity?: { type: string; title: string };
+}> = [
+  { key: 'note', label: 'Note', icon: FileText, placeholder: 'Write an internal note — visible to your team…', submit: 'Add note' },
+  { key: 'call', label: 'Call', icon: Phone, placeholder: 'Log a call — who, and what was discussed…', submit: 'Log call', activity: { type: 'call_logged', title: 'Call logged' } },
+  { key: 'meeting', label: 'Meeting', icon: CalendarDays, placeholder: 'Log a meeting or event…', submit: 'Log meeting', activity: { type: 'meeting_logged', title: 'Meeting logged' } },
+];
 
 const relativeTime = (iso: string): string => {
   const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
@@ -49,7 +61,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0 })
   const { toast } = useToast();
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [addOpen, setAddOpen] = useState(false);
+  const [type, setType] = useState<ComposerKey>('note');
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -68,43 +80,87 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0 })
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  const handleAddNote = async () => {
+  const current = COMPOSER.find((c) => c.key === type)!;
+
+  const handleSubmit = async () => {
     const body = draft.trim();
     if (!body) return;
     setSaving(true);
     try {
-      await crmActivitiesService.addNote(target, body);
+      if (current.activity) {
+        await crmActivitiesService.addActivity(target, current.activity.type, current.activity.title, body);
+      } else {
+        await crmActivitiesService.addNote(target, body);
+      }
       setDraft('');
-      setAddOpen(false);
       await load(); // instant refresh
     } catch (err) {
-      toast({ title: 'Failed to add note', description: getErrorMessage(err), variant: 'destructive' });
+      toast({ title: 'Could not save', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setSaving(false);
     }
   };
 
+  // Cmd/Ctrl+Enter submits from the textarea.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); void handleSubmit(); }
+  };
+
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between pb-2 space-y-0">
+      <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Activity className="h-4 w-4" /> Activity
         </CardTitle>
-        {target.id && (
-          <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" /> Add note
-          </Button>
-        )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Inline composer — active textbox with a type switcher (Note / Call / Meeting). */}
+        {target.id && (
+          <div className="rounded-xl border bg-muted/20 transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/25">
+            <div className="flex items-center gap-1 px-2 pt-2">
+              {COMPOSER.map((c) => {
+                const on = c.key === type;
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => setType(c.key)}
+                    className={[
+                      'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
+                      on ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    ].join(' ')}
+                  >
+                    <c.icon className="h-3.5 w-3.5" /> {c.label}
+                  </button>
+                );
+              })}
+            </div>
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onKeyDown}
+              rows={2}
+              placeholder={current.placeholder}
+              className="min-h-[2.75rem] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+            />
+            <div className="flex items-center justify-between gap-2 px-2.5 pb-2">
+              <span className="text-[10.5px] text-muted-foreground">⌘/Ctrl + Enter to save</span>
+              <Button size="sm" onClick={handleSubmit} disabled={saving || !draft.trim()}>
+                {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                {current.submit}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center gap-2 py-3 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
-            No activity yet. Notes you add and actions (emails, quotes, invoices, company
-            changes, lead status) will show up here.
+            No activity yet. Notes, calls and meetings you log — plus tracked actions (emails,
+            quotes, invoices, company changes, lead status) — show up here.
           </p>
         ) : (
           <div className="space-y-0">
@@ -136,25 +192,6 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0 })
           </div>
         )}
       </CardContent>
-
-      <Dialog open={addOpen} onOpenChange={(o) => !saving && setAddOpen(o)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add note</DialogTitle></DialogHeader>
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={5}
-            placeholder="Internal note — visible to your team in the activity feed."
-            autoFocus
-          />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAddOpen(false)} disabled={saving}>Cancel</Button>
-            <Button onClick={handleAddNote} disabled={saving || !draft.trim()}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Add note
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 };

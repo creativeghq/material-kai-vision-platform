@@ -10,9 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/core/ui/dialog';
 
 type TargetKind = 'contact' | 'company';
 
@@ -47,7 +44,6 @@ export const CrmNotesTimeline: React.FC<CrmNotesTimelineProps> = ({ targetKind, 
   const { toast } = useToast();
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,7 +108,6 @@ export const CrmNotesTimeline: React.FC<CrmNotesTimelineProps> = ({ targetKind, 
       });
       if (error) throw error;
       setDraft('');
-      setShowAdd(false);
       await load();
     } catch (err: any) {
       toast({ title: 'Failed to add note', description: err?.message, variant: 'destructive' });
@@ -204,16 +199,31 @@ export const CrmNotesTimeline: React.FC<CrmNotesTimelineProps> = ({ targetKind, 
             Timeline of internal notes. You can edit and delete the notes you added.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="shrink-0">
-            {loading ? '…' : `${notes.length} note${notes.length === 1 ? '' : 's'}`}
-          </Badge>
-          <Button size="sm" onClick={() => { setDraft(''); setShowAdd(true); }} disabled={!canLoad}>
-            <Plus className="h-4 w-4 mr-1.5" /> New note
-          </Button>
-        </div>
+        <Badge variant="secondary" className="shrink-0">
+          {loading ? '…' : `${notes.length} note${notes.length === 1 ? '' : 's'}`}
+        </Badge>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Inline composer — active textbox instead of a modal. */}
+        {canLoad && (
+          <div className="rounded-xl border bg-muted/20 transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/25">
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); void handleAdd(); } }}
+              rows={2}
+              placeholder={`Write an internal note about this ${targetKind}…`}
+              className="min-h-[2.75rem] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+            />
+            <div className="flex items-center justify-between gap-2 px-2.5 pb-2">
+              <span className="text-[10.5px] text-muted-foreground">Only you can edit or delete your notes.</span>
+              <Button size="sm" onClick={handleAdd} disabled={saving || !draft.trim()}>
+                {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                Add note
+              </Button>
+            </div>
+          </div>
+        )}
         {!canLoad ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             Save this {targetKind} first before adding notes.
@@ -301,32 +311,6 @@ export const CrmNotesTimeline: React.FC<CrmNotesTimelineProps> = ({ targetKind, 
           </div>
         )}
       </CardContent>
-
-      <Dialog open={showAdd} onOpenChange={(o) => { if (!o && !saving) setShowAdd(false); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New note</DialogTitle>
-            <DialogDescription>
-              Add an internal note about this {targetKind}. Visible to everyone in the workspace; only you can edit or delete it later.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={6}
-            placeholder="What did you want to remember?"
-            className="resize-y"
-            autoFocus
-          />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowAdd(false)} disabled={saving}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={saving || !draft.trim()}>
-              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
-              Add note
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 };
