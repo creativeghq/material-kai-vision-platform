@@ -173,11 +173,15 @@ async function translateBasicRec(
 
   try {
     const { output } = await generateStructuredWithClaude(
-      `Translate these Greek business-registry fields to English. For proper nouns with no
-established English form (company names, street names, cities) use standard Latin
-transliteration; for tax office (ΔΟΥ) and activity description give a natural English
-translation. Return null for any field whose input is null or empty. Do NOT add, guess,
-or invent anything — translate only what is given.
+      `Convert these Greek business-registry fields to Latin script for an English-language
+invoice. Rules per field:
+- onomasia, commer_title, postal_address (street), postal_area_description (city), doy_descr
+  (tax office): TRANSLITERATE only — Greek letters → Latin letters, keep the same words and
+  order. Do NOT translate descriptor words or expand abbreviations. Examples:
+  "Δ Θεσσαλονικης" → "D Thessalonikis" (NOT "Tax Office of Thessaloniki");
+  "ΑΚΜΕ ΠΛΑΚΙΔΙΑ Α.Ε." → "AKME PLAKIDIA A.E."; "Ερμού" → "Ermou".
+- primary_activity_descr: give a natural English TRANSLATION (this is a description, not a name).
+Return null for any field whose input is null or empty. Do NOT add, guess, or invent anything.
 
 ${JSON.stringify(src, null, 2)}`,
       schema,
@@ -185,7 +189,7 @@ ${JSON.stringify(src, null, 2)}`,
         model: 'claude-haiku-4-5-20251001',
         temperature: 0,
         task: 'aade_field_translation',
-        systemPrompt: 'You are a precise Greek→English translator for business-registry data. Output only the requested JSON.',
+        systemPrompt: 'You are a precise Greek→Latin transliterator for business-registry data (names/addresses transliterated verbatim, only activity descriptions translated). Output only the requested JSON.',
       },
     );
     return output as BasicRecEn;
