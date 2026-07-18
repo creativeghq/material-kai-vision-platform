@@ -1858,7 +1858,7 @@ async function executeAgent(
 
   // Project Workspace tools (all users; module-gated inside each tool; 0 cr — DB-only)
   if (config.tools.includes('create_project') && createCreateProjectTool) {
-    tools.push(createCreateProjectTool(userId, onChunk));
+    tools.push(createCreateProjectTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('list_my_projects') && createListMyProjectsTool) {
     tools.push(createListMyProjectsTool(userId, onChunk));

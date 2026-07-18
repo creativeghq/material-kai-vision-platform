@@ -243,9 +243,12 @@ export const createAttachCatalogPdfsTool = (userId: string, onChunk: ChunkSink) 
           return JSON.stringify({ error });
         }
 
+        // Scope source PDFs to the catalog's workspace so another tenant's PDF cannot be
+        // attached by uuid then extracted (BOLA guard — CLAUDE.md invariant 1).
         const { data: pdfs, error: pdfErr } = await supabase
           .from('catalog_source_pdfs')
           .select('id, original_filename, manufacturer_name, page_count, status')
+          .eq('workspace_id', catalog.workspace_id)
           .in('id', input.source_pdf_ids);
 
         if (pdfErr) return JSON.stringify({ error: pdfErr.message });
@@ -672,6 +675,7 @@ export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSin
             .from('products')
             .select('name, description, base_price, currency')
             .eq('id', input.material.price_source_ref)
+            .eq('workspace_id', catalog.workspace_id)
             .maybeSingle();
           if (prod) {
             if (price == null) price = prod.base_price ?? null;
@@ -683,6 +687,7 @@ export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSin
             .from('tracked_queries')
             .select('current_price, current_currency, current_price_updated_at')
             .eq('id', input.material.price_source_ref)
+            .eq('workspace_id', catalog.workspace_id)
             .maybeSingle();
           if (tq) {
             if (price == null) price = tq.current_price ?? null;
@@ -695,6 +700,7 @@ export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSin
             .from('document_images')
             .select('storage_path')
             .eq('product_id', input.material.image_source_ref)
+            .eq('workspace_id', catalog.workspace_id)
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle();

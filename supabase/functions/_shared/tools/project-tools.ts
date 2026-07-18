@@ -84,6 +84,7 @@ async function resolveProjectId(userId: string, projectId?: string, projectName?
 
 export const createCreateProjectTool = (
   userId: string,
+  workspaceId: string,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
@@ -104,6 +105,7 @@ export const createCreateProjectTool = (
         .from('projects')
         .insert({
           user_id: userId,
+          workspace_id: workspaceId,  // NOT NULL + tenancy binding (CLAUDE.md invariant 1)
           name,
           description: description || null,
           deadline: deadline || null,

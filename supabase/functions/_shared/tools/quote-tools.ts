@@ -180,6 +180,19 @@ export const createCreateQuoteTool = (
         const customerCompanyId = input.customer_company_id ?? null;
         const customerContactId = input.customer_contact_id ?? null;
 
+        // Verify any customer reference belongs to THIS workspace before linking it —
+        // a body-supplied id must not create a cross-tenant linkage (CLAUDE.md invariant 1).
+        if (customerCompanyId) {
+          const { data: co } = await sb.from('crm_companies').select('id')
+            .eq('id', customerCompanyId).eq('workspace_id', workspaceId).maybeSingle();
+          if (!co) return JSON.stringify({ success: false, error: 'Customer company not found in this workspace.' });
+        }
+        if (customerContactId) {
+          const { data: ct } = await sb.from('crm_contacts').select('id')
+            .eq('id', customerContactId).eq('workspace_id', workspaceId).maybeSingle();
+          if (!ct) return JSON.stringify({ success: false, error: 'Customer contact not found in this workspace.' });
+        }
+
         onChunk?.({ type: 'tool_progress', status: 'Creating quote…', timestamp: Date.now() });
 
         // 1) Insert the draft quote. Trust/identity fields are server-set.
