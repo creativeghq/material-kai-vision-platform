@@ -16,6 +16,14 @@ export type InboxThreadStatus = 'open' | 'snoozed' | 'closed';
 export type InboxMessageType = 'text' | 'system' | 'agent' | 'note';
 export type InboxParticipantType = 'member' | 'customer' | 'agent';
 
+/** A workspace-scoped conversation label (colored chip). `color` is a palette key (see LABEL_COLORS). */
+export interface InboxLabel {
+  id: string;
+  name: string;
+  color: string;
+  created_at?: string;
+}
+
 export interface InboxThread {
   id: string;
   workspace_id: string;
@@ -29,7 +37,10 @@ export interface InboxThread {
   agent_id: string | null;
   agent_state: string;
   created_at: string;
+  archived_at?: string | null;
   unread?: boolean;
+  /** Labels assigned to this thread (returned by list_threads). */
+  labels?: InboxLabel[];
 }
 
 export interface InboxParticipant {
@@ -199,7 +210,10 @@ export const inboxApi = {
   }) {
     return call<{ thread: InboxThread }>('create_thread', input);
   },
-  listThreads(filters: { channel?: InboxChannel; thread_type?: InboxThreadType; status?: InboxThreadStatus; scope?: 'all' } = {}) {
+  listThreads(filters: {
+    channel?: InboxChannel; thread_type?: InboxThreadType; status?: InboxThreadStatus;
+    scope?: 'all'; archived?: boolean; label_id?: string;
+  } = {}) {
     return call<{ threads: InboxThread[] }>('list_threads', filters);
   },
   getThread(thread_id: string) {
@@ -240,6 +254,36 @@ export const inboxApi = {
     return call<{ settings: InboxAgentSettings }>('set_agent_settings', { workspace_id, ...changes });
   },
 
+  // ── Labels (owner/admin manage; any member assigns) ──
+  listLabels(workspace_id: string) {
+    return call<{ labels: InboxLabel[] }>('list_labels', { workspace_id });
+  },
+  createLabel(workspace_id: string, name: string, color: string) {
+    return call<{ label: InboxLabel }>('create_label', { workspace_id, name, color });
+  },
+  updateLabel(label_id: string, changes: { name?: string; color?: string }) {
+    return call<{ label: InboxLabel }>('update_label', { label_id, ...changes });
+  },
+  deleteLabel(label_id: string) {
+    return call<{ ok: boolean }>('delete_label', { label_id });
+  },
+  setThreadLabels(thread_id: string, label_ids: string[]) {
+    return call<{ ok: boolean; label_ids: string[] }>('set_thread_labels', { thread_id, label_ids });
+  },
+
+  // ── Archive (soft-delete → 30-day restore window → purge) ──
+  archiveThread(thread_id: string) {
+    return call<{ ok: boolean }>('archive_thread', { thread_id });
+  },
+  restoreThread(thread_id: string) {
+    return call<{ ok: boolean }>('restore_thread', { thread_id });
+  },
+
+  // ── AI "help me write" — a draft reply for a member to review/edit/send ──
+  suggestReply(thread_id: string) {
+    return call<{ draft: string }>('suggest_reply', { thread_id });
+  },
+
   // ── Token actions (public customer thread) ──
   tokenGetThread(token: string) {
     return call<{
@@ -256,6 +300,26 @@ export const inboxApi = {
     return call<{ ok: boolean; thread_id: string }>('token_claim', { token, user_id });
   },
 };
+
+/**
+ * Label color palette — the single source of truth shared by the chip renderer and the label
+ * editor. `key` is what's stored in `inbox_labels.color`; `chip` is the Tailwind class set for a
+ * pill (works in both themes); `dot` tints the small swatch in the picker.
+ */
+export const LABEL_COLORS: Array<{ key: string; label: string; chip: string; dot: string }> = [
+  { key: 'slate',   label: 'Slate',   chip: 'bg-slate-500/15 text-slate-300 border-slate-500/30',       dot: 'bg-slate-400' },
+  { key: 'rose',    label: 'Rose',    chip: 'bg-rose-500/15 text-rose-300 border-rose-500/30',          dot: 'bg-rose-400' },
+  { key: 'amber',   label: 'Amber',   chip: 'bg-amber-500/15 text-amber-300 border-amber-500/30',       dot: 'bg-amber-400' },
+  { key: 'emerald', label: 'Emerald', chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', dot: 'bg-emerald-400' },
+  { key: 'sky',     label: 'Sky',     chip: 'bg-sky-500/15 text-sky-300 border-sky-500/30',             dot: 'bg-sky-400' },
+  { key: 'violet',  label: 'Violet',  chip: 'bg-violet-500/15 text-violet-300 border-violet-500/30',    dot: 'bg-violet-400' },
+  { key: 'cyan',    label: 'Cyan',    chip: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',          dot: 'bg-cyan-400' },
+  { key: 'teal',    label: 'Teal',    chip: 'bg-teal-500/15 text-teal-300 border-teal-500/30',          dot: 'bg-teal-400' },
+];
+
+export function labelChipClass(color: string | null | undefined): string {
+  return (LABEL_COLORS.find((c) => c.key === color) || LABEL_COLORS[0]).chip;
+}
 
 /** Resolve a viewable URL for an attachment: signed private-storage URL, or external channel URL. */
 export async function signInboxAttachment(att: InboxAttachment): Promise<string | null> {

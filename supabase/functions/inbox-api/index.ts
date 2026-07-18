@@ -383,7 +383,6 @@ async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise
 
     const owner = await workspaceOwner(db, workspaceId);
     if (!owner) return;
-    const settings = await inboxAgentSettings(db, workspaceId);
 
     // Bill the owner only now that we've committed to replying; skip (leave for a human) if unpaid.
     const { data: debit } = await db.rpc('debit_credits', {
@@ -397,34 +396,7 @@ async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise
     const debitRes = Array.isArray(debit) ? debit[0] : debit;
     if (!debitRes?.success) return;
 
-    const { data: ws } = await db.from('workspaces').select('name').eq('id', workspaceId).maybeSingle();
-    const businessName = (ws as { name?: string } | null)?.name || 'our team';
-
-    const transcript = rows.slice().reverse()
-      .map((m) => `${m.message_type === 'agent' ? 'Assistant' : 'Customer/Team'}: ${m.body || '[attachment]'}`)
-      .join('\n');
-
-    // Self-service tools — only when we know which customer this is AND the workspace allows account
-    // answers. Scope is derived from the thread, never from the message (injection-proof).
-    const scope = await resolveThreadCustomerScope(db, threadId);
-    const tools = (settings.allowAccountData && scope.contactId)
-      ? buildCustomerSupportTools(db, { workspaceId, contactId: scope.contactId })
-      : {};
-
-    const personaBase = await loadInboxAgentPersona(db);
-    const systemPrompt =
-      `${personaBase}\n\n` +
-      `Business: ${businessName}. Channel: ${thread.channel}. ` +
-      (Object.keys(tools).length
-        ? "Use the tools to look up THIS customer's own account (statement/balance, open invoices, " +
-          'quotes & projects); always call a tool for real figures and only share a payment link a tool returns.'
-        : 'You do not have access to account data in this conversation.');
-
-    const result = await generateWithClaudeTools(
-      `Conversation so far:\n${transcript}\n\nWrite the next reply to the customer.`,
-      { systemPrompt, maxTokens: 700, temperature: 0.4, task: 'inbox_agent_reply', tools, maxSteps: 6 },
-    );
-    const replyText = (result.text || '').trim();
+    const replyText = await buildAgentDraft(db, thread);
     if (!replyText) return;
 
     // The agent participant (created when the thread was handed over / auto-engaged).
@@ -445,6 +417,51 @@ async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise
   } catch (e) {
     console.warn('[inbox-api] agent reply failed:', e instanceof Error ? e.message : String(e));
   }
+}
+
+/**
+ * Generate the agent's next-reply draft for a thread — the shared brain behind both the auto-reply
+ * (maybeRunAgentReply) and the member-initiated "help me write" suggestion (suggest_reply action).
+ * Pure: reads the transcript + (injection-proof, thread-scoped) account tools and returns the text.
+ * Does NOT post, bill, or guard — the callers own that.
+ */
+async function buildAgentDraft(db: SupabaseClient, thread: Record<string, unknown>): Promise<string> {
+  const threadId = String(thread.id);
+  const workspaceId = String(thread.workspace_id);
+  const { data: history } = await db
+    .from('inbox_messages')
+    .select('body, message_type')
+    .eq('thread_id', threadId)
+    .is('deleted_at', null)
+    .neq('message_type', 'note')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  const rows = (history || []) as Array<{ body: string | null; message_type: string }>;
+  const settings = await inboxAgentSettings(db, workspaceId);
+  const { data: ws } = await db.from('workspaces').select('name').eq('id', workspaceId).maybeSingle();
+  const businessName = (ws as { name?: string } | null)?.name || 'our team';
+  const transcript = rows.slice().reverse()
+    .map((m) => `${m.message_type === 'agent' ? 'Assistant' : 'Customer/Team'}: ${m.body || '[attachment]'}`)
+    .join('\n');
+  // Self-service tools — only when we know which customer this is AND the workspace allows account
+  // answers. Scope is derived from the thread, never from the message (injection-proof).
+  const scope = await resolveThreadCustomerScope(db, threadId);
+  const tools = (settings.allowAccountData && scope.contactId)
+    ? buildCustomerSupportTools(db, { workspaceId, contactId: scope.contactId })
+    : {};
+  const personaBase = await loadInboxAgentPersona(db);
+  const systemPrompt =
+    `${personaBase}\n\n` +
+    `Business: ${businessName}. Channel: ${String(thread.channel)}. ` +
+    (Object.keys(tools).length
+      ? "Use the tools to look up THIS customer's own account (statement/balance, open invoices, " +
+        'quotes & projects); always call a tool for real figures and only share a payment link a tool returns.'
+      : 'You do not have access to account data in this conversation.');
+  const result = await generateWithClaudeTools(
+    `Conversation so far:\n${transcript}\n\nWrite the next reply to the customer.`,
+    { systemPrompt, maxTokens: 700, temperature: 0.4, task: 'inbox_agent_reply', tools, maxSteps: 6 },
+  );
+  return (result.text || '').trim();
 }
 
 /**
@@ -1032,8 +1049,33 @@ async function handleJwtAction(
       if (channelFilter) q = q.eq('channel', channelFilter);
       if (typeFilter) q = q.eq('thread_type', typeFilter);
       if (statusFilter) q = q.eq('status', statusFilter);
+      // Archived (soft-deleted) threads live in their own view for the 30-day restore window.
+      q = payload.archived === true ? q.not('archived_at', 'is', null) : q.is('archived_at', null);
+      // Optional label filter — restrict to threads carrying a given label.
+      if (payload.label_id) {
+        const { data: lt } = await db.from('inbox_thread_labels')
+          .select('thread_id').eq('label_id', String(payload.label_id));
+        const ids = (lt || []).map((r: { thread_id: string }) => r.thread_id);
+        if (ids.length === 0) return json({ threads: [] });
+        q = q.in('id', ids);
+      }
       const { data: threads, error } = await q;
       if (error) throw new HttpError(500, error.message);
+
+      // Attach labels for the returned threads in one round trip.
+      const threadIds = (threads || []).map((t: Record<string, unknown>) => String(t.id));
+      const labelsByThread = new Map<string, Array<{ id: string; name: string; color: string }>>();
+      if (threadIds.length) {
+        const { data: tl } = await db.from('inbox_thread_labels')
+          .select('thread_id, inbox_labels(id, name, color)')
+          .in('thread_id', threadIds);
+        for (const r of (tl || []) as Array<{ thread_id: string; inbox_labels: { id: string; name: string; color: string } | null }>) {
+          if (!r.inbox_labels) continue;
+          const arr = labelsByThread.get(r.thread_id) || [];
+          arr.push(r.inbox_labels);
+          labelsByThread.set(r.thread_id, arr);
+        }
+      }
 
       const enriched = (threads || []).map((t: Record<string, unknown>) => {
         const id = String(t.id);
@@ -1042,7 +1084,7 @@ async function handleJwtAction(
         const unread = lastReadByThread.has(id)
           ? (!lr || new Date(String(t.last_message_at)) > new Date(lr))
           : true;
-        return { ...t, unread };
+        return { ...t, unread, labels: labelsByThread.get(id) || [] };
       });
       return json({ threads: enriched });
     }
@@ -1391,6 +1433,151 @@ async function handleJwtAction(
         }));
 
       return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, metrics });
+    }
+
+    case 'list_labels': {
+      const workspaceId = String(payload.workspace_id || '');
+      if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
+      const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && !callerRole) throw new HttpError(403, 'You are not a member of that workspace');
+      const { data: labels } = await db.from('inbox_labels')
+        .select('id, name, color, created_at')
+        .eq('workspace_id', workspaceId)
+        .order('name', { ascending: true });
+      return json({ labels: labels || [] });
+    }
+
+    case 'create_label': {
+      const workspaceId = String(payload.workspace_id || '');
+      const name = String(payload.name || '').trim();
+      const color = String(payload.color || 'slate');
+      if (!workspaceId || !name) throw new HttpError(400, 'workspace_id and name are required');
+      const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && callerRole !== 'owner' && callerRole !== 'admin') {
+        throw new HttpError(403, 'Only a workspace owner or admin may manage labels');
+      }
+      const { data: label, error } = await db.from('inbox_labels')
+        .insert({ workspace_id: workspaceId, name, color, created_by: userId })
+        .select('id, name, color, created_at').single();
+      if (error) {
+        if ((error as { code?: string }).code === '23505') throw new HttpError(409, 'A label with that name already exists');
+        throw new HttpError(500, error.message);
+      }
+      return json({ label });
+    }
+
+    case 'update_label': {
+      const labelId = String(payload.label_id || '');
+      if (!labelId) throw new HttpError(400, 'label_id is required');
+      const { data: existing } = await db.from('inbox_labels').select('workspace_id').eq('id', labelId).maybeSingle();
+      const wsId = (existing as { workspace_id?: string } | null)?.workspace_id;
+      if (!wsId) throw new HttpError(404, 'Label not found');
+      const callerRole = await callerRoleInWorkspace(db, userId, wsId);
+      if (!operator && callerRole !== 'owner' && callerRole !== 'admin') {
+        throw new HttpError(403, 'Only a workspace owner or admin may manage labels');
+      }
+      const patch: Record<string, unknown> = {};
+      if (payload.name != null) patch.name = String(payload.name).trim();
+      if (payload.color != null) patch.color = String(payload.color);
+      const { data: label, error } = await db.from('inbox_labels').update(patch).eq('id', labelId)
+        .select('id, name, color, created_at').single();
+      if (error) throw new HttpError(500, error.message);
+      return json({ label });
+    }
+
+    case 'delete_label': {
+      const labelId = String(payload.label_id || '');
+      if (!labelId) throw new HttpError(400, 'label_id is required');
+      const { data: existing } = await db.from('inbox_labels').select('workspace_id').eq('id', labelId).maybeSingle();
+      const wsId = (existing as { workspace_id?: string } | null)?.workspace_id;
+      if (!wsId) throw new HttpError(404, 'Label not found');
+      const callerRole = await callerRoleInWorkspace(db, userId, wsId);
+      if (!operator && callerRole !== 'owner' && callerRole !== 'admin') {
+        throw new HttpError(403, 'Only a workspace owner or admin may manage labels');
+      }
+      await db.from('inbox_labels').delete().eq('id', labelId); // cascade removes assignments
+      return json({ ok: true });
+    }
+
+    case 'set_thread_labels': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const labelIds = Array.isArray(payload.label_ids) ? payload.label_ids.map(String) : [];
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may label conversations');
+      // Validate the labels belong to the thread's workspace (no cross-tenant labels).
+      let valid: string[] = [];
+      if (labelIds.length) {
+        const { data: ok } = await db.from('inbox_labels')
+          .select('id').eq('workspace_id', String(thread.workspace_id)).in('id', labelIds);
+        valid = (ok || []).map((r: { id: string }) => r.id);
+      }
+      await db.from('inbox_thread_labels').delete().eq('thread_id', threadId);
+      if (valid.length) {
+        await db.from('inbox_thread_labels')
+          .insert(valid.map((label_id) => ({ thread_id: threadId, label_id, created_by: userId })));
+      }
+      return json({ ok: true, label_ids: valid });
+    }
+
+    case 'suggest_reply': {
+      // "Help me write" — the assistant drafts the next reply for a member to review/edit/send.
+      // Uses the same injection-proof, thread-scoped brain as the auto-reply, but returns the draft
+      // instead of posting it. Billed to the workspace pool (member's balance) like an auto-reply.
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may draft AI replies');
+      const workspaceId = String(thread.workspace_id);
+
+      const { data: debit } = await db.rpc('debit_credits', {
+        p_user_id: userId,
+        p_amount: INBOX_AGENT_REPLY_COST,
+        p_operation_type: 'inbox_agent_suggest',
+        p_description: 'Inbox AI draft reply (help me write)',
+        p_metadata: { thread_id: threadId, billing_type: 'inbox_agent_suggest' },
+        p_workspace_id: workspaceId,
+      });
+      const debitRes = Array.isArray(debit) ? debit[0] : debit;
+      if (!debitRes?.success) throw new HttpError(402, 'Not enough credits for an AI draft');
+
+      const draft = await buildAgentDraft(db, thread);
+      if (!draft) {
+        // Nothing to say — refund the debit so a blank draft isn't charged.
+        await db.rpc('refund_credits', {
+          p_user_id: userId, p_amount: INBOX_AGENT_REPLY_COST,
+          p_operation_type: 'inbox_agent_suggest_refund',
+          p_description: 'Refund — AI draft produced no text',
+          p_metadata: { thread_id: threadId }, p_workspace_id: workspaceId,
+        }).catch(() => {});
+        throw new HttpError(502, 'The assistant could not draft a reply — try again.');
+      }
+      return json({ draft });
+    }
+
+    case 'archive_thread': {
+      // Soft-delete: moves the thread into the 30-day Archived view (purge cron deletes after).
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may archive conversations');
+      await db.from('inbox_threads')
+        .update({ archived_at: new Date().toISOString(), status: 'closed' }).eq('id', threadId);
+      return json({ ok: true });
+    }
+
+    case 'restore_thread': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may restore conversations');
+      await db.from('inbox_threads')
+        .update({ archived_at: null, status: 'open' }).eq('id', threadId);
+      return json({ ok: true });
     }
 
     default:

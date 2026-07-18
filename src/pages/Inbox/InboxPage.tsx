@@ -5,6 +5,7 @@ import {
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, PanelRight, CheckCircle2, Wallet,
+  Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { marketplaceService } from '@/services/marketplaceService';
@@ -28,9 +29,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
 import {
-  inboxApi, signInboxAttachment,
+  inboxApi, signInboxAttachment, LABEL_COLORS, labelChipClass,
   type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel,
-  type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings,
+  type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
 } from '@/services/inboxApi';
 
 type ChannelFilter = 'all' | InboxChannel;
@@ -79,6 +80,45 @@ function money(amount: number | null | undefined, currency: string | null | unde
   } catch { return `${amount} ${currency || ''}`.trim(); }
 }
 
+/** Per-source presentation for a thread's channel (the "internal / WhatsApp / email" tag). */
+function channelMeta(t: InboxThread): { label: string; Icon: typeof MessageCircle; className: string } {
+  if (t.channel === 'whatsapp') {
+    return { label: 'WhatsApp', Icon: MessageCircle, className: 'bg-green-500/15 text-green-400 border-green-500/30' };
+  }
+  if (t.thread_type === 'internal') {
+    return { label: 'Team', Icon: Users, className: 'bg-sky-500/15 text-sky-300 border-sky-500/30' };
+  }
+  // customer / upstream on the internal channel = an in-app customer chat.
+  return { label: t.thread_type === 'upstream' ? 'Dealer' : 'Customer', Icon: MessageSquare, className: 'bg-violet-500/15 text-violet-300 border-violet-500/30' };
+}
+
+/** Colored label pills for a thread. */
+const LabelChips: React.FC<{ labels?: InboxLabel[]; className?: string }> = ({ labels, className }) => {
+  if (!labels || labels.length === 0) return null;
+  return (
+    <div className={`flex flex-wrap items-center gap-1 ${className || ''}`}>
+      {labels.map((l) => (
+        <span key={l.id} className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded-full border ${labelChipClass(l.color)}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} />
+          {l.name}
+        </span>
+      ))}
+    </div>
+  );
+};
+
+/** Bucket threads into Today / Yesterday / Earlier for the email-client day headers. */
+function dayBucket(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const t = d.getTime();
+  if (t >= startOfToday) return 'Today';
+  if (t >= startOfToday - 86400000) return 'Yesterday';
+  if (t >= startOfToday - 6 * 86400000) return 'This week';
+  return 'Earlier';
+}
+
 const InboxPage: React.FC = () => {
   const { activeWorkspaceId, isPlatformOperator } = useWorkspace();
   const { persona } = usePermissions();
@@ -91,6 +131,10 @@ const InboxPage: React.FC = () => {
   const [filter, setFilter] = useState<ChannelFilter>('all');
   const [query, setQuery] = useState('');
   const [allWorkspaces, setAllWorkspaces] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
+  const [labelFilter, setLabelFilter] = useState<string | null>(null);
+  const [canManageLabels, setCanManageLabels] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(searchParams.get('thread'));
 
   const [messages, setMessages] = useState<InboxMessage[]>([]);
@@ -105,6 +149,8 @@ const InboxPage: React.FC = () => {
   const [isNote, setIsNote] = useState(false);
   const [sending, setSending] = useState(false);
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [aiDrafting, setAiDrafting] = useState(false);
+  const [aiDraftShown, setAiDraftShown] = useState(false);
 
   const [showNew, setShowNew] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -147,6 +193,8 @@ const InboxPage: React.FC = () => {
       const { threads } = await inboxApi.listThreads({
         ...(filter === 'all' ? {} : { channel: filter }),
         ...(allWorkspaces && isPlatformOperator ? { scope: 'all' as const } : {}),
+        ...(showArchived ? { archived: true } : {}),
+        ...(labelFilter ? { label_id: labelFilter } : {}),
       });
       setThreads(threads);
     } catch (e) {
@@ -154,9 +202,28 @@ const InboxPage: React.FC = () => {
     } finally {
       setLoadingThreads(false);
     }
-  }, [filter, allWorkspaces, isPlatformOperator, toast]);
+  }, [filter, allWorkspaces, isPlatformOperator, showArchived, labelFilter, toast]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
+
+  // Workspace labels drive the filter pills + the per-thread assignment popover.
+  const loadLabels = useCallback(async () => {
+    if (!activeWorkspaceId) { setWsLabels([]); setCanManageLabels(false); return; }
+    try {
+      const { labels } = await inboxApi.listLabels(activeWorkspaceId);
+      setWsLabels(labels);
+    } catch { /* labels are optional chrome — never block the inbox on them */ }
+    // Managing labels (create/edit/delete) is owner/admin — reuse the agent-settings can_edit gate.
+    try {
+      const { can_edit } = await inboxApi.getAgentSettings(activeWorkspaceId);
+      setCanManageLabels(can_edit);
+    } catch { setCanManageLabels(false); }
+  }, [activeWorkspaceId]);
+  useEffect(() => { loadLabels(); }, [loadLabels]);
+  // A label the filter points at may be deleted — clear a dangling filter.
+  useEffect(() => {
+    if (labelFilter && !wsLabels.some((l) => l.id === labelFilter)) setLabelFilter(null);
+  }, [wsLabels, labelFilter]);
 
   const openThread = useCallback(async (id: string) => {
     setActiveId(id);
@@ -274,6 +341,7 @@ const InboxPage: React.FC = () => {
       });
       setDraft('');
       setAttachment(null);
+      setAiDraftShown(false);
       // Human takeover: a member's text reply pauses the assistant server-side — reflect it locally.
       if (!isNote && isMember && activeThread?.agent_state === 'active') {
         setActiveThread((t) => (t ? { ...t, agent_state: 'paused' } : t));
@@ -285,20 +353,69 @@ const InboxPage: React.FC = () => {
     }
   }, [activeId, draft, attachment, isNote, isMember, activeThread, toast]);
 
+  // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
+  const aiSuggest = useCallback(async () => {
+    if (!activeId) return;
+    setAiDrafting(true);
+    try {
+      const { draft: suggestion } = await inboxApi.suggestReply(activeId);
+      setDraft(suggestion);
+      setIsNote(false);
+      setAiDraftShown(true);
+    } catch (e) {
+      toast({ title: 'Could not draft a reply', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setAiDrafting(false);
+    }
+  }, [activeId, toast]);
+
+  // Archive (soft-delete) / restore the open thread.
+  const archiveActive = useCallback(async () => {
+    if (!activeThread) return;
+    try {
+      await inboxApi.archiveThread(activeThread.id);
+      toast({ title: 'Moved to Archived', description: 'Restorable for 30 days, then permanently deleted.' });
+      backToList();
+      loadThreads();
+    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  }, [activeThread, toast, backToList, loadThreads]);
+
+  const restoreActive = useCallback(async () => {
+    if (!activeThread) return;
+    try {
+      await inboxApi.restoreThread(activeThread.id);
+      toast({ title: 'Conversation restored' });
+      setActiveThread({ ...activeThread, archived_at: null, status: 'open' });
+      loadThreads();
+    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  }, [activeThread, toast, loadThreads]);
+
   const visibleThreads = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return threads;
     return threads.filter((t) => (t.subject || '').toLowerCase().includes(q));
   }, [threads, query]);
 
-  const threadDisplayName = (t: InboxThread) => t.subject || (t.channel === 'whatsapp' ? 'WhatsApp contact' : 'Conversation');
+  // Threads grouped into Today / Yesterday / This week / Earlier for the email-client day headers.
+  const groupedThreads = useMemo(() => {
+    const order = ['Today', 'Yesterday', 'This week', 'Earlier'];
+    const buckets = new Map<string, InboxThread[]>();
+    for (const t of visibleThreads) {
+      const k = dayBucket(t.last_message_at);
+      const arr = buckets.get(k) || [];
+      arr.push(t);
+      buckets.set(k, arr);
+    }
+    return order.filter((k) => buckets.has(k)).map((k) => [k, buckets.get(k)!] as const);
+  }, [visibleThreads]);
 
-  // WhatsApp is now signalled by the green channel dot on the avatar, so only
-  // non-WhatsApp threads carry a text channel badge here.
-  const channelBadge = (t: InboxThread) =>
-    t.channel === 'whatsapp'
-      ? null
-      : <Badge variant="secondary" className="text-[10px] capitalize">{t.thread_type}</Badge>;
+  // The open thread's labels (kept fresh from the list, which carries labels per thread).
+  const activeThreadLabels = useMemo(
+    () => threads.find((t) => t.id === activeId)?.labels || [],
+    [threads, activeId],
+  );
+
+  const threadDisplayName = (t: InboxThread) => t.subject || (t.channel === 'whatsapp' ? 'WhatsApp contact' : 'Conversation');
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
 
@@ -342,9 +459,31 @@ const InboxPage: React.FC = () => {
         <Bot className="w-4 h-4" />
       </Button>
       <InboxAgentSettingsButton workspaceId={activeThread.workspace_id} />
+      <LabelAssignButton
+        workspaceId={activeThread.workspace_id}
+        threadId={activeThread.id}
+        labels={wsLabels}
+        assigned={activeThreadLabels}
+        canManage={canManageLabels}
+        onChanged={() => { loadThreads(); loadLabels(); }}
+      />
       <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="Add a teammate" onClick={() => setShowAdd(true)}>
         <UserPlus className="w-4 h-4" />
       </Button>
+      {activeThread.archived_at ? (
+        <Button variant="outline" size="sm" className="rounded-full" title="Restore this conversation" onClick={restoreActive}>
+          <ArchiveRestore className="w-4 h-4 mr-1.5" /> Restore
+        </Button>
+      ) : (
+        <Button
+          variant="outline" size="icon"
+          className="rounded-full h-9 w-9 text-muted-foreground hover:text-destructive"
+          title="Delete — moves to Archived for 30 days, then permanently removed"
+          onClick={archiveActive}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
       <select
         className="bg-transparent border border-white/10 rounded-full px-3 py-1.5 text-xs capitalize focus:outline-none focus:ring-2 focus:ring-primary/30"
         value={activeThread.status}
@@ -394,11 +533,20 @@ const InboxPage: React.FC = () => {
         {/* ── Column 1 · Conversations ── */}
         <div className={`dashboard-card rounded-2xl border-0 md:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-3 border-b border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                <MessagesSquare className="h-4 w-4" /> Conversations
-              </h3>
-              <span className="text-xs text-muted-foreground">{visibleThreads.length}</span>
+            {/* Inbox vs Archived (30-day restore window) */}
+            <div className="flex items-center gap-1 p-0.5 rounded-full bg-muted/40">
+              <button
+                onClick={() => setShowArchived(false)}
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-full transition-colors ${!showArchived ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <InboxIcon className="w-3.5 h-3.5" /> Inbox
+              </button>
+              <button
+                onClick={() => setShowArchived(true)}
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-full transition-colors ${showArchived ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Archive className="w-3.5 h-3.5" /> Archived
+              </button>
             </div>
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -411,10 +559,35 @@ const InboxPage: React.FC = () => {
             <Tabs value={filter} onValueChange={(v) => setFilter(v as ChannelFilter)}>
               <TabsList className="h-auto flex-wrap justify-start gap-1.5 bg-transparent p-0">
                 <TabsTrigger value="all" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>All</TabsTrigger>
-                <TabsTrigger value="internal" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Internal</TabsTrigger>
+                <TabsTrigger value="internal" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Team</TabsTrigger>
                 <TabsTrigger value="whatsapp" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>WhatsApp</TabsTrigger>
               </TabsList>
             </Tabs>
+            {/* Label filter pills */}
+            {wsLabels.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setLabelFilter(null)}
+                  className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-colors ${!labelFilter ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground hover:bg-accent'}`}
+                >
+                  <Tag className="w-3 h-3" /> All
+                </button>
+                {wsLabels.map((l) => {
+                  const on = labelFilter === l.id;
+                  const dot = (LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot;
+                  return (
+                    <button
+                      key={l.id}
+                      onClick={() => setLabelFilter(on ? null : l.id)}
+                      className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-colors ${labelChipClass(l.color)} ${on ? 'ring-1 ring-inset ring-current' : 'opacity-70 hover:opacity-100'}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                      {l.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {loadingThreads ? (
@@ -422,44 +595,53 @@ const InboxPage: React.FC = () => {
             ) : visibleThreads.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-sm gap-2 px-4 text-center">
                 <MessageSquare className="w-8 h-8 opacity-40" />
-                {query ? 'No conversations match your search.' : 'No conversations yet. WhatsApp and customer chats appear here automatically.'}
+                {query ? 'No conversations match your search.'
+                  : showArchived ? 'Nothing archived. Deleted conversations rest here for 30 days before they’re removed for good.'
+                  : 'No conversations yet. WhatsApp and customer chats appear here automatically.'}
               </div>
-            ) : visibleThreads.map((t) => {
-              const name = threadDisplayName(t);
-              const active = activeId === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => openThread(t.id)}
-                  className={`w-full text-left px-3 py-3 flex gap-3 border-l-2 border-b border-white/5 transition-colors ${active ? 'bg-accent border-l-primary' : 'border-l-transparent hover:bg-accent'}`}
-                >
-                  <div className="relative shrink-0 mt-0.5">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className={`text-xs ${avatarTint(name)}`}>{initials(name)}</AvatarFallback>
-                    </Avatar>
-                    {t.channel === 'whatsapp' && (
-                      <span className="absolute -right-0.5 -bottom-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-card flex items-center justify-center">
-                        <MessageSquare className="w-2 h-2 text-white" />
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                      <span className={`flex-1 truncate text-sm ${t.unread ? 'font-medium text-foreground' : 'text-foreground/90'}`}>{name}</span>
-                      <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(t.last_message_at)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      {channelBadge(t)}
-                      {t.status !== 'open' && <Badge variant="outline" className="text-[10px] capitalize">{t.status}</Badge>}
-                      {t.agent_state === 'active' && (
-                        <Badge variant="outline" className="text-[10px] border-primary/40 text-primary"><Bot className="w-2.5 h-2.5 mr-0.5" />AI</Badge>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+            ) : groupedThreads.map(([bucket, items]) => (
+              <div key={bucket}>
+                <div className="px-3 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium">{bucket}</div>
+                {items.map((t) => {
+                  const name = threadDisplayName(t);
+                  const active = activeId === t.id;
+                  const { Icon: SrcIcon, label: srcLabel, className: srcClass } = channelMeta(t);
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => openThread(t.id)}
+                      className={`w-full text-left px-3 py-2.5 flex gap-3 border-l-2 border-b border-white/5 transition-colors ${active ? 'bg-accent border-l-primary' : 'border-l-transparent hover:bg-accent'}`}
+                    >
+                      <div className="relative shrink-0 mt-0.5">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback className={`text-xs ${avatarTint(name)}`}>{initials(name)}</AvatarFallback>
+                        </Avatar>
+                        <span className={`absolute -right-0.5 -bottom-0.5 w-4 h-4 rounded-full border-2 border-card flex items-center justify-center ${srcClass}`}>
+                          <SrcIcon className="w-2 h-2" />
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                          <span className={`flex-1 truncate text-sm ${t.unread ? 'font-medium text-foreground' : 'text-foreground/90'}`}>{name}</span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(t.last_message_at)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded-full border ${srcClass}`}>
+                            <SrcIcon className="w-2.5 h-2.5" /> {srcLabel}
+                          </span>
+                          {t.status !== 'open' && !t.archived_at && <Badge variant="outline" className="text-[10px] capitalize">{t.status}</Badge>}
+                          {t.agent_state === 'active' && (
+                            <Badge variant="outline" className="text-[10px] border-primary/40 text-primary"><Bot className="w-2.5 h-2.5 mr-0.5" />AI</Badge>
+                          )}
+                          <LabelChips labels={t.labels} />
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -488,12 +670,18 @@ const InboxPage: React.FC = () => {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate text-[15px] font-display" style={{ fontWeight: 600 }}>{threadDisplayName(activeThread)}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="truncate text-[15px] font-display" style={{ fontWeight: 600 }}>{threadDisplayName(activeThread)}</div>
+                    {activeThread.archived_at && (
+                      <Badge variant="outline" className="text-[10px] shrink-0"><Archive className="w-2.5 h-2.5 mr-0.5" />Archived</Badge>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <span className="capitalize">{activeThread.channel}</span>
+                    <span>{channelMeta(activeThread).label}</span>
                     <span className="opacity-50">·</span>
                     <span>{activeCount} participant{activeCount === 1 ? '' : 's'}</span>
                   </div>
+                  <LabelChips labels={activeThreadLabels} className="mt-1" />
                 </div>
                 {/* Desktop: inline member controls. Mobile: collapsed into the details sheet. */}
                 {memberControls && <div className="hidden md:flex items-center gap-1.5">{memberControls}</div>}
@@ -543,6 +731,24 @@ const InboxPage: React.FC = () => {
                       className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-colors ${isNote ? 'bg-amber text-black' : 'text-muted-foreground hover:bg-accent'}`}
                     >
                       <StickyNote className="w-3 h-3" /> Private note
+                    </button>
+                    {!isNote && (
+                      <button
+                        onClick={aiSuggest}
+                        disabled={aiDrafting || waBlocked}
+                        title="Let the assistant draft a reply you can edit before sending (1 credit)"
+                        className="ml-auto inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-60"
+                      >
+                        {aiDrafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Draft with AI
+                      </button>
+                    )}
+                  </div>
+                )}
+                {aiDraftShown && !isNote && (
+                  <div className="flex items-center justify-between gap-2 text-xs bg-primary/10 border border-primary/25 text-primary rounded-lg px-3 py-2">
+                    <span className="inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI draft — review and edit before you send.</span>
+                    <button onClick={() => { setDraft(''); setAiDraftShown(false); }} className="inline-flex items-center gap-1 hover:underline shrink-0">
+                      <X className="w-3 h-3" /> Reject
                     </button>
                   </div>
                 )}
@@ -1002,6 +1208,125 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
             </>
           )}
         </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+/** Assign/unassign labels on the open thread; owner/admin can also create/delete workspace labels. */
+const LabelAssignButton: React.FC<{
+  workspaceId: string;
+  threadId: string;
+  labels: InboxLabel[];
+  assigned: InboxLabel[];
+  canManage: boolean;
+  onChanged: () => void;
+}> = ({ workspaceId, threadId, labels, assigned, canManage, onChanged }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newColor, setNewColor] = useState(LABEL_COLORS[0].key);
+  const assignedIds = useMemo(() => new Set(assigned.map((l) => l.id)), [assigned]);
+
+  const toggle = async (labelId: string) => {
+    const next = new Set(assignedIds);
+    if (next.has(labelId)) next.delete(labelId); else next.add(labelId);
+    setBusy(true);
+    try {
+      await inboxApi.setThreadLabels(threadId, [...next]);
+      onChanged();
+    } catch (e) {
+      toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const create = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    setBusy(true);
+    try {
+      await inboxApi.createLabel(workspaceId, name, newColor);
+      setNewName('');
+      onChanged();
+    } catch (e) {
+      toast({ title: 'Could not create label', description: (e as Error).message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const remove = async (labelId: string) => {
+    setBusy(true);
+    try {
+      await inboxApi.deleteLabel(labelId);
+      onChanged();
+    } catch (e) {
+      toast({ title: 'Could not delete label', description: (e as Error).message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="Labels">
+          <Tag className="w-4 h-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-0">
+        <div className="p-3 border-b border-border">
+          <div className="text-sm font-medium">Labels</div>
+          <div className="text-xs text-muted-foreground">Tag this conversation to filter and organise.</div>
+        </div>
+        <div className="max-h-56 overflow-y-auto p-1.5">
+          {labels.length === 0 ? (
+            <div className="text-xs text-muted-foreground px-2 py-3">No labels yet.{canManage ? ' Create one below.' : ''}</div>
+          ) : labels.map((l) => {
+            const on = assignedIds.has(l.id);
+            const dot = (LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot;
+            return (
+              <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent group">
+                <button onClick={() => toggle(l.id)} disabled={busy} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+                  <span className={`w-4 h-4 rounded flex items-center justify-center border ${on ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/40'}`}>
+                    {on && <Check className="w-3 h-3" />}
+                  </span>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                  <span className="text-sm truncate">{l.name}</span>
+                </button>
+                {canManage && (
+                  <button onClick={() => remove(l.id)} disabled={busy} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive shrink-0" title="Delete label">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {canManage && (
+          <div className="p-3 border-t border-border space-y-2">
+            <div className="text-xs text-muted-foreground">New label</div>
+            <div className="flex items-center gap-1.5">
+              {LABEL_COLORS.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => setNewColor(c.key)}
+                  title={c.label}
+                  className={`w-4 h-4 rounded-full ${c.dot} ${newColor === c.key ? 'ring-2 ring-offset-1 ring-offset-background ring-foreground/50' : ''}`}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(); } }}
+                placeholder="Label name"
+                className="h-8 text-sm"
+              />
+              <Button size="sm" className="rounded-full h-8 shrink-0" onClick={create} disabled={busy || !newName.trim()}>
+                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              </Button>
+            </div>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
