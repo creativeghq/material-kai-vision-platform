@@ -17,6 +17,8 @@ import {
   Headset,
   Search,
   Sofa,
+  Share2,
+  TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -130,6 +132,12 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // #256 — Flows toolkit: appears when the workspace owns 'flows-toolkit' AND the user can use
   // the agent (Flows are agent-built). The page is the management view; chat is the create surface.
   { id: 'automations', label: 'Automations', path: '/automations', icon: Workflow, requireCapability: 'agent.use', moduleSlug: 'flows-toolkit', surface: 'app', hub: 'marketing', description: 'Automate actions when things happen in your workspace.' },
+  // Social + SEO are agent-first toolkits (Hermes / Edith), so they deep-link through the
+  // capability registry (#275) into the agent with the right toolkit primed — same "one capability,
+  // every surface" pattern. moduleSlug gates them into the launcher (active if entitled, else an
+  // "available to add" upsell card).
+  { id: 'social', label: 'Social Media', path: '/agent-hub?capability=social-post', icon: Share2, requireCapability: 'agent.use', moduleSlug: 'social-media', surface: 'app', hub: 'marketing', description: 'Publish & schedule social posts with the AI studio.' },
+  { id: 'seo', label: 'SEO', path: '/agent-hub?capability=seo-research', icon: TrendingUp, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Keyword research, audits & content — in the AI studio.' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',
