@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
@@ -674,13 +674,26 @@ export const CompanyDetailPage: React.FC = () => {
                     {company.is_supplier && <Badge variant="secondary">Supplier</Badge>}
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowEmailDialog(true)} disabled={!company.email}>
-                    <Send className="h-4 w-4 mr-1.5" /> Email
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setMainTab('notes')}>
-                    <MessageSquare className="h-4 w-4 mr-1.5" /> Note
-                  </Button>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button type="button" onClick={() => setShowEmailDialog(true)} disabled={!company.email}
+                    className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:pointer-events-none">
+                    <Send className="h-4 w-4" /> Email
+                  </button>
+                  {company.phone ? (
+                    <a href={`tel:${company.phone}`}
+                      className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                      <Phone className="h-4 w-4" /> Call
+                    </a>
+                  ) : (
+                    <button type="button" disabled
+                      className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground opacity-40 pointer-events-none">
+                      <Phone className="h-4 w-4" /> Call
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setMainTab('notes')}
+                    className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                    <MessageSquare className="h-4 w-4" /> Note
+                  </button>
                 </div>
               </CardContent>
             </Card>

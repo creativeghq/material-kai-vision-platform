@@ -551,13 +551,30 @@ export const ContactDetailPage: React.FC = () => {
                     {!hasCompany && contact.is_supplier && <Badge variant="secondary">Supplier</Badge>}
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowEmailDialog(true)} disabled={!contact.email}>
-                    <Mail className="h-4 w-4 mr-1.5" /> Email
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setMainTab('activity')}>
-                    <MessageSquare className="h-4 w-4 mr-1.5" /> Note
-                  </Button>
+                <div className="grid grid-cols-4 gap-1.5">
+                  <button type="button" onClick={() => setShowEmailDialog(true)} disabled={!contact.email}
+                    className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:pointer-events-none">
+                    <Mail className="h-4 w-4" /> Email
+                  </button>
+                  {contact.phone ? (
+                    <a href={`tel:${contact.phone}`}
+                      className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                      <Phone className="h-4 w-4" /> Call
+                    </a>
+                  ) : (
+                    <button type="button" disabled
+                      className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground opacity-40 pointer-events-none">
+                      <Phone className="h-4 w-4" /> Call
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setMainTab('activity')}
+                    className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                    <MessageSquare className="h-4 w-4" /> Note
+                  </button>
+                  <button type="button" onClick={() => setMainTab('activity')}
+                    className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                    <Calendar className="h-4 w-4" /> Meeting
+                  </button>
                 </div>
               </CardContent>
             </Card>
@@ -622,7 +639,7 @@ export const ContactDetailPage: React.FC = () => {
               {/* Activity — the unified feed (notes live here). */}
               <TabsContent value="activity" className="space-y-4">
                 {contact.id ? (
-                  <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} />
+                  <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} onComposeEmail={() => setShowEmailDialog(true)} canEmail={!!contact.email} />
                 ) : (
                   <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Create this contact to start logging activity.</CardContent></Card>
                 )}

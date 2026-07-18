@@ -21,6 +21,10 @@ interface Props {
   target: CrmActivityTarget;
   /** Bump to force a reload (parent logged a new activity). */
   refreshKey?: number;
+  /** Opens the page's Send-email dialog (real send → auto-logs email_sent). */
+  onComposeEmail?: () => void;
+  /** Whether the party has an email on file (gates the Email action). */
+  canEmail?: boolean;
 }
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -58,7 +62,7 @@ const relativeTime = (iso: string): string => {
   return new Date(iso).toLocaleDateString();
 };
 
-export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0 }) => {
+export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail }) => {
   const { toast } = useToast();
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,6 +149,16 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0 })
                   </button>
                 );
               })}
+              {onComposeEmail && canEmail && (
+                <button
+                  type="button"
+                  onClick={onComposeEmail}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  title="Compose and send an email — it's logged here automatically"
+                >
+                  <Mail className="h-3.5 w-3.5" /> Email
+                </button>
+              )}
             </div>
             {type === 'meeting' && (
               <div className="flex items-center gap-2 px-2.5 pt-2">
