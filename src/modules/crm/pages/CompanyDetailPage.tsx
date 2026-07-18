@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
@@ -169,6 +169,8 @@ export const CompanyDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [viesBusy, setViesBusy] = useState(false);
   const [aadeBusy, setAadeBusy] = useState(false);
+  // Which top-level record tab is showing (activity-first record layout, 2026-07).
+  const [mainTab, setMainTab] = useState('notes');
   const [company, setCompany] = useState<Company | null>(isNew ? {
     id: '',
     name: '',
@@ -630,16 +632,11 @@ export const CompanyDetailPage: React.FC = () => {
   const isPureSupplier = !!company.is_supplier && !company.is_customer;
   const showCommercial = !isPureSupplier;
   const showSupplierFeatures = !!company.is_supplier;
+  const initials = (company.name || '?').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader
-        title={isNew ? 'New Company' : company.name || 'Untitled Company'}
-        description={isNew ? 'Create a new company' : `Company Details • Created ${new Date(company.created_at).toLocaleDateString()}`}
-        badge="CRM"
-/>
-
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-5">
         {/* Header Actions */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
@@ -658,85 +655,36 @@ export const CompanyDetailPage: React.FC = () => {
           )}
         </div>
 
-        {/* Main Content */}
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview">
-              <Building2 className="h-4 w-4 mr-2"/>
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="contacts">
-              <Users className="h-4 w-4 mr-2"/>
-              Contacts ({company.contacts?.length || 0})
-            </TabsTrigger>
-            <TabsTrigger value="social">
-              <Globe className="h-4 w-4 mr-2"/>
-              Social & Web
-            </TabsTrigger>
-            <TabsTrigger value="notes">
-              <FileText className="h-4 w-4 mr-2"/>
-              Notes
-            </TabsTrigger>
-            {(showCommercial || showSupplierFeatures) && (
-              <>
-                {/* One tab: the Account = balance/ledger + the Orders that drive it.
-                    Quotes / Invoices / Payments live per-order (open an order). Shown for
-                    suppliers too — there it reads "we owe them" + their bills & money-out. */}
-                <TabsTrigger value="account">
-                  <Wallet className="h-4 w-4 mr-2"/>
-                  Account
-                </TabsTrigger>
-              </>
-            )}
-            {company.is_supplier && (
-              <TabsTrigger value="products">
-                <Package className="h-4 w-4 mr-2"/>
-                Products
-              </TabsTrigger>
-            )}
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4">
-            {/* item 7 — accessibility-first myAADE import: start from the ΑΦΜ at the top
-                and prefill name / address / ΔΟΥ / activity. item 4 — hidden once ΑΑΔΕ
-                data has already been imported (nothing left to import). */}
-            {!company.aade_data_at && (
-            <Card className="border-primary/30 bg-primary/5">
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-end gap-3">
-                <div className="flex-1 space-y-1.5">
-                  <Label htmlFor="aade-vat" className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Import with myAADE</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Enter a Greek VAT number (ΑΦΜ) to pull the official business name, address, tax office (ΔΟΥ) and activity straight from the ΑΑΔΕ registry.
-                  </p>
-                  <Input
-                    id="aade-vat"
-                    value={company.vat_number || ''}
-                    onChange={(e) => setCompany((prev) => prev ? { ...prev, vat_number: e.target.value } : prev)}
-                    onBlur={(e) => { if ((e.target.value || '') !== '') patchInline({ vat_number: e.target.value }); }}
-                    placeholder="9-digit ΑΦΜ"
-                    className="max-w-xs"
-                  />
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start">
+          {/* ── SIDEBAR: identity, quick actions, Company Details ── */}
+          <aside className="space-y-3 lg:sticky lg:top-4">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground text-lg font-medium">{initials}</div>
+                  <div className="min-w-0">
+                    <div className="text-lg font-medium leading-tight truncate">{company.name || 'Untitled Company'}</div>
+                    <div className="text-sm text-muted-foreground truncate">{[company.city, company.country].filter(Boolean).join(', ') || 'Company'}</div>
+                  </div>
                 </div>
-                <Button
-                  onClick={lookupAade}
-                  disabled={aadeBusy || (company.vat_number || '').replace(/[^0-9]/g, '').length !== 9}
-                >
-                  {aadeBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-                  Import with myAADE
-                </Button>
+                {(company.is_customer || company.is_supplier) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {company.is_customer && <Badge variant="secondary">Customer</Badge>}
+                    {company.is_supplier && <Badge variant="secondary">Supplier</Badge>}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowEmailDialog(true)} disabled={!company.email}>
+                    <Send className="h-4 w-4 mr-1.5" /> Email
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setMainTab('notes')}>
+                    <MessageSquare className="h-4 w-4 mr-1.5" /> Note
+                  </Button>
+                </div>
               </CardContent>
             </Card>
-            )}
 
-            {/* CRM detail uses a compact 360px identity rail beside the detail column.
-                The create form instead gets a centered, full-width layout — a data-entry
-                form does not belong in a 360px sidebar (that was the source of the
-                overlapping-fields break: viewport md: breakpoints firing inside a 360px box). */}
-            <div className={isNew ? 'grid grid-cols-1 gap-6 max-w-3xl mx-auto' : 'grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start'}>
-              {/* LEFT — company identity */}
-              <div className={isNew ? 'space-y-4' : 'space-y-3 lg:sticky lg:top-4'}>
-            <CollapsibleCard title="Company Information" icon={Building2} defaultOpen>
+            <CollapsibleCard title="Company Details" icon={Building2} defaultOpen contentClassName="space-y-4">
                 <div className="grid grid-cols-1 gap-y-2">
                   <div>
                     <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
@@ -765,10 +713,6 @@ export const CompanyDetailPage: React.FC = () => {
                   <div>
                     <InlineText alwaysEdit={isNew} multiline label="Description" value={company.description} onSave={(v) => patchInline({ description: v })} placeholder="Brief description of the company…" copy={false} />
                   </div>
-                  {/* Role — a company can be a Customer, a Supplier, or BOTH (e.g. a
-                      supplier you also need to invoice for returns / credit notes).
-                      Editable anytime after onboarding; drives the Products tab +
-                      customer/supplier lists + finance party type. */}
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-3 mt-1 border-t">
                     <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5"/>Role</span>
                     <label htmlFor="role_is_customer" className="flex items-center gap-2 text-sm cursor-pointer">
@@ -783,263 +727,187 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
             </CollapsibleCard>
 
-            {/* Address */}
-            <CollapsibleCard title="Address" icon={MapPin} defaultOpen={isNew}>
-                <div className={`grid grid-cols-1 gap-x-6 gap-y-2 ${isNew ? 'sm:grid-cols-2' : ''}`}>
-                  <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
-                  <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
-                  <InlineText alwaysEdit={isNew} label="State / Province" value={company.state} onSave={(v) => patchInline({ state: v })} placeholder="CA" />
-                  <InlineText alwaysEdit={isNew} label="Postal Code" value={company.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="94102" />
-                  <InlineText alwaysEdit={isNew} label="Country" value={company.country} onSave={(v) => patchInline({ country: v })} placeholder="United States" />
-                </div>
-            </CollapsibleCard>
-
-            {/* CRM Categories — moved here, below the Address */}
-            {company.id && (
-              <CollapsibleCard title="CRM Categories" icon={Tags}>
-                <CategoryAssignmentPicker bare target={{ kind: 'company', id: company.id }}/>
-              </CollapsibleCard>
-            )}
-
-            {/* Supplier↔factory pin — the relation to the ingested catalog. Suppliers only. */}
-            {showSupplierFeatures && (
-              <FactoryLinkCard
-                value={company.factory_names ?? []}
-                supplierName={company.name}
-                workspaceId={activeWorkspaceId ?? ''}
-                onChange={handleFactoryPinChange}
-              />
-            )}
-
-            {/* Sub Units — secondary / branch / establishment addresses usable on documents */}
-            <AddressUnitsManager companyId={isNew ? undefined : id} />
-              </div>
-
-              {/* RIGHT — detail */}
-              <div className="space-y-4">
-            {/* Tax & VAT Card — EU VAT validation via VIES (used before invoicing) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-muted-foreground"/>
-                  Tax &amp; VAT
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
-                  <InlineSelect
-                    alwaysEdit={isNew}
-                    label="VAT Country"
-                    value={company.country_code ?? undefined}
-                    placeholder="Not set"
-                    options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span className="flex items-center gap-2"><span className="font-mono text-[10px] w-7">{o.code}</span>{o.name}{o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}</span> }))}
-                    displayValue={company.country_code ? <span className="font-mono">{company.country_code}</span> : undefined}
-                    onSave={(v) => patchInline({ country_code: v })}
-                  />
-                  <InlineText alwaysEdit={isNew} label="VAT Number" value={company.vat_number} onSave={(v) => patchInline({ vat_number: v })} placeholder="123456789" />
-                  <InlineText alwaysEdit={isNew} label="Tax Office" value={company.tax_office} onSave={(v) => patchInline({ tax_office: v })} placeholder="Optional" />
-                  <InlineText
-                    alwaysEdit={isNew}
-                    label="Γ.Ε.ΜΗ. (GEMI) Number"
-                    value={company.gemi_number}
-                    onSave={(v) => patchInline({ gemi_number: v })}
-                    placeholder="Auto-filled from ΓΕΜΗ"
-                  />
-                </div>
-
-                {/* Validation status + action */}
-                <div className="flex flex-wrap items-center gap-3">
-                  {/* Greek businesses → ΑΑΔΕ (richer: ΔΟΥ, ΚΑΔ, legal form, structured address).
-                      Manual button so the operator controls when the TAXISnet notification fires. */}
-                  {(company.country_code || '').toUpperCase() === 'EL'
-                    && (company.vat_number || '').replace(/[^0-9]/g, '').length === 9 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={lookupAade}
-                      disabled={aadeBusy}
-                      title="Fetch full business details from AADE and pre-fill the form"
->
-                      {aadeBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
-                      Fetch from AADE + ΓΕΜΗ
-                    </Button>
-                  )}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleVies}
-                    disabled={viesBusy || !company.vat_number?.trim() || !company.country_code?.trim()}
->
-                    {viesBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <ShieldCheck className="h-4 w-4"/>}
-                    Validate (VIES)
-                  </Button>
-
-                  {company.vat_validated === true && (
-                    <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
-                      {company.vat_validation_source === 'aade' ? 'AADE Active' : 'VAT verified'}{company.vat_validated_at ? ` · ${new Date(company.vat_validated_at).toLocaleDateString()}` : ''}
-                    </Badge>
-                  )}
-                  {company.vat_validated === false && (
-                    <Badge variant="destructive">
-                      {company.vat_validation_source === 'aade' ? 'AADE: business inactive' : 'VAT not recognised by VIES'}
-                    </Badge>
-                  )}
-
-                  {company.vat_validated_name && (
-                    <span className="text-sm text-muted-foreground">
-                      Registered as <span className="text-foreground">{company.vat_validated_name}</span>
-                    </span>
-                  )}
-                </div>
-                {company.vat_validated_address && (
-                  <p className="text-xs text-muted-foreground">{company.vat_validated_address}</p>
-                )}
-
-                {/* ΑΑΔΕ enrichment readout (Greek businesses) */}
-                {(company.kad_primary || company.legal_status || company.commercial_title
-                  || (Array.isArray(company.kad_all) && company.kad_all.length > 0) || company.gemi_data) && (
-                  <div className="rounded-md border border-primary/15 bg-primary/[0.03] p-3 space-y-1 text-xs">
-                    {company.commercial_title && (
-                      <div><span className="text-muted-foreground">Commercial title: </span><span className="text-foreground">{company.commercial_title}</span></div>
-                    )}
-                    {company.legal_status && (
-                      <div><span className="text-muted-foreground">Legal form: </span><span className="text-foreground">{company.legal_status}</span></div>
-                    )}
-                    {company.kad_primary && (
-                      <div><span className="text-muted-foreground">Primary activity code (KAD): </span><span className="text-foreground">{company.kad_primary}{company.kad_primary_description ? ` — ${company.kad_primary_description}` : ''}</span></div>
-                    )}
-                    {company.business_start_date && (
-                      <div><span className="text-muted-foreground">Operating since: </span><span className="text-foreground">{company.business_start_date}</span></div>
-                    )}
-                    {/* Full ΚΑΔ list (modal) + ΓΕΜΗ people → add-to-CRM — kept out of the form to reduce noise */}
-                    <CompanyRegistryDetails
-                      companyId={isNew ? undefined : id}
-                      kadAll={company.kad_all as KadEntry[] | null | undefined}
-                      gemiData={company.gemi_data}
-                      onContactAdded={() => loadCompany()}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Pricing + Invoicing & VAT — customer commercial schema; hidden for a pure supplier. */}
-            {showCommercial && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            {/* Pricing — admin-managed default discount the AI applies on quotes for this customer */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Percent className="h-4 w-4"/>
-                  Pricing
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                  <InlineSelect
-                    alwaysEdit={isNew}
-                    label="Pricing level"
-                    value={company.user_level_key ?? undefined}
-                    unsetValue="__default__"
-                    placeholder="Standard"
-                    options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))}
-                    onSave={(v) => savePricing({ user_level_key: v })}
-                    hint="Tier this customer buys at — discount applies off retail on quotes."
-                  />
-                  <InlineText alwaysEdit={isNew} type="number" label="Customer discount % (override)" value={company.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 50" copy={false} hint="Overrides the level's discount. Empty = use the level." />
-                  {/* Credit limit lives in Account → Payment Rules (single editor of crm_companies.credit_limit). */}
-                  <div className="md:col-span-2">
-                    <InlineText alwaysEdit={isNew} multiline label="Discount notes" value={company.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 50% per 2025 agreement." copy={false} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Invoicing & VAT (commercial) — #207 parity with Oxygen contact card:
-                segment, ΜΥΦ inclusion, default on-invoice VAT-exemption reason, and a
-                separate billing identity (different legal entity / ΑΦΜ / address used on
-                the myDATA counterpart when set). */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Receipt className="h-4 w-4"/>
-                  Invoicing &amp; VAT
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                  <InlineSelect
-                    alwaysEdit={isNew}
-                    label="Segment"
-                    value={company.contact_group ?? undefined}
-                    unsetValue="none"
-                    placeholder="Unsegmented"
-                    options={[
-                      { value: 'b2b', label: 'B2B' },
-                      { value: 'retail', label: 'Retail' },
-                      { value: 'wholesale', label: 'Wholesale' },
-                      { value: 'public_sector', label: 'Public sector' },
-                    ]}
-                    onSave={(v) => patchInline({ contact_group: v })}
-                    hint="Groups this party for filtering and statement batches."
-                  />
-                  <InlineSelect
-                    alwaysEdit={isNew}
-                    label="Default VAT-exemption category"
-                    value={company.vat_exemption_reason ?? undefined}
-                    unsetValue="__none"
-                    placeholder="None"
-                    options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))}
-                    displayValue={company.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{company.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === company.vat_exemption_reason)?.label}</span> : undefined}
-                    onSave={(v) => patchInline({ vat_exemption_reason: v })}
-                    hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here."
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="include_in_myf" className="cursor-pointer">Include in MYF report</Label>
-                    <p className="text-xs text-muted-foreground">Default for the “Include in MYF report” toggle when invoicing this party (the ΜΥΦ client/supplier ledger summary).</p>
-                  </div>
-                  <Switch
-                    id="include_in_myf"
-                    checked={company.include_in_myf !== false}
-                    onCheckedChange={(v) => patchInline({ include_in_myf: v })}
-/>
-                </div>
-
-                {/* Separate billing identity — collapsed by default (edge case); auto-opens when any billing field is set. */}
-                <Collapsible defaultOpen={!!(company.billing_name || company.billing_vat || company.billing_tax_office || company.billing_country_code || company.billing_street || company.billing_city || company.billing_postal_code)}>
-                  <div className="rounded-md border border-border/60">
-                    <CollapsibleTrigger className="group/bill flex w-full items-center justify-between gap-2 p-3 text-left">
-                      <span className="text-xs"><span className="text-foreground font-medium">Separate billing identity</span> <span className="text-muted-foreground">— only when invoices go to a different legal entity (different ΑΦΜ / name / address)</span></span>
-                      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/bill:rotate-180" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 pt-0">
-                    <InlineText alwaysEdit={isNew} label="Billing name" value={company.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
-                    <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={company.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
-                    <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={company.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} />
-                    <InlineSelect alwaysEdit={isNew} label="VAT country" value={company.billing_country_code ?? undefined} placeholder="Not set"
-                      options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))}
-                      displayValue={company.billing_country_code ? <span className="font-mono">{company.billing_country_code}</span> : undefined}
-                      onSave={(v) => patchInline({ billing_country_code: v })} />
-                    <InlineText alwaysEdit={isNew} label="Street" value={company.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
-                    <InlineText alwaysEdit={isNew} label="Number" value={company.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
-                    <InlineText alwaysEdit={isNew} label="Postal code" value={company.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
-                    <InlineText alwaysEdit={isNew} label="City" value={company.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
-                      </div>
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-              </CardContent>
-            </Card>
+            <div className="px-1 text-xs text-muted-foreground">
+              Created {new Date(company.created_at).toLocaleDateString()}{company.updated_at ? ` · Updated ${new Date(company.updated_at).toLocaleDateString()}` : ''}
             </div>
-            )}
-              </div>
-            </div>
+          </aside>
 
-          </TabsContent>
+          {/* ── MAIN: activity-first tabs ── */}
+          <div className="min-w-0">
+            <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
+              <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+                <TabsTrigger value="notes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FileText className="h-4 w-4 mr-2"/>Notes</TabsTrigger>
+                <TabsTrigger value="details" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Building2 className="h-4 w-4 mr-2"/>Details</TabsTrigger>
+                {(showCommercial || showSupplierFeatures) && (
+                  <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wallet className="h-4 w-4 mr-2"/>Account</TabsTrigger>
+                )}
+                <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4 mr-2"/>Contacts ({company.contacts?.length || 0})</TabsTrigger>
+                {company.is_supplier && (
+                  <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Products</TabsTrigger>
+                )}
+                <TabsTrigger value="social" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Globe className="h-4 w-4 mr-2"/>Social &amp; Web</TabsTrigger>
+              </TabsList>
+
+              {/* Details — section nav (left) + property panel (right). */}
+              <TabsContent value="details">
+                <Tabs defaultValue="address" orientation="vertical" className="flex flex-col gap-6 sm:flex-row sm:items-start">
+                  <TabsList className="h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
+                    <TabsTrigger value="address" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><MapPin className="h-4 w-4 mr-2"/>Address</TabsTrigger>
+                    <TabsTrigger value="tax" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><ShieldCheck className="h-4 w-4 mr-2"/>Tax &amp; VAT</TabsTrigger>
+                    {showCommercial && (
+                      <TabsTrigger value="commercial" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Receipt className="h-4 w-4 mr-2"/>Commercial &amp; VAT</TabsTrigger>
+                    )}
+                    {company.id && (
+                      <TabsTrigger value="categories" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Tags className="h-4 w-4 mr-2"/>Categories</TabsTrigger>
+                    )}
+                    {showSupplierFeatures && (
+                      <TabsTrigger value="factory" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Factory link</TabsTrigger>
+                    )}
+                  </TabsList>
+
+                  <div className="min-w-0 w-full flex-1 space-y-4">
+                    <TabsContent value="address" className="mt-0 space-y-4">
+                      <Card><CardContent className="p-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                          <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
+                          <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
+                          <InlineText alwaysEdit={isNew} label="State / Province" value={company.state} onSave={(v) => patchInline({ state: v })} placeholder="CA" />
+                          <InlineText alwaysEdit={isNew} label="Postal Code" value={company.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="94102" />
+                          <InlineText alwaysEdit={isNew} label="Country" value={company.country} onSave={(v) => patchInline({ country: v })} placeholder="United States" />
+                        </div>
+                      </CardContent></Card>
+                      <AddressUnitsManager companyId={isNew ? undefined : id} />
+                    </TabsContent>
+
+                    <TabsContent value="tax" className="mt-0 space-y-4">
+                      {!company.aade_data_at && (
+                      <Card className="border-primary/30 bg-primary/5">
+                        <CardContent className="p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+                          <div className="flex-1 space-y-1.5">
+                            <Label htmlFor="aade-vat" className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Import with myAADE</Label>
+                            <p className="text-xs text-muted-foreground">Enter a Greek VAT number (ΑΦΜ) to pull the official business name, address, tax office (ΔΟΥ) and activity straight from the ΑΑΔΕ registry.</p>
+                            <Input id="aade-vat" value={company.vat_number || ''} onChange={(e) => setCompany((prev) => prev ? { ...prev, vat_number: e.target.value } : prev)} onBlur={(e) => { if ((e.target.value || '') !== '') patchInline({ vat_number: e.target.value }); }} placeholder="9-digit ΑΦΜ" className="max-w-xs" />
+                          </div>
+                          <Button onClick={lookupAade} disabled={aadeBusy || (company.vat_number || '').replace(/[^0-9]/g, '').length !== 9}>
+                            {aadeBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                            Import with myAADE
+                          </Button>
+                        </CardContent>
+                      </Card>
+                      )}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-muted-foreground"/>Tax &amp; VAT</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
+                            <InlineSelect alwaysEdit={isNew} label="VAT Country" value={company.country_code ?? undefined} placeholder="Not set" options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span className="flex items-center gap-2"><span className="font-mono text-[10px] w-7">{o.code}</span>{o.name}{o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}</span> }))} displayValue={company.country_code ? <span className="font-mono">{company.country_code}</span> : undefined} onSave={(v) => patchInline({ country_code: v })} />
+                            <InlineText alwaysEdit={isNew} label="VAT Number" value={company.vat_number} onSave={(v) => patchInline({ vat_number: v })} placeholder="123456789" />
+                            <InlineText alwaysEdit={isNew} label="Tax Office" value={company.tax_office} onSave={(v) => patchInline({ tax_office: v })} placeholder="Optional" />
+                            <InlineText alwaysEdit={isNew} label="Γ.Ε.ΜΗ. (GEMI) Number" value={company.gemi_number} onSave={(v) => patchInline({ gemi_number: v })} placeholder="Auto-filled from ΓΕΜΗ" />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3">
+                            {(company.country_code || '').toUpperCase() === 'EL' && (company.vat_number || '').replace(/[^0-9]/g, '').length === 9 && (
+                              <Button type="button" variant="outline" onClick={lookupAade} disabled={aadeBusy} title="Fetch full business details from AADE and pre-fill the form">
+                                {aadeBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
+                                Fetch from AADE + ΓΕΜΗ
+                              </Button>
+                            )}
+                            <Button type="button" variant="outline" onClick={handleVies} disabled={viesBusy || !company.vat_number?.trim() || !company.country_code?.trim()}>
+                              {viesBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <ShieldCheck className="h-4 w-4"/>}
+                              Validate (VIES)
+                            </Button>
+                            {company.vat_validated === true && (
+                              <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">{company.vat_validation_source === 'aade' ? 'AADE Active' : 'VAT verified'}{company.vat_validated_at ? ` · ${new Date(company.vat_validated_at).toLocaleDateString()}` : ''}</Badge>
+                            )}
+                            {company.vat_validated === false && (
+                              <Badge variant="destructive">{company.vat_validation_source === 'aade' ? 'AADE: business inactive' : 'VAT not recognised by VIES'}</Badge>
+                            )}
+                            {company.vat_validated_name && (<span className="text-sm text-muted-foreground">Registered as <span className="text-foreground">{company.vat_validated_name}</span></span>)}
+                          </div>
+                          {company.vat_validated_address && (<p className="text-xs text-muted-foreground">{company.vat_validated_address}</p>)}
+                          {(company.kad_primary || company.legal_status || company.commercial_title || (Array.isArray(company.kad_all) && company.kad_all.length > 0) || company.gemi_data) && (
+                            <div className="rounded-md border border-primary/15 bg-primary/[0.03] p-3 space-y-1 text-xs">
+                              {company.commercial_title && (<div><span className="text-muted-foreground">Commercial title: </span><span className="text-foreground">{company.commercial_title}</span></div>)}
+                              {company.legal_status && (<div><span className="text-muted-foreground">Legal form: </span><span className="text-foreground">{company.legal_status}</span></div>)}
+                              {company.kad_primary && (<div><span className="text-muted-foreground">Primary activity code (KAD): </span><span className="text-foreground">{company.kad_primary}{company.kad_primary_description ? ` — ${company.kad_primary_description}` : ''}</span></div>)}
+                              {company.business_start_date && (<div><span className="text-muted-foreground">Operating since: </span><span className="text-foreground">{company.business_start_date}</span></div>)}
+                              <CompanyRegistryDetails companyId={isNew ? undefined : id} kadAll={company.kad_all as KadEntry[] | null | undefined} gemiData={company.gemi_data} onContactAdded={() => loadCompany()} />
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    {showCommercial && (
+                      <TabsContent value="commercial" className="mt-0 space-y-4">
+                        <Card>
+                          <CardHeader><CardTitle className="flex items-center gap-2"><Percent className="h-4 w-4"/>Pricing</CardTitle></CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                              <InlineSelect alwaysEdit={isNew} label="Pricing level" value={company.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
+                              <InlineText alwaysEdit={isNew} type="number" label="Customer discount % (override)" value={company.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 50" copy={false} hint="Overrides the level's discount. Empty = use the level." />
+                              <div className="md:col-span-2">
+                                <InlineText alwaysEdit={isNew} multiline label="Discount notes" value={company.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 50% per 2025 agreement." copy={false} />
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4"/>Invoicing &amp; VAT</CardTitle></CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                              <InlineSelect alwaysEdit={isNew} label="Segment" value={company.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />
+                              <InlineSelect alwaysEdit={isNew} label="Default VAT-exemption category" value={company.vat_exemption_reason ?? undefined} unsetValue="__none" placeholder="None" options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))} displayValue={company.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{company.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === company.vat_exemption_reason)?.label}</span> : undefined} onSave={(v) => patchInline({ vat_exemption_reason: v })} hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here." />
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="space-y-1">
+                                <Label htmlFor="include_in_myf" className="cursor-pointer">Include in MYF report</Label>
+                                <p className="text-xs text-muted-foreground">Default for the “Include in MYF report” toggle when invoicing this party (the ΜΥΦ client/supplier ledger summary).</p>
+                              </div>
+                              <Switch id="include_in_myf" checked={company.include_in_myf !== false} onCheckedChange={(v) => patchInline({ include_in_myf: v })}/>
+                            </div>
+                            <Collapsible defaultOpen={!!(company.billing_name || company.billing_vat || company.billing_tax_office || company.billing_country_code || company.billing_street || company.billing_city || company.billing_postal_code)}>
+                              <div className="rounded-md border border-border/60">
+                                <CollapsibleTrigger className="group/bill flex w-full items-center justify-between gap-2 p-3 text-left">
+                                  <span className="text-xs"><span className="text-foreground font-medium">Separate billing identity</span> <span className="text-muted-foreground">— only when invoices go to a different legal entity (different ΑΦΜ / name / address)</span></span>
+                                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/bill:rotate-180" />
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 pt-0">
+                                    <InlineText alwaysEdit={isNew} label="Billing name" value={company.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
+                                    <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={company.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
+                                    <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={company.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} />
+                                    <InlineSelect alwaysEdit={isNew} label="VAT country" value={company.billing_country_code ?? undefined} placeholder="Not set" options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))} displayValue={company.billing_country_code ? <span className="font-mono">{company.billing_country_code}</span> : undefined} onSave={(v) => patchInline({ billing_country_code: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Street" value={company.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Number" value={company.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Postal code" value={company.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
+                                    <InlineText alwaysEdit={isNew} label="City" value={company.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
+                                  </div>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+                    )}
+
+                    {company.id && (
+                      <TabsContent value="categories" className="mt-0">
+                        <Card><CardContent className="p-4">
+                          <CategoryAssignmentPicker bare target={{ kind: 'company', id: company.id }}/>
+                        </CardContent></Card>
+                      </TabsContent>
+                    )}
+
+                    {showSupplierFeatures && (
+                      <TabsContent value="factory" className="mt-0">
+                        <FactoryLinkCard value={company.factory_names ?? []} supplierName={company.name} workspaceId={activeWorkspaceId ?? ''} onChange={handleFactoryPinChange} />
+                      </TabsContent>
+                    )}
+                  </div>
+                </Tabs>
+              </TabsContent>
 
           {/* Products Tab — only when is_supplier=true. Matches products by name
               against products.metadata.factory_name / manufacturer / brand /
@@ -1203,7 +1071,9 @@ export const CompanyDetailPage: React.FC = () => {
             )}
           </TabsContent>
           )}
-        </Tabs>
+            </Tabs>
+          </div>
+        </div>
       </div>
 
       {/* Send Email Dialog */}
