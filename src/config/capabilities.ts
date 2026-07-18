@@ -99,6 +99,26 @@ export function buildAgentHandoffUrl(id: string, opts: { prompt?: string; record
   return `/agent-hub?${params.toString()}`;
 }
 
+/**
+ * Build the "open this in its page/Hub" URL for a capability (reverse handoff from a canvas
+ * artifact back to the module page). Appends the record id when the capability's page supports a
+ * detail route (`/quotes/:id`, `/finance/invoices/:id`, `/projects/:id`); otherwise returns the
+ * list/landing route. Returns null for agent-only capabilities (no page).
+ */
+export function buildPageUrl(id: string, recordId?: string): string | null {
+  const cap = getCapability(id);
+  if (!cap?.pageRoute) return null;
+  if (recordId && DETAIL_ROUTE_CAPABILITIES.has(id)) {
+    return `${cap.pageRoute.replace(/\/$/, '')}/${recordId}`;
+  }
+  return cap.pageRoute;
+}
+
+/** Capabilities whose page is exactly `/{route}/{id}` for a record (so appending the id works).
+ *  Invoice is intentionally excluded — its detail route is nested (`/finance/invoices/:id`),
+ *  so buildPageUrl('invoice', id) returns the `/finance` list rather than a wrong path. */
+const DETAIL_ROUTE_CAPABILITIES = new Set(['quote', 'project']);
+
 /** Resolve the agent + quick-start a `?capability=<id>` deep-link should open on the Agent Hub. */
 export function resolveCapabilityHandoff(id: string): { agentId?: string; quickStart?: { toolkitId: string; label: string } } {
   const cap = getCapability(id);

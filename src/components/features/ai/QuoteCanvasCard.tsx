@@ -2,6 +2,7 @@ import React from 'react';
 import { Download, FileText, ExternalLink, ClipboardList, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
+import { buildPageUrl } from '@/config/capabilities';
 
 export interface QuoteCanvasData {
   quote_id: string;
@@ -116,7 +117,7 @@ export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
           size="sm"
           variant="ghost"
           className="gap-2 ml-auto"
-          onClick={() => window.open(`/quotes/${quote_id}`, '_blank')}
+          onClick={() => window.open(buildPageUrl('quote', quote_id) ?? `/quotes/${quote_id}`, '_blank')}
         >
           <ClipboardList className="h-4 w-4" />
           Open in Quotes
