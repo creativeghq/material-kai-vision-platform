@@ -25,6 +25,7 @@ import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { validateVatViaVies } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
+import { gemiService } from '@/services/gemiService';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
@@ -113,6 +114,12 @@ interface Company {
   street_number?: string | null;
   aade_data?: any;
   aade_data_at?: string | null;
+  // ΓΕΜΗ enrichment (Greek Commercial Registry) — mirrors columns the mygemi-opendata fn writes
+  gemi_number?: string | null;
+  gemi_legal_form?: string | null;
+  gemi_status?: string | null;
+  gemi_data?: any;
+  gemi_data_at?: string | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -340,6 +347,28 @@ export const CompanyDetailPage: React.FC = () => {
           title: res.source === 'cache' ? 'AADE data (cached)' : 'AADE data fetched',
           description: res.basic_rec.onomasia ? `Imported ${res.basic_rec.onomasia} from ΑΑΔΕ.` : 'Business details imported from ΑΑΔΕ.',
         });
+
+        // ΓΕΜΗ enrichment: the GEMI number (ΑΑΔΕ doesn't return it) + legal form + status. The
+        // edge function caches gemi_* onto crm_companies server-side; here we mirror to local
+        // state for instant display. Best-effort — a ΓΕΜΗ miss never blocks the ΑΑΔΕ import.
+        try {
+          const g = await gemiService.lookup({
+            afm: rawAfm,
+            companyId: isNew ? undefined : id,
+            reason: 'crm_enrichment',
+            workspaceId: activeWorkspaceId ?? undefined,
+          });
+          if ('ok' in g && g.ok && g.gemi.ar_gemi) {
+            patchInline({
+              gemi_number: g.gemi.ar_gemi,
+              gemi_legal_form: g.gemi.legal_form,
+              gemi_status: g.gemi.status,
+              gemi_data: g.raw ?? null,
+              gemi_data_at: g.checked_at,
+            } as Partial<Company>);
+            toast({ title: 'ΓΕΜΗ number added', description: `Γ.Ε.ΜΗ.: ${g.gemi.ar_gemi}` });
+          }
+        } catch { /* GEMI is a best-effort add-on; ignore failures */ }
       }
     } finally {
       setAadeBusy(false);
@@ -757,6 +786,13 @@ export const CompanyDetailPage: React.FC = () => {
                   />
                   <InlineText alwaysEdit={isNew} label="VAT Number" value={company.vat_number} onSave={(v) => patchInline({ vat_number: v })} placeholder="123456789" />
                   <InlineText alwaysEdit={isNew} label="Tax Office" value={company.tax_office} onSave={(v) => patchInline({ tax_office: v })} placeholder="Optional" />
+                  <InlineText
+                    alwaysEdit={isNew}
+                    label="Γ.Ε.ΜΗ. (GEMI) Number"
+                    value={company.gemi_number}
+                    onSave={(v) => patchInline({ gemi_number: v })}
+                    placeholder="Auto-filled from ΓΕΜΗ"
+                  />
                 </div>
 
                 {/* Validation status + action */}
@@ -773,7 +809,7 @@ export const CompanyDetailPage: React.FC = () => {
                       title="Fetch full business details from AADE and pre-fill the form"
 >
                       {aadeBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
-                      Fetch from AADE
+                      Fetch from AADE + ΓΕΜΗ
                     </Button>
                   )}
 

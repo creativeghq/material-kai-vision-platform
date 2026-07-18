@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { aadeService } from '@/modules/myaade';
+import { gemiService } from '@/services/gemiService';
 
 type Lang = 'en' | 'gr';
 type Field = { key: string; label: string; bilingual?: boolean; textarea?: boolean; placeholder?: string };
@@ -171,6 +172,24 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
             ? `Registered as ${r.onomasia}${en?.onomasia && en.onomasia !== r.onomasia ? ` (${en.onomasia})` : ''}. Review & Save.`
             : 'Review & Save.',
         });
+
+        // ΓΕΜΗ enrichment: fills the GEMI number (ΑΑΔΕ doesn't return it) + the official
+        // Latin-character company name, which is better than a machine transliteration for the
+        // EN slot. Best-effort — a ΓΕΜΗ miss or unconfigured key never blocks the ΑΑΔΕ prefill.
+        try {
+          const g = await gemiService.lookup({ afm, reason: 'own_business', workspaceId });
+          if ('ok' in g && g.ok) {
+            setData((d) => ({
+              ...d,
+              business_gemi: g.gemi.ar_gemi ?? d.business_gemi,
+              // ΓΕΜΗ's official Latin name wins over the Haiku transliteration when present.
+              business_name_en: g.gemi.name_en ?? d.business_name_en,
+            }));
+            if (g.gemi.ar_gemi) {
+              toast({ title: 'ΓΕΜΗ number added', description: `Γ.Ε.ΜΗ.: ${g.gemi.ar_gemi}. Review & Save.` });
+            }
+          }
+        } catch { /* GEMI is a best-effort add-on; ignore failures */ }
       }
     } finally { setAadeLoading(false); }
   };
@@ -227,7 +246,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
             <div className="flex items-start justify-between gap-2 mb-3">
               <p className="text-xs text-muted-foreground">Shown when issuing e-invoices &amp; receipts and transmitted to myDATA — mandatory.</p>
               <Button size="sm" variant="outline" onClick={lookupAade} disabled={aadeLoading} className="shrink-0">
-                {aadeLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />} Fetch from ΑΑΔΕ
+                {aadeLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />} Fetch from ΑΑΔΕ + ΓΕΜΗ
               </Button>
             </div>
             <FieldGrid fields={BILLING} data={data} set={set} lang={lang} />
