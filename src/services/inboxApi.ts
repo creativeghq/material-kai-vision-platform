@@ -212,6 +212,14 @@ export const inboxApi = {
   }) {
     return call<{ thread: InboxThread }>('create_thread', input);
   },
+  /** Start a conversation with a customer (CRM contact). Returns a share link when they have no account. */
+  createCustomerThread(input: { workspace_id: string; contact_id: string; subject?: string; message?: string }) {
+    return call<{ thread_id: string; share_url: string | null; has_account: boolean }>('create_customer_thread', input);
+  },
+  /** Get-or-create the public /i/:token link for an existing customer thread. */
+  createShareLink(thread_id: string) {
+    return call<{ url: string }>('create_share_link', { thread_id });
+  },
   listThreads(filters: {
     channel?: InboxChannel; thread_type?: InboxThreadType; status?: InboxThreadStatus;
     scope?: 'all'; archived?: boolean; label_id?: string;

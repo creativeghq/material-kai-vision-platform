@@ -465,6 +465,36 @@ async function buildAgentDraft(db: SupabaseClient, thread: Record<string, unknow
 }
 
 /**
+ * Get-or-create a public share token for a customer thread → the `/i/:token` link a member can
+ * hand to a customer who has no account yet. Reuses an unclaimed token if one already exists.
+ */
+async function getOrCreateShareLink(
+  db: SupabaseClient,
+  threadId: string,
+  contactId: string | null,
+): Promise<string> {
+  const { data: existing } = await db
+    .from('inbox_thread_tokens')
+    .select('token')
+    .eq('thread_id', threadId)
+    .is('claimed_by_user_id', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let token = (existing as { token?: string } | null)?.token;
+  if (!token) {
+    const { data: ins, error } = await db
+      .from('inbox_thread_tokens')
+      .insert({ thread_id: threadId, contact_id: contactId })
+      .select('token')
+      .single();
+    if (error) throw new HttpError(500, `Failed to create share link: ${error.message}`);
+    token = (ins as { token: string }).token;
+  }
+  return `${PUBLIC_APP_URL}/i/${token}`;
+}
+
+/**
  * Directional add-rule (the heart of #209 §4). May `userId` (acting in `thread`) add `target`?
  * `callerRole` is the caller's role in thread.workspace_id (null if not a member).
  */
@@ -1528,6 +1558,80 @@ async function handleJwtAction(
           .insert(valid.map((label_id) => ({ thread_id: threadId, label_id, created_by: userId })));
       }
       return json({ ok: true, label_ids: valid });
+    }
+
+    case 'create_customer_thread': {
+      // A member starts a conversation WITH a customer (CRM contact). If the contact has a claimed
+      // account they see it in their inbox + get notified; otherwise a /i/:token share link is returned.
+      const workspaceId = String(payload.workspace_id || '');
+      const contactId = String(payload.contact_id || '');
+      if (!workspaceId || !contactId) throw new HttpError(400, 'workspace_id and contact_id are required');
+      const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && (!callerRole || !BUSINESS_ROLES.has(callerRole))) {
+        throw new HttpError(403, 'Only a business member may start a customer conversation');
+      }
+      const { data: contact } = await db
+        .from('crm_contacts')
+        .select('id, name, first_name, last_name, user_id, workspace_id')
+        .eq('id', contactId)
+        .maybeSingle();
+      const c = contact as {
+        id?: string; name?: string; first_name?: string; last_name?: string; user_id?: string; workspace_id?: string;
+      } | null;
+      if (!c || c.workspace_id !== workspaceId) throw new HttpError(404, 'Contact not found in this workspace');
+
+      const subject = payload.subject != null && String(payload.subject).trim()
+        ? String(payload.subject).trim()
+        : (c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Customer conversation');
+
+      const { data: thread, error } = await db.from('inbox_threads').insert({
+        workspace_id: workspaceId, thread_type: 'customer', channel: 'internal',
+        subject, created_by: userId, metadata: {},
+      }).select('*').single();
+      if (error) throw new HttpError(500, `Failed to create conversation: ${error.message}`);
+      const threadId = (thread as { id: string }).id;
+
+      // Creator (member owner) + the customer participant (user_id set when the contact has an
+      // account so insertMessageAndNotify can fan a bell/email out to them).
+      const { data: creatorP } = await db.from('inbox_participants').insert({
+        thread_id: threadId, participant_type: 'member', user_id: userId,
+        workspace_id: workspaceId, thread_role: 'owner', added_by: userId,
+      }).select('id').single();
+      await db.from('inbox_participants').insert({
+        thread_id: threadId, participant_type: 'customer',
+        contact_id: contactId, user_id: c.user_id ?? null,
+        thread_role: 'participant', added_by: userId,
+      });
+
+      const firstMsg = payload.message != null ? String(payload.message).trim() : '';
+      if (firstMsg) {
+        await insertMessageAndNotify(db, {
+          thread: thread as Record<string, unknown>,
+          senderParticipantId: (creatorP as { id?: string } | null)?.id ?? null,
+          body: firstMsg, attachments: [], messageType: 'text',
+          senderUserId: userId, senderLabel: 'You',
+        });
+      }
+
+      const share_url = c.user_id ? null : await getOrCreateShareLink(db, threadId, contactId);
+      return json({ thread_id: threadId, share_url, has_account: !!c.user_id });
+    }
+
+    case 'create_share_link': {
+      // A copyable /i/:token link for an existing customer/upstream thread.
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may create a share link');
+      if (String(thread.thread_type) === 'internal') {
+        throw new HttpError(400, 'Internal team conversations cannot be shared');
+      }
+      const { data: cust } = await db.from('inbox_participants')
+        .select('contact_id').eq('thread_id', threadId).eq('participant_type', 'customer')
+        .not('contact_id', 'is', null).limit(1).maybeSingle();
+      const url = await getOrCreateShareLink(db, threadId, (cust as { contact_id?: string } | null)?.contact_id ?? null);
+      return json({ url });
     }
 
     case 'suggest_reply': {
