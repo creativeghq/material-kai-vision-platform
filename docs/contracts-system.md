@@ -94,6 +94,8 @@ The signature row is the audit record — it captures `ip` and `user_agent` at s
 
 Signing emits the **`contract_signed`** flow event via `emitFlowEvent`, carrying the contract payload. Per the Flows rule, notifications for a signed contract belong in a flow — do **not** hardcode a `user_notifications` insert or an `email-api` call for it. See [flows-notification-system.md](flows-notification-system.md).
 
+> ⚠️ **Not yet delivered (2026-07-17).** The event string emitted is `contract_signed`, but the `TriggerType` union carries `contract_created` — a *different* string — and no `system-default` flow is bound to either. So the event fires and `flow-engine` matches nothing: **signing a contract currently notifies no one.** To wire it: reconcile the emitted name and the union on one string, then seed an active locked default flow for it (tracked in #272).
+
 > **Note:** `send` returns the `sign_path` but does **not** itself email the counterparty — delivery is the caller's/flow's job.
 
 ---
