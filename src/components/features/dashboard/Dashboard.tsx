@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { HeroSection } from './HeroSection';
 import { LatestWidgets } from './LatestWidgets';
-import { MyOverview } from './MyOverview';
-import { DashboardAiInsights } from './DashboardAiInsights';
+import { MyOffice } from './MyOffice';
 import { RecommendedForYou } from '@/components/features/recommendations';
 
 export const Dashboard: React.FC = () => {
@@ -12,18 +11,16 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="p-3 sm:p-6 max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
-      <div className="grid grid-cols-12 gap-6">
-        {/* Hero Section */}
+      <div className="grid grid-cols-12 gap-6 items-stretch">
+        {/* Search-first work surface */}
         <div className="col-span-12 lg:col-span-8 overflow-hidden">
           <HeroSection onNavigate={navigate} />
         </div>
 
-        {/* AI Insights panel — real, generated per workspace, cached 15 days */}
-        <DashboardAiInsights />
+        {/* My Office — greeting + personal numbers (finance/projects/tasks/inbox)
+            + KAI live insights, all in one command panel (per-workspace, cached). */}
+        <MyOffice />
       </div>
-
-      {/* Personal quick overview — finance, projects, tasks, inbox */}
-      <MyOverview />
 
       {/* Personalized Recommendations — before the platform-generated areas */}
       <div>
