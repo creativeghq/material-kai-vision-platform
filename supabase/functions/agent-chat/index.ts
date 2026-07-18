@@ -2002,7 +2002,7 @@ async function executeAgent(
       tools.push(createEmailValidateTool(userId, sendProgress));
     }
     if (config.tools.includes('save_to_crm')) {
-      tools.push(createSaveToCRMTool(userId, sendProgress, onChunk));
+      tools.push(createSaveToCRMTool(userId, workspaceId, sendProgress, onChunk));
     }
 
     // SEO Article Pipeline tools — onChunk wired across all 4 stages so the

@@ -349,10 +349,12 @@ export const createReviewSolutionTool = (
       const sb = svcClient();
       onChunk?.({ type: 'tool_progress', status: `Tech-radar review: ${title || subject_id}…`, timestamp: Date.now() });
 
-      // Resolve or build the subject
+      // Resolve or build the subject. Scope by workspace_id so a subject_id from
+      // another tenant returns "not found" (BOLA guard — CLAUDE.md invariant 1).
       let subject: any = null;
       if (subject_id) {
-        const { data } = await sb.from('tech_radar_subjects').select('*').eq('id', subject_id).maybeSingle();
+        const { data } = await sb.from('tech_radar_subjects').select('*')
+          .eq('id', subject_id).eq('workspace_id', workspaceId).maybeSingle();
         if (!data) return JSON.stringify({ success: false, error: 'subject not found' });
         subject = data;
       } else {
@@ -451,10 +453,12 @@ export const createTrackTechRadarTool = (
         return JSON.stringify({ success: true, form_opened: true, message: 'Opened the Tech Radar form for the user to fill in.' });
       }
 
-      // Resolve subject by id or title
+      // Resolve subject by id or title — always workspace-scoped (BOLA guard:
+      // a subject_id from another tenant must not resolve). CLAUDE.md invariant 1.
       let subject: any = null;
       if (subject_id) {
-        const { data } = await sb.from('tech_radar_subjects').select('*').eq('id', subject_id).maybeSingle();
+        const { data } = await sb.from('tech_radar_subjects').select('*')
+          .eq('id', subject_id).eq('workspace_id', workspaceId).maybeSingle();
         subject = data;
       } else if (title) {
         const { data } = await sb.from('tech_radar_subjects').select('*')
@@ -555,9 +559,13 @@ export const createListTechRadarTool = (
       const sb = svcClient();
 
       if (subject_id) {
-        const { data: subject } = await sb.from('tech_radar_subjects').select('*').eq('id', subject_id).maybeSingle();
+        // Workspace-scope the subject lookup so cross-tenant subject_ids 404 (BOLA guard).
+        const { data: subject } = await sb.from('tech_radar_subjects').select('*')
+          .eq('id', subject_id).eq('workspace_id', workspaceId).maybeSingle();
         if (!subject) return JSON.stringify({ success: false, error: 'subject not found' });
-        let q = sb.from('tech_radar_findings').select('*').eq('subject_id', subject_id).order('created_at', { ascending: false });
+        let q = sb.from('tech_radar_findings').select('*')
+          .eq('subject_id', subject_id).eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false });
         if (ring) q = q.eq('ring', ring);
         if (only_new) q = q.eq('is_new', true);
         const { data: findings } = await q.limit(50);

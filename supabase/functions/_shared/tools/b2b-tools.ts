@@ -982,7 +982,7 @@ export const createEmailValidateTool = (userId: string, onProgress?: (status: st
  * B2B Research Tool: Save to CRM
  * Saves researched company and contacts to the CRM database
  */
-export const createSaveToCRMTool = (userId: string, onProgress?: (status: string) => void, onChunk?: B2BChunkSink) => {
+export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgress?: (status: string) => void, onChunk?: B2BChunkSink) => {
   return tool(
     async ({ company, contacts, _workflow_run_id }) => {
       const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: _workflow_run_id }) : null;
@@ -993,10 +993,13 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
         // Send progress update
         onProgress?.(`Saving ${company.name} to CRM...`);
 
-        // First, create or update the company
+        // First, create or update the company. workspace_id is stamped server-side
+        // from the authenticated context (CLAUDE.md invariant 1 — never body-supplied;
+        // crm_companies.workspace_id is NOT NULL, so omitting it also fails the insert).
         const { data: companyData, error: companyError } = await supabase
           .from('crm_companies')
           .insert({
+            workspace_id: workspaceId,
             name: company.name,
             website: company.website,
             email: company.email,
@@ -1030,6 +1033,7 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
         // a blank entry.
         if (company.notes && String(company.notes).trim()) {
           const { error: noteErr } = await supabase.from('crm_notes').insert({
+            workspace_id: workspaceId,
             target_kind: 'company',
             target_id: companyId,
             body: String(company.notes).trim(),
@@ -1045,6 +1049,7 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
             const { data: contactData, error: contactError } = await supabase
               .from('crm_contacts')
               .insert({
+                workspace_id: workspaceId,
                 name: contact.name,
                 email: contact.email,
                 phone: contact.phone,
@@ -1072,6 +1077,7 @@ export const createSaveToCRMTool = (userId: string, onProgress?: (status: string
             // Initial research notes for the contact → crm_notes timeline entry
             if (contact.notes && String(contact.notes).trim()) {
               const { error: noteErr } = await supabase.from('crm_notes').insert({
+                workspace_id: workspaceId,
                 target_kind: 'contact',
                 target_id: contactData.id,
                 body: String(contact.notes).trim(),
