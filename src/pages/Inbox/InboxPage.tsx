@@ -5,7 +5,7 @@ import {
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, PanelRight, CheckCircle2, Wallet,
-  Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2,
+  Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2, Filter,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { marketplaceService } from '@/services/marketplaceService';
@@ -32,6 +32,7 @@ import {
   inboxApi, signInboxAttachment, LABEL_COLORS, labelChipClass,
   type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel,
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
+  type InboxThreadStatus,
 } from '@/services/inboxApi';
 
 type ChannelFilter = 'all' | InboxChannel;
@@ -120,7 +121,7 @@ function dayBucket(iso: string): string {
 }
 
 const InboxPage: React.FC = () => {
-  const { activeWorkspaceId, isPlatformOperator } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspace, isPlatformOperator } = useWorkspace();
   const { persona } = usePermissions();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -132,6 +133,8 @@ const InboxPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [allWorkspaces, setAllWorkspaces] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [statusTab, setStatusTab] = useState<InboxThreadStatus>('open');
   const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
   const [canManageLabels, setCanManageLabels] = useState(false);
@@ -391,10 +394,16 @@ const InboxPage: React.FC = () => {
   }, [activeThread, toast, loadThreads]);
 
   const visibleThreads = useMemo(() => {
+    let list = threads;
     const q = query.trim().toLowerCase();
-    if (!q) return threads;
-    return threads.filter((t) => (t.subject || '').toLowerCase().includes(q));
-  }, [threads, query]);
+    if (q) list = list.filter((t) =>
+      (t.subject || '').toLowerCase().includes(q) || (t.last_message_preview || '').toLowerCase().includes(q));
+    // Folder + status semantics: Unread ignores status; Archived is its own view; otherwise the
+    // Open / Follow-up (snoozed) / Done (closed) tab narrows the working set.
+    if (unreadOnly) list = list.filter((t) => t.unread);
+    else if (!showArchived) list = list.filter((t) => t.status === statusTab);
+    return list;
+  }, [threads, query, unreadOnly, showArchived, statusTab]);
 
   // Threads grouped into Today / Yesterday / This week / Earlier for the email-client day headers.
   const groupedThreads = useMemo(() => {
@@ -544,7 +553,17 @@ const InboxPage: React.FC = () => {
           with the details rail moved into a slide-up sheet. */}
       <div className="flex flex-col md:grid md:grid-cols-12 gap-4 flex-1 min-h-0 px-4 sm:px-6 py-4">
         {/* ── Column 0 · Mailbox sidebar (Compose · folders · labels) ── */}
-        <aside className={`dashboard-card rounded-2xl border-0 md:col-span-2 hidden md:flex flex-col overflow-hidden p-0`}>
+        <aside className="dashboard-card rounded-2xl border-0 md:col-span-3 lg:col-span-2 hidden md:flex flex-col overflow-hidden p-0">
+          {/* Workspace header */}
+          <div className="px-3 pt-3 pb-2.5 flex items-center gap-2 border-b border-white/5">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-xs font-display shrink-0" style={{ fontWeight: 700 }}>
+              {initials(activeWorkspace?.name || 'Inbox')}
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{activeWorkspace?.name || 'Workspace'}</div>
+              <div className="text-[11px] text-muted-foreground leading-tight">Inbox</div>
+            </div>
+          </div>
           {isMember && (
             <div className="p-3">
               <Button className="w-full rounded-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
@@ -554,20 +573,28 @@ const InboxPage: React.FC = () => {
           )}
           <nav className="px-2 space-y-0.5">
             <button
-              onClick={() => setShowArchived(false)}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${!showArchived ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
+              onClick={() => { setShowArchived(false); setUnreadOnly(false); }}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${!showArchived && !unreadOnly ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
             >
               <InboxIcon className="w-4 h-4 shrink-0" />
-              <span className="flex-1 text-left">Inbox</span>
-              {!showArchived && inboxUnread > 0 && (
+              <span className="flex-1 text-left">All Inboxes</span>
+              {!showArchived && <span className="text-[11px] text-muted-foreground">{threads.length}</span>}
+            </button>
+            <button
+              onClick={() => { setShowArchived(false); setUnreadOnly(true); }}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${unreadOnly && !showArchived ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
+            >
+              <Mail className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Unread</span>
+              {inboxUnread > 0 && (
                 <span className="text-[11px] rounded-full bg-primary text-primary-foreground px-1.5 min-w-5 text-center">{inboxUnread}</span>
               )}
             </button>
             <button
-              onClick={() => setShowArchived(true)}
+              onClick={() => { setShowArchived(true); setUnreadOnly(false); }}
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${showArchived ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
             >
-              <Archive className="w-4 h-4 shrink-0" />
+              <Trash2 className="w-4 h-4 shrink-0" />
               <span className="flex-1 text-left">Archived</span>
             </button>
           </nav>
@@ -613,7 +640,7 @@ const InboxPage: React.FC = () => {
         </aside>
 
         {/* ── Column 1 · Message list ── */}
-        <div className={`dashboard-card rounded-2xl border-0 md:col-span-4 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`dashboard-card rounded-2xl border-0 md:col-span-4 lg:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-3 border-b border-white/10 space-y-3">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -633,8 +660,9 @@ const InboxPage: React.FC = () => {
             </div>
             {/* Mobile folder + label filters (they live in the sidebar on desktop) */}
             <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-0.5">
-              <button onClick={() => setShowArchived(false)} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${!showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><InboxIcon className="w-3 h-3" />Inbox</button>
-              <button onClick={() => setShowArchived(true)} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Archive className="w-3 h-3" />Archived</button>
+              <button onClick={() => { setShowArchived(false); setUnreadOnly(false); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${!showArchived && !unreadOnly ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><InboxIcon className="w-3 h-3" />All</button>
+              <button onClick={() => { setShowArchived(false); setUnreadOnly(true); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${unreadOnly && !showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Mail className="w-3 h-3" />Unread</button>
+              <button onClick={() => { setShowArchived(true); setUnreadOnly(false); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Archive className="w-3 h-3" />Archived</button>
               {wsLabels.map((l) => {
                 const on = labelFilter === l.id;
                 return (
@@ -644,13 +672,38 @@ const InboxPage: React.FC = () => {
                 );
               })}
             </div>
-            <Tabs value={filter} onValueChange={(v) => setFilter(v as ChannelFilter)}>
-              <TabsList className="h-auto flex-wrap justify-start gap-1.5 bg-transparent p-0">
-                <TabsTrigger value="all" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>All</TabsTrigger>
-                <TabsTrigger value="internal" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Team</TabsTrigger>
-                <TabsTrigger value="whatsapp" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>WhatsApp</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {/* Status tabs (Open / Follow-up / Done) + channel filter. Hidden in the Unread / Archived views. */}
+            {!showArchived && !unreadOnly && (
+              <div className="flex items-center justify-between gap-2">
+                <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as InboxThreadStatus)}>
+                  <TabsList className="h-auto gap-1.5 bg-transparent p-0">
+                    <TabsTrigger value="open" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Open</TabsTrigger>
+                    <TabsTrigger value="snoozed" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Follow-up</TabsTrigger>
+                    <TabsTrigger value="closed" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Done</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="rounded-full h-8 gap-1.5 shrink-0">
+                      <Filter className="w-3.5 h-3.5" />
+                      {filter === 'all' ? 'All' : filter === 'internal' ? 'Team' : 'WhatsApp'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-40 p-1">
+                    {(['all', 'internal', 'whatsapp'] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setFilter(f)}
+                        className={`w-full flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg text-left ${filter === f ? 'bg-accent' : 'hover:bg-accent'}`}
+                      >
+                        {f === 'all' ? 'All channels' : f === 'internal' ? 'Team' : 'WhatsApp'}
+                        {filter === f && <Check className="w-3.5 h-3.5 ml-auto" />}
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {loadingThreads ? (
@@ -712,7 +765,7 @@ const InboxPage: React.FC = () => {
         </div>
 
         {/* ── Column 2 · Conversation ── */}
-        <div className={`dashboard-card rounded-2xl border-0 md:col-span-6 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`dashboard-card rounded-2xl border-0 md:col-span-5 lg:col-span-4 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
           {!activeThread ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
               <MessageSquare className="w-10 h-10 opacity-30" />
@@ -751,13 +804,13 @@ const InboxPage: React.FC = () => {
                 </div>
                 {/* Desktop: inline member controls. Mobile: collapsed into the details sheet. */}
                 {memberControls && <div className="hidden md:flex items-center gap-1.5">{memberControls}</div>}
-                {/* Open the contact / CRM details rail as a slide-over */}
+                {/* Below lg the profile rail is a slide-over; on lg+ it's the persistent 4th column. */}
                 <button
                   type="button"
                   onClick={() => setShowDetails(true)}
                   aria-label="Conversation details"
                   title="Contact, quotes, invoices & projects"
-                  className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+                  className="lg:hidden shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
                 >
                   <PanelRight className="w-5 h-5" />
                 </button>
@@ -847,6 +900,23 @@ const InboxPage: React.FC = () => {
           )}
         </div>
 
+        {/* ── Column 3 · Customer Profile (persistent on lg+; slide-over below) ── */}
+        <div className="dashboard-card rounded-2xl border-0 lg:col-span-3 hidden lg:flex flex-col overflow-hidden p-0">
+          {!activeThread ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-xs px-6 text-center gap-2">
+              <UserIcon className="w-8 h-8 opacity-30" />
+              Select a conversation to see the customer profile.
+            </div>
+          ) : (
+            <DetailsRail
+              thread={activeThread}
+              context={context}
+              participants={participants}
+              labels={labels}
+              isMember={isMember}
+            />
+          )}
+        </div>
       </div>
 
       {showNew && activeWorkspaceId && (
@@ -1009,21 +1079,60 @@ const DetailsRail: React.FC<{
   const metrics = context?.metrics ?? null;
   const invoices = context?.invoices ?? [];
 
+  // Information block: who's handling it + status (real data, no fabricated priority/response-rate).
+  const agentActive = thread.agent_state === 'active';
+  const firstMember = participants.find((p) => p.participant_type === 'member' && p.status === 'active');
+  const assignee = agentActive ? 'AI Assistant' : (firstMember ? (labels.get(firstMember.id)?.label || 'Team') : 'Unassigned');
+  const statusLabel = thread.status === 'snoozed' ? 'Follow-up' : thread.status === 'closed' ? 'Done' : 'Open';
+  void subtitle;
+
   return (
     <div className="flex-1 overflow-y-auto">
-      {/* Contact header — rounded gradient monogram + display name */}
-      <div className="p-5 flex flex-col items-center text-center border-b border-white/10">
-        <div
-          className="h-16 w-16 mb-3 rounded-2xl flex items-center justify-center text-lg font-display text-white bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/25"
-          style={{ fontWeight: 700 }}
-        >
-          {initials(displayName)}
+      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+        <span className="text-sm font-semibold text-primary">Customer Profile</span>
+      </div>
+      {/* Cover banner + overlapping avatar */}
+      <div className="border-b border-white/10">
+        <div className="h-20 bg-gradient-to-br from-primary/40 via-primary/20 to-accent/40" />
+        <div className="px-5 pb-4 -mt-8 flex flex-col items-center text-center">
+          <div
+            className="h-16 w-16 rounded-2xl flex items-center justify-center text-lg font-display text-white bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/25 ring-4 ring-card"
+            style={{ fontWeight: 700 }}
+          >
+            {initials(displayName)}
+          </div>
+          <div className="text-base font-display mt-2" style={{ fontWeight: 600 }}>{displayName}</div>
+          {contact?.position && <div className="text-xs text-muted-foreground mt-0.5">{contact.position}</div>}
+          {company?.name && (
+            <div className="mt-2">
+              <Badge variant="outline" className="text-[11px]"><Building2 className="w-3 h-3 mr-1" />{company.name}</Badge>
+            </div>
+          )}
+          {(contact?.city || contact?.country) && (
+            <div className="inline-flex items-center gap-1 mt-2.5 text-[11px] text-muted-foreground">
+              <MapPin className="w-3 h-3" />{[contact?.city, contact?.country].filter(Boolean).join(', ')}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-1.5 justify-center mt-2.5">
+            {contact?.is_client && <Badge variant="outline" className="text-[10px]"><BadgeCheck className="w-3 h-3 mr-0.5" />Client</Badge>}
+            {contact?.lead_status && <Badge variant="secondary" className="text-[10px] capitalize">{contact.lead_status}</Badge>}
+          </div>
         </div>
-        <div className="text-base font-display" style={{ fontWeight: 600 }}>{displayName}</div>
-        {subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
-        <div className="flex flex-wrap gap-1.5 justify-center mt-2.5">
-          {contact?.is_client && <Badge variant="outline" className="text-[10px]"><BadgeCheck className="w-3 h-3 mr-0.5" />Client</Badge>}
-          {contact?.lead_status && <Badge variant="secondary" className="text-[10px] capitalize">{contact.lead_status}</Badge>}
+      </div>
+
+      {/* Information — status + who's handling it */}
+      <div className="p-5 border-b border-white/10 space-y-2.5">
+        <SectionTitle icon={<Hash className="h-4 w-4" />}>Information</SectionTitle>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Status</span>
+          <Badge variant="outline" className="text-[10px]">{statusLabel}</Badge>
+        </div>
+        <div className="flex items-center justify-between text-sm gap-2">
+          <span className="text-muted-foreground shrink-0">Handled by</span>
+          <span className="inline-flex items-center gap-1.5 min-w-0">
+            {agentActive && <Bot className="w-3.5 h-3.5 text-primary shrink-0" />}
+            <span className="truncate">{assignee}</span>
+          </span>
         </div>
       </div>
 
