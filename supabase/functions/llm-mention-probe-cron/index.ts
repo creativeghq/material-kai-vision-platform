@@ -1,5 +1,6 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isModuleEnabled, moduleSupabaseClient } from '../_shared/modules/registry.ts';
 /**
  * LLM Mention Probe Cron Job — weekly visibility tracker.
  *
@@ -24,6 +25,14 @@ Deno.serve(withApiLogging('llm-mention-probe-cron', async (req) => {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Honor the module toggle: a disabled module must not run paid LLM probes.
+    if (!(await isModuleEnabled(moduleSupabaseClient(), 'mention-monitoring'))) {
+      console.log('⏸️ mention-monitoring module is disabled — skipping LLM probe');
+      return new Response(JSON.stringify({
+        success: true, skipped: 'module_disabled', timestamp: new Date().toISOString(),
+      }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';

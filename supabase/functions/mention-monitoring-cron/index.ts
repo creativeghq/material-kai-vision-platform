@@ -1,5 +1,6 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isModuleEnabled, moduleSupabaseClient } from '../_shared/modules/registry.ts';
 /**
  * Mention Monitoring Cron Job — internal-flow refresher.
  *
@@ -30,6 +31,18 @@ Deno.serve(withApiLogging('mention-monitoring-cron', async (req) => {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Honor the module toggle: a disabled module must not run paid refreshes.
+    // This was missing — mention-monitoring sat enabled=false while this cron kept
+    // spending DataForSEO/Perplexity/Anthropic hourly (799 calls / $1.44 in 30 days).
+    // isModuleEnabled is fail-closed, so a transient modules read error skips one
+    // cheap hourly tick rather than spending on a possibly-disabled module.
+    if (!(await isModuleEnabled(moduleSupabaseClient(), 'mention-monitoring'))) {
+      console.log('⏸️ mention-monitoring module is disabled — skipping refresh');
+      return new Response(JSON.stringify({
+        success: true, skipped: 'module_disabled', timestamp: new Date().toISOString(),
+      }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';

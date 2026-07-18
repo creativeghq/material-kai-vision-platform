@@ -1,5 +1,6 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isModuleEnabled, moduleSupabaseClient } from '../_shared/modules/registry.ts';
 /**
  * Job Research Digest Cron — consolidated daily email per user.
  *
@@ -32,6 +33,14 @@ Deno.serve(withApiLogging('job-research-digest-cron', async (req) => {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Honor the module toggle: a disabled module must not send digests.
+    if (!(await isModuleEnabled(moduleSupabaseClient(), 'job-research'))) {
+      console.log('⏸️ job-research module is disabled — skipping digest');
+      return new Response(JSON.stringify({
+        success: true, skipped: 'module_disabled', timestamp: new Date().toISOString(),
+      }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     const pythonBackendUrl = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';
