@@ -36,9 +36,10 @@ import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getAccessibleToolkits,
-  getToolkitOwnerAgents, toolkitTokenEstimate, resolveToolkitsToTools,
+  getToolkitOwnerAgents, toolkitTokenEstimate, resolveToolkitsToTools, getToolkitHub,
   type ToolkitDefinition, type ToolkitQuickStart,
 } from './agentToolsCatalog';
+import { HUBS } from '@/config/nav-items';
 import { Play } from 'lucide-react';
 
 // Every `icon:` referenced by TOOLKITS (cluster + quick_start) must resolve here —
@@ -131,12 +132,20 @@ export const ToolkitPickerModal: React.FC<Props> = ({
 
   if (!open) return null;
 
-  // Order: Core first, then admin-only toolkits separated visually
+  // Order: Core first, then standard toolkits grouped by Hub (#275 — same Hubs as the app
+  // launcher, so "toolkits under each Hub" matches the menu), then admin-only toolkits.
   const groups = {
     core: accessible.filter((t) => t.alwaysOn),
     standard: accessible.filter((t) => !t.alwaysOn && !t.adminOnly),
     admin: accessible.filter((t) => !t.alwaysOn && t.adminOnly),
   };
+  const standardHubGroups: { key: string; label: string; toolkits: ToolkitDefinition[] }[] = [];
+  for (const hub of HUBS) {
+    const items = groups.standard.filter((t) => getToolkitHub(t.id) === hub.id);
+    if (items.length) standardHubGroups.push({ key: hub.id, label: hub.label, toolkits: items });
+  }
+  const ungrouped = groups.standard.filter((t) => !getToolkitHub(t.id));
+  if (ungrouped.length) standardHubGroups.push({ key: 'other', label: 'Other', toolkits: ungrouped });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
@@ -199,10 +208,10 @@ export const ToolkitPickerModal: React.FC<Props> = ({
             </ToolkitSection>
           )}
 
-          {groups.standard.length > 0 && (
-            <ToolkitSection title="Toolkits">
+          {standardHubGroups.map((g) => (
+            <ToolkitSection key={g.key} title={g.label}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {groups.standard.map((tk) => (
+                {g.toolkits.map((tk) => (
                   <ToolkitCard
                     key={tk.id}
                     toolkit={tk}
@@ -213,7 +222,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
                 ))}
               </div>
             </ToolkitSection>
-          )}
+          ))}
 
           {groups.admin.length > 0 && (
             <ToolkitSection title="Admin toolkits" subtitle="Restricted to admin and owner roles.">

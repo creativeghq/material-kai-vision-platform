@@ -19,6 +19,7 @@
  *   examples     — 1-3 starter prompts the user can click to pre-fill chat
  *   imageRequired — when true, only meaningful when the user has attached an image
  */
+import type { HubId } from '@/config/nav-items';
 
 export interface AgentToolEntry {
   id: string;
@@ -1309,6 +1310,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'product_provenance', 'product_price_history', 'projects_using_product',
       'products_in_project', 'customer_overview', 'supplier_overview',
       'products_by_brand', 'brand_overview', 'related_products', 'find_products_by_spec',
+      'search_crm_by_kad',
     ],
     quick_starts: [
       {
@@ -2012,6 +2014,31 @@ export const TOOLKITS: ToolkitDefinition[] = [
 
 /** Always-on toolkit IDs (cannot be disabled by the user). */
 export const ALWAYS_ON_TOOLKIT_IDS = TOOLKITS.filter((t) => t.alwaysOn).map((t) => t.id);
+
+/**
+ * Toolkit → Hub mapping (#275 Capability Fabric) — lets the toolkit picker group clusters by the
+ * SAME Hubs as the app launcher, so "toolkits under each Hub" lines up with the menu. Toolkits with
+ * no entry (core, tech-radar, sub-agents, admin-misc) fall into an "Other" group. Kept as a map
+ * (not a per-entry field) so it's one readable place and doesn't touch every TOOLKITS row.
+ */
+export const TOOLKIT_HUB: Record<string, HubId> = {
+  // Marketing
+  mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
+  'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
+  'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',
+  // Sales
+  quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales',
+  // Finance
+  stock: 'finance',
+  // Studio
+  catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', generation: 'studio',
+  // People
+  hr: 'people',
+};
+
+export function getToolkitHub(id: string): HubId | undefined {
+  return TOOLKIT_HUB[id];
+}
 
 /** Approximate token cost of a toolkit (rough — useful for the picker UI). */
 export function toolkitTokenEstimate(toolkit: ToolkitDefinition): number {
