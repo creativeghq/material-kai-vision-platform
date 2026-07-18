@@ -4,6 +4,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { encodeBase64 as base64Encode } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { escapeHtml } from '../_shared/html.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -524,7 +525,7 @@ async function sendOneStatement(
         <th style="text-align:right;padding:8px;font-size:12px;">Due</th>
         <th style="text-align:right;padding:8px;font-size:12px;">Pay by card</th></tr></thead><tbody>
         ${open.map((i: any) => `<tr>
-          <td style="padding:8px;font-family:monospace;font-size:12px;">${String(i.internal_number ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))}</td>
+          <td style="padding:8px;font-family:monospace;font-size:12px;">${esc(i.internal_number)}</td>
           <td style="padding:8px;text-align:right;font-size:12px;">${fmtMoney(Number(i.amount_due || 0), i.currency, opts.lang)}</td>
           <td style="padding:8px;text-align:right;">${links.get(i.id) ? `<a href="${links.get(i.id)}" style="background:#883366;color:white;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:12px;">Pay now</a>` : '—'}</td>
         </tr>`).join('')}</tbody></table>`;
@@ -535,8 +536,7 @@ async function sendOneStatement(
   const bodyText = settings.statement_email_body ?? `Please find your account statement attached. Closing balance: ${fmtMoney(closing, ledger.currency, opts.lang)}.`;
   // Pentest #250 J2: escape party name + the tenant-configured statement body before
   // interpolating into HTML (escape first, THEN turn newlines into <br>).
-  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  const esc = escapeHtml; // shared canonical escaper (was an identical local copy)
   // Logo header (public URL — generation-images bucket is public-read).
   let logoHtml = '';
   if (settings.business_logo_path) {

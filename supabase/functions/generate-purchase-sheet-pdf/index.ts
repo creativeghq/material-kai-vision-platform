@@ -21,6 +21,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
+import { escapeHtml } from '../_shared/html.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -979,9 +980,7 @@ async function drawPurchaseOrderDoc(pdf: PDFDocument, font: any, bold: any, ctx:
   }
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
+// escapeHtml imported from ../_shared/html.ts (identical behaviour, deduped).
 
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = '';

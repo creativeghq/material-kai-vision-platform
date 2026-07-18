@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { escapeHtml } from '../_shared/html.ts';
 import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -67,10 +68,8 @@ function fmtMoney(value: number | null | undefined, currency = 'EUR'): string {
   }
 }
 
-function escapeHtml(s: string): string {
-  if (!s) return '';
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+// escapeHtml now imported from ../_shared/html.ts (was a local `& < > "`-only copy,
+// which left single quotes unescaped — attribute-unsafe).
 
 function isDueNow(s: Settings, nowUtc: Date): boolean {
   if (!s.digest_enabled) return false;

@@ -18,6 +18,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { escapeHtml } from '../_shared/html.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 const corsHeaders = {
@@ -204,8 +205,7 @@ function buildHtml(p: {
   recipientName: string | null;
   viewUrl: string;
 }): string {
-  const esc = (s: string) =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const esc = escapeHtml; // was a local `& < >`-only escaper (attribute-unsafe); now the shared full escaper
   const greeting = p.recipientName ? `Hi ${esc(p.recipientName.split(/\s+/)[0])},` : 'Hello,';
   const expires = p.expiresAt
     ? `<p style="margin:4px 0;color:#6b7280;font-size:13px;">Valid until ${new Date(p.expiresAt).toLocaleDateString()}</p>`

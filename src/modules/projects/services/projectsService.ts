@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { edgeError } from '@/utils/edgeError';
+import { escapeHtml } from '@/utils/escapeHtml';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
@@ -1094,8 +1095,7 @@ class ProjectsService {
     inviteUrl: string;
     message: string | null;
   }): string {
-    const escape = (s: string) =>
-      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const escape = escapeHtml; // shared canonical escaper (was `& < > "`-only — left ' unescaped)
     const messageBlock = input.message
       ? `<p style="margin:16px 0;padding:12px;background:#f5f5f5;border-left:3px solid #999;font-style:italic;">${escape(input.message)}</p>`
       : '';

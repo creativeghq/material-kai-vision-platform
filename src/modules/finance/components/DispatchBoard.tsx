@@ -8,6 +8,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Truck, Printer, AlertTriangle, PackageCheck, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { escapeHtml } from '@/utils/escapeHtml';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -242,7 +243,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
 
 /** Open a printable run sheet (one picking block per order) in a new window. Pure client render. */
 function printRunSheet(orders: DispatchQueueOrder[]) {
-  const esc = (s: any) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+  const esc = escapeHtml; // was a local `& < >`-only escaper (left " ' unescaped — attribute-unsafe)
   const today = new Date().toLocaleDateString();
   const blocks = orders.map((o) => `
     <div class="order">

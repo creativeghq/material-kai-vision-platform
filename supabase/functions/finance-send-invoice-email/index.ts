@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { escapeHtml } from '../_shared/html.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
@@ -51,8 +52,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   const number = inv.legal_number || inv.internal_number;
   const total = money(Number(inv.total ?? 0), inv.currency);
   // Pentest #250 J2: escape any tenant/customer-supplied value interpolated into the email HTML.
-  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  const esc = escapeHtml; // shared canonical escaper (was an identical local copy)
   const mark = inv.fiscal_mark ? `<p style="margin:4px 0;color:#666">myDATA MARK: <strong>${esc(inv.fiscal_mark)}</strong></p>` : '';
   const qr = inv.fiscal_qr_url ? `<p style="margin:12px 0"><a href="${inv.fiscal_qr_url}" style="color:#7a1f5c">View / verify the invoice »</a></p>` : '';
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, FileText, Receipt, Printer, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { escapeHtml } from '@/utils/escapeHtml';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
@@ -309,8 +310,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
     // document.write — CRM party name/email + ledger doc fields (attacker-influenced via
     // counterparty/import data) MUST be escaped or an <img onerror> in a party name runs
     // in the app origin and can read the Supabase session token from localStorage.
-    const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, (c) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+    const esc = escapeHtml; // shared canonical escaper (was an identical local copy)
     const sideLabel = ledgerSide === 'customer' ? 'Πελάτης / Customer' : 'Προμηθευτής / Supplier';
     const rowsHtml = ledgerWithBalance.map((r) => `
       <tr>

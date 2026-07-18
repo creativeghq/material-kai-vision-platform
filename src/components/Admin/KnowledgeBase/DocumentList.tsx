@@ -200,8 +200,10 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 
       const q = searchQuery.trim();
       if (q) {
-        const esc = q.replace(/[%,()]/g, ' ');
-        query = query.or(`title.ilike.%${esc}%,content.ilike.%${esc}%`);
+        // PostgREST ilike-filter sanitizer (strips %,() so they can't break the .or() grammar).
+        // NOT an HTML escaper — do not rename back to `esc` (see src/utils/escapeHtml.ts).
+        const ilikeTerm = q.replace(/[%,()]/g, ' ');
+        query = query.or(`title.ilike.%${ilikeTerm}%,content.ilike.%${ilikeTerm}%`);
       }
 
       query = query.range(from, to);

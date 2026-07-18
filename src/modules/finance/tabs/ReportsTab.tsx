@@ -286,11 +286,13 @@ function downloadReportCsv(report: ReportKind, rows: any[]): void {
   const colSet = new Set<string>();
   for (const r of rows) for (const k of Object.keys(r)) colSet.add(k);
   const cols: string[] = Array.from(colSet);
-  const esc = (v: any) => {
+  // CSV field quoter (RFC-4180 double-quote doubling). NOT an HTML escaper — do not
+  // rename to `esc` (that name is the HTML escaper; see src/utils/escapeHtml.ts).
+  const csvQuote = (v: any) => {
     const s = v == null ? '' : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const csv = [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\r\n');
+  const csv = [cols.join(','), ...rows.map((r) => cols.map((c) => csvQuote(r[c])).join(','))].join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Send, FileText, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { escapeHtml } from '@/utils/escapeHtml';
 import { useToast } from '@/hooks/use-toast';
 import { emailService, isSenderNotConfigured } from '@/modules/email/services/emailService';
 import { ConnectEmailModal } from '@/modules/email/components/ConnectEmailModal';
@@ -175,10 +176,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       // The body comes in as plain text; convert newlines so it renders as
       // paragraphs in the email client. Anything fancier (markdown / rich text)
       // is a follow-up — keeping v1 simple.
-      const htmlBody = `<div style="font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;white-space:pre-wrap">${
-        customBody
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      }</div>`;
+      const htmlBody = `<div style="font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;white-space:pre-wrap">${escapeHtml(customBody)}</div>`;
       const result = await emailService.sendEmail({
         to: toEmail,
         subject: customSubject.trim(),
