@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { inboxApi } from '@/services/inboxApi';
 import {
   getDashboardInsights,
@@ -88,13 +89,50 @@ function StatTile({
 
 // ── main panel ──────────────────────────────────────────────────────────────
 const _MyOffice: React.FC = () => {
-  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
+  const { activeWorkspaceId } = useWorkspace();
+  const { user } = useAuth();
+  const [greetName, setGreetName] = useState('');
   const [stats, setStats] = useState<StatState>(EMPTY_STATS);
   const [statsLoading, setStatsLoading] = useState(true);
 
   const [insights, setInsights] = useState<DashboardInsights | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // ── greeting name ── prefer business/company name, then the person's name,
+  // then the signup display name, then the email local-part. Never the
+  // workspace label ("Default Workspace" is a system name, not a person).
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    (async () => {
+      const metaName = (user.user_metadata?.display_name as string | undefined)?.trim() || '';
+      const emailPrefix = user.email?.split('@')[0]?.trim() || '';
+
+      let companyName = '';
+      let fullName = '';
+      const { data: prof } = await supabase
+        .from('user_profiles')
+        .select('full_name, business_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      fullName = (prof?.full_name as string | null)?.trim() || '';
+      if (prof?.business_id) {
+        const { data: company } = await supabase
+          .from('crm_companies')
+          .select('name')
+          .eq('id', prof.business_id)
+          .maybeSingle();
+        companyName = (company?.name as string | null)?.trim() || '';
+      }
+
+      const resolved = [companyName, fullName, metaName, emailPrefix].find(Boolean) || '';
+      if (alive) setGreetName(resolved);
+    })().catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
   // ── stats ──
   useEffect(() => {
@@ -182,8 +220,6 @@ const _MyOffice: React.FC = () => {
 
   if (!activeWorkspaceId) return null;
 
-  const wsName = activeWorkspace?.name ?? 'Workspace';
-
   return (
     <div
       className="col-span-12 lg:col-span-4 rounded-2xl border border-primary/15 bg-card p-5 flex flex-col gap-4 relative overflow-hidden"
@@ -193,7 +229,7 @@ const _MyOffice: React.FC = () => {
       <div>
         <p className="text-[11px] uppercase tracking-[0.14em] text-primary">My office</p>
         <h2 className="font-display text-lg tracking-tight mt-0.5 truncate" style={{ fontWeight: 600 }}>
-          Welcome back, {wsName}
+          {greetName ? `Welcome back, ${greetName}` : 'Welcome back'}
         </h2>
       </div>
 
