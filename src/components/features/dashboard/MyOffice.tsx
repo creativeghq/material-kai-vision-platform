@@ -91,7 +91,8 @@ function StatTile({
 const _MyOffice: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
   const { user } = useAuth();
-  const [greetName, setGreetName] = useState('');
+  const [personName, setPersonName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [stats, setStats] = useState<StatState>(EMPTY_STATS);
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -99,9 +100,12 @@ const _MyOffice: React.FC = () => {
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // ── greeting name ── prefer business/company name, then the person's name,
-  // then the signup display name, then the email local-part. Never the
-  // workspace label ("Default Workspace" is a system name, not a person).
+  // ── greeting names ── two independent values:
+  //   personName  → the human (full_name → signup display_name → email local-part)
+  //   companyName → the business, resolved from the first source that has one:
+  //                 the profile's linked company (crm_companies) → the workspace
+  //                 finance issuer (finance_settings.business_name) → branding.
+  // The workspace label ("Default Workspace") is a system name and never used.
   useEffect(() => {
     if (!user) return;
     let alive = true;
@@ -109,30 +113,46 @@ const _MyOffice: React.FC = () => {
       const metaName = (user.user_metadata?.display_name as string | undefined)?.trim() || '';
       const emailPrefix = user.email?.split('@')[0]?.trim() || '';
 
-      let companyName = '';
-      let fullName = '';
       const { data: prof } = await supabase
         .from('user_profiles')
-        .select('full_name, business_id')
+        .select('full_name, business_id, branding_company_name')
         .eq('user_id', user.id)
         .maybeSingle();
-      fullName = (prof?.full_name as string | null)?.trim() || '';
+      const fullName = (prof?.full_name as string | null)?.trim() || '';
+      const person = [fullName, metaName, emailPrefix].find(Boolean) || '';
+
+      let linkedCompany = '';
       if (prof?.business_id) {
         const { data: company } = await supabase
           .from('crm_companies')
           .select('name')
           .eq('id', prof.business_id)
           .maybeSingle();
-        companyName = (company?.name as string | null)?.trim() || '';
+        linkedCompany = (company?.name as string | null)?.trim() || '';
       }
 
-      const resolved = [companyName, fullName, metaName, emailPrefix].find(Boolean) || '';
-      if (alive) setGreetName(resolved);
+      let issuerName = '';
+      if (activeWorkspaceId) {
+        const { data: fs } = await supabase
+          .from('finance_settings')
+          .select('business_name')
+          .eq('workspace_id', activeWorkspaceId)
+          .maybeSingle();
+        issuerName = (fs?.business_name as string | null)?.trim() || '';
+      }
+
+      const branding = (prof?.branding_company_name as string | null)?.trim() || '';
+      const company = [linkedCompany, issuerName, branding].find(Boolean) || '';
+
+      if (alive) {
+        setPersonName(person);
+        setCompanyName(company);
+      }
     })().catch(() => {});
     return () => {
       alive = false;
     };
-  }, [user]);
+  }, [user, activeWorkspaceId]);
 
   // ── stats ──
   useEffect(() => {
@@ -227,9 +247,11 @@ const _MyOffice: React.FC = () => {
     >
       {/* Greeting */}
       <div>
-        <p className="text-[11px] uppercase tracking-[0.14em] text-primary">My office</p>
+        <p className="text-[11px] uppercase tracking-[0.14em] text-primary truncate">
+          {companyName ? `My office, ${companyName}` : 'My office'}
+        </p>
         <h2 className="font-display text-lg tracking-tight mt-0.5 truncate" style={{ fontWeight: 600 }}>
-          {greetName ? `Welcome back, ${greetName}` : 'Welcome back'}
+          {personName ? `Welcome back, ${personName}` : 'Welcome back'}
         </h2>
       </div>
 
