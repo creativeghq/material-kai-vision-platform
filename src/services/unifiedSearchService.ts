@@ -45,6 +45,12 @@ export interface UnifiedSearchRequest {
   image_url?: string;                // Image URL for visual search
   image_base64?: string;             // Base64-encoded image
 
+  // Aspect-biased retrieval (#277) — when set, the backend weights the matching per-aspect
+  // embedding collection (image_<aspect>_embeddings) instead of the flat 7-vector fusion, so
+  // "find similar colors / textures / styles / materials" actually biases toward that aspect.
+  // Optional + backward-compatible: omit for a normal multi_vector fusion search.
+  aspect?: 'color' | 'texture' | 'style' | 'material';
+
   // 🧠 Query Understanding (ENABLED BY DEFAULT)
   enable_query_understanding?: boolean;  // Auto-extract filters from natural language (default: true)
 
@@ -167,6 +173,8 @@ export class UnifiedSearchService {
         include_related_products: request.include_related_products !== false,
         related_products_limit: request.related_products_limit || 3,
         include_content: request.include_content !== false,
+        // Aspect bias (#277) — backend weights image_<aspect>_embeddings when present.
+        ...(request.aspect ? { aspect: request.aspect } : {}),
       };
 
       // Build query parameters
@@ -231,6 +239,7 @@ export class UnifiedSearchService {
     enableQueryUnderstanding?: boolean;  // Auto-extract filters from natural language (default: true, set to false to disable)
     image_url?: string;  // Optional image URL for visual search component
     image_base64?: string;  // Optional base64 image for visual search component
+    aspect?: 'color' | 'texture' | 'style' | 'material';  // Bias toward one aspect (#277)
   }): Promise<UnifiedSearchResponse> {
     return this.search({
       query: params.query,
@@ -241,6 +250,7 @@ export class UnifiedSearchService {
       enable_query_understanding: params.enableQueryUnderstanding,
       image_url: params.image_url,
       image_base64: params.image_base64,
+      aspect: params.aspect,
     });
   }
 

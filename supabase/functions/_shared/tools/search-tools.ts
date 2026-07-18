@@ -93,7 +93,7 @@ async function getDebitCredits() {
  */
 export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => void) => {
   return tool(
-    async ({ query, limit = 10, search_spec }) => {
+    async ({ query, limit = 10, search_spec, aspect }) => {
       try {
         // Emit search spec to frontend if provided
         if (search_spec && onChunk) {
@@ -129,6 +129,9 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
               query,
               workspace_id: workspaceId,
               top_k: limit,
+              // Aspect bias (#277): when the user asks for similar color/texture/style/material,
+              // MIVAA weights that per-aspect embedding collection. Omitted = full 7-vector fusion.
+              ...(aspect ? { aspect } : {}),
             }),
             signal: controller.signal,
           });
@@ -171,6 +174,8 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
       schema: z.object({
         query: z.string().describe('Search query - be specific and detailed'),
         limit: z.number().default(10).describe('Maximum number of results to return'),
+        aspect: z.enum(['color', 'texture', 'style', 'material']).optional()
+          .describe('Bias results toward one aspect when the user asks for similar COLOR, TEXTURE, STYLE, or MATERIAL specifically. Omit for a normal all-round search.'),
         search_spec: z.object({
           intent: z.string().describe('Brief description of what the user is looking for'),
           color_keywords: z.array(z.string()).optional().describe('Color terms extracted from query (e.g. ["warm grey", "charcoal"])'),
@@ -192,7 +197,7 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
  */
 export const createVisualSearchTool = (workspaceId: string, images: string[]) => {
   return tool(
-    async ({ query }) => {
+    async ({ query, aspect }) => {
       try {
         // Use the first attached image
         const imageDataUrl = images[0];
@@ -225,6 +230,8 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
               workspace_id: workspaceId,
               image_base64: base64Data,
               top_k: 10,
+              // Aspect bias (#277) — e.g. "find the same COLOUR as this photo".
+              ...(aspect ? { aspect } : {}),
             }),
             signal: controller.signal,
           });
@@ -260,6 +267,8 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
       description: 'Search for visually similar materials using the user\'s uploaded image. Uses CLIP/SigLIP embeddings to find products matching the visual appearance, color, texture, and style of the image. Use this when the user attaches an image and wants to find similar materials, match colors, or identify products.',
       schema: z.object({
         query: z.string().default('').describe('Optional text description to refine visual search results'),
+        aspect: z.enum(['color', 'texture', 'style', 'material']).optional()
+          .describe('Bias toward one aspect of the image — e.g. match its COLOR, TEXTURE, STYLE, or MATERIAL specifically. Omit for overall visual similarity.'),
       }),
     }
   );
