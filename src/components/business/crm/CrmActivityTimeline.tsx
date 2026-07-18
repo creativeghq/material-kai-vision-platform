@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
+import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { crmActivitiesService, type TimelineItem, type CrmActivityTarget } from '@/services/crmActivitiesService';
 import { getErrorMessage } from '@/core/errors/utils';
@@ -63,6 +64,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0 })
   const [loading, setLoading] = useState(true);
   const [type, setType] = useState<ComposerKey>('note');
   const [draft, setDraft] = useState('');
+  const [meetingAt, setMeetingAt] = useState(''); // datetime-local value, for Meeting entries
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -81,18 +83,27 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0 })
   useEffect(() => { load(); }, [load, refreshKey]);
 
   const current = COMPOSER.find((c) => c.key === type)!;
+  // Meeting can be logged with just a time; note/call need text.
+  const canSubmit = type === 'meeting' ? (!!draft.trim() || !!meetingAt) : !!draft.trim();
 
   const handleSubmit = async () => {
+    if (!canSubmit) return;
     const body = draft.trim();
-    if (!body) return;
     setSaving(true);
     try {
-      if (current.activity) {
+      if (type === 'meeting') {
+        const when = meetingAt ? new Date(meetingAt) : null;
+        const title = when
+          ? `Meeting — ${when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
+          : 'Meeting logged';
+        await crmActivitiesService.addActivity(target, 'meeting_logged', title, body, when ? { meeting_at: when.toISOString() } : {});
+      } else if (current.activity) {
         await crmActivitiesService.addActivity(target, current.activity.type, current.activity.title, body);
       } else {
         await crmActivitiesService.addNote(target, body);
       }
       setDraft('');
+      setMeetingAt('');
       await load(); // instant refresh
     } catch (err) {
       toast({ title: 'Could not save', description: getErrorMessage(err), variant: 'destructive' });
@@ -135,17 +146,29 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0 })
                 );
               })}
             </div>
+            {type === 'meeting' && (
+              <div className="flex items-center gap-2 px-2.5 pt-2">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <Input
+                  type="datetime-local"
+                  value={meetingAt}
+                  onChange={(e) => setMeetingAt(e.target.value)}
+                  className="h-8 w-auto max-w-[15rem] text-xs"
+                  aria-label="Meeting date & time"
+                />
+              </div>
+            )}
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={onKeyDown}
               rows={2}
-              placeholder={current.placeholder}
+              placeholder={type === 'meeting' ? 'What was the meeting about? (optional)' : current.placeholder}
               className="min-h-[2.75rem] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
             />
             <div className="flex items-center justify-between gap-2 px-2.5 pb-2">
               <span className="text-[10.5px] text-muted-foreground">⌘/Ctrl + Enter to save</span>
-              <Button size="sm" onClick={handleSubmit} disabled={saving || !draft.trim()}>
+              <Button size="sm" onClick={handleSubmit} disabled={saving || !canSubmit}>
                 {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
                 {current.submit}
               </Button>
