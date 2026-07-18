@@ -30,6 +30,7 @@ import {
   xmlEscape,
 } from '../_shared/aade/soap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -49,6 +50,21 @@ interface LookupBody {
   action?: 'creds-status' | 'verify-reseller-application' | string;
   /** For action='verify-reseller-application': the reseller_applications row to check. */
   application_id?: string;
+  /** When true, also return an English translation of the Greek descriptive fields
+   *  (name / activity / tax office / street / city) as `basic_rec_en`, so a bilingual
+   *  form can fill BOTH language slots from one lookup. Off by default — only the
+   *  own-business prefill opts in, so CRM/reseller lookups stay LLM-free. */
+  translate?: boolean;
+}
+
+/** English translation of the Greek descriptive fields ΑΑΔΕ returns. */
+interface BasicRecEn {
+  onomasia: string | null;
+  commer_title: string | null;
+  doy_descr: string | null;
+  postal_address: string | null;
+  postal_area_description: string | null;
+  primary_activity_descr: string | null;
 }
 
 interface FirmActivity {
@@ -123,6 +139,60 @@ function parseActivities(xml: string): FirmActivity[] {
     kind: (() => { const v = pickTag(b, 'firm_act_kind'); return v ? Number(v) : null; })(),
     kind_description: pickTag(b, 'firm_act_kind_descr'),
   })).filter((a) => a.code || a.description);
+}
+
+/**
+ * Translate the Greek descriptive fields to English via Claude Haiku so a bilingual
+ * form can fill both slots. Company/street/city are transliterated to Latin script when
+ * no established English form exists; tax office + activity are real translations.
+ * Best-effort: any failure returns null and the caller just keeps the Greek slots.
+ */
+async function translateBasicRec(
+  basicRec: BasicRec,
+  primaryActivityDescr: string | null,
+): Promise<BasicRecEn | null> {
+  const src = {
+    onomasia: basicRec.onomasia,
+    commer_title: basicRec.commer_title,
+    doy_descr: basicRec.doy_descr,
+    postal_address: basicRec.postal_address,
+    postal_area_description: basicRec.postal_area_description,
+    primary_activity_descr: primaryActivityDescr,
+  };
+  // Nothing to translate.
+  if (!Object.values(src).some((v) => v && v.trim())) return null;
+
+  const schema = z.object({
+    onomasia: z.string().nullable(),
+    commer_title: z.string().nullable(),
+    doy_descr: z.string().nullable(),
+    postal_address: z.string().nullable(),
+    postal_area_description: z.string().nullable(),
+    primary_activity_descr: z.string().nullable(),
+  });
+
+  try {
+    const { output } = await generateStructuredWithClaude(
+      `Translate these Greek business-registry fields to English. For proper nouns with no
+established English form (company names, street names, cities) use standard Latin
+transliteration; for tax office (ΔΟΥ) and activity description give a natural English
+translation. Return null for any field whose input is null or empty. Do NOT add, guess,
+or invent anything — translate only what is given.
+
+${JSON.stringify(src, null, 2)}`,
+      schema,
+      {
+        model: 'claude-haiku-4-5-20251001',
+        temperature: 0,
+        task: 'aade_field_translation',
+        systemPrompt: 'You are a precise Greek→English translator for business-registry data. Output only the requested JSON.',
+      },
+    );
+    return output as BasicRecEn;
+  } catch (err) {
+    console.error('[myaade-rgwspublic2] translation failed (keeping Greek only):', err);
+    return null;
+  }
 }
 
 /** Operation-specific SOAP body for rgWsPublic2AfmMethod. */
@@ -382,12 +452,20 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       }, 404);
     }
 
+    // English translation for bilingual forms (own-business prefill opts in via translate=true).
+    let basicRecEn: BasicRecEn | null = null;
+    if (body.translate) {
+      const primaryActDescr = (activities.find((a) => a.kind === 1) ?? activities[0] ?? null)?.description ?? null;
+      basicRecEn = await translateBasicRec(basicRec, primaryActDescr);
+    }
+
     const result = {
       ok: true,
       source: 'aade' as const,
       checked_at: new Date().toISOString(),
       valid_afm: basicRec.deactivation_flag === '1',
       basic_rec: basicRec,
+      basic_rec_en: basicRecEn,
       activities,
       secret_sources: creds.sources,
     };

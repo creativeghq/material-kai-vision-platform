@@ -28,12 +28,24 @@ export interface AadeFirmActivity {
   kind_description: string | null;
 }
 
+/** English translation of the Greek descriptive fields — present only when `translate: true`
+ *  was requested and the translation succeeded (best-effort; null otherwise). */
+export interface AadeBasicRecEn {
+  onomasia: string | null;
+  commer_title: string | null;
+  doy_descr: string | null;
+  postal_address: string | null;
+  postal_area_description: string | null;
+  primary_activity_descr: string | null;
+}
+
 export interface AadeLookupResult {
   ok: true;
   source: 'aade' | 'cache';
   checked_at: string;
   valid_afm: boolean;
   basic_rec: AadeBasicRec;
+  basic_rec_en?: AadeBasicRecEn | null;
   activities: AadeFirmActivity[];
   secret_sources?: { username: string; password: string; afm_called_by: string };
 }
@@ -61,6 +73,9 @@ export const aadeService = {
     companyId?: string;
     reason?: 'own_business' | 'crm_enrichment' | 'invoice_counterparty';
     workspaceId?: string;
+    /** Also return `basic_rec_en` (English translation of name/activity/tax office/street/city)
+     *  so a bilingual form can fill both language slots. */
+    translate?: boolean;
   }): Promise<AadeLookupResult | AadeLookupError> {
     const { data, error } = await supabase.functions.invoke('myaade-rgwspublic2', {
       body: {
@@ -68,6 +83,7 @@ export const aadeService = {
         company_id: args.companyId,
         reason: args.reason,
         workspace_id: args.workspaceId,
+        translate: args.translate,
       },
     });
     if (error) return { error: await edgeErrorMessage(error) };

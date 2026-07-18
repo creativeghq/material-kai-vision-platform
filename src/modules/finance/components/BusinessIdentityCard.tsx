@@ -119,9 +119,11 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
     } finally { setSaving(false); }
   };
 
-  /** Greek-only: prefill the issuer fields from ΑΑΔΕ (RgWsPublic2) using the VAT number.
-   *  Writes the Greek (base-key) values; review then Save. No companyId → this is the
-   *  workspace's OWN business, so nothing is cached onto a CRM company row. */
+  /** Prefill the issuer fields from ΑΑΔΕ (RgWsPublic2) using the VAT number.
+   *  The bilingual fields (name/activity/tax office/street/city) are filled in BOTH
+   *  languages: the Greek base key from ΑΑΔΕ's registered value, and the `_en` key from
+   *  the server-side English translation (`translate: true`). Review then Save. No companyId
+   *  → this is the workspace's OWN business, so nothing is cached onto a CRM company row. */
   const lookupAade = async () => {
     const afm = String(data.business_vat ?? '').replace(/[^0-9]/g, '');
     if (afm.length !== 9) {
@@ -130,27 +132,45 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
     }
     setAadeLoading(true);
     try {
-      const res = await aadeService.lookup({ afm, reason: 'own_business', workspaceId });
+      const res = await aadeService.lookup({ afm, reason: 'own_business', workspaceId, translate: true });
       if ('error' in res && res.error) {
         toast({ title: 'ΑΑΔΕ lookup failed', description: res.message || res.error, variant: 'destructive' });
         return;
       }
       if ('ok' in res && res.ok) {
         const r = res.basic_rec;
+        const en = res.basic_rec_en ?? null;
         const primaryAct = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
+        // `pick(current, greek, english)` — keep the current value if ΑΑΔΕ gave nothing.
+        const pick = (cur: any, gr: string | null | undefined) => gr ?? cur;
         setData((d) => ({
           ...d,
-          business_name: r.onomasia ?? d.business_name,
-          business_profession: primaryAct?.description ?? d.business_profession,
-          business_tax_office: r.doy_descr ?? d.business_tax_office,
-          business_address: r.postal_address ?? d.business_address,
-          business_street_number: r.postal_address_no ?? d.business_street_number,
-          business_postal_code: r.postal_zip_code ?? d.business_postal_code,
-          business_city: r.postal_area_description ?? d.business_city,
+          // Greek (base) slots — the registered ΑΑΔΕ values.
+          business_name: pick(d.business_name, r.onomasia),
+          business_profession: pick(d.business_profession, primaryAct?.description),
+          business_tax_office: pick(d.business_tax_office, r.doy_descr),
+          business_address: pick(d.business_address, r.postal_address),
+          business_city: pick(d.business_city, r.postal_area_description),
+          // English (_en) slots — the server-side translation. Fall back to the Greek value
+          // (better a filled field than an empty one) when translation was unavailable.
+          business_name_en: pick(d.business_name_en, en?.onomasia ?? r.onomasia),
+          business_profession_en: pick(d.business_profession_en, en?.primary_activity_descr ?? primaryAct?.description),
+          business_tax_office_en: pick(d.business_tax_office_en, en?.doy_descr ?? r.doy_descr),
+          business_address_en: pick(d.business_address_en, en?.postal_address ?? r.postal_address),
+          business_city_en: pick(d.business_city_en, en?.postal_area_description ?? r.postal_area_description),
+          // Non-bilingual (single-slot) fields.
+          business_street_number: pick(d.business_street_number, r.postal_address_no),
+          business_postal_code: pick(d.business_postal_code, r.postal_zip_code),
           business_country: d.business_country || 'Greece',
+          business_country_en: d.business_country_en || 'Greece',
           business_country_code: d.business_country_code || 'GR',
         }));
-        toast({ title: 'Prefilled from ΑΑΔΕ', description: r.onomasia ? `Registered as ${r.onomasia}. Review & Save.` : 'Review & Save.' });
+        toast({
+          title: 'Prefilled from ΑΑΔΕ',
+          description: r.onomasia
+            ? `Registered as ${r.onomasia}${en?.onomasia && en.onomasia !== r.onomasia ? ` (${en.onomasia})` : ''}. Review & Save.`
+            : 'Review & Save.',
+        });
       }
     } finally { setAadeLoading(false); }
   };
