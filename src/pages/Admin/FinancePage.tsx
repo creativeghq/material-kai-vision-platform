@@ -165,6 +165,17 @@ const FinancePage: React.FC = () => {
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newBillOpen, setNewBillOpen] = useState(false);
+
+  // #251 App Launcher deep-link: /finance?new=invoice opens the New Invoice modal.
+  useEffect(() => {
+    if (isAccountant) return; // read-only role cannot create
+    if (searchParams.get('new') === 'invoice') {
+      setNewInvoiceOpen(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [searchParams, setSearchParams, isAccountant]);
   const [scnOpen, setScnOpen] = useState(false);
   const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);

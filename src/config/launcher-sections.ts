@@ -6,7 +6,7 @@
 // guess a path, or the launcher ships dead links.
 import {
   ShoppingCart, Receipt, Contact, Briefcase, FolderTree, FileText,
-  Users, CalendarClock, CalendarX, LayoutTemplate,
+  Users, CalendarClock, CalendarX, LayoutTemplate, UserPlus, Building2, FilePlus,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -39,6 +39,26 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   ],
   'email-marketing': [
     { label: 'Templates', to: '/marketing/email?tab=templates', icon: LayoutTemplate },
+  ],
+};
+
+// Right-column context-aware quick-CREATE triggers, keyed by SidebarNavItem.id. Each `to` carries a
+// ?new= param that the target PAGE reads to open its real create modal/route (wired 2026-07-18):
+//   /crm?new=contact → contacts/new · /crm?new=company → AddCompanyModal
+//   /finance?new=invoice → New Invoice modal · /finance?tab=orders&new=order → New (sales) order
+//   /quotes?new=quote → Create Quote modal
+// Add a row ONLY after wiring the matching ?new= handler on the page — an unwired trigger is inert.
+export const LAUNCHER_ACTIONS: Record<string, LauncherSection[]> = {
+  crm: [
+    { label: 'New Contact', to: '/crm?new=contact', icon: UserPlus },
+    { label: 'New Company', to: '/crm?new=company', icon: Building2 },
+  ],
+  finance: [
+    { label: 'New Invoice', to: '/finance?new=invoice', icon: Receipt },
+    { label: 'New Order', to: '/finance?tab=orders&new=order', icon: ShoppingCart },
+  ],
+  quotes: [
+    { label: 'New Quote', to: '/quotes?new=quote', icon: FilePlus },
   ],
 };
 

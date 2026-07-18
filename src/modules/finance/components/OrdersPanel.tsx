@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -69,6 +69,7 @@ export const OrdersPanel: React.FC<{
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   // Inside a CRM party (company/contact) the list is already scoped — hide the filter cluster.
   const embedded = !!(companyId || contactId);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -76,6 +77,19 @@ export const OrdersPanel: React.FC<{
   }, [workspaceId]);
 
   const openCreate = (orderType: OrderType, draft: boolean) => { setCreatePreset({ orderType, draft }); setCreateOpen(true); };
+
+  // #251 App Launcher deep-link: /finance?tab=orders&new=order opens the New (sales) order flow.
+  // Only in the standalone finance list — never when embedded in a project/party tab.
+  useEffect(() => {
+    if (embedded) return;
+    if (searchParams.get('new') === 'order') {
+      setCreatePreset({ orderType: 'sales', draft: false });
+      setCreateOpen(true);
+      const p = new URLSearchParams(searchParams);
+      p.delete('new');
+      setSearchParams(p, { replace: true });
+    }
+  }, [embedded, searchParams, setSearchParams]);
 
   // Role-aware New-order menu. No role context (global Finance list / project tab) or an
   // unclassified party → offer both kinds, unchanged. A customer-only party can't be a

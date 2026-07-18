@@ -137,6 +137,17 @@ export const CRMManagement: React.FC = () => {
   const [selContacts, setSelContacts] = useState<Set<string>>(new Set());
   const [selCompanies, setSelCompanies] = useState<Set<string>>(new Set());
   const [showAddCompany, setShowAddCompany] = useState(false);
+
+  // #251 App Launcher deep-links: /crm?new=contact | /crm?new=company open the create flow.
+  useEffect(() => {
+    const n = searchParams.get('new');
+    if (n !== 'contact' && n !== 'company') return;
+    const params = new URLSearchParams(searchParams);
+    params.delete('new');
+    setSearchParams(params, { replace: true });
+    if (n === 'contact') navigate('/admin/crm/contacts/new');
+    else setShowAddCompany(true);
+  }, [searchParams, setSearchParams, navigate]);
   const [bulkBusy, setBulkBusy] = useState(false);
 
   // Add-user modal

@@ -12,7 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/po
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useLauncherApps, type LauncherApp } from '@/hooks/useLauncherApps';
-import { LAUNCHER_SECTIONS, LAUNCHER_SHORTCUTS } from '@/config/launcher-sections';
+import { LAUNCHER_SECTIONS, LAUNCHER_SHORTCUTS, LAUNCHER_ACTIONS, type LauncherSection } from '@/config/launcher-sections';
 
 const RECENT_KEY = 'launcher.recent.v1';
 
@@ -89,6 +89,21 @@ export const AppLauncher: React.FC = () => {
   };
 
   const sections = selected ? (LAUNCHER_SECTIONS[selected.id] ?? []) : [];
+  // Context-aware quick-create triggers for the selected active module (empty for add-ons).
+  const actions = selected && selected.active ? (LAUNCHER_ACTIONS[selected.id] ?? []) : [];
+
+  const shortcutRow = (s: LauncherSection) => (
+    <button
+      key={s.to}
+      type="button"
+      onClick={() => go(s.to)}
+      className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left hover:border-primary/50 hover:bg-accent/40 transition-colors"
+    >
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/60 text-primary shrink-0"><s.icon className="h-4 w-4" /></span>
+      <span className="flex-1 min-w-0 truncate text-[13px] font-medium">{s.label}</span>
+      <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+    </button>
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -224,23 +239,34 @@ export const AppLauncher: React.FC = () => {
                 )}
               </section>
 
-              {/* ── Right rail ── */}
+              {/* ── Right rail: context-aware quick-create + jump-to ── */}
               <aside className="border-t md:border-t-0 md:border-l border-border/60 bg-muted/20 p-4">
-                <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Jump to</div>
-                <div className="space-y-1.5">
-                  {LAUNCHER_SHORTCUTS.map((s) => (
-                    <button
-                      key={s.to}
-                      type="button"
-                      onClick={() => go(s.to)}
-                      className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left hover:border-primary/50 hover:bg-accent/40 transition-colors"
-                    >
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/60 text-primary shrink-0"><s.icon className="h-4 w-4" /></span>
-                      <span className="flex-1 min-w-0 truncate text-[13px] font-medium">{s.label}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />
-                    </button>
-                  ))}
-                </div>
+                {actions.length > 0 ? (
+                  <>
+                    <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Create in {selected!.label}</div>
+                    <div className="space-y-1.5">
+                      {actions.map((a) => (
+                        <button
+                          key={a.to}
+                          type="button"
+                          onClick={() => go(a.to, selected!.id)}
+                          className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left hover:border-primary/50 hover:bg-accent/40 transition-colors"
+                        >
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/60 text-primary shrink-0"><a.icon className="h-4 w-4" /></span>
+                          <span className="flex-1 min-w-0 truncate text-[13px] font-medium">{a.label}</span>
+                          <Plus className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-5 mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Across your apps</div>
+                    <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Jump to</div>
+                    <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
+                  </>
+                )}
 
                 {recent.filter((id) => byId.has(id)).length > 0 && (
                   <>

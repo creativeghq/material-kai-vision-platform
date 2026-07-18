@@ -72,6 +72,16 @@ export const QuotesPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
+  // #251 App Launcher deep-link: /quotes?new=quote opens the Create Quote modal.
+  useEffect(() => {
+    if (searchParams.get('new') === 'quote') {
+      setShowCreateModal(true);
+      const params = new URLSearchParams(searchParams);
+      params.delete('new');
+      setSearchParams(params, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   // Load quotes
   const loadQuotes = useCallback(async () => {
     try {
