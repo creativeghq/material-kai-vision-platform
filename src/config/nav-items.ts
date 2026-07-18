@@ -14,11 +14,39 @@ import {
   Megaphone,
   Package,
   Workflow,
+  Headset,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
 
 export type NavRoleRequirement = 'factory' | 'admin';
+
+/**
+ * HubSpot-style "Hubs" (#251 follow-up): the App Launcher and /apps page group the
+ * workspace's business modules into a small, organized set of Hubs instead of a flat list.
+ * A Hub is purely an IA/grouping layer over the existing `surface:'app'` items — routes,
+ * module slugs, capabilities, and entitlements are unchanged. Each app declares its `hub`;
+ * apps with no `hub` fall into a catch-all "More" bucket in the launcher.
+ */
+export type HubId = 'marketing' | 'sales' | 'finance' | 'service' | 'studio' | 'people';
+
+export interface Hub {
+  id: HubId;
+  label: string;
+  icon: LucideIcon;
+  /** One-line description shown under the Hub header in the launcher / apps hub. */
+  description: string;
+}
+
+/** Order here is the order Hubs render in the launcher rail and /apps page. */
+export const HUBS: readonly Hub[] = [
+  { id: 'marketing', label: 'Marketing Hub', icon: Megaphone, description: 'Campaigns, automations, social & SEO — powered by the Agent.' },
+  { id: 'sales', label: 'Sales Hub', icon: Briefcase, description: 'CRM, quotes, orders, services & supplier analytics.' },
+  { id: 'finance', label: 'Finance Hub', icon: Wallet, description: 'Invoices, payments, reporting & warehouse.' },
+  { id: 'service', label: 'Service Hub', icon: Headset, description: 'Customer conversations, reviews & knowledge base.' },
+  { id: 'studio', label: 'Studio Hub', icon: Palette, description: 'Projects, moodboards & client presentations.' },
+  { id: 'people', label: 'People Hub', icon: Users, description: 'Employees, absences & HR documents.' },
+];
 
 export interface SidebarNavItem {
   id: string;
@@ -35,6 +63,12 @@ export interface SidebarNavItem {
   moduleSlug?: string;
   /** One-line description shown on the App Launcher / /apps cards (for surface:'app' items). */
   description?: string;
+  /**
+   * Which Hub this app belongs to in the App Launcher / /apps grouping (#251 follow-up).
+   * Only meaningful for `surface:'app'` items; `top` surfaces stay in the lean top bar.
+   * Apps with no `hub` land in the launcher's catch-all "More" group.
+   */
+  hub?: HubId;
   /**
    * Where the item renders (#251 App Launcher IA):
    * - `'top'` (default) → the lean top nav bar (universal surfaces).
@@ -55,35 +89,38 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // ── Top bar: universal surfaces every user relies on ──
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
-  { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireCapability: 'marketplace.browse' },
 
-  // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251) ──
+  // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251),
+  //    grouped into Hubs (#251 follow-up) via the `hub` field. ──
   // #209 — Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
-  { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', description: 'Shared inbox for customer conversations.' },
-  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app', description: 'Plan and manage design projects.' },
-  { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', description: 'Build and send client quotes.' },
+  { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', hub: 'service', description: 'Shared inbox for customer conversations.' },
+  { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app', hub: 'studio', description: 'Plan and manage design projects.' },
+  // MoodBoards moved off the lean top bar into Studio Hub (#251 follow-up) — it's creative
+  // delivery work, grouped alongside Projects and client presentations.
+  { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette, surface: 'app', hub: 'studio', description: 'Curate materials and design inspiration.' },
+  { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', hub: 'sales', description: 'Build and send client quotes.' },
   // #201 — Sales portal for invited reps (persona 'sales').
-  { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', description: 'Sales-rep portal for quotes.' },
+  { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', hub: 'sales', description: 'Sales-rep portal for quotes.' },
   // Business-workspace surfaces — gated through the #195 capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance. Part of #174.
-  { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', description: 'Contacts, companies, and leads.' },
-  { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', description: 'Invoices, payments, and reports.' },
+  { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'Contacts, companies, and leads.' },
+  { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Invoices, payments, and reports.' },
   // Warehouse: inventory extracted from the Finance tab into its own paid add-on (module slug stays
   // 'stock' internally). Appears only when the workspace is entitled AND the persona holds warehouse.manage.
-  { id: 'stock', label: 'Warehouse', path: '/warehouse', icon: Package, requireCapability: 'warehouse.manage', moduleSlug: 'stock', surface: 'app', description: 'Inventory, dispatch, movements & stocktake.' },
+  { id: 'stock', label: 'Warehouse', path: '/warehouse', icon: Package, requireCapability: 'warehouse.manage', moduleSlug: 'stock', surface: 'app', hub: 'finance', description: 'Inventory, dispatch, movements & stocktake.' },
   // #252 — HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
   // hr.view (owner/admin, not plain members — employee salary/absence data is sensitive).
-  { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app', description: 'Employees, absences, and HR documents.' },
+  { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app', hub: 'people', description: 'Employees, absences, and HR documents.' },
   // #252 — employee self-service. hr.self is held ONLY by the 'employee' persona, so this shows
   // for invited employees (never owners/admins, who use the full HR above).
-  { id: 'my-hr', label: 'My HR', path: '/my-hr', icon: UserCircle, requireCapability: 'hr.self', surface: 'app', description: 'Your payslips, absences, and requests.' },
+  { id: 'my-hr', label: 'My HR', path: '/my-hr', icon: UserCircle, requireCapability: 'hr.self', surface: 'app', hub: 'people', description: 'Your payslips, absences, and requests.' },
   // #255 — Email Marketing: appears only when the workspace is entitled to 'email-marketing' AND
   // the persona holds marketing.email (owner/admin of a business node).
-  { id: 'email-marketing', label: 'Email Marketing', path: '/marketing/email', icon: Megaphone, requireCapability: 'marketing.email', moduleSlug: 'email-marketing', surface: 'app', description: 'Design templates and send bulk email campaigns.' },
+  { id: 'email-marketing', label: 'Email Marketing', path: '/marketing/email', icon: Megaphone, requireCapability: 'marketing.email', moduleSlug: 'email-marketing', surface: 'app', hub: 'marketing', description: 'Design templates and send bulk email campaigns.' },
   // #256 — Flows toolkit: appears when the workspace owns 'flows-toolkit' AND the user can use
   // the agent (Flows are agent-built). The page is the management view; chat is the create surface.
-  { id: 'automations', label: 'Automations', path: '/automations', icon: Workflow, requireCapability: 'agent.use', moduleSlug: 'flows-toolkit', surface: 'app', description: 'Automate actions when things happen in your workspace.' },
+  { id: 'automations', label: 'Automations', path: '/automations', icon: Workflow, requireCapability: 'agent.use', moduleSlug: 'flows-toolkit', surface: 'app', hub: 'marketing', description: 'Automate actions when things happen in your workspace.' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',
@@ -91,6 +128,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     icon: BarChart3,
     requireRole: 'factory',
     surface: 'app',
+    hub: 'sales',
     description: 'Supplier demand and engagement analytics.',
   },
   // Blueprints (#242) live under Projects. Supplier portal (#247) lives under Finance → Payables /

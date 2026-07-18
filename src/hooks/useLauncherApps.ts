@@ -6,7 +6,7 @@
 // Catalog metadata (subheading + add-on price) is joined from public.modules by slug.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { SIDEBAR_NAV_ITEMS, filterNavItems, type SidebarNavItem } from '@/config/nav-items';
+import { SIDEBAR_NAV_ITEMS, filterNavItems, HUBS, type SidebarNavItem, type HubId, type Hub } from '@/config/nav-items';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -26,6 +26,8 @@ export interface LauncherApp {
   active: boolean;
   isAddon?: boolean;
   priceLabel?: string;
+  /** Hub grouping (#251 follow-up). Undefined → catch-all "More" group in the launcher. */
+  hub?: HubId;
 }
 
 export interface EnableResult { ok: boolean; message: string; checkout?: boolean }
@@ -39,6 +41,38 @@ export interface LauncherApi {
   /** module slug currently being enabled (for a spinner), else null. */
   enabling: string | null;
   enable: (app: LauncherApp) => Promise<EnableResult>;
+}
+
+/** A Hub plus the apps assigned to it. `hub: null` is the catch-all "More" group. */
+export interface HubGroup {
+  hub: Hub | null;
+  apps: LauncherApp[];
+}
+
+/**
+ * Group launcher apps into Hubs (#251 follow-up), preserving HUBS order. Within each hub,
+ * active apps sort before available (add-on) apps, then alphabetically. Empty hubs are dropped.
+ * Apps with no `hub` (e.g. registry workspace nav items) collect into a trailing "More" group.
+ */
+export function groupAppsByHub(apps: LauncherApp[]): HubGroup[] {
+  const byHub = new Map<HubId | '__none__', LauncherApp[]>();
+  for (const app of apps) {
+    const key = app.hub ?? '__none__';
+    const list = byHub.get(key) ?? [];
+    list.push(app);
+    byHub.set(key, list);
+  }
+  const sortApps = (list: LauncherApp[]) =>
+    [...list].sort((a, b) => (Number(b.active) - Number(a.active)) || a.label.localeCompare(b.label));
+
+  const groups: HubGroup[] = [];
+  for (const hub of HUBS) {
+    const list = byHub.get(hub.id);
+    if (list?.length) groups.push({ hub, apps: sortApps(list) });
+  }
+  const orphans = byHub.get('__none__');
+  if (orphans?.length) groups.push({ hub: null, apps: sortApps(orphans) });
+  return groups;
 }
 
 export function useLauncherApps(): LauncherApi {
@@ -105,6 +139,7 @@ export function useLauncherApps(): LauncherApi {
         active,
         isAddon: cat?.is_addon,
         priceLabel: cat?.is_addon ? (formatAddonPrice(cat.addon_price_cents, cat.addon_currency) || undefined) : undefined,
+        hub: i.hub,
       };
     };
 

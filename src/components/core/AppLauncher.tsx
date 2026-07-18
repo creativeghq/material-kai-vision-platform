@@ -11,7 +11,7 @@ import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/popover';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useLauncherApps, type LauncherApp } from '@/hooks/useLauncherApps';
+import { useLauncherApps, groupAppsByHub, type LauncherApp } from '@/hooks/useLauncherApps';
 import { LAUNCHER_SECTIONS, LAUNCHER_SHORTCUTS, LAUNCHER_ACTIONS, type LauncherSection } from '@/config/launcher-sections';
 
 const RECENT_KEY = 'launcher.recent.v1';
@@ -35,18 +35,23 @@ export const AppLauncher: React.FC = () => {
 
   useEffect(() => { if (open) setRecent(readRecent()); }, [open]);
 
-  // Default the rail selection to the first active app (alphabetical from the hook) once loaded.
+  // All apps (active + available-to-add) grouped into Hubs (#251 follow-up). Inactive apps stay
+  // visible in their Hub with a lock → the center pane offers Enable/Request (upsell → revenue).
+  const allApps = useMemo(() => [...active, ...available], [active, available]);
+  const hubGroups = useMemo(() => groupAppsByHub(allApps), [allApps]);
+
+  // Default the rail selection to the first app of the first non-empty Hub once loaded.
   useEffect(() => {
     if (selectedId) return;
-    if (active.length) setSelectedId(active[0].id);
-    else if (available.length) setSelectedId(available[0].id);
-  }, [active, available, selectedId]);
+    const first = hubGroups[0]?.apps[0];
+    if (first) setSelectedId(first.id);
+  }, [hubGroups, selectedId]);
 
   const byId = useMemo(() => {
     const m = new Map<string, LauncherApp>();
-    [...active, ...available].forEach((a) => m.set(a.id, a));
+    allApps.forEach((a) => m.set(a.id, a));
     return m;
-  }, [active, available]);
+  }, [allApps]);
 
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
 
@@ -133,20 +138,17 @@ export const AppLauncher: React.FC = () => {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-[224px_minmax(0,1fr)_244px]">
-              {/* ── Left rail ── */}
-              <aside className="border-b md:border-b-0 md:border-r border-border/60 bg-muted/20 p-2.5 md:min-h-[460px]">
-                <div className="px-2 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Your apps</div>
-                <div className="space-y-0.5">
-                  {active.length ? active.map(railItem) : <p className="px-2 py-2 text-xs text-muted-foreground">No apps yet.</p>}
-                </div>
-
-                {available.length > 0 && (
-                  <>
-                    <div className="my-2.5 h-px bg-border/60" />
-                    <div className="px-2 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Available to add</div>
-                    <div className="space-y-0.5">{available.map(railItem)}</div>
-                  </>
-                )}
+              {/* ── Left rail: apps grouped by Hub (#251 follow-up) ── */}
+              <aside className="border-b md:border-b-0 md:border-r border-border/60 bg-muted/20 p-2.5 md:min-h-[460px] md:max-h-[70vh] md:overflow-y-auto">
+                {hubGroups.length ? hubGroups.map(({ hub, apps }) => (
+                  <div key={hub?.id ?? 'more'} className="mb-2.5 last:mb-0">
+                    <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {hub ? <hub.icon className="h-3 w-3" /> : null}
+                      {hub?.label ?? 'More'}
+                    </div>
+                    <div className="space-y-0.5">{apps.map(railItem)}</div>
+                  </div>
+                )) : <p className="px-2 py-2 text-xs text-muted-foreground">No apps yet.</p>}
 
                 <div className="my-2.5 h-px bg-border/60" />
                 <button type="button" onClick={() => go('/knowledge-base')} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors">
