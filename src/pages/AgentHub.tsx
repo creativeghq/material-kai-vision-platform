@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { AgentHub as AgentHubComponent } from '@/components/features/ai/AgentHub';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveCapabilityHandoff } from '@/config/capabilities';
 
 const AgentHubPage: React.FC = () => {
   const navigate = useNavigate();
@@ -19,7 +20,12 @@ const AgentHubPage: React.FC = () => {
   const initialPrompt = searchParams.get('prompt') ?? searchParams.get('q') ?? undefined;
   const initialConversationId = searchParams.get('conversation') ?? undefined;
   const initialMoodboardId = searchParams.get('moodboard') ?? undefined;
-  const initialAgent = searchParams.get('agent') ?? undefined;
+  // Capability Fabric (#275) rail: `?capability=<id>` resolves the owning agent + a toolkit
+  // quick-start from the shared registry, so every capability has ONE uniform handoff into the
+  // agent instead of each call site hand-rolling ?agent=/?quickstart=. Explicit params still win.
+  const capabilityParam = searchParams.get('capability') ?? undefined;
+  const capHandoff = capabilityParam ? resolveCapabilityHandoff(capabilityParam) : {};
+  const initialAgent = searchParams.get('agent') ?? capHandoff.agentId ?? undefined;
   // Deep-link from a product's "Test on a room" — pre-pin the material so the
   // interior flow already knows which material to apply.
   const pinnedProductId = searchParams.get('pinned_product_id') ?? undefined;
@@ -49,7 +55,7 @@ const AgentHubPage: React.FC = () => {
         toolkitId: quickstartParam.slice(0, quickstartParam.indexOf(':')),
         label: quickstartParam.slice(quickstartParam.indexOf(':') + 1),
       }
-    : undefined;
+    : capHandoff.quickStart;
   const [userRole, setUserRole] = useState<'viewer' | 'member' | 'admin' | 'owner'>('member');
   const [isLoading, setIsLoading] = useState(true);
 
