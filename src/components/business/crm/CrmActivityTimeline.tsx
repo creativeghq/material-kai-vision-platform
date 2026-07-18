@@ -13,8 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { crmActivitiesService, type TimelineItem, type CrmActivityTarget } from '@/services/crmActivitiesService';
+import { crmMeetingsService } from '@/services/crmMeetingsService';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getErrorMessage } from '@/core/errors/utils';
 
 interface Props {
@@ -64,11 +67,15 @@ const relativeTime = (iso: string): string => {
 
 export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [type, setType] = useState<ComposerKey>('note');
   const [draft, setDraft] = useState('');
   const [meetingAt, setMeetingAt] = useState(''); // datetime-local value, for Meeting entries
+  const [remindEmail, setRemindEmail] = useState(false);
+  const [remindWhatsapp, setRemindWhatsapp] = useState(false);
+  const [reminderLead, setReminderLead] = useState(60); // minutes before meeting_at
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -87,8 +94,9 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
   useEffect(() => { load(); }, [load, refreshKey]);
 
   const current = COMPOSER.find((c) => c.key === type)!;
-  // Meeting can be logged with just a time; note/call need text.
-  const canSubmit = type === 'meeting' ? (!!draft.trim() || !!meetingAt) : !!draft.trim();
+  const isFutureMeeting = !!meetingAt && new Date(meetingAt).getTime() > Date.now();
+  // A meeting needs a date/time; note & call need text.
+  const canSubmit = type === 'meeting' ? !!meetingAt : !!draft.trim();
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -96,11 +104,15 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
     setSaving(true);
     try {
       if (type === 'meeting') {
-        const when = meetingAt ? new Date(meetingAt) : null;
-        const title = when
-          ? `Meeting — ${when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
-          : 'Meeting logged';
-        await crmActivitiesService.addActivity(target, 'meeting_logged', title, body, when ? { meeting_at: when.toISOString() } : {});
+        await crmMeetingsService.create({
+          target,
+          workspaceId: activeWorkspaceId,
+          meetingAt: new Date(meetingAt).toISOString(),
+          notes: body || null,
+          remindEmail: isFutureMeeting && remindEmail,
+          remindWhatsapp: isFutureMeeting && remindWhatsapp,
+          reminderMinutesBefore: reminderLead,
+        });
       } else if (current.activity) {
         await crmActivitiesService.addActivity(target, current.activity.type, current.activity.title, body);
       } else {
@@ -108,6 +120,8 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
       }
       setDraft('');
       setMeetingAt('');
+      setRemindEmail(false);
+      setRemindWhatsapp(false);
       await load(); // instant refresh
     } catch (err) {
       toast({ title: 'Could not save', description: getErrorMessage(err), variant: 'destructive' });
@@ -161,15 +175,40 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
               )}
             </div>
             {type === 'meeting' && (
-              <div className="flex items-center gap-2 px-2.5 pt-2">
-                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <Input
-                  type="datetime-local"
-                  value={meetingAt}
-                  onChange={(e) => setMeetingAt(e.target.value)}
-                  className="h-8 w-auto max-w-[15rem] text-xs"
-                  aria-label="Meeting date & time"
-                />
+              <div className="space-y-2 px-2.5 pt-2">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <Input
+                    type="datetime-local"
+                    value={meetingAt}
+                    onChange={(e) => setMeetingAt(e.target.value)}
+                    className="h-8 w-auto max-w-[15rem] text-xs"
+                    aria-label="Meeting date & time"
+                  />
+                </div>
+                {isFutureMeeting && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-5 text-xs text-muted-foreground">
+                    <span>Remind me</span>
+                    <label className="flex cursor-pointer items-center gap-1.5 text-foreground">
+                      <Checkbox checked={remindEmail} onCheckedChange={(v) => setRemindEmail(v === true)} /> Email
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-1.5 text-foreground">
+                      <Checkbox checked={remindWhatsapp} onCheckedChange={(v) => setRemindWhatsapp(v === true)} /> WhatsApp
+                    </label>
+                    {(remindEmail || remindWhatsapp) && (
+                      <select
+                        value={reminderLead}
+                        onChange={(e) => setReminderLead(Number(e.target.value))}
+                        className="h-7 rounded-md border bg-background px-1.5 text-xs"
+                        aria-label="Reminder lead time"
+                      >
+                        <option value={15}>15 min before</option>
+                        <option value={60}>1 hour before</option>
+                        <option value={1440}>1 day before</option>
+                      </select>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <Textarea

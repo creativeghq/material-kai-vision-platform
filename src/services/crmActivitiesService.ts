@@ -60,7 +60,7 @@ class CrmActivitiesService {
    * This is what the unified Activity view renders.
    */
   async listTimeline(target: CrmActivityTarget, limit = 200): Promise<TimelineItem[]> {
-    const [actRes, noteRes] = await Promise.all([
+    const [actRes, noteRes, meetRes] = await Promise.all([
       supabase
         .from('crm_activities')
         .select('id, activity_type, title, description, actor_user_id, created_at')
@@ -76,9 +76,18 @@ class CrmActivitiesService {
         .eq('target_id', target.id)
         .order('created_at', { ascending: false })
         .limit(limit),
+      supabase
+        .from('crm_meetings')
+        .select('id, subject, notes, meeting_at, owner_user_id, created_at')
+        .eq('target_kind', target.kind)
+        .eq('target_id', target.id)
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false })
+        .limit(limit),
     ]);
     const acts = (actRes.data || []) as Array<{ id: string; activity_type: string; title: string; description: string | null; actor_user_id: string | null; created_at: string }>;
     const notes = (noteRes.data || []) as Array<{ id: string; body: string; created_by: string | null; created_at: string }>;
+    const meets = (meetRes.data || []) as Array<{ id: string; subject: string | null; notes: string | null; meeting_at: string; owner_user_id: string | null; created_at: string }>;
 
     const items: TimelineItem[] = [
       ...acts.map((a) => ({
@@ -88,6 +97,11 @@ class CrmActivitiesService {
       ...notes.map((n) => ({
         id: `n-${n.id}`, source: 'note' as const, activity_type: 'note_added',
         title: 'Note', description: n.body, created_at: n.created_at, actor_id: n.created_by,
+      })),
+      ...meets.map((m) => ({
+        id: `m-${m.id}`, source: 'activity' as const, activity_type: 'meeting_logged',
+        title: `${m.subject || 'Meeting'} — ${new Date(m.meeting_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`,
+        description: m.notes, created_at: m.created_at, actor_id: m.owner_user_id,
       })),
     ];
 

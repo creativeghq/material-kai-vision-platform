@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -14,6 +14,7 @@ import { WorkspaceKeysTab } from '@/components/core/Profile/WorkspaceKeysTab';
 import { ModulesActivationTab } from '@/components/core/Profile/ModulesActivationTab';
 import SupplierPortalPage from './SupplierPortalPage';
 import { AppointmentsPage } from './AppointmentsPage';
+import { ProfileMeetingsTab } from '@/components/core/Profile/ProfileMeetingsTab';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -67,6 +68,10 @@ export const UserProfilePage: React.FC = () => {
             <CalendarCheck className="h-4 w-4" />
             Appointments
           </TabsTrigger>
+          <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Calendar
+          </TabsTrigger>
           <TabsTrigger value="reviews" className="flex items-center gap-2">
             <Star className="h-4 w-4" />
             Reviews
@@ -119,6 +124,10 @@ export const UserProfilePage: React.FC = () => {
 
         <TabsContent value="appointments">
           <AppointmentsPage embedded />
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <ProfileMeetingsTab />
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">
