@@ -59,10 +59,23 @@ interface EmailTemplate {
   description?: string;
   category: string;
   is_active: boolean;
+  is_system?: boolean;
   variables: string[];
   html_template?: string;
   created_at: string;
 }
+
+/**
+ * The platform / user split the operator cares about:
+ *  - "system" (is_system=true)  — automation-only: fired by the Flows engine and
+ *    backend dispatchers (price/mention alerts, digests, auth, role-upgrade). These
+ *    are deliberately hidden from the manual send pickers (e.g. CRM → Send email).
+ *  - "manual" (is_system=false) — user-sendable / marketing templates a person picks
+ *    by hand. These are the ones that appear in the CRM send dropdown.
+ */
+type TemplateKind = 'all' | 'manual' | 'system';
+const kindOf = (t: EmailTemplate): Exclude<TemplateKind, 'all'> =>
+  t.is_system ? 'system' : 'manual';
 
 interface EmailDefaults {
   fromEmail: string;
@@ -76,6 +89,7 @@ export const EmailTemplatesTab: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const [topicFilter, setTopicFilter] = useState<string>('all');
+  const [kindFilter, setKindFilter] = useState<TemplateKind>('all');
   const [emailDefaults, setEmailDefaults] = useState<EmailDefaults>({ fromEmail: '', fromName: '' });
   const { toast } = useToast();
 
@@ -156,10 +170,20 @@ export const EmailTemplatesTab: React.FC = () => {
       .map((g) => ({ id: g.id, label: g.label }));
   }, [templates]);
 
+  const kindCounts = useMemo(() => {
+    let manual = 0;
+    let system = 0;
+    for (const t of templates) (kindOf(t) === 'system' ? system++ : manual++);
+    return { manual, system };
+  }, [templates]);
+
   const filteredTemplates = useMemo(() => {
-    if (topicFilter === 'all') return templates;
-    return templates.filter((t) => topicOf(t.slug) === topicFilter);
-  }, [templates, topicFilter]);
+    return templates.filter((t) => {
+      if (topicFilter !== 'all' && topicOf(t.slug) !== topicFilter) return false;
+      if (kindFilter !== 'all' && kindOf(t) !== kindFilter) return false;
+      return true;
+    });
+  }, [templates, topicFilter, kindFilter]);
 
   // Group filtered templates by topic for the section headers.
   const groupedTemplates = useMemo(() => {
@@ -194,6 +218,16 @@ export const EmailTemplatesTab: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Select value={kindFilter} onValueChange={(v) => setKindFilter(v as TemplateKind)}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="All templates" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All templates ({templates.length})</SelectItem>
+              <SelectItem value="manual">Manual — user-sendable ({kindCounts.manual})</SelectItem>
+              <SelectItem value="system">System — automation ({kindCounts.system})</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={topicFilter} onValueChange={setTopicFilter}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="All topics" />
@@ -240,6 +274,15 @@ export const EmailTemplatesTab: React.FC = () => {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h4 className="text-lg font-semibold">{template.name}</h4>
+                      {template.is_system ? (
+                        <Badge variant="secondary" title="Automation-only — fired by the Flows engine / backend dispatchers. Hidden from manual send pickers.">
+                          System
+                        </Badge>
+                      ) : (
+                        <Badge variant="default" title="User-sendable — appears in manual send pickers (e.g. CRM → Send email).">
+                          Manual
+                        </Badge>
+                      )}
                       {!template.is_active && <Badge variant="secondary">Inactive</Badge>}
                     </div>
                     <p className="text-sm text-muted-foreground">{template.description || 'No description'}</p>

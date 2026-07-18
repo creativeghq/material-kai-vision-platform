@@ -88,11 +88,20 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
     (async () => {
       setLoadingTemplates(true);
       try {
-        const { data, error } = await supabase
+        // Only surface human-sendable templates here. System/automation templates
+        // (is_system=true — price/mention alerts, digests, auth, role-upgrade, …) are
+        // fired by the Flows engine + backend dispatchers, never picked by hand, so
+        // they'd only clutter this picker. Also scope to this workspace's own templates
+        // plus the shared platform ones (workspace_id IS NULL) — never other tenants'.
+        let query = supabase
           .from('email_templates')
           .select('id, name, slug, description, subject_template, html_template, text_template, variables, category')
           .eq('is_active', true)
-          .order('name', { ascending: true });
+          .eq('is_system', false);
+        query = workspaceId
+          ? query.or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+          : query.is('workspace_id', null);
+        const { data, error } = await query.order('name', { ascending: true });
         if (error) throw error;
         if (cancelled) return;
         const rows = (data ?? []) as EmailTemplateRow[];
@@ -108,7 +117,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       }
     })();
     return () => { cancelled = true; };
-  }, [open, toast]);
+  }, [open, toast, workspaceId]);
 
   // Reset when dialog opens
   useEffect(() => {
