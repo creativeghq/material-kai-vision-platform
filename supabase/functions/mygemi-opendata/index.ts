@@ -71,6 +71,31 @@ interface GemiNormalized {
   activities: Array<{ code: string | null; description: string | null; type: string | null }>;
 }
 
+/** One entry in the normalized ΚΑΔ list on crm_companies.kad_all (shared shape with myaade). */
+interface KadEntry { code: string; description: string | null; source: 'aade' | 'gemi'; primary: boolean }
+
+/** Merge ΓΕΜΗ ΚΑΔ into the row's kad_all, preserving ΑΑΔΕ entries. Dedupes codes. */
+function mergeKad(
+  existingAll: unknown,
+  source: 'aade' | 'gemi',
+  items: Array<{ code: string | null; description: string | null; primary: boolean }>,
+): { kad_all: KadEntry[]; kad_codes: string[] } {
+  const kept: KadEntry[] = Array.isArray(existingAll)
+    ? (existingAll as KadEntry[]).filter((x) => x && x.source && x.source !== source)
+    : [];
+  const fresh: KadEntry[] = items
+    .filter((a) => a.code && String(a.code).trim())
+    .map((a) => ({ code: String(a.code).trim(), description: a.description ?? null, source, primary: !!a.primary }));
+  const kad_all = [...kept, ...fresh];
+  const seen = new Set<string>();
+  const kad_codes: string[] = [];
+  for (const e of kad_all) {
+    const k = e.code.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); kad_codes.push(e.code); }
+  }
+  return { kad_all, kad_codes };
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -263,7 +288,7 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
     if (body.company_id) {
       const { data: company } = await admin
         .from('crm_companies')
-        .select('id, created_by')
+        .select('id, created_by, kad_all')
         .eq('id', body.company_id)
         .maybeSingle();
       if (company) {
@@ -279,12 +304,20 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
           canWrite = rn === 'admin' || rn === 'super_admin' || rn === 'owner';
         }
         if (canWrite) {
+          // Merge ΓΕΜΗ activities into the normalized ΚΑΔ list (keeps any ΑΑΔΕ entries).
+          const { kad_all, kad_codes } = mergeKad(
+            company.kad_all,
+            'gemi',
+            norm.activities.map((a) => ({ code: a.code, description: a.description, primary: /κ[υύ]ρι/i.test(a.type ?? '') })),
+          );
           await admin.from('crm_companies').update({
             gemi_number: norm.ar_gemi,
             gemi_legal_form: norm.legal_form,
             gemi_status: norm.status,
             gemi_data: best,
             gemi_data_at: checkedAt,
+            kad_all,
+            kad_codes,
             updated_at: checkedAt,
           }).eq('id', body.company_id);
         }

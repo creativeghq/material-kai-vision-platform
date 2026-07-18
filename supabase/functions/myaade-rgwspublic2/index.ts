@@ -199,6 +199,35 @@ ${JSON.stringify(src, null, 2)}`,
   }
 }
 
+/** One entry in the normalized, queryable ΚΑΔ list on crm_companies.kad_all. */
+interface KadEntry { code: string; description: string | null; source: 'aade' | 'gemi'; primary: boolean }
+
+/**
+ * Merge this source's ΚΑΔ into the company's existing `kad_all`, preserving entries from the
+ * OTHER source (ΑΑΔΕ enrich and ΓΕΜΗ enrich run independently and must not clobber each other).
+ * Returns { kad_all, kad_codes } ready to persist. Dedupes codes case-insensitively.
+ */
+export function mergeKad(
+  existingAll: unknown,
+  source: 'aade' | 'gemi',
+  items: Array<{ code: string | null; description: string | null; primary: boolean }>,
+): { kad_all: KadEntry[]; kad_codes: string[] } {
+  const kept: KadEntry[] = Array.isArray(existingAll)
+    ? (existingAll as KadEntry[]).filter((x) => x && x.source && x.source !== source)
+    : [];
+  const fresh: KadEntry[] = items
+    .filter((a) => a.code && String(a.code).trim())
+    .map((a) => ({ code: String(a.code).trim(), description: a.description ?? null, source, primary: !!a.primary }));
+  const kad_all = [...kept, ...fresh];
+  const seen = new Set<string>();
+  const kad_codes: string[] = [];
+  for (const e of kad_all) {
+    const k = e.code.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); kad_codes.push(e.code); }
+  }
+  return { kad_all, kad_codes };
+}
+
 /** Operation-specific SOAP body for rgWsPublic2AfmMethod. */
 function buildRgWsPublic2Body(afmCalledBy: string, afmCalledFor: string): string {
   return `<srv:rgWsPublic2AfmMethod xmlns:srv="http://rgwspublic2/RgWsPublic2">
@@ -480,7 +509,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     if (body.company_id) {
       const { data: company } = await admin
         .from('crm_companies')
-        .select('id, created_by')
+        .select('id, created_by, kad_all')
         .eq('id', body.company_id)
         .maybeSingle();
 
@@ -500,6 +529,12 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
         if (canWrite) {
           const primaryAct = activities.find((a) => a.kind === 1) ?? activities[0] ?? null;
           const secondaryActs = activities.filter((a) => a.kind !== 1);
+          // Normalized queryable ΚΑΔ (merged with any ΓΕΜΗ entries already on the row).
+          const { kad_all, kad_codes } = mergeKad(
+            company.kad_all,
+            'aade',
+            activities.map((a) => ({ code: a.code, description: a.description, primary: a.kind === 1 })),
+          );
 
           let businessStartDate: string | null = null;
           if (basicRec.regist_date) {
@@ -513,6 +548,8 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
             kad_primary: primaryAct?.code ?? null,
             kad_primary_description: primaryAct?.description ?? null,
             kad_secondary: secondaryActs.length > 0 ? secondaryActs : null,
+            kad_all,
+            kad_codes,
             business_start_date: businessStartDate,
             tax_office: basicRec.doy_descr ?? null,
             aade_data: { basic_rec: basicRec, activities },

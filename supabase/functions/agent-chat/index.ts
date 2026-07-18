@@ -870,6 +870,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'search_workspace_docs',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
+      // CRM roster query — "which businesses have ΚΑΔ X?" (all users; workspace-scoped)
+      'search_crm_by_kad',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -1443,6 +1445,7 @@ async function executeAgent(
   const needsFlows = config.tools.includes('manage_flows');
   const needsHr = config.tools.includes('manage_hr');
   const needsStock = config.tools.includes('manage_stock');
+  const needsCrm = config.tools.includes('search_crm_by_kad');
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
@@ -1455,7 +1458,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, quotesMod, socialMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1477,6 +1480,7 @@ async function executeAgent(
     needsFlows        ? import('../_shared/tools/flow-tools.ts') : null,
     needsHr           ? import('../_shared/tools/hr-tools.ts') : null,
     needsStock        ? import('../_shared/tools/stock-tools.ts') : null,
+    needsCrm          ? import('../_shared/tools/crm-tools.ts') : null,
     needsQuotes       ? import('../_shared/tools/quote-tools.ts') : null,
     needsSocial       ? import('../_shared/tools/social-tools.ts') : null,
   ]);
@@ -1635,6 +1639,11 @@ async function executeAgent(
   // paid/gated module, add an is_workspace_entitled check here.
   if (config.tools.includes('search_workspace_docs') && createDocsSearchTool) {
     tools.push(createDocsSearchTool(workspaceId));
+  }
+
+  // CRM roster query — "which businesses have ΚΑΔ X?" (all users; workspace-scoped, free).
+  if (config.tools.includes('search_crm_by_kad') && crmToolsMod?.createCrmKadSearchTool) {
+    tools.push(crmToolsMod.createCrmKadSearchTool(workspaceId, onChunk));
   }
 
   // Material search (text-based 7-vector fusion) — now with search_spec support

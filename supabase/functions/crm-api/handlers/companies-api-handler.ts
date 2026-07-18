@@ -41,6 +41,8 @@ const COMPANY_WRITABLE_COLUMNS = [
   'business_start_date', 'aade_data', 'aade_data_at',
   // ΓΕΜΗ (GEMI) enrichment (mirrors the mygemi-opendata write set)
   'gemi_number', 'gemi_legal_form', 'gemi_status', 'gemi_data', 'gemi_data_at',
+  // Normalized queryable ΚΑΔ (merged ΑΑΔΕ+ΓΕΜΗ)
+  'kad_codes', 'kad_all',
 ] as const;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

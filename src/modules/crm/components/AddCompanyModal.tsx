@@ -58,6 +58,11 @@ function prefillFromAade(res: AadeLookupResult, vatNumber: string): Record<strin
     kad_primary: primaryAct?.code ?? null,
     kad_primary_description: primaryAct?.description ?? null,
     kad_secondary: secondaryActs.length > 0 ? secondaryActs : null,
+    // Normalized queryable ΚΑΔ (ΑΑΔΕ source; ΓΕΜΗ merges in later on the detail page).
+    kad_all: res.activities
+      .filter((a) => a.code)
+      .map((a) => ({ code: String(a.code), description: a.description ?? null, source: 'aade', primary: a.kind === 1 })),
+    kad_codes: [...new Set(res.activities.map((a) => a.code).filter(Boolean) as string[])],
     business_start_date: r.regist_date ? (r.regist_date.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null,
     aade_data: { basic_rec: r, activities: res.activities },
     aade_data_at: res.checked_at,

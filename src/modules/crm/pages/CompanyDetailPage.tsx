@@ -26,6 +26,8 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { validateVatViaVies } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { gemiService } from '@/services/gemiService';
+import { CompanyRegistryDetails, type KadEntry } from '@/modules/crm/components/CompanyRegistryDetails';
+import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
@@ -55,6 +57,24 @@ import {
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
+
+/** Merge one source's ΚΑΔ into an existing kad_all, preserving the other source (mirrors the
+ *  server-side mergeKad in the enrich functions). Used for instant display on the client. */
+function mergeKadClient(
+  existing: any,
+  source: 'aade' | 'gemi',
+  items: Array<{ code: string | null; description: string | null; primary: boolean }>,
+): { kad_all: KadEntry[]; kad_codes: string[] } {
+  const kept: KadEntry[] = Array.isArray(existing) ? existing.filter((x: KadEntry) => x && x.source && x.source !== source) : [];
+  const fresh: KadEntry[] = items
+    .filter((a) => a.code && String(a.code).trim())
+    .map((a) => ({ code: String(a.code).trim(), description: a.description ?? null, source, primary: !!a.primary }));
+  const kad_all = [...kept, ...fresh];
+  const seen = new Set<string>();
+  const kad_codes: string[] = [];
+  for (const e of kad_all) { const k = e.code.toLowerCase(); if (!seen.has(k)) { seen.add(k); kad_codes.push(e.code); } }
+  return { kad_all, kad_codes };
+}
 
 interface Company {
   id: string;
@@ -120,6 +140,9 @@ interface Company {
   gemi_status?: string | null;
   gemi_data?: any;
   gemi_data_at?: string | null;
+  // Normalized queryable ΚΑΔ (merged ΑΑΔΕ + ΓΕΜΗ) — [{code, description, source, primary}]
+  kad_all?: any;
+  kad_codes?: string[] | null;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -359,6 +382,17 @@ export const CompanyDetailPage: React.FC = () => {
             workspaceId: activeWorkspaceId ?? undefined,
           });
           if ('ok' in g && g.ok && g.gemi.ar_gemi) {
+            // Merge ΓΕΜΗ activities into the normalized ΚΑΔ list (preserving the ΑΑΔΕ entries
+            // adopted moments ago). Read from the freshest state via the functional setter.
+            setCompany((prev) => {
+              if (!prev) return prev;
+              const { kad_all, kad_codes } = mergeKadClient(
+                prev.kad_all,
+                'gemi',
+                (g.gemi.activities || []).map((a) => ({ code: a.code, description: a.description, primary: /κ[υύ]ρι/i.test(a.type ?? '') })),
+              );
+              return { ...prev, kad_all, kad_codes };
+            });
             patchInline({
               gemi_number: g.gemi.ar_gemi,
               gemi_legal_form: g.gemi.legal_form,
@@ -369,6 +403,16 @@ export const CompanyDetailPage: React.FC = () => {
             toast({ title: 'ΓΕΜΗ number added', description: `Γ.Ε.ΜΗ.: ${g.gemi.ar_gemi}` });
           }
         } catch { /* GEMI is a best-effort add-on; ignore failures */ }
+
+        // Log a CRM activity so the enrichment shows up in the company timeline (fire-and-forget).
+        if (!isNew && id) {
+          crmActivitiesService.log({ kind: 'company', id }, {
+            activity_type: 'registry_enrichment',
+            title: 'Enriched from ΑΑΔΕ / ΓΕΜΗ',
+            description: `Imported registry details${res.basic_rec.onomasia ? ` for ${res.basic_rec.onomasia}` : ''}.`,
+            workspace_id: activeWorkspaceId ?? null,
+          });
+        }
       }
     } finally {
       setAadeBusy(false);
@@ -384,7 +428,15 @@ export const CompanyDetailPage: React.FC = () => {
     const combinedAddress = r.postal_address
       ? `${r.postal_address} ${r.postal_address_no ?? ''}`.replace(/\s+/g, ' ').trim()
       : null;
+    // Merge ΑΑΔΕ activities into the normalized ΚΑΔ list (preserving any ΓΕΜΗ entries).
+    const { kad_all, kad_codes } = mergeKadClient(
+      company.kad_all,
+      'aade',
+      res.activities.map((a) => ({ code: a.code, description: a.description, primary: a.kind === 1 })),
+    );
     patchInline({
+      kad_all,
+      kad_codes,
       name: r.onomasia ?? company.name,
       street: r.postal_address ?? company.street,
       street_number: r.postal_address_no ?? company.street_number,
@@ -845,7 +897,8 @@ export const CompanyDetailPage: React.FC = () => {
                 )}
 
                 {/* ΑΑΔΕ enrichment readout (Greek businesses) */}
-                {(company.kad_primary || company.legal_status || company.commercial_title) && (
+                {(company.kad_primary || company.legal_status || company.commercial_title
+                  || (Array.isArray(company.kad_all) && company.kad_all.length > 0) || company.gemi_data) && (
                   <div className="rounded-md border border-primary/15 bg-primary/[0.03] p-3 space-y-1 text-xs">
                     {company.commercial_title && (
                       <div><span className="text-muted-foreground">Commercial title: </span><span className="text-foreground">{company.commercial_title}</span></div>
@@ -856,12 +909,16 @@ export const CompanyDetailPage: React.FC = () => {
                     {company.kad_primary && (
                       <div><span className="text-muted-foreground">Primary activity code (KAD): </span><span className="text-foreground">{company.kad_primary}{company.kad_primary_description ? ` — ${company.kad_primary_description}` : ''}</span></div>
                     )}
-                    {Array.isArray(company.kad_secondary) && company.kad_secondary.length> 0 && (
-                      <div><span className="text-muted-foreground">Secondary activity codes: </span><span className="text-foreground">{company.kad_secondary.length} more</span></div>
-                    )}
                     {company.business_start_date && (
                       <div><span className="text-muted-foreground">Operating since: </span><span className="text-foreground">{company.business_start_date}</span></div>
                     )}
+                    {/* Full ΚΑΔ list (modal) + ΓΕΜΗ people → add-to-CRM — kept out of the form to reduce noise */}
+                    <CompanyRegistryDetails
+                      companyId={isNew ? undefined : id}
+                      kadAll={company.kad_all as KadEntry[] | null | undefined}
+                      gemiData={company.gemi_data}
+                      onContactAdded={() => loadCompany()}
+                    />
                   </div>
                 )}
               </CardContent>
