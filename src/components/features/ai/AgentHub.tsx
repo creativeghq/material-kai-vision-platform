@@ -597,6 +597,9 @@ interface AgentHubProps {
    *  (e.g. {toolkitId:'generation', label:'Test on a room'}). Runs the same
    *  handleQuickStart dispatcher the in-app UI uses, so ANY flow is reachable. */
   initialQuickStart?: { toolkitId: string; label: string };
+  /** Deep-link: open with this toolkit enabled + its quick-starts shown (onboarding), so a
+   *  capability arrival lands on "here's what you can do" instead of a blank chat. */
+  initialToolkitId?: string;
   onConversationChange?: (conversationId: string | null) => void;
 }
 
@@ -659,6 +662,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   initialImages,
   initialGenerationMode,
   initialQuickStart,
+  initialToolkitId,
   onConversationChange,
 }) => {
   const { toast } = useToast();
@@ -3261,6 +3265,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (tk && qs) handleQuickStart(qs, tk);
     else console.warn('[AgentHub] Unknown quickstart deep-link:', initialQuickStart);
   }, [userId, initialQuickStart, initialImages, attachedImages, handleQuickStart]);
+
+  // Deep-link: arrived via `?capability=` with no specific action → enable that capability's
+  // toolkit + surface its quick-starts (onboarding card) so the user sees what they can do
+  // instead of a blank chat (#275 onboarding). Skipped when a quick-start is firing.
+  const toolkitOnboardLaunched = useRef(false);
+  useEffect(() => {
+    if (toolkitOnboardLaunched.current || !userId || !initialToolkitId || initialQuickStart) return;
+    const tk = TOOLKITS.find((t) => t.id === initialToolkitId);
+    if (!tk) return;
+    toolkitOnboardLaunched.current = true;
+    ensureAgentAndToolkit(tk);       // switch to the owning agent + enable the toolkit
+    setJustEnabledToolkitId(tk.id);  // drives the ToolkitOnboardingCard (its quick-starts)
+  }, [userId, initialToolkitId, initialQuickStart, ensureAgentAndToolkit]);
 
   // Shared image-attach path: read a set of image File objects to data URLs and
   // append them to the composer. Used by the file picker AND clipboard paste.

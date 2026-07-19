@@ -56,6 +56,9 @@ const AgentHubPage: React.FC = () => {
         label: quickstartParam.slice(quickstartParam.indexOf(':') + 1),
       }
     : capHandoff.quickStart;
+  // When arriving via `?capability=` with NO specific action, hand the capability's toolkit to the
+  // Hub so it auto-enables it and shows its quick-starts (onboarding) — never a blank chat (#275 UX).
+  const initialToolkitId = initialQuickStart ? undefined : capHandoff.toolkitId;
   const [userRole, setUserRole] = useState<'viewer' | 'member' | 'admin' | 'owner'>('member');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -123,6 +126,7 @@ const AgentHubPage: React.FC = () => {
         initialImages={initialImages.length ? initialImages : undefined}
         initialGenerationMode={initialGenerationMode}
         initialQuickStart={initialQuickStart}
+        initialToolkitId={initialToolkitId}
         onConversationChange={handleConversationChange}
       />
     </div>

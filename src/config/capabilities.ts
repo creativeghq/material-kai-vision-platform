@@ -119,12 +119,19 @@ export function buildPageUrl(id: string, recordId?: string): string | null {
  *  so buildPageUrl('invoice', id) returns the `/finance` list rather than a wrong path. */
 const DETAIL_ROUTE_CAPABILITIES = new Set(['quote', 'project']);
 
-/** Resolve the agent + quick-start a `?capability=<id>` deep-link should open on the Agent Hub. */
-export function resolveCapabilityHandoff(id: string): { agentId?: string; quickStart?: { toolkitId: string; label: string } } {
+/** Resolve the agent + toolkit + quick-start a `?capability=<id>` deep-link should open on the
+ *  Agent Hub. `toolkitId` lets the Hub auto-open that toolkit's onboarding (quick-starts) so the
+ *  user lands on "here's what you can do" instead of a blank chat (#275 onboarding). */
+export function resolveCapabilityHandoff(id: string): {
+  agentId?: string;
+  toolkitId?: string;
+  quickStart?: { toolkitId: string; label: string };
+} {
   const cap = getCapability(id);
   if (!cap) return {};
   return {
     agentId: cap.agentId,
+    toolkitId: cap.toolkitId,
     quickStart: cap.toolkitId && cap.quickStartLabel ? { toolkitId: cap.toolkitId, label: cap.quickStartLabel } : undefined,
   };
 }

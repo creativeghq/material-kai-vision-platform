@@ -13,6 +13,8 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useLauncherApps, groupAppsByHub, type LauncherApp } from '@/hooks/useLauncherApps';
 import { LAUNCHER_SECTIONS, LAUNCHER_SHORTCUTS, LAUNCHER_ACTIONS, type LauncherSection } from '@/config/launcher-sections';
+import { getCapability } from '@/config/capabilities';
+import { TOOLKITS } from '@/components/features/ai/agentToolsCatalog';
 
 const RECENT_KEY = 'launcher.recent.v1';
 
@@ -96,6 +98,18 @@ export const AppLauncher: React.FC = () => {
   const sections = selected ? (LAUNCHER_SECTIONS[selected.id] ?? []) : [];
   // Context-aware quick-create triggers for the selected active module (empty for add-ons).
   const actions = selected && selected.active ? (LAUNCHER_ACTIONS[selected.id] ?? []) : [];
+
+  // Agent-driven apps (Interior / Social / SEO) carry `?capability=<id>` in their path. Surface
+  // that capability's toolkit quick-starts as FAST actions right in the launcher — one click runs
+  // the action (agent + toolkit primed) instead of dumping the user in a blank chat (#275 UX).
+  const selectedCapabilityId = selected
+    ? new URLSearchParams(selected.path.split('?')[1] || '').get('capability')
+    : null;
+  const selectedCapability = selectedCapabilityId ? getCapability(selectedCapabilityId) : undefined;
+  const capabilityToolkitId = selectedCapability?.toolkitId;
+  const capabilityQuickStarts = capabilityToolkitId
+    ? (TOOLKITS.find((t) => t.id === capabilityToolkitId)?.quick_starts ?? [])
+    : [];
 
   const shortcutRow = (s: LauncherSection) => (
     <button
@@ -204,6 +218,39 @@ export const AppLauncher: React.FC = () => {
                             </button>
                           ))}
                         </div>
+                      </>
+                    ) : capabilityQuickStarts.length > 0 ? (
+                      <>
+                        <div className="mt-4 mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Quick actions
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {capabilityQuickStarts.map((qs) => (
+                            <button
+                              key={qs.label}
+                              type="button"
+                              onClick={() => go(
+                                `/agent-hub?capability=${selectedCapabilityId}&quickstart=${capabilityToolkitId}:${encodeURIComponent(qs.label)}`,
+                                selected.id,
+                              )}
+                              className="group text-left rounded-xl border border-border bg-card p-3 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 transition-all"
+                              title={qs.description}
+                            >
+                              <div className="text-[13px] font-medium truncate">{qs.label}</div>
+                              {qs.description && <div className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">{qs.description}</div>}
+                              <div className="mt-1.5 flex items-center gap-1 text-[11px] text-primary">
+                                <ArrowRight className="h-3 w-3" /> Run in agent
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => go(selected.path, selected.id)}
+                          className="mt-2.5 w-full text-center rounded-xl border border-dashed border-border bg-card/60 px-4 py-2.5 text-xs text-muted-foreground hover:bg-accent/40 transition-colors"
+                        >
+                          Or open {selected.label} in the agent canvas →
+                        </button>
                       </>
                     ) : (
                       <button
