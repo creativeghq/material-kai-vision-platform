@@ -90,6 +90,7 @@ import { InspirationUrlModal } from './InspirationUrlModal';
 // StarterPromptsModal removed — DB-curated starters now live inside
 // PromptBuilderModal as the "Prompt Library" tab.
 import { ToolkitPickerModal } from './ToolkitPickerModal';
+import { ActionConfirmationCard } from './ActionConfirmationCard';
 import {
   TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, buildToolInput,
   type ToolkitDefinition, type ToolkitQuickStart,
@@ -274,6 +275,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Finance (read)
   finance_invoices_list: 'Invoices',
   customer_balance_result: 'Customer balance',
+  finance_invoice_issued: 'Invoice issued',
   // Knowledge-graph tools
   customer_overview_result: 'Customer overview',
   supplier_overview_result: 'Supplier overview',
@@ -457,6 +459,17 @@ interface Message {
     initial_data: Record<string, any>;
     title?: string;
   }; // Interactive presentation sheet awaiting canvas input
+  // Human-in-the-loop approval for a sensitive agent action (#275). The tool previewed instead
+  // of mutating; Approve re-invokes it with confirm:true via the direct_tool path.
+  actionConfirmationData?: {
+    tool: string;
+    input: Record<string, unknown>;
+    title: string;
+    summary: string;
+    danger?: boolean;
+    toolkitId?: string;
+    status?: 'pending' | 'approved' | 'declined';
+  };
   sheetPdfData?: {
     sheet_id: string;
     sheet_type: SheetType;
@@ -848,6 +861,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     return null;
   }, [attachedImages, messages]);
+
+  // Human-in-the-loop confirmation (#275): Approve re-invokes the sensitive tool with confirm:true
+  // through the deterministic direct_tool path; Decline just marks the card and runs nothing.
+  const handleActionApprove = useCallback((messageId: string, data: NonNullable<Message['actionConfirmationData']>) => {
+    setMessages(prev => prev.map(m =>
+      m.id === messageId && m.actionConfirmationData
+        ? { ...m, actionConfirmationData: { ...m.actionConfirmationData, status: 'approved' } }
+        : m));
+    pendingDirectRunRef.current = {
+      toolName: data.tool,
+      toolInput: { ...data.input, confirm: true },
+      label: data.title,
+      toolkitId: data.toolkitId || '',
+    };
+    setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+  }, []);
+
+  const handleActionDecline = useCallback((messageId: string) => {
+    setMessages(prev => prev.map(m =>
+      m.id === messageId && m.actionConfirmationData
+        ? { ...m, actionConfirmationData: { ...m.actionConfirmationData, status: 'declined' } }
+        : m));
+  }, []);
 
   /**
    * Single dispatcher for a toolkit quick-start. This is THE launch path now
@@ -2504,6 +2540,35 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   service: 'AgentHub',
                   metadata: { sheet_id: chunk.sheet_id, sheet_type: chunk.sheet_type, credits_used: chunk.credits_used },
                 });
+              } else if (chunk.type === 'action_confirmation') {
+                // Human-in-the-loop gate (#275): a sensitive tool previewed instead of mutating.
+                // Render an inline Approve/Decline card; Approve re-invokes the tool with confirm:true.
+                const confirmMsg: Message = {
+                  id: `msg-confirm-${Date.now()}`,
+                  role: 'assistant',
+                  content: chunk.title || 'This action needs your approval.',
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  actionConfirmationData: {
+                    tool: chunk.tool,
+                    input: chunk.input || {},
+                    title: chunk.title || 'Confirm action',
+                    summary: chunk.summary || '',
+                    danger: !!chunk.danger,
+                    toolkitId: chunk.toolkit_id,
+                    status: 'pending',
+                  },
+                };
+                setMessages(prev => [...prev, confirmMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: confirmMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, actionConfirmationData: confirmMsg.actionConfirmationData },
+                  }).catch(() => {});
+                }
               } else if (chunk.type === 'sheet_canvas_open') {
                 const canvasMsg: Message = {
                   id: `msg-sheet-canvas-${Date.now()}`,
@@ -3497,6 +3562,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // Agent-streamed sheet/catalog cards are saved to metadata but were omitted
           // from this restore map, so they vanished on conversation reload (audit #217 H13).
           sheetCanvasData: msg.metadata?.sheetCanvasData as any | undefined,
+          actionConfirmationData: msg.metadata?.actionConfirmationData as any | undefined,
           sheetPdfData: msg.metadata?.sheetPdfData as any | undefined,
           quoteData: msg.metadata?.quoteData as any | undefined,
           catalogData: msg.metadata?.catalogData as any | undefined,
@@ -4668,7 +4734,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'bg-primary text-white shadow-sm'
@@ -4752,6 +4818,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
+                    ) : message.actionConfirmationData ? (
+                      <ActionConfirmationCard
+                        title={message.actionConfirmationData.title}
+                        summary={message.actionConfirmationData.summary}
+                        danger={message.actionConfirmationData.danger}
+                        status={message.actionConfirmationData.status}
+                        onApprove={() => handleActionApprove(message.id, message.actionConfirmationData!)}
+                        onDecline={() => handleActionDecline(message.id)}
+                      />
                     ) : message.agentResultData ? (
                       <div className="space-y-3">
                         {canvasShown ? (

@@ -72,10 +72,44 @@ export const createManageFinanceTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, customer_company_id, customer_name, unpaid_only, limit = 20 }) => {
+    async ({ action, customer_company_id, customer_name, unpaid_only, limit = 20, invoice_id, confirm }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const sb = userClient(jwt);
+
+      if (action === 'issue_invoice') {
+        if (!invoice_id) return JSON.stringify({ success: false, error: 'issue_invoice needs an invoice_id (a draft invoice).' });
+        // Load + validate the draft in-workspace (RLS via the user client).
+        const { data: inv } = await sb
+          .from('invoices')
+          .select('id, invoice_number, status, total, currency')
+          .eq('id', invoice_id).eq('workspace_id', workspaceId).maybeSingle();
+        if (!inv) return JSON.stringify({ success: false, error: 'invoice not found in this workspace' });
+        if (inv.status !== 'draft') return JSON.stringify({ success: false, error: `only draft invoices can be issued (this one is "${inv.status}")` });
+
+        // HUMAN-IN-THE-LOOP GATE (#275 / invariant #9): preview instead of mutating until confirmed.
+        if (confirm !== true) {
+          onChunk?.({
+            type: 'action_confirmation',
+            tool: 'manage_finance',
+            input: { action: 'issue_invoice', invoice_id },
+            title: 'Issue this invoice?',
+            summary: `Issue invoice ${inv.invoice_number || '(draft)'} for ${inv.total ?? '—'} ${inv.currency || ''} and transmit it to ΑΑΔΕ / myDATA. This is a legal fiscal action and cannot be undone.`,
+            danger: true,
+            toolkit_id: 'finance',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user\'s approval to issue this invoice. Do not retry — the user will approve or decline.' });
+        }
+
+        // Confirmed → issue + fiscal-transmit via the trusted server contract (numbering/tax server-side).
+        const { data, error } = await sb.functions.invoke('finance-issue-invoice', {
+          body: { invoice_id, submit_fiscal: true },
+        });
+        if (error) return JSON.stringify({ success: false, error: (error as any)?.message || 'issue failed' });
+        onChunk?.({ type: 'finance_invoice_issued', invoice_id, result: data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, issued: true, invoice_id, result: data });
+      }
 
       if (action === 'list_invoices') {
         let company: { id: string; name: string } | null = null;
@@ -111,13 +145,18 @@ export const createManageFinanceTool = (
     {
       name: 'manage_finance',
       description:
-        'Read finance data: list_invoices (recent invoices, optionally for one customer or unpaid only) and customer_balance ("what does customer X owe?"). READ-ONLY — issuing invoices stays a deliberate action on the Finance page. 0 credits.',
+        'Finance: list_invoices (recent / per-customer / unpaid), customer_balance ("what does X owe?"), ' +
+        'and issue_invoice (issue a DRAFT invoice + transmit to ΑΑΔΕ/myDATA). issue_invoice is a legal ' +
+        'fiscal action — it ALWAYS asks the user to Approve/Decline first (never pass confirm:true yourself; ' +
+        'the UI sets it when the user approves). Reads are 0 credits.',
       schema: z.object({
-        action: z.enum(['list_invoices', 'customer_balance']).default('list_invoices'),
+        action: z.enum(['list_invoices', 'customer_balance', 'issue_invoice']).default('list_invoices'),
         customer_company_id: z.string().optional().describe('CRM company UUID (preferred).'),
         customer_name: z.string().optional().describe('Customer company name to fuzzy-match if you don\'t have the id.'),
         unpaid_only: z.boolean().optional().describe('list_invoices: only invoices still owed (issued/partially paid/overdue).'),
         limit: z.number().int().min(1).max(50).default(20),
+        invoice_id: z.string().optional().describe('issue_invoice: the DRAFT invoice UUID to issue.'),
+        confirm: z.boolean().optional().describe('Do NOT set this — the Approve/Decline card sets confirm:true when the user approves.'),
       }),
     },
   );
