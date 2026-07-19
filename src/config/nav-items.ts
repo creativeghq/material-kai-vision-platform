@@ -21,6 +21,11 @@ import {
   TrendingUp,
   Radar,
   PenTool,
+  FileSignature,
+  MessageCircle,
+  Star,
+  CalendarClock,
+  BookOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -105,6 +110,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   //    grouped into Hubs (#251 follow-up) via the `hub` field. ──
   // #209 — Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
   { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', hub: 'service', description: 'Shared inbox for customer conversations.' },
+  // WhatsApp + Reviews — agent-driven comms/reputation (Hermes), same launcher pattern; the send /
+  // public reply are confirm-gated inside the tools. All-users via agent.use + their module.
+  { id: 'messaging', label: 'WhatsApp', path: '/agent-hub?capability=messaging', icon: MessageCircle, requireCapability: 'agent.use', moduleSlug: 'messaging', surface: 'app', hub: 'service', description: 'Message customers on WhatsApp — in the AI studio.' },
+  { id: 'reviews', label: 'Reviews', path: '/agent-hub?capability=reviews', icon: Star, requireCapability: 'agent.use', moduleSlug: 'reviews', surface: 'app', hub: 'service', description: 'Read reviews about you and reply — in the AI studio.' },
   { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app', hub: 'studio', description: 'Plan and manage design projects.' },
   // MoodBoards moved off the lean top bar into Studio Hub (#251 follow-up) — it's creative
   // delivery work, grouped alongside Projects and client presentations.
@@ -112,6 +121,8 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Interior Design is agent-first (the Vision agent + generation toolkit on the canvas), so the
   // Studio Hub entry deep-links into the Agent Hub with Vision pre-selected rather than a static page.
   { id: 'interior', label: 'Interior Design', path: '/agent-hub?capability=interior', icon: Sofa, surface: 'app', hub: 'studio', description: 'Design, render & stage rooms with the AI studio.' },
+  // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
+  { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', hub: 'sales', description: 'Build and send client quotes.' },
   // #201 — Sales portal for invited reps (persona 'sales').
   { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', hub: 'sales', description: 'Sales-rep portal for quotes.' },
@@ -122,10 +133,14 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // the tile opens the studio primed on the price-monitoring toolkit (track a product, pull prices).
   // All-users via agent.use + module gate; the full admin dashboard stays at /admin/monitoring.
   { id: 'price-monitoring', label: 'Price Monitoring', path: '/agent-hub?capability=price-monitoring', icon: BarChart3, requireCapability: 'agent.use', moduleSlug: 'price-monitoring', surface: 'app', hub: 'sales', description: 'Track competitor prices on your products — in the AI studio.' },
+  // Appointments — agent-driven scheduling over CRM Meetings (self-reminders); page is the Calendar tab.
+  { id: 'appointments', label: 'Appointments', path: '/agent-hub?capability=appointments', icon: CalendarClock, requireCapability: 'agent.use', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'List & schedule appointments with reminders — in the AI studio.' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Invoices, payments, and reports.' },
   // Warehouse: inventory extracted from the Finance tab into its own paid add-on (module slug stays
   // 'stock' internally). Appears only when the workspace is entitled AND the persona holds warehouse.manage.
   { id: 'stock', label: 'Warehouse', path: '/warehouse', icon: Package, requireCapability: 'warehouse.manage', moduleSlug: 'stock', surface: 'app', hub: 'finance', description: 'Inventory, dispatch, movements & stocktake.' },
+  // Contracts & e-signature — agent-driven (Trinity); the send-for-signature is confirm-gated.
+  { id: 'contracts', label: 'Contracts', path: '/agent-hub?capability=contract', icon: FileSignature, requireCapability: 'agent.use', moduleSlug: 'contracts', surface: 'app', hub: 'finance', description: 'List contracts and send drafts for e-signature — in the AI studio.' },
   // #252 — HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
   // hr.view (owner/admin, not plain members — employee salary/absence data is sensitive).
   { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app', hub: 'people', description: 'Employees, absences, and HR documents.' },
