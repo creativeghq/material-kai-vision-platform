@@ -467,6 +467,42 @@ const _financeServiceCore = {
     return { pdf_url: data?.pdf_url ?? null, pdf_storage_path: data?.pdf_storage_path ?? null, receipt_number: data?.receipt_number ?? null };
   },
 
+  /**
+   * (Re)send the payment receipt (απόδειξη είσπραξης) to the customer by email. Goes through the
+   * seeded `payment_received` Flow (never a hardcoded email-api call), same path as the automatic
+   * send on money-in. Returns whether a customer email was on file (the flow no-ops the email step
+   * when there isn't one). Inbound payments only.
+   */
+  async emailPaymentReceipt(paymentId: string): Promise<{ emailed: boolean; email: string | null }> {
+    const { data: p, error } = await supabase.from('payments')
+      .select('id, workspace_id, amount, currency, direction, counterparty_company_id, counterparty_contact_id')
+      .eq('id', paymentId).single();
+    if (error) throw error;
+    if ((p as any).direction !== 'in') throw new Error('Only inbound payments have a customer receipt.');
+    const party = await resolvePartyContactInfo((p as any).counterparty_company_id, (p as any).counterparty_contact_id);
+    const currency = (p as any).currency ?? 'EUR';
+    const amount = `${Number((p as any).amount).toFixed(2)} ${currency}`;
+    let receiptUrl: string | null = null;
+    try { receiptUrl = (await financeService.generatePaymentReceiptPdf(paymentId)).pdf_url; } catch { /* receipt optional */ }
+    const receiptLine = receiptUrl ? `<p><a href="${receiptUrl}">Download your receipt</a></p>` : '';
+    flowEventService.emit('payment_received', {
+      type: 'payment_received',
+      user_id: party.userId ?? undefined,
+      customer_email: party.email ?? undefined,
+      customer_name: party.name ?? undefined,
+      payment_id: paymentId,
+      amount,
+      currency,
+      workspace_id: (p as any).workspace_id,
+      receipt_url: receiptUrl ?? undefined,
+      receipt_line: receiptLine,
+      title: `Payment receipt — ${amount}`,
+      body: `Your payment of ${amount} has been recorded. ${receiptUrl ? 'Your receipt is attached below.' : ''}`.trim(),
+      action_url: '/finance?tab=parties',
+    });
+    return { emailed: !!party.email, email: party.email ?? null };
+  },
+
   /** #204 "Use as template" — clone an invoice into a fresh DRAFT (no fiscal/MARK). */
   async duplicateInvoice(invoiceId: string): Promise<string> {
     const src = await this.getInvoice(invoiceId);
