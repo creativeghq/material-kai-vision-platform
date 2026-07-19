@@ -983,6 +983,20 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     } finally { setSaving(false); }
   };
 
+  // Open the payment receipt (απόδειξη είσπραξης) for a recorded money-in — a proof-of-payment
+  // acknowledgment, NOT a fiscal document and NOT transmitted to myDATA/AADE. Generated on demand
+  // (cached server-side after the first time).
+  const openPaymentReceipt = async (paymentId: string) => {
+    setSaving(true);
+    try {
+      const { pdf_url } = await financeService.generatePaymentReceiptPdf(paymentId);
+      if (pdf_url) window.open(pdf_url, '_blank', 'noopener');
+      else toast({ title: 'Receipt not available yet', variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'Failed to open receipt', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   // #3 — edit the order's line items (only while it has no invoice yet).
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled' && (fin?.invoices.length ?? 0) === 0;
   const startEdit = () => {
@@ -1596,6 +1610,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
+                      {/* Payment receipt (proof of money received) — not a tax doc, never sent to myDATA. */}
+                      {p.direction === 'in' && (
+                        <button type="button" title="Payment receipt (απόδειξη είσπραξης) — proof of payment, not sent to myDATA" className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={saving} onClick={() => void openPaymentReceipt(p.id)}><Receipt className="h-3.5 w-3.5" /></button>
+                      )}
                       <button type="button" title="Edit payment" className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={saving} onClick={() => void editPay(p)}><Pencil className="h-3.5 w-3.5" /></button>
                       <button type="button" title="Delete payment" className="text-muted-foreground hover:text-destructive disabled:opacity-40" disabled={saving} onClick={() => void deletePay(p)}><Trash2 className="h-3.5 w-3.5" /></button>
                     </span>
