@@ -2234,13 +2234,42 @@ export function renderPromptTemplate(
  * reply. Returns at least one agent ID; defaults to ['kai'] when no agent is
  * found (defensive — most toolkits live on KAI).
  */
+/**
+ * Toolkit → owning AGENT ids (backend AGENT_CONFIGS agent ids, incl. the Agent-Fabric specialists
+ * Hermes/Edith/Trinity/Pepper/Vision). This is the source of truth the toolkit PICKER uses to scope
+ * clusters to the selected agent — the frontend `AGENTS` catalog only lists kai/interior-designer/
+ * demo, so a computed heuristic could never attribute e.g. the Social toolkit to Hermes. Mirrors
+ * the specialist tool lists in supabase/functions/agent-chat/index.ts (AGENT_CONFIGS). `kai` owns
+ * everything (generalist), so it's implicit — omit it here and add it in getToolkitOwnerAgents.
+ */
+export const TOOLKIT_AGENTS: Record<string, string[]> = {
+  // Marketing → Edith
+  'seo-research': ['marketing'], 'seo-domain': ['marketing'], 'seo-backlinks': ['marketing'],
+  'seo-content': ['marketing'], 'seo-multi-engine': ['marketing'], 'seo-composite': ['marketing'],
+  'seo-article': ['marketing'], mentions: ['marketing'], 'email-marketing': ['marketing'],
+  // Social → Hermes
+  social: ['social-media'],
+  // Finance / quotes → Trinity
+  quotes: ['erp'], finance: ['erp'], 'knowledge-graph': ['erp', 'product-business'],
+  // Product & business → Pepper
+  catalogs: ['product-business'], b2b: ['product-business'], 'tech-radar': ['product-business'],
+  'job-research': ['product-business'], 'price-monitoring': ['product-business'], crm: ['product-business'],
+  // Studio / interior → Vision
+  generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'],
+  projects: ['interior-designer', 'erp'],
+  // Admin/analysis helpers
+  'sub-agents': ['marketing', 'product-business'], 'admin-misc': ['marketing', 'product-business'],
+};
+
 export function getToolkitOwnerAgents(toolkit: ToolkitDefinition): string[] {
+  // kai (the generalist) owns every toolkit; specialists own the clusters in TOOLKIT_AGENTS.
+  if (TOOLKIT_AGENTS[toolkit.id]) return ['kai', ...TOOLKIT_AGENTS[toolkit.id]];
+  // Fallback for unmapped clusters: compute from the (partial) frontend catalog.
   const owners = new Set<string>();
   for (const a of AGENTS) {
     const agentToolIds = new Set(a.tools.map((t) => t.id));
-    if (toolkit.tool_ids.some((tid) => agentToolIds.has(tid))) {
-      owners.add(a.id);
-    }
+    if (toolkit.tool_ids.some((tid) => agentToolIds.has(tid))) owners.add(a.id);
   }
-  return owners.size > 0 ? [...owners] : ['kai'];
+  owners.add('kai');
+  return [...owners];
 }

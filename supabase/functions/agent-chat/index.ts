@@ -1006,6 +1006,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
       'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
+      // Price monitoring + CRM-from-VAT (Pepper is the product/business agent)
+      'track_product_prices', 'get_price_summary', 'create_company_from_vat',
     ],
   },
   marketing: {
@@ -1027,6 +1029,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer',
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
       'research_analysis', 'analytics_analysis',
+      // Email marketing — compose drafts + confirm-gated send (Edith is the marketing agent)
+      'manage_email_campaign',
     ],
   },
   erp: {
@@ -1040,6 +1044,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'customer_overview', 'supplier_overview', 'product_price_history',
       'products_in_project', 'projects_using_product', 'price_lookup',
       'create_project', 'list_my_projects', 'find_project',
+      // Finance reads + confirm-gated invoice issue (Trinity is the finance agent)
+      'manage_finance',
     ],
   },
   'social-media': {

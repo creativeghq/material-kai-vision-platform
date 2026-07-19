@@ -138,7 +138,7 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
             <div className="flex h-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
               <LayoutPanelLeft className="mb-3 h-10 w-10 opacity-40" />
               <p className="max-w-sm text-sm">
-                Your workspace. Generate a room, search materials, stage a photo, or build a sheet —
+                Your canvas. When the agent produces something — results, a document, a design —
                 it opens here full-size, with its details and actions alongside.
               </p>
             </div>
