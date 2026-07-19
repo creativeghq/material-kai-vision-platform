@@ -221,6 +221,9 @@ export const createCreateQuoteTool = (
         //    so we never leave a half-built empty quote lying around.
         const rollback = async () => { await sb.from('quotes').delete().eq('id', quoteId); };
         const payloads: Record<string, unknown>[] = [];
+        // Compact per-line summary for the canvas card's line-items accordion
+        // (the branded PDF already shows full detail; this surfaces it as data too).
+        const lineSummaries: Array<{ label: string; line_total: number; pricing_status?: string; room?: string | null }> = [];
         let subtotal = 0;
         for (const it of items) {
           const resolved = await resolveLine(sb, workspaceId, quoteId, it, customerCompanyId, customerContactId);
@@ -229,6 +232,12 @@ export const createCreateQuoteTool = (
             return JSON.stringify({ success: false, error: resolved.error });
           }
           payloads.push(resolved.payload);
+          lineSummaries.push({
+            label: resolved.label,
+            line_total: resolved.line_total ?? 0,
+            pricing_status: (resolved.payload as any).pricing_status,
+            room: ((resolved.payload as any).room ?? null) as string | null,
+          });
           subtotal += resolved.line_total ?? 0; // call-for-price lines contribute 0 to the total
         }
         const { error: itemsErr } = await sb.from('quote_items').insert(payloads);
@@ -280,9 +289,12 @@ export const createCreateQuoteTool = (
               name: input.name || 'New Quote',
               currency: 'EUR',
               subtotal: round2(subtotal),
+              cash_discount_pct: cashPct,
+              vat_rate: vatRate,
               vat_amount: round2(vatAmount),
               grand_total: round2(grandTotal),
               item_count: payloads.length,
+              items: lineSummaries,
               pdf_url: null,
               pdf_error: pdfErr?.message || pdfRes?.error || 'PDF generation failed',
             });
@@ -305,10 +317,12 @@ export const createCreateQuoteTool = (
           name: input.name || 'New Quote',
           currency: 'EUR',
           subtotal: round2(subtotal),
+          cash_discount_pct: cashPct,
           vat_rate: vatRate,
           vat_amount: round2(vatAmount),
           grand_total: round2(grandTotal),
           item_count: payloads.length,
+          items: lineSummaries,
           pdf_url: pdfUrl,
         });
 

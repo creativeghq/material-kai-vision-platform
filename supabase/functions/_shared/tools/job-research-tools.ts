@@ -535,7 +535,7 @@ export const createGetJobDigestPreviewTool = (
       for (const tj of (tracked ?? [])) {
         const { data: rows } = await sb
           .from('job_listings')
-          .select('id, url, title, company, location, salary_min, salary_max, salary_currency, employment_type, posted_at, source')
+          .select('id, url, title, company, location, salary_min, salary_max, salary_currency, employment_type, posted_at, source, seniority, description_excerpt, relevance_score, match_note')
           .eq('tracked_job_id', tj.id)
           .eq('relevance', 'match')
           .gte('discovered_at', cutoff)

@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { Globe, ChevronDown, ChevronUp, ExternalLink, Palette, Layers, Paintbrush } from 'lucide-react';
+import { Globe, ChevronDown, ChevronUp, ExternalLink, Palette, Layers, Paintbrush, Package } from 'lucide-react';
+
+interface InspirationProduct {
+  id?: string | null;
+  name?: string;
+  image_url?: string | null;
+  score?: number | null;
+}
 
 interface InspirationCardProps {
   sourceUrl: string;
@@ -12,6 +19,9 @@ interface InspirationCardProps {
   styles: string[];
   roomType?: string | null;
   focus?: string;
+  products?: InspirationProduct[];
+  searchQueryUsed?: string;
+  totalResults?: number;
 }
 
 export function InspirationCard({
@@ -25,6 +35,9 @@ export function InspirationCard({
   styles,
   roomType,
   focus,
+  products,
+  searchQueryUsed,
+  totalResults,
 }: InspirationCardProps) {
   const [expanded, setExpanded] = useState(true);
 
@@ -120,6 +133,36 @@ export function InspirationCard({
           {/* Room type */}
           {roomType && (
             <p className="text-xs text-muted-foreground">Room: <span className="text-foreground">{roomType}</span></p>
+          )}
+
+          {/* Matching catalog materials — the whole point of the analysis */}
+          {products && products.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Package className="h-3 w-3" />
+                <span>Matching materials{typeof totalResults === 'number' && totalResults > products.length ? ` (${products.length} of ${totalResults})` : ` (${products.length})`}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {products.map((p, i) => (
+                  <div key={i} className="rounded-lg">
+                    <div className="aspect-square rounded-md overflow-hidden border border-border bg-muted/40">
+                      {p.image_url
+                        ? <img src={p.image_url} alt={p.name || 'Material'} className="w-full h-full object-cover" loading="lazy" />
+                        : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Package className="h-5 w-5" /></div>}
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between gap-1">
+                      <span className="text-[11px] truncate">{p.name || 'Untitled'}</span>
+                      {typeof p.score === 'number' && (
+                        <span className="text-[10px] text-muted-foreground shrink-0">{Math.round(p.score * 100)}%</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {searchQueryUsed && (
+                <p className="text-[10px] text-muted-foreground">Matched on “{searchQueryUsed}”</p>
+              )}
+            </div>
           )}
 
           {/* Source link */}

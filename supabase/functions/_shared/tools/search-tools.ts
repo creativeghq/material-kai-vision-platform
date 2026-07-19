@@ -567,22 +567,9 @@ ${scrapeResult.markdown.substring(0, 8000)}
           };
         }
 
-        // Step 3: Emit inspiration analysis to frontend
-        onChunk?.({
-          type: 'inspiration_analysis',
-          source_url: url,
-          page_title: scrapeResult.metadata.title || '',
-          hero_image: scrapeResult.images[0] || scrapeResult.metadata.ogImage || null,
-          colors: designTokens.colors || [],
-          color_hex: designTokens.color_hex || [],
-          materials: designTokens.materials || [],
-          textures: designTokens.textures || [],
-          styles: designTokens.styles || [],
-          room_type: designTokens.room_type,
-          focus,
-        });
-
-        // Step 4: Search for matching products using MIVAA API
+        // Step 3: Search the catalog for matching products FIRST, so the single
+        // inspiration_analysis chunk below can carry them (previously the matches
+        // were only returned to the LLM and never shown on the card).
         onChunk?.({ type: 'tool_progress', status: 'Searching catalog for matching materials...', timestamp: Date.now() });
 
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
@@ -592,10 +579,13 @@ ${scrapeResult.markdown.substring(0, 8000)}
         const searchQuery = designTokens.search_query ||
           `${designTokens.materials.join(' ')} ${designTokens.styles.join(' ')} ${designTokens.textures.join(' ')} ${designTokens.colors.join(' ')}`;
 
+        let matchedProducts: any[] = [];
+        let totalResults = 0;
+        let searchErrMsg: string | null = null;
+
         const TIMEOUT_MS = 300000;
         const searchController = new AbortController();
         const searchTimeoutId = setTimeout(() => searchController.abort(), TIMEOUT_MS);
-
         try {
           const searchResponse = await fetch(searchUrl.toString(), {
             method: 'POST',
@@ -611,41 +601,68 @@ ${scrapeResult.markdown.substring(0, 8000)}
 
           if (!searchResponse.ok) {
             console.error(`MIVAA search error: ${searchResponse.status}`);
-            return JSON.stringify({
-              success: false,
-              partial_success: true,
-              design_tokens: designTokens,
-              search_query_used: searchQuery,
-              products: [],
-              error: `Catalog search failed (${searchResponse.status}). Design tokens were extracted — retry with material_search using the search_query below.`,
-            });
+            searchErrMsg = `Catalog search failed (${searchResponse.status}). Design tokens were extracted — retry with material_search using the search_query below.`;
+          } else {
+            const searchData = await searchResponse.json();
+            matchedProducts = searchData.results || searchData.products || [];
+            totalResults = searchData.total_results || matchedProducts.length || 0;
           }
-
-          const searchData = await searchResponse.json();
-
-          return JSON.stringify({
-            success: true,
-            design_tokens: designTokens,
-            search_query_used: searchQuery,
-            products: searchData.results || searchData.products || [],
-            total_results: searchData.total_results || 0,
-            source_url: url,
-            hero_image: scrapeResult.images[0] || null,
-          });
         } catch (searchError) {
           clearTimeout(searchTimeoutId);
           const isAbort = searchError instanceof Error && searchError.name === 'AbortError';
+          searchErrMsg = isAbort
+            ? 'Catalog search timed out after 300s. Design tokens were extracted — retry with material_search using the search_query below.'
+            : `Catalog search error: ${searchError instanceof Error ? searchError.message : String(searchError)}`;
+        }
+
+        // Normalize matched products to a small, card-friendly shape (defensive —
+        // MIVAA result rows vary). Only fields the card renders.
+        const cardProducts = (matchedProducts || []).slice(0, 12).map((p: any) => ({
+          id: p.id ?? p.product_id ?? p.material_id ?? null,
+          name: p.name ?? p.title ?? p.product_name ?? p.material_name ?? 'Untitled',
+          image_url: p.image_url ?? p.thumbnail_url ?? p.thumb_url ?? p.thumbnail ?? p.hero_image ?? null,
+          score: typeof p.score === 'number' ? p.score : (typeof p.similarity === 'number' ? p.similarity : null),
+        }));
+
+        // Step 4: Emit the inspiration analysis to the frontend — now WITH the
+        // matched catalog products so the card can render them.
+        onChunk?.({
+          type: 'inspiration_analysis',
+          source_url: url,
+          page_title: scrapeResult.metadata.title || '',
+          hero_image: scrapeResult.images[0] || scrapeResult.metadata.ogImage || null,
+          colors: designTokens.colors || [],
+          color_hex: designTokens.color_hex || [],
+          materials: designTokens.materials || [],
+          textures: designTokens.textures || [],
+          styles: designTokens.styles || [],
+          room_type: designTokens.room_type,
+          focus,
+          products: cardProducts,
+          search_query_used: searchQuery,
+          total_results: totalResults,
+        });
+
+        if (searchErrMsg) {
           return JSON.stringify({
             success: false,
             partial_success: true,
             design_tokens: designTokens,
             search_query_used: searchQuery,
             products: [],
-            error: isAbort
-              ? 'Catalog search timed out after 300s. Design tokens were extracted — retry with material_search using the search_query below.'
-              : `Catalog search error: ${searchError instanceof Error ? searchError.message : String(searchError)}`,
+            error: searchErrMsg,
           });
         }
+
+        return JSON.stringify({
+          success: true,
+          design_tokens: designTokens,
+          search_query_used: searchQuery,
+          products: matchedProducts,
+          total_results: totalResults,
+          source_url: url,
+          hero_image: scrapeResult.images[0] || null,
+        });
       } catch (error) {
         console.error('Inspiration URL analysis error:', error);
         return JSON.stringify({

@@ -450,6 +450,9 @@ interface Message {
     styles: string[];
     room_type?: string | null;
     focus?: string;
+    products?: Array<{ id?: string | null; name?: string; image_url?: string | null; score?: number | null }>;
+    search_query_used?: string;
+    total_results?: number;
   }; // Design inspiration URL analysis
   heatPumpData?: {
     input: Record<string, unknown>;
@@ -2496,6 +2499,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     styles: chunk.styles || [],
                     room_type: chunk.room_type,
                     focus: chunk.focus,
+                    products: chunk.products || [],
+                    search_query_used: chunk.search_query_used,
+                    total_results: chunk.total_results,
                   },
                 };
                 setMessages(prev => [...prev, inspirationMsg]);
@@ -2665,10 +2671,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   name: chunk.name || 'Quote',
                   currency: chunk.currency || 'EUR',
                   subtotal: chunk.subtotal ?? null,
+                  cash_discount_pct: chunk.cash_discount_pct ?? null,
                   vat_rate: chunk.vat_rate ?? null,
                   vat_amount: chunk.vat_amount ?? null,
                   grand_total: chunk.grand_total ?? null,
                   item_count: chunk.item_count ?? null,
+                  items: chunk.items ?? null,
                   pdf_url: chunk.pdf_url ?? null,
                   pdf_error: chunk.pdf_error ?? null,
                 };
@@ -4478,6 +4486,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           styles={message.inspirationData.styles}
           roomType={message.inspirationData.room_type}
           focus={message.inspirationData.focus}
+          products={message.inspirationData.products}
+          searchQueryUsed={message.inspirationData.search_query_used}
+          totalResults={message.inspirationData.total_results}
         />
       );
     }
@@ -4951,6 +4962,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             styles={message.inspirationData.styles}
                             roomType={message.inspirationData.room_type}
                             focus={message.inspirationData.focus}
+                            products={message.inspirationData.products}
+                            searchQueryUsed={message.inspirationData.search_query_used}
+                            totalResults={message.inspirationData.total_results}
                           />
                         )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />

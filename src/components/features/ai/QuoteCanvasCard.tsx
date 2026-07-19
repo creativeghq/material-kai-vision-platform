@@ -10,10 +10,12 @@ export interface QuoteCanvasData {
   name?: string;
   currency?: string;
   subtotal?: number | null;
+  cash_discount_pct?: number | null;
   vat_rate?: number | null;
   vat_amount?: number | null;
   grand_total?: number | null;
   item_count?: number | null;
+  items?: Array<{ label: string; line_total: number; pricing_status?: string; room?: string | null }> | null;
   pdf_url?: string | null;
   pdf_error?: string | null;
 }
@@ -33,9 +35,13 @@ function money(v: number | null | undefined, currency?: string): string {
  */
 export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
   const {
-    quote_id, quote_number, name, currency, subtotal, vat_rate, vat_amount, grand_total,
-    item_count, pdf_url, pdf_error,
+    quote_id, quote_number, name, currency, subtotal, cash_discount_pct, vat_rate, vat_amount, grand_total,
+    item_count, items, pdf_url, pdf_error,
   } = data;
+
+  const discountAmount = (cash_discount_pct && subtotal != null)
+    ? subtotal * (Number(cash_discount_pct) / 100)
+    : 0;
 
   const handleDownload = () => {
     if (!pdf_url) return;
@@ -87,6 +93,11 @@ export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
               <span>Subtotal</span><span>{money(subtotal, currency)}</span>
             </div>
           )}
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+              <span>Cash discount ({cash_discount_pct}%)</span><span>-{money(discountAmount, currency)}</span>
+            </div>
+          )}
           {vat_amount != null && (
             <div className="flex justify-between text-muted-foreground">
               <span>VAT{vat_rate != null ? ` (${vat_rate}%)` : ''}</span><span>{money(vat_amount, currency)}</span>
@@ -98,6 +109,31 @@ export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Line items — the PDF shows full detail; this surfaces it as data too */}
+      {items && items.length > 0 && (
+        <details className="group rounded-lg border border-border bg-muted/40">
+          <summary className="cursor-pointer list-none px-3 py-2 text-xs flex items-center justify-between gap-2">
+            <span className="font-medium">Line items</span>
+            <span className="text-muted-foreground">{items.length} line{items.length === 1 ? '' : 's'}</span>
+          </summary>
+          <div className="px-3 pb-2.5 pt-0.5 space-y-1.5">
+            {items.map((it, i) => (
+              <div key={i} className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="min-w-0">
+                  <span className="text-foreground">{it.label}</span>
+                  {it.room && <span className="text-muted-foreground"> · {it.room}</span>}
+                </span>
+                <span className="shrink-0 whitespace-nowrap">
+                  {it.pricing_status === 'call_for_price'
+                    ? <span className="text-amber-600 dark:text-amber-400">Call for price</span>
+                    : <span className="text-muted-foreground">{money(it.line_total, currency)}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       <div className="flex items-center gap-2 flex-wrap">
