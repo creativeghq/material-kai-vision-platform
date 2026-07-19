@@ -12,6 +12,8 @@
  * "paid now" case; its assert_workspace_member is a no-op under the service context.
  */
 
+import { computeExpenseSplit } from '../finance/expense-math.ts';
+
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
@@ -19,8 +21,6 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 function svc() { return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY); }
-
-const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /** Find (or create) an expense-side finance category by name. */
 async function resolveCategory(workspaceId: string, name: string): Promise<{ id: string; name: string }> {
@@ -57,15 +57,10 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
     vat_amount?: number; currency?: string; expense_date?: string; paid?: boolean;
   }) => {
     try {
-      if (!(amount > 0)) return JSON.stringify({ success: false, error: 'Amount (total incl. VAT) must be greater than zero.' });
-      if (!category?.trim()) return JSON.stringify({ success: false, error: 'A category is required (e.g. Rent, Utilities).' });
-      if (!payee?.trim()) return JSON.stringify({ success: false, error: 'A supplier / payee name is required.' });
-
-      const total = round2(amount);
-      const vat = round2(Math.max(0, vat_amount ?? 0));
-      const net = round2(total - vat);
-      if (net < 0) return JSON.stringify({ success: false, error: 'VAT cannot exceed the total amount.' });
-      const cur = (currency || 'EUR').toUpperCase();
+      // Validation + net/VAT/total split — pure, shared with tests/unit/expenseMath.test.ts.
+      const split = computeExpenseSplit({ amount, vat_amount, category, payee, currency });
+      if (!split.ok) return JSON.stringify({ success: false, error: split.error });
+      const { total, vat, net, currency: cur } = split;
       const issued = expense_date || new Date().toISOString().slice(0, 10);
 
       const cat = await resolveCategory(workspaceId, category);
