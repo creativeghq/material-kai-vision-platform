@@ -19,6 +19,7 @@ import {
   Sofa,
   Share2,
   TrendingUp,
+  Radar,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -116,10 +117,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Business-workspace surfaces — gated through the #195 capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance. Part of #174.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'Contacts, companies, and leads.' },
-  // Unified monitoring page (#244 B — Price / Mention / Job). The PAGE is admin-only (AdminGuard),
-  // so it carries requireRole:'admin'. For everyone else the same capabilities run through the agent
-  // (Tools hub → Agent tools, and the toolkit picker) — that's the all-users path.
-  { id: 'monitoring', label: 'Monitoring', path: '/admin/monitoring', icon: BarChart3, requireRole: 'admin', surface: 'app', hub: 'sales', description: 'Track competitor prices, brand mentions & jobs.' },
+  // Price Monitoring — agent-driven capability, exposed in the launcher like Interior/Social/SEO:
+  // the tile opens the studio primed on the price-monitoring toolkit (track a product, pull prices).
+  // All-users via agent.use + module gate; the full admin dashboard stays at /admin/monitoring.
+  { id: 'price-monitoring', label: 'Price Monitoring', path: '/agent-hub?capability=price-monitoring', icon: BarChart3, requireCapability: 'agent.use', moduleSlug: 'price-monitoring', surface: 'app', hub: 'sales', description: 'Track competitor prices on your products — in the AI studio.' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Invoices, payments, and reports.' },
   // Warehouse: inventory extracted from the Finance tab into its own paid add-on (module slug stays
   // 'stock' internally). Appears only when the workspace is entitled AND the persona holds warehouse.manage.
@@ -142,6 +143,8 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // "available to add" upsell card).
   { id: 'social', label: 'Social Media', path: '/agent-hub?capability=social-post', icon: Share2, requireCapability: 'agent.use', moduleSlug: 'social-media', surface: 'app', hub: 'marketing', description: 'Publish & schedule social posts with the AI studio.' },
   { id: 'seo', label: 'SEO', path: '/agent-hub?capability=seo-research', icon: TrendingUp, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Keyword research, audits & content — in the AI studio.' },
+  // Mention Monitoring — agent-driven (Edith), same launcher pattern as Social/SEO/Price Monitoring.
+  { id: 'mention-monitoring', label: 'Mention Monitoring', path: '/agent-hub?capability=mention-monitoring', icon: Radar, requireCapability: 'agent.use', moduleSlug: 'mention-monitoring', surface: 'app', hub: 'marketing', description: 'Track brand & product mentions across news, blogs & LLMs.' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',
