@@ -99,7 +99,8 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   crm_company_created: 'crm-company',
   messaging_channels_list: 'messaging', messaging_sent: 'messaging',
   contracts_list: 'contract', contract_sent: 'contract',
-  finance_invoices_list: 'invoice', customer_balance_result: 'invoice', finance_invoice_issued: 'invoice',
+  finance_invoices_list: 'invoice', finance_orders_list: 'invoice', finance_payments_list: 'invoice',
+  customer_balance_result: 'invoice', finance_invoice_issued: 'invoice',
   inbox_threads_list: 'inbox', inbox_reply_sent: 'inbox',
 };
 

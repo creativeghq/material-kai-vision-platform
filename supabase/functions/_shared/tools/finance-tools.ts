@@ -72,7 +72,7 @@ export const createManageFinanceTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, customer_company_id, customer_name, unpaid_only, limit = 20, invoice_id, confirm }) => {
+    async ({ action, customer_company_id, customer_name, unpaid_only, limit = 20, invoice_id, direction, confirm }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const sb = userClient(jwt);
@@ -129,6 +129,35 @@ export const createManageFinanceTool = (
         return JSON.stringify({ success: true, count: (data ?? []).length, invoices: (data ?? []).slice(0, 15) });
       }
 
+      if (action === 'list_orders') {
+        let company: { id: string; name: string } | null = null;
+        if (customer_company_id || customer_name) {
+          company = await resolveCompany(sb, workspaceId, customer_company_id, customer_name);
+          if (!company) return JSON.stringify({ success: false, error: 'customer not found in this workspace' });
+        }
+        let q = sb.from('orders').select('id, order_number, status, total, currency, created_at, customer_company_id')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false })
+          .limit(Math.min(limit, 50));
+        if (company) q = q.eq('customer_company_id', company.id);
+        const { data, error } = await q;
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'finance_orders_list', workspace_id: workspaceId, customer: company, orders: data ?? [], timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: (data ?? []).length, orders: (data ?? []).slice(0, 15) });
+      }
+
+      if (action === 'list_payments') {
+        let q = sb.from('payments').select('id, amount, currency, direction, method, paid_at, created_at')
+          .eq('workspace_id', workspaceId)
+          .order('paid_at', { ascending: false, nullsFirst: false })
+          .limit(Math.min(limit, 50));
+        if (direction) q = q.eq('direction', direction);
+        const { data, error } = await q;
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'finance_payments_list', workspace_id: workspaceId, direction: direction || 'all', payments: data ?? [], timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: (data ?? []).length, payments: (data ?? []).slice(0, 15) });
+      }
+
       if (action === 'customer_balance') {
         const company = await resolveCompany(sb, workspaceId, customer_company_id, customer_name);
         if (!company) return JSON.stringify({ success: false, error: 'Provide a customer_company_id or customer_name that exists in this workspace.' });
@@ -145,15 +174,17 @@ export const createManageFinanceTool = (
     {
       name: 'manage_finance',
       description:
-        'Finance: list_invoices (recent / per-customer / unpaid), customer_balance ("what does X owe?"), ' +
-        'and issue_invoice (issue a DRAFT invoice + transmit to ΑΑΔΕ/myDATA). issue_invoice is a legal ' +
-        'fiscal action — it ALWAYS asks the user to Approve/Decline first (never pass confirm:true yourself; ' +
-        'the UI sets it when the user approves). Reads are 0 credits.',
+        'Finance documents: list_invoices (recent / per-customer / unpaid), list_orders (sales orders), ' +
+        'list_payments (money in/out), customer_balance ("what does X owe?"), and issue_invoice (issue a ' +
+        'DRAFT invoice + transmit to ΑΑΔΕ/myDATA). issue_invoice is a legal fiscal action — it ALWAYS asks ' +
+        'the user to Approve/Decline first (never pass confirm:true yourself; the UI sets it when the user ' +
+        'approves). Reads are 0 credits.',
       schema: z.object({
-        action: z.enum(['list_invoices', 'customer_balance', 'issue_invoice']).default('list_invoices'),
+        action: z.enum(['list_invoices', 'list_orders', 'list_payments', 'customer_balance', 'issue_invoice']).default('list_invoices'),
         customer_company_id: z.string().optional().describe('CRM company UUID (preferred).'),
         customer_name: z.string().optional().describe('Customer company name to fuzzy-match if you don\'t have the id.'),
         unpaid_only: z.boolean().optional().describe('list_invoices: only invoices still owed (issued/partially paid/overdue).'),
+        direction: z.enum(['in', 'out']).optional().describe('list_payments: filter money received (in) vs paid out (out).'),
         limit: z.number().int().min(1).max(50).default(20),
         invoice_id: z.string().optional().describe('issue_invoice: the DRAFT invoice UUID to issue.'),
         confirm: z.boolean().optional().describe('Do NOT set this — the Approve/Decline card sets confirm:true when the user approves.'),

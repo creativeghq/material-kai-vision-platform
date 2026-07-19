@@ -289,6 +289,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   review_reply_posted: 'Reply posted',
   // Finance (read)
   finance_invoices_list: 'Invoices',
+  finance_orders_list: 'Orders',
+  finance_payments_list: 'Payments',
   customer_balance_result: 'Customer balance',
   finance_invoice_issued: 'Invoice issued',
   // Finance expenses
