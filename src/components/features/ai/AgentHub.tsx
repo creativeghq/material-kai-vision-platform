@@ -4407,6 +4407,71 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (message.catalogImageCandidatesData) return <CatalogInspector data={message.catalogImageCandidatesData} material={message.catalogImageCandidatesData.material_name} />;
     return null;
   };
+
+  // Shared quick-start launcher for the toolkit onboarding starters — used from
+  // both the canvas empty state and the (canvas-hidden) chat empty state so the
+  // dispatch behaviour is identical wherever the starters are shown.
+  const launchQuickStartFromOnboarding = (prompt: string, qs: ToolkitQuickStart, tk: ToolkitDefinition) => {
+    setJustEnabledToolkitId(null);
+    ensureAgentAndToolkit(tk);
+    if (qs.form?.length) {
+      setToolkitFormState({ quickStart: qs, toolkit: tk });
+      return;
+    }
+    if (qs.run && fireDirectRun(qs, tk)) return;
+    if (qs.opensModal || qs.opensSheetWizard !== undefined) {
+      handleQuickStart(qs, tk);
+      return;
+    }
+    if (qs.workflow_id) {
+      bootWorkflowLocally(qs.workflow_id);
+    } else {
+      setInput(prompt);
+      setTimeout(() => handleSendMessage(), 0);
+    }
+  };
+
+  // The agent welcome + toolkit starters. This is the canvas-first empty state:
+  // when the canvas is open with no artifact yet, it fills the middle workspace
+  // (instead of a dead "your canvas" placeholder). When the canvas is hidden it
+  // renders inside the chat rail instead. `withHero` shows the big agent intro
+  // (only for a brand-new, message-less chat); mid-conversation we show just the
+  // starter grid so the canvas isn't a void while outputs haven't landed yet.
+  const renderAgentStarters = (withHero: boolean): React.ReactNode => {
+    const justTk = justEnabledToolkitId ? TOOLKITS.find((t) => t.id === justEnabledToolkitId) : null;
+    const showJustEnabled = !!justTk && (justTk.quick_starts?.length || 0) > 0;
+    return (
+      <div className="min-h-full flex flex-col items-center justify-center py-6">
+        {withHero && (
+          <div className="text-center space-y-4 mb-6">
+            <div className="w-16 h-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center">
+              <AgentIcon className={`h-8 w-8 ${currentAgent?.color}`} />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">
+                Welcome to {currentAgent?.name}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {currentAgent?.description}
+              </p>
+            </div>
+          </div>
+        )}
+        <ToolkitOnboardingCard
+          mode={showJustEnabled ? 'just_enabled' : 'empty_state'}
+          toolkits={showJustEnabled
+            ? [justTk!]
+            : activeToolkits
+                .map((id) => TOOLKITS.find((t) => t.id === id))
+                .filter((tk): tk is NonNullable<typeof tk> => !!tk)
+                .filter((tk) => (tk.quick_starts?.length || 0) > 0)}
+          onLaunch={launchQuickStartFromOnboarding}
+          onDismiss={showJustEnabled ? () => setJustEnabledToolkitId(null) : undefined}
+        />
+      </div>
+    );
+  };
+
   const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
   // The canvas is the permanent middle workspace for every agent; the chat is a
   // right rail. `canvasHidden` is an escape hatch to reclaim a full-width chat.
@@ -4437,7 +4502,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           onClose={() => setCanvasHidden(true)}
           inspector={activeCanvasMessage ? renderCanvasInspector(activeCanvasMessage) : null}
         >
-          {activeCanvasMessage ? renderCanvasArtifact(activeCanvasMessage) : null}
+          {activeCanvasMessage
+            ? renderCanvasArtifact(activeCanvasMessage)
+            : renderAgentStarters(messages.length === 0)}
         </CanvasPanel>
       )}
 
@@ -4558,10 +4625,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             />
           ))}
 
-          {/* Just-enabled toolkit onboarding card — also renders regardless of
-              message count so users see the quick-starts the moment they
-              enable a toolkit. */}
-          {justEnabledToolkitId && (() => {
+          {/* Just-enabled toolkit onboarding card — the moment a toolkit is
+              enabled, surface its quick-starts. When the canvas is open and
+              empty, the starters live IN the canvas (renderAgentStarters), so
+              suppress the chat copy there; still show it in chat when the canvas
+              is hidden, or when the canvas already holds an artifact (mid-session
+              enable) and the empty state won't render. */}
+          {justEnabledToolkitId && messages.length > 0 && (!canvasShown || canvasArtifacts.length > 0) && (() => {
             const tk = TOOLKITS.find((t) => t.id === justEnabledToolkitId);
             if (!tk || !(tk.quick_starts?.length || 0)) return null;
             return (
@@ -4600,59 +4670,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           })()}
 
           {messages.length === 0 && Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').length === 0 ? (
-            <div className="min-h-full flex flex-col items-center justify-center py-6">
-              <div className="text-center space-y-4 mb-6">
-                <div className="w-16 h-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center">
-                  <AgentIcon className={`h-8 w-8 ${currentAgent?.color}`} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">
-                    Welcome to {currentAgent?.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {currentAgent?.description}
-                  </p>
-                </div>
-              </div>
-              {/* Toolkit-driven empty state — every active toolkit's quick-starts.
-                  Always renders something because Core has its own quick-starts. */}
-              <ToolkitOnboardingCard
-                mode="empty_state"
-                toolkits={activeToolkits
-                  .map((id) => TOOLKITS.find((t) => t.id === id))
-                  .filter((tk): tk is NonNullable<typeof tk> => !!tk)
-                  .filter((tk) => (tk.quick_starts?.length || 0) > 0)}
-                onLaunch={(prompt, qs, tk) => {
-                  setJustEnabledToolkitId(null);
-                  // Universal pre-launch guarantee: agent + toolkit are always
-                  // ready before the message fires, regardless of wizard or
-                  // prompt-fire path. No more "I don't have those tools" replies.
-                  ensureAgentAndToolkit(tk);
-                  // Form-bearing quick-starts collect their fields first, then
-                  // auto-send one complete message (takes priority over the
-                  // step-by-step workflow tracker).
-                  if (qs.form?.length) {
-                    setToolkitFormState({ quickStart: qs, toolkit: tk });
-                    return;
-                  }
-                  if (qs.run && fireDirectRun(qs, tk)) {
-                    return;
-                  }
-                  // Guided-modal quick-starts (e.g. Design a room → new-design,
-                  // Sheets → wizard) route through the shared dispatcher.
-                  if (qs.opensModal || qs.opensSheetWizard !== undefined) {
-                    handleQuickStart(qs, tk);
-                    return;
-                  }
-                  if (qs.workflow_id) {
-                    bootWorkflowLocally(qs.workflow_id);
-                  } else {
-                    setInput(prompt);
-                    setTimeout(() => handleSendMessage(), 0);
-                  }
-                }}
-              />
-            </div>
+            // Canvas-first: when the canvas is open it hosts the welcome +
+            // starters (renderAgentStarters), so the chat rail stays clean.
+            // Only render the starters here when the canvas is hidden.
+            canvasShown ? null : renderAgentStarters(true)
           ) : messages.length === 0 ? (
             // Wizard is active but no messages yet — wizard already renders above.
             null
@@ -4763,7 +4784,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
-                        : 'bg-primary text-white shadow-sm'
+                        : 'msg-assistant text-white shadow-sm'
                     }`}
                   >
                     {message.demoData ? (
@@ -5272,7 +5293,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     )}
                     <div className="flex items-center justify-between mt-2">
-                      <p className="text-xs text-white/50">
+                      <p className="text-xs text-white/60">
                         {message.timestamp.toLocaleTimeString()}
                       </p>
                       {/* Rating buttons for assistant messages */}
@@ -5283,7 +5304,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             className={`p-1 rounded-md transition-all ${
                               messageRatings[message.id] === 'up'
                                 ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                                : 'text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                : 'text-white/60 hover:text-green-300 hover:bg-white/10'
                             }`}
                             title="Helpful response"
                           >
@@ -5294,7 +5315,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             className={`p-1 rounded-md transition-all ${
                               messageRatings[message.id] === 'down'
                                 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                                : 'text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                : 'text-white/60 hover:text-red-300 hover:bg-white/10'
                             }`}
                             title="Not helpful"
                           >
