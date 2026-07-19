@@ -1839,7 +1839,7 @@ async function executeAgent(
 
   // Email marketing (module + entitlement gated inside the tool; draft-only → 0 cr)
   if (config.tools.includes('manage_email_campaign') && createManageEmailCampaignTool) {
-    tools.push(createManageEmailCampaignTool(userId, workspaceId, onChunk));
+    tools.push(createManageEmailCampaignTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Finance (module + entitlement gated inside the tool; read-only → 0 cr)

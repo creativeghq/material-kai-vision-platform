@@ -20,11 +20,19 @@ const { z } = await import('npm:zod@3.24.0');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MODULE_SLUG = 'email-marketing';
 
 function svcClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** User-scoped client so the membership-guarded audience RPC + RLS behave as on the page. */
+function userClient(jwt: string | undefined) {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
+  });
 }
 
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
@@ -48,10 +56,11 @@ async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: 
 export const createManageEmailCampaignTool = (
   userId: string,
   workspaceId: string,
+  jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, name, template_id, subject_line, description, category_ids }) => {
+    async ({ action, name, template_id, subject_line, description, category_ids, campaign_id, confirm }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const sb = svcClient();
@@ -130,21 +139,81 @@ export const createManageEmailCampaignTool = (
         });
       }
 
+      if (action === 'send') {
+        if (!campaign_id) return JSON.stringify({ success: false, error: 'send needs a campaign_id (a draft campaign).' });
+        // Load + validate the draft campaign in-workspace.
+        const { data: camp } = await sb
+          .from('campaigns')
+          .select('id, name, status, audience_filter')
+          .eq('id', campaign_id).eq('workspace_id', workspaceId).eq('channel_type', 'email').maybeSingle();
+        if (!camp) return JSON.stringify({ success: false, error: 'campaign not found in this workspace' });
+        if (camp.status !== 'draft' && camp.status !== 'paused') {
+          return JSON.stringify({ success: false, error: `only draft/paused campaigns can be sent (this one is "${camp.status}")` });
+        }
+
+        // Resolve the audience now (membership-guarded RPC → needs the user client).
+        const categoryIds: string[] = Array.isArray(camp.audience_filter?.category_ids) ? camp.audience_filter.category_ids : [];
+        const usb = userClient(jwt);
+        let recipients: any[] = [];
+        if (categoryIds.length) {
+          const { data } = await usb.rpc('crm_categories_resolve_recipients_ws', { p_workspace_id: workspaceId, p_category_ids: categoryIds });
+          recipients = Array.isArray(data) ? data : [];
+        }
+        if (recipients.length === 0) {
+          return JSON.stringify({ success: false, error: 'This campaign resolves to 0 recipients — set an audience on the Email page before sending.' });
+        }
+
+        // HUMAN-IN-THE-LOOP GATE (#275 / invariant #9): mass email — confirm before sending.
+        if (confirm !== true) {
+          onChunk?.({
+            type: 'action_confirmation',
+            tool: 'manage_email_campaign',
+            input: { action: 'send', campaign_id },
+            title: 'Send this email campaign?',
+            summary: `Send campaign "${camp.name}" to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'} from your CRM. Emails go out via the workspace's own Resend sender and cannot be recalled.`,
+            danger: true,
+            toolkit_id: 'email-marketing',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({ success: true, awaiting_confirmation: true, recipient_count: recipients.length, message: 'Awaiting the user\'s approval to send. Do not retry.' });
+        }
+
+        // Confirmed → insert recipients (dedupe safety: only if none yet) + flip to sending (cron sends).
+        const { count: existing } = await sb.from('campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', campaign_id);
+        if (!existing) {
+          const rows = recipients.map((r: any) => ({
+            campaign_id, email: r.email, contact_id: r.crm_contact_id ?? null,
+            variables: r.display_name ? { fullName: r.display_name } : {}, status: 'pending',
+          }));
+          for (let i = 0; i < rows.length; i += 500) {
+            const { error: recErr } = await sb.from('campaign_recipients').insert(rows.slice(i, i + 500));
+            if (recErr) return JSON.stringify({ success: false, error: `recipient insert failed: ${recErr.message}` });
+          }
+        }
+        const { error: upErr } = await sb.from('campaigns').update({ status: 'sending', recipient_count: recipients.length }).eq('id', campaign_id).eq('workspace_id', workspaceId);
+        if (upErr) return JSON.stringify({ success: false, error: upErr.message });
+        onChunk?.({ type: 'email_campaign_sent', campaign_id, name: camp.name, recipient_count: recipients.length, timestamp: Date.now() });
+        return JSON.stringify({ success: true, sent: true, campaign_id, recipient_count: recipients.length });
+      }
+
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
     },
     {
       name: 'manage_email_campaign',
       description:
-        'List email-marketing campaigns/templates and compose a DRAFT campaign (name + template + audience categories). ' +
-        'The agent never sends — it creates a draft the user reviews and sends from Marketing → Email. ' +
-        'Call action="list_templates" first to get a template_id for create_draft.',
+        'Email marketing: list campaigns/templates, compose a DRAFT campaign (name + template + audience), ' +
+        'and send a draft (action="send"). SENDING is a mass-comms action — it ALWAYS asks the user to ' +
+        'Approve/Decline first (never set confirm:true yourself; the UI sets it on approval). ' +
+        'Call list_templates first to get a template_id for create_draft.',
       schema: z.object({
-        action: z.enum(['list', 'list_templates', 'create_draft']).default('list'),
+        action: z.enum(['list', 'list_templates', 'create_draft', 'send']).default('list'),
         name: z.string().optional().describe('Campaign name (required for create_draft).'),
         template_id: z.string().optional().describe('Marketing template id from list_templates (required for create_draft).'),
         subject_line: z.string().optional(),
         description: z.string().optional(),
-        category_ids: z.array(z.string()).optional().describe('CRM category ids for the audience (resolved to recipients on the page).'),
+        category_ids: z.array(z.string()).optional().describe('CRM category ids for the audience.'),
+        campaign_id: z.string().optional().describe('send: the draft campaign UUID to send.'),
+        confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
       }),
     },
   );

@@ -272,6 +272,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   email_campaigns_list: 'Email campaigns',
   email_templates_list: 'Email templates',
   email_campaign_created: 'Draft campaign created',
+  email_campaign_sent: 'Campaign sending',
   // CRM
   crm_company_created: 'Company added to CRM',
   // Finance (read)
