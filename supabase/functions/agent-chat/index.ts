@@ -923,6 +923,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_messaging',
       // Finance (module + entitlement gated inside the tool; read-only, 0 cr)
       'manage_finance',
+      // Contracts & e-signature (module + entitlement gated; send is confirm-gated)
+      'manage_contracts',
       // Job research (all users; per-tool credit cost gated inside each tool — currently 0 cr)
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
       // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
@@ -949,6 +951,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'generate_3d', 'apply_lighting_preset', 'generate_vr_world',
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
+      // Business operating expenses → categorized supplier bill (Payables/AP + P&L); 0 cr
+      'record_expense', 'list_recent_expenses',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
       // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).
@@ -1048,6 +1052,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_project', 'list_my_projects', 'find_project',
       // Finance reads + confirm-gated invoice issue (Trinity is the finance agent)
       'manage_finance',
+      // Contracts & e-signature (finance/legal domain)
+      'manage_contracts',
     ],
   },
   'social-media': {
@@ -1201,6 +1207,9 @@ async function executeAgent(
     },
     'messaging': {
       tool_ids: ['manage_messaging'],
+    },
+    'contracts': {
+      tool_ids: ['manage_contracts'],
     },
     'job-research': {
       tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
@@ -1475,6 +1484,7 @@ async function executeAgent(
   const needsEmailMarketing = config.tools.includes('manage_email_campaign');
   const needsFinance = config.tools.includes('manage_finance');
   const needsMessaging = config.tools.includes('manage_messaging');
+  const needsContracts = config.tools.includes('manage_contracts');
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
   const needsSourcing = config.tools.some((t: string) => ['source_product', 'create_purchase_order', 'send_purchase_order'].includes(t));
@@ -1494,7 +1504,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1523,6 +1533,7 @@ async function executeAgent(
     needsEmailMarketing ? import('../_shared/tools/email-marketing-tools.ts') : null,
     needsFinance ? import('../_shared/tools/finance-tools.ts') : null,
     needsMessaging ? import('../_shared/tools/messaging-tools.ts') : null,
+    needsContracts ? import('../_shared/tools/contracts-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -1606,6 +1617,7 @@ async function executeAgent(
   const createManageEmailCampaignTool = emailMarketingMod?.createManageEmailCampaignTool;
   const createManageFinanceTool = financeMod?.createManageFinanceTool;
   const createManageMessagingTool = messagingMod?.createManageMessagingTool;
+  const createManageContractsTool = contractsMod?.createManageContractsTool;
   const createManageFlowsTool = flowsMod?.createManageFlowsTool;
   const createManageHrTool = hrToolsMod?.createManageHrTool;
   const createManageStockTool = stockToolsMod?.createManageStockTool;
@@ -1868,6 +1880,11 @@ async function executeAgent(
     tools.push(createManageMessagingTool(userId, workspaceId, userJwt, onChunk));
   }
 
+  // Contracts & e-signature (module + entitlement gated; send is confirm-gated)
+  if (config.tools.includes('manage_contracts') && createManageContractsTool) {
+    tools.push(createManageContractsTool(userId, workspaceId, userJwt, onChunk));
+  }
+
   // Job research tools (all users; module-gated; refresh runs on cron, not on demand → 0 cr per tool)
   if (config.tools.includes('track_job_search') && createTrackJobSearchTool) {
     // Thread the current conversation id through so the daily digest can chat-post
@@ -1977,6 +1994,17 @@ async function executeAgent(
       if (config.tools.includes('submit_trip_card')) tools.push(tripMod.createSubmitTripCardTool(userId, workspaceId, onChunk));
     } catch (tripErr) {
       console.warn('⚠️ Could not register trip-expense tools:', tripErr);
+    }
+  }
+
+  // Business operating expenses → categorized supplier bill (Payables/AP + P&L). 0 cr, DB-only.
+  if (config.tools.some((t: string) => ['record_expense', 'list_recent_expenses'].includes(t))) {
+    try {
+      const expMod = await import('../_shared/tools/expense-tools.ts');
+      if (config.tools.includes('record_expense')) tools.push(expMod.createRecordExpenseTool(userId, workspaceId, onChunk));
+      if (config.tools.includes('list_recent_expenses')) tools.push(expMod.createListExpensesTool(userId, workspaceId, onChunk));
+    } catch (expErr) {
+      console.warn('⚠️ Could not register expense tools:', expErr);
     }
   }
 

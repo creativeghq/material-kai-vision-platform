@@ -7,14 +7,14 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type SupplierBill, type SupplierBillStatus } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type SupplierBill, type SupplierBillStatus, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
@@ -85,6 +85,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
   const [supplierBills, setSupplierBills] = useState<SupplierBill[]>([]);
+  const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
   const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
@@ -131,6 +132,10 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           ? financeService.listSupplierBills({ workspaceId: activeWorkspaceId }).catch(() => [] as SupplierBill[])
           : Promise.resolve([] as SupplierBill[]),
       ]);
+      // Recurring templates — Expenses tab only.
+      if (type === 'expenses') {
+        setRecurring(await financeService.listRecurringExpenses(activeWorkspaceId).catch(() => [] as RecurringExpense[]));
+      }
       setCategories(cats ?? []);
       setCategoryMap(Object.fromEntries((cats ?? []).map((c) => [c.id, c.name])));
       setInvoices(inv);
@@ -320,6 +325,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             </Card>
             )}
 
+            {type === 'expenses' && !loading && recurring.length > 0 && (
+              <RecurringExpensesCard rows={recurring} categoryName={categoryName} readOnly={!canOperateFinance} onChanged={load} />
+            )}
             {type === 'expenses' && !loading && supplierBills.length > 0 && (
               <RecordedExpensesCard rows={supplierBills} categoryName={categoryName} />
             )}
@@ -385,6 +393,79 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         />
       )}
     </div>
+  );
+};
+
+const CADENCE_LABEL: Record<RecurringExpense['cadence'], string> = {
+  weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly',
+};
+
+/** Recurring-expense templates — each auto-generates a categorized bill every period via the
+ *  finance-recurring-expenses-daily cron. Pause/resume/delete inline. */
+const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: (id: any) => string; readOnly: boolean; onChanged: () => void }> = ({ rows, categoryName, readOnly, onChanged }) => {
+  const { toast } = useToast();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const toggle = async (r: RecurringExpense) => {
+    setBusyId(r.id);
+    try { await financeService.setRecurringExpenseActive(r.id, !r.is_active); onChanged(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusyId(null); }
+  };
+  const remove = async (r: RecurringExpense) => {
+    if (!window.confirm('Delete this recurring expense? Bills already generated are kept.')) return;
+    setBusyId(r.id);
+    try { await financeService.deleteRecurringExpense(r.id); onChanged(); }
+    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusyId(null); }
+  };
+  return (
+    <Card>
+      <div className="border-b border-border/60 px-4 py-2.5 flex items-center gap-2">
+        <Repeat className="h-4 w-4 text-muted-foreground" />
+        <div className="text-sm font-semibold">Recurring expenses</div>
+      </div>
+      <CardContent className="p-0">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border/60 text-xs text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2 text-left">Description</th>
+              <th className="px-4 py-2 text-left">Category</th>
+              <th className="px-4 py-2 text-left">Every</th>
+              <th className="px-4 py-2 text-right">Amount</th>
+              <th className="px-4 py-2 text-left">Next</th>
+              <th className="px-4 py-2 text-center">Auto-pay</th>
+              <th className="px-4 py-2 text-center">Status</th>
+              {!readOnly && <th className="px-4 py-2 w-20" />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
+                <td className="px-4 py-2">{r.description || <span className="text-muted-foreground">—</span>}</td>
+                <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName(r.category_id)}</td>
+                <td className="px-4 py-2 text-xs">{r.interval_count > 1 ? `${r.interval_count}× ` : ''}{CADENCE_LABEL[r.cadence]}</td>
+                <td className="px-4 py-2 text-right">{formatMoney(Number(r.subtotal_net) + Number(r.vat_amount), r.currency)}</td>
+                <td className="px-4 py-2">{r.is_active ? new Date(r.next_run_at).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-2 text-center">{r.auto_pay ? <span className="text-emerald-500">✓</span> : <span className="text-muted-foreground">—</span>}</td>
+                <td className="px-4 py-2 text-center"><Badge variant={r.is_active ? 'outline' : 'secondary'} className="text-[10px]">{r.is_active ? 'Active' : 'Paused'}</Badge></td>
+                {!readOnly && (
+                  <td className="px-4 py-2">
+                    <div className="flex justify-end gap-1">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={busyId === r.id} onClick={() => toggle(r)} title={r.is_active ? 'Pause' : 'Resume'}>
+                        {busyId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : r.is_active ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" disabled={busyId === r.id} onClick={() => remove(r)} title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
   );
 };
 

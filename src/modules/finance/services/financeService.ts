@@ -232,6 +232,33 @@ export interface SupplierBill {
   updated_at: string;
 }
 
+export type RecurringCadence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export interface RecurringExpense {
+  id: string;
+  workspace_id: string;
+  category_id: string;
+  supplier_company_id: string | null;
+  supplier_contact_id: string | null;
+  description: string | null;
+  reference_prefix: string | null;
+  currency: string;
+  subtotal_net: number;
+  vat_amount: number;
+  cadence: RecurringCadence;
+  interval_count: number;
+  due_days: number;
+  next_run_at: string;
+  last_run_at: string | null;
+  auto_pay: boolean;
+  bank_account_id: string | null;
+  payment_method: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CreditNote {
   id: string;
   workspace_id: string;
@@ -1231,6 +1258,81 @@ const _financeServiceCore = {
       });
     }
     return { billId: bill.id, paymentId };
+  },
+
+  // -------- Recurring expenses (auto-generate a bill each period) --------
+
+  /** Compute the first future run date one cadence-step after an anchor date. */
+  nextRecurrenceDate(anchorISO: string, cadence: RecurringCadence, interval = 1): string {
+    const d = new Date(anchorISO + 'T00:00:00Z');
+    if (cadence === 'weekly') d.setUTCDate(d.getUTCDate() + 7 * interval);
+    else if (cadence === 'monthly') d.setUTCMonth(d.getUTCMonth() + interval);
+    else if (cadence === 'quarterly') d.setUTCMonth(d.getUTCMonth() + 3 * interval);
+    else d.setUTCFullYear(d.getUTCFullYear() + interval);
+    return d.toISOString().slice(0, 10);
+  },
+
+  async createRecurringExpense(input: {
+    workspaceId: string;
+    categoryId: string;
+    supplierCompanyId?: string | null;
+    supplierContactId?: string | null;
+    description?: string | null;
+    referencePrefix?: string | null;
+    currency?: string;
+    subtotalNet: number;
+    vatAmount: number;
+    cadence: RecurringCadence;
+    intervalCount?: number;
+    dueDays?: number;
+    nextRunAt: string;
+    autoPay?: boolean;
+    bankAccountId?: string | null;
+    paymentMethod?: string | null;
+    notes?: string | null;
+  }): Promise<RecurringExpense> {
+    if (!input.supplierCompanyId && !input.supplierContactId) {
+      throw new Error('A recurring expense needs a supplier / payee.');
+    }
+    const { data, error } = await supabase.from('finance_recurring_expenses').insert({
+      workspace_id: input.workspaceId,
+      category_id: input.categoryId,
+      supplier_company_id: input.supplierCompanyId ?? null,
+      supplier_contact_id: input.supplierContactId ?? null,
+      description: input.description ?? null,
+      reference_prefix: input.referencePrefix ?? null,
+      currency: input.currency ?? 'EUR',
+      subtotal_net: Number((input.subtotalNet || 0).toFixed(2)),
+      vat_amount: Number((input.vatAmount || 0).toFixed(2)),
+      cadence: input.cadence,
+      interval_count: input.intervalCount ?? 1,
+      due_days: input.dueDays ?? 0,
+      next_run_at: input.nextRunAt,
+      auto_pay: input.autoPay ?? false,
+      bank_account_id: input.bankAccountId ?? null,
+      payment_method: input.paymentMethod ?? null,
+      notes: input.notes ?? null,
+    } as any).select().single();
+    if (error) throw error;
+    return data as RecurringExpense;
+  },
+
+  async listRecurringExpenses(workspaceId: string): Promise<RecurringExpense[]> {
+    const { data, error } = await supabase.from('finance_recurring_expenses')
+      .select('*').eq('workspace_id', workspaceId).order('next_run_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as RecurringExpense[];
+  },
+
+  async setRecurringExpenseActive(id: string, isActive: boolean): Promise<void> {
+    const { error } = await supabase.from('finance_recurring_expenses')
+      .update({ is_active: isActive } as any).eq('id', id);
+    if (error) throw error;
+  },
+
+  async deleteRecurringExpense(id: string): Promise<void> {
+    const { error } = await supabase.from('finance_recurring_expenses').delete().eq('id', id);
+    if (error) throw error;
   },
 
   async listSupplierBills(opts: { workspaceId?: string; supplierCompanyId?: string; status?: SupplierBillStatus[] } = {}): Promise<SupplierBill[]> {

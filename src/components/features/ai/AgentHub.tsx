@@ -278,10 +278,16 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Messaging / WhatsApp
   messaging_channels_list: 'WhatsApp channels',
   messaging_sent: 'WhatsApp sent',
+  // Contracts
+  contracts_list: 'Contracts',
+  contract_sent: 'Contract sent for signature',
   // Finance (read)
   finance_invoices_list: 'Invoices',
   customer_balance_result: 'Customer balance',
   finance_invoice_issued: 'Invoice issued',
+  // Finance expenses
+  expense_recorded: 'Expense recorded',
+  expenses_list: 'Recent expenses',
   // Knowledge-graph tools
   customer_overview_result: 'Customer overview',
   supplier_overview_result: 'Supplier overview',

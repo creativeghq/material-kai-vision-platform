@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   TrendingUp,
@@ -143,6 +143,9 @@ const FinancePage: React.FC = () => {
   };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Seed the standard income/expense category set once per workspace when finance is first
+  // used with an empty list (so "Add expense" etc. have Rent/Utilities/… out of the box).
+  const seededWorkspaces = useRef<Set<string>>(new Set());
 
   const [ar, setAr] = useState<AgingRow[]>([]);
   const [ap, setAp] = useState<AgingRow[]>([]);
@@ -294,7 +297,16 @@ const FinancePage: React.FC = () => {
       apWithOrders.sort(byOverdue);
       setAr(arWithOrders);
       setAp(apWithOrders);
-      setCategories(cats);
+      // First finance use with no categories → seed the standard set (idempotent, once per ws).
+      let categoryList = cats;
+      if (categoryList.length === 0 && !isAccountant && !seededWorkspaces.current.has(wsId)) {
+        seededWorkspaces.current.add(wsId);
+        try {
+          const added = await financeCategoriesService.importDefaults(wsId);
+          if (added > 0) categoryList = await financeCategoriesService.list(wsId).catch(() => categoryList);
+        } catch { /* best-effort — non-blocking */ }
+      }
+      setCategories(categoryList);
       setFollowUps(queue);
       setPnl(pnlRows);
       setCashFlow(cashRows);
