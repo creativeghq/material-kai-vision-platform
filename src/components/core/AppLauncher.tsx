@@ -1,11 +1,10 @@
-// #251 — top-bar App Launcher, three-pane layout (2026-07-18).
-// A full-width flyout: module rail (left) · the selected module's inner links, or an add-on upsell
-// (center) · jump-to shortcuts + recent (right) · a support strip footer. Data comes from
-// useLauncherApps (active/available + entitlement-aware enable/request) and the verified
-// LAUNCHER_SECTIONS/LAUNCHER_SHORTCUTS deep-links. Nothing here is account/logout — that stays in
-// the avatar menu.
+// #251 — top-bar App Launcher, three-pane layout. Hubs-first (2026-07-19): the LEFT rail lists the
+// Hubs; clicking a Hub fills the MIDDLE with every app in that hub AND each app's inner links
+// (sections + create actions), so e.g. Sales → Quotes (New Quote · Open), CRM (Users · Contacts …).
+// The RIGHT rail keeps cross-app shortcuts + recent. Data comes from useLauncherApps
+// (active/available + entitlement-aware enable/request) and the verified LAUNCHER_* deep-links.
 import React, { useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, ArrowRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, ChevronLeft, Sparkles, Wrench } from 'lucide-react';
+import { LayoutGrid, ArrowRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, Sparkles, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/popover';
@@ -31,25 +30,24 @@ export const AppLauncher: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Left-rail drill-down: null → show the Hub tiles; a hub key → show that hub's apps as an icon grid.
+  // Which Hub's apps fill the middle. Defaults to the first hub on open.
   const [activeHubKey, setActiveHubKey] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const { active, available, canManage, enabling, enable, loading } = useLauncherApps();
 
-  useEffect(() => { if (open) { setRecent(readRecent()); setActiveHubKey(null); } }, [open]);
+  useEffect(() => { if (open) setRecent(readRecent()); }, [open]);
 
-  // All apps (active + available-to-add) grouped into Hubs (#251 follow-up). Inactive apps stay
-  // visible in their Hub with a lock → the center pane offers Enable/Request (upsell → revenue).
+  // All apps (active + available-to-add) grouped into Hubs. Inactive apps stay visible in their Hub
+  // with a lock → Enable/Request inline (upsell → revenue).
   const allApps = useMemo(() => [...active, ...available], [active, available]);
   const hubGroups = useMemo(() => groupAppsByHub(allApps), [allApps]);
 
-  // Default the rail selection to the first app of the first non-empty Hub once loaded.
+  // Default the middle to the first non-empty Hub once loaded.
   useEffect(() => {
-    if (selectedId) return;
-    const first = hubGroups[0]?.apps[0];
-    if (first) setSelectedId(first.id);
-  }, [hubGroups, selectedId]);
+    if (activeHubKey) return;
+    const first = hubGroups[0];
+    if (first) setActiveHubKey(first.hub?.id ?? 'more');
+  }, [hubGroups, activeHubKey]);
 
   const byId = useMemo(() => {
     const m = new Map<string, LauncherApp>();
@@ -57,7 +55,6 @@ export const AppLauncher: React.FC = () => {
     return m;
   }, [allApps]);
 
-  const selected = selectedId ? byId.get(selectedId) ?? null : null;
   const activeHubGroup = activeHubKey
     ? hubGroups.find((g) => (g.hub?.id ?? 'more') === activeHubKey) ?? null
     : null;
@@ -74,21 +71,14 @@ export const AppLauncher: React.FC = () => {
     toast({ title: res.message, variant: res.ok ? 'default' : 'destructive' });
   };
 
-  const sections = selected ? (LAUNCHER_SECTIONS[selected.id] ?? []) : [];
-  // Context-aware quick-create triggers for the selected active module (empty for add-ons).
-  const actions = selected && selected.active ? (LAUNCHER_ACTIONS[selected.id] ?? []) : [];
-
-  // Agent-driven apps (Interior / Social / SEO) carry `?capability=<id>` in their path. Surface
-  // that capability's toolkit quick-starts as FAST actions right in the launcher — one click runs
-  // the action (agent + toolkit primed) instead of dumping the user in a blank chat (#275 UX).
-  const selectedCapabilityId = selected
-    ? new URLSearchParams(selected.path.split('?')[1] || '').get('capability')
-    : null;
-  const selectedCapability = selectedCapabilityId ? getCapability(selectedCapabilityId) : undefined;
-  const capabilityToolkitId = selectedCapability?.toolkitId;
-  const capabilityQuickStarts = capabilityToolkitId
-    ? (TOOLKITS.find((t) => t.id === capabilityToolkitId)?.quick_starts ?? [])
-    : [];
+  // An app's agent-capability quick-starts (Interior / Social / SEO carry ?capability=<id>), used as
+  // a fallback set of inner links when the app has no page sections/create-actions.
+  const capabilityQuickStarts = (app: LauncherApp) => {
+    const capId = new URLSearchParams(app.path.split('?')[1] || '').get('capability');
+    const cap = capId ? getCapability(capId) : undefined;
+    const tk = cap?.toolkitId ? TOOLKITS.find((t) => t.id === cap.toolkitId) : undefined;
+    return { capId, toolkitId: cap?.toolkitId, quickStarts: tk?.quick_starts ?? [] };
+  };
 
   const shortcutRow = (s: LauncherSection) => (
     <button
@@ -102,6 +92,84 @@ export const AppLauncher: React.FC = () => {
       <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />
     </button>
   );
+
+  const recentApps = recent.filter((id) => byId.has(id));
+
+  // One app "card" in the middle: header (icon · name · Open/Enable) + its inner links (sections +
+  // create actions, else agent quick-starts).
+  const renderAppCard = (app: LauncherApp) => {
+    const sections = LAUNCHER_SECTIONS[app.id] ?? [];
+    const actions = app.active ? (LAUNCHER_ACTIONS[app.id] ?? []) : [];
+    const cap = (sections.length === 0 && actions.length === 0 && app.active) ? capabilityQuickStarts(app) : null;
+    const quickStarts = cap?.quickStarts ?? [];
+
+    return (
+      <div key={app.id} className="rounded-xl border border-border bg-card p-3">
+        <div className="flex items-center gap-2.5">
+          <span className={[
+            'flex h-9 w-9 items-center justify-center rounded-lg shrink-0',
+            app.active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+          ].join(' ')}>
+            <app.icon className="h-4.5 w-4.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold truncate flex items-center gap-1.5">
+              {app.label}
+              {!app.active && <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" />}
+            </div>
+            {app.description && <div className="text-[11px] text-muted-foreground truncate">{app.description}</div>}
+          </div>
+          {app.active ? (
+            <Button size="sm" variant="outline" className="shrink-0 gap-1.5" onClick={() => go(app.path, app.id)}>
+              Open <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          ) : (
+            <Button size="sm" className="shrink-0 gap-1.5" disabled={enabling === app.moduleSlug} onClick={(e) => onEnable(e, app)}>
+              {enabling === app.moduleSlug
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : (<><Plus className="h-4 w-4" /> {app.priceLabel ? app.priceLabel : (canManage ? 'Enable' : 'Request')}</>)}
+            </Button>
+          )}
+        </div>
+
+        {app.active && (sections.length > 0 || actions.length > 0 || quickStarts.length > 0) && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {sections.map((s) => (
+              <button
+                key={s.to}
+                type="button"
+                onClick={() => go(s.to, app.id)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-accent/40 transition-colors"
+              >
+                <s.icon className="h-3.5 w-3.5 text-primary/80" /> {s.label}
+              </button>
+            ))}
+            {actions.map((a) => (
+              <button
+                key={a.to}
+                type="button"
+                onClick={() => go(a.to, app.id)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border bg-background px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-accent/40 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5 text-primary/80" /> {a.label}
+              </button>
+            ))}
+            {cap && quickStarts.map((qs) => (
+              <button
+                key={qs.label}
+                type="button"
+                title={qs.description}
+                onClick={() => go(`/agent-hub?capability=${cap.capId}&quickstart=${cap.toolkitId}:${encodeURIComponent(qs.label)}`, app.id)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-[12px] text-primary hover:bg-accent/40 transition-colors"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> {qs.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -131,72 +199,38 @@ export const AppLauncher: React.FC = () => {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-[224px_minmax(0,1fr)_244px]">
-              {/* ── Left rail: apps grouped by Hub (#251 follow-up) ── */}
+              {/* ── Left rail: the Hubs — click one to fill the middle ── */}
               <aside className="border-b md:border-b-0 md:border-r border-border/60 bg-muted/20 p-2.5 md:min-h-[460px] md:max-h-[70vh] md:overflow-y-auto">
-                {!hubGroups.length ? (
-                  <p className="px-2 py-2 text-xs text-muted-foreground">No apps yet.</p>
-                ) : !activeHubGroup ? (
-                  /* ── Hub tiles — click a Hub to drill into its apps ── */
+                <div className="px-2 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Hubs</div>
+                {hubGroups.length ? (
                   <div className="space-y-0.5">
                     {hubGroups.map(({ hub, apps }) => {
                       const key = hub?.id ?? 'more';
                       const HubIcon = hub?.icon ?? LayoutGrid;
+                      const sel = key === activeHubKey;
                       return (
                         <button
                           key={key}
                           type="button"
                           onClick={() => setActiveHubKey(key)}
-                          className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm border border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+                          className={[
+                            'w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition-colors border',
+                            sel ? 'bg-card border-border text-foreground shadow-sm' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                          ].join(' ')}
                         >
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-muted-foreground shrink-0"><HubIcon className="h-4 w-4" /></span>
+                          <span className={[
+                            'flex h-7 w-7 items-center justify-center rounded-lg shrink-0 transition-colors',
+                            sel ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                          ].join(' ')}>
+                            <HubIcon className="h-4 w-4" />
+                          </span>
                           <span className="flex-1 min-w-0 truncate font-medium">{hub?.label ?? 'More'}</span>
                           <span className="text-[11px] text-muted-foreground/70 shrink-0">{apps.length}</span>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />
                         </button>
                       );
                     })}
                   </div>
-                ) : (
-                  /* ── Apps inside the chosen Hub — compact icon grid (back to Hubs) ── */
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveHubKey(null)}
-                      className="w-full flex items-center gap-1.5 rounded-lg px-2 py-1.5 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                      {activeHubGroup.hub?.label ?? 'More'}
-                    </button>
-                    <div className="grid grid-cols-3 gap-1">
-                      {activeHubGroup.apps.map((app) => {
-                        const sel = app.id === selectedId;
-                        return (
-                          <button
-                            key={app.id}
-                            type="button"
-                            title={app.label}
-                            onClick={() => setSelectedId(app.id)}
-                            className={[
-                              'relative flex flex-col items-center gap-1 rounded-xl px-1 py-2 border transition-colors',
-                              sel ? 'bg-card border-border shadow-sm' : 'border-transparent hover:bg-accent/50',
-                            ].join(' ')}
-                          >
-                            <span className={[
-                              'flex h-8 w-8 items-center justify-center rounded-lg shrink-0 transition-colors',
-                              sel ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-                            ].join(' ')}>
-                              <app.icon className="h-4 w-4" />
-                            </span>
-                            <span className="w-full truncate text-center text-[10.5px] leading-tight text-muted-foreground">{app.label}</span>
-                            {app.active
-                              ? <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[hsl(var(--success))]" title="Active" />
-                              : <Lock className="absolute top-1 right-1 h-3 w-3 text-muted-foreground/60" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                ) : <p className="px-2 py-2 text-xs text-muted-foreground">No apps yet.</p>}
 
                 <div className="my-2.5 h-px bg-border/60" />
                 <button type="button" onClick={() => go('/knowledge-base')} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors">
@@ -210,152 +244,38 @@ export const AppLauncher: React.FC = () => {
                 </button>
               </aside>
 
-              {/* ── Center ── */}
+              {/* ── Center: the selected Hub's apps, each with its inner links ── */}
               <section className="p-4 md:p-5 min-w-0">
-                {!selected ? (
-                  <div className="flex h-full items-center justify-center py-12 text-sm text-muted-foreground">Pick an app on the left.</div>
-                ) : selected.active ? (
+                {!activeHubGroup ? (
+                  <div className="flex h-full items-center justify-center py-12 text-sm text-muted-foreground">Pick a hub on the left.</div>
+                ) : (
                   <>
-                    <div className="flex items-start gap-3.5">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shrink-0 shadow-sm">
-                        <selected.icon className="h-5 w-5" />
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                        {activeHubGroup.hub ? <activeHubGroup.hub.icon className="h-5 w-5" /> : <LayoutGrid className="h-5 w-5" />}
                       </span>
                       <div className="min-w-0">
-                        <h3 className="font-display text-lg font-semibold leading-tight tracking-tight">{selected.label}</h3>
-                        {selected.description && <p className="mt-1 text-xs text-muted-foreground leading-snug max-w-[46ch]">{selected.description}</p>}
+                        <h3 className="font-display text-lg font-semibold leading-tight tracking-tight">{activeHubGroup.hub?.label ?? 'More'}</h3>
+                        {activeHubGroup.hub?.description && <p className="text-xs text-muted-foreground leading-snug">{activeHubGroup.hub.description}</p>}
                       </div>
-                      <Button size="sm" className="ml-auto shrink-0 gap-1.5" onClick={() => go(selected.path, selected.id)}>
-                        Open <ArrowRight className="h-3.5 w-3.5" />
-                      </Button>
                     </div>
-
-                    {sections.length > 0 ? (
-                      <>
-                        <div className="mt-4 mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          {sections.length} {sections.length === 1 ? 'section' : 'sections'}
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {sections.map((s) => (
-                            <button
-                              key={s.to}
-                              type="button"
-                              onClick={() => go(s.to, selected.id)}
-                              className="group text-left rounded-xl border border-border bg-card p-3 hover:-translate-y-0.5 hover:border-border hover:bg-accent/40 transition-all"
-                            >
-                              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60 text-primary mb-2.5">
-                                <s.icon className="h-4 w-4" />
-                              </span>
-                              <div className="text-[13px] font-medium truncate">{s.label}</div>
-                              <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                                <ArrowRight className="h-3 w-3" /> Open
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    ) : capabilityQuickStarts.length > 0 ? (
-                      <>
-                        <div className="mt-4 mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Quick actions
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {capabilityQuickStarts.map((qs) => (
-                            <button
-                              key={qs.label}
-                              type="button"
-                              onClick={() => go(
-                                `/agent-hub?capability=${selectedCapabilityId}&quickstart=${capabilityToolkitId}:${encodeURIComponent(qs.label)}`,
-                                selected.id,
-                              )}
-                              className="group text-left rounded-xl border border-border bg-card p-3 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 transition-all"
-                              title={qs.description}
-                            >
-                              <div className="text-[13px] font-medium truncate">{qs.label}</div>
-                              {qs.description && <div className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">{qs.description}</div>}
-                              <div className="mt-1.5 flex items-center gap-1 text-[11px] text-primary">
-                                <ArrowRight className="h-3 w-3" /> Run in agent
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => go(selected.path, selected.id)}
-                          className="mt-2.5 w-full text-center rounded-xl border border-dashed border-border bg-card/60 px-4 py-2.5 text-xs text-muted-foreground hover:bg-accent/40 transition-colors"
-                        >
-                          Or open {selected.label} in the agent canvas →
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => go(selected.path, selected.id)}
-                        className="mt-4 w-full text-left rounded-xl border border-dashed border-border bg-card/60 px-4 py-5 hover:bg-accent/40 transition-colors"
-                      >
-                        <div className="text-sm font-medium">Open the {selected.label} workspace</div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">Everything for {selected.label} lives on its main page.</div>
-                      </button>
-                    )}
+                    <div className="mt-4 space-y-2.5">
+                      {activeHubGroup.apps.map(renderAppCard)}
+                    </div>
                   </>
-                ) : (
-                  // Add-on / coming-soon upsell
-                  <div className="rounded-2xl border border-border bg-card p-6 text-center">
-                    <span className="mx-auto mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/60 text-primary">
-                      <selected.icon className="h-7 w-7" />
-                    </span>
-                    <div className="mb-2 flex justify-center">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-primary">
-                        <Sparkles className="h-3 w-3" /> {selected.priceLabel ? `Add-on · ${selected.priceLabel}` : 'Paid add-on'}
-                      </span>
-                    </div>
-                    <h3 className="font-display text-lg font-semibold">{selected.label}</h3>
-                    {selected.description && <p className="mx-auto mt-1.5 max-w-[42ch] text-xs text-muted-foreground leading-relaxed">{selected.description}</p>}
-                    <div className="mt-5 flex items-center justify-center gap-2.5">
-                      <Button size="sm" className="gap-1.5" disabled={enabling === selected.moduleSlug} onClick={(e) => onEnable(e, selected)}>
-                        {enabling === selected.moduleSlug
-                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : (<><Plus className="h-4 w-4" /> {canManage ? 'Enable add-on' : 'Request access'}</>)}
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => go('/apps')}>Learn more</Button>
-                    </div>
-                  </div>
                 )}
               </section>
 
-              {/* ── Right rail: context-aware quick-create + jump-to ── */}
+              {/* ── Right rail: cross-app shortcuts + recent ── */}
               <aside className="border-t md:border-t-0 md:border-l border-border/60 bg-muted/20 p-4">
-                {actions.length > 0 ? (
-                  <>
-                    <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Create in {selected!.label}</div>
-                    <div className="space-y-1.5">
-                      {actions.map((a) => (
-                        <button
-                          key={a.to}
-                          type="button"
-                          onClick={() => go(a.to, selected!.id)}
-                          className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left hover:border-primary/50 hover:bg-accent/40 transition-colors"
-                        >
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/60 text-primary shrink-0"><a.icon className="h-4 w-4" /></span>
-                          <span className="flex-1 min-w-0 truncate text-[13px] font-medium">{a.label}</span>
-                          <Plus className="h-4 w-4 text-muted-foreground/60 shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-5 mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Across your apps</div>
-                    <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Jump to</div>
-                    <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
-                  </>
-                )}
+                <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Jump to</div>
+                <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
 
-                {recent.filter((id) => byId.has(id)).length > 0 && (
+                {recentApps.length > 0 && (
                   <>
                     <div className="mt-5 mb-2 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Recent</div>
                     <div className="space-y-0.5">
-                      {recent.filter((id) => byId.has(id)).map((id) => {
+                      {recentApps.map((id) => {
                         const app = byId.get(id)!;
                         return (
                           <button key={id} type="button" onClick={() => go(app.path, app.id)} className="w-full flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left text-[13px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors">
