@@ -883,7 +883,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     if (!payReason.trim()) { toast({ title: 'Add a reason', description: 'Every cash movement needs a reason so the payment is traceable (e.g. pre-payment, deposit, balance).', variant: 'destructive' }); return; }
     if (!payAccountId) { toast({ title: 'Pick an account', description: 'Choose which cash/bank account the money lands in (or leaves from) so it shows in your finance balances.', variant: 'destructive' }); return; }
     if (payDir === 'out' && !paySupplier) { toast({ title: 'Pick the supplier', description: 'Money out is registered against a supplier so we track what we paid them.', variant: 'destructive' }); return; }
-    const alsoIssue = !editingPaymentId && payIssueDoc && payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
+    // Issue the order's receipt/invoice in the same step — works both when recording NEW money in
+    // and when editing an existing payment (as long as the order has no document yet). Whether it's
+    // a receipt (private contact) or an invoice (business) is driven by salesDocKind.
+    const alsoIssue = payIssueDoc && payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
     setSaving(true);
     try {
       if (editingPaymentId) {
@@ -1487,12 +1490,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                 {payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
                   <label className="flex items-center gap-2 text-[11px] cursor-pointer pt-0.5">
                     <Checkbox checked={payIssueDoc} onCheckedChange={(v) => setPayIssueDoc(v === true)} />
-                    Also issue a {salesDocKind === 'receipt' ? 'receipt' : 'invoice'} for this order (opens it to review &amp; transmit)
+                    {editingPaymentId ? 'Issue' : 'Also issue'} a {salesDocKind === 'receipt' ? 'receipt' : 'invoice'} for this order (opens it to review &amp; transmit)
+                    <span className="text-muted-foreground">— {order.customer_company_id ? 'business → invoice' : 'private → receipt'}</span>
                   </label>
                 )}
                 <p className="text-[10px] text-muted-foreground">
                   {payIssueDoc
-                    ? `Records the cash and creates the ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} draft — review &amp; transmit it next.`
+                    ? `${editingPaymentId ? 'Updates the payment' : 'Records the cash'} and creates the ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} draft — review &amp; transmit it next.`
                     : <>Just the cash movement — no document. Tick the box above, or use Actions → {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}, to issue one.</>}
                 </p>
               </div>
