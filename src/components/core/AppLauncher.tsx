@@ -1,11 +1,11 @@
-// #251 — top-bar App Launcher, three-pane layout (2026-07-18).
-// A full-width flyout: module rail (left) · the selected module's inner links, or an add-on upsell
-// (center) · jump-to shortcuts + recent (right) · a support strip footer. Data comes from
+// #251 — top-bar App Launcher. Hub-first DRILL-DOWN (2026-07-19): instead of every hub expanded
+// at once (which made the menu enormous), the launcher shows the 6 Hub tiles first; click a hub to
+// see its apps as a compact icon grid (each with its section sub-icons); click an app for its detail
+// (inner links / quick-create / add-on upsell). Simpler + more accessible. Data comes from
 // useLauncherApps (active/available + entitlement-aware enable/request) and the verified
-// LAUNCHER_SECTIONS/LAUNCHER_SHORTCUTS deep-links. Nothing here is account/logout — that stays in
-// the avatar menu.
+// LAUNCHER_SECTIONS/LAUNCHER_ACTIONS/LAUNCHER_SHORTCUTS deep-links. Nothing here is account/logout.
 import React, { useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, ArrowRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, Sparkles, Wrench } from 'lucide-react';
+import { LayoutGrid, ArrowRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, ChevronLeft, Sparkles, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/popover';
@@ -27,27 +27,32 @@ function pushRecent(id: string): string[] {
   return next;
 }
 
+type View = 'hubs' | 'apps' | 'app';
+
 export const AppLauncher: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<View>('hubs');
+  const [activeHubKey, setActiveHubKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const { active, available, canManage, enabling, enable, loading } = useLauncherApps();
 
-  useEffect(() => { if (open) setRecent(readRecent()); }, [open]);
+  // Reset to the top of the drill-down each time the flyout opens.
+  useEffect(() => {
+    if (open) {
+      setRecent(readRecent());
+      setView('hubs');
+      setActiveHubKey(null);
+      setSelectedId(null);
+    }
+  }, [open]);
 
-  // All apps (active + available-to-add) grouped into Hubs (#251 follow-up). Inactive apps stay
-  // visible in their Hub with a lock → the center pane offers Enable/Request (upsell → revenue).
+  // All apps (active + available-to-add) grouped into Hubs. Inactive apps stay visible in their Hub
+  // with a lock → the app detail offers Enable/Request (upsell → revenue).
   const allApps = useMemo(() => [...active, ...available], [active, available]);
   const hubGroups = useMemo(() => groupAppsByHub(allApps), [allApps]);
-
-  // Default the rail selection to the first app of the first non-empty Hub once loaded.
-  useEffect(() => {
-    if (selectedId) return;
-    const first = hubGroups[0]?.apps[0];
-    if (first) setSelectedId(first.id);
-  }, [hubGroups, selectedId]);
 
   const byId = useMemo(() => {
     const m = new Map<string, LauncherApp>();
@@ -55,6 +60,9 @@ export const AppLauncher: React.FC = () => {
     return m;
   }, [allApps]);
 
+  const activeHubGroup = activeHubKey
+    ? hubGroups.find((g) => (g.hub?.id ?? 'more') === activeHubKey) ?? null
+    : null;
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
 
   const go = (path: string, moduleId?: string) => {
@@ -63,37 +71,28 @@ export const AppLauncher: React.FC = () => {
     navigate(path);
   };
 
+  const openHub = (key: string) => { setActiveHubKey(key); setView('apps'); };
+  const openApp = (id: string) => { setSelectedId(id); setView('app'); };
+  const back = () => { if (view === 'app') setView('apps'); else setView('hubs'); };
+
   const onEnable = async (e: React.MouseEvent, app: LauncherApp) => {
     e.stopPropagation();
     const res = await enable(app);
     toast({ title: res.message, variant: res.ok ? 'default' : 'destructive' });
   };
 
-  const railItem = (app: LauncherApp) => {
-    const sel = app.id === selectedId;
-    return (
-      <button
-        key={app.id}
-        type="button"
-        onClick={() => setSelectedId(app.id)}
-        className={[
-          'w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition-colors border',
-          sel ? 'bg-card border-border text-foreground shadow-sm' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50',
-        ].join(' ')}
-      >
-        <span className={[
-          'flex h-7 w-7 items-center justify-center rounded-lg shrink-0 transition-colors',
-          sel ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-        ].join(' ')}>
-          <app.icon className="h-4 w-4" />
-        </span>
-        <span className="flex-1 min-w-0 truncate">{app.label}</span>
-        {app.active
-          ? <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success))] shrink-0" title="Active" />
-          : <Lock className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />}
-      </button>
-    );
-  };
+  const shortcutRow = (s: LauncherSection) => (
+    <button
+      key={s.to}
+      type="button"
+      onClick={() => go(s.to)}
+      className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left hover:border-primary/50 hover:bg-accent/40 transition-colors"
+    >
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/60 text-primary shrink-0"><s.icon className="h-4 w-4" /></span>
+      <span className="flex-1 min-w-0 truncate text-[13px] font-medium">{s.label}</span>
+      <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+    </button>
+  );
 
   const sections = selected ? (LAUNCHER_SECTIONS[selected.id] ?? []) : [];
   // Context-aware quick-create triggers for the selected active module (empty for add-ons).
@@ -111,18 +110,7 @@ export const AppLauncher: React.FC = () => {
     ? (TOOLKITS.find((t) => t.id === capabilityToolkitId)?.quick_starts ?? [])
     : [];
 
-  const shortcutRow = (s: LauncherSection) => (
-    <button
-      key={s.to}
-      type="button"
-      onClick={() => go(s.to)}
-      className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left hover:border-primary/50 hover:bg-accent/40 transition-colors"
-    >
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/60 text-primary shrink-0"><s.icon className="h-4 w-4" /></span>
-      <span className="flex-1 min-w-0 truncate text-[13px] font-medium">{s.label}</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />
-    </button>
-  );
+  const recentApps = recent.filter((id) => byId.has(id));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -141,7 +129,7 @@ export const AppLauncher: React.FC = () => {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="w-[min(62rem,calc(100vw-1.5rem))] p-0 rounded-2xl shadow-xl border-border/60 overflow-hidden"
+        className="w-[min(46rem,calc(100vw-1.5rem))] p-0 rounded-2xl shadow-xl border-border/60 overflow-hidden"
       >
         <PopoverPrimitive.Arrow className="fill-popover" width={16} height={8} />
 
@@ -151,36 +139,138 @@ export const AppLauncher: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-[224px_minmax(0,1fr)_244px]">
-              {/* ── Left rail: apps grouped by Hub (#251 follow-up) ── */}
-              <aside className="border-b md:border-b-0 md:border-r border-border/60 bg-muted/20 p-2.5 md:min-h-[460px] md:max-h-[70vh] md:overflow-y-auto">
-                {hubGroups.length ? hubGroups.map(({ hub, apps }) => (
-                  <div key={hub?.id ?? 'more'} className="mb-2.5 last:mb-0">
-                    <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {hub ? <hub.icon className="h-3 w-3" /> : null}
-                      {hub?.label ?? 'More'}
+            {/* ── Header / breadcrumb ── */}
+            <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2.5">
+              {view !== 'hubs' ? (
+                <button
+                  type="button"
+                  onClick={back}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors shrink-0"
+                  aria-label="Back"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                  <LayoutGrid className="h-4 w-4" />
+                </span>
+              )}
+              <div className="min-w-0 flex items-center gap-1.5 text-sm">
+                <span className={view === 'hubs' ? 'font-semibold' : 'text-muted-foreground'}>Apps</span>
+                {view !== 'hubs' && activeHubGroup && (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+                    <span className={view === 'apps' ? 'font-semibold truncate' : 'text-muted-foreground truncate'}>
+                      {activeHubGroup.hub?.label ?? 'More'}
+                    </span>
+                  </>
+                )}
+                {view === 'app' && selected && (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+                    <span className="font-semibold truncate">{selected.label}</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3 md:p-4 md:min-h-[360px] md:max-h-[72vh] overflow-y-auto custom-scrollbar">
+              {/* ══ LEVEL 0 — Hubs ══ */}
+              {view === 'hubs' && (
+                <>
+                  {hubGroups.length ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      {hubGroups.map(({ hub, apps }) => {
+                        const key = hub?.id ?? 'more';
+                        const HubIcon = hub?.icon ?? LayoutGrid;
+                        const activeCount = apps.filter((a) => a.active).length;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => openHub(key)}
+                            className="group text-left rounded-2xl border border-border bg-card p-3.5 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/30 transition-all"
+                          >
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                              <HubIcon className="h-5 w-5" />
+                            </span>
+                            <div className="text-sm font-semibold leading-tight">{hub?.label ?? 'More'}</div>
+                            {hub?.description && (
+                              <div className="mt-1 text-[11px] text-muted-foreground leading-snug line-clamp-2">{hub.description}</div>
+                            )}
+                            <div className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
+                              {apps.length} app{apps.length === 1 ? '' : 's'}
+                              {activeCount < apps.length && <span className="text-muted-foreground/70">· {activeCount} on</span>}
+                              <ArrowRight className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-60 transition-opacity" />
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="space-y-0.5">{apps.map(railItem)}</div>
-                  </div>
-                )) : <p className="px-2 py-2 text-xs text-muted-foreground">No apps yet.</p>}
+                  ) : (
+                    <p className="px-2 py-6 text-center text-sm text-muted-foreground">No apps yet.</p>
+                  )}
 
-                <div className="my-2.5 h-px bg-border/60" />
-                <button type="button" onClick={() => go('/knowledge-base')} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-muted-foreground shrink-0"><LifeBuoy className="h-4 w-4" /></span> Support
-                </button>
-                <button type="button" onClick={() => go('/profile')} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-muted-foreground shrink-0"><Settings className="h-4 w-4" /></span> Settings
-                </button>
-                <button type="button" onClick={() => go('/apps')} className="mt-1.5 w-full flex items-center justify-center gap-2 rounded-xl bg-accent/60 px-3 py-2 text-sm font-medium text-primary hover:bg-accent transition-colors">
-                  <LayoutGrid className="h-4 w-4" /> Browse all apps
-                </button>
-              </aside>
+                  {recentApps.length > 0 && (
+                    <>
+                      <div className="mt-4 mb-2 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Recent</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {recentApps.map((id) => {
+                          const app = byId.get(id)!;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => go(app.path, app.id)}
+                              className="flex items-center gap-2 rounded-full border border-border bg-card px-2.5 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-accent/40 transition-colors"
+                            >
+                              <app.icon className="h-3.5 w-3.5" /> {app.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
 
-              {/* ── Center ── */}
-              <section className="p-4 md:p-5 min-w-0">
-                {!selected ? (
-                  <div className="flex h-full items-center justify-center py-12 text-sm text-muted-foreground">Pick an app on the left.</div>
-                ) : selected.active ? (
+              {/* ══ LEVEL 1 — Apps in the chosen Hub ══ */}
+              {view === 'apps' && activeHubGroup && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {activeHubGroup.apps.map((app) => {
+                    const subs = LAUNCHER_SECTIONS[app.id] ?? [];
+                    return (
+                      <button
+                        key={app.id}
+                        type="button"
+                        onClick={() => openApp(app.id)}
+                        className="group relative text-left rounded-xl border border-border bg-card p-3 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/30 transition-all"
+                      >
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors mb-2">
+                          <app.icon className="h-[18px] w-[18px]" />
+                        </span>
+                        <div className="text-[13px] font-medium truncate">{app.label}</div>
+                        {subs.length > 0 && (
+                          <div className="mt-1.5 flex items-center gap-1 text-muted-foreground/70">
+                            {subs.slice(0, 4).map((s, i) => <s.icon key={i} className="h-3 w-3" />)}
+                            {subs.length > 4 && <span className="text-[10px]">+{subs.length - 4}</span>}
+                          </div>
+                        )}
+                        {app.active
+                          ? <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[hsl(var(--success))]" title="Active" />
+                          : <Lock className="absolute top-2 right-2 h-3.5 w-3.5 text-muted-foreground/60" />}
+                        {!app.active && app.priceLabel && (
+                          <div className="mt-1 text-[10px] font-medium text-primary">{app.priceLabel}</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ══ LEVEL 2 — App detail ══ */}
+              {view === 'app' && selected && (
+                selected.active ? (
                   <>
                     <div className="flex items-start gap-3.5">
                       <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shrink-0 shadow-sm">
@@ -262,6 +352,29 @@ export const AppLauncher: React.FC = () => {
                         <div className="mt-0.5 text-xs text-muted-foreground">Everything for {selected.label} lives on its main page.</div>
                       </button>
                     )}
+
+                    {/* Create-in + jump-to */}
+                    {actions.length > 0 && (
+                      <>
+                        <div className="mt-5 mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Create in {selected.label}</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {actions.map((a) => (
+                            <button
+                              key={a.to}
+                              type="button"
+                              onClick={() => go(a.to, selected.id)}
+                              className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left hover:border-primary/50 hover:bg-accent/40 transition-colors"
+                            >
+                              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/60 text-primary shrink-0"><a.icon className="h-4 w-4" /></span>
+                              <span className="flex-1 min-w-0 truncate text-[13px] font-medium">{a.label}</span>
+                              <Plus className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    <div className="mt-5 mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Across your apps</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
                   </>
                 ) : (
                   // Add-on / coming-soon upsell
@@ -285,58 +398,11 @@ export const AppLauncher: React.FC = () => {
                       <Button size="sm" variant="outline" onClick={() => go('/apps')}>Learn more</Button>
                     </div>
                   </div>
-                )}
-              </section>
-
-              {/* ── Right rail: context-aware quick-create + jump-to ── */}
-              <aside className="border-t md:border-t-0 md:border-l border-border/60 bg-muted/20 p-4">
-                {actions.length > 0 ? (
-                  <>
-                    <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Create in {selected!.label}</div>
-                    <div className="space-y-1.5">
-                      {actions.map((a) => (
-                        <button
-                          key={a.to}
-                          type="button"
-                          onClick={() => go(a.to, selected!.id)}
-                          className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left hover:border-primary/50 hover:bg-accent/40 transition-colors"
-                        >
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/60 text-primary shrink-0"><a.icon className="h-4 w-4" /></span>
-                          <span className="flex-1 min-w-0 truncate text-[13px] font-medium">{a.label}</span>
-                          <Plus className="h-4 w-4 text-muted-foreground/60 shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-5 mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Across your apps</div>
-                    <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Jump to</div>
-                    <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
-                  </>
-                )}
-
-                {recent.filter((id) => byId.has(id)).length > 0 && (
-                  <>
-                    <div className="mt-5 mb-2 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Recent</div>
-                    <div className="space-y-0.5">
-                      {recent.filter((id) => byId.has(id)).map((id) => {
-                        const app = byId.get(id)!;
-                        return (
-                          <button key={id} type="button" onClick={() => go(app.path, app.id)} className="w-full flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left text-[13px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-muted-foreground shrink-0"><app.icon className="h-3.5 w-3.5" /></span>
-                            {app.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </aside>
+                )
+              )}
             </div>
 
-            {/* ── Support strip ── (Tools sits first, before Help & Support) */}
+            {/* ── Support strip ── (Tools first, before Help & Support) */}
             <div className="grid grid-cols-2 md:grid-cols-4 border-t border-border/60 bg-muted/30">
               <button type="button" onClick={() => go('/tools')} className="flex items-center gap-3 border-r border-border/60 px-4 py-3.5 text-left hover:bg-accent/40 transition-colors">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/60 text-primary shrink-0"><Wrench className="h-5 w-5" /></span>
