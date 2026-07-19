@@ -19,8 +19,6 @@ import {
   Sofa,
   Share2,
   TrendingUp,
-  Radar,
-  PenTool,
   FileSignature,
   MessageCircle,
   Star,
@@ -137,7 +135,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Price Monitoring — agent-driven capability, exposed in the launcher like Interior/Social/SEO:
   // the tile opens the studio primed on the price-monitoring toolkit (track a product, pull prices).
   // All-users via agent.use + module gate; the full admin dashboard stays at /admin/monitoring.
-  { id: 'price-monitoring', label: 'Price Monitoring', path: '/agent-hub?capability=price-monitoring', icon: BarChart3, requireCapability: 'agent.use', moduleSlug: 'price-monitoring', surface: 'app', hub: 'sales', description: 'Track competitor prices on your products — in the AI studio.' },
   // Appointments — agent-driven scheduling over CRM Meetings (self-reminders); page is the Calendar tab.
   { id: 'appointments', label: 'Appointments', path: '/agent-hub?capability=appointments', icon: CalendarClock, requireCapability: 'agent.use', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'List & schedule appointments with reminders — in the AI studio.' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Invoices, payments, and reports.' },
@@ -163,12 +160,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // every surface" pattern. moduleSlug gates them into the launcher (active if entitled, else an
   // "available to add" upsell card).
   { id: 'social', label: 'Social Media', path: '/agent-hub?capability=social-post', icon: Share2, requireCapability: 'agent.use', moduleSlug: 'social-media', surface: 'app', hub: 'marketing', description: 'Publish & schedule social posts with the AI studio.' },
-  { id: 'seo', label: 'SEO', path: '/agent-hub?capability=seo-research', icon: TrendingUp, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Keyword research, audits & content — in the AI studio.' },
-  // Mention Monitoring — agent-driven (Edith), same launcher pattern as Social/SEO/Price Monitoring.
-  { id: 'mention-monitoring', label: 'Mention Monitoring', path: '/agent-hub?capability=mention-monitoring', icon: Radar, requireCapability: 'agent.use', moduleSlug: 'mention-monitoring', surface: 'app', hub: 'marketing', description: 'Track brand & product mentions across news, blogs & LLMs.' },
-  // Content Writer — agent-driven article pipeline (Edith): keyword research → plan → write → analyze.
-  // Same launcher pattern; the SEO tile is research/audits, this one lands on the writing capability.
-  { id: 'content-writer', label: 'Content Writer', path: '/agent-hub?capability=seo-article', icon: PenTool, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Write SEO-optimized articles & content — in the AI studio.' },
+  // SEO & Content — one tile for the whole seo-toolkit; the launcher center lists research/audits +
+  // article writing as sections (Content Writer merged in here, no longer a separate tile). Mention
+  // Monitoring is nested under Social Media (see LAUNCHER_SECTIONS) to keep the Marketing list lean.
+  { id: 'seo', label: 'SEO & Content', path: '/agent-hub?capability=seo-research', icon: TrendingUp, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Keyword research, audits & SEO article writing — in the AI studio.' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',

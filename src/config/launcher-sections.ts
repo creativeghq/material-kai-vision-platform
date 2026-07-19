@@ -11,6 +11,7 @@ import {
   MessageSquarePlus, Megaphone, LayoutTemplate,
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
   Sparkles, Calculator, Flame, Thermometer, PencilRuler,
+  Radar, Search, PenTool,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -90,9 +91,22 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Heat-pump sizer', to: '/tools/heat-pump', icon: Flame },
     { label: 'Heating cost compare', to: '/tools/heating-cost', icon: Thermometer },
   ],
-  // Quotes: only the 'quotes' list tab is always-on (requests/settings are network-manager gated),
-  // and that list IS the module's Open target — so no separate sections. Sales/Inbox/Automations
-  // have no URL tabs → Open-only as well.
+  // Quotes (nav id 'quotes', route /quotes). The list is the Open target; Price Monitoring is nested
+  // here as an agent deep-link (#275 — folded in from a standalone tile to keep the Sales list lean).
+  quotes: [
+    { label: 'Price monitoring', to: '/agent-hub?capability=price-monitoring', icon: TrendingUp },
+  ],
+  // Social Media (agent app). Mention Monitoring is nested here (folded in from a standalone tile).
+  social: [
+    { label: 'Mention monitoring', to: '/agent-hub?capability=mention-monitoring', icon: Radar },
+  ],
+  // SEO & Content (agent app, seo-toolkit). One tile for both research and article writing —
+  // Content Writer merged in here as a section instead of a separate tile.
+  seo: [
+    { label: 'Keyword research', to: '/agent-hub?capability=seo-research', icon: Search },
+    { label: 'Write an article', to: '/agent-hub?capability=seo-article', icon: PenTool },
+  ],
+  // Sales/Inbox/Automations have no URL tabs → Open-only.
 };
 
 // Right-column context-aware quick-CREATE triggers, keyed by SidebarNavItem.id. Each `to` carries a
