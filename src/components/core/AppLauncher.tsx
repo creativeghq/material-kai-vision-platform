@@ -104,28 +104,20 @@ export const AppLauncher: React.FC = () => {
     const quickStarts = cap?.quickStarts ?? [];
 
     return (
-      <div key={app.id} className="rounded-xl bg-muted/40 p-3">
-        <div className="flex items-center gap-2.5">
-          <span className={[
-            'flex h-9 w-9 items-center justify-center rounded-lg shrink-0',
-            app.active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-          ].join(' ')}>
-            <app.icon className="h-4.5 w-4.5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold truncate flex items-center gap-1.5">
-              {app.label}
-              {!app.active && <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" />}
-            </div>
-            {app.description && <div className="text-[11px] text-muted-foreground truncate">{app.description}</div>}
-          </div>
+      <div key={app.id} className="py-1">
+        {/* Headline: [icon] Name ───────────── [open] */}
+        <div className="flex items-center gap-2">
+          <app.icon className={['h-4 w-4 shrink-0', app.active ? 'text-primary' : 'text-muted-foreground'].join(' ')} />
+          <span className="text-sm font-semibold shrink-0">{app.label}</span>
+          {!app.active && <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" />}
+          <span className="h-px flex-1 bg-muted" />
           {app.active ? (
             <button
               type="button"
               title={`Open ${app.label}`}
               aria-label={`Open ${app.label}`}
               onClick={() => go(app.path, app.id)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
             >
               <ArrowUpRight className="h-4 w-4" />
             </button>
@@ -139,13 +131,13 @@ export const AppLauncher: React.FC = () => {
         </div>
 
         {app.active && (sections.length > 0 || actions.length > 0 || quickStarts.length > 0) && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {sections.map((s) => (
               <button
                 key={s.to}
                 type="button"
                 onClick={() => go(s.to, app.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
               >
                 <s.icon className="h-3.5 w-3.5 text-primary/80" /> {s.label}
               </button>
@@ -155,7 +147,7 @@ export const AppLauncher: React.FC = () => {
                 key={a.to}
                 type="button"
                 onClick={() => go(a.to, app.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5 text-primary/80" /> {a.label}
               </button>
@@ -166,7 +158,7 @@ export const AppLauncher: React.FC = () => {
                 type="button"
                 title={qs.description}
                 onClick={() => go(`/agent-hub?capability=${cap.capId}&quickstart=${cap.toolkitId}:${encodeURIComponent(qs.label)}`, app.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2 py-1 text-[12px] text-primary hover:bg-accent/60 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-primary hover:bg-accent/60 transition-colors"
               >
                 <Sparkles className="h-3.5 w-3.5" /> {qs.label}
               </button>
