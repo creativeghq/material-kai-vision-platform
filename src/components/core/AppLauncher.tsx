@@ -4,7 +4,7 @@
 // The RIGHT rail keeps cross-app shortcuts + recent. Data comes from useLauncherApps
 // (active/available + entitlement-aware enable/request) and the verified LAUNCHER_* deep-links.
 import React, { useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, ArrowRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, Sparkles, Wrench } from 'lucide-react';
+import { LayoutGrid, ArrowUpRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, Sparkles, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/popover';
@@ -104,7 +104,7 @@ export const AppLauncher: React.FC = () => {
     const quickStarts = cap?.quickStarts ?? [];
 
     return (
-      <div key={app.id} className="rounded-xl border border-border bg-card p-3">
+      <div key={app.id} className="rounded-xl bg-muted/40 p-3">
         <div className="flex items-center gap-2.5">
           <span className={[
             'flex h-9 w-9 items-center justify-center rounded-lg shrink-0',
@@ -120,9 +120,15 @@ export const AppLauncher: React.FC = () => {
             {app.description && <div className="text-[11px] text-muted-foreground truncate">{app.description}</div>}
           </div>
           {app.active ? (
-            <Button size="sm" variant="outline" className="shrink-0 gap-1.5" onClick={() => go(app.path, app.id)}>
-              Open <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
+            <button
+              type="button"
+              title={`Open ${app.label}`}
+              aria-label={`Open ${app.label}`}
+              onClick={() => go(app.path, app.id)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+            </button>
           ) : (
             <Button size="sm" className="shrink-0 gap-1.5" disabled={enabling === app.moduleSlug} onClick={(e) => onEnable(e, app)}>
               {enabling === app.moduleSlug
@@ -139,7 +145,7 @@ export const AppLauncher: React.FC = () => {
                 key={s.to}
                 type="button"
                 onClick={() => go(s.to, app.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-accent/40 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
               >
                 <s.icon className="h-3.5 w-3.5 text-primary/80" /> {s.label}
               </button>
@@ -149,7 +155,7 @@ export const AppLauncher: React.FC = () => {
                 key={a.to}
                 type="button"
                 onClick={() => go(a.to, app.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border bg-background px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-accent/40 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5 text-primary/80" /> {a.label}
               </button>
@@ -160,7 +166,7 @@ export const AppLauncher: React.FC = () => {
                 type="button"
                 title={qs.description}
                 onClick={() => go(`/agent-hub?capability=${cap.capId}&quickstart=${cap.toolkitId}:${encodeURIComponent(qs.label)}`, app.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-[12px] text-primary hover:bg-accent/40 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2 py-1 text-[12px] text-primary hover:bg-accent/60 transition-colors"
               >
                 <Sparkles className="h-3.5 w-3.5" /> {qs.label}
               </button>
