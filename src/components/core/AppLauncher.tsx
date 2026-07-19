@@ -186,7 +186,8 @@ export const AppLauncher: React.FC = () => {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="w-[min(62rem,calc(100vw-1.5rem))] p-0 rounded-2xl shadow-xl border-border/60 overflow-hidden"
+        collisionPadding={24}
+        className="w-[min(62rem,calc(100vw-3rem))] p-0 rounded-2xl shadow-xl border-border/60 overflow-hidden"
       >
         <PopoverPrimitive.Arrow className="fill-popover" width={16} height={8} />
 
