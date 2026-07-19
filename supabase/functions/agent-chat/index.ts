@@ -3019,6 +3019,32 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                 if (!streamClosed) {
                   safeEnqueue(chunk);
                 }
+                // Secondary confirmation channel (#275): mirror any staged
+                // human-in-the-loop action into the EXISTING notification bell so a
+                // pending Approve/Decline isn't lost if the user navigates away (and so
+                // background/tool-result-triggered confirmations — invariant #9 — surface
+                // at all). The inline card stays the primary surface. Fire-and-forget.
+                // NOTE: written directly rather than via a Flows event because no
+                // system-default delivery flow is seeded in this environment — an emitted
+                // event would be a silent no-op (inert). Convert to emitFlowEvent once the
+                // system-default flows are seeded.
+                if (chunk?.type === 'action_confirmation' && userId) {
+                  try {
+                    supabase.from('user_notifications').insert({
+                      user_id: userId,
+                      title: chunk.title || 'Action needs your approval',
+                      body: chunk.summary || 'The assistant has an action ready to run.',
+                      type: 'action_required',
+                      action_url: conversation_id ? `/agent-hub?conversation=${conversation_id}` : '/agent-hub',
+                      metadata: { tool: chunk.tool || null, toolkit_id: chunk.toolkit_id || null, source: 'agent_confirmation' },
+                      is_read: false,
+                    }).then(({ error }: any) => {
+                      if (error) console.warn('[agent-chat] confirmation bell insert failed:', error.message);
+                    });
+                  } catch (e) {
+                    console.warn('[agent-chat] confirmation bell insert threw:', (e as Error)?.message);
+                  }
+                }
               },
               pinned_material_images, // Catalog product images pinned by user
               generation_mode || undefined, // Explicit mode override from UI chip
