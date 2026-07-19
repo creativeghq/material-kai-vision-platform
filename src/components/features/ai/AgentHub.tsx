@@ -264,6 +264,9 @@ const AGENTS: AgentDefinition[] = [
 // #245 E — chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
+  // Price monitoring
+  price_tracking_started: 'Price tracking started',
+  price_summary: 'Competitor prices',
   // Knowledge-graph tools
   customer_overview_result: 'Customer overview',
   supplier_overview_result: 'Supplier overview',

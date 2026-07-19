@@ -147,6 +147,24 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Price Monitoring (all users; module-gated; internal flow unmetered) ──
+  {
+    id: 'track_product_prices', name: 'Track Prices', category: 'Price Monitoring',
+    moduleSlug: 'price-monitoring',
+    desc: 'Start or stop competitor price monitoring on a product. Starting runs the first discovery refresh across retailers.',
+    examples: [
+      'Start tracking competitor prices for product 12345',
+    ],
+  },
+  {
+    id: 'get_price_summary', name: 'Price Summary', category: 'Price Monitoring',
+    moduleSlug: 'price-monitoring',
+    desc: 'Show the current cheapest verified price + the discovered retailer list for a product.',
+    examples: [
+      'What are competitors charging for product 12345?',
+    ],
+  },
+
   // ── Job Research (all users; module-gated) ────────────────────────────
   {
     id: 'track_job_search', name: 'Track Job Search', category: 'Job Research',
@@ -1179,6 +1197,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'price-monitoring',
+    name: 'Price Monitoring',
+    description: 'Track what competitors charge for your products across retailers (Perplexity + DataForSEO + Firecrawl verification).',
+    icon: 'Percent',
+    moduleSlug: 'price-monitoring',
+    tool_ids: ['track_product_prices', 'get_price_summary'],
+    quick_starts: [
+      { label: 'Track prices', description: 'Start monitoring competitor prices on a product', prompt: 'Start tracking competitor prices for one of my products — help me pick which one.', icon: 'Plus' },
+      { label: 'Price check', description: 'See current competitor prices for a product', prompt: 'Show me what competitors are charging for one of my tracked products.', icon: 'Search' },
+    ],
+  },
+  {
     id: 'job-research',
     name: 'Job Research',
     description: 'Background job-discovery agent across Google Jobs, Perplexity, RSS + career pages with a consolidated daily digest.',
@@ -2024,6 +2054,7 @@ export const ALWAYS_ON_TOOLKIT_IDS = TOOLKITS.filter((t) => t.alwaysOn).map((t) 
 export const TOOLKIT_HUB: Record<string, HubId> = {
   // Marketing
   mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
+  'price-monitoring': 'sales',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',
   // Sales

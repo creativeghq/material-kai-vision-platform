@@ -915,6 +915,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'price_lookup',
       // Mention monitoring (all users; per-tool credit cost gated inside the tool)
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
+      // Price monitoring (all users; internal flow unmetered → 0 cr)
+      'track_product_prices', 'get_price_summary',
       // Job research (all users; per-tool credit cost gated inside each tool — currently 0 cr)
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
       // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
@@ -1170,6 +1172,9 @@ async function executeAgent(
     },
     'mentions': {
       tool_ids: ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'],
+    },
+    'price-monitoring': {
+      tool_ids: ['track_product_prices', 'get_price_summary'],
     },
     'job-research': {
       tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
@@ -1440,6 +1445,7 @@ async function executeAgent(
   const needsPrice = config.tools.includes('price_lookup') && isAdmin;
   const needsPresentation = config.tools.includes('generate_presentation_sheet');
   const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
+  const needsPriceMonitoring = config.tools.some((t: string) => ['track_product_prices', 'get_price_summary'].includes(t));
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
   const needsSourcing = config.tools.some((t: string) => ['source_product', 'create_purchase_order', 'send_purchase_order'].includes(t));
@@ -1459,7 +1465,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1484,6 +1490,7 @@ async function executeAgent(
     needsCrm          ? import('../_shared/tools/crm-tools.ts') : null,
     needsQuotes       ? import('../_shared/tools/quote-tools.ts') : null,
     needsSocial       ? import('../_shared/tools/social-tools.ts') : null,
+    needsPriceMonitoring ? import('../_shared/tools/price-monitoring-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -1562,6 +1569,8 @@ async function executeAgent(
   const createGetMentionSummaryTool = mentionMod?.createGetMentionSummaryTool;
   const createCheckLlmVisibilityTool = mentionMod?.createCheckLlmVisibilityTool;
   const createFindNegativeMentionsTool = mentionMod?.createFindNegativeMentionsTool;
+  const createTrackProductPricesTool = priceMonitoringMod?.createTrackProductPricesTool;
+  const createGetPriceSummaryTool = priceMonitoringMod?.createGetPriceSummaryTool;
   const createManageFlowsTool = flowsMod?.createManageFlowsTool;
   const createManageHrTool = hrToolsMod?.createManageHrTool;
   const createManageStockTool = stockToolsMod?.createManageStockTool;
@@ -1796,6 +1805,14 @@ async function executeAgent(
   }
   if (config.tools.includes('find_negative_mentions') && createFindNegativeMentionsTool) {
     tools.push(createFindNegativeMentionsTool(userId, userJwt, onChunk));
+  }
+
+  // Price monitoring tools (all users; module-gated; internal flow unmetered → 0 cr)
+  if (config.tools.includes('track_product_prices') && createTrackProductPricesTool) {
+    tools.push(createTrackProductPricesTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('get_price_summary') && createGetPriceSummaryTool) {
+    tools.push(createGetPriceSummaryTool(userId, userJwt, onChunk));
   }
 
   // Job research tools (all users; module-gated; refresh runs on cron, not on demand → 0 cr per tool)
