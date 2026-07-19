@@ -108,7 +108,7 @@ export const AppLauncher: React.FC = () => {
         {/* Headline: [icon] Name ───────────── [open] */}
         <div className="flex items-center gap-2">
           <app.icon className={['h-4 w-4 shrink-0', app.active ? 'text-primary' : 'text-muted-foreground'].join(' ')} />
-          <span className="text-sm font-semibold shrink-0">{app.label}</span>
+          <span className="text-base font-semibold shrink-0">{app.label}</span>
           {!app.active && <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" />}
           <span className="h-px flex-1 bg-muted" />
           {app.active ? (
