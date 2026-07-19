@@ -102,6 +102,7 @@ export const AppLauncher: React.FC = () => {
     const actions = app.active ? (LAUNCHER_ACTIONS[app.id] ?? []) : [];
     const cap = (sections.length === 0 && actions.length === 0 && app.active) ? capabilityQuickStarts(app) : null;
     const quickStarts = cap?.quickStarts ?? [];
+    const hasLinks = app.active && (sections.length > 0 || actions.length > 0 || quickStarts.length > 0);
 
     return (
       <div key={app.id} className="py-1">
@@ -130,7 +131,7 @@ export const AppLauncher: React.FC = () => {
           )}
         </div>
 
-        {app.active && (sections.length > 0 || actions.length > 0 || quickStarts.length > 0) && (
+        {hasLinks ? (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {sections.map((s) => (
               <button
@@ -164,7 +165,9 @@ export const AppLauncher: React.FC = () => {
               </button>
             ))}
           </div>
-        )}
+        ) : app.description ? (
+          <p className="mt-1 text-[12px] text-muted-foreground leading-snug">{app.description}</p>
+        ) : null}
       </div>
     );
   };
