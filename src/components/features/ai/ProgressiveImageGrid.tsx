@@ -673,11 +673,11 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
         {/* Progress bar — only while generating */}
         {status !== 'completed' && (
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-600">
+            <div className="flex justify-between text-sm text-muted-foreground">
               <span>Generating images...</span>
               <span>{progress}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-muted rounded-full h-2">
               <div
                 className="bg-blue-600 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
@@ -699,11 +699,11 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           {modelResults.map((result) => (
             <div key={result.model_id} className="flex flex-col gap-1.5">
               <div
-                className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all"
+                className="relative aspect-square rounded-lg overflow-hidden border-2 border-border cursor-pointer hover:border-primary/50 transition-all"
                 onClick={() => handleImageClick(result)}
               >
                 {result.status === 'pending' || result.status === 'processing' ? (
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 animate-pulse">
+                  <div className="absolute inset-0 bg-muted animate-pulse">
                     <div className="absolute inset-0 opacity-30">
                       <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 bg-blue-200 rounded-full blur-3xl" />
                       <div className="absolute bottom-1/4 right-1/4 w-1/3 h-1/3 bg-purple-200 rounded-full blur-2xl" />
@@ -724,7 +724,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     </div>
                   </>
                 ) : result.status === 'failed' ? (
-                  <div className="absolute inset-0 bg-red-50 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center">
                     <div className="text-center p-4">
                       <p className="text-red-600 text-sm font-medium">Failed</p>
                       <p className="text-red-500 text-xs mt-1">{result.error}</p>
@@ -774,7 +774,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
             {editedImages.map(edited => (
               <div
                 key={edited.id}
-                className="relative rounded-xl overflow-hidden border-2 border-violet-200 bg-white group cursor-pointer"
+                className="relative rounded-xl overflow-hidden border-2 border-violet-500/30 bg-card group cursor-pointer"
                 onClick={() => setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' })}
               >
                 <img
@@ -881,7 +881,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                       className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         editMode !== 'none'
                           ? 'bg-violet-600 text-white'
-                          : 'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200'
+                          : 'bg-violet-500/10 text-violet-700 dark:text-violet-300 hover:bg-violet-500/20 border border-violet-500/20'
                       }`}
                     >
                       <Paintbrush className="w-3.5 h-3.5" />
@@ -891,7 +891,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {editMode !== 'none' && onEditImage && (
                       <button
                         onClick={() => onEditImage(selectedImage.url)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 transition-colors"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-300 hover:bg-violet-500/20 border border-violet-500/20 transition-colors"
                         title="Change colors, lighting, flooring, style and more with AI"
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -910,7 +910,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
               onValueChange={(v) => setModalActiveTab(v as typeof modalActiveTab)}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg h-9">
+              <TabsList className="grid w-full grid-cols-2 bg-muted p-1 rounded-lg h-9">
                 <TabsTrigger value="image" className="gap-1.5 text-xs rounded-md">
                   <ZoomIn className="w-3.5 h-3.5" />
                   Image
@@ -930,7 +930,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
 
               {/* Edit mode tabs */}
               {editMode !== 'none' && (
-                <div className="flex gap-1 mt-2 p-1 bg-violet-50 rounded-lg border border-violet-200">
+                <div className="flex gap-1 mt-2 p-1 bg-violet-500/10 rounded-lg border border-violet-500/20">
                   <button
                     onClick={() => { setEditMode('zone-select'); }}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -956,7 +956,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
               <TabsContent value="image" className="mt-4">
                 {editMode === 'freehand' ? (
                   /* Freehand draw mode */
-                  <div className="relative bg-gray-50 rounded-xl overflow-hidden border-2 border-violet-400" style={{ minHeight: '380px' }}>
+                  <div className="relative bg-muted/40 rounded-xl overflow-hidden border-2 border-violet-400" style={{ minHeight: '380px' }}>
                     {selectedImage && (
                       <>
                         <img
@@ -1021,8 +1021,8 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                 ) : (
                   /* Normal image view + zone-select overlays */
                   <div
-                    className={`relative bg-gray-50 rounded-xl overflow-hidden border-2 transition-colors ${
-                      editMode === 'zone-select' ? 'border-violet-400' : 'border-gray-200'
+                    className={`relative bg-muted/40 rounded-xl overflow-hidden border-2 transition-colors ${
+                      editMode === 'zone-select' ? 'border-violet-400' : 'border-border'
                     }`}
                   >
                     {selectedImage && (
@@ -1119,7 +1119,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {onGenerateVideo && selectedImage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm">
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-full text-xs font-medium text-rose-700 dark:text-rose-300 transition-colors shadow-sm">
                             <Video className="w-3.5 h-3.5" />
                             Generate Video
                             <ChevronDown className="w-3 h-3" />
@@ -1168,7 +1168,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                       <button
                         onClick={() => { if (!vrGenerating) onGenerateVR(selectedImage!.url, { prompt: selectedImage!.name }); }}
                         disabled={vrGenerating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 rounded-full text-xs font-medium text-violet-700 dark:text-violet-300 disabled:opacity-50 transition-colors shadow-sm"
                         title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (18 credits)'}
                       >
                         {vrGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
@@ -1224,7 +1224,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {onGenerateMaterialsBoard && selectedImage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-700 transition-colors shadow-sm">
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-full text-xs font-medium text-amber-700 dark:text-amber-300 transition-colors shadow-sm">
                             <Layers className="w-3.5 h-3.5" />
                             Materials Board
                             <ChevronDown className="w-3 h-3 ml-0.5" />
@@ -1254,7 +1254,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {onGenerateMaterialsBoard && selectedImage && (
                       <button
                         onClick={() => onGenerateMaterialsBoard(selectedImage.url, 'photorealistic-render')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-full text-xs font-medium text-rose-700 dark:text-rose-300 transition-colors shadow-sm"
                         title="Generate ultra-detailed magazine-quality photorealistic render (15 credits)"
                       >
                         <Camera className="w-3.5 h-3.5" />

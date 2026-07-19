@@ -121,15 +121,15 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+    <div className="bg-card rounded-xl shadow-lg overflow-hidden border border-border">
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 bg-gray-50">
+      <div className="flex border-b border-border bg-muted/40">
         <button
           onClick={() => setActiveTab('images')}
           className={`flex-1 px-4 py-3 font-medium transition-colors flex items-center justify-center gap-2 ${
             activeTab === 'images'
-              ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-background text-primary border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Grid3x3 className="w-4 h-4" />
@@ -140,8 +140,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
             onClick={() => setActiveTab('analysis')}
             className={`flex-1 px-4 py-3 font-medium transition-colors flex items-center justify-center gap-2 ${
               activeTab === 'analysis'
-                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-background text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <Maximize2 className="w-4 h-4" />
@@ -153,8 +153,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
             onClick={() => setActiveTab('materials')}
             className={`flex-1 px-4 py-3 font-medium transition-colors flex items-center justify-center gap-2 ${
               activeTab === 'materials'
-                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-background text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <LayoutGrid className="w-4 h-4" />
@@ -166,8 +166,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
             onClick={() => setActiveTab('details')}
             className={`flex-1 px-4 py-3 font-medium transition-colors flex items-center justify-center gap-2 ${
               activeTab === 'details'
-                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-background text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <DollarSign className="w-4 h-4" />
@@ -181,7 +181,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
         {/* Images Tab */}
         {activeTab === 'images' && images.length > 0 && (
           <div className="space-y-4">
-            <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer" onClick={() => setShowImageModal(true)}>
+            <div className="relative aspect-video bg-muted rounded-lg overflow-hidden group cursor-pointer" onClick={() => setShowImageModal(true)}>
               <img
                 src={images[currentImageIndex]}
                 alt={`Design ${currentImageIndex + 1}`}
@@ -250,7 +250,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                 <button
                   onClick={() => { if (!vrGenerating) onGenerateVR(images[currentImageIndex], { prompt: parsedRequest?.enhanced_prompt, roomType: parsedRequest?.room_type, style: parsedRequest?.style }); }}
                   disabled={vrGenerating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 rounded-full text-xs font-medium text-violet-700 dark:text-violet-300 disabled:opacity-50 transition-colors shadow-sm"
                   title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (18 credits)'}
                 >
                   {vrGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
@@ -260,7 +260,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
               {onGenerateVideo && (
                 <button
                   onClick={() => onGenerateVideo(images[currentImageIndex])}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-full text-xs font-medium text-rose-700 dark:text-rose-300 transition-colors shadow-sm"
                   title="Generate video walkthrough with Veo (30 credits)"
                 >
                   <Video className="w-3.5 h-3.5" />
@@ -270,7 +270,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
               {onFindMaterials && (
                 <button
                   onClick={() => onFindMaterials(images[currentImageIndex])}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full text-xs font-medium text-blue-700 transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-full text-xs font-medium text-blue-700 dark:text-blue-300 transition-colors shadow-sm"
                   title="Find matching materials for this design"
                 >
                   <Search className="w-3.5 h-3.5" />
@@ -284,7 +284,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                   mediaTitle="Generated Design"
                 >
                   <button
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-full text-xs font-medium text-pink-700 transition-colors shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 rounded-full text-xs font-medium text-pink-700 dark:text-pink-300 transition-colors shadow-sm"
                     title="Save this design to a moodboard"
                   >
                     <BookmarkPlus className="w-3.5 h-3.5" />
@@ -294,7 +294,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
               )}
               <button
                 onClick={() => downloadImage(images[currentImageIndex])}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/40 hover:bg-muted border border-border rounded-full text-xs font-medium text-muted-foreground transition-colors shadow-sm"
                 title="Download image"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -304,22 +304,22 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
             {/* Multi-Model Summary Banner */}
             {modelResults.length > 0 && (
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-3">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-blue-600" />
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold text-foreground">
                       {successfulModels}/{totalModels} AI Models Generated Images
                     </span>
                   </div>
                   <div className="flex gap-2 text-sm">
                     {modelResults.filter(m => m.provider === 'replicate' && m.success).length > 0 && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                      <span className="px-2 py-1 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded">
                         🔵 Replicate ({modelResults.filter(m => m.provider === 'replicate' && m.success).length})
                       </span>
                     )}
                     {modelResults.filter(m => m.provider === 'huggingface' && m.success).length > 0 && (
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                      <span className="px-2 py-1 bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 rounded">
                         🟡 Hugging Face ({modelResults.filter(m => m.provider === 'huggingface' && m.success).length})
                       </span>
                     )}
@@ -339,8 +339,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                       onClick={() => setCurrentImageIndex(idx)}
                       className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
                         idx === currentImageIndex
-                          ? 'border-blue-600 ring-2 ring-blue-200'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-blue-600 ring-2 ring-blue-500/30'
+                          : 'border-border hover:border-muted-foreground/40'
                       }`}
                     >
                       <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
@@ -374,9 +374,9 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
             {/* Layout Analysis */}
             {spatialAnalysis.layout_analysis && (
-              <div className="bg-white rounded-xl border-2 border-blue-100 overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-100">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
+              <div className="bg-card rounded-xl border-2 border-border overflow-hidden">
+                <div className="bg-blue-500/10 px-6 py-4 border-b border-blue-500/20">
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
                     <Maximize2 className="w-5 h-5 text-blue-600" />
                     Layout & Spatial Design
                   </h3>
@@ -385,32 +385,32 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* Room Dimensions */}
                     {spatialAnalysis.layout_analysis.room_dimensions && (
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                      <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
                         <div className="flex items-center gap-2 mb-3">
                           <Ruler className="w-5 h-5 text-blue-600" />
-                          <h4 className="font-semibold text-gray-900">Dimensions</h4>
+                          <h4 className="font-semibold text-foreground">Dimensions</h4>
                         </div>
                         <div className="space-y-2">
                           {spatialAnalysis.layout_analysis.room_dimensions.width && (
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Width:</span>
-                              <span className="font-bold text-gray-900">
+                              <span className="text-sm text-muted-foreground">Width:</span>
+                              <span className="font-bold text-foreground">
                                 {spatialAnalysis.layout_analysis.room_dimensions.width}m
                               </span>
                             </div>
                           )}
                           {spatialAnalysis.layout_analysis.room_dimensions.length && (
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Length:</span>
-                              <span className="font-bold text-gray-900">
+                              <span className="text-sm text-muted-foreground">Length:</span>
+                              <span className="font-bold text-foreground">
                                 {spatialAnalysis.layout_analysis.room_dimensions.length}m
                               </span>
                             </div>
                           )}
                           {spatialAnalysis.layout_analysis.room_dimensions.height && (
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Height:</span>
-                              <span className="font-bold text-gray-900">
+                              <span className="text-sm text-muted-foreground">Height:</span>
+                              <span className="font-bold text-foreground">
                                 {spatialAnalysis.layout_analysis.room_dimensions.height}m
                               </span>
                             </div>
@@ -421,23 +421,23 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                     {/* Furniture Placement */}
                     {spatialAnalysis.layout_analysis.furniture_placement && (
-                      <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-lg p-4 border border-green-200">
+                      <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/20">
                         <div className="flex items-center gap-2 mb-3">
                           <Sofa className="w-5 h-5 text-green-600" />
-                          <h4 className="font-semibold text-gray-900">Furniture</h4>
+                          <h4 className="font-semibold text-foreground">Furniture</h4>
                         </div>
                         <div className="space-y-2 text-sm">
                           {Array.isArray(spatialAnalysis.layout_analysis.furniture_placement) ? (
                             spatialAnalysis.layout_analysis.furniture_placement.map((item: any, idx: number) => (
                               <div key={idx} className="flex items-start gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                <span className="text-gray-700">
+                                <span className="text-muted-foreground">
                                   {typeof item === 'string' ? item : item.name || item.description || JSON.stringify(item)}
                                 </span>
                               </div>
                             ))
                           ) : (
-                            <p className="text-gray-700">{String(spatialAnalysis.layout_analysis.furniture_placement)}</p>
+                            <p className="text-muted-foreground">{String(spatialAnalysis.layout_analysis.furniture_placement)}</p>
                           )}
                         </div>
                       </div>
@@ -445,12 +445,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                     {/* Lighting */}
                     {spatialAnalysis.layout_analysis.lighting && (
-                      <div className="bg-gradient-to-br from-amber-50 to-yellow-100 rounded-lg p-4 border border-amber-200">
+                      <div className="bg-amber-500/10 rounded-lg p-4 border border-amber-500/20">
                         <div className="flex items-center gap-2 mb-3">
                           <Lightbulb className="w-5 h-5 text-amber-600" />
-                          <h4 className="font-semibold text-gray-900">Lighting</h4>
+                          <h4 className="font-semibold text-foreground">Lighting</h4>
                         </div>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-muted-foreground">
                           {typeof spatialAnalysis.layout_analysis.lighting === 'string'
                             ? spatialAnalysis.layout_analysis.lighting
                             : JSON.stringify(spatialAnalysis.layout_analysis.lighting)}
@@ -460,12 +460,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                     {/* Traffic Flow */}
                     {spatialAnalysis.layout_analysis.traffic_flow && (
-                      <div className="bg-gradient-to-br from-purple-50 to-violet-100 rounded-lg p-4 border border-purple-200">
+                      <div className="bg-purple-500/10 rounded-lg p-4 border border-purple-500/20">
                         <div className="flex items-center gap-2 mb-3">
                           <Wind className="w-5 h-5 text-purple-600" />
-                          <h4 className="font-semibold text-gray-900">Traffic Flow</h4>
+                          <h4 className="font-semibold text-foreground">Traffic Flow</h4>
                         </div>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-muted-foreground">
                           {typeof spatialAnalysis.layout_analysis.traffic_flow === 'string'
                             ? spatialAnalysis.layout_analysis.traffic_flow
                             : JSON.stringify(spatialAnalysis.layout_analysis.traffic_flow)}
@@ -475,26 +475,26 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                     {/* Space Utilization */}
                     {spatialAnalysis.layout_analysis.space_utilization && (
-                      <div className="bg-gradient-to-br from-cyan-50 to-blue-100 rounded-lg p-4 border border-cyan-200">
+                      <div className="bg-cyan-500/10 rounded-lg p-4 border border-cyan-500/20">
                         <div className="flex items-center gap-2 mb-3">
                           <TrendingUp className="w-5 h-5 text-cyan-600" />
-                          <h4 className="font-semibold text-gray-900">Space Efficiency</h4>
+                          <h4 className="font-semibold text-foreground">Space Efficiency</h4>
                         </div>
                         <div className="space-y-2">
                           {typeof spatialAnalysis.layout_analysis.space_utilization === 'number' ? (
                             <>
-                              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                              <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                                 <div
                                   className="bg-gradient-to-r from-cyan-500 to-blue-600 h-full rounded-full transition-all"
                                   style={{ width: `${spatialAnalysis.layout_analysis.space_utilization}%` }}
                                 />
                               </div>
-                              <p className="text-center font-bold text-gray-900">
+                              <p className="text-center font-bold text-foreground">
                                 {spatialAnalysis.layout_analysis.space_utilization}% Utilized
                               </p>
                             </>
                           ) : (
-                            <p className="text-sm text-gray-700">
+                            <p className="text-sm text-muted-foreground">
                               {String(spatialAnalysis.layout_analysis.space_utilization)}
                             </p>
                           )}
@@ -505,8 +505,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                   {/* Additional Layout Info */}
                   {spatialAnalysis.layout_analysis.description && (
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                      <p className="text-sm text-gray-700 leading-relaxed">
+                    <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                      <p className="text-sm text-muted-foreground leading-relaxed">
                         {spatialAnalysis.layout_analysis.description}
                       </p>
                     </div>
@@ -517,9 +517,9 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
             {/* Material Suggestions */}
             {spatialAnalysis.material_suggestions && spatialAnalysis.material_suggestions.length > 0 && (
-              <div className="bg-white rounded-xl border-2 border-green-100 overflow-hidden">
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-green-100">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
+              <div className="bg-card rounded-xl border-2 border-border overflow-hidden">
+                <div className="bg-green-500/10 px-6 py-4 border-b border-green-500/20">
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
                     <Package className="w-5 h-5 text-green-600" />
                     AI Material Recommendations
                   </h3>
@@ -534,17 +534,17 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                       return (
                         <div
                           key={idx}
-                          className="flex items-start gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 hover:shadow-md transition-shadow"
+                          className="flex items-start gap-3 p-4 bg-green-500/10 rounded-lg border border-green-500/20 hover:shadow-md transition-shadow"
                         >
                           <div className="flex-shrink-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
                             {idx + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 leading-relaxed">
+                            <p className="text-sm font-medium text-foreground leading-relaxed">
                               {suggestionText}
                             </p>
                             {suggestion.location && (
-                              <p className="text-xs text-gray-600 mt-1">
+                              <p className="text-xs text-muted-foreground mt-1">
                                 📍 {suggestion.location}
                               </p>
                             )}
@@ -559,9 +559,9 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
             {/* Accessibility Report */}
             {spatialAnalysis.accessibility_report && (
-              <div className="bg-white rounded-xl border-2 border-purple-100 overflow-hidden">
-                <div className="bg-gradient-to-r from-purple-50 to-violet-50 px-6 py-4 border-b border-purple-100">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
+              <div className="bg-card rounded-xl border-2 border-border overflow-hidden">
+                <div className="bg-purple-500/10 px-6 py-4 border-b border-purple-500/20">
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
                     <Accessibility className="w-5 h-5 text-purple-600" />
                     Accessibility Analysis
                   </h3>
@@ -572,8 +572,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                     {spatialAnalysis.accessibility_report.wheelchair_accessible !== undefined && (
                       <div className={`p-4 rounded-lg border-2 ${
                         spatialAnalysis.accessibility_report.wheelchair_accessible
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-red-50 border-red-200'
+                          ? 'bg-green-500/10 border-green-500/20'
+                          : 'bg-red-500/10 border-red-500/20'
                       }`}>
                         <div className="flex items-center gap-2 mb-2">
                           {spatialAnalysis.accessibility_report.wheelchair_accessible ? (
@@ -581,12 +581,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                           ) : (
                             <AlertCircle className="w-5 h-5 text-red-600" />
                           )}
-                          <h4 className="font-semibold text-gray-900">Wheelchair Access</h4>
+                          <h4 className="font-semibold text-foreground">Wheelchair Access</h4>
                         </div>
                         <p className={`text-sm font-medium ${
                           spatialAnalysis.accessibility_report.wheelchair_accessible
-                            ? 'text-green-700'
-                            : 'text-red-700'
+                            ? 'text-green-700 dark:text-green-300'
+                            : 'text-red-700 dark:text-red-300'
                         }`}>
                           {spatialAnalysis.accessibility_report.wheelchair_accessible ? 'Accessible' : 'Not Accessible'}
                         </p>
@@ -595,12 +595,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                     {/* Clearance */}
                     {spatialAnalysis.accessibility_report.clearance && (
-                      <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                      <div className="p-4 bg-blue-500/10 rounded-lg border-2 border-blue-500/20">
                         <div className="flex items-center gap-2 mb-2">
                           <Eye className="w-5 h-5 text-blue-600" />
-                          <h4 className="font-semibold text-gray-900">Clearance</h4>
+                          <h4 className="font-semibold text-foreground">Clearance</h4>
                         </div>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-muted-foreground">
                           {typeof spatialAnalysis.accessibility_report.clearance === 'string'
                             ? spatialAnalysis.accessibility_report.clearance
                             : JSON.stringify(spatialAnalysis.accessibility_report.clearance)}
@@ -612,8 +612,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                     {spatialAnalysis.accessibility_report.ada_compliant !== undefined && (
                       <div className={`p-4 rounded-lg border-2 ${
                         spatialAnalysis.accessibility_report.ada_compliant
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-amber-50 border-amber-200'
+                          ? 'bg-green-500/10 border-green-500/20'
+                          : 'bg-amber-500/10 border-amber-500/20'
                       }`}>
                         <div className="flex items-center gap-2 mb-2">
                           {spatialAnalysis.accessibility_report.ada_compliant ? (
@@ -621,12 +621,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                           ) : (
                             <AlertCircle className="w-5 h-5 text-amber-600" />
                           )}
-                          <h4 className="font-semibold text-gray-900">ADA Compliance</h4>
+                          <h4 className="font-semibold text-foreground">ADA Compliance</h4>
                         </div>
                         <p className={`text-sm font-medium ${
                           spatialAnalysis.accessibility_report.ada_compliant
-                            ? 'text-green-700'
-                            : 'text-amber-700'
+                            ? 'text-green-700 dark:text-green-300'
+                            : 'text-amber-700 dark:text-amber-300'
                         }`}>
                           {spatialAnalysis.accessibility_report.ada_compliant ? 'Compliant' : 'Review Needed'}
                         </p>
@@ -635,12 +635,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                     {/* Safety Notes */}
                     {spatialAnalysis.accessibility_report.safety_notes && (
-                      <div className="p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+                      <div className="p-4 bg-purple-500/10 rounded-lg border-2 border-purple-500/20">
                         <div className="flex items-center gap-2 mb-2">
                           <AlertCircle className="w-5 h-5 text-purple-600" />
-                          <h4 className="font-semibold text-gray-900">Safety Notes</h4>
+                          <h4 className="font-semibold text-foreground">Safety Notes</h4>
                         </div>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-muted-foreground">
                           {typeof spatialAnalysis.accessibility_report.safety_notes === 'string'
                             ? spatialAnalysis.accessibility_report.safety_notes
                             : JSON.stringify(spatialAnalysis.accessibility_report.safety_notes)}
@@ -651,9 +651,9 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                   {/* Additional Accessibility Info */}
                   {spatialAnalysis.accessibility_report.recommendations && (
-                    <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
-                      <h4 className="font-semibold text-gray-900 mb-2">Recommendations</h4>
-                      <p className="text-sm text-gray-700 leading-relaxed">
+                    <div className="mt-4 p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                      <h4 className="font-semibold text-foreground mb-2">Recommendations</h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
                         {typeof spatialAnalysis.accessibility_report.recommendations === 'string'
                           ? spatialAnalysis.accessibility_report.recommendations
                           : JSON.stringify(spatialAnalysis.accessibility_report.recommendations)}
@@ -707,9 +707,9 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                 <button
                   key={material.id}
                   onClick={() => onMaterialClick?.(material.id)}
-                  className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-600 hover:shadow-lg transition-all group"
+                  className="bg-card border-2 border-border rounded-lg overflow-hidden hover:border-blue-600 hover:shadow-lg transition-all group"
                 >
-                  <div className="aspect-square bg-gray-100">
+                  <div className="aspect-square bg-muted">
                     {material.image_url ? (
                       <img
                         src={material.image_url}
@@ -717,13 +717,13 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         <LayoutGrid className="w-8 h-8" />
                       </div>
                     )}
                   </div>
                   <div className="p-3">
-                    <p className="font-medium text-sm text-gray-900 line-clamp-1 group-hover:text-blue-600">
+                    <p className="font-medium text-sm text-foreground line-clamp-1 group-hover:text-blue-600">
                       {material.name}
                     </p>
                     {material.metadata?.price && (
@@ -743,43 +743,43 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
           <div className="space-y-6">
             {/* Parsed Request */}
             {parsedRequest && (
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Design Request</h3>
+              <div className="bg-blue-500/10 rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-3">Design Request</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   {parsedRequest.room_type && (
                     <div>
-                      <span className="text-gray-600">Room Type:</span>
-                      <span className="ml-2 font-medium text-gray-900">{parsedRequest.room_type}</span>
+                      <span className="text-muted-foreground">Room Type:</span>
+                      <span className="ml-2 font-medium text-foreground">{parsedRequest.room_type}</span>
                     </div>
                   )}
                   {parsedRequest.style && (
                     <div>
-                      <span className="text-gray-600">Style:</span>
-                      <span className="ml-2 font-medium text-gray-900">{parsedRequest.style}</span>
+                      <span className="text-muted-foreground">Style:</span>
+                      <span className="ml-2 font-medium text-foreground">{parsedRequest.style}</span>
                     </div>
                   )}
                   {parsedRequest.layout && (
                     <div className="col-span-2">
-                      <span className="text-gray-600">Layout:</span>
-                      <span className="ml-2 font-medium text-gray-900">{parsedRequest.layout}</span>
+                      <span className="text-muted-foreground">Layout:</span>
+                      <span className="ml-2 font-medium text-foreground">{parsedRequest.layout}</span>
                     </div>
                   )}
                   {parsedRequest.materials && parsedRequest.materials.length > 0 && (
                     <div className="col-span-2">
-                      <span className="text-gray-600">Materials:</span>
-                      <span className="ml-2 font-medium text-gray-900">{parsedRequest.materials.join(', ')}</span>
+                      <span className="text-muted-foreground">Materials:</span>
+                      <span className="ml-2 font-medium text-foreground">{parsedRequest.materials.join(', ')}</span>
                     </div>
                   )}
                   {parsedRequest.features && parsedRequest.features.length > 0 && (
                     <div className="col-span-2">
-                      <span className="text-gray-600">Features:</span>
-                      <span className="ml-2 font-medium text-gray-900">{parsedRequest.features.join(', ')}</span>
+                      <span className="text-muted-foreground">Features:</span>
+                      <span className="ml-2 font-medium text-foreground">{parsedRequest.features.join(', ')}</span>
                     </div>
                   )}
                   {parsedRequest.enhanced_prompt && (
                     <div className="col-span-2">
-                      <span className="text-gray-600">Enhanced Prompt:</span>
-                      <p className="mt-1 text-gray-900 text-xs bg-white p-2 rounded">{parsedRequest.enhanced_prompt}</p>
+                      <span className="text-muted-foreground">Enhanced Prompt:</span>
+                      <p className="mt-1 text-foreground text-xs bg-card p-2 rounded">{parsedRequest.enhanced_prompt}</p>
                     </div>
                   )}
                 </div>
@@ -788,25 +788,25 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
             {/* Quality Assessment */}
             {qualityAssessment && (
-              <div className="bg-green-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Quality Assessment</h3>
+              <div className="bg-green-500/10 rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-3">Quality Assessment</h3>
                 <div className="space-y-2">
                   {qualityAssessment.score !== undefined && (
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-600">Score:</span>
-                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <span className="text-muted-foreground">Score:</span>
+                      <div className="flex-1 bg-muted rounded-full h-2">
                         <div
                           className="bg-green-600 h-2 rounded-full"
                           style={{ width: `${qualityAssessment.score}%` }}
                         />
                       </div>
-                      <span className="font-medium text-gray-900">{qualityAssessment.score}/100</span>
+                      <span className="font-medium text-foreground">{qualityAssessment.score}/100</span>
                     </div>
                   )}
                   {qualityAssessment.feedback && (
                     <div>
-                      <span className="text-gray-600">Feedback:</span>
-                      <p className="mt-1 text-sm text-gray-900">{qualityAssessment.feedback}</p>
+                      <span className="text-muted-foreground">Feedback:</span>
+                      <p className="mt-1 text-sm text-foreground">{qualityAssessment.feedback}</p>
                     </div>
                   )}
                 </div>
@@ -815,12 +815,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
             {/* Processing Time */}
             {processingTimeMs !== undefined && (
-              <div className="bg-purple-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">Processing Time</h3>
-                <p className="text-2xl font-bold text-purple-600">
+              <div className="bg-purple-500/10 rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-2">Processing Time</h3>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-300">
                   {(processingTimeMs / 1000).toFixed(2)}s
                 </p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {images.length} images generated in {(processingTimeMs / 1000).toFixed(1)} seconds
                 </p>
               </div>
@@ -832,18 +832,18 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
       {/* Image Analysis Modal */}
       {showImageModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowImageModal(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+            <div className="flex items-center justify-between p-6 border-b border-border bg-blue-500/10">
               <div className="flex items-center gap-3">
                 <Sparkles className="w-6 h-6 text-blue-600" />
-                <h2 className="text-2xl font-bold text-gray-900">Design Analysis & Materials</h2>
+                <h2 className="text-2xl font-bold text-foreground">Design Analysis & Materials</h2>
               </div>
               <button
                 onClick={() => setShowImageModal(false)}
-                className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
               >
-                <X className="w-6 h-6 text-gray-600" />
+                <X className="w-6 h-6 text-muted-foreground" />
               </button>
             </div>
 
@@ -852,7 +852,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
                 {/* Left: Image */}
                 <div className="space-y-4">
-                  <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                  <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
                     <img
                       src={images[currentImageIndex]}
                       alt={`Design ${currentImageIndex + 1}`}
@@ -861,21 +861,21 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                   </div>
 
                   {/* Image Info */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2">Design Details</h3>
+                  <div className="bg-muted/40 rounded-lg p-4">
+                    <h3 className="font-semibold text-foreground mb-2">Design Details</h3>
                     <div className="space-y-2 text-sm">
                       {parsedRequest?.room_type && (
                         <div className="flex items-center gap-2">
-                          <Home className="w-4 h-4 text-gray-600" />
-                          <span className="text-gray-600">Room Type:</span>
-                          <span className="font-medium text-gray-900 capitalize">{parsedRequest.room_type}</span>
+                          <Home className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Room Type:</span>
+                          <span className="font-medium text-foreground capitalize">{parsedRequest.room_type}</span>
                         </div>
                       )}
                       {parsedRequest?.style && (
                         <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-gray-600" />
-                          <span className="text-gray-600">Style:</span>
-                          <span className="font-medium text-gray-900 capitalize">{parsedRequest.style}</span>
+                          <Sparkles className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Style:</span>
+                          <span className="font-medium text-foreground capitalize">{parsedRequest.style}</span>
                         </div>
                       )}
                     </div>
@@ -886,12 +886,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                 <div className="space-y-4">
                   {/* Spatial Analysis */}
                   {spatialAnalysis && (
-                    <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="bg-blue-500/10 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <Lightbulb className="w-5 h-5 text-blue-600" />
-                        <h3 className="font-semibold text-gray-900">AI Spatial Analysis</h3>
+                        <h3 className="font-semibold text-foreground">AI Spatial Analysis</h3>
                         {spatialAnalysis.confidence_score && (
-                          <span className="ml-auto text-sm font-medium text-blue-600">
+                          <span className="ml-auto text-sm font-medium text-blue-600 dark:text-blue-300">
                             {(spatialAnalysis.confidence_score * 100).toFixed(0)}% confidence
                           </span>
                         )}
@@ -900,18 +900,18 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                       {/* Layout Analysis */}
                       {spatialAnalysis.layout_analysis && (
                         <div className="mb-3">
-                          <h4 className="text-sm font-medium text-gray-700 mb-1">Layout Analysis</h4>
-                          <p className="text-sm text-gray-600">{JSON.stringify(spatialAnalysis.layout_analysis)}</p>
+                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Layout Analysis</h4>
+                          <p className="text-sm text-muted-foreground">{JSON.stringify(spatialAnalysis.layout_analysis)}</p>
                         </div>
                       )}
 
                       {/* Material Suggestions */}
                       {spatialAnalysis.material_suggestions && spatialAnalysis.material_suggestions.length > 0 && (
                         <div className="mb-3">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Material Suggestions</h4>
+                          <h4 className="text-sm font-medium text-muted-foreground mb-2">Material Suggestions</h4>
                           <div className="space-y-1">
                             {spatialAnalysis.material_suggestions.slice(0, 3).map((suggestion: any, idx: number) => (
-                              <div key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                              <div key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                                 <span>{typeof suggestion === 'string' ? suggestion : suggestion.name || JSON.stringify(suggestion)}</span>
                               </div>
@@ -923,8 +923,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                       {/* Accessibility */}
                       {spatialAnalysis.accessibility_report && (
                         <div>
-                          <h4 className="text-sm font-medium text-gray-700 mb-1">Accessibility</h4>
-                          <p className="text-sm text-gray-600">{JSON.stringify(spatialAnalysis.accessibility_report)}</p>
+                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Accessibility</h4>
+                          <p className="text-sm text-muted-foreground">{JSON.stringify(spatialAnalysis.accessibility_report)}</p>
                         </div>
                       )}
                     </div>
@@ -932,11 +932,11 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                   {/* Matched Materials */}
                   {matchedMaterials && matchedMaterials.length > 0 && (
-                    <div className="bg-green-50 rounded-lg p-4">
+                    <div className="bg-green-500/10 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <Package className="w-5 h-5 text-green-600" />
-                        <h3 className="font-semibold text-gray-900">Available Materials</h3>
-                        <span className="ml-auto text-sm font-medium text-green-600">
+                        <h3 className="font-semibold text-foreground">Available Materials</h3>
+                        <span className="ml-auto text-sm font-medium text-green-600 dark:text-green-300">
                           {matchedMaterials.length} products
                         </span>
                       </div>
@@ -945,7 +945,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                         {matchedMaterials.map((material) => (
                           <div
                             key={material.id}
-                            className="bg-white rounded-lg p-3 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer"
+                            className="bg-card rounded-lg p-3 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer"
                             onClick={() => onMaterialClick?.(material.id)}
                           >
                             {material.image_url && (
@@ -956,9 +956,9 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                               />
                             )}
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 truncate">{material.name}</h4>
+                              <h4 className="font-medium text-foreground truncate">{material.name}</h4>
                               {material.metadata?.category && (
-                                <p className="text-xs text-gray-600">{material.metadata.category}</p>
+                                <p className="text-xs text-muted-foreground">{material.metadata.category}</p>
                               )}
                             </div>
                             <TrendingUp className="w-4 h-4 text-green-600 flex-shrink-0" />
