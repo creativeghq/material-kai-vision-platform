@@ -255,7 +255,14 @@ jobs:
   # ────────────────────────────────────────────────────────────────────
   deploy-functions:
     needs: changes
-    if: needs.changes.outputs.functions == 'true' && needs.changes.outputs.changed_functions_count != '0'
+    # Run when the diff touched functions, OR on a manual/forced dispatch (the changes job fills
+    # changed_functions with ALL functions in that case — gating on the paths-filter `functions`
+    # output alone made the force_full_functions_deploy toggle inert on a frontend-only HEAD).
+    if: >-
+      (needs.changes.outputs.functions == 'true'
+       || github.event_name == 'workflow_dispatch'
+       || github.event.inputs.force_full_functions_deploy == 'true')
+      && needs.changes.outputs.changed_functions_count != '0'
     runs-on: ubuntu-latest
     environment: production
     steps:
