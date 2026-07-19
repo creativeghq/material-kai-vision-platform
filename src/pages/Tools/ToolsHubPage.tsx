@@ -19,6 +19,11 @@ import {
   ScanSearch,
   ShoppingBag,
   Thermometer,
+  LineChart,
+  Radar,
+  Megaphone,
+  Share2,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -106,6 +111,45 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
   },
 ];
 
+/**
+ * Agent tools — capabilities that live in the KAI studio (chat + canvas) rather than as a standalone
+ * page: the monitors and marketing toolkits. Each card deep-links to `/agent-hub?capability=<id>`,
+ * which primes the owning agent + toolkit so the user lands on "here's what you can do" (#275). Shown
+ * to signed-in users only.
+ */
+const AGENT_TOOLS: ToolEntry[] = [
+  {
+    slug: 'price-monitoring', to: '/agent-hub?capability=price-monitoring',
+    title: 'Price monitoring',
+    description: 'Track what competitors charge for your products across retailers — start tracking or pull the latest prices from chat.',
+    icon: LineChart, badge: 'Studio · agent',
+  },
+  {
+    slug: 'mention-monitoring', to: '/agent-hub?capability=mention-monitoring',
+    title: 'Mention monitoring',
+    description: 'Watch news, blogs and LLM answers for your brand or products — summaries and sentiment, on demand.',
+    icon: Radar, badge: 'Studio · agent',
+  },
+  {
+    slug: 'email-campaign', to: '/agent-hub?capability=email-campaign',
+    title: 'Email campaigns',
+    description: 'Draft a campaign to a CRM audience in chat — the agent composes it and you send from the Email page.',
+    icon: Megaphone, badge: 'Studio · agent',
+  },
+  {
+    slug: 'seo-research', to: '/agent-hub?capability=seo-research',
+    title: 'SEO research',
+    description: 'Keyword research, audits and content — run the SEO toolkit inside the studio.',
+    icon: Search, badge: 'Studio · agent',
+  },
+  {
+    slug: 'social-post', to: '/agent-hub?capability=social-post',
+    title: 'Social posts',
+    description: 'Publish and schedule posts across connected accounts, and read analytics — from chat.',
+    icon: Share2, badge: 'Studio · agent',
+  },
+];
+
 function ToolCard({ tool }: { tool: ToolEntry }) {
   const Icon = tool.icon;
   return (
@@ -162,6 +206,19 @@ export default function ToolsHubPage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {WORKSPACE_TOOLS.map((t) => <ToolCard key={t.slug} tool={t} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Agent tools — capabilities you run inside the KAI studio (chat + canvas). */}
+      {user && (
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold tracking-tight mb-1">Agent tools</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Run these inside the studio — the agent does the work and shows results on the canvas.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {AGENT_TOOLS.map((t) => <ToolCard key={t.slug} tool={t} />)}
           </div>
         </div>
       )}

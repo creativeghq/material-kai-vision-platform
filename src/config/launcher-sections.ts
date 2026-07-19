@@ -10,6 +10,7 @@ import {
   FolderOpen, Send, Settings, UserPlus, Receipt, FilePlus, FolderPlus,
   MessageSquarePlus, Megaphone, LayoutTemplate,
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
+  Sparkles, Calculator, Flame, Thermometer, PencilRuler,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -71,9 +72,27 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Movements', to: '/warehouse?tab=movements', icon: ArrowLeftRight },
     { label: 'Stock counts', to: '/warehouse?tab=counts', icon: ClipboardList },
   ],
+  // MoodBoards (nav id 'moodboard', route /moodboard). The board list is the Open target; the
+  // high-value work is the AI presentation sheets — surface them as agent deep-links so a click
+  // opens the studio primed on the presentation-sheets toolkit (9 sheet types) instead of hunting
+  // for the per-board Sheets tab. (#275 — sheets are an agent capability, not a page tab.)
+  moodboard: [
+    { label: 'Presentation sheets', to: '/agent-hub?capability=presentation-sheet', icon: LayoutTemplate },
+    { label: 'Design breakdown', to: '/agent-hub?capability=presentation-sheet', icon: PencilRuler },
+    { label: 'Interior studio', to: '/agent-hub?capability=interior', icon: Sparkles },
+  ],
+  // Projects (nav id 'projects', route /projects). No URL tabs on the page, but the module owns
+  // real agent + calculator capabilities that were invisible in the menu: the purchase-sheet builder
+  // (agent) and the three estimators (real pages under /tools). Surface them here.
+  projects: [
+    { label: 'Purchase sheet', to: '/agent-hub?capability=project', icon: ClipboardList },
+    { label: 'Project estimator', to: '/tools/project-plan', icon: Calculator },
+    { label: 'Heat-pump sizer', to: '/tools/heat-pump', icon: Flame },
+    { label: 'Heating cost compare', to: '/tools/heating-cost', icon: Thermometer },
+  ],
   // Quotes: only the 'quotes' list tab is always-on (requests/settings are network-manager gated),
-  // and that list IS the module's Open target — so no separate sections. Projects/Sales/Inbox/
-  // Automations have no URL tabs → Open-only as well.
+  // and that list IS the module's Open target — so no separate sections. Sales/Inbox/Automations
+  // have no URL tabs → Open-only as well.
 };
 
 // Right-column context-aware quick-CREATE triggers, keyed by SidebarNavItem.id. Each `to` carries a
