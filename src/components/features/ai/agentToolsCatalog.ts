@@ -165,6 +165,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Email Marketing (module + entitlement gated; draft-only) ──────────
+  {
+    id: 'manage_email_campaign', name: 'Email Campaigns', category: 'Email Marketing',
+    moduleSlug: 'email-marketing',
+    desc: 'List email campaigns/templates and compose a DRAFT campaign (name + template + audience). The agent drafts; you review + send from Marketing → Email.',
+    examples: [
+      'Draft a campaign to my architects category using the spring promo template',
+      'List my email campaigns',
+    ],
+  },
+
   // ── Job Research (all users; module-gated) ────────────────────────────
   {
     id: 'track_job_search', name: 'Track Job Search', category: 'Job Research',
@@ -1209,6 +1220,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'email-marketing',
+    name: 'Email Marketing',
+    description: 'Compose draft email campaigns (name + template + audience) the agent drafts and you send from the Email page.',
+    icon: 'Mail',
+    moduleSlug: 'email-marketing',
+    tool_ids: ['manage_email_campaign'],
+    quick_starts: [
+      { label: 'Draft a campaign', description: 'Compose a draft campaign to a CRM audience', prompt: 'Draft an email campaign — show me my templates and audience categories first.', icon: 'Plus' },
+      { label: 'My campaigns', description: 'List recent email campaigns', prompt: 'List my recent email campaigns and their status.', icon: 'ListChecks' },
+    ],
+  },
+  {
     id: 'job-research',
     name: 'Job Research',
     description: 'Background job-discovery agent across Google Jobs, Perplexity, RSS + career pages with a consolidated daily digest.',
@@ -2054,6 +2077,7 @@ export const ALWAYS_ON_TOOLKIT_IDS = TOOLKITS.filter((t) => t.alwaysOn).map((t) 
 export const TOOLKIT_HUB: Record<string, HubId> = {
   // Marketing
   mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
+  'email-marketing': 'marketing',
   'price-monitoring': 'sales',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',

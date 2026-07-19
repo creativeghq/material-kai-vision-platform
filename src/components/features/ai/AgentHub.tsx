@@ -267,6 +267,10 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Price monitoring
   price_tracking_started: 'Price tracking started',
   price_summary: 'Competitor prices',
+  // Email marketing
+  email_campaigns_list: 'Email campaigns',
+  email_templates_list: 'Email templates',
+  email_campaign_created: 'Draft campaign created',
   // Knowledge-graph tools
   customer_overview_result: 'Customer overview',
   supplier_overview_result: 'Supplier overview',
