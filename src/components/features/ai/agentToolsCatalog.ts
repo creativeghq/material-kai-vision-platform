@@ -198,6 +198,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Messaging / WhatsApp (module + entitlement gated; send confirm-gated) ──
+  {
+    id: 'manage_messaging', name: 'WhatsApp', category: 'Messaging',
+    moduleSlug: 'messaging',
+    desc: 'List connected WhatsApp channels and send a message (sending asks for Approve/Decline first).',
+    examples: [
+      'What WhatsApp numbers do we have connected?',
+      'Send a WhatsApp to +30691… saying the order is ready',
+    ],
+  },
+
   // ── Job Research (all users; module-gated) ────────────────────────────
   {
     id: 'track_job_search', name: 'Track Job Search', category: 'Job Research',
@@ -1242,6 +1253,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'messaging',
+    name: 'WhatsApp',
+    description: 'Send WhatsApp messages to customers via your connected channels (send asks to Approve first).',
+    icon: 'Send',
+    moduleSlug: 'messaging',
+    tool_ids: ['manage_messaging'],
+    quick_starts: [
+      { label: 'My channels', description: 'List connected WhatsApp numbers', prompt: 'List my connected WhatsApp channels.', icon: 'ListChecks' },
+      { label: 'Send a message', description: 'Send a WhatsApp to a customer', prompt: 'Send a WhatsApp message — ask me for the number and the text.', icon: 'Send' },
+    ],
+  },
+  {
     id: 'crm',
     name: 'CRM',
     description: 'Add companies to the CRM from a VAT / ΑΦΜ number (ΑΑΔΕ / VIES lookup → create).',
@@ -2122,7 +2145,7 @@ export const ALWAYS_ON_TOOLKIT_IDS = TOOLKITS.filter((t) => t.alwaysOn).map((t) 
 export const TOOLKIT_HUB: Record<string, HubId> = {
   // Marketing
   mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
-  'email-marketing': 'marketing',
+  'email-marketing': 'marketing', messaging: 'service',
   'price-monitoring': 'sales',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',
@@ -2247,8 +2270,8 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   'seo-research': ['marketing'], 'seo-domain': ['marketing'], 'seo-backlinks': ['marketing'],
   'seo-content': ['marketing'], 'seo-multi-engine': ['marketing'], 'seo-composite': ['marketing'],
   'seo-article': ['marketing'], mentions: ['marketing'], 'email-marketing': ['marketing'],
-  // Social → Hermes
-  social: ['social-media'],
+  // Social + WhatsApp → Hermes (the comms agent)
+  social: ['social-media'], messaging: ['social-media'],
   // Finance / quotes → Trinity
   quotes: ['erp'], finance: ['erp'], 'knowledge-graph': ['erp', 'product-business'],
   // Product & business → Pepper

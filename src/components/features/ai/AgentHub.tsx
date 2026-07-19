@@ -275,6 +275,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   email_campaign_sent: 'Campaign sending',
   // CRM
   crm_company_created: 'Company added to CRM',
+  // Messaging / WhatsApp
+  messaging_channels_list: 'WhatsApp channels',
+  messaging_sent: 'WhatsApp sent',
   // Finance (read)
   finance_invoices_list: 'Invoices',
   customer_balance_result: 'Customer balance',
