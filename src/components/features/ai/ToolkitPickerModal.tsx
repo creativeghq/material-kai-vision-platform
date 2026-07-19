@@ -26,7 +26,7 @@ import {
   X, Check, Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe,
   Link2, FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Lock,
   AlertCircle, Coins, RotateCcw, Briefcase, FolderKanban,
-  Users, CalendarOff, CalendarPlus, LayoutDashboard, ListChecks,
+  Users, CalendarOff, CalendarPlus, CalendarClock, CalendarDays, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,
   Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
   Pencil, PencilLine, Percent, Send, Image as ImageIcon, Wallet, Inbox, Star,
@@ -48,7 +48,7 @@ import { Play } from 'lucide-react';
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Compass, BookOpen, Megaphone, LayoutTemplate, Sparkles, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Briefcase, FolderKanban,
-  Users, CalendarOff, CalendarPlus, LayoutDashboard, ListChecks,
+  Users, CalendarOff, CalendarPlus, CalendarClock, CalendarDays, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,
   Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
   Pencil, PencilLine, Percent, Send, ImageIcon, AlertCircle, Wallet, Inbox, Star,

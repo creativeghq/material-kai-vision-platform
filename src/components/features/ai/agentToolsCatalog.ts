@@ -231,6 +231,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Appointments / meetings (crm module + entitlement gated; per-user via RLS) ──
+  {
+    id: 'manage_appointments', name: 'Appointments', category: 'Appointments',
+    moduleSlug: 'crm',
+    desc: 'List upcoming appointments and schedule new ones with optional email/WhatsApp reminders to yourself.',
+    examples: [
+      'What appointments do I have this week?',
+      'Schedule a site visit next Tuesday at 3pm and remind me an hour before',
+    ],
+  },
+
   // ── Messaging / WhatsApp (module + entitlement gated; send confirm-gated) ──
   {
     id: 'manage_messaging', name: 'WhatsApp', category: 'Messaging',
@@ -1322,6 +1333,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'appointments',
+    name: 'Appointments',
+    description: 'List upcoming appointments and schedule new ones with reminders to yourself.',
+    icon: 'CalendarClock',
+    moduleSlug: 'crm',
+    tool_ids: ['manage_appointments'],
+    quick_starts: [
+      { label: 'This week', description: 'Upcoming appointments', prompt: 'What appointments do I have coming up this week?', icon: 'CalendarDays' },
+      { label: 'Schedule one', description: 'Book a new appointment', prompt: 'Schedule an appointment for me — I\'ll give you the details.', icon: 'CalendarPlus' },
+    ],
+  },
+  {
     id: 'messaging',
     name: 'WhatsApp',
     description: 'Send WhatsApp messages to customers via your connected channels (send asks to Approve first).',
@@ -2219,7 +2242,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',
   // Sales
-  quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales', crm: 'sales',
+  quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales', crm: 'sales', appointments: 'sales',
   // Finance
   stock: 'finance', finance: 'finance', contracts: 'finance',
   // Studio

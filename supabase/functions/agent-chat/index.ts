@@ -929,6 +929,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_inbox',
       // Reviews (module-gated; per-user via RLS; public reply is confirm-gated)
       'manage_reviews',
+      // Appointments / meetings (crm module + entitlement gated; per-user via RLS; 0 cr)
+      'manage_appointments',
       // Job research (all users; per-tool credit cost gated inside each tool — currently 0 cr)
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
       // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
@@ -1227,6 +1229,9 @@ async function executeAgent(
     'reviews': {
       tool_ids: ['manage_reviews'],
     },
+    'appointments': {
+      tool_ids: ['manage_appointments'],
+    },
     'job-research': {
       tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
     },
@@ -1503,6 +1508,7 @@ async function executeAgent(
   const needsContracts = config.tools.includes('manage_contracts');
   const needsInbox = config.tools.includes('manage_inbox');
   const needsReviews = config.tools.includes('manage_reviews');
+  const needsAppointments = config.tools.includes('manage_appointments');
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
   const needsSourcing = config.tools.some((t: string) => ['source_product', 'create_purchase_order', 'send_purchase_order'].includes(t));
@@ -1522,7 +1528,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1554,6 +1560,7 @@ async function executeAgent(
     needsContracts ? import('../_shared/tools/contracts-tools.ts') : null,
     needsInbox ? import('../_shared/tools/inbox-tools.ts') : null,
     needsReviews ? import('../_shared/tools/reviews-tools.ts') : null,
+    needsAppointments ? import('../_shared/tools/appointments-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -1640,6 +1647,7 @@ async function executeAgent(
   const createManageContractsTool = contractsMod?.createManageContractsTool;
   const createManageInboxTool = inboxMod?.createManageInboxTool;
   const createManageReviewsTool = reviewsMod?.createManageReviewsTool;
+  const createManageAppointmentsTool = appointmentsMod?.createManageAppointmentsTool;
   const createManageFlowsTool = flowsMod?.createManageFlowsTool;
   const createManageHrTool = hrToolsMod?.createManageHrTool;
   const createManageStockTool = stockToolsMod?.createManageStockTool;
@@ -1915,6 +1923,11 @@ async function executeAgent(
   // Reviews (module-gated; per-user via RLS; public reply is confirm-gated)
   if (config.tools.includes('manage_reviews') && createManageReviewsTool) {
     tools.push(createManageReviewsTool(userId, workspaceId, userJwt, onChunk));
+  }
+
+  // Appointments / meetings (crm module + entitlement gated; per-user via RLS)
+  if (config.tools.includes('manage_appointments') && createManageAppointmentsTool) {
+    tools.push(createManageAppointmentsTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Job research tools (all users; module-gated; refresh runs on cron, not on demand → 0 cr per tool)

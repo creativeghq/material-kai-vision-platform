@@ -287,6 +287,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Reviews
   reviews_list: 'Reviews about you',
   review_reply_posted: 'Reply posted',
+  // Appointments
+  appointments_list: 'Upcoming appointments',
+  appointment_scheduled: 'Appointment scheduled',
   // Finance (read)
   finance_invoices_list: 'Invoices',
   finance_orders_list: 'Orders',
