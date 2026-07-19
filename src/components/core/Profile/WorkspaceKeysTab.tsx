@@ -1,17 +1,25 @@
 /**
- * Profile → Keys: one place for a workspace's third-party access.
+ * Profile → Keys: one place for a workspace's third-party access, laid out as a
+ * left sidebar of sections + a content pane (instead of one long scroll).
  *
- *  - Bring your own key (paste a secret): myAADE Special Access Codes, Resend email, myDATA REST.
- *    These reuse the exact cards mounted in Finance → Settings (same RLS, same storage).
- *  - Connections (OAuth, nothing to paste): Stripe, Social, WhatsApp — status + a link to where
- *    they're managed.
+ * Sections group the BYOK cards + connections by domain:
+ *  - Finance & Tax  → myAADE Special Access Codes, myDATA REST inbound, Stripe payouts
+ *  - Email          → Resend
+ *  - Documents      → branded PDF template
+ *  - HR & Payroll   → Ergani            (only when the HR module is enabled)
+ *  - Shipping       → courier creds     (only when the Stock module is enabled)
+ *  - Social & Messaging → Social, WhatsApp
  *
  * Everything is scoped to the active workspace; the BYOK cards self-gate via
- * is_workspace_finance_manager RLS.
+ * is_workspace_finance_manager RLS. The cards themselves are the same ones mounted
+ * in Finance → Settings / the module pages — this is just the tidy home for them.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { KeyRound, Plug, CreditCard, Share2, MessageCircle, ArrowRight, FileImage } from 'lucide-react';
+import {
+  KeyRound, CreditCard, Share2, MessageCircle, ArrowRight,
+  FileImage, Landmark, Mail, Users, Truck,
+} from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -52,10 +60,26 @@ const ConnectionRow: React.FC<{
   </div>
 );
 
+const SectionHead: React.FC<{ icon: React.ElementType; title: string; description: string }> = ({
+  icon: Icon, title, description,
+}) => (
+  <div className="space-y-1">
+    <div className="flex items-center gap-2">
+      <Icon className="h-4 w-4 text-primary" />
+      <h2 className="text-base font-semibold">{title}</h2>
+    </div>
+    <p className="text-sm text-muted-foreground">{description}</p>
+  </div>
+);
+
+type SectionId = 'finance' | 'email' | 'documents' | 'hr' | 'shipping' | 'social';
+
 export const WorkspaceKeysTab: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
   const stockModule = useModule('stock');
+  const hrModule = useModule('hr');
   const [conn, setConn] = useState<ConnState>({ stripe: 'none', social: 0 });
+  const [active, setActive] = useState<SectionId>('finance');
 
   useEffect(() => {
     if (!activeWorkspaceId) return;
@@ -75,84 +99,176 @@ export const WorkspaceKeysTab: React.FC = () => {
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
 
+  // Sidebar sections — HR / Shipping only show when their module is enabled.
+  const sections = useMemo(
+    () => ([
+      { id: 'finance' as const, label: 'Finance & Tax', icon: Landmark, available: true },
+      { id: 'email' as const, label: 'Email', icon: Mail, available: true },
+      { id: 'documents' as const, label: 'Documents', icon: FileImage, available: true },
+      { id: 'hr' as const, label: 'HR & Payroll', icon: Users, available: hrModule.enabled },
+      { id: 'shipping' as const, label: 'Shipping', icon: Truck, available: stockModule.enabled },
+      { id: 'social' as const, label: 'Social & Messaging', icon: Share2, available: true },
+    ].filter((s) => s.available)),
+    [hrModule.enabled, stockModule.enabled],
+  );
+
+  // Keep the active section valid if a module toggles off underneath us.
+  useEffect(() => {
+    if (!sections.some((s) => s.id === active)) setActive(sections[0]?.id ?? 'finance');
+  }, [sections, active]);
+
   if (!activeWorkspaceId) {
     return <p className="text-sm text-muted-foreground">Select a workspace to manage its keys.</p>;
   }
 
-  return (
-    <div className="space-y-8">
-      {/* Bring your own key */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-primary" />
-          <h2 className="text-base font-semibold">Bring your own key</h2>
-        </div>
-        <p className="text-sm text-muted-foreground -mt-2">
-          Paste your own provider credentials so these run under your account. Leave blank to use the platform defaults.
-        </p>
-        <AadeCredentialsCard workspaceId={activeWorkspaceId} />
-        <WorkspaceEmailConfigCard workspaceId={activeWorkspaceId} />
-        <InboundSetupCard workspaceId={activeWorkspaceId} />
-        <ErganiCredentialsCard workspaceId={activeWorkspaceId} />
-        {stockModule.enabled && <ShippingCredentialsCard workspaceId={activeWorkspaceId} />}
-      </section>
-
-      {/* Document design — the branded PDF template used by the presentation/sales docs
-          (quotes, catalogs, proformas). Invoices/receipts keep their own fiscal design. */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <FileImage className="h-4 w-4 text-primary" />
-          <h2 className="text-base font-semibold">Document templates</h2>
-        </div>
-        <p className="text-sm text-muted-foreground -mt-2">
-          The branded cover / background / back-cover for your quotes, catalogs and proformas.
-        </p>
-        <WorkspacePdfTemplateCard />
-      </section>
-
-      {/* Connections */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Plug className="h-4 w-4 text-primary" />
-          <h2 className="text-base font-semibold">Connections</h2>
-        </div>
-        <p className="text-sm text-muted-foreground -mt-2">
-          Authorized by connecting an account — no key to paste.
-        </p>
-        <Card>
-          <CardContent className="space-y-3 p-5">
-            <ConnectionRow
-              icon={CreditCard}
-              title="Stripe payouts"
-              description="Receive store payments into your own Stripe account."
-              to="/finance"
-              status={
-                conn.stripe === 'connected'
-                  ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">Connected</Badge>
-                  : conn.stripe === 'onboarding'
-                    ? <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">Onboarding</Badge>
-                    : <Badge variant="secondary">Not connected</Badge>
-              }
+  const renderSection = (id: SectionId) => {
+    switch (id) {
+      case 'finance':
+        return (
+          <>
+            <SectionHead
+              icon={Landmark}
+              title="Finance & Tax"
+              description="Your Greek tax + e-invoicing credentials and the account payments settle into. Leave blank to use the platform defaults."
             />
-            <ConnectionRow
+            <AadeCredentialsCard workspaceId={activeWorkspaceId} />
+            <InboundSetupCard workspaceId={activeWorkspaceId} />
+            <Card>
+              <CardContent className="p-5">
+                <ConnectionRow
+                  icon={CreditCard}
+                  title="Stripe payouts"
+                  description="Receive store payments into your own Stripe account."
+                  to="/finance"
+                  status={
+                    conn.stripe === 'connected'
+                      ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">Connected</Badge>
+                      : conn.stripe === 'onboarding'
+                        ? <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">Onboarding</Badge>
+                        : <Badge variant="secondary">Not connected</Badge>
+                  }
+                />
+              </CardContent>
+            </Card>
+          </>
+        );
+      case 'email':
+        return (
+          <>
+            <SectionHead
+              icon={Mail}
+              title="Email"
+              description="Send transactional + marketing email from your own Resend account and verified sender."
+            />
+            <WorkspaceEmailConfigCard workspaceId={activeWorkspaceId} />
+          </>
+        );
+      case 'documents':
+        return (
+          <>
+            <SectionHead
+              icon={FileImage}
+              title="Document templates"
+              description="The branded cover / background / back-cover for your quotes, catalogs and proformas. Invoices & receipts keep their own fiscal design."
+            />
+            <WorkspacePdfTemplateCard />
+          </>
+        );
+      case 'hr':
+        return (
+          <>
+            <SectionHead
+              icon={Users}
+              title="HR & Payroll"
+              description="Connect ΕΡΓΑΝΗ so absences and work-schedule submissions run under your entity."
+            />
+            <ErganiCredentialsCard workspaceId={activeWorkspaceId} />
+          </>
+        );
+      case 'shipping':
+        return (
+          <>
+            <SectionHead
+              icon={Truck}
+              title="Shipping"
+              description="Your courier credentials so dispatch labels and tracking use your own account."
+            />
+            <ShippingCredentialsCard workspaceId={activeWorkspaceId} />
+          </>
+        );
+      case 'social':
+        return (
+          <>
+            <SectionHead
               icon={Share2}
-              title="Social accounts"
-              description="Instagram, Facebook, LinkedIn, TikTok and more (via Zernio)."
-              to="/profile?tab=social-accounts"
-              status={conn.social > 0
-                ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">{conn.social} connected</Badge>
-                : <Badge variant="secondary">None</Badge>}
+              title="Social & Messaging"
+              description="Authorized by connecting an account — no key to paste."
             />
-            <ConnectionRow
-              icon={MessageCircle}
-              title="WhatsApp"
-              description="Send & receive WhatsApp messages (via Zernio)."
-              to="/admin/messaging"
-              status={<Badge variant="secondary">Via Zernio</Badge>}
-            />
-          </CardContent>
-        </Card>
-      </section>
+            <Card>
+              <CardContent className="space-y-3 p-5">
+                <ConnectionRow
+                  icon={Share2}
+                  title="Social accounts"
+                  description="Instagram, Facebook, LinkedIn, TikTok and more (via Zernio)."
+                  to="/profile?tab=social-accounts"
+                  status={conn.social > 0
+                    ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">{conn.social} connected</Badge>
+                    : <Badge variant="secondary">None</Badge>}
+                />
+                <ConnectionRow
+                  icon={MessageCircle}
+                  title="WhatsApp"
+                  description="Send & receive WhatsApp messages (via Zernio)."
+                  to="/admin/messaging"
+                  status={<Badge variant="secondary">Via Zernio</Badge>}
+                />
+              </CardContent>
+            </Card>
+          </>
+        );
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-4 w-4 text-primary" />
+        <h1 className="text-lg font-semibold">Keys &amp; connections</h1>
+      </div>
+
+      <div className="flex flex-col gap-6 md:flex-row">
+        {/* Sidebar — horizontal scroll on mobile, left column on desktop */}
+        <nav
+          className="flex gap-1 overflow-x-auto pb-1 md:w-56 md:shrink-0 md:flex-col md:overflow-visible md:pb-0"
+          aria-label="Key sections"
+        >
+          {sections.map((s) => {
+            const Icon = s.icon;
+            const isActive = s.id === active;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActive(s.id)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{s.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Content pane */}
+        <section className="min-w-0 flex-1 space-y-4">
+          {renderSection(active)}
+        </section>
+      </div>
     </div>
   );
 };

@@ -925,6 +925,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_finance',
       // Contracts & e-signature (module + entitlement gated; send is confirm-gated)
       'manage_contracts',
+      // Customer Inbox (module + entitlement gated; customer-facing reply is confirm-gated)
+      'manage_inbox',
       // Job research (all users; per-tool credit cost gated inside each tool — currently 0 cr)
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
       // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
@@ -1068,6 +1070,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_social',
       // Hermes is the comms agent — also handles WhatsApp messaging (send is confirm-gated)
       'manage_messaging',
+      // …and the customer Inbox — list conversations + reply (customer-facing reply is confirm-gated)
+      'manage_inbox',
     ],
   },
 
@@ -1212,6 +1216,9 @@ async function executeAgent(
     },
     'contracts': {
       tool_ids: ['manage_contracts'],
+    },
+    'inbox': {
+      tool_ids: ['manage_inbox'],
     },
     'job-research': {
       tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
@@ -1487,6 +1494,7 @@ async function executeAgent(
   const needsFinance = config.tools.includes('manage_finance');
   const needsMessaging = config.tools.includes('manage_messaging');
   const needsContracts = config.tools.includes('manage_contracts');
+  const needsInbox = config.tools.includes('manage_inbox');
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
   const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
   const needsSourcing = config.tools.some((t: string) => ['source_product', 'create_purchase_order', 'send_purchase_order'].includes(t));
@@ -1506,7 +1514,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1536,6 +1544,7 @@ async function executeAgent(
     needsFinance ? import('../_shared/tools/finance-tools.ts') : null,
     needsMessaging ? import('../_shared/tools/messaging-tools.ts') : null,
     needsContracts ? import('../_shared/tools/contracts-tools.ts') : null,
+    needsInbox ? import('../_shared/tools/inbox-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -1620,6 +1629,7 @@ async function executeAgent(
   const createManageFinanceTool = financeMod?.createManageFinanceTool;
   const createManageMessagingTool = messagingMod?.createManageMessagingTool;
   const createManageContractsTool = contractsMod?.createManageContractsTool;
+  const createManageInboxTool = inboxMod?.createManageInboxTool;
   const createManageFlowsTool = flowsMod?.createManageFlowsTool;
   const createManageHrTool = hrToolsMod?.createManageHrTool;
   const createManageStockTool = stockToolsMod?.createManageStockTool;
@@ -1885,6 +1895,11 @@ async function executeAgent(
   // Contracts & e-signature (module + entitlement gated; send is confirm-gated)
   if (config.tools.includes('manage_contracts') && createManageContractsTool) {
     tools.push(createManageContractsTool(userId, workspaceId, userJwt, onChunk));
+  }
+
+  // Customer Inbox (module + entitlement gated; customer-facing reply is confirm-gated)
+  if (config.tools.includes('manage_inbox') && createManageInboxTool) {
+    tools.push(createManageInboxTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Job research tools (all users; module-gated; refresh runs on cron, not on demand → 0 cr per tool)

@@ -281,6 +281,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Contracts
   contracts_list: 'Contracts',
   contract_sent: 'Contract sent for signature',
+  // Customer Inbox
+  inbox_threads_list: 'Customer conversations',
+  inbox_reply_sent: 'Reply sent',
   // Finance (read)
   finance_invoices_list: 'Invoices',
   customer_balance_result: 'Customer balance',
