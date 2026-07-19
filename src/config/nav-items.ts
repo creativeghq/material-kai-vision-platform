@@ -20,6 +20,7 @@ import {
   Share2,
   TrendingUp,
   Radar,
+  PenTool,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -145,6 +146,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'seo', label: 'SEO', path: '/agent-hub?capability=seo-research', icon: TrendingUp, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Keyword research, audits & content — in the AI studio.' },
   // Mention Monitoring — agent-driven (Edith), same launcher pattern as Social/SEO/Price Monitoring.
   { id: 'mention-monitoring', label: 'Mention Monitoring', path: '/agent-hub?capability=mention-monitoring', icon: Radar, requireCapability: 'agent.use', moduleSlug: 'mention-monitoring', surface: 'app', hub: 'marketing', description: 'Track brand & product mentions across news, blogs & LLMs.' },
+  // Content Writer — agent-driven article pipeline (Edith): keyword research → plan → write → analyze.
+  // Same launcher pattern; the SEO tile is research/audits, this one lands on the writing capability.
+  { id: 'content-writer', label: 'Content Writer', path: '/agent-hub?capability=seo-article', icon: PenTool, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Write SEO-optimized articles & content — in the AI studio.' },
   {
     id: 'factory-analytics',
     label: 'Supplier Analytics',
