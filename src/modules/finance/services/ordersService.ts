@@ -30,6 +30,9 @@ export interface Order {
   subtotal_net: number;
   vat_amount: number;
   total: number;
+  /** Order-level discount the operator entered: 'percent' (a %) or 'amount' (flat cash off the net). */
+  discount_type: 'percent' | 'amount' | null;
+  discount_value: number;
   notes: string | null;
   /** Finance category (income for sales, expense for purchase). Carried onto the invoice/bill. */
   category_id: string | null;
@@ -77,6 +80,8 @@ export interface OrderItem {
   net_value: number;
   vat_amount: number;
   line_total: number;
+  /** Effective per-line discount % (from the order-level discount, allocated proportionally). */
+  discount_pct: number;
   quantity_delivered: number;
   update_warehouse: boolean;
   sort_order: number;
@@ -107,6 +112,43 @@ export interface LinePricing {
   measurement_unit_code: string | null;
   available: number | null;   // qty on hand across the workspace's warehouses (null = not stocked)
   supplier_company_id: string | null;  // product's default supplier, to seed the line
+}
+
+export type OrderDiscountType = 'percent' | 'amount';
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Apply an order-level discount ('percent' or a flat 'amount') across the lines. The SAME effective
+ * % is applied to every line (a flat amount → an equivalent %), so it allocates proportionally by
+ * net and VAT stays exact per line. Line `unit_price` is kept at the ORIGINAL entered price so
+ * re-editing an order never double-applies the discount; the discount lives in each line's
+ * (post-discount) net/vat and its `discount_pct`, plus the order's `discount_type`/`discount_value`.
+ */
+function computeOrderLines(
+  items: NewOrderItem[],
+  discount?: { type: OrderDiscountType | null; value: number },
+): {
+  lines: Array<{ it: NewOrderItem; net: number; vat: number; pct: number; discountPct: number }>;
+  subtotal: number; vatTotal: number; total: number; effDiscountPct: number;
+} {
+  const rawSubtotal = r2(items.reduce((a, it) => a + (it.quantity || 0) * (it.unit_price || 0), 0));
+  let effDiscountPct = 0;
+  if (discount?.type === 'percent') {
+    effDiscountPct = Math.min(100, Math.max(0, Number(discount.value) || 0));
+  } else if (discount?.type === 'amount' && rawSubtotal > 0) {
+    effDiscountPct = Math.min(100, Math.max(0, ((Number(discount.value) || 0) / rawSubtotal) * 100));
+  }
+  const factor = 1 - effDiscountPct / 100;
+  const lines = items.map((it) => {
+    const net = r2((it.quantity || 0) * (it.unit_price || 0) * factor);
+    const pct = it.vat_percent ?? 0;
+    const vat = r2(net * pct / 100);
+    return { it, net, vat, pct, discountPct: Math.round(effDiscountPct * 1e6) / 1e6 };
+  });
+  const subtotal = r2(lines.reduce((a, l) => a + l.net, 0));
+  const vatTotal = r2(lines.reduce((a, l) => a + l.vat, 0));
+  return { lines, subtotal, vatTotal, total: r2(subtotal + vatTotal), effDiscountPct };
 }
 
 export const ordersService = {
@@ -266,18 +308,13 @@ export const ordersService = {
     notes?: string | null;
     categoryId?: string | null;
     expectedPaymentDate?: string | null;
+    /** Order-level discount off the net: a % or a flat cash amount. */
+    discountType?: OrderDiscountType | null;
+    discountValue?: number | null;
     items: NewOrderItem[];
   }): Promise<string> {
-    const r2 = (n: number) => Math.round(n * 100) / 100;
-    const lines = input.items.map((it) => {
-      const net = r2((it.quantity || 0) * (it.unit_price || 0));
-      const pct = it.vat_percent ?? 0;
-      const vat = r2(net * pct / 100);
-      return { it, net, vat, pct };
-    });
-    const subtotal = r2(lines.reduce((a, l) => a + l.net, 0));
-    const vatTotal = r2(lines.reduce((a, l) => a + l.vat, 0));
-    const total = r2(subtotal + vatTotal);
+    const disc = { type: input.discountType ?? null, value: Number(input.discountValue) || 0 };
+    const { lines, subtotal, vatTotal, total } = computeOrderLines(input.items, disc);
     const { data: order, error } = await supabase
       .from('orders')
       .insert({
@@ -293,6 +330,8 @@ export const ordersService = {
         subtotal_net: subtotal,
         vat_amount: vatTotal,
         total,
+        discount_type: disc.value > 0 && disc.type ? disc.type : null,
+        discount_value: disc.value > 0 && disc.type ? disc.value : 0,
         notes: input.notes ?? null,
         category_id: input.categoryId ?? null,
         expected_payment_date: input.expectedPaymentDate ?? null,
@@ -316,7 +355,8 @@ export const ordersService = {
         vat_category: l.it.vat_category ?? null,
         net_value: l.net,
         vat_amount: l.vat,
-        line_total: l.net,      // net per line (gross sits on the order total)
+        line_total: l.net,      // net per line (post-discount; gross sits on the order total)
+        discount_pct: l.discountPct,
         update_warehouse: l.it.update_warehouse ?? true,
         sort_order: i,
       }));
@@ -530,16 +570,17 @@ export const ordersService = {
     });
   },
 
-  /** Replace an order's line items and recompute its totals (draft/un-invoiced orders). */
-  async updateItems(orderId: string, workspaceId: string, items: NewOrderItem[]): Promise<void> {
-    const r2 = (n: number) => Math.round(n * 100) / 100;
-    const lines = items.map((it) => {
-      const net = r2((it.quantity || 0) * (it.unit_price || 0));
-      const pct = it.vat_percent ?? 0;
-      return { it, net, vat: r2(net * pct / 100), pct };
-    });
-    const subtotal = r2(lines.reduce((a, l) => a + l.net, 0));
-    const vatTotal = r2(lines.reduce((a, l) => a + l.vat, 0));
+  /**
+   * Replace an order's line items and recompute its totals (draft/un-invoiced orders). The
+   * order-level discount is re-applied against the (original) line prices — pass it explicitly so
+   * editing the items keeps the discount instead of silently dropping it.
+   */
+  async updateItems(
+    orderId: string, workspaceId: string, items: NewOrderItem[],
+    discount?: { type: OrderDiscountType | null; value: number },
+  ): Promise<void> {
+    const disc = { type: discount?.type ?? null, value: Number(discount?.value) || 0 };
+    const { lines, subtotal, vatTotal, total } = computeOrderLines(items, disc);
     await supabase.from('order_items').delete().eq('order_id', orderId);
     if (lines.length) {
       const { error: itErr } = await supabase.from('order_items').insert(lines.map((l, i) => ({
@@ -548,14 +589,43 @@ export const ordersService = {
         supplier_company_id: l.it.supplier_company_id ?? null,
         measurement_unit_code: l.it.measurement_unit_code ?? null,
         vat_percent: l.pct, vat_category: l.it.vat_category ?? null,
-        net_value: l.net, vat_amount: l.vat, line_total: l.net, update_warehouse: l.it.update_warehouse ?? true, sort_order: i,
+        net_value: l.net, vat_amount: l.vat, line_total: l.net, discount_pct: l.discountPct,
+        update_warehouse: l.it.update_warehouse ?? true, sort_order: i,
       })));
       if (itErr) throw itErr;
     }
     const { error } = await supabase.from('orders')
-      .update({ subtotal_net: subtotal, vat_amount: vatTotal, total: r2(subtotal + vatTotal), updated_at: new Date().toISOString() })
+      .update({
+        subtotal_net: subtotal, vat_amount: vatTotal, total,
+        discount_type: disc.value > 0 && disc.type ? disc.type : null,
+        discount_value: disc.value > 0 && disc.type ? disc.value : 0,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', orderId);
     if (error) throw error;
+  },
+
+  /** How much of the customer's on-account credit can be applied to this (sales) order. */
+  async getApplicableCredit(orderId: string, workspaceId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('get_order_applicable_credit', {
+      p_workspace_id: workspaceId, p_order_id: orderId,
+    });
+    if (error) throw error;
+    return Number(data) || 0;
+  },
+
+  /**
+   * Settle a sales order from the customer's existing on-account credit — NO new cash. Re-homes the
+   * customer's unallocated "money in" onto the order (splitting the last payment so nothing overpays);
+   * the order's payment_status recomputes via the payment trigger and any remainder stays as credit.
+   * Pass `amount` to cap it; omit to apply up to the order's outstanding.
+   */
+  async applyCreditToOrder(orderId: string, workspaceId: string, amount?: number): Promise<number> {
+    const { data, error } = await supabase.rpc('apply_customer_credit_to_order', {
+      p_workspace_id: workspaceId, p_order_id: orderId, p_amount: amount ?? null,
+    });
+    if (error) throw error;
+    return Number((data as any)?.applied) || 0;
   },
 
   /**

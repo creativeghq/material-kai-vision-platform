@@ -287,6 +287,9 @@ const NewOrderModal: React.FC<{
   // Order note from whoever places the order (e.g. delivery/pickup instructions). Prints on the
   // invoice + payment receipt and is visible on the order in the backend.
   const [notes, setNotes] = useState('');
+  // Order-level discount off the net — a % or a flat cash amount (applied proportionally so VAT stays exact).
+  const [discountType, setDiscountType] = useState<'percent' | 'amount'>('percent');
+  const [discountValue, setDiscountValue] = useState('');
 
   const isSales = orderType === 'sales';
   // Sales orders are income, purchase orders are expense — offer the matching category kinds.
@@ -297,6 +300,7 @@ const NewOrderModal: React.FC<{
     setParty(null); setPartySearch(''); setPartyOpts([]); setActiveLine(null); setLineProdOpts([]);
     setProject(null); setProjectSearch(''); setProjectOpts([]); setCurrency('EUR');
     setCategoryId('none'); setExpectedDate('');
+    setDiscountType('percent'); setDiscountValue('');
     setItems([blankLine()]);
     // Opened from inside a CRM party → that party IS the order's party (customer for a sales
     // order, supplier for a purchase order). Pre-select + lock it so the user isn't re-searching.
@@ -393,13 +397,27 @@ const NewOrderModal: React.FC<{
     const vat = net * pctOf(l.vat_code) / 100;
     return { net, vat, gross: net + vat };
   });
-  const netTotal = calc.reduce((a, c) => a + c.net, 0);
-  const vatTotal = calc.reduce((a, c) => a + c.vat, 0);
-  const grossTotal = netTotal + vatTotal;
-  // Margin = revenue − cost across lines that carry a cost. null when no line has cost yet.
+  const rawNet = calc.reduce((a, c) => a + c.net, 0);
+  // Order-level discount → an effective % applied uniformly to every line (a flat amount becomes an
+  // equivalent %), so it allocates proportionally and VAT stays exact. Mirrors computeOrderLines().
+  const dv = discountType && isSales ? (parseDecimal(discountValue) ?? 0) : 0;
+  const effDiscountPct = dv <= 0 ? 0
+    : discountType === 'percent' ? Math.min(100, Math.max(0, dv))
+    : (rawNet > 0 ? Math.min(100, Math.max(0, (dv / rawNet) * 100)) : 0);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const discCalc = items.map((l) => {
+    const net = r2((Number(l.quantity) || 0) * (Number(l.unit_price) || 0) * (1 - effDiscountPct / 100));
+    return { net, vat: r2(net * pctOf(l.vat_code) / 100) };
+  });
+  const netTotal = r2(discCalc.reduce((a, c) => a + c.net, 0));
+  const vatTotal = r2(discCalc.reduce((a, c) => a + c.vat, 0));
+  const grossTotal = r2(netTotal + vatTotal);
+  const discountAmount = r2(r2(rawNet) - netTotal);
+  // Margin = revenue − cost across lines that carry a cost. null when no line has cost yet. The
+  // discount reduces revenue, so it reduces margin by the same net amount.
   const anyCost = items.some((l) => l.unit_cost != null);
   const marginTotal = anyCost
-    ? items.reduce((a, l) => a + ((Number(l.unit_price) || 0) - (Number(l.unit_cost) || 0)) * (Number(l.quantity) || 0), 0)
+    ? items.reduce((a, l) => a + ((Number(l.unit_price) || 0) - (Number(l.unit_cost) || 0)) * (Number(l.quantity) || 0), 0) - discountAmount
     : null;
 
   // status: 'draft' = pre-order (not yet committed); 'confirmed' = a live order.
@@ -424,6 +442,8 @@ const NewOrderModal: React.FC<{
         projectId: project?.id ?? null,
         categoryId: categoryId === 'none' ? null : categoryId,
         expectedPaymentDate: expectedDate || null,
+        discountType: isSales && dv > 0 ? discountType : null,
+        discountValue: isSales && dv > 0 ? dv : 0,
         notes: notes.trim() || null,
         customerCompanyId: isSales ? coId : null,
         customerContactId: isSales ? ctId : null,
@@ -608,11 +628,35 @@ const NewOrderModal: React.FC<{
             <p className="text-[11px] text-muted-foreground">Prints on the invoice and the payment receipt, and stays visible on the order here.</p>
           </div>
 
-          <div className="flex justify-end gap-4 text-sm">
-            <span className="text-muted-foreground">Net {formatMoney(netTotal)}</span>
-            <span className="text-muted-foreground">VAT {formatMoney(vatTotal)}</span>
-            <span className="font-semibold">Total {formatMoney(grossTotal)}</span>
-            {marginTotal != null && <span className={marginTotal >= 0 ? 'text-emerald-500' : 'text-destructive'}>Margin {formatMoney(marginTotal)}</span>}
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            {/* Order-level discount off the net (sales only): a % or a flat cash amount. */}
+            {isSales ? (
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Discount (optional)</Label>
+                <div className="flex items-center gap-1.5">
+                  <Select value={discountType} onValueChange={(v: any) => setDiscountType(v)}>
+                    <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percent">%</SelectItem>
+                      <SelectItem value="amount">{currency}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <MoneyInput className="h-8 w-28 text-right text-sm px-2" placeholder="0" value={discountValue === '' ? null : (parseDecimal(discountValue) ?? null)} onValueChange={(v) => setDiscountValue(v == null ? '' : String(v))} />
+                  {effDiscountPct > 0 && (
+                    <span className="text-[11px] text-muted-foreground">≈ {effDiscountPct.toFixed(effDiscountPct < 10 ? 1 : 0)}% off</span>
+                  )}
+                </div>
+              </div>
+            ) : <div />}
+            <div className="flex flex-col items-end gap-0.5 text-sm">
+              {discountAmount > 0 && (
+                <div className="flex justify-between gap-8 w-56"><span className="text-muted-foreground">Discount</span><span className="tabular-nums text-emerald-600">−{formatMoney(discountAmount)}</span></div>
+              )}
+              <div className="flex justify-between gap-8 w-56"><span className="text-muted-foreground">Net</span><span className="tabular-nums">{formatMoney(netTotal)}</span></div>
+              <div className="flex justify-between gap-8 w-56"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{formatMoney(vatTotal)}</span></div>
+              <div className="flex justify-between gap-8 w-56 font-semibold border-t border-border/60 pt-0.5"><span>Total</span><span className="tabular-nums">{formatMoney(grossTotal)}</span></div>
+              {marginTotal != null && <div className="flex justify-between gap-8 w-56"><span className="text-muted-foreground">Margin</span><span className={`tabular-nums ${marginTotal >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(marginTotal)}</span></div>}
+            </div>
           </div>
         </div>
         <DialogFooter>
@@ -680,6 +724,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const [showPayAudit, setShowPayAudit] = useState(false);
   // Purchase-order 3-way match (PO × goods received × supplier bill).
   const [match, setMatch] = useState<ThreeWayMatch | null>(null);
+  // Customer's on-account credit that could settle this sales order without new cash (#credit-apply).
+  const [applicableCredit, setApplicableCredit] = useState(0);
 
   const load = async (id: string) => {
     try {
@@ -700,13 +746,17 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
       setMatch(res.order.order_type === 'purchase'
         ? await ordersService.getThreeWayMatch(id).catch(() => null)
         : null);
+      // How much on-account credit could be applied to this sales order (drives the "apply credit" banner).
+      setApplicableCredit(res.order.order_type === 'sales'
+        ? await ordersService.getApplicableCredit(id, res.order.workspace_id).catch(() => 0)
+        : 0);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setApplicableCredit(0); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -870,6 +920,25 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     } finally { setSaving(false); }
   };
 
+  // Settle this sales order from the customer's on-account credit — no new cash. Re-homes existing
+  // "money in" onto the order (server-side, split-safe); the order flips to paid/partial via trigger.
+  const applyCredit = async () => {
+    if (!order) return;
+    const outstanding = Math.max(0, Math.round((Number(order.total) - (fin?.received ?? 0)) * 100) / 100);
+    const willApply = Math.min(applicableCredit, outstanding);
+    if (willApply <= 0.005) return;
+    if (!window.confirm(`Apply ${formatMoney(willApply, order.currency)} of ${order.customer_company_id || order.customer_contact_id ? 'this customer’s' : 'the'} account credit to this order? No new money is recorded — the existing credit is used.`)) return;
+    setSaving(true);
+    try {
+      const applied = await ordersService.applyCreditToOrder(order.id, order.workspace_id, willApply);
+      await load(order.id);
+      onChanged();
+      toast({ title: applied > 0 ? `Applied ${formatMoney(applied, order.currency)} from credit` : 'Nothing to apply' });
+    } catch (err: any) {
+      toast({ title: 'Failed to apply credit', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   // Edit an existing payment: pre-fill the pay panel from the row and flip it into update mode.
   const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null }) => {
     setEditingPaymentId(p.id);
@@ -938,7 +1007,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         supplier_company_id: l.supplier_company_id ?? null,
         measurement_unit_code: l.unit_code,
         vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
-      })));
+      })), { type: order.discount_type, value: Number(order.discount_value) || 0 });
       setEditing(false);
       await load(order.id); onChanged();
       toast({ title: 'Order updated' });
@@ -1038,6 +1107,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         return list && list > Number(it.unit_price) ? a + (list - Number(it.unit_price)) * Number(it.quantity) : a;
       }, 0)
     : 0;
+  // Explicit order-level discount the operator entered = original line net (price × qty, pre-discount)
+  // minus the stored (post-discount) subtotal_net. Shown as its own line so net < price×qty is explained.
+  const orderDiscountAmount = order
+    ? Math.round((items.reduce((a, it) => a + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0) - Number(order.subtotal_net)) * 100) / 100
+    : 0;
+  const outstanding = order ? Math.max(0, Math.round((Number(order.total) - (fin?.received ?? 0)) * 100) / 100) : 0;
+  const creditToApply = Math.min(applicableCredit, outstanding);
   // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
   // myDATA finalises the exact document type at issue; this just labels the action correctly.
   const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
@@ -1079,6 +1155,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                       <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
                       <span className="flex flex-col"><span>Record money out</span><span className="text-[10px] text-muted-foreground">Cash paid to the supplier / refunded.</span></span>
                     </DropdownMenuItem>
+                    {/* Settle from the customer's on-account credit — no new cash movement. */}
+                    {order.order_type === 'sales' && creditToApply > 0.005 && (
+                      <DropdownMenuItem className="items-start" onClick={applyCredit}>
+                        <Banknote className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
+                        <span className="flex flex-col"><span>Pay from account credit</span><span className="text-[10px] text-muted-foreground">Use {formatMoney(creditToApply, order.currency)} of this customer’s existing credit.</span></span>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
                       <DropdownMenuItem onClick={createInvoice}>
@@ -1122,6 +1205,20 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                 </DropdownMenu>
               </div>
             </div>
+
+            {/* On-account credit available to settle this order without new cash. Shows whenever the
+                customer has unapplied "money in" and the order still has a balance. */}
+            {order.order_type === 'sales' && applicableCredit > 0.005 && outstanding > 0.005 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
+                <span className="text-sm flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>This customer has <span className="font-semibold">{formatMoney(applicableCredit, order.currency)}</span> on account — settle this order from it, no new cash needed.</span>
+                </span>
+                <Button size="sm" className="h-8" onClick={applyCredit} disabled={saving}>
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `Apply ${formatMoney(creditToApply, order.currency)}`}
+                </Button>
+              </div>
+            )}
 
             {/* Classification + expected payment — settable before the order is invoiced so it shows
                 a category and ages in Receivables/Payables (both carry onto the invoice/bill). */}
@@ -1215,8 +1312,12 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <span className="text-right tabular-nums" title="Sell price per unit (excl. VAT)">{formatMoney(Number(it.unit_price), order.currency)}</span>
-                      <span className="text-right tabular-nums" title="Net = price × qty (excl. VAT)">{formatMoney(Number(it.net_value), order.currency)}</span>
+                      <span className="text-right tabular-nums" title={Number(it.discount_pct) > 0 ? `List ${formatMoney(Number(it.unit_price), order.currency)} · ${Number(it.discount_pct)}% off` : 'Sell price per unit (excl. VAT)'}>
+                        {Number(it.discount_pct) > 0 && Number(it.quantity) > 0
+                          ? formatMoney(Number(it.net_value) / Number(it.quantity), order.currency)
+                          : formatMoney(Number(it.unit_price), order.currency)}
+                      </span>
+                      <span className="text-right tabular-nums" title="Net = price × qty (excl. VAT, after discount)">{formatMoney(Number(it.net_value), order.currency)}</span>
                       <span className="text-right tabular-nums text-muted-foreground" title="Cost per unit">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
                       <span className="text-right tabular-nums text-muted-foreground" title="Cost total (cost/unit × qty) — what this line costs us">{lineCost != null ? formatMoney(lineCost, order.currency) : '—'}</span>
                       <span className={`text-right tabular-nums ${lineProfit == null ? 'text-muted-foreground' : lineProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`} title="Profit on this line (excl. VAT) + margin % of net">
@@ -1236,6 +1337,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                 <div className="flex flex-col items-end gap-0.5 text-sm">
                   {discountTotal > 0 && (
                     <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Discount (off list)</span><span className="tabular-nums text-emerald-600">−{formatMoney(discountTotal, order.currency)}</span></div>
+                  )}
+                  {orderDiscountAmount > 0.005 && (
+                    <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Discount{order.discount_type === 'percent' ? ` (${Number(order.discount_value)}%)` : ''}</span><span className="tabular-nums text-emerald-600">−{formatMoney(orderDiscountAmount, order.currency)}</span></div>
                   )}
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Net (excl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.subtotal_net), order.currency)}</span></div>
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{formatMoney(Number(order.vat_amount), order.currency)}</span></div>
