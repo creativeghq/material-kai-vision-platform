@@ -807,7 +807,7 @@ const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
   { slug: 'interior-designer', name: 'Vision', blurb: 'interior design, room redesign, image or 3D generation, virtual staging, lighting, VR worlds, moodboards, presentation sheets' },
   { slug: 'product-business', name: 'Pepper', blurb: 'building or publishing catalogs, B2B manufacturer research, company/contact enrichment and CRM, product knowledge-graph (provenance, brand, related products, specs), tech radar, job research' },
   { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
-  { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history' },
+  { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees)' },
   { slug: 'social-media', name: 'Hermes', blurb: 'publishing or scheduling social-media posts, social analytics, best time to post' },
 ];
 
@@ -1052,6 +1052,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_project', 'list_my_projects', 'find_project',
       // Finance reads + confirm-gated invoice issue (Trinity is the finance agent)
       'manage_finance',
+      // Business operating expenses → categorized supplier bill (Payables/AP + P&L)
+      'record_expense', 'list_recent_expenses',
       // Contracts & e-signature (finance/legal domain)
       'manage_contracts',
     ],
