@@ -56,7 +56,7 @@ export const CompanyRegistryDetails: React.FC<{
         { name, position: person.role ?? undefined },
         person.role ?? 'Registry contact',
         false,
-        person.percentage ? `ΓΕΜΗ: ${person.role ?? ''} ${person.percentage ? `(${person.percentage})` : ''}`.trim() : `From ΓΕΜΗ registry`,
+        person.percentage ? `ΓΕΜΗ: ${person.role ?? ''} ${person.percentage ? `(${person.percentage})` : ''}`.trim() : 'From ΓΕΜΗ registry',
       );
       setAdded((s) => new Set(s).add(key));
       toast({ title: 'Contact added', description: `${name} added to this company.` });

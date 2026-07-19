@@ -88,7 +88,7 @@ function StatTile({
 }
 
 // ── main panel ──────────────────────────────────────────────────────────────
-const _MyOffice: React.FC = () => {
+const MyOfficeImpl: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
   const { user } = useAuth();
   const [personName, setPersonName] = useState('');
@@ -353,4 +353,4 @@ const _MyOffice: React.FC = () => {
   );
 };
 
-export const MyOffice = React.memo(_MyOffice);
+export const MyOffice = React.memo(MyOfficeImpl);
