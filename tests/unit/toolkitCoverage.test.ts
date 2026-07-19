@@ -66,6 +66,9 @@ const KNOWN_UNCLUSTERED = new Set([
   'create_purchase_order', 'send_purchase_order', 'source_product',
   // Trip expenses (submit_trip_card is user-facing: "submit a DRAFT card to finance")
   'add_trip_expense', 'create_trip_card', 'list_trip_cards', 'submit_trip_card',
+  // Business expenses (added by the concurrent finance-expenses work, commit 7db30144) — not yet
+  // clustered by that change; tracked here so main stays green until it gets a Finance-Hub cluster.
+  'record_expense', 'list_recent_expenses',
   // Generation extras (belong in the Interior Design cluster)
   'generate_gemini', 'generate_video', 'virtual_staging',
   // HVAC / energy calculators
