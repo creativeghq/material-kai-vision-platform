@@ -6264,6 +6264,86 @@
         }
       }
     },
+    "/mygemi-opendata": {
+      "post": {
+        "tags": [
+          "Business Profile"
+        ],
+        "summary": "Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API.",
+        "operationId": "post_mygemi_opendata",
+        "description": "Queries the public ΓΕΜΗ OpenData API (GET /companies?afm=…) for the Greek Commercial Registry record — GEMI number, legal form, status, incorporation date, activities. Unlike the ΑΑΔΕ RgWsPublic2 service, ΓΕΜΗ OpenData is public open data behind a single operator-issued application key (env GEMI_API_KEY → platform_secrets), so ONE platform key serves every workspace with no per-tenant quota or audit notification. 90-day cache on crm_companies; writing the cache back onto a CRM company requires ownership/admin.\n\n**Response:** `{ ok, source:'gemi'|'cache', checked_at, gemi:{arGemi,afm,coNameEl,city,street,streetNumber,zipCode,legalType:{id,descr},status:{id,descr},gemiOffice:{id,descr},incorporationDate,isBranch,activities:[...]} }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/notification-dispatcher": {
       "post": {
         "tags": [
@@ -13139,6 +13219,73 @@
         "summary": "Cron: fire late check-in alerts for employees who haven't clocked in",
         "operationId": "post_hr_checkin_cron",
         "description": "Runs every few minutes via pg_cron (x-cron-secret via isCronAuthorized). For every workspace with late alerts on, finds active employees scheduled to work today who are past (work_start_time + grace) and haven't clocked in, then emits one hr_late_checkin flow event per resolved recipient. Deduped per employee/day via hr_checkin_alerts; charges the workspace owner once per run that produces alerts.\n\n**Response:** `{ ok, checked, alerted }`",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crm-meeting-reminders": {
+      "post": {
+        "tags": [
+          "CRM"
+        ],
+        "summary": "Cron: send reminders for upcoming CRM meetings whose reminder time has arrived.",
+        "operationId": "post_crm_meeting_reminders",
+        "description": "Runs every few minutes via pg_cron (x-cron-secret via isCronAuthorized). Selects scheduled crm_meetings rows whose reminder_at has passed and reminder_sent_at is null, then sends an email reminder to the meeting owner via email-api (WhatsApp reminders require a per-workspace connected Zernio channel + approved template and are currently counted as pending). Each processed row is stamped reminder_sent_at so it never re-fires.\n\n**Response:** `{ ok, processed, emailed, whatsapp_pending }`",
         "security": [
           {
             "cronSecret": []

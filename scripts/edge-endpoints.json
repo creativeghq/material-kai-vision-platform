@@ -3055,6 +3055,49 @@
     "response": "{ok:true, valid_afm:boolean, basic_rec:{afm,doy,onomasia,commer_title,legal_status_descr,postal_address,postal_address_no,postal_zip_code,postal_area_description,regist_date,stop_date,deactivation_flag,...}, activities:[{code,description,kind,kind_description}], source:'aade'|'cache', checked_at, secret_sources}"
   },
   {
+    "name": "mygemi-opendata",
+    "tag": "Business Profile",
+    "summary": "Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API.",
+    "description": "Queries the public ΓΕΜΗ OpenData API (GET /companies?afm=…) for the Greek Commercial Registry record — GEMI number, legal form, status, incorporation date, activities. Unlike the ΑΑΔΕ RgWsPublic2 service, ΓΕΜΗ OpenData is public open data behind a single operator-issued application key (env GEMI_API_KEY → platform_secrets), so ONE platform key serves every workspace with no per-tenant quota or audit notification. 90-day cache on crm_companies; writing the cache back onto a CRM company requires ownership/admin.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      "creds-status"
+    ],
+    "request": [
+      {
+        "name": "afm",
+        "type": "string",
+        "required": true,
+        "desc": "Greek ΑΦΜ — 9 digits (non-digit characters stripped)"
+      },
+      {
+        "name": "company_id",
+        "type": "string",
+        "required": false,
+        "desc": "crm_companies.id — enables cache check and result write-back for authorized callers"
+      },
+      {
+        "name": "workspace_id",
+        "type": "string",
+        "required": false,
+        "desc": "Active workspace for cache write-back authorization"
+      },
+      {
+        "name": "reason",
+        "type": "string",
+        "required": false,
+        "desc": "Optional audit note for the lookup"
+      }
+    ],
+    "response": "{ ok, source:'gemi'|'cache', checked_at, gemi:{arGemi,afm,coNameEl,city,street,streetNumber,zipCode,legalType:{id,descr},status:{id,descr},gemiOffice:{id,descr},incorporationDate,isBranch,activities:[...]} }"
+  },
+  {
     "name": "notification-dispatcher",
     "tag": "Notifications",
     "summary": "Dispatches browser push notifications (VAPID) and signed webhook deliveries with retry.",
@@ -6910,6 +6953,22 @@
     "actions": [],
     "request": [],
     "response": "{ ok, checked, alerted }"
+  },
+  {
+    "name": "crm-meeting-reminders",
+    "tag": "CRM",
+    "summary": "Cron: send reminders for upcoming CRM meetings whose reminder time has arrived.",
+    "description": "Runs every few minutes via pg_cron (x-cron-secret via isCronAuthorized). Selects scheduled crm_meetings rows whose reminder_at has passed and reminder_sent_at is null, then sends an email reminder to the meeting owner via email-api (WhatsApp reminders require a per-workspace connected Zernio channel + approved template and are currently counted as pending). Each processed row is stamped reminder_sent_at so it never re-fires.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ ok, processed, emailed, whatsapp_pending }"
   },
   {
     "name": "hr-kiosk",
