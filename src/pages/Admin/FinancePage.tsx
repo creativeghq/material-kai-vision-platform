@@ -252,11 +252,17 @@ const FinancePage: React.FC = () => {
         // An un-invoiced order has no invoice due date, so it ages against its EXPECTED payment
         // date (operator-set). No expected date yet → it can't age → 'no_due_date' (shows as
         // "expected" money, not in a bucket). Buckets mirror vw_ar_aging exactly.
+        // NOTE: the invoice aging view computes `CURRENT_DATE - due_at` in the DB session timezone
+        // (UTC on Supabase). We MUST match that reference or an order and an invoice with the same
+        // date can disagree by a day near midnight — so both "today" and the due date are compared
+        // as UTC calendar days (date-only), not local time.
+        const nowUtc = new Date();
+        const todayUtcMs = Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate());
         const agingFromExpected = (expected: string | null): { age_bucket: AgeBucket; days_overdue: number } => {
           if (!expected) return { age_bucket: 'no_due_date', days_overdue: 0 };
-          const today = new Date(); today.setHours(0, 0, 0, 0);
-          const due = new Date(`${expected}T00:00:00`);
-          const days = Math.floor((today.getTime() - due.getTime()) / 86_400_000);
+          const [y, m, d] = expected.split('-').map(Number);
+          if (!y || !m || !d) return { age_bucket: 'no_due_date', days_overdue: 0 };
+          const days = Math.floor((todayUtcMs - Date.UTC(y, m - 1, d)) / 86_400_000);
           const bucket: AgeBucket = days <= 0 ? 'current' : days <= 30 ? '0-30' : days <= 60 ? '31-60' : days <= 90 ? '61-90' : '90+';
           return { age_bucket: bucket, days_overdue: Math.max(days, 0) };
         };
@@ -279,6 +285,11 @@ const FinancePage: React.FC = () => {
         arWithOrders = [...arWithOrders, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
         apWithOrders = [...apWithOrders, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
       } catch { /* orders overlay is best-effort — invoices/bills still render */ }
+      // Sort each side by how overdue it is (most overdue first) so aging orders interleave with
+      // invoices instead of always sitting below them. 'no_due_date' (unaged) sinks to the bottom.
+      const byOverdue = (a: AgingRow, b: AgingRow) => (b.days_overdue || 0) - (a.days_overdue || 0);
+      arWithOrders.sort(byOverdue);
+      apWithOrders.sort(byOverdue);
       setAr(arWithOrders);
       setAp(apWithOrders);
       setCategories(cats);
@@ -711,7 +722,7 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-xs">{r.party_name ?? '—'}</td>
                         <td className="px-4 py-2 text-xs text-muted-foreground" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
-                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
+                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
                               {r.category_name ?? <span className="text-primary">Set category</span>}
                             </OrderAgingInlineEditor>
                           ) : (r.category_name ?? '—')}
@@ -724,7 +735,7 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
-                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
+                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
                               {r.due_at ?? <span className="text-primary">Set date</span>}
                             </OrderAgingInlineEditor>
                           ) : (r.due_at ?? '—')}
@@ -810,7 +821,7 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-xs">{r.party_name ?? '—'}</td>
                         <td className="px-4 py-2 text-xs text-muted-foreground" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
-                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} expectedDate={r.due_at} categories={expenseCats} onSaved={() => loadAll(workspaceId)}>
+                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={expenseCats} onSaved={() => loadAll(workspaceId)}>
                               {r.category_name ?? <span className="text-primary">Set category</span>}
                             </OrderAgingInlineEditor>
                           ) : (r.category_name ?? '—')}
@@ -823,7 +834,7 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
-                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} expectedDate={r.due_at} categories={expenseCats} onSaved={() => loadAll(workspaceId)}>
+                            <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={expenseCats} onSaved={() => loadAll(workspaceId)}>
                               {r.due_at ?? <span className="text-primary">Set date</span>}
                             </OrderAgingInlineEditor>
                           ) : (r.due_at ?? '—')}

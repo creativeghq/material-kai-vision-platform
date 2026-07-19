@@ -531,6 +531,11 @@ const NewOrderModal: React.FC<{
             <div className="space-y-1">
               <Label>Expected payment date</Label>
               <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
+              {/* A pre-order stays out of Receivables/Payables until a deposit is recorded, so the
+                  expected date won't age until then — flag it so the operator isn't surprised. */}
+              {preset.draft && expectedDate && (
+                <p className="text-[11px] text-amber-600">Pre-orders age in Receivables only after a deposit is recorded.</p>
+              )}
             </div>
           </div>
 
@@ -1127,6 +1132,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                   <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="No category" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No category</SelectItem>
+                    {/* Keep a since-deactivated category selectable so its value doesn't render blank. */}
+                    {order.category_id && !categories.some((c) => c.id === order.category_id) && (
+                      <SelectItem value={order.category_id}>Current category (inactive)</SelectItem>
+                    )}
                     {categories.filter((c) => c.kind === (order.order_type === 'sales' ? 'income' : 'expense') || c.kind === 'both').map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))}
@@ -1138,7 +1147,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                 <Input type="date" className="h-8 w-44 text-xs" value={order.expected_payment_date ?? ''} disabled={saving}
                   onChange={(e) => void saveMeta({ expectedPaymentDate: e.target.value || null })} />
               </div>
-              <p className="text-[11px] text-muted-foreground max-w-xs">Un-invoiced orders age in Receivables/Payables against the expected payment date.</p>
+              {/* A pre-order (draft) only surfaces in Receivables/Payables once real cash has moved on
+                  it — so an expected date on a deposit-less pre-order won't age yet. Say so. */}
+              {order.status === 'draft' && (fin?.received ?? 0) === 0 && (fin?.paid_out ?? 0) === 0 ? (
+                <p className="text-[11px] text-amber-600 max-w-xs">This pre-order appears in Receivables/Payables once a deposit is recorded — until then the expected date won’t age.</p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground max-w-xs">Un-invoiced orders age in Receivables/Payables against the expected payment date.</p>
+              )}
             </div>
 
             {/* Order note — captured when the order is placed; prints on the invoice + receipt. */}

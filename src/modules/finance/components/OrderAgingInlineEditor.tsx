@@ -19,16 +19,25 @@ import type { FinanceCategory } from '@/modules/finance/services/financeCategori
 export const OrderAgingInlineEditor: React.FC<{
   orderId: string;
   categoryId: string | null;
+  /** Resolved name of the order's current category — used to keep a since-deactivated category
+   *  visible/selected in the picker (the `categories` list only carries active ones). */
+  categoryName?: string | null;
   expectedDate: string | null;
   categories: FinanceCategory[];
   onSaved: () => void;
   children: React.ReactNode;
-}> = ({ orderId, categoryId, expectedDate, categories, onSaved, children }) => {
+}> = ({ orderId, categoryId, categoryName, expectedDate, categories, onSaved, children }) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState(categoryId ?? 'none');
   const [date, setDate] = useState(expectedDate ?? '');
   const [busy, setBusy] = useState(false);
+
+  // The order may point at a category that has since been deactivated (not in `categories`). Keep it
+  // in the list — marked inactive — so it renders as the current value instead of showing blank.
+  const inactiveCurrent = categoryId && !categories.some((c) => c.id === categoryId)
+    ? { id: categoryId, name: categoryName ? `${categoryName} (inactive)` : 'Current category (inactive)' }
+    : null;
 
   // Re-seed from props whenever the popover opens (row may have changed under us since last open).
   useEffect(() => {
@@ -64,6 +73,7 @@ export const OrderAgingInlineEditor: React.FC<{
             <SelectTrigger className="h-9"><SelectValue placeholder="No category" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No category</SelectItem>
+              {inactiveCurrent && <SelectItem value={inactiveCurrent.id}>{inactiveCurrent.name}</SelectItem>}
               {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
             </SelectContent>
           </Select>
