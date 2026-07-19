@@ -1257,6 +1257,18 @@ html.light *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) 
 html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
 
 /* ============================================================
+   CHAT ASSISTANT BUBBLE surface (AgentHub)
+   ------------------------------------------------------------
+   The assistant bubble carries white text + white/opacity chips
+   + artifact chips, all designed for a DARK surface. On dark the
+   brand plum works; but the light theme's --primary is a mid-olive,
+   so white text sat olive-on-olive and `text-primary` accents
+   (the "In canvas" label) vanished. Keep the dark-theme look and
+   give light a warm dark-olive so every child clears AA contrast. */
+.msg-assistant { background-color: hsl(var(--primary)); }
+html.light .msg-assistant { background-color: hsl(46 20% 20%); }
+
+/* ============================================================
    BRAND GRADIENT ON PRIMARY FILLS — global
    ------------------------------------------------------------
    Every solid `bg-primary` fill (primary buttons, active tabs,
