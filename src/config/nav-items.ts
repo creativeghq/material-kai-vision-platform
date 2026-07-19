@@ -116,6 +116,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Business-workspace surfaces — gated through the #195 capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance. Part of #174.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'Contacts, companies, and leads.' },
+  // Unified monitoring page (#244 B — Price / Mention / Job). The PAGE is admin-only (AdminGuard),
+  // so it carries requireRole:'admin'. For everyone else the same capabilities run through the agent
+  // (Tools hub → Agent tools, and the toolkit picker) — that's the all-users path.
+  { id: 'monitoring', label: 'Monitoring', path: '/admin/monitoring', icon: BarChart3, requireRole: 'admin', surface: 'app', hub: 'sales', description: 'Track competitor prices, brand mentions & jobs.' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Invoices, payments, and reports.' },
   // Warehouse: inventory extracted from the Finance tab into its own paid add-on (module slug stays
   // 'stock' internally). Appears only when the workspace is entitled AND the persona holds warehouse.manage.
