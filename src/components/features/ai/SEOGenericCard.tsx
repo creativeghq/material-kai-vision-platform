@@ -126,6 +126,147 @@ function ItemList({ rows, max = 8 }: { rows: Array<{ left: string; right?: strin
   );
 }
 
+/**
+ * Human-readable labels for DataForSEO OnPage `checks` booleans/counts.
+ * Default polarity: the check is an ISSUE when true (URL audit) / non-zero (crawl).
+ * `issueWhenFalse` flags the good-thing booleans that are a problem when OFF.
+ */
+const CHECK_META: Record<string, { label: string; issueWhenFalse?: boolean }> = {
+  no_title: { label: 'Missing title tag' },
+  no_description: { label: 'Missing meta description' },
+  no_h1: { label: 'No H1 heading' },
+  no_image_alt: { label: 'Images missing alt text' },
+  no_image_title: { label: 'Images missing title attribute' },
+  no_favicon: { label: 'No favicon' },
+  no_content_encoding: { label: 'No gzip/brotli compression' },
+  no_doctype: { label: 'Missing doctype' },
+  no_encoding_meta_tag: { label: 'No charset meta tag' },
+  high_loading_time: { label: 'Slow page load' },
+  high_waiting_time: { label: 'Slow server response' },
+  is_redirect: { label: 'Page is a redirect' },
+  is_4xx_code: { label: 'Returns a 4xx error' },
+  is_5xx_code: { label: 'Returns a 5xx error' },
+  is_broken: { label: 'Broken page' },
+  is_https: { label: 'Not served over HTTPS', issueWhenFalse: true },
+  is_http: { label: 'Served over plain HTTP' },
+  canonical: { label: 'No canonical tag', issueWhenFalse: true },
+  seo_friendly_url: { label: 'URL is not SEO-friendly', issueWhenFalse: true },
+  has_render_blocking_resources: { label: 'Render-blocking resources' },
+  has_meta_refresh_redirect: { label: 'Uses meta-refresh redirect' },
+  redirect_chain: { label: 'Part of a redirect chain' },
+  canonical_chain: { label: 'Canonical chain' },
+  duplicate_title_tag: { label: 'Duplicate title tag' },
+  duplicate_meta_tags: { label: 'Duplicate meta tags' },
+  duplicate_description: { label: 'Duplicate meta description' },
+  duplicate_content: { label: 'Duplicate content' },
+  title_too_long: { label: 'Title too long' },
+  title_too_short: { label: 'Title too short' },
+  low_content_rate: { label: 'Low text-to-HTML ratio' },
+  high_content_rate: { label: 'Unusually high text-to-HTML ratio' },
+  small_page_size: { label: 'Very small page' },
+  large_page_size: { label: 'Very large page size' },
+  low_readability_rate: { label: 'Poor readability' },
+  irrelevant_description: { label: 'Description not relevant to content' },
+  irrelevant_title: { label: 'Title not relevant to content' },
+  irrelevant_meta_keywords: { label: 'Irrelevant meta keywords' },
+  deprecated_html_tags: { label: 'Uses deprecated HTML tags' },
+  flash: { label: 'Uses Flash' },
+  frame: { label: 'Uses frames' },
+  lorem_ipsum: { label: 'Placeholder (lorem ipsum) text' },
+  has_misspelling: { label: 'Spelling errors' },
+  broken_links: { label: 'Broken links' },
+  broken_resources: { label: 'Broken resources' },
+  links_external: { label: 'External links' },
+  no_image_alt_text: { label: 'Images missing alt text' },
+  duplicate_title: { label: 'Duplicate titles' },
+  no_meta_description: { label: 'Missing meta descriptions' },
+  no_content: { label: 'Pages with no content' },
+  low_character_count: { label: 'Very thin content' },
+  high_character_count: { label: 'Overly long pages' },
+  small_page_size_pages: { label: 'Very small pages' },
+  non_indexable: { label: 'Non-indexable pages' },
+};
+
+const humanizeCheckKey = (k: string): string => {
+  const meta = CHECK_META[k];
+  if (meta) return meta.label;
+  const s = k.replace(/_/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+/** Top-N positive-count entries of a `{key: count}` object, sorted desc. */
+const topEntries = (obj: any, n: number): Array<[string, number]> => {
+  if (!obj || typeof obj !== 'object') return [];
+  return Object.entries(obj)
+    .map(([k, v]) => [k, Number(v)] as [string, number])
+    .filter(([, v]) => Number.isFinite(v) && v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n);
+};
+
+/** cpc · competition · keyword-difficulty sub-line for a DataForSEO keyword item. */
+const kwSubline = (kwData: any): string | undefined => {
+  const info = kwData?.keyword_info || {};
+  const kd = kwData?.keyword_properties?.keyword_difficulty;
+  const parts: string[] = [];
+  if (info.cpc != null && Number(info.cpc) > 0) parts.push(`$${Number(info.cpc).toFixed(2)} CPC`);
+  if (info.competition != null && Number.isFinite(Number(info.competition))) parts.push(`${fmtPct(info.competition)} comp`);
+  if (kd != null) parts.push(`KD ${kd}`);
+  return parts.length ? parts.join(' · ') : undefined;
+};
+
+/** Accordion of FAILED on-page checks (booleans). Renders nothing when all pass. */
+function FailedChecksAccordion({ checks, label = 'On-page issues' }: { checks: any; label?: string }) {
+  if (!checks || typeof checks !== 'object') return null;
+  const failed = Object.entries(checks).filter(([k, v]) => {
+    const meta = CHECK_META[k];
+    return meta?.issueWhenFalse ? v === false : v === true;
+  });
+  if (failed.length === 0) return null;
+  return (
+    <details className="group rounded-lg border border-border bg-muted/40">
+      <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+        <span className="font-medium">{label} ({failed.length})</span>
+        <span className="text-xs text-muted-foreground">tap to expand</span>
+      </summary>
+      <div className="px-2.5 pb-2.5 pt-0.5 space-y-1 text-xs">
+        <ul className="space-y-1">
+          {failed.map(([k]) => (
+            <li key={k} className="flex items-start gap-1.5 text-foreground">
+              <span className={BAD}>•</span>
+              <span>{humanizeCheckKey(k)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
+  );
+}
+
+/** Accordion of non-zero site-wide issue COUNTS (crawl summary). Renders nothing when all zero. */
+function IssueCountsAccordion({ checks, label = 'Site-wide issues' }: { checks: any; label?: string }) {
+  const rows = topEntries(checks, 40);
+  if (rows.length === 0) return null;
+  return (
+    <details className="group rounded-lg border border-border bg-muted/40">
+      <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+        <span className="font-medium">{label} ({rows.length})</span>
+        <span className="text-xs text-muted-foreground">tap to expand</span>
+      </summary>
+      <div className="px-2.5 pb-2.5 pt-0.5 space-y-1 text-xs">
+        <ul className="space-y-1">
+          {rows.map(([k, v]) => (
+            <li key={k} className="flex justify-between items-baseline gap-2 text-foreground">
+              <span className="truncate">{humanizeCheckKey(k)}</span>
+              <span className={`${WARN} whitespace-nowrap`}>{fmtNum(v)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
+  );
+}
+
 export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
   const t = data.type;
 
@@ -156,7 +297,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           <ItemList rows={items.map((it: any) => {
             const kw = it.keyword_data?.keyword || it.keyword;
             const vol = it.keyword_data?.keyword_info?.search_volume ?? it.search_volume;
-            return { left: kw, right: vol != null ? `${fmtNum(vol)} /mo` : 'no volume data' };
+            return { left: kw, right: vol != null ? `${fmtNum(vol)} /mo` : 'no volume data', sub: kwSubline(it.keyword_data) };
           })} max={10} />
         )}
       </Card>
@@ -241,6 +382,14 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             <div>On-page score: {fmtNum(ip.page_metrics?.onpage_score?.value)}</div>
           </div>
         )}
+        {ip?.meta && (ip.meta.internal_links_count != null || ip.meta.external_links_count != null || ip.meta.images_count != null) && (
+          <div className="grid grid-cols-3 gap-2">
+            {ip.meta.internal_links_count != null && <Stat label="Internal links" value={fmtNum(ip.meta.internal_links_count)} />}
+            {ip.meta.external_links_count != null && <Stat label="External links" value={fmtNum(ip.meta.external_links_count)} />}
+            {ip.meta.images_count != null && <Stat label="Images" value={fmtNum(ip.meta.images_count)} />}
+          </div>
+        )}
+        <FailedChecksAccordion checks={ip?.page_metrics?.checks ?? ip?.checks} label="On-page issues" />
       </Card>
     );
   }
@@ -271,11 +420,15 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         <Primer>The terms this domain already ranks for, with its Google position (#) and each term's monthly volume. Positions 4–15 are the quickest to push onto page 1.</Primer>
         {items.length === 0 ? <Empty>This domain isn't ranking for any tracked keywords yet.</Empty> : (
           <ItemList rows={items.map((it: any) => {
-            const rank = it.ranked_serp_element?.serp_item?.rank_absolute;
+            const serp = it.ranked_serp_element?.serp_item || {};
+            const rank = serp.rank_absolute;
             const vol = it.keyword_data?.keyword_info?.search_volume;
+            const etv = serp.etv;
             return {
               left: `#${rank ?? '?'} · ${it.keyword_data?.keyword}`,
               right: vol ? `${fmtNum(vol)} /mo` : 'no volume data',
+              sub: etv != null ? `~${fmtNum(etv)} est. visits/mo${serp.url ? ' · ' + serp.url : ''}` : (serp.url || undefined),
+              href: serp.url || undefined,
             };
           })} max={12} />
         )}
@@ -312,6 +465,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             return {
               left: it.keyword_data?.keyword,
               right: `comp #${rank ?? '?'} · ${vol ? fmtNum(vol) + '/mo' : 'no vol'}`,
+              sub: kwSubline(it.keyword_data),
             };
           })} max={12} />
         )}
@@ -351,6 +505,56 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             <span className={Number.isFinite(spam) ? (spam >= 30 ? BAD : spam >= 15 ? WARN : GOOD) : ''}>{s.spam_score}</span>
           ) : '—'} />
         </div>
+        {(s.referring_main_domains != null || s.referring_pages != null) && (
+          <div className="grid grid-cols-2 gap-2">
+            {s.referring_main_domains != null && <Stat label="Referring root domains" value={fmtNum(s.referring_main_domains)} />}
+            {s.referring_pages != null && <Stat label="Referring pages" value={fmtNum(s.referring_pages)} />}
+          </div>
+        )}
+        {(() => {
+          const nofollow = s.referring_links_attributes?.nofollow ?? s.referring_links_types?.nofollow;
+          const dofollow = (s.backlinks != null && nofollow != null) ? Number(s.backlinks) - Number(nofollow) : undefined;
+          const tlds = topEntries(s.referring_links_tld, 5);
+          const platforms = topEntries(s.referring_links_platform_types, 5);
+          const hasFollow = dofollow != null || nofollow != null;
+          if (!hasFollow && tlds.length === 0 && platforms.length === 0) return null;
+          return (
+            <details className="group rounded-lg border border-border bg-muted/40">
+              <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                <span className="font-medium">Link profile</span>
+                <span className="text-xs text-muted-foreground">where your links come from</span>
+              </summary>
+              <div className="px-2.5 pb-2.5 pt-0.5 space-y-2 text-xs">
+                {hasFollow && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {dofollow != null && <Stat label={<span className={GOOD}>Dofollow</span>} value={fmtNum(dofollow)} />}
+                    {nofollow != null && <Stat label="Nofollow" value={fmtNum(nofollow)} />}
+                  </div>
+                )}
+                {tlds.length > 0 && (
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-0.5">Top TLDs</div>
+                    <ul className="space-y-0.5">
+                      {tlds.map(([k, v]) => (
+                        <li key={k} className="flex justify-between gap-2 text-foreground"><span>.{k}</span><span className="text-muted-foreground">{fmtNum(v)}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {platforms.length > 0 && (
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-0.5">Top platform types</div>
+                    <ul className="space-y-0.5">
+                      {platforms.map(([k, v]) => (
+                        <li key={k} className="flex justify-between gap-2 text-foreground"><span className="capitalize">{k.replace(/_/g, ' ')}</span><span className="text-muted-foreground">{fmtNum(v)}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </details>
+          );
+        })()}
       </Card>
     );
   }
@@ -408,12 +612,20 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           ? 'Site-wide technical health. Broken links and duplicate titles hurt rankings — treat any non-zero count here as a fix list.'
           : 'The crawl is still running. Check back in a moment for the full technical breakdown.'}</Primer>
         {ready && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <Stat label="Pages crawled" value={fmtNum(s.crawl_progress?.pages_crawled)} />
-            <Stat label="Internal links" value={fmtNum(s.page_metrics?.links_internal)} />
-            <Stat label="Broken links" value={<span className={Number(s.page_metrics?.broken_links) > 0 ? WARN : GOOD}>{fmtNum(s.page_metrics?.broken_links)}</span>} />
-            <Stat label="Duplicate titles" value={<span className={Number(s.page_metrics?.duplicate_title) > 0 ? WARN : GOOD}>{fmtNum(s.page_metrics?.duplicate_title)}</span>} />
-          </div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <Stat label="Pages crawled" value={fmtNum(s.crawl_progress?.pages_crawled)} />
+              <Stat label="Internal links" value={fmtNum(s.page_metrics?.links_internal)} />
+              <Stat label="Broken links" value={<span className={Number(s.page_metrics?.broken_links) > 0 ? WARN : GOOD}>{fmtNum(s.page_metrics?.broken_links)}</span>} />
+              <Stat label="Duplicate titles" value={<span className={Number(s.page_metrics?.duplicate_title) > 0 ? WARN : GOOD}>{fmtNum(s.page_metrics?.duplicate_title)}</span>} />
+            </div>
+            {s.page_metrics?.onpage_score != null && (
+              <div className="grid grid-cols-2 gap-2">
+                <Stat label="On-page score" value={fmtNum(s.page_metrics.onpage_score)} />
+              </div>
+            )}
+            <IssueCountsAccordion checks={s.page_metrics?.checks} label="Site-wide issues" />
+          </>
         )}
       </Card>
     );
@@ -447,8 +659,28 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         <Header icon="🛠" title={`Tech Stack — ${data.domain}`} />
         <Primer>The frameworks, analytics and platforms detected on this site — useful for understanding a competitor's setup or spotting integration opportunities.</Primer>
         {keys.length === 0 ? <Empty>No technologies could be detected.</Empty> : (
-          <div className="flex flex-wrap gap-1">
-            {keys.slice(0, 16).map((k) => <Pill key={k}>{k}</Pill>)}
+          <div className="space-y-1">
+            {keys.map((cat) => {
+              const raw = tech[cat];
+              const names: string[] = Array.isArray(raw)
+                ? raw.map((n: any) => String(n))
+                : raw && typeof raw === 'object'
+                  ? (Object.values(raw) as any[]).flat().map((n: any) => String(n))
+                  : [];
+              return (
+                <details key={cat} className="group rounded-lg border border-border bg-muted/40">
+                  <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                    <span className="font-medium capitalize">{cat.replace(/_/g, ' ')}</span>
+                    <span className="text-xs text-muted-foreground">{names.length}</span>
+                  </summary>
+                  <div className="px-2.5 pb-2.5 pt-0.5 flex flex-wrap gap-1 text-xs">
+                    {names.length === 0
+                      ? <span className="text-muted-foreground">No named technologies in this category.</span>
+                      : names.map((n, i) => <Pill key={i}>{n}</Pill>)}
+                  </div>
+                </details>
+              );
+            })}
           </div>
         )}
       </Card>
@@ -575,6 +807,16 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         </div>
         {!data.kp_present && (
           <Primer>No Knowledge Panel yet — build entity authority (Wikipedia/Wikidata, consistent name-address-phone, schema markup) to earn one.</Primer>
+        )}
+        {Array.isArray(data.organic_top) && data.organic_top.length > 0 && (
+          <div>
+            <div className="text-[11px] text-muted-foreground mb-1">Listings you own — organic results on your brand-name search</div>
+            <ItemList rows={data.organic_top.map((o: any) => ({
+              left: o.title || o.domain || o.url,
+              right: o.domain,
+              href: o.url,
+            }))} max={6} />
+          </div>
         )}
       </Card>
     );

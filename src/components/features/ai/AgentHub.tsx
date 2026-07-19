@@ -3967,6 +3967,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </span>
                   )}
                   {l.source && <span className="text-muted-foreground/70">· via {l.source.replace(/_/g, ' ')}</span>}
+                  {l.employment_type && <span className="bg-muted border border-border rounded-full px-2 py-0.5 text-[10px]">{l.employment_type.replace(/_/g, ' ')}</span>}
+                  {l.posted_at && <span>· {new Date(l.posted_at).toLocaleDateString()}</span>}
                 </div>
               </div>
             ))}
@@ -3984,24 +3986,85 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       );
     }
     if (message.sourcingOptionsData) {
+      const so = message.sourcingOptionsData;
+      const sell = so.result?.sell_price;
+      const warehouseOpts: any[] = so.result?.options?.warehouse || [];
+      const inboundOpts: any[] = so.result?.options?.inbound_po || [];
+      const supplierOpts: any[] = so.result?.options?.supplier || [];
+      const hasMarketplace = so.counts?.marketplace != null;
       return (
         <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
-          <div className="text-xs text-muted-foreground mb-0.5">Supply options · quantity {message.sourcingOptionsData.quantity}</div>
-          <p className="text-[11px] text-muted-foreground mb-2">Where this quantity can be filled from — stock already on hand, units already inbound on a PO, or suppliers to order from.</p>
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{message.sourcingOptionsData.counts?.warehouse ?? 0}</div><div className="text-[11px] text-muted-foreground">In warehouse</div></div>
-            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{message.sourcingOptionsData.counts?.inbound_po ?? 0}</div><div className="text-[11px] text-muted-foreground">Inbound on PO</div></div>
-            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{message.sourcingOptionsData.counts?.supplier ?? 0}</div><div className="text-[11px] text-muted-foreground">Order from supplier</div></div>
+          <div className="text-xs text-muted-foreground mb-0.5">
+            Supply options · quantity {so.quantity}
+            {sell?.final_sell != null && (
+              <span> · sell ref {sell.final_sell} {sell.currency || ''}</span>
+            )}
           </div>
-          {(message.sourcingOptionsData.result?.options?.supplier || []).length > 0 && (
+          <p className="text-[11px] text-muted-foreground mb-2">Where this quantity can be filled from — stock already on hand, units already inbound on a PO, or suppliers to order from.</p>
+          <div className={`grid ${hasMarketplace ? 'grid-cols-4' : 'grid-cols-3'} gap-3 text-center`}>
+            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{so.counts?.warehouse ?? 0}</div><div className="text-[11px] text-muted-foreground">In warehouse</div></div>
+            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{so.counts?.inbound_po ?? 0}</div><div className="text-[11px] text-muted-foreground">Inbound on PO</div></div>
+            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{so.counts?.supplier ?? 0}</div><div className="text-[11px] text-muted-foreground">Order from supplier</div></div>
+            {hasMarketplace && (
+              <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{so.counts?.marketplace ?? 0}</div><div className="text-[11px] text-muted-foreground">Marketplace</div></div>
+            )}
+          </div>
+          {warehouseOpts.length > 0 && (
+            <details className="group rounded-lg border border-border bg-muted/40 mt-3">
+              <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                <span className="font-medium">In warehouse</span>
+                <span className="text-xs text-muted-foreground">{warehouseOpts.length} location{warehouseOpts.length === 1 ? '' : 's'}</span>
+              </summary>
+              <div className="px-2.5 pb-2.5 pt-0.5 space-y-1 text-xs">
+                {warehouseOpts.map((w: any, i: number) => (
+                  <div key={i} className="flex justify-between gap-2 border-t border-border/60 pt-1 first:border-0 first:pt-0">
+                    <span>{w.warehouse_name || 'Warehouse'}</span>
+                    <span className="text-muted-foreground text-right">
+                      {w.available_qty != null ? `${w.available_qty} free` : ''}
+                      {w.covers_destination ? ` · ${w.covers_destination}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+          {inboundOpts.length > 0 && (
+            <details className="group rounded-lg border border-border bg-muted/40 mt-2">
+              <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                <span className="font-medium">Inbound on PO</span>
+                <span className="text-xs text-muted-foreground">{inboundOpts.length} order{inboundOpts.length === 1 ? '' : 's'}</span>
+              </summary>
+              <div className="px-2.5 pb-2.5 pt-0.5 space-y-1 text-xs">
+                {inboundOpts.map((p: any, i: number) => (
+                  <div key={i} className="flex justify-between gap-2 border-t border-border/60 pt-1 first:border-0 first:pt-0">
+                    <span>{p.order_number || (p.order_id ? `PO #${String(p.order_id).slice(0, 8)}` : 'PO')}</span>
+                    <span className="text-muted-foreground text-right">
+                      {p.uncommitted_qty != null ? `${p.uncommitted_qty} inbound` : ''}
+                      {p.expected_at ? ` · ETA ${new Date(p.expected_at).toLocaleDateString()}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+          {supplierOpts.length > 0 && (
             <div className="mt-3 space-y-1">
               <div className="text-[11px] text-muted-foreground">Suppliers who can fulfil (★ = preferred), with unit cost and lead time:</div>
-              {message.sourcingOptionsData.result.options.supplier.slice(0, 5).map((s: any, i: number) => (
-                <div key={i} className="flex justify-between text-xs bg-muted/40 border border-border rounded-md px-2.5 py-1.5">
+              {supplierOpts.slice(0, 5).map((s: any, i: number) => (
+                <div key={i} className="flex justify-between gap-2 text-xs bg-muted/40 border border-border rounded-md px-2.5 py-1.5">
                   <span>{s.supplier_name || 'Supplier'}{s.is_preferred ? ' ★' : ''}</span>
-                  <span className="text-muted-foreground">{s.cost != null ? `${s.cost} ${s.currency || ''}` : 'price on request'}{s.lead_time_days != null ? ` · ${s.lead_time_days}d lead` : ''}</span>
+                  <span className="text-muted-foreground text-right">
+                    {s.cost != null ? `${s.cost} ${s.currency || ''}` : 'price on request'}
+                    {s.lead_time_days != null ? ` · ${s.lead_time_days}d lead` : ''}
+                    {s.moq != null ? ` · MOQ ${s.moq}${s.meets_moq === false ? ' (short)' : ''}` : ''}
+                    {s.availability ? ` · ${s.availability}` : ''}
+                    {s.valid_until ? ` · until ${new Date(s.valid_until).toLocaleDateString()}` : ''}
+                  </span>
                 </div>
               ))}
+              {supplierOpts.length > 5 && (
+                <div className="text-xs text-muted-foreground text-center pt-1">+ {supplierOpts.length - 5} more</div>
+              )}
             </div>
           )}
         </div>
@@ -4012,6 +4075,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
           <div className="text-xs text-muted-foreground mb-2">Sourcing committed</div>
           <div className="text-sm text-foreground">Created {message.purchaseOrderCreatedData.purchase_orders_created} draft purchase order{message.purchaseOrderCreatedData.purchase_orders_created === 1 ? '' : 's'} and reserved {message.purchaseOrderCreatedData.allocations_created} allocation{message.purchaseOrderCreatedData.allocations_created === 1 ? '' : 's'} of stock.</div>
+          {(message.purchaseOrderCreatedData.orders || []).length > 0 && (
+            <div className="mt-3 space-y-1">
+              {message.purchaseOrderCreatedData.orders.map((o, i) => (
+                <div key={o.order_id || i} className="flex justify-between gap-2 text-xs bg-muted/40 border border-border rounded-md px-2.5 py-1.5">
+                  <span className="text-muted-foreground">Draft PO {o.order_id ? `#${String(o.order_id).slice(0, 8)}` : `#${i + 1}`}</span>
+                  <span className="text-foreground">{o.subtotal_net != null ? o.subtotal_net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <p className="text-[11px] text-muted-foreground mt-2">The POs are still drafts — review and send them to the supplier when you're ready.</p>
         </div>
       );
@@ -4034,6 +4107,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           <div className="text-xs text-muted-foreground mb-0.5">
             Mention summary · last {message.mentionSummaryData.days} days
           </div>
+          {message.mentionSummaryData.summary?.latest_at && (
+            <div className="text-[11px] text-muted-foreground mb-0.5">last mentioned {new Date(message.mentionSummaryData.summary.latest_at).toLocaleDateString()}</div>
+          )}
           <p className="text-[11px] text-muted-foreground mb-2">How often this subject was written about lately, and how the coverage felt.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-muted/40 border border-border rounded-md p-2">
@@ -4052,6 +4128,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               <div className="text-xs text-red-600 dark:text-red-400">Negative</div>
               <div className="text-2xl font-medium text-foreground">{message.mentionSummaryData.summary?.by_sentiment?.negative ?? 0}</div>
             </div>
+            {message.mentionSummaryData.summary?.sentiment_avg != null && (
+              <div className="bg-muted/40 border border-border rounded-md p-2">
+                <div className="text-xs text-muted-foreground">Avg sentiment</div>
+                <div className="text-2xl font-medium text-foreground">{message.mentionSummaryData.summary.sentiment_avg.toFixed(2)}</div>
+              </div>
+            )}
           </div>
           {(message.mentionSummaryData.summary?.top_outlets || []).length > 0 && (
             <div className="mt-3">
@@ -4081,7 +4163,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">No AI-assistant probes have run yet — once they do, you'll see how often each model mentions this and who it names alongside.</div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid ${message.llmVisibilityData.snapshot.total_probes != null ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
                 <div className="bg-muted/40 border border-border rounded-md p-2">
                   <div className="text-xs text-muted-foreground">Share of voice</div>
                   <div className="text-2xl font-medium text-foreground">
@@ -4096,15 +4178,30 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       : 'not ranked'}
                   </div>
                 </div>
+                {message.llmVisibilityData.snapshot.total_probes != null && (
+                  <div className="bg-muted/40 border border-border rounded-md p-2">
+                    <div className="text-xs text-muted-foreground">Total probes</div>
+                    <div className="text-2xl font-medium text-foreground">{message.llmVisibilityData.snapshot.total_probes}</div>
+                  </div>
+                )}
               </div>
               {message.llmVisibilityData.snapshot.per_model && (
                 <div className="mt-3 space-y-1 text-xs">
                   <div className="text-[11px] text-muted-foreground">Per model — times it was mentioned out of probes run:</div>
                   {Object.entries(message.llmVisibilityData.snapshot.per_model).map(([model, stats]: any) => (
-                    <div key={model} className="flex justify-between bg-muted/40 border border-border rounded-md px-2.5 py-1.5">
-                      <span>{model}</span>
-                      <span className="text-muted-foreground">{stats.mentioned}/{stats.probes} mentions</span>
-                    </div>
+                    <details key={model} className="group rounded-lg border border-border bg-muted/40">
+                      <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                        <span className="font-medium">{model}</span>
+                        <span className="text-xs text-muted-foreground">{stats.mentioned}/{stats.probes} mentions</span>
+                      </summary>
+                      <div className="px-2.5 pb-2.5 pt-0.5 space-y-1 text-xs">
+                        {Array.isArray(stats.positions) && stats.positions.length > 0 ? (
+                          <div className="text-muted-foreground">Ranks: {stats.positions.join(', ')}</div>
+                        ) : (
+                          <div className="text-muted-foreground">No ranked positions recorded.</div>
+                        )}
+                      </div>
+                    </details>
                   ))}
                 </div>
               )}
@@ -4138,15 +4235,33 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             <ul className="divide-y divide-border">
               {message.mentionFeedData.rows.slice(0, 10).map((r) => (
                 <li key={r.id} className="py-2">
-                  <a
-                    href={r.url} target="_blank" rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline"
-                  >{r.title || r.url}</a>
-                  <div className="text-xs text-muted-foreground">
-                    {r.outlet_name || r.outlet_domain}
-                    {r.sentiment ? ` · ${r.sentiment}` : ''}
-                    {r.published_at ? ` · ${new Date(r.published_at).toLocaleDateString()}` : ''}
-                  </div>
+                  <details className="group">
+                    <summary className="cursor-pointer list-none">
+                      <a
+                        href={r.url} target="_blank" rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >{r.title || r.url}</a>
+                      <div className="text-xs text-muted-foreground">
+                        {r.outlet_name || r.outlet_domain}
+                        {r.sentiment ? ` · ${r.sentiment}` : ''}
+                        {r.published_at ? ` · ${new Date(r.published_at).toLocaleDateString()}` : ''}
+                      </div>
+                    </summary>
+                    <div className="pt-1 space-y-1 text-xs">
+                      {r.is_anomaly && (
+                        <span className="inline-block text-amber-600 dark:text-amber-400 bg-muted border border-border rounded-full px-2 py-0.5">anomaly</span>
+                      )}
+                      {r.excerpt && <p className="text-muted-foreground">{r.excerpt}</p>}
+                      {(r.author || r.outlet_type || r.sentiment_score != null) && (
+                        <div className="flex items-center gap-2 flex-wrap text-muted-foreground">
+                          {r.author && <span>By {r.author}</span>}
+                          {r.outlet_type && <span className="bg-muted border border-border rounded-full px-2 py-0.5">{r.outlet_type}</span>}
+                          {r.sentiment_score != null && <span>score {r.sentiment_score}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 </li>
               ))}
             </ul>

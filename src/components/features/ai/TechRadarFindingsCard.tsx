@@ -50,6 +50,33 @@ function levelDot(level?: string | null): string {
   return '';
 }
 
+function safeHostname(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function statusLabel(status: string): string {
+  if (status === 'in_progress') return 'in progress';
+  return status;
+}
+
+function statusBadgeCls(status: string): string {
+  switch (status) {
+    case 'accepted':
+    case 'done':
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+    case 'in_progress':
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30';
+    case 'dismissed':
+      return 'bg-muted text-muted-foreground border-border';
+    default:
+      return 'bg-muted text-muted-foreground border-border';
+  }
+}
+
 export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData }) {
   const { toast } = useToast();
   const [statuses, setStatuses] = useState<Record<string, string>>({});
@@ -91,7 +118,14 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-xs text-muted-foreground">Tech Radar · technology recommendations{data.saved === false ? ' · one-shot (not saved)' : ''}</div>
-          <div className="text-sm font-semibold mt-0.5 line-clamp-1">{data.subject?.title || 'Review'}</div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <div className="text-sm font-semibold line-clamp-1">{data.subject?.title || 'Review'}</div>
+            {typeof data.new_count === 'number' && data.new_count > 0 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full border bg-primary/15 text-primary border-primary/30 shrink-0">
+                {data.new_count} new
+              </span>
+            )}
+          </div>
         </div>
         <div className="text-right shrink-0">
           <div className="text-xs text-muted-foreground">{sorted.length === 1 ? 'finding' : 'findings'}</div>
@@ -142,7 +176,7 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
       <div className="space-y-2">
         {sorted.map((f, idx) => {
           const ring = RING_META[f.ring] || RING_META.assess;
-          const decided = f.id ? statuses[f.id] : '';
+          const decided = (f.id ? statuses[f.id] : '') || f.status || '';
           return (
             <div
               key={f.id || `${idx}-${f.title}`}
@@ -173,7 +207,11 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
                     >✕</button>
                   </div>
                 )}
-                {decided && <span className="text-[11px] text-muted-foreground shrink-0">{decided}</span>}
+                {decided && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${statusBadgeCls(decided)}`}>
+                    {statusLabel(decided)}
+                  </span>
+                )}
               </div>
 
               {f.rationale && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{f.rationale}</p>}
@@ -188,11 +226,39 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
                 {(f.evidence || []).slice(0, 3).map((e, i) =>
                   e.url ? (
                     <a key={i} href={e.url} target="_blank" rel="noreferrer" className="text-primary hover:underline line-clamp-1">
-                      {e.title || new URL(e.url).hostname}
+                      {e.title || safeHostname(e.url)}
                     </a>
                   ) : null,
                 )}
               </div>
+
+              {(f.evidence || []).length > 0 && (
+                <details className="group rounded-lg border border-border bg-muted/40 mt-1.5">
+                  <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                    <span className="font-medium">Evidence &amp; sources</span>
+                    <span className="text-xs text-muted-foreground">{f.evidence!.length}</span>
+                  </summary>
+                  <div className="px-2.5 pb-2.5 pt-0.5 space-y-2 text-xs">
+                    {f.evidence!.map((e, i) => (
+                      <div key={i} className="space-y-0.5">
+                        {e.url ? (
+                          <a
+                            href={e.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline break-words"
+                          >
+                            {e.title || safeHostname(e.url)}
+                          </a>
+                        ) : e.title ? (
+                          <div className="font-medium">{e.title}</div>
+                        ) : null}
+                        {e.note && <div className="text-muted-foreground leading-relaxed">{e.note}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           );
         })}

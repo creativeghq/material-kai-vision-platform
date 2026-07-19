@@ -201,6 +201,116 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
             />
           </div>
 
+          {/* SERP-feature detail accordions — surface the actual carousel/pack items */}
+          {Array.isArray(videos?.source?.videos) && videos.source.videos.length > 0 && (
+            <details className="group rounded-lg border border-border bg-muted/40">
+              <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                <span className="font-medium">Videos in the carousel ({videos.source.videos.length})</span>
+                <span className="text-xs text-muted-foreground">where to publish</span>
+              </summary>
+              <div className="px-2.5 pb-2.5 pt-0.5 space-y-1 text-xs">
+                {videos.source.platforms && typeof videos.source.platforms === 'object' && (
+                  <div className="flex flex-wrap gap-1 pb-1">
+                    {Object.entries(videos.source.platforms as Record<string, any>).map(([p, n]) => (
+                      <span key={p} className="text-[10px] bg-background border border-border rounded-full px-2 py-0.5">{p}: {String(n)}</span>
+                    ))}
+                  </div>
+                )}
+                {videos.source.videos.map((v: any, i: number) => (
+                  <div key={i} className="leading-snug">
+                    {v.url ? (
+                      <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{v.title || v.url}</a>
+                    ) : (
+                      <span>{v.title}</span>
+                    )}
+                    {(v.creator || v.platform || v.duration) && (
+                      <span className="text-muted-foreground">
+                        {' — '}
+                        {[v.creator, v.platform, v.duration].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {news.length > 0 && (
+            <details className="group rounded-lg border border-border bg-muted/40">
+              <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                <span className="font-medium">Top stories ({news.length})</span>
+                <span className="text-xs text-muted-foreground">news pack</span>
+              </summary>
+              <div className="px-2.5 pb-2.5 pt-0.5 space-y-1 text-xs">
+                {news.map((n, i) => (
+                  <div key={i} className="leading-snug">
+                    {n.source?.url ? (
+                      <a href={n.source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{n.source.title || n.title}</a>
+                    ) : (
+                      <span>{n.source?.title || n.title}</span>
+                    )}
+                    {(n.source?.source || n.source?.timestamp) && (
+                      <span className="text-muted-foreground"> — {[n.source?.source, n.source?.timestamp].filter(Boolean).join(' · ')}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {paid.length > 0 && (
+            <details className="group rounded-lg border border-border bg-muted/40">
+              <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                <span className="font-medium">Advertisers bidding ({paid.length})</span>
+                <span className="text-xs text-muted-foreground">paid competition</span>
+              </summary>
+              <div className="px-2.5 pb-2.5 pt-0.5 space-y-1.5 text-xs">
+                {paid.map((p, i) => (
+                  <div key={i} className="leading-snug">
+                    <div>
+                      {p.source?.url ? (
+                        <a href={p.source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{p.source.domain}</a>
+                      ) : (
+                        <span className="font-medium">{p.source?.domain}</span>
+                      )}
+                      {p.source?.title && <span className="text-foreground"> — {p.source.title}</span>}
+                    </div>
+                    {p.source?.description && <div className="text-muted-foreground">{p.source.description}</div>}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {shopping.length > 0 && (
+            <details className="group rounded-lg border border-border bg-muted/40">
+              <summary className="cursor-pointer list-none px-2.5 py-2 text-sm flex items-center justify-between gap-2">
+                <span className="font-medium">Shopping listings ({shopping.length})</span>
+                <span className="text-xs text-muted-foreground">transactional</span>
+              </summary>
+              <div className="px-2.5 pb-2.5 pt-0.5 space-y-1.5 text-xs">
+                {shopping.map((s, i) => (
+                  <div key={i} className="leading-snug">
+                    <div>
+                      {s.source?.url ? (
+                        <a href={s.source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{s.source.title}</a>
+                      ) : (
+                        <span className="font-medium">{s.source?.title}</span>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {[
+                        s.source?.price != null ? `${s.source.price}${s.source.currency ? ` ${s.source.currency}` : ''}` : null,
+                        s.source?.seller,
+                        s.source?.rating_value != null ? `★ ${s.source.rating_value}` : null,
+                      ].filter(Boolean).join(' · ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
           {/* AI Overview detail */}
           {ai && (
             <div className="rounded-lg border border-border bg-muted/40 p-3">
@@ -214,7 +324,25 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                   “{String(ai.source.ai_overview_text).slice(0, 500)}{String(ai.source.ai_overview_text).length > 500 ? '…' : ''}”
                 </div>
               )}
-              {Array.isArray(ai.source?.cited_domains) && ai.source.cited_domains.length > 0 && (
+              {Array.isArray(ai.source?.references) && ai.source.references.length > 0 ? (
+                <div className="mt-2">
+                  <div className="text-[11px] text-muted-foreground mb-1">Sources Google cited:</div>
+                  <div className="space-y-0.5">
+                    {ai.source.references.map((r: any, i: number) => (
+                      <div key={i} className="text-xs leading-snug">
+                        {r.url ? (
+                          <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{r.title || r.domain || r.url}</a>
+                        ) : (
+                          <span>{r.title || r.domain}</span>
+                        )}
+                        {(r.domain || r.source) && (r.title || r.url) && (
+                          <span className="text-muted-foreground"> — {r.domain || r.source}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : Array.isArray(ai.source?.cited_domains) && ai.source.cited_domains.length > 0 && (
                 <div className="mt-2">
                   <div className="text-[11px] text-muted-foreground mb-1">Sources Google cited:</div>
                   <div className="flex flex-wrap gap-1">
@@ -232,9 +360,17 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
             <div className="rounded-lg border border-border bg-muted/40 p-3">
               <div className="text-xs text-muted-foreground mb-1">Featured snippet · position 0</div>
               <div className="text-sm">
-                Held by <span className="font-medium">{fs.source?.current_domain || 'unknown'}</span>
+                Held by{' '}
+                {fs.source?.current_url ? (
+                  <a href={fs.source.current_url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">{fs.source?.current_domain || 'unknown'}</a>
+                ) : (
+                  <span className="font-medium">{fs.source?.current_domain || 'unknown'}</span>
+                )}
                 {fs.source?.current_domain && <span className="text-muted-foreground"> — win it by answering more directly.</span>}
               </div>
+              {fs.source?.current_title && (
+                <div className="text-xs font-medium mt-1">{fs.source.current_title}</div>
+              )}
               {fs.source?.current_description && (
                 <div className="text-xs italic text-muted-foreground mt-1">
                   “{String(fs.source.current_description).slice(0, 240)}”
@@ -249,9 +385,17 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
               <div className="text-xs text-muted-foreground mb-1">Knowledge panel</div>
               <div className="text-sm">
                 {kg.source?.knowledge_graph_present
-                  ? <>Present — <span className="font-medium">{kg.source?.title || '(unnamed entity)'}</span></>
+                  ? <>Present — {kg.source?.url
+                      ? <a href={kg.source.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">{kg.source?.title || '(unnamed entity)'}</a>
+                      : <span className="font-medium">{kg.source?.title || '(unnamed entity)'}</span>}</>
                   : <span className={WARN}>Not shown — build entity authority (Wikipedia, Wikidata, consistent NAP) to earn one.</span>}
               </div>
+              {kg.source?.knowledge_graph_present && kg.source?.subtitle && (
+                <div className="text-xs text-muted-foreground mt-0.5">{kg.source.subtitle}</div>
+              )}
+              {kg.source?.knowledge_graph_present && kg.source?.description && (
+                <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{kg.source.description}</div>
+              )}
             </div>
           )}
 
@@ -264,6 +408,13 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                 <Stat label="Ranking keywords" value={fmtNum(domain.source?.ranking_keywords_count)} />
                 <Stat label="Est. traffic /mo" value={fmtNum(domain.source?.estimated_organic_monthly_traffic)} />
                 <Stat label="Backlinks" value={fmtNum(domain.source?.backlinks)} />
+                <Stat label="Referring domains" value={fmtNum(domain.source?.referring_domains)} />
+                <Stat
+                  label="Traffic value /mo"
+                  value={domain.source?.estimated_traffic_value_usd != null
+                    ? `$${fmtNum(domain.source.estimated_traffic_value_usd)}`
+                    : '—'}
+                />
               </div>
             </div>
           )}
@@ -289,6 +440,9 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                 <span className="text-sm flex-1 truncate">{c.source?.domain}</span>
               </div>
               <div className="text-xs text-muted-foreground truncate ml-9">{c.source?.title}</div>
+              {c.source?.description && (
+                <div className="text-xs text-muted-foreground/80 ml-9 mt-0.5 line-clamp-2">{c.source.description}</div>
+              )}
             </a>
           ))}
         </div>
@@ -312,6 +466,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                 {k.source?.difficulty != null && <span>KD {k.source.difficulty}/100</span>}
                 {k.source?.intent && <span>· {k.source.intent} intent</span>}
                 {k.source?.cpc != null && k.source.cpc > 0 && <span>· ${Number(k.source.cpc).toFixed(2)} CPC</span>}
+                {k.source?.competition != null && <span>· {k.source.competition} competition</span>}
               </div>
             </div>
           ))}
@@ -325,9 +480,19 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
           {paa.length === 0 ? (
             <div className="text-sm text-muted-foreground py-4 text-center">No People Also Ask questions returned.</div>
           ) : paa.map((q, i) => (
-            <div key={i} className="bg-muted/40 rounded-lg p-2.5 border border-border">
-              <div className="text-sm font-medium">{q.title}</div>
-            </div>
+            q.rationale ? (
+              <details key={i} className="group bg-muted/40 rounded-lg border border-border">
+                <summary className="cursor-pointer list-none px-2.5 py-2 text-sm font-medium flex items-center justify-between gap-2">
+                  <span className="min-w-0">{q.title}</span>
+                  <span className="text-xs text-muted-foreground shrink-0 group-open:hidden">answer</span>
+                </summary>
+                <div className="px-2.5 pb-2.5 pt-0.5 text-xs text-muted-foreground leading-relaxed">{q.rationale}</div>
+              </details>
+            ) : (
+              <div key={i} className="bg-muted/40 rounded-lg p-2.5 border border-border">
+                <div className="text-sm font-medium">{q.title}</div>
+              </div>
+            )
           ))}
           {related.length > 0 && (
             <div className="pt-2">

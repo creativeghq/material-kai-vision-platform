@@ -142,6 +142,46 @@ export const CatalogExtractionCandidatesCard: React.FC<Props> = ({ catalogId, qu
                     <span className="font-medium">{formatPrice(c.price, c.currency)}</span>
                   )}
                 </div>
+                {(() => {
+                  const specEntries = c.specs
+                    ? Object.entries(c.specs).filter(([k]) => k !== 'bbox')
+                    : [];
+                  const specsRaw = (c as any).specs_raw as Record<string, any> | null | undefined;
+                  const rawEntries = specsRaw
+                    ? Object.entries(specsRaw).filter(([k]) => k !== 'bbox')
+                    : [];
+                  if (specEntries.length === 0) return null;
+                  return (
+                    <details
+                      className="group rounded-lg border border-border bg-muted/40 mt-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <summary className="cursor-pointer list-none px-2.5 py-1.5 text-xs flex items-center justify-between gap-2">
+                        <span className="font-medium">Specs</span>
+                        <span className="text-[10px] text-muted-foreground">{specEntries.length}</span>
+                      </summary>
+                      <div className="px-2.5 pb-2 pt-0.5 space-y-1 text-[11px]">
+                        {specEntries.map(([k, v]) => (
+                          <div key={k} className="flex justify-between gap-2">
+                            <span className="text-muted-foreground shrink-0">{humanizeSpecKey(k)}</span>
+                            <span className="text-right break-words min-w-0">{formatSpecValue(v)}</span>
+                          </div>
+                        ))}
+                        {rawEntries.length > 0 && (
+                          <div className="pt-1 mt-1 border-t border-border">
+                            <div className="text-muted-foreground mb-0.5">Original values</div>
+                            {rawEntries.map(([k, v]) => (
+                              <div key={k} className="flex justify-between gap-2">
+                                <span className="text-muted-foreground shrink-0">{humanizeSpecKey(k)}</span>
+                                <span className="text-right break-words min-w-0">{formatSpecValue(v)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  );
+                })()}
               </div>
             </div>
           );
@@ -180,4 +220,19 @@ export const CatalogExtractionCandidatesCard: React.FC<Props> = ({ catalogId, qu
 function formatPrice(amount: number, currency: string | null): string {
   const symbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : (currency ? `${currency} ` : '');
   return `${symbol}${amount.toFixed(2)}`;
+}
+
+function humanizeSpecKey(k: string): string {
+  if (k.toLowerCase() === 'sku') return 'SKU';
+  return k
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function formatSpecValue(v: any): string {
+  if (v == null) return '—';
+  if (Array.isArray(v)) return v.map((x) => formatSpecValue(x)).join(', ');
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
 }

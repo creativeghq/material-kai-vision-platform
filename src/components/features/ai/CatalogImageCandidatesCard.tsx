@@ -76,37 +76,74 @@ export const CatalogImageCandidatesCard: React.FC<Props> = ({
       <div className="p-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
         {candidates.map((c, i) => {
           const isPicked = selectedIdx === i;
+          const meta = c.source_metadata || {};
+          const domain: string | null = c.source === 'web' ? (meta.source_domain ?? null) : null;
+          const sourceUrl: string | null = c.source === 'web' ? (meta.source_url ?? null) : null;
+          const w = meta.width;
+          const h = meta.height;
+          const dims: string | null = c.source === 'web' && w && h ? `${w}×${h}` : null;
+          const rawScore = meta.score;
+          const scorePct: number | null =
+            c.source === 'db' && typeof rawScore === 'number'
+              ? Math.round(rawScore <= 1 ? rawScore * 100 : rawScore)
+              : null;
           return (
-            <button
-              key={i}
-              disabled={committed || submitting}
-              onClick={() => handleSelect(i)}
-              className={`relative rounded overflow-hidden border-2 transition group ${
-                isPicked ? 'border-primary' : committed ? 'border-border opacity-50' : 'border-border hover:border-primary/50'
-              }`}
-            >
-              <div className="aspect-square bg-muted">
-                <img src={c.thumb_url} alt={c.title || ''} className="w-full h-full object-cover" />
-              </div>
-              <div className="absolute top-1 left-1 bg-black/60 text-white rounded px-1 py-0.5 text-[10px] flex items-center gap-1">
-                {c.source === 'db' ? <Database className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
-                {c.source}
-              </div>
-              {isPicked && (
-                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                  {submitting ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-primary-foreground" />
-                  ) : (
-                    <Check className="h-8 w-8 text-primary-foreground bg-primary rounded-full p-1" />
-                  )}
+            <div key={i} className="flex flex-col gap-0.5 min-w-0">
+              <button
+                disabled={committed || submitting}
+                onClick={() => handleSelect(i)}
+                className={`relative rounded overflow-hidden border-2 transition group ${
+                  isPicked ? 'border-primary' : committed ? 'border-border opacity-50' : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className="aspect-square bg-muted">
+                  <img src={c.thumb_url} alt={c.title || ''} className="w-full h-full object-cover" />
                 </div>
-              )}
-              {c.title && (
-                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] px-1 py-0.5 truncate text-left">
-                  {c.title}
+                <div className="absolute top-1 left-1 bg-black/60 text-white rounded px-1 py-0.5 text-[10px] flex items-center gap-1">
+                  {c.source === 'db' ? <Database className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
+                  {c.source}
                 </div>
+                {dims && (
+                  <div className="absolute top-1 right-1 bg-black/60 text-white rounded px-1 py-0.5 text-[10px]">
+                    {dims}
+                  </div>
+                )}
+                {scorePct != null && (
+                  <div className="absolute top-1 right-1 bg-black/60 text-white rounded px-1 py-0.5 text-[10px]">
+                    {scorePct}% match
+                  </div>
+                )}
+                {isPicked && (
+                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                    {submitting ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-primary-foreground" />
+                    ) : (
+                      <Check className="h-8 w-8 text-primary-foreground bg-primary rounded-full p-1" />
+                    )}
+                  </div>
+                )}
+                {c.title && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] px-1 py-0.5 truncate text-left">
+                    {c.title}
+                  </div>
+                )}
+              </button>
+              {domain && (
+                sourceUrl ? (
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline text-[10px] truncate px-0.5"
+                    title={sourceUrl}
+                  >
+                    {domain}
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground text-[10px] truncate px-0.5">{domain}</span>
+                )
               )}
-            </button>
+            </div>
           );
         })}
       </div>

@@ -16,31 +16,92 @@ import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubL
 const isScalar = (v: any) => v == null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
 const labelize = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
+// Hard ceiling on how deep nested objects may expand (via <details>) before we
+// fall back to a plain "{N} fields" count — keeps recursion bounded regardless
+// of payload shape/cycles.
+const MAX_DEPTH = 4;
+const ARRAY_INLINE_CAP = 8;
+
+const URL_RE = /^https?:\/\//i;
+const IMG_URL_RE = /^https?:\/\/\S+\.(png|jpe?g|webp|gif)(\?\S*)?$/i;
+
 function Scalar({ v }: { v: any }) {
   if (v == null || v === '') return <span className="text-muted-foreground">—</span>;
   if (typeof v === 'boolean') return <span>{v ? 'Yes' : 'No'}</span>;
+  if (typeof v === 'string') {
+    if (IMG_URL_RE.test(v)) {
+      return (
+        <a href={v} target="_blank" rel="noopener noreferrer" className="inline-block">
+          <img
+            src={v}
+            alt=""
+            loading="lazy"
+            className="max-h-16 max-w-[8rem] rounded border border-border object-cover"
+          />
+        </a>
+      );
+    }
+    if (URL_RE.test(v)) {
+      return (
+        <a href={v} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+          {v}
+        </a>
+      );
+    }
+  }
   return <span>{String(v)}</span>;
 }
 
-// One value, rendered to a sensible depth (objects 1 level, arrays capped).
+// Renders a single array item (scalar → Scalar, object → inline KeyValues).
+function ArrayItem({ item, depth }: { item: any; depth: number }) {
+  return (
+    <div className="rounded bg-muted/40 border border-border px-2 py-1 text-xs">
+      {isScalar(item) ? <Scalar v={item} /> : <KeyValues obj={item} depth={depth + 1} inline />}
+    </div>
+  );
+}
+
+// One value, rendered to a sensible depth (objects expand via <details>, arrays
+// cap inline with a "Show all" disclosure for the overflow).
 function Value({ v, depth = 0 }: { v: any; depth?: number }) {
   if (isScalar(v)) return <Scalar v={v} />;
   if (Array.isArray(v)) {
     if (v.length === 0) return <span className="text-muted-foreground">None</span>;
-    const shown = v.slice(0, 8);
+    const shown = v.slice(0, ARRAY_INLINE_CAP);
+    const rest = v.slice(ARRAY_INLINE_CAP);
     return (
       <div className="space-y-1">
         {shown.map((item, i) => (
-          <div key={i} className="rounded bg-muted/40 border border-border px-2 py-1 text-xs">
-            {isScalar(item) ? <Scalar v={item} /> : <KeyValues obj={item} depth={depth + 1} inline />}
-          </div>
+          <ArrayItem key={i} item={item} depth={depth} />
         ))}
-        {v.length > shown.length && <div className="text-[11px] text-muted-foreground">+ {v.length - shown.length} more</div>}
+        {rest.length > 0 && (
+          <details className="space-y-1">
+            <summary className="cursor-pointer text-primary text-xs">Show all {v.length}</summary>
+            <div className="space-y-1 mt-1">
+              {rest.map((item, i) => (
+                <ArrayItem key={i} item={item} depth={depth} />
+              ))}
+            </div>
+          </details>
+        )}
       </div>
     );
   }
   // object
-  if (depth >= 2) return <span className="text-muted-foreground">{Object.keys(v).length} fields</span>;
+  const fieldCount = Object.keys(v).length;
+  if (depth >= 2) {
+    // Beyond the inline depth budget: expand one more level on demand, but stop
+    // at MAX_DEPTH so recursion stays bounded on deep/cyclic payloads.
+    if (depth >= MAX_DEPTH) return <span className="text-muted-foreground">{fieldCount} fields</span>;
+    return (
+      <details>
+        <summary className="cursor-pointer text-primary text-xs">{fieldCount} fields</summary>
+        <div className="mt-1">
+          <KeyValues obj={v} depth={depth + 1} />
+        </div>
+      </details>
+    );
+  }
   return <KeyValues obj={v} depth={depth + 1} />;
 }
 
