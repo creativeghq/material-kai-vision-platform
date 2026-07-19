@@ -284,6 +284,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Customer Inbox
   inbox_threads_list: 'Customer conversations',
   inbox_reply_sent: 'Reply sent',
+  // Reviews
+  reviews_list: 'Reviews about you',
+  review_reply_posted: 'Reply posted',
   // Finance (read)
   finance_invoices_list: 'Invoices',
   customer_balance_result: 'Customer balance',

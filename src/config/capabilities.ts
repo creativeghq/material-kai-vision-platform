@@ -65,6 +65,7 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'price-monitoring', label: 'Price Monitoring', hub: 'sales', pageRoute: '/admin/monitoring', agentId: 'kai', agentTool: 'track_product_prices', toolkitId: 'price-monitoring', recordTable: 'tracked_queries', canvasKind: 'result', moduleSlug: 'price-monitoring' },
   { id: 'messaging', label: 'WhatsApp', hub: 'service', pageRoute: '/admin/messaging', agentId: 'social-media', agentTool: 'manage_messaging', toolkitId: 'messaging', recordTable: 'messaging_channels', moduleSlug: 'messaging' },
   { id: 'inbox', label: 'Inbox', hub: 'service', pageRoute: '/inbox', agentId: 'social-media', agentTool: 'manage_inbox', toolkitId: 'inbox', quickStartLabel: 'Open conversations', recordTable: 'inbox_threads', moduleSlug: 'inbox' },
+  { id: 'reviews', label: 'Reviews', hub: 'service', agentId: 'social-media', agentTool: 'manage_reviews', toolkitId: 'reviews', quickStartLabel: 'Unanswered reviews', recordTable: 'profile_reviews', moduleSlug: 'reviews' },
 
   // ── Sales ──
   { id: 'quote', label: 'Quote', hub: 'sales', pageRoute: '/quotes', agentId: 'erp', agentTool: 'create_quote', toolkitId: 'quotes', recordTable: 'quotes', canvasKind: 'quote', moduleSlug: 'quotes' },
