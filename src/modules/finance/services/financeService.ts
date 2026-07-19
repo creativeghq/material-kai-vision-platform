@@ -1133,6 +1133,8 @@ const _financeServiceCore = {
     issuedAt?: string;
     dueAt?: string;
     notes?: string;
+    /** Optional finance category (expense side) — required for the bill to appear in P&L per category. */
+    categoryId?: string | null;
     /** Optional purchase order this bill is matched against (drives 3-way match). */
     orderId?: string;
   }): Promise<SupplierBill> {
@@ -1150,12 +1152,80 @@ const _financeServiceCore = {
         issued_at: input.issuedAt ?? null,
         due_at: input.dueAt ?? null,
         notes: input.notes ?? null,
+        category_id: input.categoryId ?? null,
         order_id: input.orderId ?? null,
       })
       .select()
       .single();
     if (error) throw error;
     return data as SupplierBill;
+  },
+
+  /**
+   * Record a business operating expense (rent, utilities, fees, …). An expense IS a supplier
+   * bill — the canonical spend record that feeds Payables (AP aging) and the P&L per category.
+   * Party is optional (many operating costs have no CRM supplier). When `paidNow` is set, the
+   * matching money-out payment is booked and allocated to the bill in the same step, so it
+   * settles immediately (drops out of AP) and hits cash-out; otherwise it stays an open payable.
+   */
+  async createExpense(input: {
+    workspaceId: string;
+    categoryId: string;
+    description?: string;
+    reference?: string;
+    supplierCompanyId?: string;
+    supplierContactId?: string;
+    currency?: string;
+    subtotalNet: number;
+    vatAmount: number;
+    issuedAt?: string;
+    dueAt?: string;
+    notes?: string;
+    /** When true, also record the outgoing payment now (bill is created as paid). */
+    paidNow?: boolean;
+    paidFromBankAccountId?: string | null;
+    paymentMethod?: PaymentMethod;
+    paidAt?: string;
+  }): Promise<{ billId: string; paymentId: string | null }> {
+    const currency = input.currency ?? 'EUR';
+    const subtotalNet = Number((input.subtotalNet || 0).toFixed(2));
+    const vatAmount = Number((input.vatAmount || 0).toFixed(2));
+    const total = Number((subtotalNet + vatAmount).toFixed(2));
+
+    const bill = await this.createSupplierBill({
+      workspaceId: input.workspaceId,
+      supplierBillNumber: input.reference || undefined,
+      supplierCompanyId: input.supplierCompanyId,
+      supplierContactId: input.supplierContactId,
+      currency,
+      subtotalNet,
+      vatAmount,
+      total,
+      issuedAt: input.issuedAt,
+      dueAt: input.dueAt,
+      notes: input.notes ?? input.description ?? undefined,
+      categoryId: input.categoryId,
+    });
+
+    let paymentId: string | null = null;
+    if (input.paidNow && total > 0) {
+      paymentId = await this.recordPayment({
+        workspaceId: input.workspaceId,
+        direction: 'out',
+        amount: total,
+        currency,
+        method: input.paymentMethod ?? 'bank_transfer',
+        paidAt: input.paidAt ?? new Date().toISOString(),
+        counterpartyCompanyId: input.supplierCompanyId ?? null,
+        counterpartyContactId: input.supplierContactId ?? null,
+        reference: input.reference || null,
+        notes: input.description ?? null,
+        categoryId: input.categoryId,
+        bankAccountId: input.paidFromBankAccountId ?? null,
+        allocations: [{ target_id: bill.id, target_type: 'supplier_bill', amount: total }],
+      });
+    }
+    return { billId: bill.id, paymentId };
   },
 
   async listSupplierBills(opts: { workspaceId?: string; supplierCompanyId?: string; status?: SupplierBillStatus[] } = {}): Promise<SupplierBill[]> {

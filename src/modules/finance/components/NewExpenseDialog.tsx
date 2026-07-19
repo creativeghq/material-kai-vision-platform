@@ -1,0 +1,316 @@
+// Record a business operating expense (rent, utilities, fees, …). An expense IS a supplier
+// bill — the canonical spend record that feeds Payables (AP aging) + P&L per category. Party
+// is optional. The "Paid now" toggle flips it between an open payable and a settled cost:
+//   OFF → open payable (shows in AP with a due date)
+//   ON  → also books the outgoing payment now (settled, drops out of AP, hits cash-out)
+import React, { useEffect, useMemo, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/core/ui/dialog';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Label } from '@/components/core/ui/label';
+import { Textarea } from '@/components/core/ui/textarea';
+import { Switch } from '@/components/core/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  financeService, PAYMENT_METHOD_LABEL, type PaymentMethod, type BankAccount,
+} from '@/modules/finance/services/financeService';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { useSessionDraft } from '@/hooks/useSessionDraft';
+import { parseDecimalOr } from '@/utils/decimal';
+
+interface Party { type: 'company' | 'contact'; id: string; label: string }
+
+interface Props {
+  workspaceId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: () => void;
+}
+
+const METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'check', 'other'];
+
+export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [description, setDescription] = useState('');
+  const [reference, setReference] = useState('');
+  const [currency, setCurrency] = useState('EUR');
+  const [subtotalNet, setSubtotalNet] = useState<string>('0');
+  const [vatAmount, setVatAmount] = useState<string>('0');
+  const [issuedAt, setIssuedAt] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [dueAt, setDueAt] = useState<string>('');
+  const [notes, setNotes] = useState('');
+
+  const [paidNow, setPaidNow] = useState(true);
+  const [bankAccountId, setBankAccountId] = useState<string>('');
+  const [method, setMethod] = useState<PaymentMethod>('bank_transfer');
+
+  const [party, setParty] = useState<Party | null>(null);
+  const [partySearch, setPartySearch] = useState('');
+  const [partyOptions, setPartyOptions] = useState<Party[]>([]);
+
+  const expenseCats = useMemo(
+    () => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'),
+    [categories],
+  );
+  const total = parseDecimalOr(subtotalNet, 0) + parseDecimalOr(vatAmount, 0);
+
+  // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
+  const clearDraft = useSessionDraft(
+    `fin-expense:${workspaceId}`,
+    open,
+    { categoryId, description, reference, currency, subtotalNet, vatAmount, issuedAt, dueAt, notes, paidNow, bankAccountId, method, party },
+    (d) => {
+      setCategoryId(d?.categoryId ?? '');
+      setDescription(d?.description ?? '');
+      setReference(d?.reference ?? '');
+      setCurrency(d?.currency ?? 'EUR');
+      setSubtotalNet(d?.subtotalNet ?? '0');
+      setVatAmount(d?.vatAmount ?? '0');
+      setIssuedAt(d?.issuedAt ?? new Date().toISOString().slice(0, 10));
+      setDueAt(d?.dueAt ?? '');
+      setNotes(d?.notes ?? '');
+      setPaidNow(d?.paidNow ?? true);
+      setBankAccountId(d?.bankAccountId ?? '');
+      setMethod(d?.method ?? 'bank_transfer');
+      setParty(d?.party ?? null);
+      setPartySearch('');
+    },
+  );
+
+  // Load expense categories + bank accounts when the dialog opens.
+  useEffect(() => {
+    if (!open || !workspaceId) return;
+    void financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+    void financeService.listBankAccounts(workspaceId).then((accts) => {
+      setBankAccounts(accts);
+      // Default to the workspace's default account when none picked yet.
+      setBankAccountId((cur) => cur || accts.find((a) => a.is_default)?.id || accts[0]?.id || '');
+    }).catch(() => setBankAccounts([]));
+  }, [open, workspaceId]);
+
+  // Optional supplier/payee search (suppliers only).
+  useEffect(() => {
+    if (!open) return;
+    const term = partySearch.trim();
+    if (term.length < 2) { setPartyOptions([]); return; }
+    const t = setTimeout(async () => {
+      const [companies, contacts] = await Promise.all([
+        supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike('name', `%${term}%`).limit(8),
+        supabase.from('crm_contacts').select('id, name, first_name, last_name, email').eq('is_supplier', true)
+          .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
+      ]);
+      const opts: Party[] = [];
+      for (const c of companies.data ?? []) opts.push({ type: 'company', id: c.id, label: `${c.name} (company)` });
+      for (const c of contacts.data ?? []) {
+        const label = c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || c.id;
+        opts.push({ type: 'contact', id: c.id, label });
+      }
+      setPartyOptions(opts);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [partySearch, open]);
+
+  const handleSave = async () => {
+    if (!categoryId) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
+    if (total <= 0) { toast({ title: 'Amount must be positive', variant: 'destructive' }); return; }
+    if (parseDecimalOr(subtotalNet, 0) < 0 || parseDecimalOr(vatAmount, 0) < 0) {
+      toast({ title: 'Amounts cannot be negative', variant: 'destructive' }); return;
+    }
+    try {
+      setBusy(true);
+      // Business rollup: a supplier contact attached to a supplier company is attributed to
+      // the BUSINESS — same rule as supplier bills / customer docs.
+      let cpCompanyId = party?.type === 'company' ? party.id : undefined;
+      let cpContactId = party?.type === 'contact' ? party.id : undefined;
+      if (cpContactId && !cpCompanyId) {
+        const rolled = await financeService.resolvePrimaryCompanyId(cpContactId).catch(() => null);
+        if (rolled) { cpCompanyId = rolled; cpContactId = undefined; }
+      }
+      await financeService.createExpense({
+        workspaceId,
+        categoryId,
+        description: description.trim() || undefined,
+        reference: reference.trim() || undefined,
+        supplierCompanyId: cpCompanyId,
+        supplierContactId: cpContactId,
+        currency,
+        subtotalNet: parseDecimalOr(subtotalNet, 0),
+        vatAmount: parseDecimalOr(vatAmount, 0),
+        issuedAt: issuedAt || undefined,
+        dueAt: paidNow ? undefined : (dueAt || undefined),
+        notes: notes || undefined,
+        paidNow,
+        paidFromBankAccountId: paidNow ? (bankAccountId || null) : null,
+        paymentMethod: method,
+        paidAt: paidNow ? new Date(issuedAt || Date.now()).toISOString() : undefined,
+      });
+      toast({
+        title: paidNow ? 'Expense recorded & paid' : 'Expense recorded as payable',
+        description: paidNow ? 'Booked as a paid cost — visible in Payables and Payments.' : 'Open in Payables (AP) until you mark it paid.',
+      });
+      clearDraft();
+      onCreated();
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Add expense</DialogTitle>
+          <DialogDescription>
+            A business cost (rent, utilities, fees…). Recorded as a categorized supplier bill — an open <strong>payable</strong> until paid, or settled now.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Category *</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger><SelectValue placeholder={expenseCats.length ? 'Pick a category' : 'No expense categories'} /></SelectTrigger>
+                <SelectContent>
+                  {expenseCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {expenseCats.length === 0 && (
+                <p className="text-[11px] text-muted-foreground">Add expense categories in Settings → Finance Categories (Import defaults).</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label>Reference / bill #</Label>
+              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="optional — e.g. DEH-2026/06" />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Description</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Office rent — June 2026" />
+          </div>
+
+          <div className="space-y-1">
+            <Label>Supplier / payee <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            {party ? (
+              <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
+                <span className="text-sm">{party.label}</span>
+                <Button size="sm" variant="ghost" onClick={() => setParty(null)}>Change</Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input placeholder="Search suppliers (is_supplier)…" value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
+                {partyOptions.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
+                    {partyOptions.map((o) => (
+                      <button key={`${o.type}-${o.id}`} type="button"
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                        onClick={() => { setParty(o); setPartySearch(''); setPartyOptions([]); }}>
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label>Subtotal (net)</Label>
+              <Input type="text" inputMode="decimal" value={subtotalNet} onChange={(e) => setSubtotalNet(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>VAT amount</Label>
+              <Input type="text" inputMode="decimal" value={vatAmount} onChange={(e) => setVatAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Total</Label>
+              <Input value={total.toFixed(2)} disabled />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label>Date</Label>
+              <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Currency</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EUR">EUR</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="GBP">GBP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {!paidNow && (
+              <div className="space-y-1">
+                <Label>Due date</Label>
+                <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          {/* Paid-now toggle: settled cost vs open payable */}
+          <div className="rounded-md border border-border/60 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm">Paid now</Label>
+                <p className="text-[11px] text-muted-foreground">{paidNow ? 'Books the payment out of an account — settles immediately.' : 'Leaves it as an open payable in AP until you mark it paid.'}</p>
+              </div>
+              <Switch checked={paidNow} onCheckedChange={setPaidNow} />
+            </div>
+            {paidNow && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Paid from</Label>
+                  <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                    <SelectTrigger><SelectValue placeholder={bankAccounts.length ? 'Pick account' : 'No accounts'} /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}{a.is_default ? ' (default)' : ''}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Method</Label>
+                  <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {METHODS.map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABEL[m]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Label>Notes</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { clearDraft(); onOpenChange(false); }} disabled={busy}>Cancel</Button>
+          <Button onClick={handleSave} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (paidNow ? 'Record & pay' : 'Record payable')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

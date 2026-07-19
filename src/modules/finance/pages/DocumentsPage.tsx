@@ -14,7 +14,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type SupplierBill, type SupplierBillStatus } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
@@ -27,6 +27,7 @@ import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryDialog';
+import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Input } from '@/components/core/ui/input';
@@ -83,6 +84,8 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
+  const [supplierBills, setSupplierBills] = useState<SupplierBill[]>([]);
+  const [newExpenseOpen, setNewExpenseOpen] = useState(false);
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
   const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
   const [cheques, setCheques] = useState<Cheque[]>([]);
@@ -115,7 +118,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const [inv, cn, inb, pmts, dns, chq, cats] = await Promise.all([
+      const [inv, cn, inb, pmts, dns, chq, cats, bills] = await Promise.all([
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 200 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
         inboundService.list(activeWorkspaceId).catch(() => []),
@@ -123,12 +126,17 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         deliveryNotesService.list(activeWorkspaceId).catch(() => []),
         chequesService.list(activeWorkspaceId).catch(() => []),
         financeCategoriesService.list(activeWorkspaceId).catch(() => [] as FinanceCategory[]),
+        // Only the Expenses tab renders the recorded-bill spend log — skip the query elsewhere.
+        type === 'expenses'
+          ? financeService.listSupplierBills({ workspaceId: activeWorkspaceId }).catch(() => [] as SupplierBill[])
+          : Promise.resolve([] as SupplierBill[]),
       ]);
       setCategories(cats ?? []);
       setCategoryMap(Object.fromEntries((cats ?? []).map((c) => [c.id, c.name])));
       setInvoices(inv);
       setCreditNotes(cn);
       setInbound(inb);
+      setSupplierBills(bills);
       setPayments(pmts);
       setDeliveryNotes(dns);
       setCheques(chq);
@@ -224,6 +232,11 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                     <Tags className="h-3.5 w-3.5 mr-1" /> Expense category
                   </Button>
                 )}
+                {type === 'expenses' && canOperateFinance && (
+                  <Button size="sm" onClick={() => setNewExpenseOpen(true)} title="Record a business expense (rent, utilities, fees…)">
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add expense
+                  </Button>
+                )}
                 {(type === 'invoices' || type === 'receipts') && !isAccountant && (
                   <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
                 )}
@@ -306,6 +319,10 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
               </CardContent>
             </Card>
             )}
+
+            {type === 'expenses' && !loading && supplierBills.length > 0 && (
+              <RecordedExpensesCard rows={supplierBills} categoryName={categoryName} />
+            )}
           </div>
         </div>
       </div>
@@ -359,7 +376,56 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           onChanged={load}
         />
       )}
+      {activeWorkspaceId && (
+        <NewExpenseDialog
+          workspaceId={activeWorkspaceId}
+          open={newExpenseOpen}
+          onOpenChange={setNewExpenseOpen}
+          onCreated={() => { setNewExpenseOpen(false); load(); }}
+        />
+      )}
     </div>
+  );
+};
+
+/** Recorded-expense spend log (manual + supplier bills) shown under the myDATA inbox on the
+ *  Expenses tab. These are `supplier_bills` — they also appear in Payables (open ones age in AP). */
+const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: any) => string }> = ({ rows, categoryName }) => {
+  const statusVar = (s: SupplierBillStatus) =>
+    s === 'paid' ? 'default' : s === 'overdue' || s === 'disputed' ? 'destructive' : 'outline';
+  return (
+    <Card>
+      <div className="border-b border-border/60 px-4 py-2.5">
+        <div className="text-sm font-semibold">Recorded expenses &amp; bills</div>
+        <p className="text-[11px] text-muted-foreground">Categorized costs you entered or received. Open ones also age in Payables (AP).</p>
+      </div>
+      <CardContent className="p-0">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border/60 text-xs text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2 text-left">Reference</th>
+              <th className="px-4 py-2 text-left">Date</th>
+              <th className="px-4 py-2 text-left">Category</th>
+              <th className="px-4 py-2 text-right">Total</th>
+              <th className="px-4 py-2 text-right">Due</th>
+              <th className="px-4 py-2 text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((b) => (
+              <tr key={b.id} className="border-b border-border/30 hover:bg-muted/30">
+                <td className="px-4 py-2 font-mono text-xs">{b.supplier_bill_number || <span className="text-muted-foreground">{b.notes ? b.notes.slice(0, 40) : '—'}</span>}</td>
+                <td className="px-4 py-2">{b.issued_at ? new Date(b.issued_at).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName((b as any).category_id)}</td>
+                <td className="px-4 py-2 text-right">{formatMoney(b.total, b.currency)}</td>
+                <td className="px-4 py-2 text-right font-medium">{formatMoney(b.amount_due, b.currency)}</td>
+                <td className="px-4 py-2 text-center"><Badge variant={statusVar(b.status)} className="text-[10px]">{humanizeLabel(b.status)}</Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
   );
 };
 

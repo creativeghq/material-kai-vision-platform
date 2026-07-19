@@ -59,6 +59,7 @@ import { OrderAgingInlineEditor } from '@/modules/finance/components/OrderAgingI
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
+import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
@@ -165,6 +166,7 @@ const FinancePage: React.FC = () => {
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newBillOpen, setNewBillOpen] = useState(false);
+  const [newExpenseOpen, setNewExpenseOpen] = useState(false);
 
   // #251 App Launcher deep-link: /finance?new=invoice opens the New Invoice modal.
   useEffect(() => {
@@ -768,6 +770,7 @@ const FinancePage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 {!isAccountant && <Button variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
+                {!isAccountant && <Button variant="outline" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>}
                 {!isAccountant && <Button onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
               </div>
             </div>
@@ -973,6 +976,12 @@ const FinancePage: React.FC = () => {
         open={newBillOpen}
         onOpenChange={setNewBillOpen}
         onCreated={async () => { setNewBillOpen(false); if (workspaceId) await loadAll(workspaceId); }}
+      />
+      <NewExpenseDialog
+        workspaceId={workspaceId}
+        open={newExpenseOpen}
+        onOpenChange={setNewExpenseOpen}
+        onCreated={async () => { setNewExpenseOpen(false); if (workspaceId) await loadAll(workspaceId); }}
       />
       <NewSupplierCreditNoteDialog
         workspaceId={workspaceId}
