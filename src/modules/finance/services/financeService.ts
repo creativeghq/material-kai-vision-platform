@@ -11,6 +11,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
+import { round2, extractNet, vatCategory } from '@/modules/finance/lib/vatMath';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
@@ -1396,10 +1397,10 @@ const _financeServiceCore = {
     const rate = Number((inv as any)?.vat_rate ?? 24);
     const net = round2(extractNet(input.amount, rate));
     const vat = round2(input.amount - net);
-    // myDATA VAT category — EXACT rate→category map (24→1,13→2,6→3,17→4,9→5,4→6,0→7),
-    // matching supabase/functions/_shared/fiscal/invoice-builder.ts. A `>=` ladder here
-    // mislabelled the reduced-island rates 17/9/4.
-    const vatCat = ({ 24: 1, 13: 2, 6: 3, 17: 4, 9: 5, 4: 6, 0: 7 } as Record<number, number>)[Math.round(rate)] ?? 7;
+    // myDATA VAT category — EXACT rate→category map via the shared vatMath helper
+    // (matches supabase/functions/_shared/fiscal/invoice-builder.ts). A `>=` ladder
+    // here mislabelled the reduced-island rates 17/9/4.
+    const vatCat = vatCategory(rate);
 
     const lines = [{
       description: input.reason || 'Credit',
@@ -2536,12 +2537,7 @@ export function vatCatRequiresExemption(code: string | number | null | undefined
   return vatPctForCat(code, -1) === 0;
 }
 
-/** Round to 2 decimals (currency). */
-export function round2(n: number): number {
-  return Math.round((Number(n) || 0) * 100) / 100;
-}
-
-/** Net value of a VAT-inclusive gross amount at the given percentage. */
-export function extractNet(gross: number, pct: number): number {
-  return (Number(gross) || 0) / (1 + (Number(pct) || 0) / 100);
-}
+// round2 / extractNet now live in the pure, hermetically-tested @/modules/finance/lib/vatMath
+// module (guarded by tests/unit/vatMath.test.ts). Re-exported here so the components that
+// import them from this service keep working unchanged.
+export { round2, extractNet, vatCategory };

@@ -207,6 +207,26 @@ await check('db.data-integrity.registry', ['DB_KEY'], async () => {
   return 'framework wired';
 });
 
+// 8. Business-expenses agent tool (#275, shipped 2026-07-19) — is the schema the
+//   `list_recent_expenses` / `record_expense` tools depend on actually live? We read
+//   supplier_bills with the EXACT column list the list tool selects, including the
+//   GENERATED `amount_due` column the expense/Payables flow reads. A missing/renamed
+//   column → PostgREST 400 (caught even on an empty table); a missing table (migration
+//   not applied) → 404. Zero side effects. An empty table SKIPs (data state, not a bug).
+await check('db.expense-tool.schema', ['DB_KEY'], async () => {
+  const cols = 'id,supplier_bill_number,total,amount_due,currency,status,issued_at,category_id,notes';
+  const { res, json } = await http(
+    `${SUPABASE_URL}/rest/v1/supplier_bills?select=${cols}&order=issued_at.desc.nullslast&limit=1`,
+    { headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}` } },
+  );
+  assert(res.ok, `GET supplier_bills → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'supplier_bills did not return an array');
+  skipIf(json.length === 0, 'no supplier_bills rows yet — columns validated, nothing to sample');
+  const row = json[0];
+  assert('amount_due' in row && 'total' in row, 'expense columns missing from returned row');
+  return 'expense-tool schema live';
+});
+
 // ── Report ──────────────────────────────────────────────────────────────────
 const pad = (s, n) => String(s).padEnd(n);
 console.log('\n  Production smoke tests');

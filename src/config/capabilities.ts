@@ -11,6 +11,7 @@
 // consumer is the `?capability=<id>` deep-link in the Agent Hub page (rail #3) which resolves the
 // owning agent + a toolkit quick-start from here instead of every call site hand-rolling params.
 import type { HubId } from './nav-items';
+import { HUBS } from './nav-items';
 
 export interface CapabilityDef {
   /** Stable slug — the handoff id used in `?capability=<id>` deep-links. */
@@ -82,6 +83,37 @@ const BY_ID = new Map(CAPABILITIES.map((c) => [c.id, c]));
 
 export function getCapability(id: string): CapabilityDef | undefined {
   return BY_ID.get(id);
+}
+
+/**
+ * Agent result-chunk `type` → capability id. Lets the generic AgentResultCard render a reverse
+ * "Open in {Hub}" handoff (rail #3) for the rail-4 capability tools without a bespoke card each.
+ * Only types whose capability has a real `pageRoute` will actually show a button (buildPageUrl null-
+ * checks). A result may carry a record id in its payload (see RESULT_RECORD_KEY) to deep-link.
+ */
+export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
+  price_tracking_started: 'price-monitoring', price_summary: 'price-monitoring',
+  email_campaigns_list: 'email-campaign', email_templates_list: 'email-campaign',
+  email_campaign_created: 'email-campaign', email_campaign_sent: 'email-campaign',
+  crm_company_created: 'crm-company',
+  messaging_channels_list: 'messaging', messaging_sent: 'messaging',
+  contracts_list: 'contract', contract_sent: 'contract',
+  finance_invoices_list: 'invoice', customer_balance_result: 'invoice', finance_invoice_issued: 'invoice',
+  inbox_threads_list: 'inbox', inbox_reply_sent: 'inbox',
+};
+
+/** Per-result-type payload key that holds the record id to deep-link (when the page has a detail route). */
+export const RESULT_RECORD_KEY: Record<string, string> = {
+  crm_company_created: 'company_id',
+  finance_invoice_issued: 'invoice_id',
+  contract_sent: 'contract_id',
+};
+
+/** The human Hub label ("Finance Hub") for a capability, for the "Open in {Hub}" button. */
+export function capabilityHubLabel(id: string): string | undefined {
+  const cap = getCapability(id);
+  if (!cap?.hub) return undefined;
+  return HUBS.find((h) => h.id === cap.hub)?.label;
 }
 
 /**

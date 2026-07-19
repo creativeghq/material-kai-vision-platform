@@ -524,7 +524,7 @@ interface Message {
     pdf_url: string | null;
   };
   // #245 E — generic structured result card for previously-unrendered chunks
-  agentResultData?: { title: string; data: Record<string, any> };
+  agentResultData?: { title: string; data: Record<string, any>; resultType?: string };
   llmVisibilityData?: {
     product_id: string;
     snapshot: {
@@ -2770,7 +2770,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   timestamp: new Date(),
                   agentId: selectedAgent,
                   model: selectedModel,
-                  agentResultData: { title, data: payload },
+                  agentResultData: { title, data: payload, resultType: chunk.type },
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
@@ -4342,7 +4342,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       );
     }
     if (message.techRadarData) return <TechRadarFindingsCard data={message.techRadarData} />;
-    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} />;
+    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} />;
     return renderDataCardBody(message);
   };
 
@@ -4852,7 +4852,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             onOpen={() => focusCanvas(message.id)}
                           />
                         ) : (
-                          <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} />
+                          <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} />
                         )}
                       </div>
                     ) : message.sourcingOptionsData ? (

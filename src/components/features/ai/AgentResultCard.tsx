@@ -1,10 +1,16 @@
 import React from 'react';
+import { ExternalLink } from 'lucide-react';
+import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubLabel } from '@/config/capabilities';
 
 /**
  * #245 E — generic structured renderer for agent result chunks that were
  * previously emitted but shown as plain text (graph tools, trip-expense,
  * job-research, misc). One card, consistent layout, handles arbitrary JSON
  * payloads so all 19 chunk types become visible without 19 bespoke cards.
+ *
+ * #275 rail-3 — when the result maps to a page-backed capability, it also
+ * renders a reverse "Open in {Hub}" handoff (deep-links to the record when the
+ * payload carries its id), so any capability tool's card can jump to its page.
  */
 
 const isScalar = (v: any) => v == null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
@@ -54,11 +60,29 @@ function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: numbe
   );
 }
 
-export const AgentResultCard: React.FC<{ title: string; data: Record<string, any> }> = ({ title, data }) => {
+export const AgentResultCard: React.FC<{ title: string; data: Record<string, any>; resultType?: string }> = ({ title, data, resultType }) => {
+  // Rail-3 reverse handoff: resolve the owning capability's page + Hub label.
+  const capId = resultType ? RESULT_TYPE_CAPABILITY[resultType] : undefined;
+  const recordId = capId && resultType ? (data?.[RESULT_RECORD_KEY[resultType]] as string | undefined) : undefined;
+  const pageUrl = capId ? buildPageUrl(capId, recordId) : null;
+  const hubLabel = capId ? capabilityHubLabel(capId) : undefined;
+
   return (
     <div className="bg-white/5 rounded-lg p-4 border border-white/10">
       <div className="text-xs text-white/60 mb-2">{title}</div>
       <KeyValues obj={data} />
+      {pageUrl && (
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => window.open(pageUrl, '_blank')}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Open in {hubLabel || 'page'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
