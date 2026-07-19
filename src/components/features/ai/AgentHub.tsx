@@ -271,6 +271,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   email_campaigns_list: 'Email campaigns',
   email_templates_list: 'Email templates',
   email_campaign_created: 'Draft campaign created',
+  // Finance (read)
+  finance_invoices_list: 'Invoices',
+  customer_balance_result: 'Customer balance',
   // Knowledge-graph tools
   customer_overview_result: 'Customer overview',
   supplier_overview_result: 'Supplier overview',

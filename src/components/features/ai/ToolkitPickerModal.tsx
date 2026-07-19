@@ -29,7 +29,7 @@ import {
   Users, CalendarOff, CalendarPlus, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,
   Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
-  Pencil, PencilLine, Percent, Send, Image as ImageIcon,
+  Pencil, PencilLine, Percent, Send, Image as ImageIcon, Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -51,7 +51,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Users, CalendarOff, CalendarPlus, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,
   Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
-  Pencil, PencilLine, Percent, Send, ImageIcon, AlertCircle,
+  Pencil, PencilLine, Percent, Send, ImageIcon, AlertCircle, Wallet,
 };
 
 interface Props {

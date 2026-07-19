@@ -176,6 +176,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Finance (module + entitlement gated; read-only) ──────────────────
+  {
+    id: 'manage_finance', name: 'Finance', category: 'Finance',
+    moduleSlug: 'sales-finance',
+    desc: 'Read finance data: list invoices (recent / per-customer / unpaid) and a customer\'s open A/R balance. Read-only — issuing invoices stays on the Finance page.',
+    examples: [
+      'What does ACME owe us?',
+      'Show me unpaid invoices',
+    ],
+  },
+
   // ── Job Research (all users; module-gated) ────────────────────────────
   {
     id: 'track_job_search', name: 'Track Job Search', category: 'Job Research',
@@ -1220,6 +1231,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'finance',
+    name: 'Finance',
+    description: 'Ask about invoices and customer balances — "what does ACME owe?", "show unpaid invoices". Read-only.',
+    icon: 'Wallet',
+    moduleSlug: 'sales-finance',
+    tool_ids: ['manage_finance'],
+    quick_starts: [
+      { label: 'Unpaid invoices', description: 'List invoices still owed', prompt: 'Show me all unpaid invoices.', icon: 'FileText' },
+      { label: 'Customer balance', description: 'What does a customer owe?', prompt: 'What is the open balance for a customer? Help me pick which one.', icon: 'Wallet' },
+    ],
+  },
+  {
     id: 'email-marketing',
     name: 'Email Marketing',
     description: 'Compose draft email campaigns (name + template + audience) the agent drafts and you send from the Email page.',
@@ -2084,7 +2107,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   // Sales
   quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales',
   // Finance
-  stock: 'finance',
+  stock: 'finance', finance: 'finance',
   // Studio
   catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', generation: 'studio',
   // People

@@ -68,7 +68,7 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'crm-company', label: 'CRM Company', hub: 'sales', pageRoute: '/crm', agentId: 'kai', agentTool: 'save_to_crm', toolkitId: 'b2b', recordTable: 'crm_companies', moduleSlug: 'crm' },
 
   // ── Finance ──
-  { id: 'invoice', label: 'Invoice', hub: 'finance', pageRoute: '/finance', recordTable: 'invoices', moduleSlug: 'sales-finance' },
+  { id: 'invoice', label: 'Invoice', hub: 'finance', pageRoute: '/finance', agentId: 'kai', agentTool: 'manage_finance', toolkitId: 'finance', recordTable: 'invoices', moduleSlug: 'sales-finance' },
   { id: 'warehouse', label: 'Warehouse', hub: 'finance', pageRoute: '/warehouse', agentId: 'kai', agentTool: 'manage_stock', toolkitId: 'stock', moduleSlug: 'stock' },
 
   // ── People ──
