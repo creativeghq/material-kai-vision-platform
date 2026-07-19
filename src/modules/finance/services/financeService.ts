@@ -1187,6 +1187,11 @@ const _financeServiceCore = {
     paymentMethod?: PaymentMethod;
     paidAt?: string;
   }): Promise<{ billId: string; paymentId: string | null }> {
+    // A supplier bill requires a counterparty (DB CHECK supplier_bills_supplier_required) —
+    // needed for AP/myDATA/statements/spend-per-supplier. Callers must supply a payee.
+    if (!input.supplierCompanyId && !input.supplierContactId) {
+      throw new Error('An expense needs a supplier / payee.');
+    }
     const currency = input.currency ?? 'EUR';
     const subtotalNet = Number((input.subtotalNet || 0).toFixed(2));
     const vatAmount = Number((input.vatAmount || 0).toFixed(2));

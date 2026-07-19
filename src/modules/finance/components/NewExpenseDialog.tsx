@@ -4,7 +4,7 @@
 //   OFF → open payable (shows in AP with a due date)
 //   ON  → also books the outgoing payment now (settled, drops out of AP, hits cash-out)
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/core/ui/dialog';
@@ -58,6 +58,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [party, setParty] = useState<Party | null>(null);
   const [partySearch, setPartySearch] = useState('');
   const [partyOptions, setPartyOptions] = useState<Party[]>([]);
+  const [creatingParty, setCreatingParty] = useState(false);
 
   const expenseCats = useMemo(
     () => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'),
@@ -121,8 +122,38 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     return () => clearTimeout(t);
   }, [partySearch, open]);
 
+  // Quick-create a supplier from the typed name (supplier bills require a counterparty —
+  // for myDATA / statements / spend-per-supplier). Find-or-create by name to avoid dupes.
+  const createParty = async () => {
+    const name = partySearch.trim();
+    if (name.length < 2) return;
+    setCreatingParty(true);
+    try {
+      const existing = await supabase.from('crm_companies').select('id, name')
+        .eq('workspace_id', workspaceId).ilike('name', name).limit(1).maybeSingle();
+      let id = existing.data?.id as string | undefined;
+      if (!id) {
+        const ins = await supabase.from('crm_companies')
+          .insert({ workspace_id: workspaceId, name, is_supplier: true } as any)
+          .select('id').single();
+        if (ins.error) throw ins.error;
+        id = ins.data.id;
+      } else {
+        // Ensure it's flagged as a supplier so it shows in future searches.
+        await supabase.from('crm_companies').update({ is_supplier: true } as any).eq('id', id);
+      }
+      setParty({ type: 'company', id: id!, label: `${name} (company)` });
+      setPartySearch(''); setPartyOptions([]);
+    } catch (err: any) {
+      toast({ title: 'Could not create supplier', description: err?.message, variant: 'destructive' });
+    } finally {
+      setCreatingParty(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!categoryId) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
+    if (!party) { toast({ title: 'Pick or create a supplier / payee', variant: 'destructive' }); return; }
     if (total <= 0) { toast({ title: 'Amount must be positive', variant: 'destructive' }); return; }
     if (parseDecimalOr(subtotalNet, 0) < 0 || parseDecimalOr(vatAmount, 0) < 0) {
       toast({ title: 'Amounts cannot be negative', variant: 'destructive' }); return;
@@ -204,7 +235,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </div>
 
           <div className="space-y-1">
-            <Label>Supplier / payee <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Label>Supplier / payee *</Label>
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <span className="text-sm">{party.label}</span>
@@ -212,7 +243,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </div>
             ) : (
               <div className="relative">
-                <Input placeholder="Search suppliers (is_supplier)…" value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
+                <Input placeholder="Search or type a new payee (landlord, utility…)" value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
                 {partyOptions.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
                     {partyOptions.map((o) => (
@@ -223,6 +254,12 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       </button>
                     ))}
                   </div>
+                )}
+                {partySearch.trim().length >= 2 && partyOptions.length === 0 && (
+                  <Button type="button" size="sm" variant="outline" className="mt-1" disabled={creatingParty} onClick={createParty}>
+                    {creatingParty ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                    Create supplier “{partySearch.trim()}”
+                  </Button>
                 )}
               </div>
             )}
