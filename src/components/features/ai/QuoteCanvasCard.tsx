@@ -52,7 +52,7 @@ export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
         <FileText className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium">{name || 'Quote'}</span>
         {quote_number && (
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-muted border border-border px-2 py-0.5 rounded-full">
             {quote_number}
           </span>
         )}
@@ -65,7 +65,7 @@ export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
 
       {/* PDF preview — the exact branded quote design */}
       {pdf_url ? (
-        <div className="rounded-lg overflow-hidden border border-white/15 bg-black/20" style={{ aspectRatio: '1 / 1.414' }}>
+        <div className="rounded-lg overflow-hidden border border-border bg-muted/40" style={{ aspectRatio: '1 / 1.414' }}>
           <iframe src={`${pdf_url}#toolbar=0&navpanes=0`} className="w-full h-full" title={name || 'Quote'} />
         </div>
       ) : (
@@ -81,7 +81,7 @@ export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
 
       {/* Totals summary */}
       {(subtotal != null || grand_total != null) && (
-        <div className="text-xs space-y-1 rounded-lg bg-white/5 p-3">
+        <div className="text-xs space-y-1 rounded-lg bg-muted/40 border border-border p-3">
           {subtotal != null && (
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span><span>{money(subtotal, currency)}</span>
@@ -93,7 +93,7 @@ export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
             </div>
           )}
           {grand_total != null && (
-            <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-white/10">
+            <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-border">
               <span>Total</span><span>{money(grand_total, currency)}</span>
             </div>
           )}

@@ -61,7 +61,7 @@ export function VirtualStagingViewer({
         <div className="space-y-2">
           <div
             ref={containerRef}
-            className="relative w-full rounded-xl overflow-hidden border border-white/20 shadow-md select-none touch-none cursor-col-resize"
+            className="relative w-full rounded-xl overflow-hidden border border-border shadow-md select-none touch-none cursor-col-resize"
             style={{ aspectRatio: '16/10' }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -112,7 +112,7 @@ export function VirtualStagingViewer({
         <img
           src={resultImageUrl}
           alt={`Virtual staging — ${room}`}
-          className="w-full rounded-xl border border-white/20 shadow-md object-cover"
+          className="w-full rounded-xl border border-border shadow-md object-cover"
           loading="lazy"
         />
       )}

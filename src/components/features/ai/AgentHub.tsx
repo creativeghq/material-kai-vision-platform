@@ -3901,28 +3901,34 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const renderDataCardBody = (message: Message): React.ReactNode => {
     if (message.jobFindingsData) {
       return (
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="flex items-center justify-between mb-3">
+        <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
+          <div className="flex items-center justify-between mb-1">
             <div>
-              <div className="text-xs text-white/60">Daily job digest · {message.jobFindingsData.discovered_at_window === 'last_24h' ? 'last 24h' : message.jobFindingsData.discovered_at_window}</div>
+              <div className="text-xs text-muted-foreground">Daily job digest · {message.jobFindingsData.discovered_at_window === 'last_24h' ? 'last 24 hours' : message.jobFindingsData.discovered_at_window}</div>
               <div className="text-sm font-medium mt-0.5">{message.jobFindingsData.tracked_job_label}</div>
             </div>
-            <div className="text-2xl font-light text-white/80">
+            <div className="text-2xl font-light text-foreground">
               {message.jobFindingsData.listings.length}
-              <span className="text-xs text-white/40 ml-1">{message.jobFindingsData.listings.length === 1 ? 'match' : 'matches'}</span>
+              <span className="text-xs text-muted-foreground ml-1">{message.jobFindingsData.listings.length === 1 ? 'match' : 'matches'}</span>
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground mb-3">New roles matching this saved search. Open one to apply, or flag a bad fit so future digests get sharper.</p>
+          {message.jobFindingsData.listings.length === 0 ? (
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+              No new matches in this window — nothing to review yet. I'll keep watching and surface fresh roles as they appear.
+            </div>
+          ) : (
           <div className="space-y-2">
             {message.jobFindingsData.listings.slice(0, 8).map((l, idx) => (
-              <div key={l.id || `${idx}-${l.url}`} className="bg-black/20 rounded-md p-2.5 border border-white/5">
+              <div key={l.id || `${idx}-${l.url}`} className="bg-muted/40 rounded-md p-2.5 border border-border">
                 <div className="flex items-start justify-between gap-2">
                   <a
                     href={l.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm font-medium text-pink-300 hover:underline inline-flex items-start gap-1 min-w-0"
+                    className="text-sm font-medium text-primary hover:underline inline-flex items-start gap-1 min-w-0"
                   >
-                    <span className="line-clamp-1">{l.title || '(untitled)'}</span>
+                    <span className="line-clamp-1">{l.title || '(untitled role)'}</span>
                   </a>
                   {l.id && (
                     <button
@@ -3942,16 +3948,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           window.alert('Failed to record correction: ' + String(e));
                         }
                       }}
-                      className="text-[11px] text-white/40 hover:text-red-400 shrink-0 px-1"
+                      className="text-[11px] text-muted-foreground hover:text-red-600 dark:hover:text-red-400 shrink-0 px-1"
                     >
-                      ⚠ wrong
+                      ⚠ wrong fit
                     </button>
                   )}
                 </div>
-                <div className="text-xs text-white/60 mt-0.5 flex items-center gap-2 flex-wrap">
-                  <span>{l.company || '—'}</span>
+                <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span>{l.company || 'Company not listed'}</span>
                   {l.location && <span>· {l.location}</span>}
-                  {l.is_remote && <span className="text-emerald-400">· Remote</span>}
+                  {l.is_remote && <span className="text-emerald-600 dark:text-emerald-400">· Remote</span>}
                   {(l.salary_min || l.salary_max) && (
                     <span>
                       · {l.salary_currency || ''}
@@ -3960,17 +3966,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       {l.salary_max ? l.salary_max.toLocaleString() : (l.salary_min ? '+' : '')}
                     </span>
                   )}
-                  {l.source && <span className="text-white/40">· {l.source.replace(/_/g, ' ')}</span>}
+                  {l.source && <span className="text-muted-foreground/70">· via {l.source.replace(/_/g, ' ')}</span>}
                 </div>
               </div>
             ))}
             {message.jobFindingsData.listings.length > 8 && (
-              <div className="text-xs text-white/40 text-center pt-1">
+              <div className="text-xs text-muted-foreground text-center pt-1">
                 + {message.jobFindingsData.listings.length - 8} more
               </div>
             )}
           </div>
-          <div className="text-[11px] text-white/40 mt-3">
+          )}
+          <div className="text-[11px] text-muted-foreground mt-3">
             Tip: ask "show me the rest" or "find more like #2" to dig in.
           </div>
         </div>
@@ -3978,19 +3985,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     if (message.sourcingOptionsData) {
       return (
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="text-xs text-white/60 mb-2">Supply options · qty {message.sourcingOptionsData.quantity}</div>
+        <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
+          <div className="text-xs text-muted-foreground mb-0.5">Supply options · quantity {message.sourcingOptionsData.quantity}</div>
+          <p className="text-[11px] text-muted-foreground mb-2">Where this quantity can be filled from — stock already on hand, units already inbound on a PO, or suppliers to order from.</p>
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.warehouse ?? 0}</div><div className="text-[11px] text-white/60">Warehouse</div></div>
-            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.inbound_po ?? 0}</div><div className="text-[11px] text-white/60">Inbound PO</div></div>
-            <div><div className="text-2xl font-medium">{message.sourcingOptionsData.counts?.supplier ?? 0}</div><div className="text-[11px] text-white/60">Supplier</div></div>
+            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{message.sourcingOptionsData.counts?.warehouse ?? 0}</div><div className="text-[11px] text-muted-foreground">In warehouse</div></div>
+            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{message.sourcingOptionsData.counts?.inbound_po ?? 0}</div><div className="text-[11px] text-muted-foreground">Inbound on PO</div></div>
+            <div className="bg-muted/40 border border-border rounded-md py-2"><div className="text-2xl font-medium text-foreground">{message.sourcingOptionsData.counts?.supplier ?? 0}</div><div className="text-[11px] text-muted-foreground">Order from supplier</div></div>
           </div>
           {(message.sourcingOptionsData.result?.options?.supplier || []).length > 0 && (
             <div className="mt-3 space-y-1">
+              <div className="text-[11px] text-muted-foreground">Suppliers who can fulfil (★ = preferred), with unit cost and lead time:</div>
               {message.sourcingOptionsData.result.options.supplier.slice(0, 5).map((s: any, i: number) => (
-                <div key={i} className="flex justify-between text-xs">
+                <div key={i} className="flex justify-between text-xs bg-muted/40 border border-border rounded-md px-2.5 py-1.5">
                   <span>{s.supplier_name || 'Supplier'}{s.is_preferred ? ' ★' : ''}</span>
-                  <span className="text-white/60">{s.cost != null ? `${s.cost} ${s.currency || ''}` : '—'}{s.lead_time_days != null ? ` · ${s.lead_time_days}d` : ''}</span>
+                  <span className="text-muted-foreground">{s.cost != null ? `${s.cost} ${s.currency || ''}` : 'price on request'}{s.lead_time_days != null ? ` · ${s.lead_time_days}d lead` : ''}</span>
                 </div>
               ))}
             </div>
@@ -4000,54 +4009,56 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     if (message.purchaseOrderCreatedData) {
       return (
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="text-xs text-white/60 mb-2">Sourcing committed</div>
-          <div className="text-sm">{message.purchaseOrderCreatedData.purchase_orders_created} draft purchase order(s) · {message.purchaseOrderCreatedData.allocations_created} allocation(s)</div>
+        <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
+          <div className="text-xs text-muted-foreground mb-2">Sourcing committed</div>
+          <div className="text-sm text-foreground">Created {message.purchaseOrderCreatedData.purchase_orders_created} draft purchase order{message.purchaseOrderCreatedData.purchase_orders_created === 1 ? '' : 's'} and reserved {message.purchaseOrderCreatedData.allocations_created} allocation{message.purchaseOrderCreatedData.allocations_created === 1 ? '' : 's'} of stock.</div>
+          <p className="text-[11px] text-muted-foreground mt-2">The POs are still drafts — review and send them to the supplier when you're ready.</p>
         </div>
       );
     }
     if (message.purchaseOrderSentData) {
       return (
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="text-xs text-white/60 mb-2">Purchase order sent</div>
-          <div className="space-y-1 text-sm">
-            <div><span className="text-white/60">PO #:</span> {message.purchaseOrderSentData.order_number}</div>
-            {message.purchaseOrderSentData.recipient && <div><span className="text-white/60">To:</span> {message.purchaseOrderSentData.recipient}</div>}
-            {message.purchaseOrderSentData.pdf_url && <a href={message.purchaseOrderSentData.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">Open PDF</a>}
+        <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
+          <div className="text-xs text-muted-foreground mb-2">Purchase order sent to the supplier</div>
+          <div className="space-y-1 text-sm text-foreground">
+            <div><span className="text-muted-foreground">PO number:</span> {message.purchaseOrderSentData.order_number}</div>
+            {message.purchaseOrderSentData.recipient && <div><span className="text-muted-foreground">Sent to:</span> {message.purchaseOrderSentData.recipient}</div>}
+            {message.purchaseOrderSentData.pdf_url && <a href={message.purchaseOrderSentData.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">Open PDF</a>}
           </div>
         </div>
       );
     }
     if (message.mentionSummaryData) {
       return (
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="text-xs text-white/60 mb-2">
+        <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
+          <div className="text-xs text-muted-foreground mb-0.5">
             Mention summary · last {message.mentionSummaryData.days} days
           </div>
+          <p className="text-[11px] text-muted-foreground mb-2">How often this subject was written about lately, and how the coverage felt.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div>
-              <div className="text-xs text-white/60">Total</div>
-              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.total_count ?? 0}</div>
+            <div className="bg-muted/40 border border-border rounded-md p-2">
+              <div className="text-xs text-muted-foreground">Total</div>
+              <div className="text-2xl font-medium text-foreground">{message.mentionSummaryData.summary?.total_count ?? 0}</div>
             </div>
-            <div>
-              <div className="text-xs text-green-400">Positive</div>
-              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.positive ?? 0}</div>
+            <div className="bg-muted/40 border border-border rounded-md p-2">
+              <div className="text-xs text-emerald-600 dark:text-emerald-400">Positive</div>
+              <div className="text-2xl font-medium text-foreground">{message.mentionSummaryData.summary?.by_sentiment?.positive ?? 0}</div>
             </div>
-            <div>
-              <div className="text-xs text-white/60">Neutral</div>
-              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.neutral ?? 0}</div>
+            <div className="bg-muted/40 border border-border rounded-md p-2">
+              <div className="text-xs text-muted-foreground">Neutral</div>
+              <div className="text-2xl font-medium text-foreground">{message.mentionSummaryData.summary?.by_sentiment?.neutral ?? 0}</div>
             </div>
-            <div>
-              <div className="text-xs text-red-400">Negative</div>
-              <div className="text-2xl font-medium">{message.mentionSummaryData.summary?.by_sentiment?.negative ?? 0}</div>
+            <div className="bg-muted/40 border border-border rounded-md p-2">
+              <div className="text-xs text-red-600 dark:text-red-400">Negative</div>
+              <div className="text-2xl font-medium text-foreground">{message.mentionSummaryData.summary?.by_sentiment?.negative ?? 0}</div>
             </div>
           </div>
           {(message.mentionSummaryData.summary?.top_outlets || []).length > 0 && (
             <div className="mt-3">
-              <div className="text-xs text-white/60 mb-1">Top outlets</div>
+              <div className="text-xs text-muted-foreground mb-1">Outlets covering it most (domain · mentions)</div>
               <div className="flex flex-wrap gap-1">
                 {message.mentionSummaryData.summary.top_outlets.slice(0, 6).map((o: any) => (
-                  <span key={o.domain} className="text-[11px] bg-white/10 rounded-full px-2 py-0.5">
+                  <span key={o.domain} className="text-[11px] bg-muted border border-border rounded-full px-2 py-0.5">
                     {o.domain} · {o.count}
                   </span>
                 ))}
@@ -4056,51 +4067,53 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           )}
           <a
             href={`/admin/mention-monitoring/products/${message.mentionSummaryData.product_id}`}
-            className="text-xs text-blue-300 hover:underline mt-3 inline-block"
+            className="text-xs text-primary hover:underline mt-3 inline-block"
           >Open Mentions tab →</a>
         </div>
       );
     }
     if (message.llmVisibilityData) {
       return (
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="text-xs text-white/60 mb-2">LLM visibility{message.llmVisibilityData.forced ? ' · fresh probe' : ''}</div>
+        <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
+          <div className="text-xs text-muted-foreground mb-0.5">LLM visibility{message.llmVisibilityData.forced ? ' · fresh probe' : ''}</div>
+          <p className="text-[11px] text-muted-foreground mb-2">How AI assistants (ChatGPT, Gemini, Claude and others) talk about this subject when asked — how often it comes up, and where it ranks.</p>
           {!message.llmVisibilityData.snapshot?.present ? (
-            <div className="text-sm text-white/60">No probes recorded yet.</div>
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">No AI-assistant probes have run yet — once they do, you'll see how often each model mentions this and who it names alongside.</div>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-white/60">Share of voice</div>
-                  <div className="text-2xl font-medium">
+                <div className="bg-muted/40 border border-border rounded-md p-2">
+                  <div className="text-xs text-muted-foreground">Share of voice</div>
+                  <div className="text-2xl font-medium text-foreground">
                     {Math.round((message.llmVisibilityData.snapshot.share_of_voice || 0) * 100)}%
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-white/60">Average rank</div>
-                  <div className="text-2xl font-medium">
+                <div className="bg-muted/40 border border-border rounded-md p-2">
+                  <div className="text-xs text-muted-foreground">Average rank</div>
+                  <div className="text-2xl font-medium text-foreground">
                     {message.llmVisibilityData.snapshot.avg_position
                       ? `#${message.llmVisibilityData.snapshot.avg_position.toFixed(1)}`
-                      : '—'}
+                      : 'not ranked'}
                   </div>
                 </div>
               </div>
               {message.llmVisibilityData.snapshot.per_model && (
                 <div className="mt-3 space-y-1 text-xs">
+                  <div className="text-[11px] text-muted-foreground">Per model — times it was mentioned out of probes run:</div>
                   {Object.entries(message.llmVisibilityData.snapshot.per_model).map(([model, stats]: any) => (
-                    <div key={model} className="flex justify-between">
+                    <div key={model} className="flex justify-between bg-muted/40 border border-border rounded-md px-2.5 py-1.5">
                       <span>{model}</span>
-                      <span className="text-white/60">{stats.mentioned}/{stats.probes} mentions</span>
+                      <span className="text-muted-foreground">{stats.mentioned}/{stats.probes} mentions</span>
                     </div>
                   ))}
                 </div>
               )}
               {message.llmVisibilityData.snapshot.top_competitors && message.llmVisibilityData.snapshot.top_competitors.length > 0 && (
                 <div className="mt-3">
-                  <div className="text-xs text-white/60 mb-1">Top co-mentioned competitors</div>
+                  <div className="text-xs text-muted-foreground mb-1">Named alongside it most often (rivals the models bring up)</div>
                   <div className="flex flex-wrap gap-1">
                     {message.llmVisibilityData.snapshot.top_competitors.slice(0, 8).map(([name, count]: any) => (
-                      <span key={String(name)} className="text-[11px] bg-white/10 rounded-full px-2 py-0.5">
+                      <span key={String(name)} className="text-[11px] bg-muted border border-border rounded-full px-2 py-0.5">
                         {String(name)} · {count}
                       </span>
                     ))}
@@ -4114,21 +4127,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     if (message.mentionFeedData) {
       return (
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="text-xs text-white/60 mb-2">
-            Mention feed{message.mentionFeedData.sentiment_filter ? ` · ${message.mentionFeedData.sentiment_filter}` : ''} · last {message.mentionFeedData.days}d
+        <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
+          <div className="text-xs text-muted-foreground mb-0.5">
+            Mention feed{message.mentionFeedData.sentiment_filter ? ` · ${message.mentionFeedData.sentiment_filter}` : ''} · last {message.mentionFeedData.days} days
           </div>
+          <p className="text-[11px] text-muted-foreground mb-2">The individual articles and posts that mention this subject — newest first. Open one to read the source.</p>
           {message.mentionFeedData.rows.length === 0 ? (
-            <div className="text-sm text-white/60">No mentions match the filter.</div>
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Nothing matches this filter yet{message.mentionFeedData.sentiment_filter ? ` for ${message.mentionFeedData.sentiment_filter} coverage` : ''} — try widening the time range or clearing the sentiment filter.</div>
           ) : (
-            <ul className="divide-y divide-white/10">
+            <ul className="divide-y divide-border">
               {message.mentionFeedData.rows.slice(0, 10).map((r) => (
                 <li key={r.id} className="py-2">
                   <a
                     href={r.url} target="_blank" rel="noopener noreferrer"
-                    className="text-sm hover:underline"
+                    className="text-sm text-primary hover:underline"
                   >{r.title || r.url}</a>
-                  <div className="text-xs text-white/60">
+                  <div className="text-xs text-muted-foreground">
                     {r.outlet_name || r.outlet_domain}
                     {r.sentiment ? ` · ${r.sentiment}` : ''}
                     {r.published_at ? ` · ${new Date(r.published_at).toLocaleDateString()}` : ''}

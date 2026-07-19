@@ -34,12 +34,14 @@ export interface TechRadarFindingsData {
   saved?: boolean;
 }
 
-const RING_META: Record<string, { label: string; cls: string; order: number }> = {
-  adopt:  { label: 'Adopt',  cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', order: 0 },
-  trial:  { label: 'Trial',  cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30',             order: 1 },
-  assess: { label: 'Assess', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30',       order: 2 },
-  hold:   { label: 'Hold',   cls: 'bg-white/10 text-white/50 border-white/15',                order: 3 },
+const RING_META: Record<string, { label: string; cls: string; blurb: string; order: number }> = {
+  adopt:  { label: 'Adopt',  cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30', blurb: 'Proven — safe to put into production now.', order: 0 },
+  trial:  { label: 'Trial',  cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30',                 blurb: 'Promising — try it on a low-risk project first.', order: 1 },
+  assess: { label: 'Assess', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',        blurb: 'Worth a look — run a spike before committing.', order: 2 },
+  hold:   { label: 'Hold',   cls: 'bg-muted text-muted-foreground border-border',                                  blurb: 'Not now — avoid new use until things change.', order: 3 },
 };
+
+const RING_ORDER: Array<keyof typeof RING_META | string> = ['adopt', 'trial', 'assess', 'hold'];
 
 function levelDot(level?: string | null): string {
   if (level === 'high') return '●●●';
@@ -74,20 +76,68 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
     (a, b) => (RING_META[a.ring]?.order ?? 9) - (RING_META[b.ring]?.order ?? 9),
   );
 
+  // Which rings are actually present, in radar order — drives the legend.
+  const ringsPresent = RING_ORDER.filter((r) => sorted.some((f) => f.ring === r));
+
+  // "What to do next" — the most actionable findings (Adopt/Trial first) that
+  // carry a concrete recommendation. Only render what's in the data.
+  const actions = sorted
+    .filter((f) => f.recommendation && f.recommendation.trim().length > 0)
+    .sort((a, b) => (RING_META[a.ring]?.order ?? 9) - (RING_META[b.ring]?.order ?? 9))
+    .slice(0, 4);
+
   return (
-    <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="bg-card text-card-foreground rounded-xl p-4 border border-border space-y-3">
+      <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs text-white/60">Tech Radar{data.saved === false ? ' · one-shot (not saved)' : ''}</div>
-          <div className="text-sm font-medium mt-0.5 line-clamp-1">{data.subject?.title || 'Review'}</div>
+          <div className="text-xs text-muted-foreground">Tech Radar · technology recommendations{data.saved === false ? ' · one-shot (not saved)' : ''}</div>
+          <div className="text-sm font-semibold mt-0.5 line-clamp-1">{data.subject?.title || 'Review'}</div>
         </div>
-        <div className="text-2xl font-light text-white/80 shrink-0">
-          {sorted.length}
-          <span className="text-xs text-white/40 ml-1">{sorted.length === 1 ? 'idea' : 'ideas'}</span>
+        <div className="text-right shrink-0">
+          <div className="text-xs text-muted-foreground">{sorted.length === 1 ? 'finding' : 'findings'}</div>
+          <div className="text-2xl font-semibold leading-none">{sorted.length}</div>
         </div>
       </div>
 
-      {data.summary && <p className="text-xs text-white/70 leading-relaxed">{data.summary}</p>}
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Each technology is placed in one of four rings — how ready it is to use. Accept the ones you'll pursue and dismiss the rest to keep your radar focused.
+      </p>
+
+      {data.summary && <p className="text-sm leading-relaxed">{data.summary}</p>}
+
+      {/* Ring legend — explains what each ring means, only for rings in view */}
+      {ringsPresent.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {ringsPresent.map((r) => {
+            const meta = RING_META[r] || RING_META.assess;
+            return (
+              <span key={r} className={`text-[10px] px-2 py-0.5 rounded-full border ${meta.cls}`} title={meta.blurb}>
+                {meta.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* What to do next — top recommendations */}
+      {actions.length > 0 && (
+        <div className="rounded-lg border border-border bg-muted/40 p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">What to do next</div>
+          <ol className="space-y-2">
+            {actions.map((f, i) => (
+              <li key={f.id || `${i}-${f.title}`} className="flex gap-2 text-sm">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+                  {i + 1}
+                </span>
+                <span>
+                  <span className="font-medium">{f.title}</span>
+                  <span className="block text-xs text-muted-foreground">{f.recommendation}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       <div className="space-y-2">
         {sorted.map((f, idx) => {
@@ -96,14 +146,14 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
           return (
             <div
               key={f.id || `${idx}-${f.title}`}
-              className={`bg-black/20 rounded-md p-2.5 border border-white/5 transition-opacity ${decided === 'dismissed' ? 'opacity-40' : ''}`}
+              className={`bg-muted/40 rounded-lg p-2.5 border border-border transition-opacity ${decided === 'dismissed' ? 'opacity-40' : ''}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${ring.cls}`}>{ring.label}</span>
-                    {f.category && <span className="text-[10px] text-white/40">{f.category}</span>}
-                    {f.is_new && <span className="text-[10px] text-pink-300">new</span>}
+                    {f.category && <span className="text-[10px] text-muted-foreground">{f.category}</span>}
+                    {f.is_new && <span className="text-[10px] text-primary font-medium">new</span>}
                   </div>
                   <div className="text-sm font-medium mt-1 line-clamp-2">{f.title}</div>
                 </div>
@@ -112,28 +162,32 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
                     <button
                       type="button"
                       onClick={() => setStatus(f, 'accepted')}
-                      className="text-[11px] text-white/50 hover:text-emerald-400 px-1"
-                      title="Accept"
+                      className="text-[11px] text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 px-1"
+                      title="Accept — add to your plan"
                     >✓</button>
                     <button
                       type="button"
                       onClick={() => setStatus(f, 'dismissed')}
-                      className="text-[11px] text-white/50 hover:text-red-400 px-1"
-                      title="Dismiss"
+                      className="text-[11px] text-muted-foreground hover:text-red-600 dark:hover:text-red-400 px-1"
+                      title="Dismiss — hide from the radar"
                     >✕</button>
                   </div>
                 )}
-                {decided && <span className="text-[11px] text-white/40 shrink-0">{decided}</span>}
+                {decided && <span className="text-[11px] text-muted-foreground shrink-0">{decided}</span>}
               </div>
 
-              {f.rationale && <p className="text-xs text-white/60 mt-1 leading-relaxed">{f.rationale}</p>}
+              {f.rationale && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{f.rationale}</p>}
 
-              <div className="text-[11px] text-white/40 mt-1 flex items-center gap-3 flex-wrap">
-                {f.effort && <span>effort {levelDot(f.effort)}</span>}
-                {f.impact && <span>impact {levelDot(f.impact)}</span>}
+              {f.recommendation && (
+                <p className="text-xs text-primary font-medium mt-1 leading-relaxed">→ {f.recommendation}</p>
+              )}
+
+              <div className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-3 flex-wrap">
+                {f.effort && <span title="How much work to adopt">effort {levelDot(f.effort)}</span>}
+                {f.impact && <span title="Expected payoff">impact {levelDot(f.impact)}</span>}
                 {(f.evidence || []).slice(0, 3).map((e, i) =>
                   e.url ? (
-                    <a key={i} href={e.url} target="_blank" rel="noreferrer" className="text-sky-300/70 hover:underline line-clamp-1">
+                    <a key={i} href={e.url} target="_blank" rel="noreferrer" className="text-primary hover:underline line-clamp-1">
                       {e.title || new URL(e.url).hostname}
                     </a>
                   ) : null,

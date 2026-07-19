@@ -95,6 +95,12 @@ export const CatalogExtractionCandidatesCard: React.FC<Props> = ({ catalogId, qu
         </div>
       )}
 
+      {!committed && (
+        <div className="px-3 pt-2 text-xs text-muted-foreground">
+          Materials pulled from the catalog PDF. Deselect any that don't belong, then add the rest to a section.
+        </div>
+      )}
+
       <div className="p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[420px] overflow-y-auto">
         {candidates.map((c, i) => {
           const isSelected = selected.has(i);

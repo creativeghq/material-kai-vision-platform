@@ -33,7 +33,7 @@ export function InspirationCard({
   })();
 
   return (
-    <div className="rounded-xl border border-primary/20 bg-primary/5 overflow-hidden mb-3">
+    <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden mb-3">
       {/* Header */}
       <button
         className="w-full flex items-center gap-3 p-3 hover:bg-primary/10 transition-colors text-left"
@@ -58,7 +58,7 @@ export function InspirationCard({
         <div className="px-3 pb-3 space-y-3">
           {/* Hero image thumbnail */}
           {heroImage && (
-            <div className="rounded-lg overflow-hidden border border-white/20 max-h-40">
+            <div className="rounded-lg overflow-hidden border border-border max-h-40">
               <img src={heroImage} alt="Inspiration" className="w-full h-full object-cover" loading="lazy" />
             </div>
           )}

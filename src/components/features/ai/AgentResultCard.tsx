@@ -17,7 +17,7 @@ const isScalar = (v: any) => v == null || typeof v === 'string' || typeof v === 
 const labelize = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 function Scalar({ v }: { v: any }) {
-  if (v == null || v === '') return <span className="text-white/40">—</span>;
+  if (v == null || v === '') return <span className="text-muted-foreground">—</span>;
   if (typeof v === 'boolean') return <span>{v ? 'Yes' : 'No'}</span>;
   return <span>{String(v)}</span>;
 }
@@ -26,34 +26,34 @@ function Scalar({ v }: { v: any }) {
 function Value({ v, depth = 0 }: { v: any; depth?: number }) {
   if (isScalar(v)) return <Scalar v={v} />;
   if (Array.isArray(v)) {
-    if (v.length === 0) return <span className="text-white/40">none</span>;
+    if (v.length === 0) return <span className="text-muted-foreground">None</span>;
     const shown = v.slice(0, 8);
     return (
       <div className="space-y-1">
         {shown.map((item, i) => (
-          <div key={i} className="rounded bg-white/5 px-2 py-1 text-xs">
+          <div key={i} className="rounded bg-muted/40 border border-border px-2 py-1 text-xs">
             {isScalar(item) ? <Scalar v={item} /> : <KeyValues obj={item} depth={depth + 1} inline />}
           </div>
         ))}
-        {v.length > shown.length && <div className="text-[11px] text-white/50">+ {v.length - shown.length} more</div>}
+        {v.length > shown.length && <div className="text-[11px] text-muted-foreground">+ {v.length - shown.length} more</div>}
       </div>
     );
   }
   // object
-  if (depth >= 2) return <span className="text-white/50">{Object.keys(v).length} fields</span>;
+  if (depth >= 2) return <span className="text-muted-foreground">{Object.keys(v).length} fields</span>;
   return <KeyValues obj={v} depth={depth + 1} />;
 }
 
 function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: number; inline?: boolean }) {
   if (obj == null || typeof obj !== 'object') return <Scalar v={obj} />;
   const entries = Object.entries(obj).filter(([k]) => !['timestamp', 'type'].includes(k));
-  if (entries.length === 0) return <span className="text-white/40">—</span>;
+  if (entries.length === 0) return <span className="text-muted-foreground">Nothing to show</span>;
   return (
     <div className={inline ? 'flex flex-wrap gap-x-4 gap-y-0.5' : 'space-y-1.5'}>
       {entries.map(([k, v]) => (
         <div key={k} className={inline ? 'text-xs' : 'grid grid-cols-[140px_1fr] gap-2 text-xs items-start'}>
-          <span className="text-white/50">{labelize(k)}{inline ? ': ' : ''}</span>
-          <div className="text-white/90"><Value v={v} depth={depth} /></div>
+          <span className="text-muted-foreground">{labelize(k)}{inline ? ': ' : ''}</span>
+          <div className="text-foreground"><Value v={v} depth={depth} /></div>
         </div>
       ))}
     </div>
@@ -68,15 +68,15 @@ export const AgentResultCard: React.FC<{ title: string; data: Record<string, any
   const hubLabel = capId ? capabilityHubLabel(capId) : undefined;
 
   return (
-    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-      <div className="text-xs text-white/60 mb-2">{title}</div>
+    <div className="bg-card text-card-foreground rounded-xl p-4 border border-border">
+      <div className="text-xs text-muted-foreground mb-2">{title}</div>
       <KeyValues obj={data} />
       {pageUrl && (
         <div className="mt-3 flex justify-end">
           <button
             type="button"
             onClick={() => window.open(pageUrl, '_blank')}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1 text-xs text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Open in {hubLabel || 'page'}
