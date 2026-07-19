@@ -543,7 +543,12 @@ interface Message {
       total_probes?: number;
       share_of_voice?: number;
       avg_position?: number | null;
-      per_model?: Record<string, { probes: number; mentioned: number; positions: number[] }>;
+      per_model?: Record<string, {
+        probes: number;
+        mentioned: number;
+        positions: number[];
+        samples?: Array<{ template?: string; response?: string; mentioned?: boolean; position?: number | null; sentiment?: string | null; context_snippet?: string | null }>;
+      }>;
       top_competitors?: Array<[string, number]>;
     };
     forced?: boolean;
@@ -577,6 +582,10 @@ interface Message {
       employment_type?: string | null;
       posted_at?: string | null;
       source?: string;
+      seniority?: string | null;
+      description_excerpt?: string | null;
+      relevance_score?: number | null;
+      match_note?: string | null;
     }>;
   };
   /** Tech Radar review results (Pepper) — rendered as a ring-grouped findings card. */
@@ -3978,6 +3987,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   {l.employment_type && <span className="bg-muted border border-border rounded-full px-2 py-0.5 text-[10px]">{l.employment_type.replace(/_/g, ' ')}</span>}
                   {l.posted_at && <span>· {new Date(l.posted_at).toLocaleDateString()}</span>}
                 </div>
+                {(l.seniority || l.description_excerpt || l.match_note) && (
+                  <details className="group mt-1.5">
+                    <summary className="cursor-pointer list-none text-[11px] text-primary hover:underline">Details</summary>
+                    <div className="mt-1 space-y-1 text-xs">
+                      {l.seniority && (
+                        <span className="inline-block bg-muted border border-border rounded-full px-2 py-0.5 text-[10px] capitalize">{l.seniority}</span>
+                      )}
+                      {l.description_excerpt && (
+                        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{l.description_excerpt}</p>
+                      )}
+                      {l.match_note && (
+                        <p className="text-muted-foreground"><span className="text-foreground">Why it matched:</span> {l.match_note}</p>
+                      )}
+                    </div>
+                  </details>
+                )}
               </div>
             ))}
             {message.jobFindingsData.listings.length > 8 && (
@@ -4202,11 +4227,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         <span className="font-medium">{model}</span>
                         <span className="text-xs text-muted-foreground">{stats.mentioned}/{stats.probes} mentions</span>
                       </summary>
-                      <div className="px-2.5 pb-2.5 pt-0.5 space-y-1 text-xs">
+                      <div className="px-2.5 pb-2.5 pt-0.5 space-y-2 text-xs">
                         {Array.isArray(stats.positions) && stats.positions.length > 0 ? (
                           <div className="text-muted-foreground">Ranks: {stats.positions.join(', ')}</div>
                         ) : (
                           <div className="text-muted-foreground">No ranked positions recorded.</div>
+                        )}
+                        {Array.isArray(stats.samples) && stats.samples.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="text-[11px] text-muted-foreground">What {model} actually said:</div>
+                            {stats.samples.map((s: any, si: number) => (
+                              <div key={si} className="rounded-md border border-border bg-background/60 p-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {s.template && <span className="text-[10px] text-muted-foreground">{s.template}</span>}
+                                  {s.mentioned
+                                    ? <span className="text-[10px] text-emerald-600 dark:text-emerald-400">mentioned{s.position ? ` · #${s.position}` : ''}</span>
+                                    : <span className="text-[10px] text-muted-foreground">not mentioned</span>}
+                                  {s.sentiment && <span className="text-[10px] text-muted-foreground">· {s.sentiment}</span>}
+                                </div>
+                                {s.response && <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{s.response}</p>}
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </details>
