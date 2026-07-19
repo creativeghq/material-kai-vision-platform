@@ -187,6 +187,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── CRM (workspace-scoped) ────────────────────────────────────────────
+  {
+    id: 'create_company_from_vat', name: 'Company from VAT', category: 'CRM',
+    moduleSlug: 'crm',
+    desc: 'Add a company to the CRM from a VAT / ΑΦΜ number — looks it up on ΑΑΔΕ (Greek) or VIES (EU) for the legal name + address, then creates it via crm-api.',
+    examples: [
+      'Add ΑΦΜ 094014201 to the CRM',
+      'Create a company from VAT DE811128135',
+    ],
+  },
+
   // ── Job Research (all users; module-gated) ────────────────────────────
   {
     id: 'track_job_search', name: 'Track Job Search', category: 'Job Research',
@@ -1231,6 +1242,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'crm',
+    name: 'CRM',
+    description: 'Add companies to the CRM from a VAT / ΑΦΜ number (ΑΑΔΕ / VIES lookup → create).',
+    icon: 'Building2',
+    moduleSlug: 'crm',
+    tool_ids: ['create_company_from_vat'],
+    quick_starts: [
+      { label: 'Company from VAT', description: 'Look up a VAT/ΑΦΜ and add the company', prompt: 'Add a company to the CRM from a VAT or ΑΦΜ number — ask me for it.', icon: 'Plus' },
+    ],
+  },
+  {
     id: 'finance',
     name: 'Finance',
     description: 'Ask about invoices and customer balances — "what does ACME owe?", "show unpaid invoices". Read-only.',
@@ -2105,7 +2127,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',
   // Sales
-  quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales',
+  quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales', crm: 'sales',
   // Finance
   stock: 'finance', finance: 'finance',
   // Studio

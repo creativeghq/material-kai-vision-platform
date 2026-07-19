@@ -870,8 +870,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'search_workspace_docs',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
-      // CRM roster query — "which businesses have ΚΑΔ X?" (all users; workspace-scoped)
-      'search_crm_by_kad',
+      // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
+      'search_crm_by_kad', 'create_company_from_vat',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -1186,6 +1186,9 @@ async function executeAgent(
     'finance': {
       tool_ids: ['manage_finance'],
     },
+    'crm': {
+      tool_ids: ['create_company_from_vat'],
+    },
     'job-research': {
       tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
     },
@@ -1464,7 +1467,7 @@ async function executeAgent(
   const needsFlows = config.tools.includes('manage_flows');
   const needsHr = config.tools.includes('manage_hr');
   const needsStock = config.tools.includes('manage_stock');
-  const needsCrm = config.tools.includes('search_crm_by_kad');
+  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat'].includes(t));
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
@@ -1670,6 +1673,9 @@ async function executeAgent(
   // CRM roster query — "which businesses have ΚΑΔ X?" (all users; workspace-scoped, free).
   if (config.tools.includes('search_crm_by_kad') && crmToolsMod?.createCrmKadSearchTool) {
     tools.push(crmToolsMod.createCrmKadSearchTool(workspaceId, onChunk));
+  }
+  if (config.tools.includes('create_company_from_vat') && crmToolsMod?.createCompanyFromVatTool) {
+    tools.push(crmToolsMod.createCompanyFromVatTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Material search (text-based 7-vector fusion) — now with search_spec support
