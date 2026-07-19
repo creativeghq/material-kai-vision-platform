@@ -70,6 +70,7 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
 
   // ── Finance ──
   { id: 'invoice', label: 'Invoice', hub: 'finance', pageRoute: '/finance', agentId: 'kai', agentTool: 'manage_finance', toolkitId: 'finance', recordTable: 'invoices', moduleSlug: 'sales-finance' },
+  { id: 'contract', label: 'Contracts', hub: 'finance', pageRoute: '/contracts', agentId: 'erp', agentTool: 'manage_contracts', toolkitId: 'contracts', recordTable: 'contracts', moduleSlug: 'contracts' },
   { id: 'warehouse', label: 'Warehouse', hub: 'finance', pageRoute: '/warehouse', agentId: 'kai', agentTool: 'manage_stock', toolkitId: 'stock', moduleSlug: 'stock' },
 
   // ── People ──

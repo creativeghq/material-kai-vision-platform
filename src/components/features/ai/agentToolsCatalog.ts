@@ -198,6 +198,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── Contracts & e-signature (module + entitlement gated; send confirm-gated) ──
+  {
+    id: 'manage_contracts', name: 'Contracts', category: 'Contracts',
+    moduleSlug: 'contracts',
+    desc: 'List contracts and send a draft for e-signature (sending asks for Approve/Decline first).',
+    examples: [
+      'List our draft contracts',
+      'Send contract … for signature',
+    ],
+  },
+
   // ── Messaging / WhatsApp (module + entitlement gated; send confirm-gated) ──
   {
     id: 'manage_messaging', name: 'WhatsApp', category: 'Messaging',
@@ -1253,6 +1264,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'contracts',
+    name: 'Contracts',
+    description: 'List contracts and send drafts for e-signature (sending asks to Approve first).',
+    icon: 'FileText',
+    moduleSlug: 'contracts',
+    tool_ids: ['manage_contracts'],
+    quick_starts: [
+      { label: 'My contracts', description: 'List recent contracts', prompt: 'List my recent contracts and their status.', icon: 'ListChecks' },
+      { label: 'Send for signature', description: 'Send a draft contract to sign', prompt: 'Send a draft contract for e-signature — help me pick which one.', icon: 'Send' },
+    ],
+  },
+  {
     id: 'messaging',
     name: 'WhatsApp',
     description: 'Send WhatsApp messages to customers via your connected channels (send asks to Approve first).',
@@ -2152,7 +2175,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   // Sales
   quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales', crm: 'sales',
   // Finance
-  stock: 'finance', finance: 'finance',
+  stock: 'finance', finance: 'finance', contracts: 'finance',
   // Studio
   catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', generation: 'studio',
   // People
@@ -2280,6 +2303,8 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   // Studio / interior → Vision
   generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'],
   projects: ['interior-designer', 'erp'],
+  // Contracts → Trinity (finance/legal) — also on kai via the generalist
+  contracts: ['erp'],
   // Admin/analysis helpers
   'sub-agents': ['marketing', 'product-business'], 'admin-misc': ['marketing', 'product-business'],
 };
