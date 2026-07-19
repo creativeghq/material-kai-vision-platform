@@ -4,7 +4,7 @@ import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
-  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, PanelRight, CheckCircle2, Wallet,
+  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2, Filter,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -765,7 +765,7 @@ const InboxPage: React.FC = () => {
         </div>
 
         {/* ── Column 2 · Conversation ── */}
-        <div className={`dashboard-card rounded-2xl border-0 md:col-span-5 lg:col-span-4 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`dashboard-card rounded-2xl border-0 md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
           {!activeThread ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
               <MessageSquare className="w-10 h-10 opacity-30" />
@@ -804,16 +804,15 @@ const InboxPage: React.FC = () => {
                 </div>
                 {/* Desktop: inline member controls. Mobile: collapsed into the details sheet. */}
                 {memberControls && <div className="hidden md:flex items-center gap-1.5">{memberControls}</div>}
-                {/* Below lg the profile rail is a slide-over; on lg+ it's the persistent 4th column. */}
-                <button
-                  type="button"
+                {/* Open the Customer Profile drawer (only present while a conversation is open) */}
+                <Button
+                  variant="outline" size="sm"
                   onClick={() => setShowDetails(true)}
-                  aria-label="Conversation details"
-                  title="Contact, quotes, invoices & projects"
-                  className="lg:hidden shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+                  title="Customer profile — contact, quotes, invoices & projects"
+                  className="shrink-0 rounded-full gap-1.5"
                 >
-                  <PanelRight className="w-5 h-5" />
-                </button>
+                  <UserIcon className="w-4 h-4" /> <span className="hidden sm:inline">Profile</span>
+                </Button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -897,24 +896,6 @@ const InboxPage: React.FC = () => {
                 </div>
               </div>
             </>
-          )}
-        </div>
-
-        {/* ── Column 3 · Customer Profile (persistent on lg+; slide-over below) ── */}
-        <div className="dashboard-card rounded-2xl border-0 lg:col-span-3 hidden lg:flex flex-col overflow-hidden p-0">
-          {!activeThread ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-xs px-6 text-center gap-2">
-              <UserIcon className="w-8 h-8 opacity-30" />
-              Select a conversation to see the customer profile.
-            </div>
-          ) : (
-            <DetailsRail
-              thread={activeThread}
-              context={context}
-              participants={participants}
-              labels={labels}
-              isMember={isMember}
-            />
           )}
         </div>
       </div>
