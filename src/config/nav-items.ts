@@ -26,6 +26,7 @@ import {
   Star,
   CalendarClock,
   BookOpen,
+  ImagePlus,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -123,6 +124,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'interior', label: 'Interior Design', path: '/agent-hub?capability=interior', icon: Sofa, surface: 'app', hub: 'studio', description: 'Design, render & stage rooms with the AI studio.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
   { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
+  // Image Studio — general image generation/editing (Vision + Gemini pipeline), for marketing
+  // visuals / product shots / social imagery, distinct from the room-focused Interior tile. Reuses
+  // the existing generation engine; opens the studio with the image pipeline (image-edit) primed.
+  { id: 'image-studio', label: 'Image Studio', path: '/agent-hub?agent=interior-designer&generation_mode=image-edit', icon: ImagePlus, requireCapability: 'agent.use', surface: 'app', hub: 'studio', description: 'Generate & edit product shots and marketing visuals — in the AI studio.' },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', hub: 'sales', description: 'Build and send client quotes.' },
   // #201 — Sales portal for invited reps (persona 'sales').
   { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', hub: 'sales', description: 'Sales-rep portal for quotes.' },
