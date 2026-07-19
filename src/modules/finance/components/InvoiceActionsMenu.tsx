@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
-import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -109,6 +109,23 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     }
   };
 
+  // One-click download of the document PDF (invoice / receipt / credit note all render via the
+  // same finance-invoice-pdf edge function). Fetches the signed URL and saves the blob.
+  const downloadPdf = async () => {
+    try {
+      const { pdf_url } = await financeService.generateInvoicePdf(invoiceId, true);
+      if (!pdf_url) { toast({ title: 'PDF not available', variant: 'destructive' }); return; }
+      const blob = await (await fetch(pdf_url)).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `document-${invoiceId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: 'Failed to download', description: err?.message, variant: 'destructive' });
+    }
+  };
+
   const sendEmail = async () => {
     try {
       const { data, error } = await financeService.sendInvoiceEmail(invoiceId);
@@ -198,7 +215,8 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
       <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => go()}><Eye className="h-4 w-4 mr-2" /> View</DropdownMenuItem>
         {canOperateFinance && <DropdownMenuItem onClick={() => go()}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>}
-        <DropdownMenuItem onClick={() => go()}><FileText className="h-4 w-4 mr-2" /> Print / PDF</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => go()}><FileText className="h-4 w-4 mr-2" /> View / Print</DropdownMenuItem>
+        <DropdownMenuItem onClick={downloadPdf}><Download className="h-4 w-4 mr-2" /> Download PDF</DropdownMenuItem>
 
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">myDATA</DropdownMenuLabel>

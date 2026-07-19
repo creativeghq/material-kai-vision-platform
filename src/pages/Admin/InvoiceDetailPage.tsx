@@ -32,6 +32,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
+import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 
 const PAYMENT_METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'check', 'other'];
 
@@ -410,11 +411,12 @@ const InvoiceDetailPage: React.FC = () => {
                 <th className="px-4 py-2 text-left">Method</th>
                 <th className="px-4 py-2 text-left">Reference</th>
                 <th className="px-4 py-2 text-right">Amount allocated</th>
+                <th className="px-4 py-2 text-right w-24">Receipt</th>
               </tr>
             </thead>
             <tbody>
               {(invoice.payments ?? []).length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">No payments recorded.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No payments recorded.</td></tr>
               )}
               {(invoice.payments ?? []).map((p) => {
                 const allocAmount = p.allocations
@@ -426,6 +428,7 @@ const InvoiceDetailPage: React.FC = () => {
                     <td className="px-4 py-2">{p.method ?? '—'}</td>
                     <td className="px-4 py-2">{p.reference ?? '—'}</td>
                     <td className="px-4 py-2 text-right font-medium">{formatMoney(allocAmount, p.currency)}</td>
+                    <td className="px-4 py-2 text-right"><PaymentReceiptActions paymentId={p.id} direction={(p as any).direction ?? 'in'} /></td>
                   </tr>
                 );
               })}

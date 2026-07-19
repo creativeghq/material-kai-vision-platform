@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Mail, Link2, Download } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -23,6 +23,7 @@ import { edgeErrorMessage } from '@/utils/edgeError';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { MoneyInput } from '@/components/core/ui/money-input';
+import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderListRow, type OrderItem, type Order,
@@ -983,48 +984,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     } finally { setSaving(false); }
   };
 
-  // The payment receipt (απόδειξη είσπραξης) for a recorded money-in — a proof-of-payment
-  // acknowledgment, NOT a fiscal document and NOT transmitted to myDATA/AADE. Three actions per
-  // row: email it to the customer, copy a shareable link, or download the PDF. All generate the
-  // receipt on demand (cached server-side after the first time).
-  const emailPaymentReceipt = async (paymentId: string) => {
-    setSaving(true);
-    try {
-      const { emailed, email } = await financeService.emailPaymentReceipt(paymentId);
-      toast(emailed
-        ? { title: 'Receipt emailed', description: email ?? undefined }
-        : { title: 'No email on file', description: 'Add an email on this customer’s contact to send receipts.', variant: 'destructive' });
-    } catch (err: any) {
-      toast({ title: 'Failed to email receipt', description: err?.message, variant: 'destructive' });
-    } finally { setSaving(false); }
-  };
-  const copyPaymentReceiptLink = async (paymentId: string) => {
-    setSaving(true);
-    try {
-      const { pdf_url } = await financeService.generatePaymentReceiptPdf(paymentId);
-      if (!pdf_url) { toast({ title: 'Receipt not available yet', variant: 'destructive' }); return; }
-      await navigator.clipboard.writeText(pdf_url);
-      toast({ title: 'Receipt link copied', description: 'A shareable link to the receipt PDF is on your clipboard.' });
-    } catch (err: any) {
-      toast({ title: 'Failed to copy link', description: err?.message, variant: 'destructive' });
-    } finally { setSaving(false); }
-  };
-  const downloadPaymentReceipt = async (paymentId: string) => {
-    setSaving(true);
-    try {
-      const { pdf_url, receipt_number } = await financeService.generatePaymentReceiptPdf(paymentId);
-      if (!pdf_url) { toast({ title: 'Receipt not available yet', variant: 'destructive' }); return; }
-      const blob = await (await fetch(pdf_url)).blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${receipt_number ?? `receipt-${paymentId.slice(0, 8)}`}.pdf`;
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: 'Failed to download receipt', description: err?.message, variant: 'destructive' });
-    } finally { setSaving(false); }
-  };
-
   // #3 — edit the order's line items (only while it has no invoice yet).
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled' && (fin?.invoices.length ?? 0) === 0;
   const startEdit = () => {
@@ -1640,13 +1599,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                       <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
                       {/* Payment receipt (απόδειξη είσπραξης) — proof of money received, NOT a tax doc,
                           never sent to myDATA. Email it / copy a link / download the PDF. */}
-                      {p.direction === 'in' && (
-                        <span className="flex items-center gap-1.5 border-r border-border/40 pr-1.5 mr-0.5">
-                          <button type="button" title="Email the receipt to the customer" className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={saving} onClick={() => void emailPaymentReceipt(p.id)}><Mail className="h-3.5 w-3.5" /></button>
-                          <button type="button" title="Copy a shareable link to the receipt PDF" className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={saving} onClick={() => void copyPaymentReceiptLink(p.id)}><Link2 className="h-3.5 w-3.5" /></button>
-                          <button type="button" title="Download the receipt PDF (not sent to myDATA)" className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={saving} onClick={() => void downloadPaymentReceipt(p.id)}><Download className="h-3.5 w-3.5" /></button>
-                        </span>
-                      )}
+                      <PaymentReceiptActions paymentId={p.id} direction={p.direction} className="border-r border-border/40 pr-1.5 mr-0.5" />
                       <button type="button" title="Edit payment" className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={saving} onClick={() => void editPay(p)}><Pencil className="h-3.5 w-3.5" /></button>
                       <button type="button" title="Delete payment" className="text-muted-foreground hover:text-destructive disabled:opacity-40" disabled={saving} onClick={() => void deletePay(p)}><Trash2 className="h-3.5 w-3.5" /></button>
                     </span>

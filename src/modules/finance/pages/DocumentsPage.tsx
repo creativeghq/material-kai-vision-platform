@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type SupplierBill, type SupplierBillStatus, type RecurringExpense } from '@/modules/finance/services/financeService';
+import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
@@ -704,11 +705,12 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
         <th className="px-4 py-2 text-left">Reference</th>
         <th className="px-4 py-2 text-right">Amount</th>
         <th className="px-4 py-2 text-right">Allocated</th>
+        <th className="px-4 py-2 text-right w-24">Receipt</th>
       </tr>
     </thead>
     <tbody>
       {rows.length === 0 && (
-        <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
+        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
       )}
       {rows.map((p: any) => {
         const allocated = (p.allocations ?? []).reduce((s: number, a: any) => s + Number(a.amount ?? 0), 0);
@@ -723,6 +725,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
             <td className="px-4 py-2 text-muted-foreground">{p.reference ?? '—'}</td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(p.amount, p.currency)}</td>
             <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(allocated, p.currency)}</td>
+            <td className="px-4 py-2 text-right"><PaymentReceiptActions paymentId={p.id} direction={p.direction} /></td>
           </tr>
         );
       })}
