@@ -1437,6 +1437,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               content:   msg.content,
               timestamp: new Date(msg.created_at),
               agentId:   'kai',
+              // Structured completion (emitBackgroundResult resultData) → renders as an
+              // AgentResultCard with the rail-3 "Open in {Hub}" handoff instead of plain text.
+              agentResultData: msg.metadata?.agentResultData || undefined,
             }];
           });
         },

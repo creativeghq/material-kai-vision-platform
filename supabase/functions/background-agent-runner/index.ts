@@ -23,6 +23,7 @@ const MIVAA_API_KEY            = Deno.env.get('MIVAA_API_KEY') || '';
 import { corsHeaders }        from '../_shared/cors.ts';
 import { authenticate }       from '../_shared/auth.ts';
 import { emitFlowEvent }      from '../_shared/flow-events.ts';
+import { emitBackgroundResult } from '../_shared/background-result.ts';
 import { createLogHelper, createHeartbeatHelper } from '../_shared/agents/base-agent.ts';
 import { getRunnerGated, AGENT_TYPE_CATALOG } from '../_shared/agents/registry.ts';
 import { DelegateToMivaaError, CancelledError } from '../_shared/agents/types.ts';
@@ -462,22 +463,9 @@ async function postResultToChat(
 
     const content = `**Background task complete** — *${taskPreview}*\n\n${report}`;
 
-    await supabase.from('agent_chat_messages').insert({
-      conversation_id: conversationId,
-      role:            'assistant',
-      content,
-      metadata: {
-        background_task: true,
-        run_id:          runId,
-        task_preview:    taskPreview,
-      },
-    });
-
-    // Update conversation's last_message_at so it floats to the top of the list
-    await supabase
-      .from('agent_chat_conversations')
-      .update({ last_message_at: new Date().toISOString() })
-      .eq('id', conversationId);
+    // Shared async-completion primitive (#275) — inserts the background_task assistant message the
+    // Agent Hub `background-results:{conversation_id}` channel injects into the live conversation.
+    await emitBackgroundResult(supabase, { conversationId, content, runId, taskPreview });
 
     console.log(`[postResultToChat] Result posted to conversation ${conversationId}`);
   } catch (err) {
