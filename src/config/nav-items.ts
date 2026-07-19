@@ -19,7 +19,6 @@ import {
   Sofa,
   Share2,
   TrendingUp,
-  Wrench,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
@@ -99,10 +98,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // over materials/catalogs/KB — the same MIVAA backend the agent's material_search tool uses.
   { id: 'search', label: 'Search', path: '/search', icon: Search },
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireCapability: 'marketplace.browse' },
-  // Tools — the unified utilities hub: public scanners/calculators + (signed-in) the agent-driven
-  // monitors (Price/Mention/Job) as one-click "run in the studio" cards. A first-class top-bar entry
-  // so the agent-based tools have a real home in the menu, not just the Profile dropdown (#275).
-  { id: 'tools', label: 'Tools', path: '/tools', icon: Wrench },
 
   // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251),
   //    grouped into Hubs (#251 follow-up) via the `hub` field. ──

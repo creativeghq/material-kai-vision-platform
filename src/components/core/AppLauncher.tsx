@@ -5,7 +5,7 @@
 // LAUNCHER_SECTIONS/LAUNCHER_SHORTCUTS deep-links. Nothing here is account/logout — that stays in
 // the avatar menu.
 import React, { useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, ArrowRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, Sparkles } from 'lucide-react';
+import { LayoutGrid, ArrowRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, Sparkles, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/popover';
@@ -336,8 +336,12 @@ export const AppLauncher: React.FC = () => {
               </aside>
             </div>
 
-            {/* ── Support strip ── */}
-            <div className="grid grid-cols-3 border-t border-border/60 bg-muted/30">
+            {/* ── Support strip ── (Tools sits first, before Help & Support) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 border-t border-border/60 bg-muted/30">
+              <button type="button" onClick={() => go('/tools')} className="flex items-center gap-3 border-r border-border/60 px-4 py-3.5 text-left hover:bg-accent/40 transition-colors">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/60 text-primary shrink-0"><Wrench className="h-5 w-5" /></span>
+                <span className="min-w-0"><span className="block text-[13px] font-medium truncate">Tools</span><span className="block text-[11px] text-muted-foreground truncate">Scanners, calculators &amp; agent tools</span></span>
+              </button>
               <button type="button" onClick={() => go('/knowledge-base')} className="flex items-center gap-3 border-r border-border/60 px-4 py-3.5 text-left hover:bg-accent/40 transition-colors">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/60 text-primary shrink-0"><LifeBuoy className="h-5 w-5" /></span>
                 <span className="min-w-0"><span className="block text-[13px] font-medium truncate">Help &amp; Support</span><span className="block text-[11px] text-muted-foreground truncate">Guides &amp; answers</span></span>
