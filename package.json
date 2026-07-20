@@ -154,6 +154,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "jest": "^30.1.1",
     "jest-junit": "^16.0.0",
+    "js-yaml": "^4.1.0",
     "lovable-tagger": "^1.1.10",
     "lucide-react": "^0.544.0",
     "postcss": "^8.5.6",

@@ -1,12 +1,20 @@
 # Semgrep security gate (pentest #250) — runs the invariant ruleset on PRs + pushes.
 #
-# ROLLOUT: currently REPORT-ONLY (non-blocking) — it prints findings but never fails the
-# build, because the existing codebase has legitimate matches (e.g. PartiesTab's now-
-# ESCAPED document.write). To finish the gate:
-#   1. Triage the current findings; add `// nosemgrep: <rule-id>` on the legit ones.
-#   2. Flip the "Enforce" step below to blocking (remove `|| true` / add `--error`),
-#      ideally diff-aware on PRs via `--baseline-commit origin/main` so only NEW findings
-#      fail the build.
+# STATUS: BLOCKING as of 2026-07-20. A finding fails the build.
+#
+# It was report-only (`|| true`) pending triage of "existing legitimate matches" — but the
+# ruleset was INVALID YAML (an unquoted pattern containing `": F"` parsed as a mapping), so
+# semgrep loaded ZERO rules and exited non-zero on every run. `|| true` swallowed that, and the
+# job reported success. The gate had never evaluated a single rule since it was added.
+#
+# With the YAML fixed the real finding count is 0, so there was nothing to triage and the gate
+# went straight to blocking. Two things keep it honest:
+#   • no `|| true` — an invalid config now fails the build instead of hiding, which is the
+#     specific failure that made this dead. Do not re-add it.
+#   • tests/unit/semgrepRuleset.test.ts parses the YAML in the unit tier, so a malformed
+#     ruleset fails fast even before this job pulls its container.
+# If a legitimate match ever appears, annotate it at the source with `// nosemgrep: <rule-id>`
+# and say why — never by weakening this step.
 name: 🔒 Semgrep Security
 
 on:
@@ -24,5 +32,10 @@ jobs:
       image: semgrep/semgrep
     steps:
       - uses: actions/checkout@v4
-      - name: Run semgrep (report-only)
-        run: semgrep --config .github/semgrep-security.yml --severity ERROR --severity WARNING || true
+      - name: Run semgrep (blocking)
+        run: |
+          semgrep \
+            --config .github/semgrep-security.yml \
+            --severity ERROR --severity WARNING \
+            --exclude node_modules --exclude dist \
+            --error
