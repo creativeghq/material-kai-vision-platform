@@ -116,6 +116,7 @@
         "npm:input-otp@^1.4.2",
         "npm:jest-junit@16",
         "npm:jest@^30.1.1",
+        "npm:js-yaml@^4.1.0",
         "npm:jspdf@^4.2.0",
         "npm:leva@~0.10.1",
         "npm:lovable-tagger@^1.1.10",
