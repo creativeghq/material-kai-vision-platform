@@ -185,7 +185,11 @@ function frontendToolkits(): Record<string, Set<string>> {
   const body = valueBlock(read(CATALOG), 'export const TOOLKITS');
   const out: Record<string, Set<string>> = {};
   for (const { src } of childObjects(body)) {
-    const m = src.match(/^\{\s*id: '([a-z0-9-]+)'/);
+    // Tolerate a leading `//` comment block before `id:` — several toolkits document
+    // their persona/gating right inside the literal. Requiring `id:` to be the very
+    // first key made those entries parse as ABSENT, which surfaced as the misleading
+    // "server binds a toolkit with no picker entry" failure instead of a parse bug.
+    const m = src.match(/^\{\s*(?:\/\/[^\n]*\n\s*)*id: '([a-z0-9-]+)'/);
     if (m) out[m[1]] = idsOf(src);
   }
   return out;
