@@ -75,8 +75,11 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'quote', label: 'Quote', hub: 'sales', pageRoute: '/quotes', agentId: 'erp', agentTool: 'create_quote', toolkitId: 'quotes', recordTable: 'quotes', canvasKind: 'quote', moduleSlug: 'quotes' },
   { id: 'crm-company', label: 'CRM Company', hub: 'sales', pageRoute: '/crm', agentId: 'kai', agentTool: 'create_company_from_vat', toolkitId: 'crm', recordTable: 'crm_companies', moduleSlug: 'crm' },
   { id: 'appointments', label: 'Appointments', hub: 'sales', pageRoute: '/profile?tab=calendar', agentId: 'kai', agentTool: 'manage_appointments', toolkitId: 'appointments', quickStartLabel: 'This week', recordTable: 'crm_meetings', moduleSlug: 'crm' },
-  // Sales rep portal — page-only today; no agent tool exists for it yet (fabric gap).
-  { id: 'sales', label: 'Sales', hub: 'sales', pageRoute: '/sales' },
+  // Sales rep portal — the page is literally "the rep portal for quotes", and the `quotes` toolkit
+  // (create_quote / generate_quote_pdf / list_my_quotes) is not admin-gated, so a rep can drive it
+  // from chat. Wired to that toolkit; no quickStartLabel so opening it primes the toolkit and shows
+  // its quick-starts rather than auto-firing one.
+  { id: 'sales', label: 'Sales', hub: 'sales', pageRoute: '/sales', agentId: 'erp', agentTool: 'list_my_quotes', toolkitId: 'quotes' },
 
   // ── Finance ──
   { id: 'invoice', label: 'Invoice', hub: 'finance', pageRoute: '/finance', agentId: 'kai', agentTool: 'manage_finance', toolkitId: 'finance', recordTable: 'invoices', moduleSlug: 'sales-finance' },
@@ -87,7 +90,12 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
 
   // ── People ──
   { id: 'hr', label: 'HR', hub: 'people', pageRoute: '/hr', agentId: 'kai', agentTool: 'manage_hr', toolkitId: 'hr', moduleSlug: 'hr' },
-  // Employee self-service — page-only by design (an employee's own record); no agent tool.
+  // Employee self-service — page-only ON PURPOSE, not an oversight. The only HR tool is `manage_hr`,
+  // whose actions are manager-facing (list_employees / overview / who_is_on_leave / record_absence /
+  // add_employee) and RBAC-gated on hr.view (writes admin-only). My HR is gated on hr.self, so the
+  // self-service persona has no hr.view and calling manage_hr would 403 for exactly the user of this
+  // page. Wiring it here would be broken UI. Needs a self-scoped tool (my absences / request leave)
+  // before it can join the agent rail.
   { id: 'my-hr', label: 'My HR', hub: 'people', pageRoute: '/my-hr' },
 ];
 
