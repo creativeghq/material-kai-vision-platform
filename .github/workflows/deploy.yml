@@ -230,16 +230,18 @@ jobs:
           set -euo pipefail
           URL="${{ steps.deploy.outputs.url }}"
           sleep 10
-          if [ -n "$URL" ]; then
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --connect-timeout 30 --max-time 60 || echo "000")
-            echo "📊 HTTP $HTTP_STATUS — $URL"
-            case "$HTTP_STATUS" in
-              200|301|302) echo "✅ Healthy" ;;
-              *) echo "⚠️  Non-OK status: $HTTP_STATUS" ;;
-            esac
-          else
-            echo "⚠️  Deployment URL not captured"
+          # This step used to only WARN on a bad status, so a deploy serving 500s (or a URL that
+          # never got captured) reported green — the same "looks checked, isn't" shape as the
+          # semgrep `|| true`. It gates now. 302 is the normal response for the prod URL.
+          if [ -z "$URL" ]; then
+            echo "❌ Deployment URL not captured — cannot verify the deploy"; exit 1
           fi
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --connect-timeout 30 --max-time 60 || echo "000")
+          echo "📊 HTTP $HTTP_STATUS — $URL"
+          case "$HTTP_STATUS" in
+            200|301|302|307|308) echo "✅ Healthy" ;;
+            *) echo "❌ Unhealthy: HTTP $HTTP_STATUS"; exit 1 ;;
+          esac
 
       - name: 📋 Summary
         if: always()
@@ -413,6 +415,23 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
+      # The suites self-SKIP without both keys so `npm test` stays green on a no-secret
+      # checkout. In CI that same skip would silently retire the tenancy + money-path
+      # coverage while still reporting success, so require the secrets HERE.
+      - name: 🔑 Require integration credentials
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] || missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          [ -n "${SUPABASE_ANON_KEY:-}" ] || missing="$missing SUPABASE_ANON_KEY"
+          if [ -n "$missing" ]; then
+            echo "❌ Missing secret(s):$missing — the live suites would SKIP and report green."
+            exit 1
+          fi
+          echo "✅ Integration credentials present"
       - name: 🔗 Live integration tests
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
