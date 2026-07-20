@@ -316,6 +316,9 @@ export function InvoiceDocument({
   const Body = () => (
     <>
       <Header />
+      {data.isPreInvoice && (
+        <div style={{ fontSize: 9.5, ...muted, marginBottom: 12 }}>{L.preInvoiceNote}</div>
+      )}
       <Customer />
       <Items />
       <Totals />
@@ -371,6 +374,9 @@ export function InvoiceDocument({
           </div>
         </div>
         <div style={{ borderTop: `0.8px solid ${colors.line}`, margin: '10px 0 14px' }} />
+        {data.isPreInvoice && (
+          <div style={{ fontSize: 9, ...muted, marginBottom: 12 }}>{L.preInvoiceNote}</div>
+        )}
         {/* Three party columns */}
         <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
           {columns.map((c, i) => (

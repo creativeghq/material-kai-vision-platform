@@ -26,6 +26,7 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
     orderDetails: 'ΣΤΟΙΧΕΙΑ ΠΑΡΑΓΓΕΛΙΑΣ', billTo: 'ΣΤΟΙΧΕΙΑ ΧΡΕΩΣΗΣ', shipTo: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ',
     itemCode: 'Κωδ. Είδους', itemDescr: 'Περιγραφή Είδους', itemComment: 'Σχόλιο Είδους',
     order: 'Παραγγελία', invoiceNo: 'Τιμολόγιο', orderNotes: 'Σημείωση παραγγελίας',
+    preInvoice: 'ΠΡΟΤΙΜΟΛΟΓΙΟ', preInvoiceNote: 'Δεν αποτελεί φορολογικό παραστατικό.',
   },
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
@@ -47,10 +48,19 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
     orderDetails: 'ORDER DETAILS', billTo: 'BILL TO', shipTo: 'SHIP TO',
     itemCode: 'Item code', itemDescr: 'Description', itemComment: 'Comment',
     order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order note',
+    preInvoice: 'PRE-INVOICE', preInvoiceNote: 'Not a tax document.',
   },
 };
 
-export function invoiceDocTitle(documentType: string | null | undefined, L: Record<string, string>): string {
+export function invoiceDocTitle(
+  documentType: string | null | undefined,
+  L: Record<string, string>,
+  status?: string | null,
+): string {
+  // A DRAFT sales/service invoice is a pre-invoice (προτιμολόγιο) — numbered but not issued
+  // and never sent to myDATA — so it must not print as a fiscal "SALES INVOICE".
+  const isSalesOrService = !documentType || /^[12]\./.test(documentType);
+  if (status === 'draft' && isSalesOrService) return L.preInvoice;
   switch (documentType) {
     case '2.1': case '2.2': case '2.3': case '2.4': return L.service;
     case '11.1': case '11.2': case '11.3': case '11.4': case '11.5': return L.receipt;

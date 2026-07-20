@@ -2471,12 +2471,31 @@ const _financeServiceV2 = {
     return (data as any)?.id ?? null;
   },
 
-  async resolvePayToken(payToken: string, opts: { successUrl?: string; cancelUrl?: string } = {}): Promise<{
+  async resolvePayToken(
+    payToken: string,
+    opts: {
+      successUrl?: string; cancelUrl?: string;
+      /** Fetch the document + payable options only — creates no checkout session. */
+      infoOnly?: boolean;
+      /** Requested amount (deposit / part payment). Re-validated + clamped server-side. */
+      amount?: number;
+    } = {},
+  ): Promise<{
     ok: boolean;
+    info?: boolean;
     checkout_url?: string;
     invoice_id?: string;
     internal_number?: string;
     amount?: number;
+    amount_due?: number;
+    total?: number;
+    partial?: boolean;
+    status?: string;
+    is_pre_invoice?: boolean;
+    deposit_pct?: number | null;
+    deposit_amount?: number | null;
+    min_amount?: number;
+    max_amount?: number;
     currency?: string;
     customer_display?: string;
     already_paid?: boolean;
@@ -2487,6 +2506,8 @@ const _financeServiceV2 = {
         pay_token: payToken,
         success_url: opts.successUrl,
         cancel_url: opts.cancelUrl,
+        ...(opts.infoOnly ? { info_only: true } : {}),
+        ...(opts.amount != null ? { amount: opts.amount } : {}),
       },
     });
     if (error) throw await edgeError(error);

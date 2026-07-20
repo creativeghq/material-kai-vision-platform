@@ -156,7 +156,8 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
 
   return {
     lang, currency,
-    title: invoiceDocTitle(inv.document_type, L),
+    title: invoiceDocTitle(inv.document_type, L, inv.status),
+    isPreInvoice: invoiceDocTitle(inv.document_type, L, inv.status) === L.preInvoice,
     labels: L,
     issuer: { name: fs?.business_name || '', lines: issuerLines, logoUrl: inv.logo_mode === 'none' ? null : (logoUrl ?? null) },
     customer: { name: custName, lines: custLines },

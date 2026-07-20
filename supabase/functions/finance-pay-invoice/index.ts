@@ -31,6 +31,10 @@ interface PublicBody {
   pay_token: string;
   success_url?: string;
   cancel_url?: string;
+  /** Return the document + payable options only. No checkout session, no side effects. */
+  info_only?: boolean;
+  /** Requested amount (deposit / part payment). Clamped server-side to [min, amount_due]. */
+  amount?: number;
 }
 
 function json(body: any, status = 200): Response {
@@ -207,6 +211,61 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       return json({ ok: true, already_paid: true, invoice_id: row.invoice_id }, 200);
     }
 
+    // ── Payable options (gateway-agnostic policy) ────────────────────────
+    // The AMOUNT IS ALWAYS DERIVED SERVER-SIDE. The client may express an intent
+    // (a requested figure) but never sets the price: we clamp it to [min, amount_due]
+    // computed from the invoice's own deposit terms.
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const { data: extra } = await supabase
+      .from('invoices').select('deposit_pct, total, status').eq('id', row.invoice_id).maybeSingle();
+    const amountDue = r2(Number(row.amount_due));
+    const totalAmt = r2(Number((extra as any)?.total ?? amountDue));
+    const depositPct = (extra as any)?.deposit_pct != null ? Number((extra as any).deposit_pct) : null;
+    const isPreInvoice = (extra as any)?.status === 'draft';
+    // A deposit floor only applies to the FIRST payment; once part is paid, the rest is due in full.
+    const untouched = amountDue >= totalAmt - 0.005;
+    const depositAmount = depositPct && untouched ? Math.min(r2(totalAmt * depositPct / 100), amountDue) : null;
+    // Stripe (and every gateway) rejects dust charges.
+    const MIN_CHARGE = 0.5;
+    const minAmount = Math.max(depositAmount ?? amountDue, MIN_CHARGE);
+
+    if (pb.info_only) {
+      return json({
+        ok: true,
+        info: true,
+        invoice_id: row.invoice_id,
+        internal_number: row.internal_number,
+        customer_display: row.customer_display,
+        currency: row.currency,
+        status: row.status,
+        is_pre_invoice: isPreInvoice,
+        total: totalAmt,
+        amount_due: amountDue,
+        deposit_pct: depositPct,
+        deposit_amount: depositAmount,
+        min_amount: Math.min(minAmount, amountDue),
+        max_amount: amountDue,
+      });
+    }
+
+    // Resolve the charge amount: requested (clamped) or the full balance.
+    let chargeAmount = amountDue;
+    if (pb.amount != null) {
+      const req = Number(pb.amount);
+      if (!Number.isFinite(req) || req <= 0) return json({ error: 'invalid amount' }, 400);
+      chargeAmount = r2(req);
+      if (chargeAmount > amountDue + 0.005) return json({ error: 'amount exceeds the balance due' }, 400);
+      if (chargeAmount < minAmount - 0.005) {
+        return json({ error: `minimum payable is ${minAmount.toFixed(2)} ${row.currency}` }, 400);
+      }
+      chargeAmount = Math.min(chargeAmount, amountDue);
+    }
+    const isPartial = chargeAmount < amountDue - 0.005;
+    const docLabel = isPreInvoice ? 'Pre-invoice' : 'Invoice';
+    const lineName = isPartial
+      ? `Deposit — ${docLabel} ${row.internal_number}`
+      : `${docLabel} ${row.internal_number}`;
+
     const { data: destAcctPublic } = row.workspace_id
       ? await supabase.rpc('get_workspace_payout_account', { p_workspace_id: row.workspace_id })
       : { data: null };
@@ -217,8 +276,8 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
         {
           price_data: {
             currency: String(row.currency || 'eur').toLowerCase(),
-            product_data: { name: `Invoice ${row.internal_number}` },
-            unit_amount: Math.round(Number(row.amount_due) * 100),
+            product_data: { name: lineName },
+            unit_amount: Math.round(chargeAmount * 100),
           },
           quantity: 1,
         },
@@ -250,7 +309,9 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       session_id: session.id,
       invoice_id: row.invoice_id,
       internal_number: row.internal_number,
-      amount: Number(row.amount_due),
+      amount: chargeAmount,
+      amount_due: amountDue,
+      partial: isPartial,
       currency: row.currency,
       customer_display: row.customer_display,
     });

@@ -66,8 +66,10 @@ export interface TotalsExtraRow { label: string; value: number; negative?: boole
 export interface InvoiceRenderData {
   lang: 'el' | 'en';
   currency: string;
-  /** Document title resolved from document_type + language. */
+  /** Document title resolved from document_type + language (+ draft ⇒ pre-invoice). */
   title: string;
+  /** True when this is a draft pre-invoice (προτιμολόγιο) — not a fiscal document. */
+  isPreInvoice?: boolean;
   labels: Record<string, string>;
   issuer: { name: string; lines: string[]; logoUrl?: string | null };
   customer: InvoiceParty;

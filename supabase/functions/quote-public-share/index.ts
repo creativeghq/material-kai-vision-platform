@@ -225,6 +225,38 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     }
   }
 
+  // Pre-invoice (draft invoice auto-created when the quote was accepted). It carries its
+  // own pay_token, so once the customer has signed we can offer "Pay now" straight from the
+  // shared quote. Same trust level as the quote share token itself — this link is for them.
+  // Only surfaced once there is still a balance to collect.
+  let payable: any = null;
+  {
+    const { data: pre } = await supabase
+      .from('invoices')
+      .select('id, internal_number, currency, total, amount_due, deposit_pct, pay_token, pay_token_expires_at')
+      .eq('quote_id', quote.id)
+      .eq('status', 'draft')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const notExpired = !pre?.pay_token_expires_at || new Date(pre.pay_token_expires_at) > new Date();
+    if (pre?.pay_token && notExpired && Number(pre.amount_due ?? 0) > 0) {
+      const total = Number(pre.total ?? 0);
+      const due = Number(pre.amount_due ?? 0);
+      const pct = pre.deposit_pct != null ? Number(pre.deposit_pct) : null;
+      const untouched = due >= total - 0.005;
+      payable = {
+        pay_token: pre.pay_token,
+        number: pre.internal_number ?? '',
+        currency: pre.currency ?? 'EUR',
+        total,
+        amount_due: due,
+        deposit_pct: pct,
+        deposit_amount: pct && untouched ? Math.round(total * pct) / 100 : null,
+      };
+    }
+  }
+
   // Latest signature (if accepted) — for the public "Accepted" banner.
   let signed_by: string | null = null;
   let signed_at: string | null = null;
@@ -263,6 +295,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     seller,
     pdf_url,
     issued_document,
+    payable,
     not_found: false,
   });
 }));

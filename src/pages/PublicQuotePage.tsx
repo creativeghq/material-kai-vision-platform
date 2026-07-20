@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Loader2, Download, ExternalLink, FileText, CheckCircle2, PenLine } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Loader2, Download, ExternalLink, FileText, CheckCircle2, PenLine, CreditCard } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
@@ -75,11 +75,16 @@ const money = (v: number | null | undefined, currency: string) =>
 
 export default function PublicQuotePage() {
   const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<PublicQuote | null>(null);
   const [seller, setSeller] = useState<QuoteSeller | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [issuedDoc, setIssuedDoc] = useState<IssuedDocument | null>(null);
+  const [payable, setPayable] = useState<{
+    pay_token: string; number: string; currency: string;
+    total: number; amount_due: number; deposit_pct: number | null; deposit_amount: number | null;
+  } | null>(null);
   const [notFound, setNotFound] = useState(false);
 
   // Stable per-visit session id so repeated downloads from the same visit
@@ -103,6 +108,7 @@ export default function PublicQuotePage() {
       setSeller(data?.seller ?? null);
       setPdfUrl(data?.pdf_url ?? null);
       setIssuedDoc(data?.issued_document ?? null);
+      setPayable(data?.payable ?? null);
       setNotFound(!!data?.not_found || !data?.quote);
     } catch {
       setNotFound(true);
@@ -305,13 +311,36 @@ export default function PublicQuotePage() {
 
         {/* Sign & Accept (e-sign + audit trail). Shows the accepted banner once signed. */}
         {(quote.status === 'accepted' || quote.signed_by) ? (
-          <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-            <div className="text-sm">
-              <span className="font-medium">Accepted</span>
-              {quote.signed_by && <span className="text-muted-foreground"> · signed by {quote.signed_by}</span>}
-              {quote.signed_at && <span className="text-muted-foreground"> · {new Date(quote.signed_at).toLocaleDateString()}</span>}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium">Accepted</span>
+                {quote.signed_by && <span className="text-muted-foreground"> · signed by {quote.signed_by}</span>}
+                {quote.signed_at && <span className="text-muted-foreground"> · {new Date(quote.signed_at).toLocaleDateString()}</span>}
+              </div>
             </div>
+
+            {/* Signed → there's a pre-invoice waiting to be paid. */}
+            {payable && (
+              <Card className="dashboard-card border border-white/10 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CreditCard className="h-4 w-4 text-primary" /> Ready to pay
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Pre-invoice {payable.number} · balance {money(payable.amount_due, payable.currency)}
+                  {payable.deposit_amount != null && (
+                    <> · a deposit of {money(payable.deposit_amount, payable.currency)} ({payable.deposit_pct}%) is enough to get started.</>
+                  )}
+                </p>
+                <Button className="rounded-full gap-2" onClick={() => navigate(`/pay/${payable.pay_token}`)}>
+                  <CreditCard className="h-4 w-4" />
+                  {payable.deposit_amount != null
+                    ? `Pay deposit ${money(payable.deposit_amount, payable.currency)}`
+                    : `Pay ${money(payable.amount_due, payable.currency)}`}
+                </Button>
+              </Card>
+            )}
           </div>
         ) : (
           <Card className="dashboard-card border border-white/10 p-4 space-y-3">

@@ -59,6 +59,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     orderDetails: 'ΣΤΟΙΧΕΙΑ ΠΑΡΑΓΓΕΛΙΑΣ', billTo: 'ΣΤΟΙΧΕΙΑ ΧΡΕΩΣΗΣ', shipTo: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ',
     itemCode: 'Κωδ. Είδους', itemDescr: 'Περιγραφή Είδους', itemComment: 'Σχόλιο Είδους',
     order: 'Παραγγελία', invoiceNo: 'Τιμολόγιο', orderNotes: 'Σημείωση παραγγελίας',
+    preInvoice: 'ΠΡΟΤΙΜΟΛΟΓΙΟ', preInvoiceNote: 'Δεν αποτελεί φορολογικό παραστατικό.',
   },
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
@@ -84,6 +85,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     orderDetails: 'ORDER DETAILS', billTo: 'BILL TO', shipTo: 'SHIP TO',
     itemCode: 'Item code', itemDescr: 'Description', itemComment: 'Comment',
     order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order note',
+    preInvoice: 'PRE-INVOICE', preInvoiceNote: 'Not a tax document.',
   },
 };
 
@@ -91,7 +93,12 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   bank_transfer: 'Bank transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
 };
 
-function docTitle(documentType: string | null, L: Record<string, string>): string {
+function docTitle(documentType: string | null, L: Record<string, string>, status?: string | null): string {
+  // A DRAFT sales/service invoice is a pre-invoice (προτιμολόγιο): numbered but not issued
+  // and never transmitted to myDATA, so it must NOT print as a fiscal "SALES INVOICE".
+  // Retail receipts (11.x), credit notes (5.x) and delivery notes (9.3) keep their own titles.
+  const isSalesOrService = !documentType || /^[12]\./.test(documentType);
+  if (status === 'draft' && isSalesOrService) return L.preInvoice;
   switch (documentType) {
     case '2.1': case '2.2': case '2.3': case '2.4': return L.service;
     case '11.1': case '11.2': case '11.3': case '11.4': case '11.5': return L.receipt;
@@ -376,7 +383,8 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
 
   // ── Header (template-aware) ──
   const issuerName = fs?.business_name || '';
-  const title = docTitle(inv.document_type, L);
+  const title = docTitle(inv.document_type, L, inv.status);
+  const isPreInvoice = title === L.preInvoice;
   const issuerLines = [
     [fs?.business_address, fs?.business_street_number].filter(Boolean).join(' '),
     [fs?.business_postal_code, fs?.business_city].filter(Boolean).join(' '),
@@ -481,6 +489,9 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
 
   page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.7, color: LINE });
   y -= 16;
+
+  // A pre-invoice is not a fiscal document — say so plainly on the page.
+  if (isPreInvoice) { text(L.preInvoiceNote, M, y, 8, font, MUTED); y -= 14; }
 
   // ── Customer / parties block ──
   const custName = customer ? (customer.name || [customer.first_name, customer.last_name].filter(Boolean).join(' ')) : '—';
