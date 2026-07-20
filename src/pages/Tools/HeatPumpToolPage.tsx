@@ -167,15 +167,15 @@ export default function HeatPumpToolPage() {
 
             <Separator />
 
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <Label htmlFor="dhw" className="cursor-pointer">Include domestic hot water</Label>
                 <p className="text-xs text-muted-foreground">Adds a combined DHW allowance per occupant.</p>
               </div>
-              <Switch id="dhw" checked={includeDhw} onCheckedChange={setIncludeDhw} />
+              <Switch id="dhw" className="shrink-0" checked={includeDhw} onCheckedChange={setIncludeDhw} />
             </div>
             {includeDhw && (
-              <div className="w-1/2">
+              <div className="w-full sm:w-1/2">
                 <Label htmlFor="occupants">Occupants</Label>
                 <Input id="occupants" type="number" inputMode="numeric" min={1} value={occupants} onChange={(e) => setOccupants(e.target.value)} />
               </div>
@@ -183,15 +183,15 @@ export default function HeatPumpToolPage() {
 
             <Separator />
 
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <Label htmlFor="advanced" className="cursor-pointer">Advanced: exact design temperature</Label>
                 <p className="text-xs text-muted-foreground">Override the zone with the local TOTEE winter design temp.</p>
               </div>
-              <Switch id="advanced" checked={advanced} onCheckedChange={setAdvanced} />
+              <Switch id="advanced" className="shrink-0" checked={advanced} onCheckedChange={setAdvanced} />
             </div>
             {advanced && (
-              <div className="w-1/2">
+              <div className="w-full sm:w-1/2">
                 <Label htmlFor="design-temp">Design outdoor temp (°C)</Label>
                 <Input id="design-temp" type="number" inputMode="decimal" placeholder="e.g. -4" value={designTemp} onChange={(e) => setDesignTemp(e.target.value)} />
               </div>

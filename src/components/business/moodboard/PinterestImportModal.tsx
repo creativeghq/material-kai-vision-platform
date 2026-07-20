@@ -394,7 +394,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                   {loadingPins ? (
                     <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[45vh] sm:max-h-64 overflow-y-auto">
                       {boardPins.map((pin, i) => (
                         <button
                           key={i}

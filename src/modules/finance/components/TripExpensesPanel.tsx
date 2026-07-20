@@ -273,7 +273,7 @@ const TripCardDetail: React.FC<{
               {(report.trip_start || report.trip_end) && <> · {report.trip_start ?? '?'} → {report.trip_end ?? '?'}</>}
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             {canEditItems && <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Expense</Button>}
             {canEditItems && report.item_count > 0 && (
               <Button size="sm" disabled={busy} onClick={submit}><Send className="h-3.5 w-3.5 mr-1" /> Submit</Button>
@@ -286,7 +286,7 @@ const TripCardDetail: React.FC<{
         </div>
 
         {/* Totals strip */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Totals label="Total" value={report.total_amount} currency={report.currency} />
           <Totals label="Approved" value={report.approved_amount} currency={report.currency} tone="green" />
           <Totals label="Rejected" value={report.rejected_amount} currency={report.currency} tone="red" />

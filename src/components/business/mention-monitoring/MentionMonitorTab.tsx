@@ -187,8 +187,8 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
     <div className="space-y-4">
       {/* Header card */}
       <Card className="dashboard-card">
-        <CardHeader className="flex flex-row items-start justify-between">
-          <div>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
               Mention Monitoring
@@ -197,7 +197,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
               News, blogs, RSS, and LLM mentions of <span className="font-medium">{productName}</span>
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <span className="text-xs text-muted-foreground">{enabled ? 'Active' : 'Off'}</span>
             <Switch checked={enabled} onCheckedChange={handleToggle} />
             {admin && enabled && (
@@ -288,7 +288,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
 
             {/* Feed */}
             <TabsContent value="feed" className="space-y-3 mt-4">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant={!filterSentiment ? 'default' : 'outline'} onClick={() => setFilterSentiment('')} className="rounded-full">All</Button>
                 <Button size="sm" variant={filterSentiment === 'positive' ? 'default' : 'outline'} onClick={() => setFilterSentiment('positive')} className="rounded-full">Positive</Button>
                 <Button size="sm" variant={filterSentiment === 'neutral' ? 'default' : 'outline'} onClick={() => setFilterSentiment('neutral')} className="rounded-full">Neutral</Button>
@@ -383,8 +383,8 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
 
             {/* LLM */}
             <TabsContent value="llm" className="mt-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
+                <div className="min-w-0">
                   <h4 className="text-sm font-medium">LLM visibility</h4>
                   <p className="text-xs text-muted-foreground">
                     How this product appears in AI answers across cheap-tier models.

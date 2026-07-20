@@ -8,8 +8,12 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
+  // `h-screen` (100vh) is the LARGE viewport on mobile Safari / Chrome Android:
+  // with `overflow-hidden` on the root, ~60-100px of <main>'s scroll box lives
+  // under the browser toolbar with no way to scroll it into view. `100dvh`
+  // tracks the visible viewport; `h-screen` stays as the fallback.
   return (
-    <div className="relative h-screen overflow-hidden flex flex-col">
+    <div className="relative h-screen h-[100dvh] overflow-hidden flex flex-col">
       {/* Command-center atmosphere — brand aurora + film grain behind every page. */}
       <div className="app-aurora" aria-hidden="true" />
       <div className="app-grain" aria-hidden="true" />

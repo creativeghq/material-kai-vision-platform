@@ -425,7 +425,7 @@ const PurchaseItemDialog: React.FC<{
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></div>
             <div className="space-y-1"><Label className="text-xs">Unit cost</Label><Input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="—" /></div>
             <div className="space-y-1">

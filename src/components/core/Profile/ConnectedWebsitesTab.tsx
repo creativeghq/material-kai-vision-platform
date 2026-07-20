@@ -269,10 +269,13 @@ export const ConnectedWebsitesTab: React.FC = () => {
                           href={w.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 hover:text-foreground"
+                          // A raw URL is unbreakable, so without min-w-0/truncate
+                          // its min-content width blew past the card and gave the
+                          // whole Profile tab horizontal scroll at 390px.
+                          className="flex min-w-0 max-w-full items-center gap-1 hover:text-foreground"
                         >
-                          {w.url}
-                          <ExternalLink className="w-3 h-3" />
+                          <span className="truncate">{w.url}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
                         </a>
                         <span>·</span>
                         <span>Last crawl: {timeAgo(w.last_crawled_at)}</span>
@@ -432,7 +435,7 @@ export const ConnectedWebsitesTab: React.FC = () => {
           {previewResult && (
             <div className="space-y-4 py-2">
               {/* Stats bar */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="border rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">Total URLs</p>
                   <p className="text-xl font-semibold">{previewResult.result.pages_discovered.toLocaleString()}</p>

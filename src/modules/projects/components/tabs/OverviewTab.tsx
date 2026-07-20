@@ -259,7 +259,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
             <CardTitle className="text-sm font-medium">Tasks</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
               <Stat label="Todo" value={taskStats.todo} icon={<Circle className="h-3.5 w-3.5" />} />
               <Stat label="Active" value={taskStats.in_progress} icon={<Clock className="h-3.5 w-3.5 text-blue-300" />} />
               <Stat label="Done" value={taskStats.done} icon={<CheckCircle className="h-3.5 w-3.5 text-emerald-300" />} />

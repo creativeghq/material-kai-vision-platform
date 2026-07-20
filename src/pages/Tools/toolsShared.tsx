@@ -252,7 +252,7 @@ export function PriceResultsCard({ data }: { data: PublicPriceScanResponse }) {
           )}
         </div>
         {data.stats.count > 0 && (
-          <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
             <StatTile label="Lowest" value={formatPrice(data.stats.min, data.stats.currency)} accent="text-emerald-500 dark:text-emerald-400" />
             <StatTile label="Median" value={formatPrice(data.stats.median, data.stats.currency)} />
             <StatTile label="Highest" value={formatPrice(data.stats.max, data.stats.currency)} accent="text-muted-foreground" />

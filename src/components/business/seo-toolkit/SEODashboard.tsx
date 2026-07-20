@@ -502,7 +502,7 @@ const AddDomainDialog: React.FC<{ open: boolean; onClose: () => void; onAdded: (
             <label className="text-xs text-muted-foreground">Display label (optional)</label>
             <Input placeholder="Flobali (main brand)" value={label} onChange={(e) => setLabel(e.target.value)} />
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label className="text-xs text-muted-foreground">Country</label>
               <Input placeholder="US" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value.toUpperCase())} />
@@ -561,8 +561,11 @@ const BacklinksTab: React.FC = () => {
             {loading ? 'Loading...' : 'Add a tracked domain in the Domain Audit tab to see backlinks here.'}
           </div>
         ) : (
-          <div className="divide-y divide-border">
-            <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[11px] uppercase text-muted-foreground tracking-wide bg-white/5">
+          // A hand-rolled 5-column table. At 390px each col-span-2 cell is ~48px,
+          // so counts and the audit date wrapped to 3+ lines and "Drill" was
+          // unusable. Scroll it like a real table instead of squeezing it.
+          <div className="divide-y divide-border overflow-x-auto">
+            <div className="grid min-w-[640px] grid-cols-12 gap-2 px-4 py-2 text-[11px] uppercase text-muted-foreground tracking-wide bg-white/5">
               <div className="col-span-4">Domain</div>
               <div className="col-span-2 text-right">Ref. domains</div>
               <div className="col-span-2 text-right">Backlinks</div>
@@ -570,7 +573,7 @@ const BacklinksTab: React.FC = () => {
               <div className="col-span-2 text-right">Action</div>
             </div>
             {domains.map((d) => (
-              <div key={d.id} className="grid grid-cols-12 gap-2 px-4 py-3 text-xs items-center hover:bg-white/5">
+              <div key={d.id} className="grid min-w-[640px] grid-cols-12 gap-2 px-4 py-3 text-xs items-center hover:bg-white/5">
                 <div className="col-span-4 truncate font-medium">{d.display_label || d.domain}</div>
                 <div className="col-span-2 text-right">{fmtNum(d.current_referring_domains)}</div>
                 <div className="col-span-2 text-right">{fmtNum(d.current_backlinks)}</div>

@@ -61,7 +61,9 @@ export const Sidebar: React.FC = () => {
         <button
           type="button"
           aria-label="Profile"
-          className={`flex items-center gap-2 px-2 md:px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+          // min-h-9/min-w-9 on mobile: the label is `hidden md:inline`, so this
+          // was a 28x32 icon-only hit area for the primary account entry point.
+          className={`flex min-h-9 min-w-9 items-center justify-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-200 md:min-h-0 md:min-w-0 md:px-3 ${
             isActive('/profile')
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'

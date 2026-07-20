@@ -1319,7 +1319,7 @@ export const ProfileTab: React.FC = () => {
             ) : (
               <div className="space-y-2">
                 <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Visibility</p>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
                   {[
                     { icon: Eye,     label: 'Profile visits', value: profileViews },
                     { icon: Users,   label: 'Followers',      value: analytics.followers },
@@ -1336,7 +1336,7 @@ export const ProfileTab: React.FC = () => {
                 </div>
 
                 <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Inbound</p>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
                   {[
                     { icon: Mail,     label: 'Hire reqs',  value: analytics.hireRequestsTotal,      badge: analytics.hireRequestsUnread > 0 ? analytics.hireRequestsUnread : null,   badgeClass: 'bg-primary text-primary-foreground' },
                     { icon: Calendar, label: 'Appts',      value: analytics.appointmentsTotal,      badge: analytics.appointmentsPending > 0 ? analytics.appointmentsPending : null, badgeClass: 'bg-amber-100 text-amber-700' },
@@ -1357,7 +1357,7 @@ export const ProfileTab: React.FC = () => {
                 </div>
 
                 <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">Content</p>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
                   {[
                     { icon: FileText,      label: 'Quotes',    value: analytics.quotesCreated },
                     { icon: Sparkles,      label: 'VR worlds', value: analytics.vrWorldsCreated },

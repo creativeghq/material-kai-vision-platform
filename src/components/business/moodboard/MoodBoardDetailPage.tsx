@@ -317,7 +317,11 @@ export const MoodBoardDetailPage: React.FC = () => {
       />
 
       {/* ── Hero Section ─────────────────────────────────────────────────── */}
-      <div className="mt-4 mx-2 sm:mx-4 relative rounded-2xl h-[240px] sm:h-[380px] overflow-hidden">
+      {/* Fixed 240px on mobile clipped the title off the top: the bottom-anchored
+          content block holds an h1 + 2-line description + a wrapping badge row
+          that runs 3-4 rows deep at 390px. Below `sm` the hero grows with its
+          content and the copy sits in normal flow under the image instead. */}
+      <div className="mt-4 mx-2 sm:mx-4 relative rounded-2xl min-h-[240px] sm:h-[380px] overflow-hidden">
         {/* Background image */}
         {heroImage ? (
           <img
@@ -337,7 +341,9 @@ export const MoodBoardDetailPage: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
         {/* Top-right controls */}
-        <div className="absolute top-4 right-4 flex items-center gap-2">
+        {/* Three labelled pill buttons anchored right grow LEFTWARD — without a
+            wrap + width cap they ran off the card edge at 390px. */}
+        <div className="absolute top-4 right-4 flex max-w-[calc(100%-2rem)] flex-wrap items-center justify-end gap-2 sm:max-w-none sm:flex-nowrap">
           {/* Share / visibility toggle */}
           <Button
             variant="ghost"
@@ -382,7 +388,7 @@ export const MoodBoardDetailPage: React.FC = () => {
         </div>
 
         {/* Hero content — bottom aligned */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-8 pb-4 sm:pb-7">
+        <div className="relative pt-28 sm:pt-0 sm:absolute sm:bottom-0 sm:left-0 sm:right-0 px-4 sm:px-8 pb-4 sm:pb-7">
           {/* Title + description */}
           <h1 className="text-2xl sm:text-4xl font-light text-white mb-1 tracking-tight drop-shadow-lg">
             {moodboard.title}

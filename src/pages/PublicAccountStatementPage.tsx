@@ -169,6 +169,10 @@ const PublicAccountStatementPage: React.FC = () => {
               {data.invoices && data.invoices.length > 0 && (
                 <div className="rounded-md border overflow-hidden">
                   <div className="border-b px-4 py-2 text-sm font-medium flex items-center gap-2"><CreditCard className="h-4 w-4" /> Open invoices</div>
+                  {/* Mirrors the sibling table below — the font-mono invoice number
+                      is un-truncated, so a long internal_number pushed the page
+                      sideways without a scroll container. */}
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="text-xs text-muted-foreground">
                       <tr className="border-b">
@@ -191,6 +195,7 @@ const PublicAccountStatementPage: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
 

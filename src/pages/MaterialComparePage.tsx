@@ -292,7 +292,7 @@ export default function MaterialComparePage() {
             {/* Product headers */}
             <thead>
               <tr>
-                <th className="w-48 p-3 text-left align-bottom">
+                <th className="sticky left-0 z-20 w-48 bg-background p-3 text-left align-bottom">
                   <span className="text-sm text-muted-foreground font-normal">Property</span>
                 </th>
                 {products.map((p) => (
@@ -360,7 +360,7 @@ export default function MaterialComparePage() {
                     const diff = isDifferent(values);
                     return (
                       <tr key={`prop-${key}`} className={diff ? 'bg-accent/30' : ''}>
-                        <td className="p-3 text-sm text-muted-foreground align-top">
+                        <td className="sticky left-0 z-10 bg-background p-3 text-sm text-muted-foreground align-top">
                           <div className="flex items-center gap-1.5">
                             {diff ? (
                               <AlertCircle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
@@ -401,7 +401,7 @@ export default function MaterialComparePage() {
                     const diff = isDifferent(values);
                     return (
                       <tr key={`spec-${key}`} className={diff ? 'bg-accent/30' : ''}>
-                        <td className="p-3 text-sm text-muted-foreground align-top">
+                        <td className="sticky left-0 z-10 bg-background p-3 text-sm text-muted-foreground align-top">
                           <div className="flex items-center gap-1.5">
                             {diff ? (
                               <AlertCircle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />

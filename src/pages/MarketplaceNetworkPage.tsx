@@ -124,7 +124,11 @@ const MarketplaceNetworkPage: React.FC = () => {
           {loading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : (
-            <table className="w-full text-sm">
+            // 7 columns incl. a 150px select and a number input — intrinsic width
+            // ~700px. Without the scroll wrapper the whole DOCUMENT scrolled
+            // sideways at 390px and dragged the nav off with it.
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border/60">
                   <th className="px-4 py-2 text-left">Workspace</th>
@@ -206,6 +210,7 @@ const MarketplaceNetworkPage: React.FC = () => {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

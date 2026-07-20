@@ -126,8 +126,8 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                 <TableHead>Product</TableHead>
                 <TableHead>Cheapest Verified</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Last Check</TableHead>
-                <TableHead>Next Check</TableHead>
+                <TableHead className="hidden md:table-cell">Last Check</TableHead>
+                <TableHead className="hidden md:table-cell">Next Check</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -157,12 +157,12 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                         {tq.is_active ? 'active' : 'paused'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                       {tq.last_refreshed_at
                         ? new Date(tq.last_refreshed_at).toLocaleString()
                         : 'Never'}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                       {tq.next_check_at
                         ? new Date(tq.next_check_at).toLocaleString()
                         : '—'}

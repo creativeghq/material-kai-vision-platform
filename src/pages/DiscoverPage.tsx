@@ -318,7 +318,9 @@ function FactoryModal({
 
   return (
     <Dialog open={!!factory} onOpenChange={() => onClose()}>
-      <DialogContent hideClose className="no-card-hover w-[95vw] max-w-5xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[92vh] flex flex-col">
+      {/* 92dvh, not 92vh — 92% of the LARGE viewport puts the bottom of the
+          modal (the end of the products list) under mobile Safari's toolbar. */}
+      <DialogContent hideClose className="no-card-hover w-[95vw] max-w-5xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[92dvh] flex flex-col">
         {/* Banner */}
         <div
           className="h-28 sm:h-36 relative overflow-hidden shrink-0"
@@ -328,12 +330,15 @@ function FactoryModal({
           <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
 
           {/* Top-right controls */}
-          <div className="absolute top-3 right-3 flex items-center gap-1.5">
+          {/* `hideClose` on the DialogContent means this is the ONLY way out on
+              touch — 28px was under any usable tap target. */}
+          <div className="absolute top-2 right-2 flex items-center gap-1.5 sm:top-3 sm:right-3">
             <button
               onClick={onClose}
-              className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              aria-label="Close"
+              className="w-9 h-9 sm:w-7 sm:h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
             >
-              <X className="h-3.5 w-3.5 text-white" />
+              <X className="h-4 w-4 sm:h-3.5 sm:w-3.5 text-white" />
             </button>
           </div>
         </div>
