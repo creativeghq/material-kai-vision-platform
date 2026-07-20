@@ -52,7 +52,8 @@ suite('money paths · payments + credits', () => {
   const pay = (as: TestUser, args: Record<string, unknown>) =>
     as.client.rpc('record_payment_fx', {
       p_workspace_id: wsA, p_direction: 'in', p_amount: 100, p_currency: 'EUR',
-      p_fx_rate_to_base: 1, p_method: 'bank', p_paid_at: new Date().toISOString(),
+      // payments_method_check: bank_transfer | cash | card | check | other
+      p_fx_rate_to_base: 1, p_method: 'bank_transfer', p_paid_at: new Date().toISOString(),
       p_counterparty_contact_id: null, p_counterparty_company_id: null,
       p_reference: `E2E ${rid}`, p_notes: null, p_allocations: null,
       p_category_id: null, p_bank_account_id: null, p_order_id: null,
@@ -127,9 +128,15 @@ suite('money paths · payments + credits', () => {
     expect((deb as any)?.[0]?.success ?? (deb as any)?.success).toBe(true);
     expect(await balance(A.id)).toBe(70);
 
-    const { count } = await svc.from('credit_transactions')
-      .select('*', { count: 'exact', head: true }).eq('user_id', A.id).eq('operation_type', 'e2e_test');
-    expect(count, 'debit wrote no ledger row — balance and ledger would drift').toBeGreaterThan(0);
+    // The ledger has no `operation_type` column — the RPC stores it under metadata and stamps
+    // transaction_type='debit' with a NEGATIVE signed amount.
+    const { data: led } = await svc.from('credit_transactions')
+      .select('amount, transaction_type, balance_after, metadata')
+      .eq('user_id', A.id).eq('transaction_type', 'debit').order('created_at', { ascending: false }).limit(1);
+    expect(led?.length, 'debit wrote no ledger row — balance and ledger would drift').toBe(1);
+    expect(Number(led![0].amount)).toBe(-30);
+    expect(Number(led![0].balance_after)).toBe(70);
+    expect((led![0].metadata as any)?.operation_type).toBe('e2e_test');
 
     await svc.rpc('refund_credits', {
       p_user_id: A.id, p_amount: 30, p_operation_type: 'e2e_test',
