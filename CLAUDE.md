@@ -33,6 +33,30 @@ The catalog pipeline's layout+OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/Pa
 - **Manager + lifecycle**: [paddleocr_endpoint_manager.py](mivaa-pdf-extractor/app/services/pdf/paddleocr_endpoint_manager.py) (`PaddleOCRManager.from_config`, `run_structural_pass`=page mode — the only inference entrypoint; per-image OCR calls it on the crop. The old `run_block_ocr`=block wrapper was removed 2026-07-04 as unused, though the Modal `/parse` endpoint still supports `mode="block"`) holds inference + retry + `paddleocr_metrics` telemetry; lifecycle (warmup `/health` probe / scale-to-zero no-op) is delegated to `ModalEndpointProvider` in [endpoint_providers.py](mivaa-pdf-extractor/app/services/pdf/endpoint_providers.py) (Modal-only; SLIG now uses the same provider — see the SLIG→Modal section below). The registry's `get_paddleocr_manager` + `endpoint_controller`'s `paddleocr` gate + `warm_all` warm it alongside SLIG. Pricing `PADDLEOCR_PRICING`; admin monitor (`AsyncJobQueueMonitor`, `PlatformOverviewTab`) surfaces PaddleOCR. **Modal app deployed at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`** (app `paddleocr-vl`, workspace `basilakis`). The only required runtime secret is **`PADDLEOCR_MODAL_API_KEY`** (value of the `paddleocr-api-key` Modal secret; the URL is baked as the config default). Redeploy via `modal deploy modal_app/paddleocr_vl.py` (see [modal_app/README.md](mivaa-pdf-extractor/modal_app/README.md)). All wired in `deploy.yml`.
 - **Known residual**: `Image`/`Figure`/`chart` regions are crop sources but not OCR'd, so a product name rendered *inside* a photo is still not read. **Follow-up (not yet built): Voyage `voyage-multimodal-3` page embedding → `vecs.page_embeddings` (8th fusion vector)** for catalog-Q&A retrieval.
 
+## Data layering — the pipeline is Medallion; name the layers (2026-07-20)
+
+The PDF pipeline is a bronze→silver→gold refinement ladder. Naming it explicitly matters because **every cache/pipeline bug we've hit has been a layer violation** (the 2026-06-30 cache-first chunking fix was exactly this — Stage 2 was re-deriving from bronze what silver already held).
+
+| Layer | Tables / stores | Rule |
+|---|---|---|
+| **Bronze** (raw, immutable) | `pdf-documents` raw PDFs, `document_layout_analysis` (`processing_version='paddleocr-vl'`) | Never mutated. Re-run only when the source file changes. |
+| **Silver** (clean, conformed) | `document_chunks`, `document_images` (+ OCR / `vision_analysis`), `products.attributes_raw` | Derived from bronze. Rebuildable without re-uploading. |
+| **Gold** (business-ready) | `products`, `vecs.image_*_embeddings`, `products.attributes` (canonicalized), `facet_canonical_values` | Derived from silver. Rebuildable without re-running OCR. |
+
+**The rule: never re-derive from bronze what silver already holds; rebuild gold from silver.** This is why the understanding-embedding backfill, the aspect-embedding backfill, and `recanonicalize=true` are cheap — they rebuild gold in place. A new consumer that reaches past silver back to the PDF is a bug.
+
+Monitoring follows the same ladder: raw discovery hits → classified/deduped `tracked_query_price_history` / `mention_history` → the denormalized `current_*` cache on the subject row (a gold serving layer).
+
+**Do NOT build analytics rollup tables yet.** Measured 2026-07-20: `ai_usage_logs` is 4,120 rows / $5.98 lifetime — a rollup would be slower than the scan and pure maintenance overhead. **Revisit only when `ai_usage_logs` passes ~5M rows or a cost-dashboard query exceeds ~500 ms.** Same test before adding one for any other telemetry table.
+
+## Telemetry retention (2026-07-20)
+
+Log tables are bronze and need a TTL, enforced in SQL — never assume the writer is well-behaved.
+
+- **`system_logs`** — tiered via `prune_system_logs()` (cron `system-logs-daily-cleanup`, 02:00): **INFO kept 7d, WARNING+ kept 30d**. Batched at 50k rows/loop so a catch-up run never holds long locks. Retention keys off `created_at`, which now has `idx_system_logs_created_at` (it was seq-scanning nightly before).
+- **`api_usage_logs`** — `prune_api_usage_logs()` (cron `api-usage-logs-cleanup-daily`, 02:10): **90d**. It's a request audit trail; billing lives in `ai_usage_logs` / `credit_transactions`, which have **no** TTL by design.
+- **The DB log sink is filtered at the source.** `SupabaseLoggingHandler` is attached to the **root** logger, so without a denylist every third-party library logging at INFO writes a Postgres row. `_is_noise()` drops sub-WARNING records from `_DEFAULT_DENY_PREFIXES` (httpx, httpcore, urllib3, middleware, `app.middleware.error_logging`, …); **WARNING and above is never dropped, from any logger.** Tunable via env `SUPABASE_LOG_DENY_PREFIXES` (comma-separated) without a deploy. Before this, 99.8% of rows were INFO and 289k of 299k weekly rows came from 3 chatter loggers — 691 MB for ~714 rows of actual signal. **If you add a chatty INFO logger, add its prefix here, don't widen retention.**
+
 ## SLIG (SigLIP2) → Modal; HuggingFace fully removed (2026-06-14)
 SLIG — the platform's **visual encoder** (768D `visual` fusion vector in `vecs.image_slig_embeddings`, plus zero-shot + image⇄text similarity, plus text→visual query embedding on the realtime search path) — **moved off HuggingFace Inference Endpoints onto Modal**, mirroring the PaddleOCR-VL cutover. **HuggingFace now hosts NOTHING** — both GPU endpoints are Modal-only.
 - **Model truth corrected**: `basiliskan/slig` is a verbatim duplication of **`google/siglip2-base-patch16-512`** — stock SigLIP2 base, **native 768D, NO SO400M and NO 1152→768 projection head** (older docstrings were wrong; `config.json` is `model_type: "siglip"`, no `auto_map`). Bit-for-bit reproducible with stock `transformers`.
