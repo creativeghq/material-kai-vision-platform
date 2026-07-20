@@ -85,7 +85,14 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // documents. Deliberately NO crm.view / sales.portal / finance / anything else, so an employee
   // can never see another person's (e.g. a sales rep's) details. Data is further self-scoped in
   // hr-api's self- endpoints (the caller's own linked hr_employees row).
-  employee: ['hr.self'],
+  //
+  // `agent.use` is granted so the employee can reach My HR from chat via the self-scoped
+  // `manage_my_hr` tool ("how much leave do I have left?", "request 3 days off"). It opens the
+  // Agent Hub surface, NOT data: every toolkit is independently gated (module slug / adminOnly /
+  // capability), so an employee still only gets Core + My HR, and manage_my_hr takes no
+  // employee_id — hr-api resolves the subject from their own JWT. Note the cost side: agent use
+  // draws on the workspace's pooled credits, so an employee can spend the owner's balance.
+  employee: ['hr.self', 'agent.use'],
   // Project clients / referral end-users: their own work only, no business back-office.
   end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
 };
