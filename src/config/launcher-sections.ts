@@ -114,8 +114,8 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // (honored by pages/AgentHub.tsx independently of ?capability=). Labels after the colon MUST match
   // the toolkit quick_start `label` verbatim; the display label here is ours (image-neutral wording).
   'image-studio': [
-    { label: 'Edit an image', to: '/agent-hub?agent=interior-designer&generation_mode=image-edit&quickstart=generation:Edit%20a%20photo', icon: Wand2 },
-    { label: 'Re-light an image', to: '/agent-hub?agent=interior-designer&quickstart=generation:Re-light%20a%20room', icon: Lightbulb },
+    { label: 'Edit an image', to: '/agent-hub?capability=image-studio&generation_mode=image-edit&quickstart=generation:Edit%20a%20photo', icon: Wand2 },
+    { label: 'Re-light an image', to: '/agent-hub?capability=image-studio&quickstart=generation:Re-light%20a%20room', icon: Lightbulb },
   ],
   // Automations (nav id 'automations', route /automations). The page has no URL tabs and creating a
   // flow is an agent flow (not a page modal), so this surfaces the real `flows-toolkit` quick-starts.

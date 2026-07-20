@@ -54,6 +54,10 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'moodboard', label: 'MoodBoards', hub: 'studio', pageRoute: '/moodboard', recordTable: 'moodboards' },
   { id: 'project', label: 'Projects', hub: 'studio', pageRoute: '/projects', agentId: 'kai', agentTool: 'create_project', toolkitId: 'projects', recordTable: 'projects' },
   { id: 'catalog', label: 'Catalogs', hub: 'studio', pageRoute: '/admin/catalogs', agentId: 'product-business', agentTool: 'create_catalog', toolkitId: 'catalogs', recordTable: 'presentation_catalogs', canvasKind: 'catalog', moduleSlug: 'presentation-catalogs' },
+  // Image Studio — agent-only (no page). Shares the `generation` engine with Interior Design; the
+  // nav path adds &generation_mode=image-edit to prime the image pipeline. No distinct agentTool
+  // exists yet (the toolkit's quick-starts are the surface) — that's a real fabric gap, not a stub.
+  { id: 'image-studio', label: 'Image Studio', hub: 'studio', agentId: 'interior-designer', toolkitId: 'generation', canvasKind: 'image' },
 
   // ── Marketing ──
   { id: 'social-post', label: 'Social Post', hub: 'marketing', agentId: 'social-media', agentTool: 'manage_social', toolkitId: 'social', recordTable: 'social_posts', moduleSlug: 'social-media' },
@@ -71,14 +75,20 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'quote', label: 'Quote', hub: 'sales', pageRoute: '/quotes', agentId: 'erp', agentTool: 'create_quote', toolkitId: 'quotes', recordTable: 'quotes', canvasKind: 'quote', moduleSlug: 'quotes' },
   { id: 'crm-company', label: 'CRM Company', hub: 'sales', pageRoute: '/crm', agentId: 'kai', agentTool: 'create_company_from_vat', toolkitId: 'crm', recordTable: 'crm_companies', moduleSlug: 'crm' },
   { id: 'appointments', label: 'Appointments', hub: 'sales', pageRoute: '/profile?tab=calendar', agentId: 'kai', agentTool: 'manage_appointments', toolkitId: 'appointments', quickStartLabel: 'This week', recordTable: 'crm_meetings', moduleSlug: 'crm' },
+  // Sales rep portal — page-only today; no agent tool exists for it yet (fabric gap).
+  { id: 'sales', label: 'Sales', hub: 'sales', pageRoute: '/sales' },
 
   // ── Finance ──
   { id: 'invoice', label: 'Invoice', hub: 'finance', pageRoute: '/finance', agentId: 'kai', agentTool: 'manage_finance', toolkitId: 'finance', recordTable: 'invoices', moduleSlug: 'sales-finance' },
+  // App-level Finance (the `invoice` entry above is the record-level capability on the same page).
+  { id: 'finance', label: 'Finance', hub: 'finance', pageRoute: '/finance', agentId: 'kai', agentTool: 'manage_finance', toolkitId: 'finance', moduleSlug: 'sales-finance' },
   { id: 'contract', label: 'Contracts', hub: 'finance', pageRoute: '/contracts', agentId: 'erp', agentTool: 'manage_contracts', toolkitId: 'contracts', recordTable: 'contracts', moduleSlug: 'contracts' },
   { id: 'warehouse', label: 'Warehouse', hub: 'finance', pageRoute: '/warehouse', agentId: 'kai', agentTool: 'manage_stock', toolkitId: 'stock', moduleSlug: 'stock' },
 
   // ── People ──
   { id: 'hr', label: 'HR', hub: 'people', pageRoute: '/hr', agentId: 'kai', agentTool: 'manage_hr', toolkitId: 'hr', moduleSlug: 'hr' },
+  // Employee self-service — page-only by design (an employee's own record); no agent tool.
+  { id: 'my-hr', label: 'My HR', hub: 'people', pageRoute: '/my-hr' },
 ];
 
 const BY_ID = new Map(CAPABILITIES.map((c) => [c.id, c]));

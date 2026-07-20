@@ -125,7 +125,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Image Studio — general image generation/editing (Vision + Gemini pipeline), for marketing
   // visuals / product shots / social imagery, distinct from the room-focused Interior tile. Reuses
   // the existing generation engine; opens the studio with the image pipeline (image-edit) primed.
-  { id: 'image-studio', label: 'Image Studio', path: '/agent-hub?agent=interior-designer&generation_mode=image-edit', icon: ImagePlus, requireCapability: 'agent.use', surface: 'app', hub: 'studio', description: 'Generate & edit product shots and marketing visuals — in the AI studio.' },
+  { id: 'image-studio', label: 'Image Studio', path: '/agent-hub?capability=image-studio&generation_mode=image-edit', icon: ImagePlus, requireCapability: 'agent.use', surface: 'app', hub: 'studio', description: 'Generate & edit product shots and marketing visuals — in the AI studio.' },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', hub: 'sales', description: 'Build and send client quotes.' },
   // #201 — Sales portal for invited reps (persona 'sales').
   { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', hub: 'sales', description: 'Sales-rep portal for quotes.' },
