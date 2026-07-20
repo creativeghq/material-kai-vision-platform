@@ -295,18 +295,35 @@ jobs:
           echo "🔧 Project: $PROJECT_REF"
           echo ""
 
+          # Bundling resolves remote imports (esm.sh, deno.land) at deploy time, so a CDN blip
+          # fails a function that is perfectly fine. Observed 2026-07-20: finance-pay-invoice and
+          # generate-quote-pdf both died on `Import 'https://esm.sh/…' failed: 522` while the
+          # other 94 deployed. Retry transient failures before declaring the deploy broken —
+          # a red deploy nobody can act on trains people to ignore red deploys.
           deploy_one() {
             local name="$1"
             local log="/tmp/deploy-logs/$name.log"
-            if supabase functions deploy "$name" --no-verify-jwt --project-ref "$PROJECT_REF" >"$log" 2>&1; then
-              echo "✅ $name"
-            else
-              echo "❌ $name"
-              echo "$name" >> "$FAILED_FILE"
-              echo "─── log: $name ───"
-              tail -n 40 "$log"
-              echo "─── end log: $name ───"
-            fi
+            local attempt
+            for attempt in 1 2 3; do
+              if supabase functions deploy "$name" --no-verify-jwt --project-ref "$PROJECT_REF" >"$log" 2>&1; then
+                if [ "$attempt" -gt 1 ]; then echo "✅ $name (attempt $attempt)"; else echo "✅ $name"; fi
+                return 0
+              fi
+              # Only retry network/CDN-shaped failures; a genuine code error must fail FAST and
+              # loud rather than burn three attempts and bury the real message.
+              if grep -qiE '5[0-9]{2} <unknown status code>|failed to create the graph|connection (closed|reset)|timed out|error sending request' "$log" \
+                 && [ "$attempt" -lt 3 ]; then
+                echo "⏳ $name — transient bundling failure, retrying ($attempt/3)"
+                sleep $((attempt * 10))
+                continue
+              fi
+              break
+            done
+            echo "❌ $name"
+            echo "$name" >> "$FAILED_FILE"
+            echo "─── log: $name ───"
+            tail -n 40 "$log"
+            echo "─── end log: $name ───"
           }
           export -f deploy_one
           export PROJECT_REF SUPABASE_ACCESS_TOKEN
