@@ -266,6 +266,14 @@ const AGENTS: AgentDefinition[] = [
 // #245 E — chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
+  // My HR (employee self-service). These MUST be registered: a quick-start with `run` is a
+  // deterministic direct tool call that skips the LLM, so there is no narration fallback — an
+  // unregistered chunk is dropped and the user just sees "Done — ran manage_my_hr" with no data.
+  my_hr_profile: 'My HR profile',
+  my_hr_timeoff: 'My time off',
+  my_hr_timeoff_requested: 'Time-off request submitted',
+  my_hr_documents: 'My HR documents',
+  my_hr_punches: 'My clock-ins',
   // Price monitoring
   price_tracking_started: 'Price tracking started',
   price_summary: 'Competitor prices',
