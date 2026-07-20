@@ -12,6 +12,7 @@ import {
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
   Calculator, Flame, Thermometer,
   Radar, Search, PenTool,
+  Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -107,7 +108,23 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Keyword research', to: '/agent-hub?capability=seo-research', icon: Search },
     { label: 'Write an article', to: '/agent-hub?capability=seo-article', icon: PenTool },
   ],
-  // Sales/Inbox/Automations have no URL tabs → Open-only.
+  // Image Studio (agent app). Its path uses ?generation_mode= rather than ?capability=, so the
+  // launcher's capability-quickstart fallback can't resolve anything → it rendered empty. These
+  // deep-link straight into real `generation` toolkit quick-starts via `?quickstart=<toolkit>:<label>`
+  // (honored by pages/AgentHub.tsx independently of ?capability=). Labels after the colon MUST match
+  // the toolkit quick_start `label` verbatim; the display label here is ours (image-neutral wording).
+  'image-studio': [
+    { label: 'Edit an image', to: '/agent-hub?agent=interior-designer&generation_mode=image-edit&quickstart=generation:Edit%20a%20photo', icon: Wand2 },
+    { label: 'Re-light an image', to: '/agent-hub?agent=interior-designer&quickstart=generation:Re-light%20a%20room', icon: Lightbulb },
+  ],
+  // Automations (nav id 'automations', route /automations). The page has no URL tabs and creating a
+  // flow is an agent flow (not a page modal), so this surfaces the real `flows-toolkit` quick-starts.
+  automations: [
+    { label: 'My flows', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:My%20flows', icon: ListChecks },
+    { label: 'Pause a flow', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:Pause%20a%20flow', icon: PauseCircle },
+  ],
+  // Sales/Inbox have no URL tabs → Open-only. My HR is Open-only too: EmployeeSelfServicePage uses
+  // Tabs `defaultValue` and never reads ?tab=, so a tab deep-link would be inert.
 };
 
 // Right-column context-aware quick-CREATE triggers, keyed by SidebarNavItem.id. Each `to` carries a
@@ -150,6 +167,12 @@ export const LAUNCHER_ACTIONS: Record<string, LauncherSection[]> = {
   'email-marketing': [
     { label: 'New Campaign', to: '/marketing/email?new=campaign', icon: Megaphone },
     { label: 'New Template', to: '/marketing/email?tab=templates&new=template', icon: LayoutTemplate },
+  ],
+  // Automations has no page create-modal (a flow is built by the agent), so this create trigger is
+  // an agent deep-link into the flows-toolkit "Create a flow" quick-start, which opens a real
+  // guided form (name / trigger / action) and then runs manage_flows. Wired, not inert.
+  automations: [
+    { label: 'New automation', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:Create%20a%20flow', icon: Workflow },
   ],
 };
 
