@@ -90,13 +90,11 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
 
   // ── People ──
   { id: 'hr', label: 'HR', hub: 'people', pageRoute: '/hr', agentId: 'kai', agentTool: 'manage_hr', toolkitId: 'hr', moduleSlug: 'hr' },
-  // Employee self-service — page-only ON PURPOSE, not an oversight. The only HR tool is `manage_hr`,
-  // whose actions are manager-facing (list_employees / overview / who_is_on_leave / record_absence /
-  // add_employee) and RBAC-gated on hr.view (writes admin-only). My HR is gated on hr.self, so the
-  // self-service persona has no hr.view and calling manage_hr would 403 for exactly the user of this
-  // page. Wiring it here would be broken UI. Needs a self-scoped tool (my absences / request leave)
-  // before it can join the agent rail.
-  { id: 'my-hr', label: 'My HR', hub: 'people', pageRoute: '/my-hr' },
+  // Employee self-service. Deliberately NOT wired to `manage_hr` — that one is manager-facing and
+  // RBAC-gated on hr.view, which the hr.self persona doesn't have (it would 403 for exactly this
+  // page's user). Instead it uses `manage_my_hr`, whose every action hr-api hard-scopes to the
+  // caller's own hr_employees row, so an employee can reach their own record and never a colleague's.
+  { id: 'my-hr', label: 'My HR', hub: 'people', pageRoute: '/my-hr', agentId: 'kai', agentTool: 'manage_my_hr', toolkitId: 'my-hr', moduleSlug: 'hr' },
 ];
 
 const BY_ID = new Map(CAPABILITIES.map((c) => [c.id, c]));

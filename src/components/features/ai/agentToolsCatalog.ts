@@ -1429,6 +1429,50 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    // Employee self-service counterpart of the `hr` toolkit below. NOT adminOnly — this is for the
+    // hr.self persona (an invited employee with no hr.view/hr.manage). Every action is hard-scoped
+    // server-side to the caller's own hr_employees row, so it can never read a colleague.
+    id: 'my-hr',
+    name: 'My HR',
+    description: 'Your own HR record from chat: leave balance, your absences, request time off, your documents and clock-ins.',
+    icon: 'Users',
+    moduleSlug: 'hr',
+    tool_ids: ['manage_my_hr'],
+    quick_starts: [
+      {
+        label: 'My leave balance', description: 'Allowance, taken and remaining days', icon: 'CalendarOff',
+        prompt: 'How much leave do I have left?',
+        run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_profile' } },
+      },
+      {
+        label: 'My time off', description: 'Your absences and their approval status', icon: 'ListChecks',
+        prompt: 'Show my time off and the status of each request.',
+        run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_timeoff' } },
+      },
+      {
+        label: 'Request time off', description: 'Submit a leave request for approval', icon: 'CalendarPlus',
+        prompt: 'Request time off.',
+        run: { tool: 'manage_my_hr', fixedArgs: { action: 'request_timeoff' } },
+        form: [
+          { key: 'absence_type', label: 'Type', kind: 'select', default: 'vacation', options: [
+            { value: 'vacation', label: 'Vacation' },
+            { value: 'sick', label: 'Sick' },
+            { value: 'unpaid', label: 'Unpaid' },
+            { value: 'other', label: 'Other' },
+          ] },
+          { key: 'start_date', label: 'First day', kind: 'text', required: true, placeholder: 'YYYY-MM-DD' },
+          { key: 'end_date', label: 'Last day (inclusive)', kind: 'text', required: true, placeholder: 'YYYY-MM-DD' },
+          { key: 'note', label: 'Note for HR (optional)', kind: 'textarea', placeholder: 'e.g. family trip' },
+        ],
+      },
+      {
+        label: 'My documents', description: 'Your HR documents', icon: 'FolderKanban',
+        prompt: 'List my HR documents.',
+        run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_documents' } },
+      },
+    ],
+  },
+  {
     id: 'hr',
     name: 'HR',
     description: 'Ask about your team and log absences from chat: who\'s on leave, HR overview, record a sick/vacation day, add an employee.',
@@ -2248,7 +2292,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   // Studio
   catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', generation: 'studio',
   // People
-  hr: 'people',
+  hr: 'people', 'my-hr': 'people',
 };
 
 export function getToolkitHub(id: string): HubId | undefined {

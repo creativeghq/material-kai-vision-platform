@@ -939,6 +939,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_flows',
       // HR toolkit (#252; module-gated hr + workspace entitlement; owner/admin RBAC enforced in hr-api)
       'manage_hr',
+      // Employee HR self-service — for the hr.self persona (no hr.view/hr.manage). Hard-scoped to
+      // the caller's own hr_employees row inside hr-api; cannot address another employee.
+      'manage_my_hr',
       // Stock toolkit (module-gated stock + workspace entitlement; finance-manager RBAC enforced in stock-api)
       'manage_stock',
       // Sourcing / fulfillment (#237; RPC-gated — resolve=member, create_po=finance-manager; 0 cr)
@@ -1241,6 +1244,9 @@ async function executeAgent(
     'hr': {
       tool_ids: ['manage_hr'],
     },
+    'my-hr': {
+      tool_ids: ['manage_my_hr'],
+    },
     'stock': {
       tool_ids: ['manage_stock'],
     },
@@ -1514,6 +1520,7 @@ async function executeAgent(
   const needsSourcing = config.tools.some((t: string) => ['source_product', 'create_purchase_order', 'send_purchase_order'].includes(t));
   const needsFlows = config.tools.includes('manage_flows');
   const needsHr = config.tools.includes('manage_hr');
+  const needsMyHr = config.tools.includes('manage_my_hr');
   const needsStock = config.tools.includes('manage_stock');
   const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat'].includes(t));
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
@@ -1528,7 +1535,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1549,6 +1556,7 @@ async function executeAgent(
     needsDocs         ? import('../_shared/tools/docs-tools.ts') : null,
     needsFlows        ? import('../_shared/tools/flow-tools.ts') : null,
     needsHr           ? import('../_shared/tools/hr-tools.ts') : null,
+    needsMyHr         ? import('../_shared/tools/my-hr-tools.ts') : null,
     needsStock        ? import('../_shared/tools/stock-tools.ts') : null,
     needsCrm          ? import('../_shared/tools/crm-tools.ts') : null,
     needsQuotes       ? import('../_shared/tools/quote-tools.ts') : null,
@@ -1650,6 +1658,7 @@ async function executeAgent(
   const createManageAppointmentsTool = appointmentsMod?.createManageAppointmentsTool;
   const createManageFlowsTool = flowsMod?.createManageFlowsTool;
   const createManageHrTool = hrToolsMod?.createManageHrTool;
+  const createManageMyHrTool = myHrToolsMod?.createManageMyHrTool;
   const createManageStockTool = stockToolsMod?.createManageStockTool;
   const createCreateQuoteTool = quotesMod?.createCreateQuoteTool;
   const createGenerateQuotePdfTool = quotesMod?.createGenerateQuotePdfTool;
@@ -1953,6 +1962,9 @@ async function executeAgent(
     tools.push(createManageFlowsTool(userId, workspaceId, userJwt, onChunk));
   }
   // HR toolkit (#252; module-gated hr + entitlement; owner/admin RBAC enforced server-side in hr-api)
+  if (config.tools.includes('manage_my_hr') && createManageMyHrTool) {
+    tools.push(createManageMyHrTool(userId, workspaceId, userJwt, onChunk));
+  }
   if (config.tools.includes('manage_hr') && createManageHrTool) {
     tools.push(createManageHrTool(userId, workspaceId, userJwt, onChunk));
   }
