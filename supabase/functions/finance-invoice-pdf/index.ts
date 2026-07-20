@@ -13,7 +13,8 @@ import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage, type RGB } from 
 import fontkit from '@pdf-lib/fontkit';
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
+import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getSpec, resolveColorsHex, toPdfColors, hexToRgb, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
 
@@ -126,13 +127,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
-  if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
-
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
+  // Body is parsed BEFORE auth so we can tell an internal receipt call apart from a
+  // user-driven render (the two authenticate differently — see below).
   let kind: 'invoice' | 'credit_note' | 'delivery_note' | 'payment_receipt' = 'invoice';
   let docId = '';
   let regenerate = false;
@@ -148,6 +144,26 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     return json({ error: 'invalid body' }, 400);
   }
 
+  // Service-to-service: the Stripe webhook has no user, so it can't mint the payment
+  // receipt the way the finance UI does. A trusted internal caller (service-role or a
+  // valid x-cron-secret) may generate a PAYMENT RECEIPT — and nothing else. Every other
+  // document kind still requires a finance user, and the payment_id fully determines the
+  // workspace server-side, so no caller-supplied tenancy is ever trusted.
+  const internal = kind === 'payment_receipt' && isCronAuthorized(req);
+  let authUserId: string | null = null;
+  if (!internal) {
+    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
+    if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
+    authUserId = auth.userId;
+  } else {
+    // authenticate() normally does this; internal calls must bootstrap secrets themselves.
+    await bootstrapForFunction();
+  }
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
   const TABLE = kind === 'credit_note' ? 'credit_notes' : kind === 'delivery_note' ? 'delivery_notes' : kind === 'payment_receipt' ? 'payments' : 'invoices';
   const OUT = kind === 'credit_note' ? 'credit-note-output' : kind === 'delivery_note' ? 'delivery-note-output' : kind === 'payment_receipt' ? 'payment-receipt-output' : 'invoice-output';
   const PREFIX = kind === 'credit_note' ? 'cn' : kind === 'delivery_note' ? 'dn' : kind === 'payment_receipt' ? 'pr' : 'inv';
@@ -155,7 +171,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   const { data: row } = await supabase.from(TABLE).select('*').eq('id', docId).maybeSingle();
   if (!row) return json({ error: `${kind} not found` }, 404);
   // Tenancy: a finance user may only render documents in a workspace they belong to.
-  if (!(await userCanAccessWorkspace(supabase, auth.userId, row.workspace_id))) {
+  // (Internal receipt calls have no user; their trust comes from the service secret.)
+  if (!internal && !(await userCanAccessWorkspace(supabase, authUserId, row.workspace_id))) {
     return json({ error: 'Not authorized for this document' }, 403);
   }
 

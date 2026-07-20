@@ -621,8 +621,10 @@ async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent
     }).catch(() => {});
   }
 
-  // Customer-facing: notify + email the buyer that their payment was received (seeded flow).
+  // Customer-facing: notify + email the buyer that their payment was received (seeded flow),
+  // carrying the seller's own branded receipt — same document a manual payment produces.
   const cust = (inv.company ?? inv.contact) as { email?: string; name?: string } | null;
+  const receiptUrl = await generatePaymentReceipt(paymentRow.id);
   await emitFlowEvent('payment_received', {
     type: 'payment_received',
     customer_email: cust?.email ?? undefined,
@@ -632,7 +634,8 @@ async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent
     amount: `${amount.toFixed(2)} ${currency}`,
     currency,
     workspace_id: inv.workspace_id,
-    receipt_line: '', // receipt PDF is generated from the finance UI (service-role can't mint it here)
+    receipt_url: receiptUrl ?? undefined,
+    receipt_line: receiptLineFor(receiptUrl),
     title: `Payment received — ${amount.toFixed(2)} ${currency}`,
     body: `We received your payment of ${amount.toFixed(2)} ${currency} for invoice ${inv.internal_number}.`,
     action_url: `/finance/invoices/${inv.id}`,
@@ -717,6 +720,7 @@ async function handleStatementPaymentSucceeded(paymentIntent: Stripe.PaymentInte
   const { data: partyRow } = await supabase
     .from(isCompany ? 'crm_companies' : 'crm_contacts')
     .select('email, name').eq('id', partyId).maybeSingle();
+  const stmtReceiptUrl = await generatePaymentReceipt(paymentRow.id);
   await emitFlowEvent('payment_received', {
     type: 'payment_received',
     customer_email: (partyRow as any)?.email ?? undefined,
@@ -725,13 +729,51 @@ async function handleStatementPaymentSucceeded(paymentIntent: Stripe.PaymentInte
     amount: `${amount.toFixed(2)} ${currency}`,
     currency,
     workspace_id: workspaceId,
-    receipt_line: '',
+    receipt_url: stmtReceiptUrl ?? undefined,
+    receipt_line: receiptLineFor(stmtReceiptUrl),
     title: `Payment received — ${amount.toFixed(2)} ${currency}`,
     body: `We received your account payment of ${amount.toFixed(2)} ${currency}. Thank you.`,
     action_url: '/finance',
   }).catch(() => {});
 
   console.log(`Recorded statement balance payment ${paymentRow.id} (${amount} ${currency}); allocated to ${allocations.length} invoice(s), ${remaining.toFixed(2)} on account`);
+}
+
+/**
+ * Generate the seller's own payment receipt (απόδειξη είσπραξης) for a payment we just
+ * recorded, and return a link to it. Online payments used to skip this entirely — the
+ * customer got only Stripe's generic receipt, never the workspace-branded document that
+ * manually-recorded payments produce. `finance-invoice-pdf` accepts a service call
+ * (x-cron-secret) for payment receipts specifically, since a webhook has no user.
+ *
+ * Best-effort by design: a receipt failure must never fail the webhook (Stripe would
+ * retry the whole delivery). We just fall back to a receipt-less notification.
+ */
+async function generatePaymentReceipt(paymentId: string): Promise<string | null> {
+  try {
+    const base = Deno.env.get('SUPABASE_URL');
+    const secret = Deno.env.get('CRON_SECRET');
+    if (!base || !secret) return null;
+    const res = await fetch(`${base}/functions/v1/finance-invoice-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
+      body: JSON.stringify({ payment_id: paymentId }),
+    });
+    if (!res.ok) {
+      console.error(`payment receipt generation failed (${res.status}) for ${paymentId}`);
+      return null;
+    }
+    const out = await res.json();
+    return (out?.pdf_url as string) ?? null;
+  } catch (err) {
+    console.error('payment receipt generation threw', err);
+    return null;
+  }
+}
+
+/** Customer-facing "download your receipt" line for the payment_received email. */
+function receiptLineFor(url: string | null): string {
+  return url ? `<p><a href="${url}">Download your receipt</a></p>` : '';
 }
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
