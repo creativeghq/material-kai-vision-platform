@@ -624,22 +624,24 @@ async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent
   // Customer-facing: notify + email the buyer that their payment was received (seeded flow),
   // carrying the seller's own branded receipt — same document a manual payment produces.
   const cust = (inv.company ?? inv.contact) as { email?: string; name?: string } | null;
-  const receiptUrl = await generatePaymentReceipt(paymentRow.id);
-  await emitFlowEvent('payment_received', {
-    type: 'payment_received',
-    customer_email: cust?.email ?? undefined,
-    customer_name: cust?.name ?? undefined,
-    invoice_id: inv.id,
-    payment_id: paymentRow.id,
-    amount: `${amount.toFixed(2)} ${currency}`,
-    currency,
-    workspace_id: inv.workspace_id,
-    receipt_url: receiptUrl ?? undefined,
-    receipt_line: receiptLineFor(receiptUrl),
-    title: `Payment received — ${amount.toFixed(2)} ${currency}`,
-    body: `We received your payment of ${amount.toFixed(2)} ${currency} for invoice ${inv.internal_number}.`,
-    action_url: `/finance/invoices/${inv.id}`,
-  }).catch(() => {});
+  await runInBackground((async () => {
+    const receiptUrl = await generatePaymentReceipt(paymentRow.id);
+    await emitFlowEvent('payment_received', {
+      type: 'payment_received',
+      customer_email: cust?.email ?? undefined,
+      customer_name: cust?.name ?? undefined,
+      invoice_id: inv.id,
+      payment_id: paymentRow.id,
+      amount: `${amount.toFixed(2)} ${currency}`,
+      currency,
+      workspace_id: inv.workspace_id,
+      receipt_url: receiptUrl ?? undefined,
+      receipt_line: receiptLineFor(receiptUrl),
+      title: `Payment received — ${amount.toFixed(2)} ${currency}`,
+      body: `We received your payment of ${amount.toFixed(2)} ${currency} for invoice ${inv.internal_number}.`,
+      action_url: `/finance/invoices/${inv.id}`,
+    }).catch(() => {});
+  })());
 }
 
 /**
@@ -720,21 +722,23 @@ async function handleStatementPaymentSucceeded(paymentIntent: Stripe.PaymentInte
   const { data: partyRow } = await supabase
     .from(isCompany ? 'crm_companies' : 'crm_contacts')
     .select('email, name').eq('id', partyId).maybeSingle();
-  const stmtReceiptUrl = await generatePaymentReceipt(paymentRow.id);
-  await emitFlowEvent('payment_received', {
-    type: 'payment_received',
-    customer_email: (partyRow as any)?.email ?? undefined,
-    customer_name: (partyRow as any)?.name ?? undefined,
-    payment_id: paymentRow.id,
-    amount: `${amount.toFixed(2)} ${currency}`,
-    currency,
-    workspace_id: workspaceId,
-    receipt_url: stmtReceiptUrl ?? undefined,
-    receipt_line: receiptLineFor(stmtReceiptUrl),
-    title: `Payment received — ${amount.toFixed(2)} ${currency}`,
-    body: `We received your account payment of ${amount.toFixed(2)} ${currency}. Thank you.`,
-    action_url: '/finance',
-  }).catch(() => {});
+  await runInBackground((async () => {
+    const stmtReceiptUrl = await generatePaymentReceipt(paymentRow.id);
+    await emitFlowEvent('payment_received', {
+      type: 'payment_received',
+      customer_email: (partyRow as any)?.email ?? undefined,
+      customer_name: (partyRow as any)?.name ?? undefined,
+      payment_id: paymentRow.id,
+      amount: `${amount.toFixed(2)} ${currency}`,
+      currency,
+      workspace_id: workspaceId,
+      receipt_url: stmtReceiptUrl ?? undefined,
+      receipt_line: receiptLineFor(stmtReceiptUrl),
+      title: `Payment received — ${amount.toFixed(2)} ${currency}`,
+      body: `We received your account payment of ${amount.toFixed(2)} ${currency}. Thank you.`,
+      action_url: '/finance',
+    }).catch(() => {});
+  })());
 
   console.log(`Recorded statement balance payment ${paymentRow.id} (${amount} ${currency}); allocated to ${allocations.length} invoice(s), ${remaining.toFixed(2)} on account`);
 }
@@ -774,6 +778,28 @@ async function generatePaymentReceipt(paymentId: string): Promise<string | null>
 /** Customer-facing "download your receipt" line for the payment_received email. */
 function receiptLineFor(url: string | null): string {
   return url ? `<p><a href="${url}">Download your receipt</a></p>` : '';
+}
+
+/**
+ * Run follow-up work AFTER the webhook has already answered Stripe.
+ *
+ * Stripe gives a delivery ~10s before it times out and retries. Rendering a receipt PDF
+ * (font fetch + layout) is slow enough to eat into that, and it is not something Stripe
+ * needs to know about — the payment row is already committed by the time we get here.
+ * `EdgeRuntime.waitUntil` keeps the worker alive past the response so the receipt + email
+ * still complete, while Stripe gets its 200 immediately.
+ *
+ * Falls back to awaiting inline where the runtime doesn't support it (local dev), so the
+ * behaviour is identical, just slower.
+ */
+function runInBackground(work: Promise<unknown>): Promise<void> {
+  const guarded = work.catch((err) => console.error('[stripe-webhooks] background task failed', err));
+  const rt = (globalThis as any).EdgeRuntime;
+  if (typeof rt?.waitUntil === 'function') {
+    rt.waitUntil(guarded);
+    return Promise.resolve();
+  }
+  return guarded as Promise<void>;
 }
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
