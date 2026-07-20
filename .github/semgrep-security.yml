@@ -4,15 +4,20 @@
 rules:
   # ── J · XSS / output encoding (invariant 11) ────────────────────────────────
   - id: no-dangerously-set-inner-html
-    languages: [typescript, tsx, javascript]
+    languages: [typescript, javascript]
     severity: ERROR
     message: >
       XSS (#250 J / invariant 11): dangerouslySetInnerHTML renders raw HTML. Use JSX or
       react-markdown (WITHOUT rehype-raw), or escape with the esc() helper.
-    pattern: dangerouslySetInnerHTML={=~/.*/}
+    # `dangerouslySetInnerHTML={=~/.*/}` (the original) matches NOTHING — verified against a
+    # probe component. It has to be anchored to the JSX element, in both the self-closing and
+    # with-children forms, with `...` around it so other props don't defeat the match.
+    pattern-either:
+      - pattern: <$EL ... dangerouslySetInnerHTML={...} ... />
+      - pattern: <$EL ... dangerouslySetInnerHTML={...} ...>...</$EL>
 
   - id: no-document-write
-    languages: [typescript, tsx, javascript]
+    languages: [typescript, javascript]
     severity: ERROR
     message: >
       XSS (#250 J1): document.write() with app/user content runs in the page origin and
@@ -20,7 +25,7 @@ rules:
     pattern: document.write(...)
 
   - id: no-rehype-raw
-    languages: [typescript, tsx, javascript]
+    languages: [typescript, javascript]
     severity: ERROR
     message: "XSS (#250 J / invariant 11): rehype-raw renders raw HTML from markdown — do not use."
     pattern-either:

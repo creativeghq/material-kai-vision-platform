@@ -25,6 +25,37 @@ describe('semgrep security ruleset', () => {
     expect(() => parse(raw), 'semgrep-security.yml does not parse — semgrep would load 0 rules').not.toThrow();
   });
 
+  // Semgrep has no `tsx` / `jsx` language — the ruleset declared `tsx` and semgrep rejected the
+  // WHOLE config (UnknownLanguageError), which report-only hid. `.tsx` files are covered by
+  // `typescript`; verified by scanning a probe component.
+  const VALID_LANGUAGES = new Set([
+    'typescript', 'ts', 'javascript', 'js', 'python', 'py', 'python3',
+    'json', 'yaml', 'html', 'sql', 'bash', 'sh', 'go', 'ruby', 'java', 'generic', 'regex',
+  ]);
+
+  it('declares only language identifiers semgrep accepts', () => {
+    const doc = parse(raw) as { rules: Array<{ id: string; languages: string[] }> };
+    const bad = doc.rules.flatMap((r) =>
+      (r.languages ?? []).filter((l) => !VALID_LANGUAGES.has(l)).map((l) => `${r.id}: ${l}`));
+    expect(
+      bad,
+      `Unknown semgrep language(s). semgrep rejects the ENTIRE config on one bad language, ` +
+        `so every rule silently stops running. Note there is no 'tsx'/'jsx' — '.tsx' is covered ` +
+        `by 'typescript'.`,
+    ).toEqual([]);
+  });
+
+  it('keeps the JSX rules anchored to an element (the empty-pattern trap)', () => {
+    // `dangerouslySetInnerHTML={=~/.*/}` parsed fine and matched NOTHING for months. A pattern
+    // that cannot match is indistinguishable from a clean codebase, so pin the working shape.
+    const doc = parse(raw) as { rules: Array<{ id: string; 'pattern-either'?: Array<{ pattern: string }> }> };
+    const rule = doc.rules.find((r) => r.id === 'no-dangerously-set-inner-html');
+    expect(rule, 'the dangerouslySetInnerHTML rule is gone').toBeTruthy();
+    const pats = (rule!['pattern-either'] ?? []).map((p) => p.pattern).join('\n');
+    expect(pats, 'pattern must anchor to a JSX element or it matches nothing').toContain('<$EL');
+    expect(pats).toContain('dangerouslySetInnerHTML');
+  });
+
   it('defines rules, each with the fields semgrep requires', () => {
     const doc = parse(raw) as { rules?: Array<Record<string, unknown>> };
     expect(Array.isArray(doc.rules), 'no `rules:` array').toBe(true);
