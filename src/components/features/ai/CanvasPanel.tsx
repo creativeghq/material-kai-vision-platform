@@ -13,7 +13,7 @@
 import React from 'react';
 import {
   FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video, Sofa,
-  PanelRightClose, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
+  PanelRightClose, ArrowLeft, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
   Wand2, Calculator,
 } from 'lucide-react';
@@ -89,14 +89,34 @@ interface CanvasPanelProps {
   children?: React.ReactNode;
   /** Contextual detail panel for the active artifact (issue #253 P3). */
   inspector?: React.ReactNode;
+  /**
+   * Single-pane (mobile) mode. The canvas takes the whole screen instead of
+   * sharing it with the chat rail, so the close control reads as "back to chat"
+   * and the inspector stacks under the artifact instead of docking beside it.
+   */
+  singlePane?: boolean;
 }
 
-export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, onSelect, onClose, children, inspector }) => {
+export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, onSelect, onClose, children, inspector, singlePane }) => {
   return (
-    <div className="flex min-w-0 flex-1 flex-col border-r border-white/8 bg-background">
+    <div className={cn(
+      'flex min-w-0 flex-1 flex-col bg-background',
+      !singlePane && 'border-r border-white/8',
+    )}>
       {/* Tab strip + close */}
       <div className="flex h-[52px] shrink-0 items-center gap-1 border-b border-white/8 px-2">
-        <LayoutPanelLeft className="mx-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        {singlePane ? (
+          <button
+            onClick={onClose}
+            title="Back to chat"
+            aria-label="Back to chat"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        ) : (
+          <LayoutPanelLeft className="mx-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto custom-scrollbar">
           {artifacts.length === 0 && (
             <span className="px-1.5 text-sm font-medium text-muted-foreground">Canvas</span>
@@ -117,23 +137,28 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
                 title={a.title}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
-                <span className="max-w-[180px] truncate">{a.title}</span>
+                <span className="max-w-[140px] truncate sm:max-w-[180px]">{a.title}</span>
               </button>
             );
           })}
         </div>
-        <button
-          onClick={onClose}
-          title="Close canvas"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
-        >
-          <PanelRightClose className="h-4 w-4" />
-        </button>
+        {!singlePane && (
+          <button
+            onClick={onClose}
+            title="Close canvas"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          >
+            <PanelRightClose className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      {/* Active artifact + contextual inspector */}
-      <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
+      {/* Active artifact + contextual inspector.
+          Below `lg` the inspector stacks UNDER the artifact instead of being
+          dropped entirely — on a phone it's the only way to reach an artifact's
+          details/actions. */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-6 custom-scrollbar">
           {children ?? (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
               <LayoutPanelLeft className="mb-3 h-10 w-10 opacity-40" />
@@ -145,7 +170,7 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
           )}
         </div>
         {inspector && (
-          <aside className="hidden w-[288px] shrink-0 overflow-auto border-l border-white/8 bg-white/[0.015] custom-scrollbar lg:block">
+          <aside className="max-h-[45%] shrink-0 overflow-auto border-t border-white/8 bg-white/[0.015] custom-scrollbar lg:max-h-none lg:w-[288px] lg:border-l lg:border-t-0">
             {inspector}
           </aside>
         )}

@@ -56,6 +56,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveUploadPath } from '@/utils/storagePaths';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
@@ -748,6 +749,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // the chat auto-docks to a right rail while you work. `canvasHidden` lets the
   // user reclaim a full-width chat; `chatCollapsed` hides the chat to focus the canvas.
   const [canvasHidden, setCanvasHidden] = useState(false);
+  // On a phone the canvas and the chat can NEVER share the viewport — a 390px
+  // screen split between a flex-1 canvas and a 400px chat rail collapsed the
+  // canvas to a sliver. Below `md` the studio is single-pane: `chatCollapsed`
+  // doubles as "the canvas is the active pane", and exactly one is mounted.
+  const isMobile = useIsMobile();
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'orchestrator');
@@ -3784,8 +3790,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const focusCanvas = useCallback((id: string) => {
     setActiveCanvasId(id);
     setCanvasHidden(false);
-    setChatCollapsed(false);
-  }, []);
+    // Desktop: dock the chat back open beside the canvas. Mobile: the canvas
+    // takes over the single pane (the chat is one tap away via the back arrow).
+    setChatCollapsed(isMobile);
+  }, [isMobile]);
 
   // Attach a temporary catalog source PDF straight from chat. Reuses the exact
   // same upload path as the admin builder (catalogsService.uploadSourcePdf →
@@ -4658,6 +4666,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // The canvas is the permanent middle workspace for every agent; the chat is a
   // right rail. `canvasHidden` is an escape hatch to reclaim a full-width chat.
   const canvasShown = !canvasHidden;
+  // Single-pane below `md`: the canvas is mounted only when it's the active pane.
+  const canvasPaneVisible = canvasShown && (!isMobile || chatCollapsed);
+  const chatPaneHidden = canvasShown && chatCollapsed;
 
   return (
     <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
@@ -4676,12 +4687,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       />
 
       {/* Studio canvas — full-width artifact workspace, docked left of the chat */}
-      {canvasShown && (
+      {canvasPaneVisible && (
         <CanvasPanel
           artifacts={canvasArtifacts}
           activeId={activeCanvasId}
           onSelect={setActiveCanvasId}
-          onClose={() => setCanvasHidden(true)}
+          singlePane={isMobile}
+          // Mobile's control is "back to chat"; desktop's is "close the canvas".
+          onClose={() => (isMobile ? setChatCollapsed(false) : setCanvasHidden(true))}
           inspector={activeCanvasMessage ? renderCanvasInspector(activeCanvasMessage) : null}
         >
           {activeCanvasMessage
@@ -4691,7 +4704,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       )}
 
       {/* Collapsed-chat handle — re-dock the chat when the canvas is full-screen */}
-      {canvasShown && chatCollapsed && (
+      {canvasShown && chatCollapsed && !isMobile && (
         <button
           onClick={() => setChatCollapsed(false)}
           title="Show chat"
@@ -4706,9 +4719,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       <div
         className={cn(
           'min-h-0 flex flex-col',
-          canvasShown
-            ? (chatCollapsed ? 'hidden' : 'w-full max-w-[400px] shrink-0 border-l border-white/8')
-            : 'flex-1',
+          chatPaneHidden && 'hidden',
+          // Right rail beside the canvas on desktop; full width on mobile (where
+          // the canvas is a separate, mutually-exclusive pane).
+          !chatPaneHidden && canvasShown && !isMobile
+            ? 'w-full max-w-[400px] shrink-0 border-l border-white/8'
+            : 'flex-1 min-w-0',
         )}
       >
         {/* Studio header — agent identity + conversation manager launcher (replaces the old left sidebar + mobile drawer) */}
@@ -4723,21 +4739,38 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             )}
           </div>
           <Button
-            variant={canvasShown ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setCanvasHidden((v) => !v)}
-            className="gap-2 rounded-full"
-            title={canvasShown ? 'Hide canvas' : 'Show canvas'}
+            variant={canvasShown && !isMobile ? 'default' : 'ghost'}
+            size={isMobile ? 'icon' : 'sm'}
+            onClick={() => {
+              // Mobile: swap to the canvas pane. Desktop: dock/undock it.
+              if (isMobile) {
+                setCanvasHidden(false);
+                setChatCollapsed(true);
+              } else {
+                setCanvasHidden((v) => !v);
+              }
+            }}
+            className={cn('rounded-full relative', !isMobile && 'gap-2')}
+            title={isMobile ? 'Open canvas' : canvasShown ? 'Hide canvas' : 'Show canvas'}
           >
             <LayoutTemplate className="h-4 w-4" />
             <span className="hidden sm:inline">Canvas</span>
             {canvasArtifacts.length > 0 && (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/20 px-1 text-[10px] font-semibold">
+              <span
+                className={cn(
+                  'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold',
+                  // Icon-only on mobile — the count rides the corner instead of
+                  // widening a fixed-size button.
+                  isMobile
+                    ? 'absolute -right-0.5 -top-0.5 bg-primary text-primary-foreground'
+                    : 'bg-primary/20',
+                )}
+              >
                 {canvasArtifacts.length}
               </span>
             )}
           </Button>
-          {canvasShown && (
+          {canvasShown && !isMobile && (
             <Button
               variant="ghost"
               size="icon"
@@ -4813,7 +4846,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               suppress the chat copy there; still show it in chat when the canvas
               is hidden, or when the canvas already holds an artifact (mid-session
               enable) and the empty state won't render. */}
-          {justEnabledToolkitId && messages.length > 0 && (!canvasShown || canvasArtifacts.length > 0) && (() => {
+          {justEnabledToolkitId && messages.length > 0 && (!canvasPaneVisible || canvasArtifacts.length > 0) && (() => {
             const tk = TOOLKITS.find((t) => t.id === justEnabledToolkitId);
             if (!tk || !(tk.quick_starts?.length || 0)) return null;
             return (
@@ -4854,8 +4887,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           {messages.length === 0 && Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').length === 0 ? (
             // Canvas-first: when the canvas is open it hosts the welcome +
             // starters (renderAgentStarters), so the chat rail stays clean.
-            // Only render the starters here when the canvas is hidden.
-            canvasShown ? null : renderAgentStarters(true)
+            // Only render the starters here when the canvas pane isn't mounted —
+            // which on mobile is the normal case (single-pane), so a fresh chat
+            // still opens on the welcome + starters instead of a blank screen.
+            canvasPaneVisible ? null : renderAgentStarters(true)
           ) : messages.length === 0 ? (
             // Wizard is active but no messages yet — wizard already renders above.
             null
@@ -4963,7 +4998,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[75%]'} ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-5 ${
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[88%] sm:max-w-[75%]'} min-w-0 ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-3.5 sm:p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'msg-assistant text-white shadow-sm'
@@ -5534,7 +5569,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       <Bot className="h-4 w-4 text-white animate-pulse" />
                     </div>
                   </div>
-                  <div className="max-w-[80%] rounded-2xl p-5 bg-primary/5 border border-primary/20">
+                  <div className="min-w-0 max-w-[88%] sm:max-w-[80%] rounded-2xl p-3.5 sm:p-5 bg-primary/5 border border-primary/20">
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-3">
                         <div className="flex gap-1.5">
@@ -5587,7 +5622,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
 
         {/* Input Area */}
-        <div className="px-4 pb-4 pt-2">
+        <div className="px-2.5 pb-3 pt-2 sm:px-4 sm:pb-4">
           {/* Voice Recording Indicator */}
           {isRecording && interimTranscript && (
             <div className="pb-2">
@@ -6016,7 +6051,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               <div className="flex items-stretch">
 
                 {/* Left panel: attach, voice, prompt library */}
-                <div className="flex flex-col items-center justify-around px-1.5 py-2 border-r border-input gap-1">
+                {/* On a phone a 4-high icon column forced the whole composer to
+                    ~120px tall; a 2×2 grid halves that without hiding tools. */}
+                <div className="grid shrink-0 grid-cols-2 content-center items-center justify-items-center gap-0.5 border-r border-input px-1 py-2 sm:flex sm:flex-col sm:justify-around sm:gap-1 sm:px-1.5">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
@@ -6099,7 +6136,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 </div>
 
                 {/* Textarea — resizable, with slash-command palette */}
-                <div className="flex-1 relative">
+                <div className="relative min-w-0 flex-1">
                   <CommandPalette
                     open={paletteOpen}
                     onClose={() => { setPaletteOpen(false); setPaletteQuery(''); }}
@@ -6164,7 +6201,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   onClick={handleSendMessage}
                   disabled={isLoading || (!input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0 && attachedDocuments.length === 0)}
                   className={cn(
-                    'flex items-center justify-center px-4 border-l border-input rounded-r-xl transition-colors',
+                    'flex shrink-0 items-center justify-center px-3.5 sm:px-4 border-l border-input rounded-r-xl transition-colors',
                     isLoading || (!input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0 && attachedDocuments.length === 0)
                       ? 'text-muted-foreground/40 bg-muted/20 cursor-not-allowed'
                       : 'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -6178,7 +6215,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </TooltipProvider>
 
             <div className="mt-1.5 flex items-center justify-between gap-2 flex-wrap">
-              <div className="text-xs text-muted-foreground/60">
+              {/* Keyboard hint is desktop-only — it costs a whole line on a phone
+                  and there is no "/" affordance worth teaching on touch. */}
+              <div className="hidden text-xs text-muted-foreground/60 sm:block">
                 Type <kbd className="px-1 py-0.5 rounded bg-muted/50 text-[10px]">/</kbd> to launch a workflow or invoke a specific tool
               </div>
               {/* Active toolkit chips — always visible above the chat. The Core

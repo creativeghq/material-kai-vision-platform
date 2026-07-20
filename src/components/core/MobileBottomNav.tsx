@@ -91,7 +91,10 @@ export const MobileBottomNav: React.FC = () => {
     <>
       <nav
         aria-label="Primary"
-        className="mobile-bottom-nav fixed bottom-0 inset-x-0 z-50 md:hidden bg-sidebar/95 backdrop-blur-lg border-t border-white/8"
+        // z-40, NOT z-50: dialogs/overlays (Radix + the agent's custom pickers)
+        // all sit at z-50 and the nav is painted after <main>, so at equal z it
+        // covered the bottom ~56px of every modal on mobile.
+        className="mobile-bottom-nav fixed bottom-0 inset-x-0 z-40 md:hidden bg-sidebar/95 backdrop-blur-lg border-t border-white/8"
       >
         <ul className="grid h-14" style={{ gridTemplateColumns: `repeat(${barItems.length + 1}, minmax(0, 1fr))` }}>
           {barItems.map((item) => {
