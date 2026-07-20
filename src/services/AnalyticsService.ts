@@ -16,6 +16,16 @@ export interface AnalyticsEvent {
   timestamp: string;
 }
 
+/**
+ * The table column is `event_data`; this service's public interface calls it `metadata`.
+ * Every write used to send `metadata` verbatim, so PostgREST rejected the row for an unknown
+ * column — and because every call site is fire-and-forget, the error was swallowed.
+ * `analytics_events` had 0 rows lifetime and both admin dashboards that read it showed nothing.
+ * Map at the DB boundary, in both directions, and never send `metadata` to Postgres again.
+ */
+const eventMeta = (row: unknown): Record<string, unknown> =>
+  ((row as { event_data?: Record<string, unknown> } | null)?.event_data ?? {});
+
 export interface AnalyticsMetrics {
   total_events: number;
   events_by_type: Record<string, number>;
@@ -78,7 +88,8 @@ class AnalyticsServiceImpl extends BaseService {
           event_type: event.event_type,
           workspace_id: event.workspace_id,
           user_id: event.user_id,
-          metadata: event.metadata,
+          event_data: event.metadata,
+          session_id: (event.metadata?.session_id as string | undefined) ?? null,
           created_at: event.timestamp,
         },
       ]);
@@ -122,7 +133,7 @@ class AnalyticsServiceImpl extends BaseService {
         eventsByType[event.event_type] =
           (eventsByType[event.event_type] || 0) + 1;
 
-        if (event.metadata?.error) {
+        if (eventMeta(event)?.error) {
           errorCount++;
         }
 
@@ -130,8 +141,9 @@ class AnalyticsServiceImpl extends BaseService {
           userIds.add(event.user_id);
         }
 
-        if (event.metadata?.session_id) {
-          sessionIds.add(event.metadata.session_id as string);
+        const sid = event.session_id ?? (eventMeta(event)?.session_id as string | undefined);
+        if (sid) {
+          sessionIds.add(sid);
         }
       });
 
@@ -230,7 +242,7 @@ class AnalyticsServiceImpl extends BaseService {
       (events || []).forEach((event) => {
         if (event.user_id) {
           uniqueUsers.add(event.user_id);
-          const sessionId = event.metadata?.session_id as string;
+          const sessionId = event.session_id ?? (eventMeta(event)?.session_id as string | undefined);
           if (sessionId) {
             userSessions.set(sessionId, (userSessions.get(sessionId) || 0) + 1);
           }
@@ -256,8 +268,8 @@ class AnalyticsServiceImpl extends BaseService {
 
   private calculateAverageResponseTime(events: unknown[]): number {
     const responseTimes = events
-      .filter((e) => (e as any).metadata?.response_time)
-      .map((e) => (e as any).metadata.response_time as number);
+      .filter((e) => eventMeta(e)?.response_time)
+      .map((e) => eventMeta(e).response_time as number);
 
     if (responseTimes.length === 0) return 0;
 
@@ -276,7 +288,7 @@ class AnalyticsServiceImpl extends BaseService {
       const current = trendsByDate.get(date) || { events: 0, errors: 0 };
 
       current.events++;
-      if ((event as any).metadata?.error) {
+      if (eventMeta(event)?.error) {
         current.errors++;
       }
 

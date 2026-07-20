@@ -233,7 +233,7 @@ export const PublicProfilePage: React.FC = () => {
       supabase.from('analytics_events').insert({
         event_type: 'profile_viewed',
         user_id: null,
-        metadata: { profile_user_id: userId, professional_type: profileData.professional_type },
+        event_data: { profile_user_id: userId, professional_type: profileData.professional_type },
         created_at: new Date().toISOString(),
       }).then(() => {});
 

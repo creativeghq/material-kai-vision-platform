@@ -102,7 +102,7 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
       supabase.from('analytics_events').insert({
         event_type: 'hire_me_submitted',
         user_id: null,
-        metadata: { to_user_id: toUserId, services_requested: selectedNames, has_services: selectedNames.length > 0 },
+        event_data: { to_user_id: toUserId, services_requested: selectedNames, has_services: selectedNames.length > 0 },
         created_at: new Date().toISOString(),
       }).then(() => {});
     } catch {
