@@ -34,6 +34,51 @@ function pick(body: any, cols: readonly string[]): Record<string, unknown> {
 }
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contractor'];
 const POSTING_STATUS = ['draft', 'open', 'closed'];
+const LOCATION_TYPES = ['onsite', 'hybrid', 'remote'];
+/** Columns a manager may set on a posting. `published_at` is derived, never body-supplied. */
+const JOB_POSTING_COLS = [
+  'title', 'slug', 'department_id', 'employment_type', 'location', 'location_type', 'remote', 'level',
+  'description', 'requirements', 'salary_min', 'salary_max', 'currency',
+  'compensation', 'compensation_note', 'apply_config', 'closes_at', 'status',
+] as const;
+const APPLY_CONFIG_KEYS = ['require_resume', 'ask_phone', 'ask_location', 'ask_links', 'ask_cover_letter'] as const;
+
+/**
+ * Normalise + bound the two JSON columns on a posting. These are rendered on an anonymous public
+ * page, so we rebuild them key-by-key rather than storing whatever the client sent.
+ */
+function normalizeJobPostingFields(fields: Record<string, unknown>): string | null {
+  if (fields.employment_type && !EMPLOYMENT_TYPES.includes(String(fields.employment_type))) return 'invalid employment_type';
+  if (fields.status && !POSTING_STATUS.includes(String(fields.status))) return 'invalid status';
+  if (fields.location_type != null && fields.location_type !== '' && !LOCATION_TYPES.includes(String(fields.location_type))) return 'invalid location_type';
+  if (fields.location_type === '') fields.location_type = null;
+  if (typeof fields.slug === 'string') fields.slug = fields.slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 70) || null;
+
+  if (fields.compensation !== undefined) {
+    if (!Array.isArray(fields.compensation)) return 'compensation must be an array';
+    if (fields.compensation.length > 12) return 'too many compensation bands (max 12)';
+    fields.compensation = (fields.compensation as any[]).map((b) => ({
+      region: String(b?.region ?? '').trim().slice(0, 80),
+      currency: String(b?.currency ?? '').trim().slice(0, 8).toUpperCase(),
+      min: b?.min == null || b?.min === '' ? null : Number(b.min),
+      max: b?.max == null || b?.max === '' ? null : Number(b.max),
+      equity: !!b?.equity,
+      bonus: !!b?.bonus,
+      note: String(b?.note ?? '').trim().slice(0, 200) || null,
+    })).filter((b) => b.region && (b.min != null || b.max != null || b.note));
+    if ((fields.compensation as any[]).some((b) => (b.min != null && !Number.isFinite(b.min)) || (b.max != null && !Number.isFinite(b.max)))) {
+      return 'compensation amounts must be numbers';
+    }
+  }
+  if (fields.apply_config !== undefined) {
+    const raw = fields.apply_config as Record<string, unknown> | null;
+    if (raw != null && (typeof raw !== 'object' || Array.isArray(raw))) return 'apply_config must be an object';
+    const out: Record<string, boolean> = {};
+    for (const k of APPLY_CONFIG_KEYS) if (raw?.[k] !== undefined) out[k] = !!raw[k];
+    fields.apply_config = out;
+  }
+  return null;
+}
 const APP_STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
 const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'];
 const DOC_TYPES = ['contract', 'id', 'certificate', 'payslip', 'review', 'other'];
@@ -304,10 +349,10 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     }
     case 'create-job-posting': {
       requireManage();
-      const fields = pick(body, ['title', 'department_id', 'employment_type', 'location', 'remote', 'description', 'requirements', 'salary_min', 'salary_max', 'currency', 'status']);
+      const fields = pick(body, JOB_POSTING_COLS);
       if (!fields.title) return json({ error: 'title is required' }, 400);
-      if (fields.employment_type && !EMPLOYMENT_TYPES.includes(String(fields.employment_type))) return json({ error: 'invalid employment_type' }, 400);
-      if (fields.status && !POSTING_STATUS.includes(String(fields.status))) return json({ error: 'invalid status' }, 400);
+      const bad = normalizeJobPostingFields(fields);
+      if (bad) return json({ error: bad }, 400);
       if (fields.status === 'open') (fields as any).published_at = new Date().toISOString();
       const { data, error } = await supabase.from('hr_job_postings')
         .insert({ ...fields, workspace_id: workspaceId, created_by: userId }).select('*').single();
@@ -318,10 +363,15 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       requireManage();
       const id = String(body?.job_posting_id ?? '');
       if (!id) return json({ error: 'job_posting_id is required' }, 400);
-      const fields = pick(body, ['title', 'department_id', 'employment_type', 'location', 'remote', 'description', 'requirements', 'salary_min', 'salary_max', 'currency', 'status']);
-      if (fields.employment_type && !EMPLOYMENT_TYPES.includes(String(fields.employment_type))) return json({ error: 'invalid employment_type' }, 400);
-      if (fields.status && !POSTING_STATUS.includes(String(fields.status))) return json({ error: 'invalid status' }, 400);
-      if (fields.status === 'open') (fields as any).published_at = new Date().toISOString();
+      const fields = pick(body, JOB_POSTING_COLS);
+      const bad = normalizeJobPostingFields(fields);
+      if (bad) return json({ error: bad }, 400);
+      if (fields.status === 'open') {
+        // Stamp the publish date only on the draft/closed → open transition. Re-stamping it on
+        // every edit would silently re-sort the careers page each time someone fixes a typo.
+        const { data: cur } = await supabase.from('hr_job_postings').select('published_at').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+        if (!cur?.published_at) (fields as any).published_at = new Date().toISOString();
+      }
       const { data, error } = await supabase.from('hr_job_postings').update(fields).eq('id', id).eq('workspace_id', workspaceId).select('*').maybeSingle();
       if (error) throw new HttpError(400, error.message);
       if (!data) return json({ error: 'not found' }, 404);
@@ -384,7 +434,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
     case 'list-applications': {
       let q = supabase.from('hr_applications')
         .select(`*,
-          candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email, phone, headline, resume_path ),
+          candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email, phone, headline, location, links, resume_path ),
           posting:hr_job_postings!hr_applications_job_posting_id_fkey ( id, title )`)
         .eq('workspace_id', workspaceId).order('applied_at', { ascending: false });
       if (body?.job_posting_id) q = q.eq('job_posting_id', String(body.job_posting_id));

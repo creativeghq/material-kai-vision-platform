@@ -105,6 +105,7 @@ const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const ToolsHubPage = lazy(() => import('./pages/Tools/ToolsHubPage'));
 const PublicCareersPage = lazy(() => import('./pages/Careers/PublicCareersPage'));
+const PublicJobPage = lazy(() => import('./pages/Careers/PublicJobPage'));
 const ClockInKioskPage = lazy(() => import('./modules/hr/pages/ClockInKioskPage'));
 const PriceScanPage = lazy(() => import('./pages/Tools/PriceScanPage'));
 const MentionScanPage = lazy(() => import('./pages/Tools/MentionScanPage'));
@@ -184,6 +185,7 @@ const App = () => (
                 {/* #209 — public customer inbox thread (tokenized, no auth) */}
                 <Route path="/i/:token" element={<PageErrorBoundary name="Inbox Thread"><PublicInboxThreadPage /></PageErrorBoundary>} />
                 <Route path="/careers/:slug" element={<PageErrorBoundary name="Careers"><PublicCareersPage /></PageErrorBoundary>} />
+                <Route path="/careers/:slug/:job" element={<PageErrorBoundary name="Job posting"><PublicJobPage /></PageErrorBoundary>} />
                 {/* #252 — public workspace clock-in kiosk: app.materialshub.gr/{workspace-slug}/clockin */}
                 <Route path="/:slug/clockin" element={<PageErrorBoundary name="Clock-in Kiosk"><ClockInKioskPage /></PageErrorBoundary>} />
                 <Route path="/tools" element={<PageErrorBoundary name="Tools Hub"><ToolsHubPage /></PageErrorBoundary>} />

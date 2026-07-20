@@ -2,7 +2,8 @@
 // #252 — PUBLIC careers page API (anonymous). Lists a workspace's OPEN job postings by public
 // slug and accepts applications. No session; resolves the workspace from `slug` (mirrors
 // finance-storefront). Apply is Turnstile-gated when TURNSTILE_SECRET_KEY is configured
-// (fail-open when not, so it works out of the box). Writes only hr_candidates + hr_applications.
+// (fail-open when not, so it works out of the box). Writes only hr_candidates + hr_applications
+// (+ the applicant's résumé into this workspace's own hr/ storage prefix).
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -29,6 +30,25 @@ function clientIp(req: Request): string {
 
 const CAREERS_MAX_PER_WINDOW = 8;              // applications per IP per window
 const CAREERS_WINDOW_MS = 10 * 60_000;
+const HR_DOC_BUCKET = 'pdf-documents';         // same private bucket the admin ATS signs from
+const RESUME_MAX_BYTES = 8_000_000;            // 8 MB — public callers, keep it tight
+
+/** Per-posting application-form config. Anything the admin didn't set falls back to "ask for it". */
+const APPLY_DEFAULTS = {
+  require_resume: true, ask_phone: true, ask_location: true, ask_links: true, ask_cover_letter: true,
+} as const;
+const applyConfig = (raw: any) => ({ ...APPLY_DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) });
+
+const JOB_PUBLIC_COLS =
+  'id, slug, title, location, location_type, remote, employment_type, level, salary_min, salary_max, currency, ' +
+  'compensation, compensation_note, apply_config, published_at, closes_at, status, ' +
+  'department:hr_departments!hr_job_postings_department_id_fkey ( name )';
+
+/** Flatten the department join + drop nothing else — these columns are all public by design. */
+const shapeJob = (j: any) => ({ ...j, department: j?.department?.name ?? null });
+
+/** A posting is publicly visible only while it is open AND not past its close date. */
+const isLive = (j: any) => !!j && j.status === 'open' && (!j.closes_at || new Date(j.closes_at).getTime() > Date.now());
 
 Deno.serve(withApiLogging('hr-careers', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
@@ -47,39 +67,51 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
   const slug = String(body?.slug ?? '').trim();
   if (!action || !slug) return json({ error: 'action and slug are required' }, 400);
 
-  const { data: ws } = await supabase.from('workspaces').select('id, name, slug').eq('slug', slug).maybeSingle();
+  const { data: ws } = await supabase.from('workspaces').select('id, name, slug, description, settings').eq('slug', slug).maybeSingle();
   if (!ws) return json({ error: 'not found' }, 404);
 
   const siteKeyRes = await resolveSecret(supabase, 'TURNSTILE_SITE_KEY').catch(() => ({ value: null }));
   const turnstileSiteKey = (siteKeyRes as any)?.value || null;
+  const settings = (ws as any).settings ?? {};
+  const company = {
+    name: ws.name,
+    tagline: settings.careers_tagline ?? ws.description ?? null,
+    logo_url: settings.logo_url ?? settings.company_logo_url ?? null,
+    website: settings.website ?? null,
+  };
 
   if (action === 'meta') {
     const { data: jobs } = await supabase
-      .from('hr_job_postings')
-      .select('id, title, location, remote, employment_type, salary_min, salary_max, currency, published_at, department:hr_departments!hr_job_postings_department_id_fkey ( name )')
+      .from('hr_job_postings').select(JOB_PUBLIC_COLS)
       .eq('workspace_id', ws.id).eq('status', 'open').order('published_at', { ascending: false });
     return json({
-      ok: true, company: ws.name, turnstile_site_key: turnstileSiteKey,
-      jobs: (jobs ?? []).map((j: any) => ({ ...j, department: j.department?.name ?? null })),
+      ok: true, company: ws.name, company_profile: company, turnstile_site_key: turnstileSiteKey,
+      jobs: (jobs ?? []).filter(isLive).map(shapeJob),
     });
   }
 
   if (action === 'get-job') {
-    const jobId = String(body?.job_id ?? '');
-    const { data: job } = await supabase
-      .from('hr_job_postings')
-      .select('id, title, location, remote, employment_type, description, requirements, salary_min, salary_max, currency, published_at, status, department:hr_departments!hr_job_postings_department_id_fkey ( name )')
-      .eq('id', jobId).eq('workspace_id', ws.id).maybeSingle();
-    if (!job || job.status !== 'open') return json({ error: 'This position is no longer open.' }, 404);
-    return json({ ok: true, company: ws.name, turnstile_site_key: turnstileSiteKey, job: { ...job, department: (job as any).department?.name ?? null } });
+    // Prefer the human-readable slug (shareable URL); `job_id` stays supported for old links.
+    const jobSlug = String(body?.job_slug ?? '').trim();
+    const jobId = String(body?.job_id ?? '').trim();
+    if (!jobSlug && !jobId) return json({ error: 'job_slug or job_id is required' }, 400);
+    let q = supabase.from('hr_job_postings').select(JOB_PUBLIC_COLS).eq('workspace_id', ws.id);
+    q = jobSlug ? q.eq('slug', jobSlug) : q.eq('id', jobId);
+    const { data: job } = await q.maybeSingle();
+    if (!isLive(job)) return json({ error: 'This position is no longer open.' }, 404);
+    return json({
+      ok: true, company: ws.name, company_profile: company, turnstile_site_key: turnstileSiteKey,
+      job: { ...shapeJob(job), apply_config: applyConfig((job as any).apply_config) },
+    });
   }
 
   if (action === 'apply') {
-    const jobId = String(body?.job_id ?? '');
+    const jobSlug = String(body?.job_slug ?? '').trim();
+    const jobId = String(body?.job_id ?? '').trim();
     // Cap every field so a public caller can't store arbitrarily large rows (spam / storage abuse).
     const name = String(body?.name ?? '').trim().slice(0, 200);
     const email = String(body?.email ?? '').trim().slice(0, 200);
-    if (!jobId || !name) return json({ error: 'Name is required.' }, 400);
+    if ((!jobId && !jobSlug) || !name) return json({ error: 'Name is required.' }, 400);
     // Bot check (only enforced when configured).
     if (Deno.env.get('TURNSTILE_SECRET_KEY') && !(await verifyTurnstile(String(body?.turnstile_token ?? ''), clientIp(req)))) {
       return json({ error: 'Bot check failed — please retry.' }, 400);
@@ -94,26 +126,65 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
       return json({ error: 'Too many applications from this network. Please try again later.' }, 429);
     }
     await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'careers_apply' });
-    // Job must be open + in this workspace.
-    const { data: job } = await supabase.from('hr_job_postings').select('id, status').eq('id', jobId).eq('workspace_id', ws.id).maybeSingle();
-    if (!job || job.status !== 'open') return json({ error: 'This position is no longer open.' }, 404);
+
+    // Job must be live + in this workspace (never trust a body-supplied workspace).
+    let jq = supabase.from('hr_job_postings').select('id, status, closes_at, apply_config').eq('workspace_id', ws.id);
+    jq = jobSlug ? jq.eq('slug', jobSlug) : jq.eq('id', jobId);
+    const { data: job } = await jq.maybeSingle();
+    if (!isLive(job)) return json({ error: 'This position is no longer open.' }, 404);
+    const cfg = applyConfig((job as any).apply_config);
+
+    // Résumé (optional per posting). Decoded + sniffed here so we never store a mislabelled blob.
+    const resumeB64 = String(body?.resume_base64 ?? '');
+    let resumeBytes: Uint8Array | null = null;
+    if (resumeB64) {
+      try { resumeBytes = Uint8Array.from(atob(resumeB64), (ch) => ch.charCodeAt(0)); }
+      catch { return json({ error: 'Could not read that file — please re-upload.' }, 400); }
+      if (resumeBytes.length > RESUME_MAX_BYTES) return json({ error: 'Résumé is too large (max 8MB).' }, 400);
+      const isPdf = resumeBytes.length > 4 && resumeBytes[0] === 0x25 && resumeBytes[1] === 0x50 && resumeBytes[2] === 0x44 && resumeBytes[3] === 0x46;
+      if (!isPdf) return json({ error: 'Please upload your résumé as a PDF.' }, 400);
+    }
+    if (cfg.require_resume && !resumeBytes) return json({ error: 'A résumé (PDF) is required for this role.' }, 400);
 
     // Reuse an existing candidate (same email in this workspace) else create one.
+    const profile = {
+      phone: String(body?.phone ?? '').trim().slice(0, 50) || null,
+      headline: String(body?.headline ?? '').trim().slice(0, 300) || null,
+      location: String(body?.location ?? '').trim().slice(0, 200) || null,
+      links: String(body?.links ?? '').trim().slice(0, 1000) || null,
+    };
     let candidateId = '';
     if (email) {
       const { data: existing } = await supabase.from('hr_candidates').select('id').eq('workspace_id', ws.id).eq('email', email).maybeSingle();
-      if (existing) candidateId = existing.id;
+      if (existing) {
+        candidateId = existing.id;
+        // Refresh the profile from this (newer) application, but never blank out what we already had.
+        const patch = Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== null));
+        if (Object.keys(patch).length) await supabase.from('hr_candidates').update(patch).eq('id', candidateId).eq('workspace_id', ws.id);
+      }
     }
     if (!candidateId) {
       const { data: c, error: cErr } = await supabase.from('hr_candidates').insert({
-        workspace_id: ws.id, name, email: email || null,
-        phone: String(body?.phone ?? '').trim().slice(0, 50) || null, headline: String(body?.headline ?? '').trim().slice(0, 300) || null, source: 'careers_page',
+        workspace_id: ws.id, name, email: email || null, source: 'careers_page', ...profile,
       }).select('id').single();
       if (cErr) return json({ error: 'Could not submit application.' }, 400);
       candidateId = c.id;
     }
+
+    // Store the résumé under this workspace's own hr/ prefix so the admin CV viewer
+    // (`assertHrObjectPath`) can sign it, and no other tenant's path is reachable.
+    if (resumeBytes) {
+      const safe = String(body?.resume_filename ?? 'resume.pdf').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+      const path = `hr/${ws.id}/candidates/${candidateId}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from(HR_DOC_BUCKET)
+        .upload(path, resumeBytes, { contentType: 'application/pdf', upsert: true });
+      if (upErr) return json({ error: 'Could not upload your résumé — please try again.' }, 400);
+      await supabase.from('hr_candidates').update({ resume_bucket: HR_DOC_BUCKET, resume_path: path })
+        .eq('id', candidateId).eq('workspace_id', ws.id);
+    }
+
     const { error: aErr } = await supabase.from('hr_applications').insert({
-      workspace_id: ws.id, job_posting_id: jobId, candidate_id: candidateId, stage: 'applied',
+      workspace_id: ws.id, job_posting_id: (job as any).id, candidate_id: candidateId, stage: 'applied',
       notes: String(body?.cover_letter ?? '').trim().slice(0, 5000) || null,
     });
     if (aErr) {

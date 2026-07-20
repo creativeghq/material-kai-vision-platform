@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap, ExternalLink, FileUp, FileText, Wand2, Zap, Trash2, Lock, LockOpen } from 'lucide-react';
+import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap, ExternalLink, FileUp, FileText, Wand2, Zap, Trash2, Lock, LockOpen, Pencil, Link as LinkIcon } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
-  hrService, type JobPosting, type Application, type Department, type AppStage, type EmploymentType, type PostingStatus,
-  APP_STAGE_LABELS, APP_STAGES, POSTING_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS,
+  hrService, type JobPosting, type Application, type Department, type AppStage, type EmploymentType, type PostingStatus, type LocationType,
+  APP_STAGE_LABELS, APP_STAGES, POSTING_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS, LOCATION_TYPE_LABELS,
 } from '../services/hrService';
 import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
 import { parseDecimal } from '@/utils/decimal';
@@ -28,7 +28,9 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
   const [postings, setPostings] = useState<JobPosting[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<JobPosting | null>(null);
+  // Track the id, not the row: every reload then re-derives the selected posting from fresh data,
+  // so editing a job doesn't leave a stale copy on screen.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [posFilter, setPosFilter] = useState<PostingStatus | 'all'>('open');
 
   const load = useCallback(async () => {
@@ -43,8 +45,15 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
   if (loading) return <Skeleton className="h-64 w-full" />;
   if (!workspaceId) return null;
 
+  const selected = selectedId ? postings.find((p) => p.id === selectedId) ?? null : null;
   if (selected) {
-    return <ApplicationsPipeline workspaceId={workspaceId} posting={selected} departments={departments} canManage={canManage} onBack={() => { setSelected(null); load(); }} />;
+    return (
+      <ApplicationsPipeline
+        workspaceId={workspaceId} posting={selected} departments={departments} canManage={canManage}
+        careersSlug={activeWorkspace?.slug ?? null}
+        onRefresh={load} onBack={() => { setSelectedId(null); void load(); }}
+      />
+    );
   }
 
   const counts = { open: postings.filter((p) => p.status === 'open').length, draft: postings.filter((p) => p.status === 'draft').length, closed: postings.filter((p) => p.status === 'closed').length };
@@ -79,7 +88,7 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {shown.map((p) => (
-            <button key={p.id} onClick={() => setSelected(p)} className="text-left rounded-2xl border border-border/60 bg-card p-4 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
+            <button key={p.id} onClick={() => setSelectedId(p.id)} className="text-left rounded-2xl border border-border/60 bg-card p-4 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-medium truncate">{p.title}</div>
@@ -102,7 +111,7 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
 }
 
 // ── Applications pipeline for one posting ──
-function ApplicationsPipeline({ workspaceId, posting, departments, canManage, onBack }: { workspaceId: string; posting: JobPosting; departments: Department[]; canManage: boolean; onBack: () => void }) {
+function ApplicationsPipeline({ workspaceId, posting, departments, canManage, careersSlug, onRefresh, onBack }: { workspaceId: string; posting: JobPosting; departments: Department[]; canManage: boolean; careersSlug: string | null; onRefresh: () => void; onBack: () => void }) {
   const { toast } = useToast();
   const [apps, setApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,6 +152,16 @@ function ApplicationsPipeline({ workspaceId, posting, departments, canManage, on
         </div>
         {canManage && (
           <div className="flex items-center gap-2">
+            {careersSlug && posting.status === 'open' && (
+              <Button
+                variant="outline" size="sm" className="rounded-full"
+                onClick={() => window.open(`${window.location.origin}/careers/${careersSlug}/${posting.slug || posting.id}`, '_blank')}
+                title="Open the public posting"
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />View public page
+              </Button>
+            )}
+            <JobDialog workspaceId={workspaceId} departments={departments} posting={posting} onDone={onRefresh} />
             <Button variant="outline" size="sm" className="rounded-full" disabled={busyPosting} onClick={toggleStatus}>
               {posting.status === 'closed' ? <><LockOpen className="h-4 w-4 mr-1" />Reopen</> : <><Lock className="h-4 w-4 mr-1" />Close</>}
             </Button>
@@ -220,7 +239,15 @@ function ApplicantRow({ app, workspaceId, canManage, onChanged }: { app: Applica
             {app.candidate?.name || 'Candidate'}
             {app.ai_score != null && <Badge variant={scoreVariant(app.ai_score)} className="gap-1"><Wand2 className="h-3 w-3" />{app.ai_score}/100</Badge>}
           </div>
-          <div className="text-xs text-muted-foreground truncate">{app.candidate?.headline || app.candidate?.email || '—'}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {[app.candidate?.headline, app.candidate?.location, app.candidate?.email].filter(Boolean).join(' · ') || '—'}
+          </div>
+          {app.candidate?.links && (
+            <div className="text-xs text-muted-foreground truncate mt-0.5 flex items-center gap-1">
+              <LinkIcon className="h-3 w-3 shrink-0" />
+              <span className="truncate">{app.candidate.links}</span>
+            </div>
+          )}
         </div>
 
         {canManage && (
@@ -288,15 +315,55 @@ function AddApplicantDialog({ workspaceId, postingId, onDone }: { workspaceId: s
   );
 }
 
-// ── New job dialog (with AI description) ──
-function JobDialog({ workspaceId, departments, onDone }: { workspaceId: string; departments: Department[]; onDone: () => void }) {
+// ── Create / edit job dialog (with AI description) ──
+type CompRow = { region: string; currency: string; min: string; max: string; equity: boolean; bonus: boolean; note: string };
+
+const blankForm = () => ({
+  title: '', department_id: '', employment_type: 'full_time' as EmploymentType, location: '',
+  location_type: '' as '' | LocationType, level: '', keywords: '',
+  description: '', requirements: '', salary_min: '', salary_max: '', currency: 'EUR',
+  compensation_note: '', closes_at: '',
+  require_resume: true, ask_phone: true, ask_location: true, ask_links: true, ask_cover_letter: true,
+});
+
+/** Hydrate the form from an existing posting (edit mode). */
+function formFromPosting(p: JobPosting): ReturnType<typeof blankForm> {
+  const cfg = p.apply_config ?? {};
+  const flag = (v: boolean | undefined) => v !== false; // unset → asked for
+  return {
+    ...blankForm(),
+    title: p.title ?? '', department_id: p.department_id ?? '',
+    employment_type: (p.employment_type ?? 'full_time') as EmploymentType,
+    location: p.location ?? '', location_type: (p.location_type ?? (p.remote ? 'remote' : '')) as '' | LocationType,
+    level: p.level ?? '', description: p.description ?? '', requirements: p.requirements ?? '',
+    salary_min: p.salary_min != null ? String(p.salary_min) : '', salary_max: p.salary_max != null ? String(p.salary_max) : '',
+    currency: p.currency || 'EUR', compensation_note: p.compensation_note ?? '',
+    closes_at: p.closes_at ? p.closes_at.slice(0, 10) : '',
+    require_resume: flag(cfg.require_resume), ask_phone: flag(cfg.ask_phone), ask_location: flag(cfg.ask_location),
+    ask_links: flag(cfg.ask_links), ask_cover_letter: flag(cfg.ask_cover_letter),
+  };
+}
+
+const compRowsFromPosting = (p?: JobPosting | null): CompRow[] =>
+  (p?.compensation ?? []).map((b) => ({
+    region: b.region ?? '', currency: b.currency || 'EUR',
+    min: b.min != null ? String(b.min) : '', max: b.max != null ? String(b.max) : '',
+    equity: !!b.equity, bonus: !!b.bonus, note: b.note ?? '',
+  }));
+
+function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId: string; departments: Department[]; posting?: JobPosting; onDone: () => void }) {
   const { toast } = useToast();
+  const isEdit = !!posting;
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [f, setF] = useState({ title: '', department_id: '', employment_type: 'full_time' as EmploymentType, location: '', remote: false, keywords: '', description: '', requirements: '', salary_min: '', salary_max: '', status: 'draft' });
+  const [f, setF] = useState(() => (posting ? formFromPosting(posting) : blankForm()));
+  const [comp, setComp] = useState<CompRow[]>(() => compRowsFromPosting(posting));
   const upd = (k: string, v: unknown) => setF((p) => ({ ...p, [k]: v }));
-  const reset = () => setF({ title: '', department_id: '', employment_type: 'full_time', location: '', remote: false, keywords: '', description: '', requirements: '', salary_min: '', salary_max: '', status: 'draft' });
+  const reset = () => { setF(posting ? formFromPosting(posting) : blankForm()); setComp(compRowsFromPosting(posting)); };
+
+  const updComp = (i: number, patch: Partial<CompRow>) => setComp((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const addComp = () => setComp((rows) => [...rows, { region: '', currency: f.currency || 'EUR', min: '', max: '', equity: false, bonus: false, note: '' }]);
 
   const generate = async () => {
     if (!f.title.trim()) { toast({ title: 'Enter a job title first', variant: 'destructive' }); return; }
@@ -311,25 +378,45 @@ function JobDialog({ workspaceId, departments, onDone }: { workspaceId: string; 
     finally { setAiBusy(false); }
   };
 
-  const submit = async (status: 'draft' | 'open') => {
+  const submit = async (status: PostingStatus) => {
     if (!f.title.trim()) { toast({ title: 'Title is required', variant: 'destructive' }); return; }
     setSaving(true);
     try {
-      await hrService.createJobPosting(workspaceId, {
-        title: f.title.trim(), department_id: f.department_id || null, employment_type: f.employment_type, location: f.location.trim() || null, remote: f.remote,
+      const payload = {
+        title: f.title.trim(), department_id: f.department_id || null, employment_type: f.employment_type,
+        location: f.location.trim() || null, location_type: f.location_type || null,
+        // `remote` is the legacy boolean — keep it in step with location_type so old readers stay correct.
+        remote: f.location_type === 'remote', level: f.level.trim() || null,
         description: f.description || null, requirements: f.requirements || null,
-        salary_min: parseDecimal(f.salary_min), salary_max: parseDecimal(f.salary_max), status,
-      });
-      toast({ title: status === 'open' ? 'Job published' : 'Draft saved' }); setOpen(false); reset(); onDone();
+        salary_min: parseDecimal(f.salary_min), salary_max: parseDecimal(f.salary_max), currency: f.currency || 'EUR',
+        compensation: comp
+          .filter((r) => r.region.trim())
+          .map((r) => ({ region: r.region.trim(), currency: r.currency || 'EUR', min: parseDecimal(r.min), max: parseDecimal(r.max), equity: r.equity, bonus: r.bonus, note: r.note.trim() || null })),
+        compensation_note: f.compensation_note.trim() || null,
+        closes_at: f.closes_at ? new Date(`${f.closes_at}T23:59:59`).toISOString() : null,
+        apply_config: {
+          require_resume: f.require_resume, ask_phone: f.ask_phone, ask_location: f.ask_location,
+          ask_links: f.ask_links, ask_cover_letter: f.ask_cover_letter,
+        },
+        status,
+      };
+      if (isEdit) await hrService.updateJobPosting(workspaceId, posting!.id, payload);
+      else await hrService.createJobPosting(workspaceId, payload);
+      toast({ title: isEdit ? 'Job updated' : status === 'open' ? 'Job published' : 'Draft saved' });
+      setOpen(false); onDone();
     } catch (e) { toast({ title: 'Could not save', description: (e as Error).message, variant: 'destructive' }); }
     finally { setSaving(false); }
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />New job</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        {isEdit
+          ? <Button variant="outline" size="sm" className="rounded-full"><Pencil className="h-4 w-4 mr-1" />Edit</Button>
+          : <Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />New job</Button>}
+      </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>New job posting</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEdit ? 'Edit job posting' : 'New job posting'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Title *</Label><Input value={f.title} onChange={(e) => upd('title', e.target.value)} placeholder="Senior Product Designer" /></div>
@@ -341,7 +428,7 @@ function JobDialog({ workspaceId, departments, onDone }: { workspaceId: string; 
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Type</Label>
               <Select value={f.employment_type} onValueChange={(v) => upd('employment_type', v)}>
@@ -349,8 +436,21 @@ function JobDialog({ workspaceId, departments, onDone }: { workspaceId: string; 
                 <SelectContent>{(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((t) => <SelectItem key={t} value={t}>{EMPLOYMENT_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1"><Label>Location</Label><Input value={f.location} onChange={(e) => upd('location', e.target.value)} placeholder="Athens" /></div>
-            <div className="space-y-1 flex items-end"><label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={f.remote} onChange={(e) => upd('remote', e.target.checked)} /> Remote</label></div>
+            <div className="space-y-1">
+              <Label>Work setup</Label>
+              <Select value={f.location_type || 'none'} onValueChange={(v) => upd('location_type', v === 'none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">—</SelectItem>
+                  {(Object.keys(LOCATION_TYPE_LABELS) as LocationType[]).map((t) => <SelectItem key={t} value={t}>{LOCATION_TYPE_LABELS[t]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1"><Label>Location</Label><Input value={f.location} onChange={(e) => upd('location', e.target.value)} placeholder="United Kingdom; Ireland" /></div>
+            <div className="space-y-1"><Label>Level</Label><Input value={f.level} onChange={(e) => upd('level', e.target.value)} placeholder="P4" /></div>
+            <div className="space-y-1"><Label>Applications close</Label><Input type="date" value={f.closes_at} onChange={(e) => upd('closes_at', e.target.value)} /></div>
           </div>
 
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
@@ -363,14 +463,72 @@ function JobDialog({ workspaceId, departments, onDone }: { workspaceId: string; 
 
           <div className="space-y-1"><Label>Description</Label><Textarea rows={6} value={f.description} onChange={(e) => upd('description', e.target.value)} placeholder="Role overview & responsibilities (markdown)" /></div>
           <div className="space-y-1"><Label>Requirements</Label><Textarea rows={4} value={f.requirements} onChange={(e) => upd('requirements', e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <p className="text-xs text-muted-foreground">Both fields render as Markdown on the public page — use <code>##</code> headings and <code>-</code> bullets.</p>
+
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Salary min</Label><Input type="text" inputMode="decimal" value={f.salary_min} onChange={(e) => upd('salary_min', e.target.value)} /></div>
             <div className="space-y-1"><Label>Salary max</Label><Input type="text" inputMode="decimal" value={f.salary_max} onChange={(e) => upd('salary_max', e.target.value)} /></div>
+            <div className="space-y-1"><Label>Currency</Label><Input value={f.currency} onChange={(e) => upd('currency', e.target.value.toUpperCase())} placeholder="EUR" /></div>
+          </div>
+
+          {/* Optional per-region bands — when present they replace the flat range on the public page. */}
+          <div className="rounded-xl border border-border/60 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Label>Compensation by region <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Button size="sm" variant="outline" className="rounded-full h-8" onClick={addComp}><Plus className="h-3.5 w-3.5 mr-1" />Add region</Button>
+            </div>
+            {comp.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Leave empty to show the single salary range above.</p>
+            ) : comp.map((r, i) => (
+              <div key={i} className="rounded-lg border border-border/40 p-2 space-y-2">
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <Input value={r.region} onChange={(e) => updComp(i, { region: e.target.value })} placeholder="United Kingdom" className="h-8" />
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => setComp((rows) => rows.filter((_, idx) => idx !== i))}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input value={r.min} inputMode="decimal" onChange={(e) => updComp(i, { min: e.target.value })} placeholder="Min" className="h-8" />
+                  <Input value={r.max} inputMode="decimal" onChange={(e) => updComp(i, { max: e.target.value })} placeholder="Max" className="h-8" />
+                  <Input value={r.currency} onChange={(e) => updComp(i, { currency: e.target.value.toUpperCase() })} placeholder="GBP" className="h-8" />
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={r.equity} onChange={(e) => updComp(i, { equity: e.target.checked })} />Offers equity</label>
+                  <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={r.bonus} onChange={(e) => updComp(i, { bonus: e.target.checked })} />Offers bonus</label>
+                </div>
+              </div>
+            ))}
+            <div className="space-y-1">
+              <Label className="text-xs">Compensation note</Label>
+              <Textarea rows={2} value={f.compensation_note} onChange={(e) => upd('compensation_note', e.target.value)} placeholder="How you determine compensation, link to your philosophy, etc." />
+            </div>
+          </div>
+
+          {/* What the public application form asks for. */}
+          <div className="rounded-xl border border-border/60 p-3 space-y-2">
+            <Label>Application form</Label>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {([
+                ['require_resume', 'Require a résumé (PDF)'], ['ask_phone', 'Ask for phone'],
+                ['ask_location', 'Ask for location'], ['ask_links', 'Ask for links (GitHub, portfolio…)'],
+                ['ask_cover_letter', 'Ask for a cover letter'],
+              ] as const).map(([k, label]) => (
+                <label key={k} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={f[k]} onChange={(e) => upd(k, e.target.checked)} />{label}
+                </label>
+              ))}
+            </div>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => submit('draft')} disabled={saving}>Save draft</Button>
-          <Button className="rounded-full" onClick={() => submit('open')} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Publish</Button>
+          {isEdit ? (
+            <Button className="rounded-full" onClick={() => submit(posting!.status)} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save changes
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" className="rounded-full" onClick={() => submit('draft')} disabled={saving}>Save draft</Button>
+              <Button className="rounded-full" onClick={() => submit('open')} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Publish</Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

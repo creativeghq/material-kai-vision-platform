@@ -146,14 +146,32 @@ export const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
 // ── Expansion types (org, recruitment, onboarding, documents, payroll, analytics) ──
 export interface Department { id: string; name: string; description: string | null; head_contact_id: string | null; head: { id: string; name: string } | null; employee_count: number; }
 export type PostingStatus = 'draft' | 'open' | 'closed';
+export type LocationType = 'onsite' | 'hybrid' | 'remote';
+/** One region's pay band, rendered on the public job page's facts rail. */
+export interface CompensationBand {
+  region: string; currency: string; min: number | null; max: number | null;
+  equity: boolean; bonus: boolean; note: string | null;
+}
+/** Which optional fields the public application form asks for. Unset keys default to true. */
+export interface ApplyConfig {
+  require_resume?: boolean; ask_phone?: boolean; ask_location?: boolean; ask_links?: boolean; ask_cover_letter?: boolean;
+}
 export interface JobPosting {
-  id: string; title: string; department_id: string | null; department: { id: string; name: string } | null;
-  employment_type: EmploymentType | null; location: string | null; remote: boolean;
+  id: string; title: string; slug: string | null; department_id: string | null; department: { id: string; name: string } | null;
+  employment_type: EmploymentType | null; location: string | null; location_type: LocationType | null; remote: boolean;
+  level: string | null;
   description: string | null; requirements: string | null; salary_min: number | null; salary_max: number | null;
-  currency: string | null; status: PostingStatus; created_at: string; published_at: string | null;
+  currency: string | null; compensation: CompensationBand[]; compensation_note: string | null;
+  apply_config: ApplyConfig; closes_at: string | null;
+  status: PostingStatus; created_at: string; published_at: string | null;
   applicant_count: number; active_applicants: number;
 }
-export interface Candidate { id: string; name: string; email: string | null; phone: string | null; headline: string | null; source: string | null; resume_path?: string | null; created_at: string; }
+export const LOCATION_TYPE_LABELS: Record<LocationType, string> = { onsite: 'On-site', hybrid: 'Hybrid', remote: 'Remote' };
+export interface Candidate {
+  id: string; name: string; email: string | null; phone: string | null; headline: string | null;
+  location?: string | null; links?: string | null;
+  source: string | null; resume_path?: string | null; created_at: string;
+}
 export type AppStage = 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
 export interface Application {
   id: string; job_posting_id: string; candidate_id: string; stage: AppStage; rating: number | null; notes: string | null;
