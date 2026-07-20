@@ -1831,6 +1831,83 @@ async function handleTokenAction(db: SupabaseClient, action: string, payload: Js
 
 const TOKEN_ACTIONS = new Set(['token_get_thread', 'token_send_message', 'token_claim']);
 
+// ── Public "Hire me" contact form (PublicProfilePage → HireMeModal) ───────────────────────────
+// The modal is rendered on a PUBLIC profile page with no auth gate, but it wrote to
+// profile_contact_requests straight from the browser and RLS only allows `authenticated` — so a
+// logged-out visitor always got "Failed to send". The form was inert for exactly the audience it
+// exists to serve. It posts here instead: Turnstile-gated, rate-limited, service-role insert.
+const CONTACT_MAX_PER_RECIPIENT_HOUR = 20;   // stops one profile being flooded
+const CONTACT_MAX_PER_SENDER_WINDOW = 3;
+const CONTACT_SENDER_WINDOW_MS = 10 * 60_000;
+
+function clientIp(req: Request): string {
+  return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || '0.0.0.0';
+}
+
+async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+  const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
+  if (!secret) return true; // not configured → fail-open, same contract as hr-careers
+  const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    body: new URLSearchParams({ secret, response: token, remoteip: ip }),
+  });
+  return !!(await r.json().catch(() => ({ success: false }))).success;
+}
+
+async function handleProfileContact(db: SupabaseClient, req: Request, payload: Json): Promise<Response> {
+  const toUserId = String((payload as Record<string, unknown>).to_user_id ?? '').trim();
+  const name = String((payload as Record<string, unknown>).from_name ?? '').trim().slice(0, 200);
+  const email = String((payload as Record<string, unknown>).from_email ?? '').trim().slice(0, 200);
+  const message = String((payload as Record<string, unknown>).message ?? '').trim().slice(0, 5000);
+  const servicesRaw = (payload as Record<string, unknown>).services_requested;
+  const services = Array.isArray(servicesRaw)
+    ? servicesRaw.map((s) => String(s).slice(0, 120)).slice(0, 20)
+    : null;
+
+  if (!toUserId || !name || !email || !message) throw new HttpError(400, 'name, email and message are required');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
+
+  if (!(await verifyTurnstile(String((payload as Record<string, unknown>).turnstile_token ?? ''), clientIp(req)))) {
+    throw new HttpError(400, 'Bot check failed — please retry.');
+  }
+
+  // The recipient must be a real profile; never let a caller aim a request at an arbitrary uuid.
+  const { data: recipient } = await db.from('user_profiles').select('user_id').eq('user_id', toUserId).maybeSingle();
+  if (!recipient) throw new HttpError(404, 'Profile not found');
+
+  const since = new Date(Date.now() - CONTACT_SENDER_WINDOW_MS).toISOString();
+  const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const [{ count: bySender }, { count: byRecipient }] = await Promise.all([
+    db.from('profile_contact_requests').select('*', { count: 'exact', head: true })
+      .eq('from_email', email).gte('created_at', since),
+    db.from('profile_contact_requests').select('*', { count: 'exact', head: true })
+      .eq('to_user_id', toUserId).gte('created_at', hourAgo),
+  ]);
+  if ((bySender ?? 0) >= CONTACT_MAX_PER_SENDER_WINDOW || (byRecipient ?? 0) >= CONTACT_MAX_PER_RECIPIENT_HOUR) {
+    throw new HttpError(429, 'Too many messages right now — please try again later.');
+  }
+
+  // is_read is set server-side: a sender must never be able to pre-mark their own message read.
+  const { error } = await db.from('profile_contact_requests').insert({
+    to_user_id: toUserId, from_name: name, from_email: email, message,
+    services_requested: services && services.length ? services : null, is_read: false,
+  });
+  if (error) throw new HttpError(400, 'Could not send your message.');
+
+  // Same event the authenticated client path emits — the seeded "Hire Me Received" flow owns
+  // delivery, so an admin can retarget it without a deploy.
+  await emitFlowEvent('hire_me_received', {
+    user_id: toUserId, to_user_id: toUserId, type: 'hire_me',
+    title: `New hire request from ${name}`,
+    body: services && services.length ? `Interested in: ${services.join(', ')}` : message.slice(0, 100),
+    action_url: '/profile?tab=inbox',
+    from_name: name, from_email: email, services_requested: services ?? [],
+    sent_at: new Date().toISOString(),
+  }).catch(() => {});
+
+  return json({ ok: true });
+}
+
 async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
@@ -1865,6 +1942,12 @@ async function handler(req: Request): Promise<Response> {
       return json({ error: claimAuth.error || 'Unauthorized' }, 401);
     }
     return handleTokenAction(db, action, { ...payload, user_id: claimAuth.userId });
+  }
+
+  // Public branch — genuinely anonymous visitor on a public profile page. Turnstile + rate
+  // limited inside the handler; writes only profile_contact_requests.
+  if (action === 'profile_contact') {
+    return handleProfileContact(db, req, payload);
   }
 
   // Token branch — unauthenticated customer, service-role only.

@@ -13,7 +13,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { flowEventService } from '@/services/flows/flowEventService';
+import { edgeError } from '@/utils/edgeError';
 import type { ServiceItem } from './ProfileTab';
 
 interface HireMeModalProps {
@@ -65,15 +65,21 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
         .filter((s) => selectedServices.includes(s.id))
         .map((s) => s.name);
 
-      const { error } = await supabase.from('profile_contact_requests').insert({
-        to_user_id: toUserId,
-        from_name: form.name.trim(),
-        from_email: form.email.trim(),
-        message: form.message.trim(),
-        services_requested: selectedNames.length > 0 ? selectedNames : null,
+      // Goes through inbox-api, not a direct insert: this modal renders on a PUBLIC profile
+      // page, and profile_contact_requests is authenticated-only, so the old client-side
+      // insert failed for every logged-out visitor — the exact audience the form is for.
+      // The function is Turnstile-gated + rate-limited and sets is_read server-side.
+      const { error } = await supabase.functions.invoke('inbox-api', {
+        body: {
+          action: 'profile_contact',
+          to_user_id: toUserId,
+          from_name: form.name.trim(),
+          from_email: form.email.trim(),
+          message: form.message.trim(),
+          services_requested: selectedNames.length > 0 ? selectedNames : null,
+        },
       });
-
-      if (error) throw error;
+      if (error) throw await edgeError(error);
 
       setSent(true);
       toast({
@@ -81,34 +87,21 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
         description: `Your message has been sent to ${toUserName}.`,
       });
 
-      // Recipient notification is delivered by the "Hire Me Received" flow
-      // (Flows dashboard). The event carries the full notification payload so
-      // the flow's Create Notification action can template it directly, which
-      // lets an admin pause/edit/redirect the notification without code changes.
-      flowEventService.emit('hire_me_received', {
-        user_id: toUserId, // recipient — consumed by create_notification
-        to_user_id: toUserId, // retained for filters / back-compat
-        type: 'hire_me',
-        title: `New hire request from ${form.name.trim()}`,
-        body: selectedNames.length > 0
-          ? `Interested in: ${selectedNames.join(', ')}`
-          : form.message.trim().slice(0, 100),
-        action_url: '/profile?tab=inbox',
-        from_name: form.name.trim(),
-        from_email: form.email.trim(),
-        services_requested: selectedNames,
-        sent_at: new Date().toISOString(),
-      });
+      // The `hire_me_received` flow event is emitted SERVER-SIDE by inbox-api now. Emitting it
+      // here too would double-notify the recipient — and an anonymous visitor can't emit it
+      // anyway, which is half of why this form never worked logged-out.
       supabase.from('analytics_events').insert({
         event_type: 'hire_me_submitted',
         user_id: null,
         event_data: { to_user_id: toUserId, services_requested: selectedNames, has_services: selectedNames.length > 0 },
         created_at: new Date().toISOString(),
       }).then(() => {});
-    } catch {
+    } catch (err) {
+      // Show the real reason (rate limit, bot check, unknown profile) — a blanket
+      // "Something went wrong" is what let this form fail silently for logged-out visitors.
       toast({
         title: 'Failed to send',
-        description: 'Something went wrong. Please try again.',
+        description: (err as Error)?.message || 'Something went wrong. Please try again.',
         variant: 'destructive',
       });
     } finally {
