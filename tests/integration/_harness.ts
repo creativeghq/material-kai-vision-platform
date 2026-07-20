@@ -66,6 +66,16 @@ export async function addMember(svc: SupabaseClient, wsId: string, userId: strin
   if (error) throw new Error(`addMember: ${error.message}`);
 }
 
+// Paid modules refuse with 402 unless the workspace holds an entitlement (assertEntitled →
+// is_workspace_entitled). A fixture workspace is never the operator root, so it must be granted
+// explicitly before any hr / sales-finance / stock endpoint will answer.
+export async function grantModule(svc: SupabaseClient, wsId: string, moduleSlug: string): Promise<void> {
+  const { error } = await svc
+    .from('workspace_module_entitlements')
+    .upsert({ workspace_id: wsId, module_slug: moduleSlug, enabled: true }, { onConflict: 'workspace_id,module_slug' });
+  if (error) throw new Error(`grantModule(${moduleSlug}): ${error.message}`);
+}
+
 // Best-effort teardown. Data first (FK), then memberships, workspaces, users. Never throws —
 // the email-prefix cron is the backstop if anything here fails.
 export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; userIds?: string[] }): Promise<void> {
