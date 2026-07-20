@@ -28,6 +28,13 @@ on:
       # a docs-only push runs the guards and skips every deploy job.
       - 'docs/**'
       - 'scripts/**'
+      # Third instance of the same trap: a change to the WORKFLOW ITSELF didn't match any
+      # path, so edits to this file never ran it. The health-check and credential-gate steps
+      # were both committed and never executed once. A CI change you cannot observe is not a
+      # CI change. (Deploy jobs stay gated on changes.outputs.*, so a workflow-only push runs
+      # the guards and skips every deploy.)
+      - '.github/workflows/**'
+      - '.github/semgrep-security.yml'
   workflow_dispatch:
     inputs:
       deployment_reason:
