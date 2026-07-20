@@ -96,52 +96,59 @@ export const MobileBottomNav: React.FC = () => {
         // covered the bottom ~56px of every modal on mobile.
         className="mobile-bottom-nav fixed bottom-0 inset-x-0 z-40 md:hidden bg-sidebar/95 backdrop-blur-lg border-t border-white/8"
       >
+        {/* Each cell keeps a full-width tap target (thumb reach) but its VISUAL
+            weight is constrained to a centred pill, so a 5-across bar reads
+            tight instead of four small glyphs floating in 78px columns. The
+            active state is that pill filling in — a top hairline is a top-tab
+            affordance and looked out of place on a bottom bar. */}
         <ul className="grid h-14" style={{ gridTemplateColumns: `repeat(${barItems.length + 1}, minmax(0, 1fr))` }}>
           {barItems.map((item) => {
             const active = isActive(item.path);
             return (
-              <li key={item.id}>
+              <li key={item.id} className="min-w-0">
                 <Link
                   to={item.path}
                   aria-current={active ? 'page' : undefined}
-                  className={`relative flex h-full flex-col items-center justify-center gap-0.5 transition-colors ${
+                  className={`flex h-full min-w-0 flex-col items-center justify-center gap-1 px-0.5 transition-colors ${
                     active ? 'text-primary' : 'text-muted-foreground'
                   }`}
                 >
-                  {active && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full"
-                      style={{ background: 'var(--brand-gradient)' }}
-                    />
-                  )}
-                  <item.icon className="w-5 h-5 flex-shrink-0" strokeWidth={active ? 2.2 : 1.8} />
-                  <span className="text-[10px] leading-none font-light max-w-full truncate px-0.5">
+                  <span
+                    className={`flex h-6 w-12 items-center justify-center rounded-full transition-colors ${
+                      active ? 'bg-primary/15' : 'bg-transparent'
+                    }`}
+                  >
+                    <item.icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={active ? 2.2 : 1.8} />
+                  </span>
+                  <span
+                    className={`max-w-full truncate text-[10px] leading-none ${
+                      active ? 'font-normal' : 'font-light'
+                    }`}
+                  >
                     {item.label}
                   </span>
                 </Link>
               </li>
             );
           })}
-          <li>
+          <li className="min-w-0">
             <button
               type="button"
               onClick={() => setMoreOpen(true)}
               aria-haspopup="dialog"
               aria-expanded={moreOpen}
-              className={`relative flex h-full w-full flex-col items-center justify-center gap-0.5 transition-colors ${
+              className={`flex h-full w-full min-w-0 flex-col items-center justify-center gap-1 px-0.5 transition-colors ${
                 moreActive ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
-              {moreActive && (
-                <span
-                  aria-hidden="true"
-                  className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full"
-                  style={{ background: 'var(--brand-gradient)' }}
-                />
-              )}
-              <MoreHorizontal className="w-5 h-5 flex-shrink-0" strokeWidth={moreActive ? 2.2 : 1.8} />
-              <span className="text-[10px] leading-none font-light">More</span>
+              <span
+                className={`flex h-6 w-12 items-center justify-center rounded-full transition-colors ${
+                  moreActive ? 'bg-primary/15' : 'bg-transparent'
+                }`}
+              >
+                <MoreHorizontal className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={moreActive ? 2.2 : 1.8} />
+              </span>
+              <span className={`text-[10px] leading-none ${moreActive ? 'font-normal' : 'font-light'}`}>More</span>
             </button>
           </li>
         </ul>
@@ -150,11 +157,18 @@ export const MobileBottomNav: React.FC = () => {
       </nav>
 
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl bg-sidebar border-t border-white/8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        {/* The overflow list is unbounded (every entitled app lands here), so the
+            sheet scrolls rather than growing past the viewport. 3 columns at
+            390px = ~118px cells, enough for two-word labels ("Email Marketing",
+            "Interior Design") that were being mangled in 4 columns. */}
+        <SheetContent
+          side="bottom"
+          className="max-h-[80vh] overflow-y-auto rounded-t-2xl bg-sidebar border-t border-white/8 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+        >
           <SheetHeader className="text-left">
             <SheetTitle className="text-base font-light">Menu</SheetTitle>
           </SheetHeader>
-          <div className="grid grid-cols-4 gap-2 pt-2">
+          <div className="grid grid-cols-3 gap-1.5 pt-2 sm:grid-cols-4">
             {overflowItems.map((item) => {
               const active = isActive(item.path);
               return (
@@ -163,14 +177,14 @@ export const MobileBottomNav: React.FC = () => {
                   to={item.path}
                   onClick={() => setMoreOpen(false)}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-3 px-1 text-center transition-colors ${
+                  className={`flex min-h-[76px] min-w-0 flex-col items-center justify-start gap-1.5 rounded-xl px-1 py-3 text-center transition-colors ${
                     active
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
                   }`}
                 >
                   <item.icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-[11px] leading-tight font-light">{item.label}</span>
+                  <span className="line-clamp-2 text-[11px] leading-tight font-light break-words">{item.label}</span>
                 </Link>
               );
             })}
@@ -178,14 +192,14 @@ export const MobileBottomNav: React.FC = () => {
               to="/profile"
               onClick={() => setMoreOpen(false)}
               aria-current={location.pathname.startsWith('/profile') ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-3 px-1 text-center transition-colors ${
+              className={`flex min-h-[76px] min-w-0 flex-col items-center justify-start gap-1.5 rounded-xl px-1 py-3 text-center transition-colors ${
                 location.pathname.startsWith('/profile')
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
               }`}
             >
               <User className="w-5 h-5 flex-shrink-0" />
-              <span className="text-[11px] leading-tight font-light">Profile</span>
+              <span className="line-clamp-2 text-[11px] leading-tight font-light break-words">Profile</span>
             </Link>
           </div>
           <MobileInstallButton onDone={() => setMoreOpen(false)} />
