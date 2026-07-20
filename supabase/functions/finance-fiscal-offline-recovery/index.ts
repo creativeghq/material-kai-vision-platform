@@ -71,5 +71,40 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   results.credit_notes_checked = (cns ?? []).length;
   await recover('credit_notes', cns ?? [], (r) => String(r.credit_note_number ?? ''));
 
+  // ── Missing payment receipts (safety net for the Stripe webhook) ───────────────
+  // Online payments generate their receipt in a post-response background task, which
+  // gives immediacy but not durability: if the worker dies mid-task the receipt is lost
+  // with no retry. Sweep any recent CARD payment that still has no receipt PDF and mint it.
+  //
+  // Scoped to stripe_payment_intent_id IS NOT NULL on purpose: a MANUALLY recorded payment
+  // may legitimately have no receipt because the user un-ticked "Send receipt to customer",
+  // and silently generating one would override that choice.
+  {
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const { data: missing } = await supabase.from('payments')
+      .select('id')
+      .eq('direction', 'in')
+      .not('stripe_payment_intent_id', 'is', null)
+      .is('pdf_storage_path', null)
+      .gte('created_at', since)
+      .limit(25);
+    results.receipts_missing = (missing ?? []).length;
+    results.receipts_generated = 0;
+    for (const p of missing ?? []) {
+      try {
+        // finance-invoice-pdf is idempotent — it returns the cached PDF if one already exists.
+        const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/finance-invoice-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-cron-secret': cronSecret },
+          body: JSON.stringify({ payment_id: (p as any).id }),
+        });
+        if (res.ok) results.receipts_generated++;
+        else console.error(`receipt sweep failed (${res.status}) for payment ${(p as any).id}`);
+      } catch (err) {
+        console.error('receipt sweep threw', err); // retried next tick
+      }
+    }
+  }
+
   return json({ ok: true, ...results });
 }));
