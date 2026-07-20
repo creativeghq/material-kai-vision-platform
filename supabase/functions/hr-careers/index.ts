@@ -39,10 +39,14 @@ const APPLY_DEFAULTS = {
 } as const;
 const applyConfig = (raw: any) => ({ ...APPLY_DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) });
 
-const JOB_PUBLIC_COLS =
+// The board only needs card-level fields; the detail page additionally needs the body copy.
+// Keep these two SEPARATE — folding them into one list either bloats every board response with
+// full descriptions, or (as happened once) silently drops the body from the detail page.
+const JOB_SUMMARY_COLS =
   'id, slug, title, location, location_type, remote, employment_type, level, salary_min, salary_max, currency, ' +
   'compensation, compensation_note, apply_config, published_at, closes_at, status, ' +
   'department:hr_departments!hr_job_postings_department_id_fkey ( name )';
+const JOB_DETAIL_COLS = `${JOB_SUMMARY_COLS}, description, requirements`;
 
 /** Flatten the department join + drop nothing else — these columns are all public by design. */
 const shapeJob = (j: any) => ({ ...j, department: j?.department?.name ?? null });
@@ -82,7 +86,7 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
 
   if (action === 'meta') {
     const { data: jobs } = await supabase
-      .from('hr_job_postings').select(JOB_PUBLIC_COLS)
+      .from('hr_job_postings').select(JOB_SUMMARY_COLS)
       .eq('workspace_id', ws.id).eq('status', 'open').order('published_at', { ascending: false });
     return json({
       ok: true, company: ws.name, company_profile: company, turnstile_site_key: turnstileSiteKey,
@@ -95,7 +99,7 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
     const jobSlug = String(body?.job_slug ?? '').trim();
     const jobId = String(body?.job_id ?? '').trim();
     if (!jobSlug && !jobId) return json({ error: 'job_slug or job_id is required' }, 400);
-    let q = supabase.from('hr_job_postings').select(JOB_PUBLIC_COLS).eq('workspace_id', ws.id);
+    let q = supabase.from('hr_job_postings').select(JOB_DETAIL_COLS).eq('workspace_id', ws.id);
     q = jobSlug ? q.eq('slug', jobSlug) : q.eq('id', jobId);
     const { data: job } = await q.maybeSingle();
     if (!isLive(job)) return json({ error: 'This position is no longer open.' }, 404);
