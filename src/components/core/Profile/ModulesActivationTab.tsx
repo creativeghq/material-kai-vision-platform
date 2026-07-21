@@ -1,15 +1,22 @@
 // #251 — Profile → Modules. The workspace OWNER activates / purchases optional modules here.
 // Free (plan-covered) modules activate instantly; add-ons redirect to Stripe checkout.
+//
+// Presented as a storefront: modules are grouped into the same Hubs the App Launcher uses
+// (`/apps`), carry the same icons + copy (see `resolveModuleMeta`), and each card states what it
+// costs and what happens if you click. Filter pills let the owner jump straight to what's
+// available to add vs. what's already running.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Check, Sparkles, Send } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { Loader2, Check, Sparkles, Send, ArrowRight, Lock, LayoutGrid } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { registeredModules, refreshModuleRegistry } from '@/modules/_core';
-import { SIDEBAR_NAV_ITEMS } from '@/config/nav-items';
+import { SIDEBAR_NAV_ITEMS, type Hub } from '@/config/nav-items';
+import { resolveModuleMeta, hubOrder, type ModuleMeta } from '@/config/module-catalog-meta';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
   fetchModuleCatalog,
@@ -35,6 +42,22 @@ const tenantFacingSlugs = new Set<string>([
     .map((i) => i.moduleSlug as string),
 ]);
 
+type Filter = 'all' | 'active' | 'available';
+
+/** A catalog row joined with its resolved presentation meta + entitlement state. */
+interface ModuleTile {
+  row: ModuleCatalogRow;
+  meta: ModuleMeta;
+  /** Covered by the current plan tier (no activation needed). */
+  covered: boolean;
+  /** Explicitly entitled to this workspace, or otherwise available. */
+  isActivated: boolean;
+  hasIt: boolean;
+  /** Purchasable right now (published add-on with a Stripe product). */
+  purchasable: boolean;
+  price: string | null;
+}
+
 export const ModulesActivationTab: React.FC = () => {
   const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
   const { planLevel, planName, availableSlugs, loading: entLoading } = useEntitlements();
@@ -46,6 +69,7 @@ export const ModulesActivationTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [requested, setRequested] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<Filter>('all');
 
   const isOwner = workspaceRole === 'owner' || isPlatformOperator;
 
@@ -83,11 +107,50 @@ export const ModulesActivationTab: React.FC = () => {
   }, []);
 
   // Modules the owner can activate: published add-ons + published modules that surface a
-  // workspace launcher entry.
-  const rows = useMemo(
-    () => catalog.filter((m) => m.is_addon || tenantFacingSlugs.has(m.slug)),
-    [catalog],
+  // workspace launcher entry, joined with their presentation meta + entitlement state.
+  const tiles = useMemo<ModuleTile[]>(
+    () => catalog
+      .filter((m) => m.is_addon || tenantFacingSlugs.has(m.slug))
+      .map((row) => {
+        const covered = planLevel >= tierRank(row.price_tier);
+        const isActivated = activated.has(row.slug) || availableSlugs.has(row.slug);
+        return {
+          row,
+          meta: resolveModuleMeta(row.slug, row),
+          covered,
+          isActivated,
+          hasIt: covered || isActivated,
+          purchasable: !!row.is_addon && !!row.addon_stripe_product_id,
+          price: formatAddonPrice(row.addon_price_cents, row.addon_currency),
+        };
+      })
+      .sort((a, b) => a.row.name.localeCompare(b.row.name)),
+    [catalog, planLevel, activated, availableSlugs],
   );
+
+  const counts = useMemo(() => ({
+    all: tiles.length,
+    active: tiles.filter((t) => t.hasIt).length,
+    available: tiles.filter((t) => !t.hasIt).length,
+  }), [tiles]);
+
+  // Group the filtered tiles by Hub, preserving the launcher's Hub order.
+  const groups = useMemo(() => {
+    const visible = tiles.filter((t) => filter === 'all' || (filter === 'active' ? t.hasIt : !t.hasIt));
+    const byHub = new Map<string, { label: string; hub: Hub | null; tiles: ModuleTile[]; order: number }>();
+    for (const t of visible) {
+      const key = t.meta.hub?.id ?? '__more__';
+      const entry = byHub.get(key) ?? {
+        label: t.meta.hub?.label ?? 'Platform & integrations',
+        hub: t.meta.hub,
+        tiles: [],
+        order: hubOrder(t.meta.hub?.id ?? null),
+      };
+      entry.tiles.push(t);
+      byHub.set(key, entry);
+    }
+    return [...byHub.values()].sort((a, b) => a.order - b.order);
+  }, [tiles, filter]);
 
   const handleActivate = async (m: ModuleCatalogRow) => {
     if (!activeWorkspaceId) return;
@@ -153,99 +216,182 @@ export const ModulesActivationTab: React.FC = () => {
     return <p className="text-sm text-muted-foreground">Select a workspace to manage its modules.</p>;
   }
 
-  return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold mb-1">Modules</h2>
-        <p className="text-sm text-muted-foreground">
-          {isOwner ? (
-            <>Activate optional modules for this workspace. Your plan is <span className="font-medium">{planName}</span> —
-            modules it includes activate for free; others are available as monthly add-ons.</>
-          ) : (
-            <>Optional modules for this workspace. You can request activation — the workspace owner is notified and decides.</>
+  const filterPill = (id: Filter, label: string, count: number) => (
+    <button
+      key={id}
+      type="button"
+      onClick={() => setFilter(id)}
+      className={cn(
+        'rounded-full border px-3 py-1 text-xs transition-colors',
+        filter === id
+          ? 'border-transparent bg-primary text-primary-foreground'
+          : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+      )}
+    >
+      {label} <span className="opacity-70">{count}</span>
+    </button>
+  );
+
+  const renderTile = (t: ModuleTile) => {
+    const { row: m, meta, covered, isActivated, hasIt, purchasable, price } = t;
+    const Icon = meta.icon;
+    const isBusy = busy === m.slug;
+
+    // ── Status line (bottom-left): what the workspace has, in plain words. ──
+    let status: React.ReactNode;
+    if (covered) {
+      status = <span className="text-xs text-muted-foreground">Included in {planName}</span>;
+    } else if (hasIt) {
+      status = <span className="text-xs text-emerald-500">Active add-on{price ? ` · ${price}` : ''}</span>;
+    } else if (purchasable) {
+      status = <span className="text-xs text-muted-foreground">Add-on{price ? ` · ${price}` : ''}</span>;
+    } else {
+      const tierLabel = (m.price_tier || 'a higher').replace(/^\w/, (c) => c.toUpperCase());
+      status = (
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Lock className="h-3 w-3" /> {tierLabel} plan
+        </span>
+      );
+    }
+
+    // ── Action (bottom-right). ──
+    let action: React.ReactNode;
+    if (hasIt) {
+      const cancel = isOwner && isActivated && m.is_addon && !covered ? (
+        <Button size="sm" variant="ghost" className="text-muted-foreground" disabled={isBusy} onClick={() => handleDeactivate(m)}>
+          {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cancel'}
+        </Button>
+      ) : null;
+      action = (
+        <div className="flex items-center gap-1">
+          {cancel}
+          {meta.path && (
+            <Button size="sm" variant="outline" asChild>
+              <Link to={meta.path}>Open <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
+            </Button>
           )}
-        </p>
+        </div>
+      );
+    } else if (isOwner) {
+      action = purchasable ? (
+        <Button size="sm" disabled={isBusy} onClick={() => handleActivate(m)}>
+          {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="mr-1 h-4 w-4" /> Add{price ? ` · ${price}` : ''}</>}
+        </Button>
+      ) : (
+        <Button size="sm" variant="outline" asChild>
+          <a href="/profile?tab=subscription">Upgrade plan</a>
+        </Button>
+      );
+    } else {
+      action = requested.has(m.slug) ? (
+        <Badge variant="secondary" className="gap-1"><Check className="h-3 w-3" /> Requested</Badge>
+      ) : (
+        <Button size="sm" variant="outline" disabled={isBusy} onClick={() => handleRequest(m)}>
+          {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="mr-1 h-4 w-4" /> Request</>}
+        </Button>
+      );
+    }
+
+    return (
+      <Card
+        key={m.slug}
+        className={cn(
+          'h-full transition-colors',
+          hasIt ? 'border-primary/25' : 'hover:border-foreground/20',
+        )}
+      >
+        <CardContent className="flex h-full flex-col gap-3 p-4">
+          <div className="flex items-start gap-3">
+            <div className={cn(
+              'shrink-0 rounded-lg p-2',
+              hasIt ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+            )}>
+              <Icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="truncate font-medium">{m.name}</div>
+                {hasIt ? (
+                  <Badge variant="secondary" className="shrink-0 gap-1 text-[10px]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
+                  </Badge>
+                ) : price ? (
+                  <Badge variant="outline" className="shrink-0 text-[10px]">{price}</Badge>
+                ) : null}
+              </div>
+              {meta.description && (
+                <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{meta.description}</p>
+              )}
+            </div>
+          </div>
+          <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+            {status}
+            {action}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="mb-1 text-lg font-semibold">Modules</h2>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            {isOwner ? (
+              <>Everything you can run in this workspace, grouped the same way as your Hubs.
+              You're on <span className="font-medium text-foreground">{planName}</span> — modules it
+              covers switch on for free, the rest are monthly add-ons you can cancel any time.</>
+            ) : (
+              <>Everything this workspace can run. You can request a module — the workspace owner is
+              notified and decides.</>
+            )}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" asChild className="gap-2">
+          <Link to="/apps"><LayoutGrid className="h-4 w-4" /> Open Apps</Link>
+        </Button>
       </div>
 
       {(loading || entLoading) ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
+        <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading modules…
         </div>
-      ) : rows.length === 0 ? (
-        <Card><CardContent className="py-8 text-sm text-muted-foreground text-center">
+      ) : tiles.length === 0 ? (
+        <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
           No optional modules are published yet. Check back soon.
         </CardContent></Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {rows.map((m) => {
-            const covered = planLevel >= tierRank(m.price_tier);
-            const isActivated = activated.has(m.slug) || availableSlugs.has(m.slug);
-            const hasIt = covered || isActivated;
-            const price = formatAddonPrice(m.addon_price_cents, m.addon_currency);
+        <>
+          <div className="flex flex-wrap gap-2">
+            {filterPill('all', 'All', counts.all)}
+            {filterPill('active', 'Active', counts.active)}
+            {filterPill('available', 'Available to add', counts.available)}
+          </div>
 
-            let badge: React.ReactNode;
-            let action: React.ReactNode = null;
-
-            // Status badge is the same regardless of role.
-            if (covered) {
-              badge = <Badge variant="secondary">Included in {planName}</Badge>;
-            } else if (hasIt) {
-              badge = <Badge className="gap-1"><Check className="h-3 w-3" /> Active</Badge>;
-            } else if (m.is_addon && m.addon_stripe_product_id) {
-              badge = price ? <Badge variant="outline">{price}</Badge> : <Badge variant="outline">Add-on</Badge>;
-            } else {
-              const tierLabel = (m.price_tier || 'a higher').replace(/^\w/, (c) => c.toUpperCase());
-              badge = <Badge variant="outline">Requires {tierLabel} plan</Badge>;
-            }
-
-            if (hasIt) {
-              // Owner of an active add-on can cancel; everyone else just sees it's active.
-              action = isOwner && isActivated && m.is_addon && !covered ? (
-                <Button size="sm" variant="outline" disabled={busy === m.slug} onClick={() => handleDeactivate(m)}>
-                  {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cancel'}
-                </Button>
-              ) : (
-                <Badge className="gap-1"><Check className="h-3 w-3" /> Active</Badge>
-              );
-            } else if (isOwner) {
-              action = m.is_addon && m.addon_stripe_product_id ? (
-                <Button size="sm" disabled={busy === m.slug} onClick={() => handleActivate(m)}>
-                  {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="h-4 w-4 mr-1" /> Activate</>}
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" asChild>
-                  <a href="/profile?tab=subscription">Upgrade</a>
-                </Button>
-              );
-            } else {
-              // Non-owner: request activation from the workspace owner.
-              action = requested.has(m.slug) ? (
-                <Badge variant="secondary" className="gap-1"><Check className="h-3 w-3" /> Requested</Badge>
-              ) : (
-                <Button size="sm" variant="outline" disabled={busy === m.slug} onClick={() => handleRequest(m)}>
-                  {busy === m.slug ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="h-4 w-4 mr-1" /> Request from Workspace Owner</>}
-                </Button>
-              );
-            }
-
+          {groups.length === 0 ? (
+            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
+              {filter === 'available'
+                ? 'Nothing left to add — every module available on your plan is already on.'
+                : 'No modules match this filter yet.'}
+            </CardContent></Card>
+          ) : groups.map((g) => {
+            const HubIcon = g.hub?.icon;
             return (
-              <Card key={m.slug}>
-                <CardContent className="p-4 flex flex-col gap-3 h-full">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{m.name}</div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {m.summary || m.description || ''}
-                      </p>
-                    </div>
-                    {badge}
-                  </div>
-                  <div className="mt-auto flex justify-end">{action}</div>
-                </CardContent>
-              </Card>
+              <section key={g.label} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  {HubIcon ? <HubIcon className="h-4 w-4 text-primary" /> : null}
+                  <h3 className="text-sm font-semibold">{g.label}</h3>
+                  <span className="text-xs text-muted-foreground">{g.tiles.length}</span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {g.tiles.map(renderTile)}
+                </div>
+              </section>
             );
           })}
-        </div>
+        </>
       )}
     </div>
   );
