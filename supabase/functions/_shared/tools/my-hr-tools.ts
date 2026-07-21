@@ -94,7 +94,23 @@ export const createManageMyHrTool = (
           const r = await callHrApi(jwt!, ws, 'self-profile');
           if (!r.ok) return JSON.stringify({ success: false, error: r.error });
           const p = r.data?.profile ?? {};
-          onChunk?.({ type: 'my_hr_profile', profile: p, timestamp: Date.now() });
+          // Emit a CURATED, flat payload — never the raw hr-api row. The raw profile carries
+          // pay_basis / monthly_salary / hourly_rate / department_id, and the generic result card
+          // renders whatever it's given: dumping salary into a chat card is bad UX (and awkward on
+          // a shared screen). Flat keys also render far better than a nested object.
+          onChunk?.({
+            type: 'my_hr_profile',
+            position: p?.contact?.position ?? null,
+            department: p?.department?.name ?? null,
+            employment_type: p?.employment_type ?? null,
+            start_date: p?.start_date ?? null,
+            weekly_hours: p?.weekly_hours ?? null,
+            status: p?.status ?? null,
+            leave_allowance_days: p?.summary?.annual_leave_allowance_days ?? p?.annual_leave_allowance_days ?? null,
+            leave_remaining_days: p?.summary?.remaining_leave_days ?? null,
+            leave_taken_days: p?.summary?.total_absence_days ?? null,
+            timestamp: Date.now(),
+          });
           return JSON.stringify({
             success: true,
             profile: {
@@ -118,7 +134,15 @@ export const createManageMyHrTool = (
           const r = await callHrApi(jwt!, ws, 'self-timeoff');
           if (!r.ok) return JSON.stringify({ success: false, error: r.error });
           const absences: any[] = r.data?.absences ?? [];
-          onChunk?.({ type: 'my_hr_timeoff', absences, timestamp: Date.now() });
+          onChunk?.({
+            type: 'my_hr_timeoff',
+            total: absences.length,
+            absences: absences.slice(0, 25).map((a) => ({
+              type: a.absence_type, from: a.start_date, to: a.end_date,
+              working_days: a.working_days, status: a.status, note: a.note ?? null,
+            })),
+            timestamp: Date.now(),
+          });
           return JSON.stringify({
             success: true,
             count: absences.length,
@@ -139,7 +163,13 @@ export const createManageMyHrTool = (
           });
           if (!r.ok) return JSON.stringify({ success: false, error: r.error });
           const a = r.data?.absence ?? {};
-          onChunk?.({ type: 'my_hr_timeoff_requested', absence: a, timestamp: Date.now() });
+          onChunk?.({
+            type: 'my_hr_timeoff_requested',
+            type_requested: a.absence_type, from: a.start_date, to: a.end_date,
+            working_days: a.working_days, status: a.status,
+            note: 'Pending — still needs HR approval.',
+            timestamp: Date.now(),
+          });
           return JSON.stringify({
             success: true,
             submitted: { type: a.absence_type, from: a.start_date, to: a.end_date, working_days: a.working_days, status: a.status },
@@ -151,7 +181,12 @@ export const createManageMyHrTool = (
           const r = await callHrApi(jwt!, ws, 'self-documents');
           if (!r.ok) return JSON.stringify({ success: false, error: r.error });
           const documents: any[] = r.data?.documents ?? [];
-          onChunk?.({ type: 'my_hr_documents', documents, timestamp: Date.now() });
+          onChunk?.({
+            type: 'my_hr_documents',
+            total: documents.length,
+            documents: documents.slice(0, 25).map((d) => ({ name: d.name, doc_type: d.doc_type, added: d.created_at })),
+            timestamp: Date.now(),
+          });
           return JSON.stringify({
             success: true,
             count: documents.length,
@@ -164,7 +199,13 @@ export const createManageMyHrTool = (
           const r = await callHrApi(jwt!, ws, 'self-punches', { days: days ?? 14 });
           if (!r.ok) return JSON.stringify({ success: false, error: r.error });
           const punches: any[] = r.data?.punches ?? [];
-          onChunk?.({ type: 'my_hr_punches', punches, clocked_in: r.data?.clocked_in ?? false, timestamp: Date.now() });
+          onChunk?.({
+            type: 'my_hr_punches',
+            clocked_in: r.data?.clocked_in ?? false,
+            total: punches.length,
+            punches: punches.slice(0, 30).map((x) => ({ type: x.punch_type, at: x.punched_at, date: x.reference_date, status: x.status })),
+            timestamp: Date.now(),
+          });
           return JSON.stringify({
             success: true,
             clocked_in: r.data?.clocked_in ?? false,
