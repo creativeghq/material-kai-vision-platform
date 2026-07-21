@@ -1845,6 +1845,10 @@ function clientIp(req: Request): string {
 }
 
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+  // Read from env, which bootstrapForFunction() fills from platform_secrets. That bootstrap is
+  // memoised PER WORKER, so pasting the key into the admin UI does NOT take effect on already-warm
+  // workers — they keep the snapshot from their cold start. After first setting TURNSTILE_SECRET_KEY,
+  // redeploy (or wait for recycle) or the fail-open branch below silently stays active.
   const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
   if (!secret) return true; // not configured → fail-open, same contract as hr-careers
   const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
