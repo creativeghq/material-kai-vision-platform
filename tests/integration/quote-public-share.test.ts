@@ -33,7 +33,8 @@ suite('quote-public-share · anonymous token surface', () => {
   const seedQuote = async (over: Record<string, unknown>) => {
     const { data, error } = await svc.from('quotes').insert({
       workspace_id: ws, user_id: owner.id, name: `E2E Quote ${rid}`,
-      status: 'sent', currency: 'EUR', grand_total: 1234.56,
+      // valid_status CHECK: draft|submitted|quoted|accepted|rejected|expired — 'sent' is not one.
+      status: 'quoted', currency: 'EUR', grand_total: 1234.56,
       ...over,
     }).select('id, public_share_token').single();
     if (error) throw new Error(`seed quote: ${error.message}`);
@@ -93,7 +94,7 @@ suite('quote-public-share · anonymous token surface', () => {
       expect(status, `signer "${signer_name}" was accepted`).toBe(400);
     }
     const { data } = await svc.from('quotes').select('status').eq('id', sharedQuote).single();
-    expect(data!.status, 'quote changed status on a rejected accept').toBe('sent');
+    expect(data!.status, 'quote changed status on a rejected accept').toBe('quoted');
   });
 
   it('accepts with a signer and flips the quote to accepted', async () => {
@@ -113,6 +114,6 @@ suite('quote-public-share · anonymous token surface', () => {
     });
     expect(body.not_found).toBe(true);
     const { data } = await svc.from('quotes').select('status').eq('id', disabledQuote).single();
-    expect(data!.status, 'a revoked link still accepted the quote').toBe('sent');
+    expect(data!.status, 'a revoked link still accepted the quote').toBe('quoted');
   });
 });
