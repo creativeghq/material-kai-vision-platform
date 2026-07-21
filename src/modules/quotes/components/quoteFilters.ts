@@ -51,10 +51,15 @@ export function buildQuoteFilters(rows: QuoteWithItems[]): FilterGroupDef[] {
           accessor: (r: QuoteWithItems) => r.currency,
         },
         {
-          key: 'customer', type: 'bool', label: 'Customer',
-          description: 'Quotes already tied to a CRM company or contact.',
-          trueLabel: 'Has customer', falseLabel: 'No customer',
-          accessor: (r: QuoteWithItems) => !!(r.customer_company_id || r.customer_contact_id),
+          // `customer_name` is resolved from the CRM FK on read (quotesService.getUserQuotes),
+          // so this can be a real picker instead of the has/hasn't flag it started as.
+          key: 'customer', type: 'multi', label: 'Customer',
+          description: 'CRM company or contact the quote is addressed to.',
+          options: [
+            { value: NONE_VALUE, label: 'No customer' },
+            ...optionsFromRows(rows, (r) => r.customer_name ?? undefined),
+          ],
+          accessor: (r: QuoteWithItems) => r.customer_name ?? undefined,
         },
       ],
     },

@@ -14,14 +14,37 @@ export interface DocInput {
   status: string; // 'published' | 'draft'
 }
 
-export async function listDocs(workspaceId: string): Promise<WorkspaceDoc[]> {
+export interface WorkspaceDocWithAuthor extends WorkspaceDoc {
+  /** Display name behind `created_by`, resolved on read so the list can filter by author. */
+  author_name?: string | null;
+}
+
+export async function listDocs(workspaceId: string): Promise<WorkspaceDocWithAuthor[]> {
   const { data, error } = await supabase
     .from('workspace_docs')
     .select('*')
     .eq('workspace_id', workspaceId)
     .order('updated_at', { ascending: false });
   if (error) throw new Error(error.message);
-  return data ?? [];
+  const docs = data ?? [];
+
+  // `created_by` is a bare uuid; resolve it to a name in one batched lookup so the docs list
+  // can offer an author picker rather than only a "mine vs theirs" toggle.
+  const authorIds = [...new Set(docs.map((d) => d.created_by).filter(Boolean))] as string[];
+  if (authorIds.length === 0) return docs;
+
+  const { data: profiles } = await supabase
+    .from('user_profiles')
+    .select('user_id, full_name, email')
+    .in('user_id', authorIds);
+
+  const nameById = new Map<string, string>();
+  for (const p of profiles ?? []) {
+    const label = (p as any).full_name || (p as any).email;
+    if (label) nameById.set((p as any).user_id, label);
+  }
+  // An unresolved author simply gets no option — never drop the doc itself.
+  return docs.map((d) => ({ ...d, author_name: d.created_by ? nameById.get(d.created_by) ?? null : null }));
 }
 
 /** Flows — a workspace doc reached the 'published' state (fire-and-forget). */

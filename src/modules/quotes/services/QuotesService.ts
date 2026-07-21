@@ -81,6 +81,28 @@ export interface QuoteItem {
 
 export interface QuoteWithItems extends Quote {
   items?: QuoteItemWithProduct[];
+  /** CRM company/contact name behind `customer_company_id`/`customer_contact_id`, resolved on read. */
+  customer_name?: string | null;
+}
+
+/**
+ * Batch-resolve the CRM display name behind each quote's customer FK, keyed by that FK's id.
+ * Two `in()` queries regardless of list length — the quote row itself stores only uuids.
+ */
+async function resolveCustomerNames(quotes: Quote[]): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
+  const companyIds = [...new Set(quotes.map((q) => q.customer_company_id).filter(Boolean))] as string[];
+  const contactIds = [...new Set(quotes.map((q) => q.customer_contact_id).filter(Boolean))] as string[];
+
+  const [companies, contacts] = await Promise.all([
+    companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
+    contactIds.length ? supabase.from('crm_contacts').select('id, name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+  ]);
+
+  // A missing name must not break the list — the filter just won't offer that option.
+  for (const row of (companies as any).data ?? []) if (row?.name) names.set(row.id, row.name);
+  for (const row of (contacts as any).data ?? []) if (row?.name) names.set(row.id, row.name);
+  return names;
 }
 
 export interface Product {
@@ -282,10 +304,16 @@ export class QuotesService {
       return acc;
     }, {} as Record<string, QuoteItem[]>);
 
+    // Resolve customer names in two batched lookups. Without these the quote row carries only
+    // bare uuids, which is why the list could offer a "has customer" flag but not a real
+    // customer filter — there was nothing to label the options with.
+    const customerNames = await resolveCustomerNames(quotes);
+
     // Combine quotes with their items
     return quotes.map((quote: Quote) => ({
       ...quote,
       items: itemsByQuoteId[quote.id] || [],
+      customer_name: customerNames.get(quote.customer_company_id ?? quote.customer_contact_id ?? '') ?? null,
     }));
   }
 

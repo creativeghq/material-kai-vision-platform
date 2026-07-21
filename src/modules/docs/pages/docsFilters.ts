@@ -2,13 +2,13 @@
  * Filter definitions for the Docs list.
  *
  * The list only had a title/tag search box, so a workspace with a few dozen docs had no way to
- * separate drafts from published, or to find everything under one tag. Author is exposed as a
- * "mine vs the team" toggle rather than a picker — `workspace_docs` stores `created_by` as a raw
- * uuid and the list query joins no profile, so there are no names to render.
+ * separate drafts from published, or to find everything under one tag. Author is both a picker
+ * (names resolved from `created_by` by `listDocs`) and a "just mine" shortcut, since finding
+ * your own drafts is the common case and doesn't need the reader to know their own name.
  */
-import { BookText, CalendarDays, Tags } from 'lucide-react';
+import { BookText, CalendarDays, Tags, User } from 'lucide-react';
 import { NONE_VALUE, optionsFromRows, type FilterGroupDef } from '@/components/core/filters';
-import type { WorkspaceDoc } from '../services/docsService';
+import type { WorkspaceDocWithAuthor as WorkspaceDoc } from '../services/docsService';
 
 export function buildDocsFilters(rows: WorkspaceDoc[], myUserId: string | undefined): FilterGroupDef[] {
   return [
@@ -28,8 +28,21 @@ export function buildDocsFilters(rows: WorkspaceDoc[], myUserId: string | undefi
           ],
           accessor: (d: WorkspaceDoc) => d.status,
         },
+      ],
+    },
+    {
+      key: 'people', label: 'Author', icon: User,
+      fields: [
+        {
+          key: 'author', type: 'multi', label: 'Written by',
+          options: [
+            { value: NONE_VALUE, label: 'Unknown author' },
+            ...optionsFromRows(rows, (d) => d.author_name ?? undefined),
+          ],
+          accessor: (d: WorkspaceDoc) => d.author_name ?? undefined,
+        },
         ...(myUserId ? [{
-          key: 'mine', type: 'bool' as const, label: 'Author',
+          key: 'mine', type: 'bool' as const, label: 'Just mine',
           trueLabel: 'Written by me', falseLabel: 'Written by others',
           accessor: (d: WorkspaceDoc) => d.created_by === myUserId,
         }] : []),
