@@ -198,15 +198,6 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
     const email = String(body?.email ?? '').trim().slice(0, 200);
     if ((!jobId && !jobSlug) || !name) return json({ error: 'Name is required.' }, 400);
     // Bot check (only enforced when configured).
-    const secretRes = await resolveSecret(supabase, 'TURNSTILE_SECRET_KEY').catch(() => ({ value: null }));
-    const turnstileSecret = (secretRes as any)?.value || null;
-    // Service-role callers skip only the BOT check (they can write these tables directly anyway);
-    // this is also what lets the live integration suite exercise the apply path.
-    const trustedCaller = (req.headers.get('authorization') || '')
-      === `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`;
-    if (!trustedCaller && !(await verifyTurnstile(turnstileSecret, String(body?.turnstile_token ?? ''), clientIp(req)))) {
-      return json({ error: 'Bot check failed — please retry.' }, 400);
-    }
     // Per-IP throttle (works even when Turnstile isn't configured): cap applications per IP per window.
     const ip = clientIp(req);
     const rlSince = new Date(Date.now() - CAREERS_WINDOW_MS).toISOString();
@@ -236,6 +227,15 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
       if (!isPdf) return json({ error: 'Please upload your résumé as a PDF.' }, 400);
     }
     if (cfg.require_resume && !resumeBytes) return json({ error: 'A résumé (PDF) is required for this role.' }, 400);
+
+    // Bot check LAST, right before anything is written. The checks above (job live, per-IP
+    // throttle, résumé type/size) are cheap and side-effect-free, so a malformed or flooding
+    // request never burns a Turnstile verification — and they stay observable to an automated
+    // caller that cannot mint a challenge token.
+    const secretRes = await resolveSecret(supabase, 'TURNSTILE_SECRET_KEY').catch(() => ({ value: null }));
+    if (!(await verifyTurnstile((secretRes as any)?.value || null, String(body?.turnstile_token ?? ''), clientIp(req)))) {
+      return json({ error: 'Bot check failed — please retry.' }, 400);
+    }
 
     // Reuse an existing candidate (same email in this workspace) else create one.
     const profile = {

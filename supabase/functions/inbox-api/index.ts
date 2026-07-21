@@ -1873,15 +1873,6 @@ async function handleProfileContact(db: SupabaseClient, req: Request, payload: J
   if (!toUserId || !name || !email || !message) throw new HttpError(400, 'name, email and message are required');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
 
-  // A caller holding the SERVICE ROLE can already write these rows directly, so making it prove
-  // it isn't a bot is theatre — and it's the only way an automated test can exercise the path
-  // past a real Turnstile challenge. Every other guard below still applies to it.
-  const isTrustedCaller = (req.headers.get('authorization') || '') === `Bearer ${SERVICE_ROLE_KEY}`;
-  if (!isTrustedCaller
-      && !(await verifyTurnstile(db, String((payload as Record<string, unknown>).turnstile_token ?? ''), clientIp(req)))) {
-    throw new HttpError(400, 'Bot check failed — please retry.');
-  }
-
   // The recipient must be a real profile; never let a caller aim a request at an arbitrary uuid.
   const { data: recipient } = await db.from('user_profiles').select('user_id').eq('user_id', toUserId).maybeSingle();
   if (!recipient) throw new HttpError(404, 'Profile not found');
@@ -1896,6 +1887,14 @@ async function handleProfileContact(db: SupabaseClient, req: Request, payload: J
   ]);
   if ((bySender ?? 0) >= CONTACT_MAX_PER_SENDER_WINDOW || (byRecipient ?? 0) >= CONTACT_MAX_PER_RECIPIENT_HOUR) {
     throw new HttpError(429, 'Too many messages right now — please try again later.');
+  }
+
+  // Bot check LAST, immediately before the write. Everything above is a cheap local guard
+  // (shape, recipient exists, rate limit) with no side effects, so running them first means a
+  // malformed or flooding request never burns a Turnstile verification — and it keeps those
+  // guards observable to an automated caller that cannot mint a challenge token.
+  if (!(await verifyTurnstile(db, String((payload as Record<string, unknown>).turnstile_token ?? ''), clientIp(req)))) {
+    throw new HttpError(400, 'Bot check failed — please retry.');
   }
 
   // is_read is set server-side: a sender must never be able to pre-mark their own message read.
