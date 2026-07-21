@@ -167,6 +167,13 @@ export interface OrderListOptions {
 export interface OrderSearchOptions extends OrderListOptions {
   /** Free text — matched server-side against the order number OR the joined party name. */
   search?: string;
+  /** Inclusive created_at window, ISO dates. */
+  createdFrom?: string;
+  createdTo?: string;
+  /** Inclusive `total` bounds. Pair with `currency` — a range across mixed currencies is noise. */
+  totalMin?: number;
+  totalMax?: number;
+  currency?: string;
 }
 
 export const ordersService = {
@@ -186,6 +193,12 @@ export const ordersService = {
       p_search: opts.search?.trim() || null,
       p_limit: opts.limit ?? 20,
       p_offset: opts.offset ?? 0,
+      p_created_from: opts.createdFrom ?? null,
+      // End-of-day so a timestamptz column doesn't drop the final day the operator picked.
+      p_created_to: opts.createdTo ? `${opts.createdTo}T23:59:59.999` : null,
+      p_total_min: opts.totalMin ?? null,
+      p_total_max: opts.totalMax ?? null,
+      p_currency: opts.currency ?? null,
     });
     if (error) throw error;
     const raw = (data ?? []) as Array<{ order_row: Order; party_name: string | null; total_count: number }>;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Check, X } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Check, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -42,8 +42,10 @@ const STATUS_TONE: Record<OrderStatus, string> = {
 /**
  * Orders filter every dimension in SQL (`search_orders` RPC), so NO field carries an accessor —
  * they are read out of the values bag and passed as RPC params, and the list keeps the server's
- * exact count. Date / total ranges are deliberately absent: the RPC has no parameters for them
- * and post-filtering a page in the browser would make the count and the paging lie.
+ * exact count. Date and total ranges run in SQL too — `search_orders` gained parameters for them
+ * rather than have the browser post-filter a page, which would have made the count and the
+ * paging lie. Currency sits next to the total range because a min/max across mixed currencies
+ * is meaningless on its own.
  */
 const ORDER_FILTER_GROUPS: FilterGroupDef[] = [
   {
@@ -60,7 +62,37 @@ const ORDER_FILTER_GROUPS: FilterGroupDef[] = [
       },
     ],
   },
+  {
+    key: 'amounts', label: 'Amounts', icon: Coins,
+    fields: [
+      { key: 'total', type: 'range', label: 'Order total', min: 0, max: 50000 },
+      {
+        key: 'currency', type: 'select', label: 'Currency',
+        description: 'Pair with a total range — amounts are not comparable across currencies.',
+        options: [{ value: 'EUR', label: 'EUR' }, { value: 'USD', label: 'USD' }, { value: 'GBP', label: 'GBP' }],
+      },
+    ],
+  },
+  {
+    key: 'dates', label: 'Dates', icon: CalendarDays,
+    fields: [{ key: 'created_at', type: 'dateRange', label: 'Created' }],
+  },
 ];
+
+/** Map the values bag onto the RPC's filter parameters — used by both the list and the preview. */
+function orderSearchParams(v: FilterValues) {
+  const totalRange = (v.total as { min?: number; max?: number } | undefined) ?? {};
+  const created = (v.created_at as { from?: string; to?: string } | undefined) ?? {};
+  return {
+    orderType: (v.order_type as OrderType | undefined) || undefined,
+    status: (v.status as OrderStatus | undefined) || undefined,
+    createdFrom: created.from,
+    createdTo: created.to,
+    totalMin: totalRange.min,
+    totalMax: totalRange.max,
+    currency: (v.currency as string | undefined) || undefined,
+  };
+}
 
 type Party = { type: 'company' | 'contact'; id: string; name: string; vat?: string | null; sub?: string | null };
 const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct ?? 0;
@@ -89,8 +121,6 @@ export const OrdersPanel: React.FC<{
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filterValues, setFilterValues] = useState<FilterValues>({});
-  const typeF = filterValues.order_type as OrderType | undefined;
-  const statusF = filterValues.status as OrderStatus | undefined;
   // `filterValues.q` is what the user is typing; `searchQ` is the debounced value the query
   // actually runs on, so a fast typist doesn't fire a round trip per keystroke.
   const search = (filterValues.q as string | undefined) ?? '';
@@ -142,8 +172,7 @@ export const OrdersPanel: React.FC<{
       setLoading(true);
       const res = await ordersService.search({
         workspaceId, companyId, contactId, projectId,
-        orderType: typeF,
-        status: statusF,
+        ...orderSearchParams(filterValues),
         search: searchQ || undefined,
         limit: TABLE_PAGE_SIZE,
         offset: (page - 1) * TABLE_PAGE_SIZE,
@@ -160,7 +189,12 @@ export const OrdersPanel: React.FC<{
       setLoading(false);
     }
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, contactId, projectId, typeF, statusF, searchQ, page]);
+  // One key for every server-side filter parameter, so adding a dimension to the group def can't
+  // leave the query stale the way an ad-hoc dependency list would.
+  const filterKey = JSON.stringify(orderSearchParams(filterValues));
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, contactId, projectId, filterKey, searchQ, page]);
+  // A narrowed set is a different list — restart at the first page.
+  useEffect(() => { setPage(1); }, [filterKey]);
 
   // Debounce the search box. Page 1 is set in the SAME tick as the new term so the query never
   // fires once for the stale page and again for page 1.
@@ -177,8 +211,7 @@ export const OrdersPanel: React.FC<{
   const previewCount = async (v: FilterValues) => {
     const res = await ordersService.search({
       workspaceId, companyId, contactId, projectId,
-      orderType: v.order_type as OrderType | undefined,
-      status: v.status as OrderStatus | undefined,
+      ...orderSearchParams(v),
       search: (v.q as string | undefined)?.trim() || undefined,
       limit: 1, offset: 0,
     });
