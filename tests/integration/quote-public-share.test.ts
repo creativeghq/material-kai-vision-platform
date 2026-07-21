@@ -27,7 +27,8 @@ suite('quote-public-share · anonymous token surface', () => {
     return { status: res.status, body: await res.json().catch(() => null) };
   }
 
-  const newToken = (tag: string) => `e2e${tag}${rid}`.padEnd(40, '0');
+  // public_share_token is a UUID column — a padded string fails at insert with 22P02.
+  const newToken = () => crypto.randomUUID();
 
   const seedQuote = async (over: Record<string, unknown>) => {
     const { data, error } = await svc.from('quotes').insert({
@@ -45,11 +46,11 @@ suite('quote-public-share · anonymous token surface', () => {
     ws = await createWorkspace(svc, 'wsQuote', rid, owner.id);
     await addMember(svc, ws, owner.id, 'owner');
 
-    sharedToken = newToken('a');
+    sharedToken = newToken();
     const a = await seedQuote({ public_share_token: sharedToken, public_share_enabled: true });
     sharedQuote = a.id;
 
-    disabledToken = newToken('b');
+    disabledToken = newToken();
     const b = await seedQuote({ public_share_token: disabledToken, public_share_enabled: false });
     disabledQuote = b.id;
   });
@@ -68,7 +69,7 @@ suite('quote-public-share · anonymous token surface', () => {
   });
 
   it('returns not_found for an unknown token — and leaks nothing', async () => {
-    const { body } = await share({ token: 'z'.repeat(48) });
+    const { body } = await share({ token: crypto.randomUUID() });
     expect(body.not_found).toBe(true);
     expect(body.quote).toBeNull();
   });
