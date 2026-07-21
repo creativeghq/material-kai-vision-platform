@@ -24,6 +24,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { fetchAllPages } from '@/utils/fetchAllPages';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
@@ -48,6 +49,10 @@ const UNIT_OPTIONS: Array<{ code: string; label: string }> = [
 ];
 const DEFAULT_UNIT = 'item';
 
+// Ceiling on how many orders we hold client-side for the in-browser search/party filters. Reaching
+// it is reported in the UI rather than silently capping the list (which is what `.limit(500)` did).
+const MAX_ORDERS_IN_MEMORY = 5000;
+
 /** Orders list + create — mounted as the first Finance → Documents tab. */
 export const OrdersPanel: React.FC<{
   workspaceId: string; companyId?: string; contactId?: string; projectId?: string;
@@ -58,6 +63,9 @@ export const OrdersPanel: React.FC<{
 }> = ({ workspaceId, companyId, contactId, projectId, partyRoles }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
+  // True when the workspace has more orders than we're willing to hold in memory. The search /
+  // party filters below run client-side, so the user must be told they're filtering a partial set.
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [typeF, setTypeF] = useState<'all' | OrderType>('all');
   const [statusF, setStatusF] = useState<'all' | OrderStatus>('all');
@@ -105,7 +113,21 @@ export const OrdersPanel: React.FC<{
     if (!workspaceId) return;
     try {
       setLoading(true);
-      setRows(await ordersService.list({ workspaceId, companyId, contactId, projectId, orderType: typeF === 'all' ? undefined : typeF, status: statusF === 'all' ? undefined : statusF }));
+      // The type/status filters are pushed to the server, but search + party/project matching are
+      // client-side — so the client genuinely needs the whole (filtered) set. Drain it page by page
+      // instead of taking one capped fetch, which used to drop the tail silently.
+      const res = await fetchAllPages<OrderListRow>(
+        (limit, offset) =>
+          ordersService.listPage({
+            workspaceId, companyId, contactId, projectId,
+            orderType: typeF === 'all' ? undefined : typeF,
+            status: statusF === 'all' ? undefined : statusF,
+            limit, offset,
+          }).then(({ rows: r, count }) => ({ data: r, count })),
+        { maxRows: MAX_ORDERS_IN_MEMORY },
+      );
+      setRows(res.rows);
+      setTruncated(res.truncated);
     } catch (err: any) {
       toast({ title: 'Failed to load orders', description: err?.message, variant: 'destructive' });
     } finally {
@@ -243,6 +265,13 @@ export const OrdersPanel: React.FC<{
               </tbody>
             </table>
             <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="orders" />
+            {/* Say it out loud when the list is capped — the filters above only ever see what's
+                loaded, so a silent cap would make them quietly wrong. */}
+            {truncated && (
+              <p className="px-4 pb-3 -mt-1 text-[11px] text-muted-foreground">
+                Only the {MAX_ORDERS_IN_MEMORY.toLocaleString()} most recent orders are loaded — search and filters cover those.
+              </p>
+            )}
             </>
           )}
         </CardContent>

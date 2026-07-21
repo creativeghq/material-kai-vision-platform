@@ -53,7 +53,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
-import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
+import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Progress } from '@/components/core/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
@@ -94,6 +94,12 @@ import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
 import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
 
+// Rows behind the summary tiles that need message bodies (ratings, latency, cost estimates) and so
+// can't be answered by a count query. Every tile fed from these is labelled with the window size —
+// the tables next to them are server-paged and cover everything.
+const AGENT_CHAT_STATS_WINDOW = 100;
+const RECENT_EVENTS_WINDOW = 50;
+
 const VALID_OPERATIONS_TABS = new Set([
   'system-health', 'data-processing', 'performance', 'agent-chat',
   'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
@@ -126,10 +132,15 @@ const OperationsDashboardInner: React.FC = () => {
     avg_response_time: 0,
   });
   const [searchAnalytics, setSearchAnalytics] = useState<SearchAnalytic[]>([]);
+  // `apiUsage` / `agentChatRows` each hold ONE page of rows fetched with an exact count.
   const [apiUsage, setApiUsage] = useState<ApiUsageLog[]>([]);
-  const [agentChats, setAgentChats] = useState<AgentChatMessage[]>([]);
-  const [agentChatPage, setAgentChatPage] = useState(1);
   const [apiUsagePage, setApiUsagePage] = useState(1);
+  const [apiUsageTotal, setApiUsageTotal] = useState(0);
+  const [agentChatRows, setAgentChatRows] = useState<AgentChatMessage[]>([]);
+  const [agentChatPage, setAgentChatPage] = useState(1);
+  const [agentChatTotal, setAgentChatTotal] = useState(0);
+  // Separate fixed-size window feeding the summary tiles.
+  const [agentChats, setAgentChats] = useState<AgentChatMessage[]>([]);
   const [subscriptionStats, setSubscriptionStats] = useState<SubscriptionStats>({
     totalUsers: 0,
     freeUsers: 0,
@@ -187,6 +198,72 @@ const OperationsDashboardInner: React.FC = () => {
   };
 
 
+  // Server-paged table loaders. They report the exact row count so the footer readout describes the
+  // whole table instead of whatever slice happened to be fetched for the tiles.
+  const loadAgentChatPage = useCallback(async (page: number) => {
+    const from = (page - 1) * TABLE_PAGE_SIZE;
+    const { data, count, error } = await supabase
+      .from('agent_chat_messages')
+      .select(
+        `
+          id,
+          conversation_id,
+          role,
+          content,
+          metadata,
+          created_at,
+          agent_chat_conversations!inner (
+            user_id
+          )
+        `,
+        { count: 'exact' },
+      )
+      .eq('role', 'assistant')
+      .order('created_at', { ascending: false })
+      .range(from, from + TABLE_PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('❌ Error fetching agent chat page:', error);
+      return;
+    }
+
+    setAgentChatRows(
+      (data || []).map((msg: any) => ({
+        id: msg.id,
+        conversation_id: msg.conversation_id,
+        role: msg.role,
+        content: msg.content,
+        metadata: msg.metadata,
+        created_at: msg.created_at,
+        user_id: msg.agent_chat_conversations?.user_id,
+      })),
+    );
+    setAgentChatTotal(count ?? 0);
+    setAgentChatPage(page);
+  }, []);
+
+  const loadApiUsagePage = useCallback(async (page: number): Promise<{ count: number; rows: ApiUsageLog[] }> => {
+    const from = (page - 1) * TABLE_PAGE_SIZE;
+    const { data, count, error } = await supabase
+      .from('api_usage_logs')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, from + TABLE_PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('❌ Error fetching api_usage_logs page:', error);
+      return { count: 0, rows: [] };
+    }
+
+    // No client-side row filtering here — dropping rows after the range would leave short pages
+    // that disagree with the exact count. The cells already render null status / timestamp.
+    const rows = (data || []) as ApiUsageLog[];
+    setApiUsage(rows);
+    setApiUsageTotal(count ?? 0);
+    setApiUsagePage(page);
+    return { count: count ?? 0, rows };
+  }, []);
+
   const fetchAnalyticsData = useCallback(async () => {
     try {
       setLoading(true);
@@ -214,7 +291,7 @@ const OperationsDashboardInner: React.FC = () => {
         .from('analytics_events')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(RECENT_EVENTS_WINDOW);
 
       if (searchError) {
         console.error('❌ Error fetching analytics_events:', searchError);
@@ -231,25 +308,8 @@ const OperationsDashboardInner: React.FC = () => {
       }
       console.log('✅ Analytics events:', searchData?.length || 0);
 
-      // Fetch API usage logs
-      const { data: apiData, error: apiError } = await supabase
-        .from('api_usage_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (apiError) {
-        console.error('❌ Error fetching api_usage_logs:', apiError);
-        if (apiError.message?.includes('JWT') || apiError.message?.includes('401')) {
-          toast({
-            title: 'Session Expired',
-            description: 'Your session has expired. Please refresh the page and log in again.',
-            variant: 'destructive',
-          });
-          return;
-        }
-        throw apiError;
-      }
+      // API Request Logs table — first page + the exact all-time count behind the "API Calls" tile.
+      const { count: apiCallCount, rows: apiRows } = await loadApiUsagePage(1);
 
       // Fetch agent chat messages (assistant responses with metadata)
       const { data: agentChatData, error: agentChatError } = await supabase
@@ -267,7 +327,7 @@ const OperationsDashboardInner: React.FC = () => {
         `)
         .eq('role', 'assistant')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(AGENT_CHAT_STATS_WINDOW);
 
       if (agentChatError) {
         console.error('❌ Error fetching agent chats:', agentChatError);
@@ -293,7 +353,8 @@ const OperationsDashboardInner: React.FC = () => {
       }));
 
       setAgentChats(agentChatMessages);
-      setAgentChatPage(1);
+      // Agent Chat table is paged independently of the stats window above.
+      await loadAgentChatPage(1);
 
       // Filter and cast data to match expected types
       const filteredSearchData = (searchData || [])
@@ -325,30 +386,15 @@ const OperationsDashboardInner: React.FC = () => {
           session_id: (item as any).session_id,
         }));
 
-      const filteredApiData = (apiData || [])
-        .filter(
-          (item: unknown) =>
-            (item as any).created_at &&
-            (item as any).id &&
-            (item as any).response_status !== null,
-        ) as ApiUsageLog[];
-
       setSearchAnalytics(filteredSearchData);
-      setApiUsage(filteredApiData);
-      // A refetch replaces both result sets wholesale — restart at page 1 rather than
-      // leaving the reader on a page that may no longer exist.
-      setApiUsagePage(1);
 
-      // Calculate aggregate statistics (include agent chats in search count)
+      // Aggregates over the recent windows above — only the API call count is a true total.
       const totalSearches = (searchData?.length || 0) + agentChatMessages.length;
-      const totalApiCalls = apiData?.length || 0;
       const uniqueUsers = new Set([
         ...(searchData
           ?.map((s: unknown) => (s as any).user_id)
           .filter(Boolean) || []),
-        ...(apiData
-          ?.map((a: unknown) => (a as any).user_id)
-          .filter(Boolean) || []),
+        ...apiRows.map((a) => a.user_id).filter(Boolean),
         ...agentChatMessages.map((m) => m.user_id).filter(Boolean),
       ]).size;
 
@@ -362,7 +408,7 @@ const OperationsDashboardInner: React.FC = () => {
 
       setAnalytics({
         total_searches: totalSearches,
-        total_api_calls: totalApiCalls,
+        total_api_calls: apiCallCount,
         active_users: uniqueUsers,
         avg_response_time: Math.round(avgAgentResponseTime),
       });
@@ -591,7 +637,7 @@ const OperationsDashboardInner: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, loadAgentChatPage, loadApiUsagePage]);
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -810,31 +856,31 @@ const OperationsDashboardInner: React.FC = () => {
             {/* Platform Overview Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <StatCard
-                title="Total Searches"
+                title="Recent Searches"
                 value={analytics.total_searches}
                 icon={Search}
-                description="Search queries processed"
+                description={`Last ${RECENT_EVENTS_WINDOW} events + ${AGENT_CHAT_STATS_WINDOW} responses`}
                 trend={12}
               />
               <StatCard
                 title="API Calls"
                 value={analytics.total_api_calls}
                 icon={BarChart3}
-                description="Total API requests"
+                description="Total API requests, all time"
                 trend={8}
               />
               <StatCard
                 title="Active Users"
                 value={analytics.active_users}
                 icon={Users}
-                description="Unique users today"
+                description="Unique users in the recent sample"
                 trend={15}
               />
               <StatCard
                 title="Avg Response Time"
                 value={`${analytics.avg_response_time}ms`}
                 icon={Clock}
-                description="Average API response time"
+                description={`Across the last ${AGENT_CHAT_STATS_WINDOW} responses`}
                 trend={-5}
               />
             </div>
@@ -846,7 +892,9 @@ const OperationsDashboardInner: React.FC = () => {
                   Agent Chat Analytics
                 </CardTitle>
                 <CardDescription>
-                  Track agent responses, response times, quality ratings, and costs
+                  Response times, quality ratings and cost estimates are computed over the{' '}
+                  {AGENT_CHAT_STATS_WINDOW} most recent responses. The table below pages through all
+                  of them.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -879,12 +927,13 @@ const OperationsDashboardInner: React.FC = () => {
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
                           <div className="text-sm text-slate-600">Total Chats</div>
-                          <div className="text-2xl font-bold text-slate-900">{agentChats.length}</div>
+                          <div className="text-2xl font-bold text-slate-900">{agentChatTotal}</div>
+                          <div className="text-xs text-muted-foreground mt-1">all assistant responses</div>
                         </div>
                         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
                           <div className="text-sm text-slate-600">Avg Response Time</div>
                           <div className="text-2xl font-bold text-slate-900">{avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(1)}s` : '—'}</div>
-                          <div className="text-xs text-muted-foreground mt-1">across all feature types</div>
+                          <div className="text-xs text-muted-foreground mt-1">last {AGENT_CHAT_STATS_WINDOW} responses</div>
                         </div>
                         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-green-200 shadow-sm">
                           <div className="text-sm text-green-700 flex items-center gap-1">
@@ -901,11 +950,11 @@ const OperationsDashboardInner: React.FC = () => {
                           </div>
                           <div className="text-2xl font-bold text-red-600">{downCount}</div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            {ratedChats.length > 0 ? `${ratedChats.length} total rated` : 'No ratings yet'}
+                            {ratedChats.length > 0 ? `${ratedChats.length} rated of last ${AGENT_CHAT_STATS_WINDOW}` : 'No ratings yet'}
                           </div>
                         </div>
                         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200 shadow-sm">
-                          <div className="text-sm text-blue-700">Est. Total Cost</div>
+                          <div className="text-sm text-blue-700">Est. Cost</div>
                           <div className="text-2xl font-bold text-blue-600">
                             ${agentChats.reduce((sum, chat) => {
                               const model = chat.metadata?.model || 'claude-opus-4-8';
@@ -914,6 +963,7 @@ const OperationsDashboardInner: React.FC = () => {
                               return sum + calculateCost(model, inputTokens, outputTokens).total;
                             }, 0).toFixed(4)}
                           </div>
+                          <div className="text-xs text-muted-foreground mt-1">last {AGENT_CHAT_STATS_WINDOW} responses</div>
                         </div>
                       </div>
 
@@ -922,7 +972,7 @@ const OperationsDashboardInner: React.FC = () => {
                         <div className="mb-4 bg-white/80 rounded-lg border border-slate-200 p-4 shadow-sm">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-slate-700">Rating Breakdown</span>
-                            <span className="text-xs text-muted-foreground">{ratedChats.length} / {agentChats.length} responses rated</span>
+                            <span className="text-xs text-muted-foreground">{ratedChats.length} / {agentChats.length} recent responses rated</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <ThumbsUp className="h-4 w-4 text-green-600 shrink-0" />
@@ -980,7 +1030,7 @@ const OperationsDashboardInner: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginate(agentChats, agentChatPage).map((chat) => {
+                    {agentChatRows.map((chat) => {
                       const model = chat.metadata?.model || 'claude-opus-4-8';
                       const inputTokens = estimateTokens(chat.content);
                       const outputTokens = estimateTokens(chat.content);
@@ -1065,11 +1115,11 @@ const OperationsDashboardInner: React.FC = () => {
                 </Table>
                 <TablePagination
                   page={agentChatPage}
-                  total={agentChats.length}
-                  onPageChange={setAgentChatPage}
+                  total={agentChatTotal}
+                  onPageChange={loadAgentChatPage}
                   label="responses"
                 />
-                {agentChats.length === 0 && (
+                {agentChatTotal === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     No agent chat data available yet. Start chatting with the agent to see analytics.
                   </div>
@@ -1153,14 +1203,14 @@ const OperationsDashboardInner: React.FC = () => {
             </Card>
 
             {/* API Request Logs (merged from API Usage tab) */}
-            {apiUsage.length > 0 && (
+            {apiUsageTotal > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Zap className="h-5 w-5" />
                     API Request Logs
                   </CardTitle>
-                  <CardDescription>Recent raw API endpoint requests and response codes</CardDescription>
+                  <CardDescription>Raw API endpoint requests and response codes, newest first</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -1175,7 +1225,7 @@ const OperationsDashboardInner: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginate(apiUsage, apiUsagePage).map((log) => (
+                      {apiUsage.map((log) => (
                         <TableRow key={log.id}>
                           <TableCell className="font-mono text-sm max-w-xs truncate">
                             {log.request_path}
@@ -1207,8 +1257,8 @@ const OperationsDashboardInner: React.FC = () => {
                   </Table>
                   <TablePagination
                     page={apiUsagePage}
-                    total={apiUsage.length}
-                    onPageChange={setApiUsagePage}
+                    total={apiUsageTotal}
+                    onPageChange={loadApiUsagePage}
                     label="requests"
                   />
                 </CardContent>

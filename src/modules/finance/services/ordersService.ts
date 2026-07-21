@@ -151,27 +151,40 @@ function computeOrderLines(
   return { lines, subtotal, vatTotal, total: r2(subtotal + vatTotal), effDiscountPct };
 }
 
+export interface OrderListOptions {
+  workspaceId: string;
+  orderType?: OrderType;
+  status?: OrderStatus;
+  companyId?: string;
+  contactId?: string;
+  projectId?: string;
+  /** Page size. Defaults to 500 — the historical cap, so existing callers are unchanged. */
+  limit?: number;
+  /** Row offset for paging. Defaults to 0. */
+  offset?: number;
+}
+
 export const ordersService = {
-  async list(opts: {
-    workspaceId: string;
-    orderType?: OrderType;
-    status?: OrderStatus;
-    companyId?: string;
-    contactId?: string;
-    projectId?: string;
-  }): Promise<OrderListRow[]> {
+  /**
+   * One page of orders PLUS the server's exact total. Screens that filter client-side must page
+   * through this (see `fetchAllPages`) rather than take a single capped fetch — otherwise the tail
+   * is silently dropped and every client-side filter is computed over a partial set.
+   */
+  async listPage(opts: OrderListOptions): Promise<{ rows: OrderListRow[]; count: number }> {
+    const limit = opts.limit ?? 500;
+    const offset = opts.offset ?? 0;
     let q = supabase
       .from('orders')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('workspace_id', opts.workspaceId)
       .order('created_at', { ascending: false })
-      .limit(500);
+      .range(offset, offset + limit - 1);
     if (opts.orderType) q = q.eq('order_type', opts.orderType);
     if (opts.status) q = q.eq('status', opts.status);
     if (opts.projectId) q = q.eq('project_id', opts.projectId);
     if (opts.companyId) q = q.or(`customer_company_id.eq.${opts.companyId},supplier_company_id.eq.${opts.companyId}`);
     if (opts.contactId) q = q.or(`customer_contact_id.eq.${opts.contactId},supplier_contact_id.eq.${opts.contactId}`);
-    const { data, error } = await q;
+    const { data, error, count } = await q;
     if (error) throw error;
     const rows = (data ?? []) as Order[];
 
@@ -184,12 +197,20 @@ export const ordersService = {
     ]);
     const cmap = new Map<string, string>((comps.data ?? []).map((c) => [c.id, c.name] as [string, string]));
     const ctmap = new Map<string, string>((conts.data ?? []).map((c) => [c.id, c.name] as [string, string]));
-    return rows.map((r) => ({
-      ...r,
-      party_name:
-        cmap.get(r.customer_company_id ?? '') ?? cmap.get(r.supplier_company_id ?? '') ??
-        ctmap.get(r.customer_contact_id ?? '') ?? ctmap.get(r.supplier_contact_id ?? '') ?? null,
-    }));
+    return {
+      rows: rows.map((r) => ({
+        ...r,
+        party_name:
+          cmap.get(r.customer_company_id ?? '') ?? cmap.get(r.supplier_company_id ?? '') ??
+          ctmap.get(r.customer_contact_id ?? '') ?? ctmap.get(r.supplier_contact_id ?? '') ?? null,
+      })),
+      count: count ?? rows.length,
+    };
+  },
+
+  /** Rows only — the historical shape, kept so existing callers don't change. */
+  async list(opts: OrderListOptions): Promise<OrderListRow[]> {
+    return (await this.listPage(opts)).rows;
   },
 
   /**
@@ -280,7 +301,8 @@ export const ordersService = {
     return d;
   },
 
-  /** Purchase orders for a supplier that a bill can be matched against. */
+  /** Purchase orders for a supplier that a bill can be matched against. Capped at 500 (was 50 —
+   *  a long-standing supplier's older POs fell off the picker entirely). */
   async listPurchaseOrdersForSupplier(workspaceId: string, supplierCompanyId: string): Promise<Array<{ id: string; order_number: string | null; total: number; three_way_match_status: string | null }>> {
     const { data, error } = await supabase
       .from('orders')
@@ -290,7 +312,7 @@ export const ordersService = {
       .eq('supplier_company_id', supplierCompanyId)
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(500);
     if (error) throw error;
     return (data ?? []) as Array<{ id: string; order_number: string | null; total: number; three_way_match_status: string | null }>;
   },
@@ -517,7 +539,8 @@ export const ordersService = {
   },
 
   /** Audit trail of edits/deletes to this order's payments (newest first). Reads are RLS-gated to
-   *  finance managers, so non-finance users transparently get an empty list. */
+   *  finance managers, so non-finance users transparently get an empty list. Capped at 500 (was
+   *  50) — this is a single order's history, so the ceiling is only a runaway guard. */
   async listOrderPaymentAudit(orderId: string): Promise<Array<{
     id: string; payment_id: string | null; action: 'update' | 'delete'; actor: string | null;
     old_row: any; new_row: any; changed_at: string;
@@ -526,7 +549,7 @@ export const ordersService = {
       .select('id, payment_id, action, actor, old_row, new_row, changed_at')
       .filter('old_row->>order_id', 'eq', orderId)
       .order('changed_at', { ascending: false })
-      .limit(50);
+      .limit(500);
     if (error) return [];
     return (data ?? []) as any;
   },

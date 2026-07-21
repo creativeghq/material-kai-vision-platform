@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Activity,
-  Cpu,
   Server,
   AlertTriangle,
   CheckCircle,
@@ -28,15 +27,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
-import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
+import { TablePagination, paginate, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
+// Rows behind the rate / latency figures. They need per-row fields, so they can't come from a count
+// query — every tile derived from them says so. `total_processing_jobs` IS a real count.
+const JOB_STATS_WINDOW = 100;
+
 interface SystemMetrics {
   total_processing_jobs: number;
+  /** Rows the rate + latency figures were computed over (≤ JOB_STATS_WINDOW). */
+  jobs_sampled: number;
   avg_processing_time: number;
   success_rate: number;
   error_rate: number;
@@ -55,14 +60,6 @@ interface ProcessingJob {
   processing_time_ms: number;
   created_at: string;
   error_message?: string;
-}
-
-interface MLTask {
-  id: string;
-  ml_operation_type: string;
-  processing_time_ms: number;
-  confidence_scores: Record<string, number> | null;
-  created_at: string;
 }
 
 interface EnhancedJobDetails {
@@ -113,6 +110,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState<SystemMetrics>({
     total_processing_jobs: 0,
+    jobs_sampled: 0,
     avg_processing_time: 0,
     success_rate: 0,
     error_rate: 0,
@@ -123,9 +121,12 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
       claude_avg_time: 0,
     },
   });
+  // One page of rows for the table, fetched with an exact count.
   const [processingJobs, setProcessingJobs] = useState<ProcessingJob[]>([]);
   const [processingJobsPage, setProcessingJobsPage] = useState(1);
-  const [mlTasks, setMLTasks] = useState<MLTask[]>([]);
+  const [processingJobsTotal, setProcessingJobsTotal] = useState(0);
+  // Separate fixed window feeding the metric tiles + the enhanced-job lookups.
+  const [jobsSample, setJobsSample] = useState<ProcessingJob[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Enhanced monitoring state
@@ -223,8 +224,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
   // Load enhanced job details for recent jobs
   const loadEnhancedJobDetails = useCallback(async () => {
     try {
-      // Get recent job IDs from processing jobs
-      const recentJobIds = processingJobs.slice(0, 10).map((job) => job.id);
+      // Get recent job IDs from the stats window, not the visible page — otherwise every page
+      // change would re-fan-out these per-job gateway calls.
+      const recentJobIds = jobsSample.slice(0, 10).map((job) => job.id);
 
       const enhancedJobPromises = recentJobIds.map((jobId) =>
         fetchEnhancedJobDetails(jobId),
@@ -239,7 +241,28 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
     } catch (error) {
       console.error('Error loading enhanced job details:', error);
     }
-  }, [processingJobs, fetchEnhancedJobDetails]);
+  }, [jobsSample, fetchEnhancedJobDetails]);
+
+  // Server-paged table loader — reports the exact row count so the footer readout describes the
+  // whole queue rather than the window the tiles are computed over.
+  const loadProcessingJobsPage = useCallback(async (page: number): Promise<number> => {
+    const from = (page - 1) * TABLE_PAGE_SIZE;
+    const { data, count, error } = await supabase
+      .from('materials_catalog')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, from + TABLE_PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('Error fetching processing jobs page:', error);
+      return 0;
+    }
+
+    setProcessingJobs((data as ProcessingJob[]) || []);
+    setProcessingJobsTotal(count ?? 0);
+    setProcessingJobsPage(page);
+    return count ?? 0;
+  }, []);
 
   const fetchPerformanceData = useCallback(async () => {
     try {
@@ -250,15 +273,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
         .from('materials_catalog')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(JOB_STATS_WINDOW);
 
       if (queueError) throw queueError;
-
-      // Fetch ML tasks (agent_ml_tasks table doesn't exist, use empty array)
-      const mlData: any[] = [];
-      const mlError = null;
-
-      if (mlError) throw mlError;
 
       // Fetch analytics events for AI performance
       const { data: analyticsData, error: analyticsError } = await supabase
@@ -270,10 +287,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
 
       if (analyticsError) throw analyticsError;
 
-      setProcessingJobs((queueData as ProcessingJob[]) || []);
+      setJobsSample((queueData as ProcessingJob[]) || []);
       // Refetch replaces the whole result set — don't strand the reader on a page past the end.
-      setProcessingJobsPage(1);
-      setMLTasks((mlData as MLTask[]) || []);
+      const totalJobsAllTime = await loadProcessingJobsPage(1);
 
       // Calculate performance metrics
       const totalJobs = queueData?.length || 0;
@@ -320,7 +336,8 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
       });
 
       setMetrics({
-        total_processing_jobs: totalJobs,
+        total_processing_jobs: totalJobsAllTime,
+        jobs_sampled: totalJobs,
         avg_processing_time: Math.round(avgProcessingTime),
         success_rate: Math.round(successRate),
         error_rate: Math.round(errorRate),
@@ -347,7 +364,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
     } finally {
       setLoading(false);
     }
-  }, [toast, fetchDocumentAnalysisMetrics]);
+  }, [toast, fetchDocumentAnalysisMetrics, loadProcessingJobsPage]);
 
   useEffect(() => {
     fetchPerformanceData();
@@ -355,10 +372,10 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
 
   // Load enhanced job details when processing jobs change
   useEffect(() => {
-    if (processingJobs.length > 0) {
+    if (jobsSample.length > 0) {
       loadEnhancedJobDetails();
     }
-  }, [processingJobs, loadEnhancedJobDetails]);
+  }, [jobsSample, loadEnhancedJobDetails]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -468,14 +485,14 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             title="Processing Jobs"
             value={metrics.total_processing_jobs}
             icon={Server}
-            description="Total processing jobs"
+            description="Total processing jobs, all time"
             status="good"
           />
           <MetricCard
             title="Success Rate"
             value={`${metrics.success_rate}%`}
             icon={CheckCircle}
-            description="Job completion rate"
+            description={`Completion rate, last ${JOB_STATS_WINDOW} jobs`}
             status={
               metrics.success_rate > 90
                 ? 'good'
@@ -488,7 +505,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             title="Avg Processing Time"
             value={`${metrics.avg_processing_time}ms`}
             icon={Clock}
-            description="Average job duration"
+            description={`Duration, last ${JOB_STATS_WINDOW} jobs`}
             status={
               metrics.avg_processing_time < 2000
                 ? 'good'
@@ -501,7 +518,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             title="Error Rate"
             value={`${metrics.error_rate}%`}
             icon={AlertTriangle}
-            description="Failed job percentage"
+            description={`Failed share, last ${JOB_STATS_WINDOW} jobs`}
             status={
               metrics.error_rate < 5
                 ? 'good'
@@ -519,7 +536,6 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             </TabsTrigger>
             <TabsTrigger value="ai-performance">AI Performance</TabsTrigger>
             <TabsTrigger value="processing-queue">Processing Queue</TabsTrigger>
-            <TabsTrigger value="ml-tasks">ML Tasks</TabsTrigger>
             <TabsTrigger value="system-health">System Health</TabsTrigger>
           </TabsList>
 
@@ -898,10 +914,12 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                     <div className="flex justify-between">
                       <span className="text-sm">Hybrid Success Rate</span>
                       <span className="font-mono text-sm">
+                        {/* Both sides of this ratio are window figures — pairing the completion
+                            counts with the all-time job total would read as ~0%. */}
                         {Math.round(
                           ((metrics.ai_model_performance.openai_success +
                             metrics.ai_model_performance.claude_success) /
-                            Math.max(metrics.total_processing_jobs, 1)) *
+                            Math.max(metrics.jobs_sampled, 1)) *
                             100,
                         )}
                         %
@@ -929,7 +947,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginate(processingJobs, processingJobsPage).map((job) => (
+                    {processingJobs.map((job) => (
                       <TableRow key={job.id}>
                         <TableCell className="font-medium">
                           {job.job_type}
@@ -962,81 +980,14 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                 </Table>
                 <TablePagination
                   page={processingJobsPage}
-                  total={processingJobs.length}
-                  onPageChange={setProcessingJobsPage}
+                  total={processingJobsTotal}
+                  onPageChange={loadProcessingJobsPage}
                   label="jobs"
                 />
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="ml-tasks" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>ML Operation Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Operation Type</TableHead>
-                      <TableHead>Processing Time</TableHead>
-                      <TableHead>Confidence</TableHead>
-                      <TableHead>Created</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mlTasks.slice(0, 15).map((task) => (
-                      <TableRow key={task.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Cpu className="h-4 w-4" />
-                            <span className="font-medium">
-                              {task.ml_operation_type}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {task.processing_time_ms
-                            ? `${task.processing_time_ms}ms`
-                            : 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          {task.confidence_scores &&
-                          typeof task.confidence_scores === 'object' ? (
-                            <div className="space-y-1">
-                              {Object.entries(task.confidence_scores)
-                                .slice(0, 2)
-                                .map(([key, value]) => (
-                                  <div
-                                    key={key}
-                                    className="flex items-center gap-2"
-                                  >
-                                    <span className="text-xs">{key}:</span>
-                                    <Progress
-                                      value={Number(value) * 100}
-                                      className="w-16 h-2"
-                                    />
-                                    <span className="text-xs">
-                                      {(Number(value) * 100).toFixed(0)}%
-                                    </span>
-                                  </div>
-                                ))}
-                            </div>
-                          ) : (
-                            'N/A'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(task.created_at).toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
           <TabsContent value="system-health" className="space-y-4">
             <div className="grid md:grid-cols-3 gap-6">
               <Card>

@@ -3,8 +3,10 @@ import { Loader2, Download, FileText, FileCheck, Receipt, Package, Wallet, Chevr
 import { Card } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
+import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
 import {
   customerDocumentsService,
   type CustomerInvoiceDoc,
@@ -55,21 +57,33 @@ export const MyDocumentsTab: React.FC = () => {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [invoices, setInvoices] = useState<CustomerInvoiceDoc[]>([]);
   const [receipts, setReceipts] = useState<CustomerReceiptDoc[]>([]);
-  // Each of the three lists grows independently, so each keeps its own page.
+  // Each of the three lists grows independently, so each keeps its own page — and each page is
+  // fetched from the server. Client-side slicing used to page over a 200-row ceiling, so anything
+  // past row 200 was simply unreachable.
   const [orderPage, setOrderPage] = useState(1);
   const [invoicePage, setInvoicePage] = useState(1);
   const [receiptPage, setReceiptPage] = useState(1);
+  // Server-reported totals — the page count comes from these, not from the rows on screen.
+  const [totals, setTotals] = useState({ orders: 0, invoices: 0, receipts: 0 });
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
       try {
-        const res = await customerDocumentsService.listMyDocuments();
-        if (!cancelled) {
-          setSummary(res.summary); setOrders(res.orders); setInvoices(res.invoices); setReceipts(res.receipts);
-          setOrderPage(1); setInvoicePage(1); setReceiptPage(1);
-        }
+        const data = await customerDocumentsService.listMyDocuments({
+          limit: TABLE_PAGE_SIZE,
+          ordersOffset: (orderPage - 1) * TABLE_PAGE_SIZE,
+          invoicesOffset: (invoicePage - 1) * TABLE_PAGE_SIZE,
+          receiptsOffset: (receiptPage - 1) * TABLE_PAGE_SIZE,
+        });
+        if (cancelled) return;
+        setSummary(data.summary);
+        setOrders(data.orders); setInvoices(data.invoices); setReceipts(data.receipts);
+        setTotals({
+          orders: data.paging?.orders.total ?? data.orders.length,
+          invoices: data.paging?.invoices.total ?? data.invoices.length,
+          receipts: data.paging?.receipts.total ?? data.receipts.length,
+        });
       } catch (err) {
         if (!cancelled) toast({ title: 'Could not load your account', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
       } finally {
@@ -77,7 +91,7 @@ export const MyDocumentsTab: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [toast]);
+  }, [toast, orderPage, invoicePage, receiptPage]);
 
   const open = (url: string | null) => {
     if (url) window.open(url, '_blank');
@@ -92,7 +106,7 @@ export const MyDocumentsTab: React.FC = () => {
     );
   }
 
-  const isEmpty = summary.length === 0 && orders.length === 0 && invoices.length === 0 && receipts.length === 0;
+  const isEmpty = summary.length === 0 && totals.orders === 0 && totals.invoices === 0 && totals.receipts === 0;
   if (isEmpty) {
     return (
       <Card className="dashboard-card p-12 text-center space-y-3">
@@ -118,22 +132,22 @@ export const MyDocumentsTab: React.FC = () => {
       ))}
 
       {/* ── Orders ── */}
-      {orders.length > 0 && (
+      {totals.orders > 0 && (
         <div className="space-y-2">
           <h3 className="text-base font-semibold">Orders</h3>
           <div className="space-y-2">
-            {paginate(orders, orderPage).map((o) => <OrderRow key={o.id} order={o} />)}
+            {orders.map((o) => <OrderRow key={o.id} order={o} />)}
           </div>
-          <TablePagination page={orderPage} total={orders.length} onPageChange={setOrderPage} label="orders" />
+          <TablePagination page={orderPage} total={totals.orders} onPageChange={setOrderPage} label="orders" />
         </div>
       )}
 
       {/* ── Invoices & receipts ── */}
-      {invoices.length > 0 && (
+      {totals.invoices > 0 && (
         <div className="space-y-2">
           <h3 className="text-base font-semibold">Invoices &amp; receipts</h3>
           <div className="space-y-2">
-            {paginate(invoices, invoicePage).map((d) => (
+            {invoices.map((d) => (
               <Card key={d.id} className="dashboard-card p-3 flex items-center gap-3">
                 {d.kind === 'receipt' ? <FileCheck className="h-4 w-4 text-primary shrink-0" /> : <FileText className="h-4 w-4 text-primary shrink-0" />}
                 <div className="flex-1 min-w-0">
@@ -154,16 +168,16 @@ export const MyDocumentsTab: React.FC = () => {
               </Card>
             ))}
           </div>
-          <TablePagination page={invoicePage} total={invoices.length} onPageChange={setInvoicePage} label="documents" />
+          <TablePagination page={invoicePage} total={totals.invoices} onPageChange={setInvoicePage} label="documents" />
         </div>
       )}
 
       {/* ── Payment receipts ── */}
-      {receipts.length > 0 && (
+      {totals.receipts > 0 && (
         <div className="space-y-2">
           <h3 className="text-base font-semibold">Payment receipts</h3>
           <div className="space-y-2">
-            {paginate(receipts, receiptPage).map((r) => (
+            {receipts.map((r) => (
               <Card key={r.id} className="dashboard-card p-3 flex items-center gap-3">
                 <Receipt className="h-4 w-4 text-primary shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -178,7 +192,7 @@ export const MyDocumentsTab: React.FC = () => {
               </Card>
             ))}
           </div>
-          <TablePagination page={receiptPage} total={receipts.length} onPageChange={setReceiptPage} label="receipts" />
+          <TablePagination page={receiptPage} total={totals.receipts} onPageChange={setReceiptPage} label="receipts" />
         </div>
       )}
     </div>

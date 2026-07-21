@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 
 /** A customer-facing issued document (tax invoice or retail receipt). */
 export interface CustomerInvoiceDoc {
@@ -64,12 +65,32 @@ export interface CustomerOrderDetail {
   items: CustomerOrderItem[];
 }
 
+/** Per-list paging metadata returned alongside each page. */
+export interface MyDocumentsPaging {
+  limit: number;
+  scan_cap: number;
+  /** True when a list hit the server's scan cap — its `total` is then a floor, not the exact count. */
+  truncated: boolean;
+  orders: { offset: number; total: number };
+  invoices: { offset: number; total: number };
+  receipts: { offset: number; total: number };
+}
+
 export interface MyDocumentsResult {
   linked: boolean;
   summary: CustomerAccountSummary[];
   orders: CustomerOrder[];
   invoices: CustomerInvoiceDoc[];
   receipts: CustomerReceiptDoc[];
+  paging?: MyDocumentsPaging;
+}
+
+/** Per-list offsets. Each list pages independently, so they're separate cursors. */
+export interface MyDocumentsPageOpts {
+  limit?: number;
+  ordersOffset?: number;
+  invoicesOffset?: number;
+  receiptsOffset?: number;
 }
 
 export const customerDocumentsService = {
@@ -80,15 +101,24 @@ export const customerDocumentsService = {
    * tables are RLS-gated to workspace members (a customer is not one); the function
    * scopes strictly to records addressed to the caller's own linked CRM contacts.
    */
-  async listMyDocuments(): Promise<MyDocumentsResult> {
-    const { data, error } = await supabase.functions.invoke('finance-customer-documents', { body: { action: 'overview' } });
-    if (error) throw error;
+  async listMyDocuments(opts: MyDocumentsPageOpts = {}): Promise<MyDocumentsResult> {
+    const { data, error } = await supabase.functions.invoke('finance-customer-documents', {
+      body: {
+        action: 'overview',
+        ...(opts.limit != null ? { limit: opts.limit } : {}),
+        ...(opts.ordersOffset ? { orders_offset: opts.ordersOffset } : {}),
+        ...(opts.invoicesOffset ? { invoices_offset: opts.invoicesOffset } : {}),
+        ...(opts.receiptsOffset ? { receipts_offset: opts.receiptsOffset } : {}),
+      },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error));
     return {
       linked: !!data?.linked,
       summary: (data?.summary ?? []) as CustomerAccountSummary[],
       orders: (data?.orders ?? []) as CustomerOrder[],
       invoices: (data?.invoices ?? []) as CustomerInvoiceDoc[],
       receipts: (data?.receipts ?? []) as CustomerReceiptDoc[],
+      paging: data?.paging as MyDocumentsPaging | undefined,
     };
   },
 

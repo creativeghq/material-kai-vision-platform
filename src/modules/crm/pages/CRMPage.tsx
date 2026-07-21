@@ -27,6 +27,7 @@ import { WorkspaceQuotaBadge } from '@/components/core/WorkspaceQuotaBadge';
 import { AdminStatCard } from '@/components/Admin/AdminStatCard';
 import { usersAPI, contactsAPI, companiesAPI } from '@/services/crm.service';
 import { crmCategoriesService, type CrmCategorySummary } from '@/services/crmCategoriesService';
+import { fetchAllPages } from '@/utils/fetchAllPages';
 import { humanizeLabel } from '@/utils/humanize';
 import { CategoriesPanel } from './CategoriesPage';
 import { CrmFilters, type FilterDef } from '../components/CrmFilters';
@@ -110,6 +111,9 @@ export const CRMManagement: React.FC = () => {
   const [users, setUsers] = useState<UserWithAuth[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
+  // Set when the drain hit its safety ceiling — surfaced so the list never under-reports silently.
+  const [contactsTruncated, setContactsTruncated] = useState(false);
+  const [companiesTruncated, setCompaniesTruncated] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -196,8 +200,13 @@ export const CRMManagement: React.FC = () => {
       // — even though companies (loaded via this API, which grants global operators
       // cross-tenant scope in getCrmScope) show up fine. The API also flattens the
       // attached-company junction into the `companies` array the table renders.
-      const response = await contactsAPI.listContacts(500, 0);
-      setContacts(response.data || []);
+      // Drain every page: the five contact filters below all run client-side, so a single capped
+      // fetch would mean each filter silently searched only the first 500 rows.
+      const { rows, truncated } = await fetchAllPages<Contact>(
+        (limit, offset) => contactsAPI.listContacts(limit, offset),
+      );
+      setContacts(rows);
+      setContactsTruncated(truncated);
     } catch (error: any) {
       toast({ title: 'Error', description: `Failed to load contacts: ${error.message}`, variant: 'destructive' });
     } finally { setLoadingContacts(false); }
@@ -206,8 +215,11 @@ export const CRMManagement: React.FC = () => {
   const loadCompanies = async () => {
     try {
       setLoadingCompanies(true);
-      const response = await companiesAPI.listCompanies(500, 0);
-      setCompanies(response.data || []);
+      const { rows, truncated } = await fetchAllPages<any>(
+        (limit, offset) => companiesAPI.listCompanies(limit, offset),
+      );
+      setCompanies(rows);
+      setCompaniesTruncated(truncated);
     } catch (error: any) {
       toast({ title: 'Error', description: `Failed to load companies: ${error.message}`, variant: 'destructive' });
     } finally { setLoadingCompanies(false); }
@@ -627,6 +639,11 @@ export const CRMManagement: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  {contactsTruncated && (
+                    <p className="px-4 pb-2 text-xs text-amber-500">
+                      Only the first {contacts.length.toLocaleString()} contacts are loaded — filters and counts cover that set.
+                    </p>
+                  )}
                   <TablePagination page={contactsPage} total={filteredContacts.length} onPageChange={setContactsPage} label="contacts" />
                 </div>
               </CardContent>
@@ -695,6 +712,11 @@ export const CRMManagement: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  {companiesTruncated && (
+                    <p className="px-4 pb-2 text-xs text-amber-500">
+                      Only the first {companies.length.toLocaleString()} companies are loaded — filters and counts cover that set.
+                    </p>
+                  )}
                   <TablePagination page={companiesPage} total={filteredCompanies.length} onPageChange={setCompaniesPage} label="companies" />
                 </div>
               </CardContent>

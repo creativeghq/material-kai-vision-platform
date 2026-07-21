@@ -182,6 +182,8 @@ export async function handleContacts(req: Request): Promise<Response> {
         return new Response(JSON.stringify({ data: [], count: 0 }), { status: 200, headers: corsHeaders });
       }
 
+      // `count: 'exact'` so the caller can paginate — the response used to report
+      // `count: rows.length` (the PAGE size), which made a total row count unknowable.
       let listQuery = supabase
         .from('crm_contacts')
         .select(`
@@ -195,13 +197,13 @@ export async function handleContacts(req: Request): Promise<Response> {
               name
             )
           )
-        `)
+        `, { count: 'exact' })
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
       if (!scope.isGlobalOperator) {
         listQuery = listQuery.in('workspace_id', scope.workspaceIds);
       }
-      const { data, error } = await listQuery;
+      const { data, error, count } = await listQuery;
 
       if (error) {
         return new Response(
@@ -230,7 +232,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       });
 
       return new Response(
-        JSON.stringify({ data: rows, count: rows.length }),
+        JSON.stringify({ data: rows, count: count ?? rows.length }),
         { status: 200, headers: corsHeaders },
       );
     }

@@ -18,6 +18,36 @@ function json(body: unknown, status = 200): Response {
 
 const isReceiptDoc = (dt: string | null) => String(dt ?? '').startsWith('11');
 
+// ── Paging ──────────────────────────────────────────────────────────────────
+// Each of the three lists (orders / invoices / receipts) is paged independently by the client.
+// Paging is PRESENTATION ONLY: it never touches the scoping filters below, which stay derived
+// from the caller's own linked CRM contacts and their companies.
+//
+// Every list is assembled from TWO scoped queries (by contact + by company) that are merged and
+// de-duped, so a per-query `.range()` would slice the wrong rows. Instead we read the cheap
+// metadata rows up to SCAN_CAP, merge/sort/dedupe in memory — which also gives an exact total and
+// keeps the account summary correct regardless of which page is requested — and then sign PDF URLs
+// for the requested slice ONLY. Signing is one storage round trip per row, so it's the part that
+// must not be done 200-at-a-time.
+const SCAN_CAP = 2000;
+const MAX_PAGE_SIZE = 500;
+const DEFAULT_PAGE_SIZE = 200; // == the previous hard cap, so a caller that sends nothing is unchanged
+
+const clampInt = (v: unknown, min: number, max: number, dflt: number): number => {
+  // NB: absent must mean "default", not 0 — `Number(null)` is 0, which would silently clamp to `min`.
+  if (v === null || v === undefined || v === '') return dflt;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return dflt;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+};
+
+/** Newest-first by a nullable timestamp column; nulls sort last (matches `nullsFirst: false`). */
+const byDateDesc = (key: string) => (a: any, b: any) => {
+  const av = a?.[key] ? Date.parse(a[key]) : Number.NEGATIVE_INFINITY;
+  const bv = b?.[key] ? Date.parse(b[key]) : Number.NEGATIVE_INFINITY;
+  return bv - av;
+};
+
 Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST' && req.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -34,9 +64,20 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
   // 'order_detail' (line items for a single owned order).
   let action = 'overview';
   let orderId: string | null = null;
+  let body: any = null;
   if (req.method === 'POST') {
-    try { const b = await req.json(); action = b?.action ?? 'overview'; orderId = b?.order_id ?? null; } catch { /* no body */ }
+    try { body = await req.json(); action = body?.action ?? 'overview'; orderId = body?.order_id ?? null; } catch { /* no body */ }
   }
+
+  // Page size + per-list offsets, from the body (POST) or the query string (GET). These are
+  // clamped numbers and are used ONLY to slice already-scoped results — never as a filter.
+  const qp = new URL(req.url).searchParams;
+  const pageSize = clampInt(body?.limit ?? qp.get('limit'), 1, MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE);
+  const offsets = {
+    orders: clampInt(body?.orders_offset ?? qp.get('orders_offset'), 0, SCAN_CAP, 0),
+    invoices: clampInt(body?.invoices_offset ?? qp.get('invoices_offset'), 0, SCAN_CAP, 0),
+    receipts: clampInt(body?.receipts_offset ?? qp.get('receipts_offset'), 0, SCAN_CAP, 0),
+  };
 
   // 1. The caller's own CRM contacts (the only documents they may see).
   const { data: contacts } = await supabase
@@ -100,12 +141,14 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
       .neq('status', 'draft')
       .neq('status', 'void')
       .order('issued_at', { ascending: false, nullsFirst: false })
-      .limit(200);
+      .limit(SCAN_CAP);
   const invResults = await Promise.all([
     fetchInvoices('customer_contact_id', contactIds),
     companyIds.length ? fetchInvoices('customer_company_id', companyIds) : Promise.resolve({ data: [] as any[] }),
   ]);
-  const invRows = dedupeById(invResults.flatMap((r: any) => r.data ?? []));
+  // Merged across both scoped queries → re-sort, because each was only ordered within itself.
+  const invAll = dedupeById(invResults.flatMap((r: any) => r.data ?? [])).sort(byDateDesc('issued_at'));
+  const invRows = invAll.slice(offsets.invoices, offsets.invoices + pageSize);
 
   const invoices = await Promise.all((invRows ?? []).map(async (r: any) => ({
     id: r.id,
@@ -129,12 +172,13 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
       .in(col, ids)
       .eq('direction', 'in')
       .order('paid_at', { ascending: false })
-      .limit(200);
+      .limit(SCAN_CAP);
   const payResults = await Promise.all([
     fetchPayments('counterparty_contact_id', contactIds),
     companyIds.length ? fetchPayments('counterparty_company_id', companyIds) : Promise.resolve({ data: [] as any[] }),
   ]);
-  const payRows = dedupeById(payResults.flatMap((r: any) => r.data ?? []));
+  const payAll = dedupeById(payResults.flatMap((r: any) => r.data ?? [])).sort(byDateDesc('paid_at'));
+  const payRows = payAll.slice(offsets.receipts, offsets.receipts + pageSize);
 
   const receipts = await Promise.all((payRows ?? []).map(async (r: any) => ({
     id: r.id,
@@ -154,12 +198,13 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
       .in(col, ids)
       .eq('order_type', 'sales')
       .order('created_at', { ascending: false })
-      .limit(200);
+      .limit(SCAN_CAP);
   const orderResults = await Promise.all([
     fetchOrders('customer_contact_id', contactIds),
     companyIds.length ? fetchOrders('customer_company_id', companyIds) : Promise.resolve({ data: [] as any[] }),
   ]);
-  const orders = dedupeById(orderResults.flatMap((r: any) => r.data ?? [])).map((o: any) => ({
+  const orderAll = dedupeById(orderResults.flatMap((r: any) => r.data ?? [])).sort(byDateDesc('created_at'));
+  const orders = orderAll.slice(offsets.orders, offsets.orders + pageSize).map((o: any) => ({
     id: o.id,
     order_number: o.order_number,
     status: o.status,
@@ -179,13 +224,15 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     if (!cell) { cell = { currency: k, billed: 0, paid: 0, outstanding: 0, doc_count: 0, order_count: 0 }; byCurrency.set(k, cell); }
     return cell;
   };
-  for (const inv of invoices) {
-    const c = bump(inv.currency);
-    c.billed += inv.total;
-    c.outstanding += inv.amount_due;
+  //    Computed over the FULL scoped sets, not the requested page — otherwise "total spent" would
+  //    change every time the customer turned a page.
+  for (const inv of invAll) {
+    const c = bump(inv.currency ?? 'EUR');
+    c.billed += Number(inv.total ?? 0);
+    c.outstanding += Number(inv.amount_due ?? 0);
     c.doc_count += 1;
   }
-  for (const o of orders) bump(o.currency).order_count += 1;
+  for (const o of orderAll) bump(o.currency ?? 'EUR').order_count += 1;
   const summary = Array.from(byCurrency.values()).map((c) => ({
     ...c,
     billed: Math.round(c.billed * 100) / 100,
@@ -193,5 +240,19 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     paid: Math.round((c.billed - c.outstanding) * 100) / 100,
   }));
 
-  return json({ ok: true, linked: true, summary, orders, invoices, receipts });
+  // `truncated` = a list hit SCAN_CAP, so its total is a floor rather than the real count.
+  const truncated = [invResults, payResults, orderResults]
+    .some((rs) => rs.some((r: any) => (r.data ?? []).length >= SCAN_CAP));
+
+  return json({
+    ok: true, linked: true, summary, orders, invoices, receipts,
+    paging: {
+      limit: pageSize,
+      scan_cap: SCAN_CAP,
+      truncated,
+      orders: { offset: offsets.orders, total: orderAll.length },
+      invoices: { offset: offsets.invoices, total: invAll.length },
+      receipts: { offset: offsets.receipts, total: payAll.length },
+    },
+  });
 }));
