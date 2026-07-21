@@ -12,6 +12,7 @@ import { hasCreds, serviceClient, createUser, teardown, runId, SUPABASE_URL, typ
 const suite = hasCreds ? describe : describe.skip;
 
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 suite('inbox-api · public profile contact', () => {
   const rid = runId();
@@ -19,13 +20,17 @@ suite('inbox-api · public profile contact', () => {
   let recipient: TestUser;
   const senderEmail = `e2e-contact-${rid}@materialshub.gr`;
 
-  async function contact(body: Record<string, unknown>): Promise<{ status: number; body: any }> {
+  // Turnstile is LIVE on this endpoint, and a test can't mint a valid challenge token. The
+  // service role skips only the bot check (it can write these rows directly anyway), so use it
+  // for assertions about what happens AFTER the gate — and plain anon to prove the gate itself.
+  async function contact(body: Record<string, unknown>, as: 'service' | 'anon' = 'service') {
+    const key = as === 'service' ? SERVICE_KEY : ANON_KEY;
     const res = await fetch(`${SUPABASE_URL}/functions/v1/inbox-api`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${ANON_KEY}`, apikey: ANON_KEY, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${key}`, apikey: ANON_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'profile_contact', ...body }),
     });
-    return { status: res.status, body: await res.json().catch(() => null) };
+    return { status: res.status, body: await res.json().catch(() => null) as any };
   }
 
   beforeAll(async () => {
@@ -39,7 +44,16 @@ suite('inbox-api · public profile contact', () => {
     await teardown(svc, { userIds: [recipient.id] });
   });
 
-  it('accepts a contact request from a fully ANONYMOUS caller (the bug this path fixed)', async () => {
+  it('bot-checks a real anonymous caller (Turnstile is enforced, not fail-open)', async () => {
+    const { body } = await contact({
+      to_user_id: recipient.id, from_name: 'E2E Bot', from_email: `e2e-bot-${rid}@materialshub.gr`,
+      message: 'no token',
+    }, 'anon');
+    expect(body?.error, 'tokenless anonymous submission was ACCEPTED — Turnstile is fail-open again')
+      .toMatch(/bot check/i);
+  });
+
+  it('accepts a contact request once past the bot gate (the bug this path fixed)', async () => {
     const { body } = await contact({
       to_user_id: recipient.id, from_name: 'E2E Anon', from_email: senderEmail,
       message: 'anonymous hire enquiry', services_requested: ['Design'],

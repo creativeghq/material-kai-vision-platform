@@ -1873,7 +1873,12 @@ async function handleProfileContact(db: SupabaseClient, req: Request, payload: J
   if (!toUserId || !name || !email || !message) throw new HttpError(400, 'name, email and message are required');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
 
-  if (!(await verifyTurnstile(db, String((payload as Record<string, unknown>).turnstile_token ?? ''), clientIp(req)))) {
+  // A caller holding the SERVICE ROLE can already write these rows directly, so making it prove
+  // it isn't a bot is theatre — and it's the only way an automated test can exercise the path
+  // past a real Turnstile challenge. Every other guard below still applies to it.
+  const isTrustedCaller = (req.headers.get('authorization') || '') === `Bearer ${SERVICE_ROLE_KEY}`;
+  if (!isTrustedCaller
+      && !(await verifyTurnstile(db, String((payload as Record<string, unknown>).turnstile_token ?? ''), clientIp(req)))) {
     throw new HttpError(400, 'Bot check failed — please retry.');
   }
 

@@ -13,6 +13,7 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 const suite = hasCreds ? describe : describe.skip;
 
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 suite('hr-careers · public careers page', () => {
   const rid = runId();
@@ -21,13 +22,17 @@ suite('hr-careers · public careers page', () => {
   let wsA = '', wsSlug = '', openJob = '', openSlug = '';
 
   // Anonymous call — only the publishable/anon key, never a user JWT.
-  async function careers(body: Record<string, unknown>): Promise<{ status: number; body: any }> {
+  // `apply` is Turnstile-gated and a test can't mint a challenge token, so those assertions use
+  // the service role, which skips ONLY the bot check. Reads stay anon (no gate on them), and one
+  // assertion below deliberately applies as anon to prove the gate is enforced.
+  async function careers(body: Record<string, unknown>, as: 'anon' | 'service' = 'anon') {
+    const key = as === 'service' ? SERVICE_KEY : ANON_KEY;
     const res = await fetch(`${SUPABASE_URL}/functions/v1/hr-careers`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${ANON_KEY}`, apikey: ANON_KEY, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${key}`, apikey: ANON_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    return { status: res.status, body: await res.json().catch(() => null) };
+    return { status: res.status, body: await res.json().catch(() => null) as any };
   }
 
   const seedPosting = async (over: Record<string, unknown>) => {
@@ -106,7 +111,7 @@ suite('hr-careers · public careers page', () => {
     expect(body.jobs.map((j: any) => j.id)).not.toContain(expired.id);
     expect((await careers({ action: 'get-job', slug: wsSlug, job_slug: expired.slug })).status).toBe(404);
     // …and it must not silently accept applications either.
-    const applied = await careers({ action: 'apply', slug: wsSlug, job_slug: expired.slug, name: 'Late Applicant' });
+    const applied = await careers({ action: 'apply', slug: wsSlug, job_slug: expired.slug, name: 'Late Applicant' }, 'service');
     expect(applied.status).toBe(404);
   });
 
@@ -115,12 +120,20 @@ suite('hr-careers · public careers page', () => {
     expect(status).toBe(404);
   });
 
+  it('bot-checks a real anonymous applicant (Turnstile is enforced, not fail-open)', async () => {
+    const { body } = await careers({
+      action: 'apply', slug: wsSlug, job_slug: openSlug, name: 'E2E Bot Applicant',
+    });
+    expect(body?.error, 'tokenless anonymous apply was accepted — Turnstile is fail-open again')
+      .toMatch(/bot check/i);
+  });
+
   it('rejects a non-PDF résumé regardless of the filename', async () => {
     const notPdf = Buffer.from('hello world').toString('base64');
     const { body } = await careers({
       action: 'apply', slug: wsSlug, job_slug: openSlug, name: 'E2E Applicant',
       email: `e2e-appl-${rid}@materialshub.gr`, resume_base64: notPdf, resume_filename: 'cv.pdf',
-    });
+    }, 'service');
     expect(body.error).toMatch(/PDF/i);
   });
 
@@ -130,7 +143,7 @@ suite('hr-careers · public careers page', () => {
     const { body } = await careers({
       action: 'apply', slug: wsSlug, job_slug: openSlug, name: 'E2E Applicant', email,
       location: 'Athens, GR', links: 'github.com/e2e', resume_base64: pdf, resume_filename: 'cv.pdf',
-    });
+    }, 'service');
     expect(body.ok).toBe(true);
 
     const { data: cand } = await svc.from('hr_candidates')
@@ -143,7 +156,7 @@ suite('hr-careers · public careers page', () => {
     expect(cand!.resume_path).toMatch(new RegExp(`^hr/${wsA}/candidates/`));
 
     // Re-applying is reported, not duplicated.
-    const again = await careers({ action: 'apply', slug: wsSlug, job_slug: openSlug, name: 'E2E Applicant', email, resume_base64: pdf, resume_filename: 'cv.pdf' });
+    const again = await careers({ action: 'apply', slug: wsSlug, job_slug: openSlug, name: 'E2E Applicant', email, resume_base64: pdf, resume_filename: 'cv.pdf' }, 'service');
     expect(again.body.already).toBe(true);
     const { count } = await svc.from('hr_applications')
       .select('*', { count: 'exact', head: true }).eq('workspace_id', wsA).eq('candidate_id', cand!.id);

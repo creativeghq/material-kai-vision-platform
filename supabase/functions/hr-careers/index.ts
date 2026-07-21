@@ -200,7 +200,11 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
     // Bot check (only enforced when configured).
     const secretRes = await resolveSecret(supabase, 'TURNSTILE_SECRET_KEY').catch(() => ({ value: null }));
     const turnstileSecret = (secretRes as any)?.value || null;
-    if (!(await verifyTurnstile(turnstileSecret, String(body?.turnstile_token ?? ''), clientIp(req)))) {
+    // Service-role callers skip only the BOT check (they can write these tables directly anyway);
+    // this is also what lets the live integration suite exercise the apply path.
+    const trustedCaller = (req.headers.get('authorization') || '')
+      === `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`;
+    if (!trustedCaller && !(await verifyTurnstile(turnstileSecret, String(body?.turnstile_token ?? ''), clientIp(req)))) {
       return json({ error: 'Bot check failed — please retry.' }, 400);
     }
     // Per-IP throttle (works even when Turnstile isn't configured): cap applications per IP per window.
