@@ -222,6 +222,12 @@ export interface CrmListFilters {
   /** contacts: is_client/is_supplier · companies: is_customer/is_supplier. */
   kind?: 'client' | 'supplier' | 'neither';
   /**
+   * Contacts only — attached-company filter, by NAME. Resolved server-side because a contact can
+   * carry its company via the junction OR the legacy free-text `company` column; matching both
+   * needs one query, which the client can't express.
+   */
+  companyName?: string;
+  /**
    * Id allowlist for membership filters the client already resolved (category /
    * industry / attached company).
    *
@@ -239,6 +245,7 @@ function appendCrmFilters(params: URLSearchParams, filters?: CrmListFilters) {
   if (filters.profession) params.set('profession', filters.profession);
   if (filters.status) params.set('status', filters.status);
   if (filters.kind) params.set('kind', filters.kind);
+  if (filters.companyName) params.set('company_name', filters.companyName);
   // Set even when empty — see the `ids` note above.
   if (filters.ids !== undefined) params.set('ids', filters.ids.join(','));
 }

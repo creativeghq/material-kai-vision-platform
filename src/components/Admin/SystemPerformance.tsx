@@ -53,13 +53,21 @@ interface SystemMetrics {
   };
 }
 
+/**
+ * A row of `background_jobs` — the real processing queue.
+ * This used to be cast from `materials_catalog`, which has none of these columns, so job_type /
+ * status / duration / error rendered blank on every row. Duration is derived from the timestamps
+ * (there is no processing_time_ms column) so it agrees with the aggregate tiles above.
+ */
 interface ProcessingJob {
   id: string;
-  job_type: string;
-  status: string;
-  processing_time_ms: number;
+  job_type: string | null;
+  status: string | null;
   created_at: string;
-  error_message?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error_message?: string | null;
+  error?: string | null;
 }
 
 interface EnhancedJobDetails {
@@ -249,8 +257,8 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
   const loadProcessingJobsPage = useCallback(async (page: number): Promise<number> => {
     const from = (page - 1) * TABLE_PAGE_SIZE;
     const { data, count, error } = await supabase
-      .from('materials_catalog')
-      .select('*', { count: 'exact' })
+      .from('background_jobs')
+      .select('id, job_type, status, created_at, started_at, completed_at, error_message, error', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, from + TABLE_PAGE_SIZE - 1);
 
@@ -271,8 +279,8 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
 
       // Recent rows kept only to seed the per-job enhanced-details fan-out (10 max).
       const { data: queueData, error: queueError } = await supabase
-        .from('materials_catalog')
-        .select('*')
+        .from('background_jobs')
+        .select('id, job_type, status, created_at, started_at, completed_at, error_message, error')
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -368,6 +376,17 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
       loadEnhancedJobDetails();
     }
   }, [recentJobRefs, loadEnhancedJobDetails]);
+
+  // Wall-clock duration from the queue timestamps — the same measure admin_processing_job_stats
+  // averages, so a row and the "Avg Processing Time" tile can't tell different stories.
+  const formatJobDuration = (job: ProcessingJob): string => {
+    if (!job.started_at) return '-';
+    const end = job.completed_at ? new Date(job.completed_at).getTime() : Date.now();
+    const ms = end - new Date(job.started_at).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return '-';
+    const suffix = job.completed_at ? '' : ' (running)';
+    return ms < 1000 ? `${ms}ms${suffix}` : `${(ms / 1000).toFixed(1)}s${suffix}`;
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -947,25 +966,21 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                     {processingJobs.map((job) => (
                       <TableRow key={job.id}>
                         <TableCell className="font-medium">
-                          {job.job_type}
+                          {job.job_type ?? '—'}
                         </TableCell>
                         <TableCell>
-                          <Badge className={getStatusColor(job.status)}>
-                            {job.status}
+                          <Badge className={getStatusColor(job.status ?? '')}>
+                            {job.status ?? 'unknown'}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {job.processing_time_ms
-                            ? `${job.processing_time_ms}ms`
-                            : '-'}
-                        </TableCell>
+                        <TableCell>{formatJobDuration(job)}</TableCell>
                         <TableCell>
                           {new Date(job.created_at).toLocaleString()}
                         </TableCell>
                         <TableCell className="max-w-xs">
-                          {job.error_message ? (
+                          {job.error_message || job.error ? (
                             <span className="text-red-600 text-sm truncate block">
-                              {job.error_message}
+                              {job.error_message || job.error}
                             </span>
                           ) : (
                             '-'

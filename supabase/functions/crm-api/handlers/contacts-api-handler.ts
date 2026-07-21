@@ -216,6 +216,10 @@ export async function handleContacts(req: Request): Promise<Response> {
       const profession = url.searchParams.get('profession') || '';
       const status = url.searchParams.get('status') || '';
       const kind = url.searchParams.get('kind') || ''; // client | supplier | neither
+      // Attached-company filter, sent as a NAME. Resolved here rather than client-side because a
+      // contact can carry its company two ways: the crm_company_contacts junction, or the legacy
+      // free-text `company` column. Only the server can match both in one query.
+      const companyName = (url.searchParams.get('company_name') || '').trim();
       const ids = parseIdsParam(url);
 
       if (!scope.isGlobalOperator && scope.workspaceIds.length === 0) {
@@ -285,6 +289,33 @@ export async function handleContacts(req: Request): Promise<Response> {
         const clauses = [`name.ilike.%${safe}%`, `email.ilike.%${safe}%`];
         if (companyContactIds.length > 0) clauses.push(`id.in.(${companyContactIds.join(',')})`);
         listQuery = listQuery.or(clauses.join(','));
+      }
+      if (companyName) {
+        const safeCompany = escapeLike(companyName);
+        let namedQuery = supabase
+          .from('crm_companies')
+          .select('id')
+          .eq('name', companyName)
+          .limit(MAX_FILTER_IDS);
+        if (!scope.isGlobalOperator) {
+          namedQuery = namedQuery.in('workspace_id', scope.workspaceIds);
+        }
+        const { data: namedCompanies } = await namedQuery;
+        const namedIds = (namedCompanies ?? []).map((c: { id: string }) => c.id);
+        let attachedContactIds: string[] = [];
+        if (namedIds.length > 0) {
+          const { data: junction } = await supabase
+            .from('crm_company_contacts')
+            .select('contact_id')
+            .in('company_id', namedIds)
+            .limit(MAX_FILTER_IDS);
+          attachedContactIds = [...new Set((junction ?? [])
+            .map((j: { contact_id: string }) => j.contact_id)
+            .filter(Boolean))];
+        }
+        const companyClauses = [`company.ilike.%${safeCompany}%`];
+        if (attachedContactIds.length > 0) companyClauses.push(`id.in.(${attachedContactIds.join(',')})`);
+        listQuery = listQuery.or(companyClauses.join(','));
       }
       if (profession) listQuery = listQuery.eq('profession', profession);
       if (status) listQuery = listQuery.eq('status', status);
