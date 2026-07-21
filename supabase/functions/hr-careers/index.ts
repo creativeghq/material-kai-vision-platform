@@ -22,9 +22,12 @@ function jsonCached(body: any, status = 200): Response {
   });
 }
 
-async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
-  const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
-  if (!secret) return true; // not configured → fail-open (careers form still works)
+async function verifyTurnstile(secret: string | null, token: string, ip: string): Promise<boolean> {
+  // The secret is resolved by the CALLER via resolveSecret (env-first, then platform_secrets).
+  // Deno.env.get alone is not enough: bootstrapForFunction() copies platform_secrets into env
+  // with Deno.env.set, which this runtime denies (the bootstrap swallows the throw), so an
+  // admin-saved key never reaches env and this check silently failed OPEN.
+  if (!secret) return true; // genuinely not configured → fail-open (careers form still works)
   const body = new URLSearchParams({ secret, response: token, remoteip: ip });
   const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body });
   const out = await r.json().catch(() => ({ success: false }));
@@ -195,7 +198,9 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
     const email = String(body?.email ?? '').trim().slice(0, 200);
     if ((!jobId && !jobSlug) || !name) return json({ error: 'Name is required.' }, 400);
     // Bot check (only enforced when configured).
-    if (Deno.env.get('TURNSTILE_SECRET_KEY') && !(await verifyTurnstile(String(body?.turnstile_token ?? ''), clientIp(req)))) {
+    const secretRes = await resolveSecret(supabase, 'TURNSTILE_SECRET_KEY').catch(() => ({ value: null }));
+    const turnstileSecret = (secretRes as any)?.value || null;
+    if (!(await verifyTurnstile(turnstileSecret, String(body?.turnstile_token ?? ''), clientIp(req)))) {
       return json({ error: 'Bot check failed — please retry.' }, 400);
     }
     // Per-IP throttle (works even when Turnstile isn't configured): cap applications per IP per window.

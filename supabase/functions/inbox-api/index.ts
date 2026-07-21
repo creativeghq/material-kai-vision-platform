@@ -21,6 +21,7 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { sendWhatsAppReply } from '../_shared/zernio.ts';
 import { generateWithClaudeTools } from '../_shared/ai-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 
@@ -1844,13 +1845,14 @@ function clientIp(req: Request): string {
   return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || '0.0.0.0';
 }
 
-async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
-  // Read from env, which bootstrapForFunction() fills from platform_secrets. That bootstrap is
-  // memoised PER WORKER, so pasting the key into the admin UI does NOT take effect on already-warm
-  // workers — they keep the snapshot from their cold start. After first setting TURNSTILE_SECRET_KEY,
-  // redeploy (or wait for recycle) or the fail-open branch below silently stays active.
-  const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
-  if (!secret) return true; // not configured → fail-open, same contract as hr-careers
+async function verifyTurnstile(db: SupabaseClient, token: string, ip: string): Promise<boolean> {
+  // Resolve through resolveSecret (env-first, then platform_secrets) — NOT Deno.env.get.
+  // bootstrapForFunction() is supposed to copy platform_secrets into env, but it does that via
+  // Deno.env.set, which this runtime denies (the bootstrap swallows the throw by design). Verified
+  // live: with TURNSTILE_SECRET_KEY populated in platform_secrets and the function freshly
+  // redeployed, Deno.env.get still returned undefined and this check silently failed OPEN.
+  const secret = (await resolveSecret(db, 'TURNSTILE_SECRET_KEY').catch(() => ({ value: null })))?.value;
+  if (!secret) return true; // genuinely not configured → fail-open, same contract as hr-careers
   const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
     method: 'POST',
     body: new URLSearchParams({ secret, response: token, remoteip: ip }),
@@ -1871,7 +1873,7 @@ async function handleProfileContact(db: SupabaseClient, req: Request, payload: J
   if (!toUserId || !name || !email || !message) throw new HttpError(400, 'name, email and message are required');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
 
-  if (!(await verifyTurnstile(String((payload as Record<string, unknown>).turnstile_token ?? ''), clientIp(req)))) {
+  if (!(await verifyTurnstile(db, String((payload as Record<string, unknown>).turnstile_token ?? ''), clientIp(req)))) {
     throw new HttpError(400, 'Bot check failed — please retry.');
   }
 
