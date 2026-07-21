@@ -1,12 +1,12 @@
 // #251 — Profile → Modules. The workspace OWNER activates / purchases optional modules here.
 // Free (plan-covered) modules activate instantly; add-ons redirect to Stripe checkout.
 //
-// Presented as a storefront: modules are grouped into the same Hubs the App Launcher uses
-// (`/apps`), carry the same icons + copy (see `resolveModuleMeta`), and each card states what it
-// costs and what happens if you click. Filter pills let the owner jump straight to what's
-// available to add vs. what's already running.
+// This is the ONLY module storefront — the standalone /apps page was folded in here and now
+// redirects. Modules are grouped into the same Hubs the top-bar App Launcher uses, carry the same
+// icons + copy (see `resolveModuleMeta`), and each card states what it costs and what happens if
+// you click. Filter pills jump straight to what's available to add vs. what's already running.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Check, Sparkles, Send, ArrowRight, Lock, LayoutGrid, Coins } from 'lucide-react';
+import { Loader2, Check, Sparkles, Send, ArrowRight, Lock, Coins } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -397,9 +397,6 @@ export const ModulesActivationTab: React.FC = () => {
             )}
           </p>
         </div>
-        <Button variant="outline" size="sm" asChild className="gap-2">
-          <Link to="/apps"><LayoutGrid className="h-4 w-4" /> Open Apps</Link>
-        </Button>
       </div>
 
       {(loading || entLoading) ? (

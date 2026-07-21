@@ -33,7 +33,6 @@ import HealthPage from './pages/Health';
 // Core user pages
 const Index = lazy(() => import('./pages/Index'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
-const AppsPage = lazy(() => import('./pages/AppsPage'));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
 const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
@@ -236,18 +235,9 @@ const App = () => (
                     </PageErrorBoundary>
                   }
                 />
-                <Route
-                  path="/apps"
-                  element={
-                    <PageErrorBoundary name="Apps">
-                      <AuthGuard>
-                        <Layout>
-                          <AppsPage />
-                        </Layout>
-                      </AuthGuard>
-                    </PageErrorBoundary>
-                  }
-                />
+                {/* The standalone /apps hub was folded into Profile → Modules, which lists the
+                    same Hub-grouped catalog plus cost, credit and subscription state. */}
+                <Route path="/apps" element={<Navigate to="/profile?tab=modules" replace />} />
                 <Route
                   path="/recognition"
                   element={

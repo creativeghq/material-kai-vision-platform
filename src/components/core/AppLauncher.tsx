@@ -241,8 +241,8 @@ export const AppLauncher: React.FC = () => {
                 <button type="button" onClick={() => go('/profile')} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-muted-foreground shrink-0"><Settings className="h-4 w-4" /></span> Settings
                 </button>
-                <button type="button" onClick={() => go('/apps')} className="mt-1.5 w-full flex items-center justify-center gap-2 rounded-xl bg-accent/60 px-3 py-2 text-sm font-medium text-primary hover:bg-accent transition-colors">
-                  <LayoutGrid className="h-4 w-4" /> Browse all apps
+                <button type="button" onClick={() => go('/profile?tab=modules')} className="mt-1.5 w-full flex items-center justify-center gap-2 rounded-xl bg-accent/60 px-3 py-2 text-sm font-medium text-primary hover:bg-accent transition-colors">
+                  <LayoutGrid className="h-4 w-4" /> Browse all modules
                 </button>
               </aside>
 
@@ -306,9 +306,9 @@ export const AppLauncher: React.FC = () => {
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/60 text-primary shrink-0"><Settings className="h-5 w-5" /></span>
                 <span className="min-w-0"><span className="block text-[13px] font-medium truncate">Preferences</span><span className="block text-[11px] text-muted-foreground truncate">Your account &amp; workspace</span></span>
               </button>
-              <button type="button" onClick={() => go('/apps')} className="flex items-center gap-3 px-4 py-3.5 text-left hover:bg-accent/40 transition-colors">
+              <button type="button" onClick={() => go('/profile?tab=modules')} className="flex items-center gap-3 px-4 py-3.5 text-left hover:bg-accent/40 transition-colors">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/60 text-primary shrink-0"><Check className="h-5 w-5" /></span>
-                <span className="min-w-0"><span className="block text-[13px] font-medium truncate">Manage apps</span><span className="block text-[11px] text-muted-foreground truncate">Enable &amp; configure</span></span>
+                <span className="min-w-0"><span className="block text-[13px] font-medium truncate">Manage modules</span><span className="block text-[11px] text-muted-foreground truncate">Enable, price &amp; cancel</span></span>
               </button>
             </div>
           </>

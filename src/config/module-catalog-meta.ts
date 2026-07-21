@@ -3,7 +3,7 @@
 // The `modules` table carries catalog columns (summary/description/icon) but they're sparsely
 // filled and `icon` is a bare string. The curated sources of truth for how a module LOOKS in the
 // product are already in the codebase: SIDEBAR_NAV_ITEMS (icon + hub + description for every app)
-// and each module's manifest. This resolver layers them so both the App Launcher (`/apps`) and
+// and each module's manifest. This resolver layers them so the top-bar App Launcher and
 // Profile → Modules render the same icon/copy for the same module, with the DB as an override.
 import type { LucideIcon } from 'lucide-react';
 import {

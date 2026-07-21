@@ -32,7 +32,7 @@ import type { Capability } from '@/auth/capabilities';
 export type NavRoleRequirement = 'factory' | 'admin';
 
 /**
- * HubSpot-style "Hubs" (#251 follow-up): the App Launcher and /apps page group the
+ * HubSpot-style "Hubs" (#251 follow-up): the App Launcher and Profile → Modules group the
  * workspace's business modules into a small, organized set of Hubs instead of a flat list.
  * A Hub is purely an IA/grouping layer over the existing `surface:'app'` items — routes,
  * module slugs, capabilities, and entitlements are unchanged. Each app declares its `hub`;
@@ -48,7 +48,7 @@ export interface Hub {
   description: string;
 }
 
-/** Order here is the order Hubs render in the launcher rail and /apps page. */
+/** Order here is the order Hubs render in the launcher rail and Profile → Modules. */
 export const HUBS: readonly Hub[] = [
   { id: 'marketing', label: 'Marketing Hub', icon: Megaphone, description: 'Campaigns, automations, social & SEO — powered by the Agent.' },
   { id: 'sales', label: 'Sales Hub', icon: Briefcase, description: 'CRM, quotes, orders, services & supplier analytics.' },
@@ -71,10 +71,10 @@ export interface SidebarNavItem {
   requireCapability?: Capability;
   /** Optional module gate. When set, item is only shown if the referenced module is enabled. */
   moduleSlug?: string;
-  /** One-line description shown on the App Launcher / /apps cards (for surface:'app' items). */
+  /** One-line description shown on the App Launcher / Profile → Modules cards (surface:'app'). */
   description?: string;
   /**
-   * Which Hub this app belongs to in the App Launcher / /apps grouping (#251 follow-up).
+   * Which Hub this app belongs to in the App Launcher / Profile → Modules grouping (#251).
    * Only meaningful for `surface:'app'` items; `top` surfaces stay in the lean top bar.
    * Apps with no `hub` land in the launcher's catch-all "More" group.
    */
@@ -82,7 +82,7 @@ export interface SidebarNavItem {
   /**
    * Where the item renders (#251 App Launcher IA):
    * - `'top'` (default) → the lean top nav bar (universal surfaces).
-   * - `'app'` → the workspace **App Launcher** + `/apps` hub, alongside optional modules.
+   * - `'app'` → the workspace **App Launcher**, alongside optional modules.
    *   Keeps the top bar uncluttered as the platform grows to many modules. Routes/guards
    *   are unchanged — only the entry point moves.
    */
