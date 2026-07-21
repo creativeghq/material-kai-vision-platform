@@ -37,6 +37,8 @@ import { warehouseService, type WarehouseItem, type Warehouse } from '@/services
 import { humanizeLabel } from '@/utils/humanize';
 import { parseDecimalOr } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildDocumentFilters, type DocFilterType } from '@/modules/finance/components/documentFilters';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch' | 'delivery_notes' | 'cheques' | 'expenses';
 
@@ -94,8 +96,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [cheques, setCheques] = useState<Cheque[]>([]);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
-  const [categoryFilter, setCategoryFilter] = useState<string>('all'); // 'all' | 'none' | <category id>
-  const [query, setQuery] = useState('');
   // Only one document table renders at a time (the type discriminates), so a single page
   // cursor serves them all — it's reset on every type/filter change below.
   const [page, setPage] = useState(1);
@@ -157,10 +157,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     } finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [activeWorkspaceId]);
-  // Reset filters whenever the document type changes (categories are side-scoped).
-  useEffect(() => { setCategoryFilter('all'); setQuery(''); setPage(1); }, [type]);
-  // A narrowed category/search is a different result set — restart at the first page.
-  useEffect(() => { setPage(1); }, [categoryFilter, query]);
 
   // Which finance-category side applies to the active surface (drives filter + inline picker).
   const sideKind: 'income' | 'expense' | null =
@@ -169,37 +165,37 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     () => categories.filter((c) => !sideKind || c.kind === sideKind || c.kind === 'both'),
     [categories, sideKind],
   );
-  const matchesCategoryFilter = (categoryId: any) =>
-    categoryFilter === 'all' ? true : categoryFilter === 'none' ? !categoryId : categoryId === categoryFilter;
-  const q = query.trim().toLowerCase();
-  const hit = (...fields: any[]) => !q || fields.some((f) => String(f ?? '').toLowerCase().includes(q));
 
-  const rows = useMemo(() => {
-    let base: Invoice[] = [];
-    if (type === 'invoices') base = invoices.filter((i) => !isReceipt((i as any).document_type));
-    else if (type === 'receipts') base = invoices.filter((i) => isReceipt((i as any).document_type));
-    return base
-      .filter((i) => matchesCategoryFilter((i as any).category_id))
-      .filter((i) => hit(i.internal_number, (i as any).customer_name, categoryName((i as any).category_id)));
-  }, [type, invoices, categoryFilter, q]);
+  // The unfiltered rows for the active document type — one table renders at a time, so a
+  // single base array feeds the shared filter engine and the pagination footer.
+  const baseRows = useMemo<any[]>(() => {
+    switch (type) {
+      case 'invoices': return invoices.filter((i) => !isReceipt((i as any).document_type));
+      case 'receipts': return invoices.filter((i) => isReceipt((i as any).document_type));
+      case 'credit_notes': return creditNotes;
+      case 'expenses': return inbound;
+      case 'payments': return payments;
+      case 'delivery_notes': return deliveryNotes;
+      case 'cheques': return cheques;
+      default: return [];
+    }
+  }, [type, invoices, creditNotes, inbound, payments, deliveryNotes, cheques]);
 
-  const filteredInbound = useMemo(
-    () => inbound.filter((d) => matchesCategoryFilter((d as any).category_id)).filter((d) => hit(d.issuer_name, d.issuer_vat, d.doc_type)),
-    [inbound, categoryFilter, q],
+  const filterGroups = useMemo(
+    () => buildDocumentFilters(type as DocFilterType, { rows: baseRows, categories: sideCategories, categoryName }),
+    [type, baseRows, sideCategories, categoryMap],
   );
-  const filteredPayments = useMemo(
-    () => payments.filter((p) => matchesCategoryFilter((p as any).category_id)).filter((p: any) => hit(p.reference, p.method, p.counterparty_name)),
-    [payments, categoryFilter, q],
-  );
+  const { values: filterValues, setValues: setFilterValues, filtered: activeRows, previewCount } =
+    useFilters<any>(baseRows, filterGroups);
 
-  // The rows the active document type is showing — what pagination counts and slices.
-  const activeRows: any[] =
-    type === 'credit_notes' ? creditNotes
-    : type === 'expenses' ? filteredInbound
-    : type === 'payments' ? filteredPayments
-    : type === 'delivery_notes' ? deliveryNotes
-    : type === 'cheques' ? cheques
-    : rows;
+  // Switching document type carries no meaningful filter state across — start clean.
+  useEffect(() => { setFilterValues({}); setPage(1); }, [type]);
+  // A narrowed result set is a different list — restart at the first page.
+  useEffect(() => { setPage(1); }, [filterValues]);
+
+  const rows = activeRows as Invoice[];
+  const filteredInbound = activeRows as InboundDocument[];
+  const filteredPayments = activeRows as PaymentWithAllocation[];
 
   // Issuing/dismissing a document shrinks the list — clamp so the last page never goes blank.
   useEffect(() => { setPage((p) => clampPage(p, activeRows.length)); }, [activeRows.length]);
@@ -222,23 +218,14 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold capitalize">{DOC_LABEL[type]}</h2>
               <div className="flex items-center gap-2">
-                {(type === 'invoices' || type === 'receipts' || type === 'expenses' || type === 'payments') && (
-                  <Input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={type === 'expenses' ? 'Search supplier / VAT…' : type === 'payments' ? 'Search reference / counterparty…' : 'Search number / customer…'}
-                    className="h-8 w-52 text-xs"
+                {type !== 'dispatch' && filterGroups.length > 0 && (
+                  <FilterBar
+                    groups={filterGroups}
+                    values={filterValues}
+                    onChange={setFilterValues}
+                    previewCount={previewCount}
+                    title={`Filter ${DOC_LABEL[type].toLowerCase()}`}
                   />
-                )}
-                {(type === 'invoices' || type === 'receipts' || type === 'expenses' || type === 'payments') && (
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="All categories" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All categories</SelectItem>
-                      <SelectItem value="none">Uncategorized</SelectItem>
-                      {sideCategories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
                 )}
                 {type === 'receipts' && !isAccountant && (
                   <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
@@ -292,15 +279,15 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 {loading || wsLoading ? (
                   <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : type === 'credit_notes' ? (
-                  <CreditNoteTable rows={paginate(creditNotes, page)} financeBase={financeBase} />
+                  <CreditNoteTable rows={paginate(activeRows as CreditNote[], page)} financeBase={financeBase} />
                 ) : type === 'expenses' ? (
                   <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} />
                 ) : type === 'payments' ? (
                   <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} />
                 ) : type === 'delivery_notes' ? (
-                  <DeliveryNotesTable rows={paginate(deliveryNotes, page)} readOnly={isAccountant} onChanged={load} />
+                  <DeliveryNotesTable rows={paginate(activeRows as DeliveryNote[], page)} readOnly={isAccountant} onChanged={load} />
                 ) : type === 'cheques' ? (
-                  <ChequesTable rows={paginate(cheques, page)} readOnly={isAccountant} onChanged={load} />
+                  <ChequesTable rows={paginate(activeRows as Cheque[], page)} readOnly={isAccountant} onChanged={load} />
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
