@@ -141,10 +141,7 @@ suite('hr-careers · public careers page', () => {
     // proves every guard before it accepted the payload. The storage-prefix behaviour this used
     // to assert was verified against prod before Turnstile was switched on; it cannot be
     // exercised from CI without a real challenge token.
-    const pdf = Buffer.from('%PDF-1.4
-1 0 obj<</Type/Catalog>>endobj
-trailer<</Root 1 0 R>>
-%%EOF').toString('base64');
+    const pdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF').toString('base64');
     const { body } = await careers({
       action: 'apply', slug: wsSlug, job_slug: openSlug, name: 'E2E Applicant',
       email: `e2e-appl2-${rid}@materialshub.gr`, resume_base64: pdf, resume_filename: 'cv.pdf',
