@@ -142,11 +142,24 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
   const siteKeyRes = await resolveSecret(supabase, 'TURNSTILE_SITE_KEY').catch(() => ({ value: null }));
   const turnstileSiteKey = (siteKeyRes as any)?.value || null;
   const settings = (ws as any).settings ?? {};
+
+  // Branding comes from finance_settings — the SAME source the public quote, statement and
+  // catalog pages use (see catalog-access → resolveOwnerBranding). The original version read
+  // `workspaces.settings.logo_url`, which NOTHING in the app writes, so every careers page
+  // rendered the generic fallback icon. Tenants already set this in Finance → Settings.
+  const { data: fs } = await supabase
+    .from('finance_settings')
+    .select('business_name, business_logo_path, business_website')
+    .eq('workspace_id', ws.id).maybeSingle();
+  const logoUrl = fs?.business_logo_path
+    ? supabase.storage.from('generation-images').getPublicUrl(fs.business_logo_path).data.publicUrl
+    : (settings.logo_url ?? settings.company_logo_url ?? null);
+
   const company = {
-    name: ws.name,
+    name: fs?.business_name || ws.name,
     tagline: settings.careers_tagline ?? ws.description ?? null,
-    logo_url: settings.logo_url ?? settings.company_logo_url ?? null,
-    website: settings.website ?? null,
+    logo_url: logoUrl,
+    website: fs?.business_website ?? settings.website ?? null,
   };
 
   if (action === 'meta') {

@@ -111,7 +111,8 @@ interface MaterialDemand {
   avg_confidence: number;
   last_requested: string;
   first_requested: string;
-  example_queries: any[];
+  // `example_queries` was dropped from the matview: it carried verbatim user search strings +
+  // timestamps and the view is readable by every authenticated user, not just admins.
 }
 
 interface AnalyticsStats {
@@ -489,18 +490,6 @@ export const SearchAnalyticsDashboard = () => {
                     </div>
                   </div>
 
-                  {material.example_queries && material.example_queries.length > 0 && (
-                    <div className="mt-3">
-                      <div className="text-xs text-muted-foreground mb-1">Example searches:</div>
-                      <div className="flex flex-wrap gap-1">
-                        {material.example_queries.slice(0, 3).map((q: any, i: number) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {typeof q === 'string' ? q : q.query}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="ml-4">

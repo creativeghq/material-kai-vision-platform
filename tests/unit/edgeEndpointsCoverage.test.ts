@@ -28,10 +28,9 @@ const FUNCTIONS_DIR = join(ROOT, 'supabase/functions');
 
 // Real, deployed edge functions with no entry in edge-endpoints.json. SHRINK by
 // documenting each; never grow. A new undocumented function should fail instead.
-const KNOWN_UNDOCUMENTED = new Set([
-  'contracts-api',
-  'stock-api', // paid Stock add-on (#252 sibling) — needs a spec entry
-]);
+// Emptied 2026-07-21: contracts-api and stock-api both gained spec entries in d5045782, and the
+// "stays honest" assertion correctly failed until they were pruned. Keep at zero.
+const KNOWN_UNDOCUMENTED = new Set<string>([]);
 
 interface EndpointEntry { name: string }
 
