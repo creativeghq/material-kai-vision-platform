@@ -141,7 +141,8 @@ const InboxPage: React.FC = () => {
 
   // One bag for every secondary dimension. `channel` and `label` are request parameters on
   // listThreads (server-applied); the rest are matched client-side against the loaded page.
-  const filterGroups = useMemo(() => buildInboxFilters(wsLabels), [wsLabels]);
+  // Assignee options come off the loaded threads, so the group def depends on them too.
+  const filterGroups = useMemo(() => buildInboxFilters(wsLabels, threads, myUserId ?? undefined), [wsLabels, threads, myUserId]);
   const { values: filterValues, setValues: setFilterValues, filtered: matchedThreads, previewCount } =
     useFilters<InboxThread>(threads, filterGroups);
   const filter = (filterValues.channel as ChannelFilter) || 'all';

@@ -184,6 +184,13 @@ export const ProjectsListPage: React.FC = () => {
                   <CardContent className="p-5 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="text-base font-light truncate flex-1">{p.name}</h3>
+                      {/* The list now includes projects shared via an active collaborator grant —
+                          mark them so they aren't mistaken for your own. */}
+                      {p.is_mine === false && (
+                        <Badge variant="secondary" className="shrink-0 text-xs" title={p.owner_name ? `Owned by ${p.owner_name}` : 'Shared with you'}>
+                          Shared
+                        </Badge>
+                      )}
                       <Badge variant="outline" className={`shrink-0 text-xs ${STATUS_TONES[p.status]}`}>
                         {STATUS_LABELS[p.status]}
                       </Badge>

@@ -5,8 +5,8 @@
  * no way to narrow by client, budget or deadline. Archived is now a field like any other, seeded
  * to `false` so the default view still hides archived projects.
  */
-import { CalendarDays, Coins, FolderKanban, Users } from 'lucide-react';
-import { NONE_VALUE, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
+import { CalendarDays, Coins, FolderKanban, UserRound, Users } from 'lucide-react';
+import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import type { ProjectStatus, ProjectWithClient } from '../services/projectsService';
 
 const STATUS_OPTIONS: Array<{ value: ProjectStatus; label: string }> = [
@@ -80,6 +80,24 @@ export function buildProjectFilters(rows: ProjectWithClient[]): FilterGroupDef[]
           description: 'The CRM company or contact the project is billed to.',
           options: clientOptions,
           accessor: clientKey,
+        },
+      ],
+    },
+    {
+      key: 'owner', label: 'Owner', icon: UserRound,
+      fields: [
+        {
+          // The list now returns collaborator-shared projects too (RLS was always wider than the
+          // old user_id filter), so who owns a project is a real dimension rather than a constant.
+          key: 'owner', type: 'multi', label: 'Owned by',
+          options: optionsFromRows(rows, (p) => p.owner_name ?? undefined),
+          accessor: (p: ProjectWithClient) => p.owner_name ?? undefined,
+        },
+        {
+          key: 'is_mine', type: 'bool', label: 'Ownership',
+          description: 'Projects you own, versus ones shared with you as a collaborator.',
+          trueLabel: 'Mine', falseLabel: 'Shared with me',
+          accessor: (p: ProjectWithClient) => p.is_mine !== false,
         },
       ],
     },

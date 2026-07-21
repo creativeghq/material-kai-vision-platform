@@ -43,6 +43,18 @@ export interface InboxThread {
   unread?: boolean;
   /** Labels assigned to this thread (returned by list_threads). */
   labels?: InboxLabel[];
+  /**
+   * Human assignees — active `member` participants, resolved to names by list_threads.
+   * Assignment is a participant row rather than a column on the thread, so this is the only
+   * place the mailbox list learns who owns a conversation.
+   */
+  assignees?: InboxThreadAssignee[];
+}
+
+export interface InboxThreadAssignee {
+  user_id: string;
+  name: string;
+  thread_role: string;
 }
 
 export interface InboxParticipant {

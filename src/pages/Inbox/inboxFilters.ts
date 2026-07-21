@@ -9,11 +9,11 @@
  * `inboxApi.listThreads`, so the server has already applied them and the client matcher
  * passes them through.
  */
-import { CalendarDays, MessagesSquare, Tag } from 'lucide-react';
-import type { FilterGroupDef, FilterOption } from '@/components/core/filters';
+import { CalendarDays, MessagesSquare, Tag, UserRound } from 'lucide-react';
+import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import type { InboxLabel, InboxThread } from '@/services/inboxApi';
 
-export function buildInboxFilters(labels: InboxLabel[]): FilterGroupDef[] {
+export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] = [], myUserId?: string): FilterGroupDef[] {
   const labelOptions: FilterOption[] = labels.map((l) => ({ value: l.id, label: l.name }));
   return [
     {
@@ -51,6 +51,26 @@ export function buildInboxFilters(labels: InboxLabel[]): FilterGroupDef[] {
           trueLabel: 'Unread only', falseLabel: 'Read only',
           accessor: (t: InboxThread) => !!t.unread,
         },
+      ],
+    },
+    {
+      key: 'people', label: 'Assignment', icon: UserRound,
+      fields: [
+        {
+          key: 'assignee', type: 'multi', label: 'Assigned to',
+          description: 'Team members on the conversation. Unassigned means nobody has picked it up.',
+          options: [
+            { value: NONE_VALUE, label: 'Unassigned' },
+            ...optionsFromRows(threads, (t: InboxThread) => (t.assignees ?? []).map((a) => a.name)),
+          ],
+          accessor: (t: InboxThread) => (t.assignees ?? []).map((a) => a.name),
+        },
+        ...(myUserId ? [{
+          key: 'mine', type: 'bool' as const, label: 'Just mine',
+          description: 'Conversations you are on, regardless of who else is.',
+          trueLabel: 'Assigned to me', falseLabel: 'Not mine',
+          accessor: (t: InboxThread) => (t.assignees ?? []).some((a) => a.user_id === myUserId),
+        }] : []),
       ],
     },
     ...(labelOptions.length > 0 ? [{

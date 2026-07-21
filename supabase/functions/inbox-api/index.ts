@@ -1117,6 +1117,36 @@ async function handleJwtAction(
         }
       }
 
+      // Attach the human assignees (active `user` participants) for the same threads. Assignment
+      // is modelled as a participant row, not a column on the thread, so the mailbox list had no
+      // way to show or filter by who owns a conversation without this second round trip.
+      const assigneesByThread = new Map<string, Array<{ user_id: string; name: string; thread_role: string }>>();
+      if (threadIds.length) {
+        const { data: parts } = await db.from('inbox_participants')
+          .select('thread_id, user_id, thread_role')
+          .in('thread_id', threadIds)
+          .eq('participant_type', 'member')
+          .eq('status', 'active')
+          .not('user_id', 'is', null);
+        const partRows = (parts || []) as Array<{ thread_id: string; user_id: string; thread_role: string }>;
+        const assigneeIds = [...new Set(partRows.map((p) => p.user_id))];
+        const nameById = new Map<string, string>();
+        if (assigneeIds.length) {
+          const { data: profiles } = await db.from('user_profiles')
+            .select('user_id, full_name, email').in('user_id', assigneeIds);
+          for (const pr of (profiles || []) as Array<{ user_id: string; full_name: string | null; email: string | null }>) {
+            const label = pr.full_name || pr.email;
+            if (label) nameById.set(pr.user_id, label);
+          }
+        }
+        for (const p of partRows) {
+          const arr = assigneesByThread.get(p.thread_id) || [];
+          // An unresolved profile still counts as an assignee — fall back to the id.
+          arr.push({ user_id: p.user_id, name: nameById.get(p.user_id) || p.user_id, thread_role: p.thread_role });
+          assigneesByThread.set(p.thread_id, arr);
+        }
+      }
+
       const enriched = (threads || []).map((t: Record<string, unknown>) => {
         const id = String(t.id);
         // Threads visible only via workspace membership (not an explicit participant) start unread.
@@ -1124,7 +1154,7 @@ async function handleJwtAction(
         const unread = lastReadByThread.has(id)
           ? (!lr || new Date(String(t.last_message_at)) > new Date(lr))
           : true;
-        return { ...t, unread, labels: labelsByThread.get(id) || [] };
+        return { ...t, unread, labels: labelsByThread.get(id) || [], assignees: assigneesByThread.get(id) || [] };
       });
       return json({ threads: enriched });
     }

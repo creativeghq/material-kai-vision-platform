@@ -43,6 +43,10 @@ export interface Project {
 export interface ProjectWithClient extends Project {
   client_company?: { id: string; name: string } | null;
   client_contact?: { id: string; name: string | null; first_name?: string | null; last_name?: string | null; email?: string | null } | null;
+  /** Set by listProjects: false for projects reached via an active collaborator grant. */
+  is_mine?: boolean;
+  /** Owner display name — 'You' for your own, else the owner's name. */
+  owner_name?: string | null;
 }
 
 export interface ProjectRoom {
@@ -306,6 +310,15 @@ export interface UpdateTaskInput {
 class ProjectsService {
   // ---------- PROJECTS ----------
 
+  /**
+   * Projects the caller can see: their own plus any they are an active collaborator on.
+   *
+   * This deliberately does NOT filter on `user_id`. RLS already scopes the table via
+   * `projects_owner_all` (owner) and `projects_collaborator_read`
+   * (`_user_is_active_project_collaborator`, which honours `revoked_at`/`expires_at`), so an
+   * explicit owner filter here was narrower than the policy and hid every project shared with
+   * you — the collaborator feature existed but nothing shared ever reached this list.
+   */
   async listProjects(opts: { status?: ProjectStatus | 'active' } = {}): Promise<ProjectWithClient[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -317,7 +330,6 @@ class ProjectsService {
         client_company:crm_companies(id, name),
         client_contact:crm_contacts(id, name, first_name, last_name, email)
       `)
-      .eq('user_id', user.id)
       .order('last_activity_at', { ascending: false });
 
     if (opts.status === 'active') {
@@ -328,7 +340,25 @@ class ProjectsService {
 
     const { data, error } = await query;
     if (error) throw error;
-    return (data || []) as ProjectWithClient[];
+    const rows = (data || []) as ProjectWithClient[];
+
+    // Resolve owner names so a shared list can say who owns what. Own projects are marked
+    // without a lookup; only the other owners need resolving.
+    const otherOwnerIds = [...new Set(rows.map((r) => r.user_id).filter((id) => id && id !== user.id))] as string[];
+    const nameById = new Map<string, string>();
+    if (otherOwnerIds.length) {
+      const { data: profiles } = await supabase
+        .from('user_profiles').select('user_id, full_name, email').in('user_id', otherOwnerIds);
+      for (const p of profiles ?? []) {
+        const label = (p as any).full_name || (p as any).email;
+        if (label) nameById.set((p as any).user_id, label);
+      }
+    }
+    return rows.map((r) => ({
+      ...r,
+      is_mine: r.user_id === user.id,
+      owner_name: r.user_id === user.id ? 'You' : (nameById.get(r.user_id) ?? 'Shared with me'),
+    }));
   }
 
   async getProject(id: string): Promise<ProjectWithClient | null> {
