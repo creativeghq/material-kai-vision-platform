@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -23,8 +23,7 @@ import { edgeErrorMessage } from '@/utils/edgeError';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { MoneyInput } from '@/components/core/ui/money-input';
-import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { fetchAllPages } from '@/utils/fetchAllPages';
+import { TablePagination, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
@@ -49,10 +48,6 @@ const UNIT_OPTIONS: Array<{ code: string; label: string }> = [
 ];
 const DEFAULT_UNIT = 'item';
 
-// Ceiling on how many orders we hold client-side for the in-browser search/party filters. Reaching
-// it is reported in the UI rather than silently capping the list (which is what `.limit(500)` did).
-const MAX_ORDERS_IN_MEMORY = 5000;
-
 /** Orders list + create — mounted as the first Finance → Documents tab. */
 export const OrdersPanel: React.FC<{
   workspaceId: string; companyId?: string; contactId?: string; projectId?: string;
@@ -63,13 +58,15 @@ export const OrdersPanel: React.FC<{
 }> = ({ workspaceId, companyId, contactId, projectId, partyRoles }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
-  // True when the workspace has more orders than we're willing to hold in memory. The search /
-  // party filters below run client-side, so the user must be told they're filtering a partial set.
-  const [truncated, setTruncated] = useState(false);
+  // Total MATCHING rows as counted by the server — the list itself only ever holds one page.
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [typeF, setTypeF] = useState<'all' | OrderType>('all');
   const [statusF, setStatusF] = useState<'all' | OrderStatus>('all');
+  // `search` is what the user is typing; `searchQ` is the debounced value the query actually runs
+  // on, so a fast typist doesn't fire a round trip per keystroke.
   const [search, setSearch] = useState('');
+  const [searchQ, setSearchQ] = useState('');
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   // What the New-order dropdown chose: sales/purchase + whether it's a draft (pre-order).
@@ -109,45 +106,43 @@ export const OrdersPanel: React.FC<{
   const showSales = roleUnset || !!partyRoles?.customer;
   const showPurchase = roleUnset || !!partyRoles?.supplier;
 
+  // Everything — filters, free text, paging AND the party-name join — runs in SQL, so the browser
+  // only ever holds one page and the filters always cover the WHOLE workspace, not a capped slice.
   const load = async () => {
     if (!workspaceId) return;
     try {
       setLoading(true);
-      // The type/status filters are pushed to the server, but search + party/project matching are
-      // client-side — so the client genuinely needs the whole (filtered) set. Drain it page by page
-      // instead of taking one capped fetch, which used to drop the tail silently.
-      const res = await fetchAllPages<OrderListRow>(
-        (limit, offset) =>
-          ordersService.listPage({
-            workspaceId, companyId, contactId, projectId,
-            orderType: typeF === 'all' ? undefined : typeF,
-            status: statusF === 'all' ? undefined : statusF,
-            limit, offset,
-          }).then(({ rows: r, count }) => ({ data: r, count })),
-        { maxRows: MAX_ORDERS_IN_MEMORY },
-      );
+      const res = await ordersService.search({
+        workspaceId, companyId, contactId, projectId,
+        orderType: typeF === 'all' ? undefined : typeF,
+        status: statusF === 'all' ? undefined : statusF,
+        search: searchQ || undefined,
+        limit: TABLE_PAGE_SIZE,
+        offset: (page - 1) * TABLE_PAGE_SIZE,
+      });
+      // A delete / refresh can shrink the set past the current page. Land on the new last page
+      // instead of stranding the user on an empty one; the page change re-runs this load.
+      const clamped = clampPage(page, res.count);
+      if (clamped !== page) { setPage(clamped); return; }
       setRows(res.rows);
-      setTruncated(res.truncated);
+      setTotal(res.count);
     } catch (err: any) {
       toast({ title: 'Failed to load orders', description: err?.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, contactId, projectId, typeF, statusF]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, contactId, projectId, typeF, statusF, searchQ, page]);
 
-  // A different filter/search is a different result set — start it at the first page.
-  useEffect(() => { setPage(1); }, [typeF, statusF, search, companyId, contactId, projectId]);
+  // Debounce the search box. Page 1 is set in the SAME tick as the new term so the query never
+  // fires once for the stale page and again for page 1.
+  useEffect(() => {
+    const t = setTimeout(() => { setSearchQ(search.trim()); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const filtered = useMemo(() => {
-    const t = search.trim().toLowerCase();
-    if (!t) return rows;
-    return rows.filter((r) => (r.party_name ?? '').toLowerCase().includes(t) || (r.order_number ?? '').toLowerCase().includes(t));
-  }, [rows, search]);
-
-  // Keep the page inside the result set — narrowing the search or deleting an order would
-  // otherwise strand the user on a page that no longer exists.
-  useEffect(() => { setPage((p) => clampPage(p, filtered.length)); }, [filtered.length]);
+  // A different party/project scope is a different result set — start it at the first page.
+  useEffect(() => { setPage(1); }, [companyId, contactId, projectId]);
 
   return (
     <div className="space-y-4">
@@ -163,7 +158,7 @@ export const OrdersPanel: React.FC<{
             <>
               <div className="space-y-1">
                 <Label className="block text-[10px] text-muted-foreground">Type</Label>
-                <Select value={typeF} onValueChange={(v: any) => setTypeF(v)}>
+                <Select value={typeF} onValueChange={(v: any) => { setTypeF(v); setPage(1); }}>
                   <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All</SelectItem>
@@ -174,7 +169,7 @@ export const OrdersPanel: React.FC<{
               </div>
               <div className="space-y-1">
                 <Label className="block text-[10px] text-muted-foreground">Status</Label>
-                <Select value={statusF} onValueChange={(v: any) => setStatusF(v)}>
+                <Select value={statusF} onValueChange={(v: any) => { setStatusF(v); setPage(1); }}>
                   <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All statuses</SelectItem>
@@ -225,8 +220,12 @@ export const OrdersPanel: React.FC<{
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : filtered.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">No orders yet. An accepted quote creates one automatically, or add one above.</div>
+          ) : rows.length === 0 ? (
+            <div className="p-12 text-center text-sm text-muted-foreground">
+              {searchQ
+                ? `No orders match “${searchQ}”.`
+                : 'No orders yet. An accepted quote creates one automatically, or add one above.'}
+            </div>
           ) : (
             <>
             <table className="w-full text-sm">
@@ -242,7 +241,7 @@ export const OrdersPanel: React.FC<{
                 </tr>
               </thead>
               <tbody>
-                {paginate(filtered, page).map((r) => (
+                {rows.map((r) => (
                   <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => setOpenId(r.id)}>
                     <td className="px-4 py-2 font-mono text-xs">{r.order_number ?? r.id.slice(0, 8)}</td>
                     <td className="px-4 py-2">{r.party_name ?? '—'}</td>
@@ -264,14 +263,7 @@ export const OrdersPanel: React.FC<{
                 ))}
               </tbody>
             </table>
-            <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="orders" />
-            {/* Say it out loud when the list is capped — the filters above only ever see what's
-                loaded, so a silent cap would make them quietly wrong. */}
-            {truncated && (
-              <p className="px-4 pb-3 -mt-1 text-[11px] text-muted-foreground">
-                Only the {MAX_ORDERS_IN_MEMORY.toLocaleString()} most recent orders are loaded — search and filters cover those.
-              </p>
-            )}
+            <TablePagination page={page} total={total} onPageChange={setPage} label="orders" />
             </>
           )}
         </CardContent>

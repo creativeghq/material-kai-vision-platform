@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Users, Building2, Trash2, Mail, CreditCard, Key, ExternalLink, Tags } from 'lucide-react';
 
@@ -25,15 +25,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { WorkspaceQuotaBadge } from '@/components/core/WorkspaceQuotaBadge';
 import { AdminStatCard } from '@/components/Admin/AdminStatCard';
-import { usersAPI, contactsAPI, companiesAPI } from '@/services/crm.service';
+import { usersAPI, contactsAPI, companiesAPI, type CrmListFilters } from '@/services/crm.service';
 import { crmCategoriesService, type CrmCategorySummary } from '@/services/crmCategoriesService';
-import { fetchAllPages } from '@/utils/fetchAllPages';
 import { humanizeLabel } from '@/utils/humanize';
 import { CategoriesPanel } from './CategoriesPage';
 import { CrmFilters, type FilterDef } from '../components/CrmFilters';
 import { AddCompanyModal } from '../components/AddCompanyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
-import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import {
   ANY, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS, CLIENT_SUPPLIER_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
@@ -80,6 +79,19 @@ function toggle<T>(set: Set<T>, value: T): Set<T> {
   return next;
 }
 
+/**
+ * Intersect the active membership-id allowlists into the `ids` filter the list API takes.
+ *
+ * `null` entries mean "that filter is off". Returns `undefined` when no filter is active,
+ * and an EMPTY ARRAY when the active filters overlap on nothing — which the service sends
+ * as an explicit empty `ids=` so the server returns an empty page instead of everything.
+ */
+function intersectIds(...sets: Array<Set<string> | null>): string[] | undefined {
+  const active = sets.filter((s): s is Set<string> => s !== null);
+  if (active.length === 0) return undefined;
+  return [...active.reduce((a, b) => new Set([...a].filter((id) => b.has(id))))];
+}
+
 export const CRMManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -111,16 +123,20 @@ export const CRMManagement: React.FC = () => {
   const [users, setUsers] = useState<UserWithAuth[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
-  // Set when the drain hit its safety ceiling — surfaced so the list never under-reports silently.
-  const [contactsTruncated, setContactsTruncated] = useState(false);
-  const [companiesTruncated, setCompaniesTruncated] = useState(false);
+  // Total row counts for the CURRENT filter set, straight off the API's exact count.
+  // `contacts`/`companies` now hold one page only, so they can't be counted locally.
+  const [contactsTotal, setContactsTotal] = useState(0);
+  const [companiesTotal, setCompaniesTotal] = useState(0);
   const [roles, setRoles] = useState<Role[]>([]);
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  // Debounced copy of the search box — contacts/companies search hits the server, so
+  // firing on every keystroke would be a request per character.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0 });
 
-  // Client-side pagination over the already-filtered lists — one page state per tab
-  // so switching tabs never lands on a page the other list doesn't have.
+  // Users are client-paginated (single edge-function payload). Contacts + companies are
+  // SERVER-paged: the page number feeds the request's offset.
   const [usersPage, setUsersPage] = useState(1);
   const [contactsPage, setContactsPage] = useState(1);
   const [companiesPage, setCompaniesPage] = useState(1);
@@ -136,6 +152,15 @@ export const CRMManagement: React.FC = () => {
   // Industry is a `kind='industry'` CRM category; filtering by it is the same
   // membership lookup as the generic category filter, kept in its own set.
   const [companyIndustryIds, setCompanyIndustryIds] = useState<Set<string> | null>(null);
+  // The contacts "company" filter is by attached-business NAME, which lives across the
+  // crm_company_contacts junction. Resolve it to a contact-id allowlist and reuse the
+  // same server-side `ids` param as the category filters, rather than teaching the list
+  // endpoint a junction join.
+  const [contactCompanyIds, setContactCompanyIds] = useState<Set<string> | null>(null);
+  // Bounded id+name lookup backing the company dropdowns (the contacts "company" filter
+  // and the bulk "Assign company" action). Separate from the paged table feed, which no
+  // longer holds every company — this is a picker, not the data set.
+  const [companyLookup, setCompanyLookup] = useState<Array<{ id: string; name: string }>>([]);
 
   // Per-tab selection (users keyed by user_id; contacts/companies by id)
   const [selUsers, setSelUsers] = useState<Set<string>>(new Set());
@@ -190,44 +215,89 @@ export const CRMManagement: React.FC = () => {
     } finally { setLoadingUsers(false); }
   };
 
-  const loadContacts = async () => {
+  // The `ids` allowlists sent to the server, one per tab. `undefined` = no membership
+  // filter active; `[]` = the active filters matched nothing (→ empty page).
+  const contactIdsFilter = useMemo(
+    () => intersectIds(contactCatIds, contactCompanyIds),
+    [contactCatIds, contactCompanyIds]);
+  const companyIdsFilter = useMemo(
+    () => intersectIds(companyCatIds, companyIndustryIds),
+    [companyCatIds, companyIndustryIds]);
+
+  const contactQuery: CrmListFilters = useMemo(() => ({
+    search: debouncedSearch || undefined,
+    profession: contactF.profession === ANY ? undefined : contactF.profession,
+    status: contactF.status === ANY ? undefined : contactF.status,
+    kind: contactF.clientSupplier === ANY
+      ? undefined : (contactF.clientSupplier as CrmListFilters['kind']),
+    ids: contactIdsFilter,
+  }), [debouncedSearch, contactF.profession, contactF.status, contactF.clientSupplier, contactIdsFilter]);
+
+  const companyQuery: CrmListFilters = useMemo(() => ({
+    search: debouncedSearch || undefined,
+    profession: companyF.profession === ANY ? undefined : companyF.profession,
+    kind: companyF.customerSupplier === ANY
+      ? undefined : (companyF.customerSupplier as CrmListFilters['kind']),
+    ids: companyIdsFilter,
+  }), [debouncedSearch, companyF.profession, companyF.customerSupplier, companyIdsFilter]);
+
+  // Load through the crm-api edge function (same path as users/companies) rather than a
+  // direct supabase query. The direct query is bound by the `is_workspace_member` RLS on
+  // crm_contacts, so a global operator on the /admin/crm surface who isn't an active
+  // member of the tenant workspace that owns the contacts sees an empty table. The API
+  // also flattens the attached-company junction into the `companies` array the table
+  // renders, and applies the filters + exact count server-side so this fetches ONE page.
+  const loadContacts = useCallback(async () => {
     try {
       setLoadingContacts(true);
-      // Load through the crm-api edge function (same path as users/companies) rather than
-      // a direct supabase query. The direct query is bound by the `is_workspace_member`
-      // RLS on crm_contacts, so a global operator on the /admin/crm surface who isn't an
-      // active member of the tenant workspace that owns the contacts sees an empty table
-      // — even though companies (loaded via this API, which grants global operators
-      // cross-tenant scope in getCrmScope) show up fine. The API also flattens the
-      // attached-company junction into the `companies` array the table renders.
-      // Drain every page: the five contact filters below all run client-side, so a single capped
-      // fetch would mean each filter silently searched only the first 500 rows.
-      const { rows, truncated } = await fetchAllPages<Contact>(
-        (limit, offset) => contactsAPI.listContacts(limit, offset),
+      const res = await contactsAPI.listContacts(
+        TABLE_PAGE_SIZE, (contactsPage - 1) * TABLE_PAGE_SIZE, contactQuery,
       );
-      setContacts(rows);
-      setContactsTruncated(truncated);
+      setContacts(res.data || []);
+      setContactsTotal(res.count ?? 0);
     } catch (error: any) {
       toast({ title: 'Error', description: `Failed to load contacts: ${error.message}`, variant: 'destructive' });
     } finally { setLoadingContacts(false); }
-  };
+  }, [contactsPage, contactQuery, toast]);
 
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       setLoadingCompanies(true);
-      const { rows, truncated } = await fetchAllPages<any>(
-        (limit, offset) => companiesAPI.listCompanies(limit, offset),
+      const res = await companiesAPI.listCompanies(
+        TABLE_PAGE_SIZE, (companiesPage - 1) * TABLE_PAGE_SIZE, undefined, companyQuery,
       );
-      setCompanies(rows);
-      setCompaniesTruncated(truncated);
+      setCompanies(res.data || []);
+      setCompaniesTotal(res.count ?? 0);
     } catch (error: any) {
       toast({ title: 'Error', description: `Failed to load companies: ${error.message}`, variant: 'destructive' });
     } finally { setLoadingCompanies(false); }
+  }, [companiesPage, companyQuery, toast]);
+
+  const loadCompanyLookup = async () => {
+    try {
+      const res = await companiesAPI.listCompanies(500, 0);
+      setCompanyLookup(((res.data || []) as Array<{ id: string; name: string }>)
+        .filter((c) => c.id && c.name).map((c) => ({ id: c.id, name: c.name })));
+    } catch { /* picker data only — never block the page on it */ }
   };
 
   useEffect(() => {
-    loadRoles(); loadCategories(); loadUsers(); loadContacts(); loadCompanies();
+    loadRoles(); loadCategories(); loadUsers(); loadCompanyLookup();
   }, []);
+
+  // Re-fetch whenever the page or any server-side filter changes.
+  useEffect(() => { loadContacts(); }, [loadContacts]);
+  useEffect(() => { loadCompanies(); }, [loadCompanies]);
+
+  // Debounce the shared search box (~300ms) and drop back to page 1 — a narrower result
+  // set would otherwise strand the user on an out-of-range page.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+      setContactsPage(1); setCompaniesPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   // Fetch member ids when the contacts category filter changes
   useEffect(() => {
@@ -249,6 +319,24 @@ export const CRMManagement: React.FC = () => {
     }).catch(() => setCompanyCatIds(new Set()));
     return () => { cancelled = true; };
   }, [companyF.category]);
+
+  // Attached-company filter → contact ids. The company detail endpoint already returns the
+  // flattened `contacts[]` for the junction, so no new server capability is needed.
+  useEffect(() => {
+    if (!contactF.company || contactF.company === ANY) { setContactCompanyIds(null); return; }
+    let cancelled = false;
+    (async () => {
+      const match = companyLookup.find((c) => c.name === contactF.company);
+      // Unknown name → match nothing (an empty set), never "no filter".
+      if (!match) { if (!cancelled) setContactCompanyIds(new Set()); return; }
+      try {
+        const res = await companiesAPI.getCompany(match.id);
+        const attached = (res.data?.contacts ?? []) as Array<{ contact_id: string }>;
+        if (!cancelled) setContactCompanyIds(new Set(attached.map((a) => a.contact_id).filter(Boolean)));
+      } catch { if (!cancelled) setContactCompanyIds(new Set()); }
+    })();
+    return () => { cancelled = true; };
+  }, [contactF.company, companyLookup]);
 
   useEffect(() => {
     if (!companyF.industry || companyF.industry === ANY) { setCompanyIndustryIds(null); return; }
@@ -272,9 +360,11 @@ export const CRMManagement: React.FC = () => {
   const companyCategoryOptions: Option[] = useMemo(
     () => categories.filter((c) => c.kind !== 'industry').map((c) => ({ value: c.id, label: c.name })),
     [categories]);
+  // Sourced from the bounded lookup, not the table feed — the companies table now holds
+  // one page, so deriving the picker from it would list only 20 names.
   const companyNameOptions: Option[] = useMemo(() =>
-    [...new Set(companies.map((c) => c.name).filter(Boolean))].sort().map((n) => ({ value: n as string, label: n as string })),
-    [companies]);
+    [...new Set(companyLookup.map((c) => c.name))].sort().map((n) => ({ value: n, label: n })),
+    [companyLookup]);
   const subscriptionOptions: Option[] = useMemo(() =>
     [...new Set(users.map((u) => u.subscription_tier).filter(Boolean))].sort().map((s) => ({ value: s as string, label: s as string })),
     [users]);
@@ -297,51 +387,30 @@ export const CRMManagement: React.FC = () => {
     return primary?.company_name ?? c.company ?? '';
   };
 
-  const filteredContacts = useMemo(() => contacts.filter((c) =>
-    (c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || contactCompanyName(c).toLowerCase().includes(q)) &&
-    (contactF.profession === ANY || c.profession === contactF.profession) &&
-    (contactF.status === ANY || c.status === contactF.status) &&
-    (contactF.company === ANY || contactCompanyName(c) === contactF.company) &&
-    (contactF.clientSupplier === ANY ||
-      (contactF.clientSupplier === 'client' && c.is_client) ||
-      (contactF.clientSupplier === 'supplier' && c.is_supplier) ||
-      (contactF.clientSupplier === 'neither' && !c.is_client && !c.is_supplier)) &&
-    (!contactCatIds || contactCatIds.has(c.id)),
-  ), [contacts, q, contactF, contactCatIds]);
-
-  const filteredCompanies = useMemo(() => companies.filter((c) =>
-    (c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.website?.toLowerCase().includes(q)) &&
-    (companyF.profession === ANY || c.profession === companyF.profession) &&
-    (companyF.status === ANY || c.status === companyF.status) &&
-    (companyF.customerSupplier === ANY ||
-      (companyF.customerSupplier === 'client' && c.is_customer) ||
-      (companyF.customerSupplier === 'supplier' && c.is_supplier) ||
-      (companyF.customerSupplier === 'neither' && !c.is_customer && !c.is_supplier)) &&
-    (!companyIndustryIds || companyIndustryIds.has(c.id)) &&
-    (!companyCatIds || companyCatIds.has(c.id)),
-  ), [companies, q, companyF, companyCatIds, companyIndustryIds]);
+  // NOTE: contacts + companies are filtered SERVER-side (see contactQuery / companyQuery)
+  // — `contacts` / `companies` already hold exactly the rows for the current page.
 
   // ── pagination ────────────────────────────────────────────────────────────
-  // Reset to page 1 whenever the filtered result set changes (search/filter), so
-  // a narrowed list never strands the user on an out-of-range page.
+  // Users only: reset to page 1 whenever their client-side result set changes. The
+  // contacts/companies page reset lives in the search debounce + each filter's onChange,
+  // so the reset lands in the same commit as the change and doesn't cost an extra fetch.
   useEffect(() => { setUsersPage(1); }, [q, userF]);
-  useEffect(() => { setContactsPage(1); }, [q, contactF, contactCatIds]);
-  useEffect(() => { setCompaniesPage(1); }, [q, companyF, companyCatIds, companyIndustryIds]);
 
   // A delete or a reload can shrink the list under the current page — clamp instead of
   // stranding the user on an empty table.
   useEffect(() => { setUsersPage((p) => clampPage(p, filteredUsers.length)); }, [filteredUsers.length]);
-  useEffect(() => { setContactsPage((p) => clampPage(p, filteredContacts.length)); }, [filteredContacts.length]);
-  useEffect(() => { setCompaniesPage((p) => clampPage(p, filteredCompanies.length)); }, [filteredCompanies.length]);
+  useEffect(() => { setContactsPage((p) => clampPage(p, contactsTotal)); }, [contactsTotal]);
+  useEffect(() => { setCompaniesPage((p) => clampPage(p, companiesTotal)); }, [companiesTotal]);
 
   const pagedUsers = useMemo(() => paginate(filteredUsers, usersPage), [filteredUsers, usersPage]);
-  const pagedContacts = useMemo(() => paginate(filteredContacts, contactsPage), [filteredContacts, contactsPage]);
-  const pagedCompanies = useMemo(() => paginate(filteredCompanies, companiesPage), [filteredCompanies, companiesPage]);
 
   // ── selection helpers ─────────────────────────────────────────────────────
+  // Contacts/companies "select all" covers the CURRENT PAGE only — the other pages were
+  // never fetched, so a whole-result-set select would be selecting rows nobody has seen
+  // (and bulk delete would act on them).
   const allUsersSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selUsers.has(u.user_id));
-  const allContactsSelected = filteredContacts.length > 0 && filteredContacts.every((c) => selContacts.has(c.id));
-  const allCompaniesSelected = filteredCompanies.length > 0 && filteredCompanies.every((c) => selCompanies.has(c.id));
+  const allContactsSelected = contacts.length > 0 && contacts.every((c) => selContacts.has(c.id));
+  const allCompaniesSelected = companies.length > 0 && companies.every((c) => selCompanies.has(c.id));
 
   // ── bulk runner ───────────────────────────────────────────────────────────
   const runBulk = async (ids: string[], op: (id: string) => Promise<unknown>, verb: string, after: () => Promise<void>, clear: () => void) => {
@@ -457,19 +526,26 @@ export const CRMManagement: React.FC = () => {
     { key: 'subscription', label: 'plan', value: userF.subscription, options: subscriptionOptions, onChange: (v) => setUserF((f) => ({ ...f, subscription: v })) },
     { key: 'profession', label: 'type', value: userF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setUserF((f) => ({ ...f, profession: v })) },
   ];
+  // Contacts/companies filters drive a server query, so each change also drops back to
+  // page 1 — otherwise a narrower result set leaves the user on an out-of-range offset.
+  const setContact = (patch: Partial<typeof contactF>) => { setContactsPage(1); setContactF((f) => ({ ...f, ...patch })); };
+  const setCompany = (patch: Partial<typeof companyF>) => { setCompaniesPage(1); setCompanyF((f) => ({ ...f, ...patch })); };
+
   const contactFilters: FilterDef[] = [
-    { key: 'profession', label: 'type', value: contactF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setContactF((f) => ({ ...f, profession: v })) },
-    { key: 'status', label: 'status', value: contactF.status, options: STATUS_OPTIONS, onChange: (v) => setContactF((f) => ({ ...f, status: v })) },
-    { key: 'company', label: 'company', value: contactF.company, options: companyNameOptions, onChange: (v) => setContactF((f) => ({ ...f, company: v })) },
-    { key: 'clientSupplier', label: 'kind', value: contactF.clientSupplier, options: CLIENT_SUPPLIER_OPTIONS, onChange: (v) => setContactF((f) => ({ ...f, clientSupplier: v })) },
-    { key: 'category', label: 'category', value: contactF.category, options: categoryOptions, onChange: (v) => setContactF((f) => ({ ...f, category: v })) },
+    { key: 'profession', label: 'type', value: contactF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setContact({ profession: v }) },
+    { key: 'status', label: 'status', value: contactF.status, options: STATUS_OPTIONS, onChange: (v) => setContact({ status: v }) },
+    { key: 'company', label: 'company', value: contactF.company, options: companyNameOptions, onChange: (v) => setContact({ company: v }) },
+    { key: 'clientSupplier', label: 'kind', value: contactF.clientSupplier, options: CLIENT_SUPPLIER_OPTIONS, onChange: (v) => setContact({ clientSupplier: v }) },
+    { key: 'category', label: 'category', value: contactF.category, options: categoryOptions, onChange: (v) => setContact({ category: v }) },
   ];
+  // No `status` filter here: crm_companies has no status column, so the old client-side
+  // `c.status === …` test could only ever match zero rows. Dropped rather than shipped as
+  // an inert control that 400s server-side.
   const companyFilters: FilterDef[] = [
-    { key: 'profession', label: 'type', value: companyF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setCompanyF((f) => ({ ...f, profession: v })) },
-    { key: 'status', label: 'status', value: companyF.status, options: STATUS_OPTIONS, onChange: (v) => setCompanyF((f) => ({ ...f, status: v })) },
-    { key: 'customerSupplier', label: 'kind', value: companyF.customerSupplier, options: CLIENT_SUPPLIER_OPTIONS, onChange: (v) => setCompanyF((f) => ({ ...f, customerSupplier: v })) },
-    { key: 'industry', label: 'industry', value: companyF.industry, options: industryOptions, onChange: (v) => setCompanyF((f) => ({ ...f, industry: v })) },
-    { key: 'category', label: 'category', value: companyF.category, options: companyCategoryOptions, onChange: (v) => setCompanyF((f) => ({ ...f, category: v })) },
+    { key: 'profession', label: 'type', value: companyF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setCompany({ profession: v }) },
+    { key: 'customerSupplier', label: 'kind', value: companyF.customerSupplier, options: CLIENT_SUPPLIER_OPTIONS, onChange: (v) => setCompany({ customerSupplier: v }) },
+    { key: 'industry', label: 'industry', value: companyF.industry, options: industryOptions, onChange: (v) => setCompany({ industry: v }) },
+    { key: 'category', label: 'category', value: companyF.category, options: companyCategoryOptions, onChange: (v) => setCompany({ category: v }) },
   ];
 
   return (
@@ -485,8 +561,9 @@ export const CRMManagement: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <AdminStatCard title="Total Users" value={userStats.total} icon={Users} description="Registered users" variant="glass" />
           <AdminStatCard title="Active Users" value={userStats.active} icon={Users} description="Currently active" variant="glass" />
-          <AdminStatCard title="Total Contacts" value={contacts.length} icon={Building2} description="CRM contacts" variant="glass" />
-          <AdminStatCard title="Total Companies" value={companies.length} icon={Building2} description="CRM companies" variant="glass" />
+          {/* Totals come from the API's exact count — the arrays hold one page now. */}
+          <AdminStatCard title="Total Contacts" value={contactsTotal} icon={Building2} description="CRM contacts" variant="glass" />
+          <AdminStatCard title="Total Companies" value={companiesTotal} icon={Building2} description="CRM companies" variant="glass" />
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
@@ -602,8 +679,11 @@ export const CRMManagement: React.FC = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10">
+                          {/* Page-scoped: selecting rows from pages that were never fetched
+                              would let bulk delete act on records the user hasn't seen. */}
                           <Checkbox checked={allContactsSelected} onCheckedChange={(v) =>
-                            setSelContacts(v ? new Set(filteredContacts.map((c) => c.id)) : new Set())} aria-label="Select all" />
+                            setSelContacts(v ? new Set(contacts.map((c) => c.id)) : new Set())}
+                            aria-label="Select all on this page" title="Select all on this page" />
                         </TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
@@ -616,9 +696,9 @@ export const CRMManagement: React.FC = () => {
                     <TableBody>
                       {loadingContacts ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">Loading...</TableCell></TableRow>
-                      ) : filteredContacts.length === 0 ? (
+                      ) : contacts.length === 0 ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">No contacts found</TableCell></TableRow>
-                      ) : pagedContacts.map((contact) => (
+                      ) : contacts.map((contact) => (
                         <TableRow key={contact.id} data-state={selContacts.has(contact.id) ? 'selected' : undefined}>
                           <TableCell>
                             <Checkbox checked={selContacts.has(contact.id)} onCheckedChange={() => setSelContacts((s) => toggle(s, contact.id))} aria-label="Select row" />
@@ -639,12 +719,7 @@ export const CRMManagement: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
-                  {contactsTruncated && (
-                    <p className="px-4 pb-2 text-xs text-amber-500">
-                      Only the first {contacts.length.toLocaleString()} contacts are loaded — filters and counts cover that set.
-                    </p>
-                  )}
-                  <TablePagination page={contactsPage} total={filteredContacts.length} onPageChange={setContactsPage} label="contacts" />
+                  <TablePagination page={contactsPage} total={contactsTotal} onPageChange={setContactsPage} label="contacts" />
                 </div>
               </CardContent>
             </Card>
@@ -675,8 +750,10 @@ export const CRMManagement: React.FC = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10">
+                          {/* Page-scoped — see the contacts table note. */}
                           <Checkbox checked={allCompaniesSelected} onCheckedChange={(v) =>
-                            setSelCompanies(v ? new Set(filteredCompanies.map((c) => c.id)) : new Set())} aria-label="Select all" />
+                            setSelCompanies(v ? new Set(companies.map((c) => c.id)) : new Set())}
+                            aria-label="Select all on this page" title="Select all on this page" />
                         </TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
@@ -689,9 +766,9 @@ export const CRMManagement: React.FC = () => {
                     <TableBody>
                       {loadingCompanies ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">Loading...</TableCell></TableRow>
-                      ) : filteredCompanies.length === 0 ? (
+                      ) : companies.length === 0 ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">No companies found</TableCell></TableRow>
-                      ) : pagedCompanies.map((company) => (
+                      ) : companies.map((company) => (
                         <TableRow key={company.id} data-state={selCompanies.has(company.id) ? 'selected' : undefined}>
                           <TableCell>
                             <Checkbox checked={selCompanies.has(company.id)} onCheckedChange={() => setSelCompanies((s) => toggle(s, company.id))} aria-label="Select row" />
@@ -712,12 +789,7 @@ export const CRMManagement: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
-                  {companiesTruncated && (
-                    <p className="px-4 pb-2 text-xs text-amber-500">
-                      Only the first {companies.length.toLocaleString()} companies are loaded — filters and counts cover that set.
-                    </p>
-                  )}
-                  <TablePagination page={companiesPage} total={filteredCompanies.length} onPageChange={setCompaniesPage} label="companies" />
+                  <TablePagination page={companiesPage} total={companiesTotal} onPageChange={setCompaniesPage} label="companies" />
                 </div>
               </CardContent>
             </Card>

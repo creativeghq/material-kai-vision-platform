@@ -34,14 +34,14 @@ import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
-// Rows behind the rate / latency figures. They need per-row fields, so they can't come from a count
-// query — every tile derived from them says so. `total_processing_jobs` IS a real count.
-const JOB_STATS_WINDOW = 100;
+// Rows still fetched for the AI-provider panel — analytics_events carries no per-provider
+// aggregate, so those two figures remain a recent-window read and say so on screen.
+const AI_EVENTS_WINDOW = 100;
 
 interface SystemMetrics {
   total_processing_jobs: number;
-  /** Rows the rate + latency figures were computed over (≤ JOB_STATS_WINDOW). */
-  jobs_sampled: number;
+  /** Analytics events the AI-provider completion counts were read from (≤ AI_EVENTS_WINDOW). */
+  ai_events_sampled: number;
   avg_processing_time: number;
   success_rate: number;
   error_rate: number;
@@ -110,7 +110,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState<SystemMetrics>({
     total_processing_jobs: 0,
-    jobs_sampled: 0,
+    ai_events_sampled: 0,
     avg_processing_time: 0,
     success_rate: 0,
     error_rate: 0,
@@ -125,8 +125,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
   const [processingJobs, setProcessingJobs] = useState<ProcessingJob[]>([]);
   const [processingJobsPage, setProcessingJobsPage] = useState(1);
   const [processingJobsTotal, setProcessingJobsTotal] = useState(0);
-  // Separate fixed window feeding the metric tiles + the enhanced-job lookups.
-  const [jobsSample, setJobsSample] = useState<ProcessingJob[]>([]);
+  // Recent rows kept only to seed the per-job gateway fan-out below — the metric tiles are SQL
+  // aggregates now and no longer read this.
+  const [recentJobRefs, setRecentJobRefs] = useState<ProcessingJob[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Enhanced monitoring state
@@ -224,9 +225,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
   // Load enhanced job details for recent jobs
   const loadEnhancedJobDetails = useCallback(async () => {
     try {
-      // Get recent job IDs from the stats window, not the visible page — otherwise every page
-      // change would re-fan-out these per-job gateway calls.
-      const recentJobIds = jobsSample.slice(0, 10).map((job) => job.id);
+      // Fixed set of recent job IDs, not the visible page — otherwise every page change would
+      // re-fan-out these per-job gateway calls.
+      const recentJobIds = recentJobRefs.slice(0, 10).map((job) => job.id);
 
       const enhancedJobPromises = recentJobIds.map((jobId) =>
         fetchEnhancedJobDetails(jobId),
@@ -241,7 +242,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
     } catch (error) {
       console.error('Error loading enhanced job details:', error);
     }
-  }, [jobsSample, fetchEnhancedJobDetails]);
+  }, [recentJobRefs, fetchEnhancedJobDetails]);
 
   // Server-paged table loader — reports the exact row count so the footer readout describes the
   // whole queue rather than the window the tiles are computed over.
@@ -268,12 +269,12 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
     try {
       setLoading(true);
 
-      // Use existing table since processing_queue doesn't exist
+      // Recent rows kept only to seed the per-job enhanced-details fan-out (10 max).
       const { data: queueData, error: queueError } = await supabase
         .from('materials_catalog')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(JOB_STATS_WINDOW);
+        .limit(10);
 
       if (queueError) throw queueError;
 
@@ -283,36 +284,27 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
         .select('*')
         .or('event_type.ilike.%ai%,event_type.ilike.%hybrid%')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(AI_EVENTS_WINDOW);
 
       if (analyticsError) throw analyticsError;
 
-      setJobsSample((queueData as ProcessingJob[]) || []);
+      setRecentJobRefs((queueData as ProcessingJob[]) || []);
       // Refetch replaces the whole result set — don't strand the reader on a page past the end.
-      const totalJobsAllTime = await loadProcessingJobsPage(1);
+      await loadProcessingJobsPage(1);
 
-      // Calculate performance metrics
-      const totalJobs = queueData?.length || 0;
-      const completedJobs =
-        queueData?.filter(
-          (job: Record<string, unknown>) => job.status === 'completed',
-        ) || [];
-      const failedJobs =
-        queueData?.filter(
-          (job: Record<string, unknown>) => job.status === 'failed',
-        ) || [];
-
-      const avgProcessingTime =
-        completedJobs.reduce(
-          (sum: number, job: Record<string, unknown>) =>
-            sum + (Number(job.processing_time_ms) || 0),
-          0,
-        ) / Math.max(completedJobs.length, 1);
-
-      const successRate =
-        totalJobs > 0 ? (completedJobs.length / totalJobs) * 100 : 0;
-      const errorRate =
-        totalJobs > 0 ? (failedJobs.length / totalJobs) * 100 : 0;
+      // Job health tiles come from one all-time SQL aggregate over background_jobs, the real
+      // processing queue. They used to reduce a 100-row materials_catalog sample, which has no
+      // status / processing_time_ms / error columns — so those rates could only ever read zero.
+      const { data: jobStats, error: jobStatsError } = await supabase.rpc(
+        'admin_processing_job_stats',
+      );
+      if (jobStatsError) console.error('Error fetching processing job stats:', jobStatsError);
+      const js = (jobStats || {}) as {
+        total_jobs?: number;
+        success_rate?: number;
+        error_rate?: number;
+        avg_processing_time_ms?: number;
+      };
 
       // AI model performance from analytics
       const hybridEvents =
@@ -336,11 +328,11 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
       });
 
       setMetrics({
-        total_processing_jobs: totalJobsAllTime,
-        jobs_sampled: totalJobs,
-        avg_processing_time: Math.round(avgProcessingTime),
-        success_rate: Math.round(successRate),
-        error_rate: Math.round(errorRate),
+        total_processing_jobs: Number(js.total_jobs) || 0,
+        ai_events_sampled: hybridEvents.length,
+        avg_processing_time: Math.round(Number(js.avg_processing_time_ms) || 0),
+        success_rate: Math.round(Number(js.success_rate) || 0),
+        error_rate: Math.round(Number(js.error_rate) || 0),
         ai_model_performance: {
           openai_success: openaiCount,
           claude_success: claudeCount,
@@ -372,10 +364,10 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
 
   // Load enhanced job details when processing jobs change
   useEffect(() => {
-    if (jobsSample.length > 0) {
+    if (recentJobRefs.length > 0) {
       loadEnhancedJobDetails();
     }
-  }, [jobsSample, loadEnhancedJobDetails]);
+  }, [recentJobRefs, loadEnhancedJobDetails]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -492,7 +484,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             title="Success Rate"
             value={`${metrics.success_rate}%`}
             icon={CheckCircle}
-            description={`Completion rate, last ${JOB_STATS_WINDOW} jobs`}
+            description="Completion rate, all jobs"
             status={
               metrics.success_rate > 90
                 ? 'good'
@@ -505,7 +497,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             title="Avg Processing Time"
             value={`${metrics.avg_processing_time}ms`}
             icon={Clock}
-            description={`Duration, last ${JOB_STATS_WINDOW} jobs`}
+            description="Duration, all completed jobs"
             status={
               metrics.avg_processing_time < 2000
                 ? 'good'
@@ -518,7 +510,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             title="Error Rate"
             value={`${metrics.error_rate}%`}
             icon={AlertTriangle}
-            description={`Failed share, last ${JOB_STATS_WINDOW} jobs`}
+            description="Failed share, all jobs"
             status={
               metrics.error_rate < 5
                 ? 'good'
@@ -827,6 +819,11 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                     <Brain className="h-4 w-4" />
                     AI Provider Performance
                   </CardTitle>
+                  {/* Still window-derived: the provider + timing live inside analytics_events
+                      event_data JSON, with no aggregate behind them — so the label stays honest. */}
+                  <p className="text-xs text-muted-foreground">
+                    Last {AI_EVENTS_WINDOW} AI/hybrid analytics events
+                  </p>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -914,12 +911,12 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                     <div className="flex justify-between">
                       <span className="text-sm">Hybrid Success Rate</span>
                       <span className="font-mono text-sm">
-                        {/* Both sides of this ratio are window figures — pairing the completion
-                            counts with the all-time job total would read as ~0%. */}
+                        {/* Both sides of this ratio come from the same recent analytics-event
+                            window — pairing it with an all-time total would read as ~0%. */}
                         {Math.round(
                           ((metrics.ai_model_performance.openai_success +
                             metrics.ai_model_performance.claude_success) /
-                            Math.max(metrics.jobs_sampled, 1)) *
+                            Math.max(metrics.ai_events_sampled, 1)) *
                             100,
                         )}
                         %

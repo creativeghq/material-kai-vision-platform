@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows } from './_scope.ts';
-import { pickContactFields } from './contacts-api-handler.ts';
+import { pickContactFields, escapeLike, parseIdsParam } from './contacts-api-handler.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -234,9 +234,21 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const limit = parseInt(url.searchParams.get('limit') || '50');
       const offset = parseInt(url.searchParams.get('offset') || '0');
       const search = url.searchParams.get('search');
+      // Server-side filters so the CRM list can be SERVER-paged instead of draining every
+      // company into the browser to filter it there. NOTE: there is deliberately no
+      // `status` param — crm_companies has no status column.
+      const profession = url.searchParams.get('profession') || '';
+      const kind = url.searchParams.get('kind') || ''; // client (=customer) | supplier | neither
+      const ids = parseIdsParam(url);
 
       // Non-global callers with no membership see nothing.
       if (!scope.isGlobalOperator && scope.workspaceIds.length === 0) {
+        return new Response(JSON.stringify({ data: [], count: 0 }), { status: 200, headers: corsHeaders });
+      }
+
+      // Present-but-empty `ids` = the caller's category/industry lookup matched nothing.
+      // Short-circuit rather than fall through to an unfiltered query.
+      if (ids !== null && ids.length === 0) {
         return new Response(JSON.stringify({ data: [], count: 0 }), { status: 200, headers: corsHeaders });
       }
 
@@ -250,10 +262,22 @@ export async function handleCompanies(req: Request): Promise<Response> {
         query = query.in('workspace_id', scope.workspaceIds);
       }
 
+      // Every filter below is ANDed ON TOP of the workspace clause above. None of them
+      // may relax or replace it — a request param must never influence tenant scope.
+
       // Add search filter if provided — escape % and _ to prevent wildcard injection
       if (search) {
-        const safeSearch = search.replace(/[%_\\]/g, '\\$&');
+        const safeSearch = escapeLike(search);
         query = query.or(`name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%,website.ilike.%${safeSearch}%`);
+      }
+      if (ids) query = query.in('id', ids);
+      if (profession) query = query.eq('profession', profession);
+      // `neither` uses IS NOT TRUE so NULL (never set) counts as "not a customer/supplier",
+      // matching the client-side `!c.is_customer && !c.is_supplier` this replaces.
+      if (kind === 'client') query = query.eq('is_customer', true);
+      else if (kind === 'supplier') query = query.eq('is_supplier', true);
+      else if (kind === 'neither') {
+        query = query.not('is_customer', 'is', true).not('is_supplier', 'is', true);
       }
 
       const { data, error, count } = await query;

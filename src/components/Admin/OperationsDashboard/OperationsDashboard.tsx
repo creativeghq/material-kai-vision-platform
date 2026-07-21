@@ -80,7 +80,6 @@ import { ModuleSubscribersPanel } from './ModuleSubscribersPanel';
 import type {
   UsageAnalytics,
   AgentChatMessage,
-  SearchAnalytic,
   ApiUsageLog,
   SubscriptionStats,
   UserProfile,
@@ -94,11 +93,21 @@ import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
 import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
 
-// Rows behind the summary tiles that need message bodies (ratings, latency, cost estimates) and so
-// can't be answered by a count query. Every tile fed from these is labelled with the window size —
-// the tables next to them are server-paged and cover everything.
-const AGENT_CHAT_STATS_WINDOW = 100;
-const RECENT_EVENTS_WINDOW = 50;
+// Shape of `admin_agent_chat_stats()` — one all-time aggregate row replacing what used to be a
+// 100-row client-side sample. Token counts are returned per model rather than pre-costed so the
+// price table stays in constants.ts instead of being forked into SQL.
+interface AgentChatStats {
+  total_responses: number;
+  total_analytics_events: number;
+  total_api_calls: number;
+  active_users: number;
+  avg_response_time_ms: number;
+  rating_up: number;
+  rating_down: number;
+  rated_total: number;
+  by_model: Array<{ model: string; responses: number; est_tokens: number }>;
+  by_feature: Array<{ feature: string; responses: number; avg_response_time_ms: number | null }>;
+}
 
 const VALID_OPERATIONS_TABS = new Set([
   'system-health', 'data-processing', 'performance', 'agent-chat',
@@ -131,7 +140,6 @@ const OperationsDashboardInner: React.FC = () => {
     active_users: 0,
     avg_response_time: 0,
   });
-  const [searchAnalytics, setSearchAnalytics] = useState<SearchAnalytic[]>([]);
   // `apiUsage` / `agentChatRows` each hold ONE page of rows fetched with an exact count.
   const [apiUsage, setApiUsage] = useState<ApiUsageLog[]>([]);
   const [apiUsagePage, setApiUsagePage] = useState(1);
@@ -139,8 +147,8 @@ const OperationsDashboardInner: React.FC = () => {
   const [agentChatRows, setAgentChatRows] = useState<AgentChatMessage[]>([]);
   const [agentChatPage, setAgentChatPage] = useState(1);
   const [agentChatTotal, setAgentChatTotal] = useState(0);
-  // Separate fixed-size window feeding the summary tiles.
-  const [agentChats, setAgentChats] = useState<AgentChatMessage[]>([]);
+  // Single all-time aggregate row feeding the summary tiles.
+  const [agentStats, setAgentStats] = useState<AgentChatStats | null>(null);
   const [subscriptionStats, setSubscriptionStats] = useState<SubscriptionStats>({
     totalUsers: 0,
     freeUsers: 0,
@@ -286,132 +294,36 @@ const OperationsDashboardInner: React.FC = () => {
 
       console.log('✅ User authenticated:', session.user.email);
 
-      // Fetch search analytics
-      const { data: searchData, error: searchError } = await supabase
-        .from('analytics_events')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(RECENT_EVENTS_WINDOW);
-
-      if (searchError) {
-        console.error('❌ Error fetching analytics_events:', searchError);
-        // Check if it's an auth error
-        if (searchError.message?.includes('JWT') || searchError.message?.includes('401')) {
-          toast({
-            title: 'Session Expired',
-            description: 'Your session has expired. Please refresh the page and log in again.',
-            variant: 'destructive',
-          });
-          return;
-        }
-        throw searchError;
-      }
-      console.log('✅ Analytics events:', searchData?.length || 0);
-
-      // API Request Logs table — first page + the exact all-time count behind the "API Calls" tile.
-      const { count: apiCallCount, rows: apiRows } = await loadApiUsagePage(1);
-
-      // Fetch agent chat messages (assistant responses with metadata)
-      const { data: agentChatData, error: agentChatError } = await supabase
-        .from('agent_chat_messages')
-        .select(`
-          id,
-          conversation_id,
-          role,
-          content,
-          metadata,
-          created_at,
-          agent_chat_conversations!inner (
-            user_id
-          )
-        `)
-        .eq('role', 'assistant')
-        .order('created_at', { ascending: false })
-        .limit(AGENT_CHAT_STATS_WINDOW);
-
-      if (agentChatError) {
-        console.error('❌ Error fetching agent chats:', agentChatError);
-        if (agentChatError.message?.includes('JWT') || agentChatError.message?.includes('401')) {
-          toast({
-            title: 'Session Expired',
-            description: 'Your session has expired. Please refresh the page and log in again.',
-            variant: 'destructive',
-          });
-          return;
-        }
-      }
-
-      // Map agent chat data with user info
-      const agentChatMessages: AgentChatMessage[] = (agentChatData || []).map((msg: any) => ({
-        id: msg.id,
-        conversation_id: msg.conversation_id,
-        role: msg.role,
-        content: msg.content,
-        metadata: msg.metadata,
-        created_at: msg.created_at,
-        user_id: msg.agent_chat_conversations?.user_id,
-      }));
-
-      setAgentChats(agentChatMessages);
-      // Agent Chat table is paged independently of the stats window above.
+      // API Request Logs table — first page only; the "API Calls" total comes from the aggregate.
+      await loadApiUsagePage(1);
+      // Agent Chat table is paged independently of the tiles.
       await loadAgentChatPage(1);
 
-      // Filter and cast data to match expected types
-      const filteredSearchData = (searchData || [])
-        .filter(
-          (item: unknown) =>
-            (item as any).created_at &&
-            (item as any).event_type &&
-            (item as any).id,
-        )
-        .map((item: unknown) => ({
-          id: (item as any).id,
-          query_text:
-            (((item as any).event_data as Record<string, unknown>)
-              ?.query as string) || 'Unknown query',
-          results_shown:
-            (((item as any).event_data as Record<string, unknown>)
-              ?.results_count as number) || 0,
-          clicks_count:
-            (((item as any).event_data as Record<string, unknown>)
-              ?.clicks as number) || 0,
-          satisfaction_rating:
-            (((item as any).event_data as Record<string, unknown>)
-              ?.rating as number) ?? 0,
-          response_time_ms:
-            (((item as any).event_data as Record<string, unknown>)
-              ?.response_time as number) || 0,
-          created_at: (item as any).created_at || new Date().toISOString(),
-          user_id: (item as any).user_id,
-          session_id: (item as any).session_id,
-        }));
+      // One aggregate row over the FULL agent_chat_messages / analytics_events / api_usage_logs
+      // tables, replacing the old fetch-100-rows-and-reduce-in-the-browser path. Operator-gated
+      // server-side (is_platform_operator), so it can safely expose platform-wide usage + cost.
+      const { data: statsRow, error: statsError } = await supabase.rpc('admin_agent_chat_stats');
 
-      setSearchAnalytics(filteredSearchData);
-
-      // Aggregates over the recent windows above — only the API call count is a true total.
-      const totalSearches = (searchData?.length || 0) + agentChatMessages.length;
-      const uniqueUsers = new Set([
-        ...(searchData
-          ?.map((s: unknown) => (s as any).user_id)
-          .filter(Boolean) || []),
-        ...apiRows.map((a) => a.user_id).filter(Boolean),
-        ...agentChatMessages.map((m) => m.user_id).filter(Boolean),
-      ]).size;
-
-      // Calculate avg response time from agent chats (more accurate)
-      const agentResponseTimes = agentChatMessages
-        .map((m) => m.metadata?.responseTimeMs)
-        .filter((t): t is number => typeof t === 'number' && t > 0);
-      const avgAgentResponseTime = agentResponseTimes.length > 0
-        ? agentResponseTimes.reduce((a, b) => a + b, 0) / agentResponseTimes.length
-        : 0;
-
-      setAnalytics({
-        total_searches: totalSearches,
-        total_api_calls: apiCallCount,
-        active_users: uniqueUsers,
-        avg_response_time: Math.round(avgAgentResponseTime),
-      });
+      if (statsError) {
+        console.error('❌ Error fetching agent chat stats:', statsError);
+        if (statsError.message?.includes('JWT') || statsError.message?.includes('401')) {
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please refresh the page and log in again.',
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else if (statsRow) {
+        const stats = statsRow as unknown as AgentChatStats;
+        setAgentStats(stats);
+        setAnalytics({
+          total_searches: (stats.total_analytics_events || 0) + (stats.total_responses || 0),
+          total_api_calls: stats.total_api_calls || 0,
+          active_users: stats.active_users || 0,
+          avg_response_time: Math.round(stats.avg_response_time_ms || 0),
+        });
+      }
 
       // Fetch subscription and credits data
       const { data: profiles, error: profilesError } = await supabase
@@ -856,10 +768,10 @@ const OperationsDashboardInner: React.FC = () => {
             {/* Platform Overview Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <StatCard
-                title="Recent Searches"
+                title="Searches & Responses"
                 value={analytics.total_searches}
                 icon={Search}
-                description={`Last ${RECENT_EVENTS_WINDOW} events + ${AGENT_CHAT_STATS_WINDOW} responses`}
+                description="Analytics events + agent responses, all time"
                 trend={12}
               />
               <StatCard
@@ -873,14 +785,14 @@ const OperationsDashboardInner: React.FC = () => {
                 title="Active Users"
                 value={analytics.active_users}
                 icon={Users}
-                description="Unique users in the recent sample"
+                description="Unique users across all logged activity"
                 trend={15}
               />
               <StatCard
                 title="Avg Response Time"
                 value={`${analytics.avg_response_time}ms`}
                 icon={Clock}
-                description={`Across the last ${AGENT_CHAT_STATS_WINDOW} responses`}
+                description="Across all agent responses"
                 trend={-5}
               />
             </div>
@@ -892,35 +804,26 @@ const OperationsDashboardInner: React.FC = () => {
                   Agent Chat Analytics
                 </CardTitle>
                 <CardDescription>
-                  Response times, quality ratings and cost estimates are computed over the{' '}
-                  {AGENT_CHAT_STATS_WINDOW} most recent responses. The table below pages through all
-                  of them.
+                  Response times, quality ratings and cost estimates are aggregated in SQL over every
+                  assistant response. The table below pages through them.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {/* Summary Stats */}
                 {(() => {
-                  const ratedChats = agentChats.filter((c) => c.metadata?.rating);
-                  const upCount = agentChats.filter((c) => c.metadata?.rating === 'up').length;
-                  const downCount = agentChats.filter((c) => c.metadata?.rating === 'down').length;
-                  const approvalPct = ratedChats.length > 0 ? Math.round((upCount / ratedChats.length) * 100) : null;
-                  const avgResponseMs = agentChats.length > 0
-                    ? Math.round(
-                        agentChats.filter((c) => c.metadata?.responseTimeMs && c.metadata.responseTimeMs > 0)
-                          .reduce((sum, c) => sum + (c.metadata?.responseTimeMs || 0), 0) /
-                        Math.max(agentChats.filter((c) => c.metadata?.responseTimeMs && c.metadata.responseTimeMs > 0).length, 1),
-                      )
-                    : 0;
-                  const featureCounts: Record<string, number> = {};
-                  const featureResponseTimes: Record<string, number[]> = {};
-                  agentChats.forEach((c) => {
-                    const ft = getFeatureType(c.metadata);
-                    featureCounts[ft] = (featureCounts[ft] || 0) + 1;
-                    if (c.metadata?.responseTimeMs && c.metadata.responseTimeMs > 0) {
-                      if (!featureResponseTimes[ft]) featureResponseTimes[ft] = [];
-                      featureResponseTimes[ft].push(c.metadata.responseTimeMs);
-                    }
-                  });
+                  const ratedCount = agentStats?.rated_total ?? 0;
+                  const upCount = agentStats?.rating_up ?? 0;
+                  const downCount = agentStats?.rating_down ?? 0;
+                  const approvalPct = ratedCount > 0 ? Math.round((upCount / ratedCount) * 100) : null;
+                  const avgResponseMs = Math.round(agentStats?.avg_response_time_ms ?? 0);
+                  const totalResponses = agentStats?.total_responses ?? 0;
+                  // Pricing stays client-side (constants.ts); SQL only returns the per-model token
+                  // estimate, so the two never drift out of sync.
+                  const estCost = (agentStats?.by_model ?? []).reduce(
+                    (sum, m) => sum + calculateCost(m.model, m.est_tokens, m.est_tokens).total,
+                    0,
+                  );
+                  const features = [...(agentStats?.by_feature ?? [])].sort((a, b) => b.responses - a.responses);
                   return (
                     <>
                       {/* Row 1: core metrics */}
@@ -933,7 +836,7 @@ const OperationsDashboardInner: React.FC = () => {
                         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
                           <div className="text-sm text-slate-600">Avg Response Time</div>
                           <div className="text-2xl font-bold text-slate-900">{avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(1)}s` : '—'}</div>
-                          <div className="text-xs text-muted-foreground mt-1">last {AGENT_CHAT_STATS_WINDOW} responses</div>
+                          <div className="text-xs text-muted-foreground mt-1">all responses</div>
                         </div>
                         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-green-200 shadow-sm">
                           <div className="text-sm text-green-700 flex items-center gap-1">
@@ -950,29 +853,24 @@ const OperationsDashboardInner: React.FC = () => {
                           </div>
                           <div className="text-2xl font-bold text-red-600">{downCount}</div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            {ratedChats.length > 0 ? `${ratedChats.length} rated of last ${AGENT_CHAT_STATS_WINDOW}` : 'No ratings yet'}
+                            {ratedCount > 0 ? `${ratedCount} rated of ${totalResponses}` : 'No ratings yet'}
                           </div>
                         </div>
                         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200 shadow-sm">
                           <div className="text-sm text-blue-700">Est. Cost</div>
                           <div className="text-2xl font-bold text-blue-600">
-                            ${agentChats.reduce((sum, chat) => {
-                              const model = chat.metadata?.model || 'claude-opus-4-8';
-                              const inputTokens = estimateTokens(chat.content);
-                              const outputTokens = estimateTokens(chat.content);
-                              return sum + calculateCost(model, inputTokens, outputTokens).total;
-                            }, 0).toFixed(4)}
+                            ${estCost.toFixed(4)}
                           </div>
-                          <div className="text-xs text-muted-foreground mt-1">last {AGENT_CHAT_STATS_WINDOW} responses</div>
+                          <div className="text-xs text-muted-foreground mt-1">all responses</div>
                         </div>
                       </div>
 
                       {/* Row 2: Ratings approval bar */}
-                      {ratedChats.length > 0 && (
+                      {ratedCount > 0 && (
                         <div className="mb-4 bg-white/80 rounded-lg border border-slate-200 p-4 shadow-sm">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-slate-700">Rating Breakdown</span>
-                            <span className="text-xs text-muted-foreground">{ratedChats.length} / {agentChats.length} recent responses rated</span>
+                            <span className="text-xs text-muted-foreground">{ratedCount} / {totalResponses} responses rated</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <ThumbsUp className="h-4 w-4 text-green-600 shrink-0" />
@@ -993,16 +891,15 @@ const OperationsDashboardInner: React.FC = () => {
                       )}
 
                       {/* Row 3: Feature type breakdown */}
-                      {Object.keys(featureCounts).length > 0 && (
+                      {features.length > 0 && (
                         <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                          {Object.entries(featureCounts).sort((a, b) => b[1] - a[1]).map(([ft, count]) => {
-                            const times = featureResponseTimes[ft] || [];
-                            const avgMs = times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null;
+                          {features.map((f) => {
+                            const avgMs = f.avg_response_time_ms;
                             return (
-                              <div key={ft} className={`rounded-lg border px-3 py-2.5 text-center ${FEATURE_COLORS[ft] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                                <div className="text-xs font-medium truncate">{ft}</div>
-                                <div className="text-xl font-bold mt-0.5">{count}</div>
-                                {avgMs !== null && (
+                              <div key={f.feature} className={`rounded-lg border px-3 py-2.5 text-center ${FEATURE_COLORS[f.feature] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                                <div className="text-xs font-medium truncate">{f.feature}</div>
+                                <div className="text-xl font-bold mt-0.5">{f.responses}</div>
+                                {avgMs !== null && avgMs > 0 && (
                                   <div className="text-xs opacity-70 mt-0.5">{(avgMs / 1000).toFixed(1)}s avg</div>
                                 )}
                               </div>

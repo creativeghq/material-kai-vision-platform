@@ -164,11 +164,44 @@ export interface OrderListOptions {
   offset?: number;
 }
 
+export interface OrderSearchOptions extends OrderListOptions {
+  /** Free text — matched server-side against the order number OR the joined party name. */
+  search?: string;
+}
+
 export const ordersService = {
   /**
-   * One page of orders PLUS the server's exact total. Screens that filter client-side must page
-   * through this (see `fetchAllPages`) rather than take a single capped fetch — otherwise the tail
-   * is silently dropped and every client-side filter is computed over a partial set.
+   * Server-paged orders list: filters, free-text search AND the party-name join all run in SQL
+   * (`search_orders` RPC), so the client never has to hold the whole workspace to filter it.
+   * Prefer this for any screen that pages; `listPage` stays for the callers that need every row.
+   */
+  async search(opts: OrderSearchOptions): Promise<{ rows: OrderListRow[]; count: number }> {
+    const { data, error } = await supabase.rpc('search_orders', {
+      p_workspace_id: opts.workspaceId,
+      p_order_type: opts.orderType ?? null,
+      p_status: opts.status ?? null,
+      p_company_id: opts.companyId ?? null,
+      p_contact_id: opts.contactId ?? null,
+      p_project_id: opts.projectId ?? null,
+      p_search: opts.search?.trim() || null,
+      p_limit: opts.limit ?? 20,
+      p_offset: opts.offset ?? 0,
+    });
+    if (error) throw error;
+    const raw = (data ?? []) as Array<{ order_row: Order; party_name: string | null; total_count: number }>;
+    return {
+      // The RPC hands back the whole orders row as a composite — flatten it into the same
+      // OrderListRow shape `listPage` produces so consumers are identical.
+      rows: raw.map((r) => ({ ...r.order_row, party_name: r.party_name })),
+      // total_count is the count of ALL matching rows, repeated on every row; no rows = no matches.
+      count: raw.length ? Number(raw[0].total_count) : 0,
+    };
+  },
+
+  /**
+   * One page of orders PLUS the server's exact total. Retained for the callers that need a plain
+   * filtered list (`listUninvoicedOutstanding`, CustomerFinanceTabs, FinancePage). The Orders panel
+   * uses `search()` instead — it needs to filter on the party name, which isn't a column here.
    */
   async listPage(opts: OrderListOptions): Promise<{ rows: OrderListRow[]; count: number }> {
     const limit = opts.limit ?? 500;

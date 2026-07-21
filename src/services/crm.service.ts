@@ -207,6 +207,42 @@ export const stripeAPI = {
 
 // ============ CRM Contacts ============
 
+/**
+ * Server-side list filters shared by contacts + companies.
+ *
+ * These exist so the CRM list pages can be SERVER-paged: filtering in the browser
+ * forced the page to drain every row first.
+ */
+export interface CrmListFilters {
+  /** Free text: name/email (+ website for companies), ILIKE. */
+  search?: string;
+  profession?: string;
+  /** Contacts only — crm_companies has no status column. */
+  status?: string;
+  /** contacts: is_client/is_supplier · companies: is_customer/is_supplier. */
+  kind?: 'client' | 'supplier' | 'neither';
+  /**
+   * Id allowlist for membership filters the client already resolved (category /
+   * industry / attached company).
+   *
+   * `undefined` = no filter. An EMPTY ARRAY means "the membership lookup matched
+   * nothing" and is sent as an explicit empty `ids=` param so the server returns an
+   * empty page — dropping it would show everything exactly when the user filtered to none.
+   */
+  ids?: string[];
+}
+
+/** Append the shared filters onto a list request's query string. */
+function appendCrmFilters(params: URLSearchParams, filters?: CrmListFilters) {
+  if (!filters) return;
+  if (filters.search) params.set('search', filters.search);
+  if (filters.profession) params.set('profession', filters.profession);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.kind) params.set('kind', filters.kind);
+  // Set even when empty — see the `ids` note above.
+  if (filters.ids !== undefined) params.set('ids', filters.ids.join(','));
+}
+
 export const contactsAPI = {
   async createContact(contact: any) {
     const token = await getAuthToken();
@@ -228,13 +264,15 @@ export const contactsAPI = {
     return response.json();
   },
 
-  async listContacts(limit = 50, offset = 0) {
+  /** `filters` is optional so the existing positional (limit, offset) call sites keep working. */
+  async listContacts(limit = 50, offset = 0, filters?: CrmListFilters) {
     const token = await getAuthToken();
 
     const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
     });
+    appendCrmFilters(params, filters);
 
     const response = await fetch(`${getApiBase()}/crm-api/contacts?${params}`, {
       headers: {
@@ -422,7 +460,9 @@ export const companiesAPI = {
     return response.json();
   },
 
-  async listCompanies(limit = 50, offset = 0, search?: string) {
+  /** `search` stays positional for the existing call sites; `filters` adds the rest
+   *  (and `filters.search` wins when both are supplied). */
+  async listCompanies(limit = 50, offset = 0, search?: string, filters?: CrmListFilters) {
     const token = await getAuthToken();
 
     const params = new URLSearchParams({
@@ -430,6 +470,7 @@ export const companiesAPI = {
       offset: offset.toString(),
       ...(search && { search }),
     });
+    appendCrmFilters(params, filters);
 
     const response = await fetch(`${getApiBase()}/crm-api/companies?${params}`, {
       headers: {

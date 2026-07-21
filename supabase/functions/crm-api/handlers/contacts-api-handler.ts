@@ -10,6 +10,37 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+const LIST_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Max ids accepted in the `ids` allowlist. Bounds both the URL length and the
+ *  generated `IN (...)` list — the caller resolves category/industry membership and
+ *  sends the ids, so an unbounded list would be a cheap way to build a huge query. */
+export const MAX_FILTER_IDS = 1000;
+
+/** Escape PostgREST ilike wildcards so a user typing `%` or `_` can't broaden the match. */
+export function escapeLike(value: string): string {
+  return value.replace(/[%_\\]/g, '\\$&');
+}
+
+/**
+ * Parse the `ids` allowlist query param (used for the client-resolved category /
+ * industry / attached-company membership filters).
+ *
+ * Returns `null` when the param is ABSENT — no filter. Returns an ARRAY when it is
+ * present, and that array may be EMPTY: an empty list means "the caller's membership
+ * lookup matched nothing" and MUST produce an empty page. Treating it as "no filter"
+ * would show every row precisely when the user filtered down to none.
+ */
+export function parseIdsParam(url: URL): string[] | null {
+  if (!url.searchParams.has('ids')) return null;
+  return (url.searchParams.get('ids') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    // Drop anything that isn't a uuid rather than letting Postgres 22P02 the whole list.
+    .filter((s) => LIST_UUID_RE.test(s))
+    .slice(0, MAX_FILTER_IDS);
+}
+
 /** Verify a contact id is reachable by the caller's workspace scope. */
 async function contactInScope(contactId: string, scope: CrmScope): Promise<boolean> {
   if (scope.isGlobalOperator) {
@@ -178,12 +209,29 @@ export async function handleContacts(req: Request): Promise<Response> {
       const limit = parseInt(url.searchParams.get('limit') || '50');
       const offset = parseInt(url.searchParams.get('offset') || '0');
 
+      // Server-side filters. These exist so the CRM list can be SERVER-paged: the page
+      // used to drain every contact into the browser purely because these five filters
+      // ran client-side.
+      const search = (url.searchParams.get('search') || '').trim();
+      const profession = url.searchParams.get('profession') || '';
+      const status = url.searchParams.get('status') || '';
+      const kind = url.searchParams.get('kind') || ''; // client | supplier | neither
+      const ids = parseIdsParam(url);
+
       if (!scope.isGlobalOperator && scope.workspaceIds.length === 0) {
+        return new Response(JSON.stringify({ data: [], count: 0 }), { status: 200, headers: corsHeaders });
+      }
+
+      // Present-but-empty `ids` = the caller's membership lookup matched nothing.
+      // Short-circuit rather than fall through to an unfiltered query.
+      if (ids !== null && ids.length === 0) {
         return new Response(JSON.stringify({ data: [], count: 0 }), { status: 200, headers: corsHeaders });
       }
 
       // `count: 'exact'` so the caller can paginate — the response used to report
       // `count: rows.length` (the PAGE size), which made a total row count unknowable.
+      // With the filters below applied the count reflects the FILTERED set, which is
+      // what the table footer needs.
       let listQuery = supabase
         .from('crm_contacts')
         .select(`
@@ -203,6 +251,51 @@ export async function handleContacts(req: Request): Promise<Response> {
       if (!scope.isGlobalOperator) {
         listQuery = listQuery.in('workspace_id', scope.workspaceIds);
       }
+
+      // Every filter below is ANDed ON TOP of the workspace clause above. None of them
+      // may relax or replace it — a request param must never influence tenant scope.
+      if (ids) listQuery = listQuery.in('id', ids);
+      if (search) {
+        const safe = escapeLike(search);
+        // The list renders each contact's ATTACHED COMPANY, and the old client-side search matched
+        // on that name too. `company` isn't a column here (it's the crm_company_contacts junction),
+        // so resolve matching companies to their contact ids first and OR them in — otherwise
+        // moving search server-side would quietly lose a way people actually find contacts.
+        let companyContactIds: string[] = [];
+        let companyQuery = supabase
+          .from('crm_companies')
+          .select('id')
+          .ilike('name', `%${safe}%`)
+          .limit(MAX_FILTER_IDS);
+        if (!scope.isGlobalOperator) {
+          companyQuery = companyQuery.in('workspace_id', scope.workspaceIds);
+        }
+        const { data: matchedCompanies } = await companyQuery;
+        const matchedIds = (matchedCompanies ?? []).map((c: { id: string }) => c.id);
+        if (matchedIds.length > 0) {
+          const { data: junction } = await supabase
+            .from('crm_company_contacts')
+            .select('contact_id')
+            .in('company_id', matchedIds)
+            .limit(MAX_FILTER_IDS);
+          companyContactIds = [...new Set((junction ?? [])
+            .map((j: { contact_id: string }) => j.contact_id)
+            .filter(Boolean))];
+        }
+        const clauses = [`name.ilike.%${safe}%`, `email.ilike.%${safe}%`];
+        if (companyContactIds.length > 0) clauses.push(`id.in.(${companyContactIds.join(',')})`);
+        listQuery = listQuery.or(clauses.join(','));
+      }
+      if (profession) listQuery = listQuery.eq('profession', profession);
+      if (status) listQuery = listQuery.eq('status', status);
+      // `neither` uses IS NOT TRUE so NULL (never set) counts as "not a client/supplier",
+      // matching the client-side `!c.is_client && !c.is_supplier` this replaces.
+      if (kind === 'client') listQuery = listQuery.eq('is_client', true);
+      else if (kind === 'supplier') listQuery = listQuery.eq('is_supplier', true);
+      else if (kind === 'neither') {
+        listQuery = listQuery.not('is_client', 'is', true).not('is_supplier', 'is', true);
+      }
+
       const { data, error, count } = await listQuery;
 
       if (error) {

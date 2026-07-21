@@ -5,8 +5,10 @@
 //
 // Why an edge function (not direct table reads): the invoices RLS is
 // `is_workspace_member(workspace_id)` — a customer is NOT a workspace member, so they
-// can't read the table directly. This runs under service role but scopes STRICTLY to
-// documents whose counterparty is one of the caller's own linked CRM contacts.
+// can't read the table directly. The overview lists come from `my_customer_*` RPCs that
+// scope themselves from auth.uid() (the caller's own linked CRM contacts + those contacts'
+// companies); the service-role client is used only for PDF signing and `order_detail`,
+// which does its own explicit ownership check.
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
@@ -20,18 +22,16 @@ const isReceiptDoc = (dt: string | null) => String(dt ?? '').startsWith('11');
 
 // ── Paging ──────────────────────────────────────────────────────────────────
 // Each of the three lists (orders / invoices / receipts) is paged independently by the client.
-// Paging is PRESENTATION ONLY: it never touches the scoping filters below, which stay derived
-// from the caller's own linked CRM contacts and their companies.
+// Paging is PRESENTATION ONLY: it never touches the scoping, which the RPCs derive from
+// auth.uid() server-side (the caller's own crm_contacts + the companies those contacts link to).
 //
-// Every list is assembled from TWO scoped queries (by contact + by company) that are merged and
-// de-duped, so a per-query `.range()` would slice the wrong rows. Instead we read the cheap
-// metadata rows up to SCAN_CAP, merge/sort/dedupe in memory — which also gives an exact total and
-// keeps the account summary correct regardless of which page is requested — and then sign PDF URLs
-// for the requested slice ONLY. Signing is one storage round trip per row, so it's the part that
-// must not be done 200-at-a-time.
-const SCAN_CAP = 2000;
+// The lists come from `my_customer_*` RPCs that do the contact-OR-company union in SQL, so
+// LIMIT/OFFSET are exact and there is no scan cap: we fetch exactly one page of metadata rows
+// (`total_count` rides along on every row) and sign PDF URLs for that page ONLY. Signing is one
+// storage round trip per row, so it's the part that must not be done 200-at-a-time.
 const MAX_PAGE_SIZE = 500;
 const DEFAULT_PAGE_SIZE = 200; // == the previous hard cap, so a caller that sends nothing is unchanged
+const MAX_OFFSET = 1_000_000; // sanity bound only — the union is no longer capped
 
 const clampInt = (v: unknown, min: number, max: number, dflt: number): number => {
   // NB: absent must mean "default", not 0 — `Number(null)` is 0, which would silently clamp to `min`.
@@ -41,12 +41,8 @@ const clampInt = (v: unknown, min: number, max: number, dflt: number): number =>
   return Math.min(max, Math.max(min, Math.floor(n)));
 };
 
-/** Newest-first by a nullable timestamp column; nulls sort last (matches `nullsFirst: false`). */
-const byDateDesc = (key: string) => (a: any, b: any) => {
-  const av = a?.[key] ? Date.parse(a[key]) : Number.NEGATIVE_INFINITY;
-  const bv = b?.[key] ? Date.parse(b[key]) : Number.NEGATIVE_INFINITY;
-  return bv - av;
-};
+/** `total_count` is identical on every row of an RPC page; 0 rows ⇒ nothing matched. */
+const totalOf = (rows: any[] | null): number => Number(rows?.[0]?.total_count ?? 0);
 
 Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -57,6 +53,15 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
   if (!auth.success || !auth.userId) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  // The `my_customer_*` RPCs scope themselves from auth.uid(), so they MUST run as the caller —
+  // under service role auth.uid() is NULL and every list would come back empty. Storage signing
+  // and the order_detail reads stay on the service-role client above (the customer is not a
+  // workspace member, so those tables are not readable under their own RLS).
+  const asUser = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -74,9 +79,9 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
   const qp = new URL(req.url).searchParams;
   const pageSize = clampInt(body?.limit ?? qp.get('limit'), 1, MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE);
   const offsets = {
-    orders: clampInt(body?.orders_offset ?? qp.get('orders_offset'), 0, SCAN_CAP, 0),
-    invoices: clampInt(body?.invoices_offset ?? qp.get('invoices_offset'), 0, SCAN_CAP, 0),
-    receipts: clampInt(body?.receipts_offset ?? qp.get('receipts_offset'), 0, SCAN_CAP, 0),
+    orders: clampInt(body?.orders_offset ?? qp.get('orders_offset'), 0, MAX_OFFSET, 0),
+    invoices: clampInt(body?.invoices_offset ?? qp.get('invoices_offset'), 0, MAX_OFFSET, 0),
+    receipts: clampInt(body?.receipts_offset ?? qp.get('receipts_offset'), 0, MAX_OFFSET, 0),
   };
 
   // 1. The caller's own CRM contacts (the only documents they may see).
@@ -125,32 +130,15 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     return data?.signedUrl ?? null;
   };
 
-  const dedupeById = (rows: any[]): any[] => {
-    const seen = new Set<string>();
-    return rows.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
-  };
-
   // 2. Issued documents (invoices + retail receipts) addressed to the caller's contact
-  //    OR their linked business. Two explicit IN-queries merged + de-duped — avoids the
-  //    PostgREST or()/in() ambiguity entirely, so each filter is trivially correct.
-  const fetchInvoices = (col: 'customer_contact_id' | 'customer_company_id', ids: string[]) =>
-    supabase
-      .from('invoices')
-      .select('id, internal_number, legal_number, document_type, status, total, currency, issued_at, due_at, amount_due, pdf_storage_path')
-      .in(col, ids)
-      .neq('status', 'draft')
-      .neq('status', 'void')
-      .order('issued_at', { ascending: false, nullsFirst: false })
-      .limit(SCAN_CAP);
-  const invResults = await Promise.all([
-    fetchInvoices('customer_contact_id', contactIds),
-    companyIds.length ? fetchInvoices('customer_company_id', companyIds) : Promise.resolve({ data: [] as any[] }),
-  ]);
-  // Merged across both scoped queries → re-sort, because each was only ordered within itself.
-  const invAll = dedupeById(invResults.flatMap((r: any) => r.data ?? [])).sort(byDateDesc('issued_at'));
-  const invRows = invAll.slice(offsets.invoices, offsets.invoices + pageSize);
+  //    OR their linked business. The RPC unions both in SQL and takes no identity argument,
+  //    so there is nothing a caller could forge — and the page is exact.
+  const { data: invRows } = await asUser.rpc('my_customer_invoices', {
+    p_limit: pageSize,
+    p_offset: offsets.invoices,
+  });
 
-  const invoices = await Promise.all((invRows ?? []).map(async (r: any) => ({
+  const invoices = await Promise.all(((invRows ?? []) as any[]).map(async (r: any) => ({
     id: r.id,
     kind: isReceiptDoc(r.document_type) ? 'receipt' : 'invoice',
     number: r.legal_number ?? r.internal_number ?? '',
@@ -165,22 +153,12 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
   })));
 
   // 3. Payment receipts (απόδειξη είσπραξης) for money the caller (or their business) paid.
-  const fetchPayments = (col: 'counterparty_contact_id' | 'counterparty_company_id', ids: string[]) =>
-    supabase
-      .from('payments')
-      .select('id, receipt_number, amount, currency, method, paid_at, pdf_storage_path')
-      .in(col, ids)
-      .eq('direction', 'in')
-      .order('paid_at', { ascending: false })
-      .limit(SCAN_CAP);
-  const payResults = await Promise.all([
-    fetchPayments('counterparty_contact_id', contactIds),
-    companyIds.length ? fetchPayments('counterparty_company_id', companyIds) : Promise.resolve({ data: [] as any[] }),
-  ]);
-  const payAll = dedupeById(payResults.flatMap((r: any) => r.data ?? [])).sort(byDateDesc('paid_at'));
-  const payRows = payAll.slice(offsets.receipts, offsets.receipts + pageSize);
+  const { data: payRows } = await asUser.rpc('my_customer_payments', {
+    p_limit: pageSize,
+    p_offset: offsets.receipts,
+  });
 
-  const receipts = await Promise.all((payRows ?? []).map(async (r: any) => ({
+  const receipts = await Promise.all(((payRows ?? []) as any[]).map(async (r: any) => ({
     id: r.id,
     number: r.receipt_number ?? `PR-${String(r.id).slice(0, 8).toUpperCase()}`,
     amount: Number(r.amount ?? 0),
@@ -191,20 +169,11 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
   })));
 
   // 4. Sales orders placed by the caller (or their business) — status + payment state.
-  const fetchOrders = (col: 'customer_contact_id' | 'customer_company_id', ids: string[]) =>
-    supabase
-      .from('orders')
-      .select('id, order_number, status, payment_status, total, currency, created_at')
-      .in(col, ids)
-      .eq('order_type', 'sales')
-      .order('created_at', { ascending: false })
-      .limit(SCAN_CAP);
-  const orderResults = await Promise.all([
-    fetchOrders('customer_contact_id', contactIds),
-    companyIds.length ? fetchOrders('customer_company_id', companyIds) : Promise.resolve({ data: [] as any[] }),
-  ]);
-  const orderAll = dedupeById(orderResults.flatMap((r: any) => r.data ?? [])).sort(byDateDesc('created_at'));
-  const orders = orderAll.slice(offsets.orders, offsets.orders + pageSize).map((o: any) => ({
+  const { data: orderRows } = await asUser.rpc('my_customer_orders', {
+    p_limit: pageSize,
+    p_offset: offsets.orders,
+  });
+  const orders = ((orderRows ?? []) as any[]).map((o: any) => ({
     id: o.id,
     order_number: o.order_number,
     status: o.status,
@@ -214,45 +183,26 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     created_at: o.created_at,
   }));
 
-  // 5. Account summary — billed / paid / outstanding per currency (derived from the
-  //    issued documents above so the math is internally consistent and never double-counts
-  //    a payment receipt against its invoice). `paid = billed − outstanding`.
-  const byCurrency = new Map<string, { currency: string; billed: number; paid: number; outstanding: number; doc_count: number; order_count: number }>();
-  const bump = (cur: string): { currency: string; billed: number; paid: number; outstanding: number; doc_count: number; order_count: number } => {
-    const k = cur || 'EUR';
-    let cell = byCurrency.get(k);
-    if (!cell) { cell = { currency: k, billed: 0, paid: 0, outstanding: 0, doc_count: 0, order_count: 0 }; byCurrency.set(k, cell); }
-    return cell;
-  };
-  //    Computed over the FULL scoped sets, not the requested page — otherwise "total spent" would
-  //    change every time the customer turned a page.
-  for (const inv of invAll) {
-    const c = bump(inv.currency ?? 'EUR');
-    c.billed += Number(inv.total ?? 0);
-    c.outstanding += Number(inv.amount_due ?? 0);
-    c.doc_count += 1;
-  }
-  for (const o of orderAll) bump(o.currency ?? 'EUR').order_count += 1;
-  const summary = Array.from(byCurrency.values()).map((c) => ({
-    ...c,
-    billed: Math.round(c.billed * 100) / 100,
-    outstanding: Math.round(c.outstanding * 100) / 100,
-    paid: Math.round((c.billed - c.outstanding) * 100) / 100,
+  // 5. Account summary — billed / paid / outstanding per currency. Aggregated in SQL over the
+  //    WHOLE account (all pages), so "total spent" doesn't change when the customer turns a page.
+  //    `paid = billed − outstanding`, so a payment receipt is never double-counted against its invoice.
+  const { data: summaryRows } = await asUser.rpc('my_customer_account_summary');
+  const summary = ((summaryRows ?? []) as any[]).map((c: any) => ({
+    currency: c.currency ?? 'EUR',
+    billed: Math.round(Number(c.billed ?? 0) * 100) / 100,
+    paid: Math.round(Number(c.paid ?? 0) * 100) / 100,
+    outstanding: Math.round(Number(c.outstanding ?? 0) * 100) / 100,
+    doc_count: Number(c.doc_count ?? 0),
+    order_count: Number(c.order_count ?? 0),
   }));
-
-  // `truncated` = a list hit SCAN_CAP, so its total is a floor rather than the real count.
-  const truncated = [invResults, payResults, orderResults]
-    .some((rs) => rs.some((r: any) => (r.data ?? []).length >= SCAN_CAP));
 
   return json({
     ok: true, linked: true, summary, orders, invoices, receipts,
     paging: {
       limit: pageSize,
-      scan_cap: SCAN_CAP,
-      truncated,
-      orders: { offset: offsets.orders, total: orderAll.length },
-      invoices: { offset: offsets.invoices, total: invAll.length },
-      receipts: { offset: offsets.receipts, total: payAll.length },
+      orders: { offset: offsets.orders, total: totalOf(orderRows as any[]) },
+      invoices: { offset: offsets.invoices, total: totalOf(invRows as any[]) },
+      receipts: { offset: offsets.receipts, total: totalOf(payRows as any[]) },
     },
   });
 }));
