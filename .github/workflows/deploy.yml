@@ -80,6 +80,10 @@ jobs:
             frontend:
               - 'src/**'
               - 'public/**'
+              # Vercel serverless functions (sitemap.xml, kb-prerender) ship with the
+              # frontend project. Without this, editing api/* changed nothing in prod —
+              # the sitemap fix in 285a4ad silently never deployed.
+              - 'api/**'
               - 'package.json'
               - 'package-lock.json'
               - 'vite.config.*'

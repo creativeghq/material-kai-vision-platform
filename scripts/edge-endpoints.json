@@ -7788,5 +7788,54 @@
         "params": []
       }
     ]
+  },
+  {
+    "name": "viva-webhooks",
+    "tag": "Payments",
+    "summary": "Viva.com payment webhook receiver + verification-key handshake (multi-tenant BYOK)",
+    "description": "#273 Phase 2 - Viva.com webhooks, multi-tenant BYOK. Two surfaces:\n\n- GET  - the verification-key handshake Viva performs at webhook registration. The key is per-merchant, so the caller passes ?workspace_id=<uuid> to say which tenant is registering; the function fetches that workspace's key from Viva and echoes it back.\n- POST - the event deliveries: 1796 payment created, 1797 reversal created, 1798 payment failed, 2054 account transaction (merchant-level, covers incoming RF bank transfers).\n\nSECURITY: Viva payment webhooks carry NO per-message signature (Viva-Signature-256 exists only on their Data Services contract, which has a shared secret; payment webhooks have none), so there is nothing to verify per delivery. Invariant #6 is satisfied differently and more strongly: THE WEBHOOK IS A TRIGGER, NEVER DATA - the handler reads the transaction back from Viva's API and acts on that, so a forged delivery cannot inject state.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "methodDocs": {
+      "get": {
+        "summary": "Verification-key handshake (Viva webhook registration)",
+        "description": "Returns the workspace's Viva verification key so Viva can complete webhook registration. Requires ?workspace_id=<uuid>. 400 if missing, 503 if Viva is not configured for that workspace (`viva_not_configured`), 502 if the key fetch fails."
+      },
+      "post": {
+        "summary": "Viva event delivery (1796 / 1797 / 1798 / 2054)"
+      }
+    },
+    "query": [
+      {
+        "name": "workspace_id",
+        "type": "string",
+        "required": true,
+        "desc": "Tenant whose Viva verification key is being fetched (the key is per-merchant)",
+        "methods": [
+          "get"
+        ]
+      }
+    ],
+    "request": [
+      {
+        "name": "EventTypeId",
+        "type": "integer",
+        "required": true,
+        "desc": "1796 payment created | 1797 reversal created | 1798 payment failed | 2054 account transaction"
+      },
+      {
+        "name": "EventData",
+        "type": "object",
+        "required": false,
+        "desc": "Viva event payload. Treated as a TRIGGER ONLY - the transaction is read back from Viva's API before any state change."
+      }
+    ],
+    "response": "{ ok } (always 200 to Viva once accepted; processing errors are logged, not surfaced)"
   }
 ]

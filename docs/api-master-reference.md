@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (96)
+## 1. Supabase Edge Functions (97)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -112,6 +112,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `stripe-api` | JWT | Stripe Checkout and Customer Portal session creator |
 | `stripe-connect` | JWT | Stripe Connect onboarding and status for per-workspace payouts |
 | `stripe-webhooks` | sig | Stripe webhook receiver for subscription, payment, and invoice events |
+| `viva-webhooks` _(GET + POST)_ | public | Viva.com payment webhook receiver + verification-key handshake (multi-tenant BYOK) |
 
 **Quotes**
 
