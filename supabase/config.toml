@@ -179,6 +179,12 @@ verify_jwt = false
 [functions.stripe-webhooks]
 verify_jwt = false
 
+# Viva posts unauthenticated deliveries and GETs the verification key. Authenticity does
+# not come from a JWT (or a signature — Viva payment webhooks have none); it comes from
+# re-reading the transaction from Viva. See the function header.
+[functions.viva-webhooks]
+verify_jwt = false
+
 [functions.generate-interior-video-v2]
 verify_jwt = false
 

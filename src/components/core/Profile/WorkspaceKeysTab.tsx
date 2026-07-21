@@ -27,6 +27,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
+import { VivaConfigCard } from '@/modules/payments-viva/components/VivaConfigCard';
 import { WorkspacePdfTemplateCard } from '@/components/core/Profile/WorkspacePdfTemplateCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentialsCard';
@@ -133,6 +134,7 @@ export const WorkspaceKeysTab: React.FC = () => {
             />
             <AadeCredentialsCard workspaceId={activeWorkspaceId} />
             <InboundSetupCard workspaceId={activeWorkspaceId} />
+            <VivaConfigCard workspaceId={activeWorkspaceId} />
             <Card>
               <CardContent className="p-5">
                 <ConnectionRow
