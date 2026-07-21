@@ -14,6 +14,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +34,10 @@ export const SalesPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Per-order customer label + CRM deep-link, resolved after load.
   const [customers, setCustomers] = useState<Record<string, { label: string; href: string }>>({});
+  const [page, setPage] = useState(1);
+
+  // A reload can return fewer orders than the current page covers.
+  useEffect(() => { setPage((p) => clampPage(p, orders.length)); }, [orders.length]);
 
   // #251 App Launcher deep-link: /sales?new=order opens the New Order dialog.
   useEffect(() => {
@@ -144,6 +149,7 @@ export const SalesPage: React.FC = () => {
                 </Button>
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
@@ -157,7 +163,7 @@ export const SalesPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((q) => {
+                    {paginate(orders, page).map((q) => {
                       const cid = (q as any).customer_company_id ? `company:${(q as any).customer_company_id}` : (q as any).customer_contact_id ? `contact:${(q as any).customer_contact_id}` : null;
                       const cust = cid ? customers[cid] : null;
                       const partyCompanyId = (q as any).customer_company_id as string | null;
@@ -206,6 +212,8 @@ export const SalesPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              <TablePagination page={page} total={orders.length} onPageChange={setPage} label="orders" />
+              </>
             )}
           </div>
         </div>

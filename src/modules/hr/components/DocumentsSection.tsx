@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type HrDocument, type Employee, type DocType, DOC_TYPE_LABELS } from '../services/hrService';
 import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
 
@@ -20,11 +21,13 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
     setLoading(true);
-    try { const [d, e] = await Promise.all([hrService.listDocuments(workspaceId), hrService.listEmployees(workspaceId)]); setDocs(d.documents); setEmployees(e.employees); }
+    // Deleting the last document on a page would otherwise leave the table blank.
+    try { const [d, e] = await Promise.all([hrService.listDocuments(workspaceId), hrService.listEmployees(workspaceId)]); setDocs(d.documents); setEmployees(e.employees); setPage((p) => clampPage(p, d.documents.length)); }
     catch (err) { toast({ title: 'Failed to load documents', description: (err as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, toast]);
@@ -54,7 +57,7 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
             <Table>
               <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Employee</TableHead><TableHead>Added</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>
-                {docs.map((d) => (
+                {paginate(docs, page).map((d) => (
                   <TableRow key={d.id}>
                     <TableCell className="font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />{d.name}</TableCell>
                     <TableCell><Badge variant="outline">{DOC_TYPE_LABELS[d.doc_type]}</Badge></TableCell>
@@ -71,6 +74,7 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
               </TableBody>
             </Table>
           )}
+          <TablePagination page={page} total={docs.length} onPageChange={setPage} label="documents" />
         </CardContent>
       </Card>
     </div>

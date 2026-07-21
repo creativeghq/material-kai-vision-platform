@@ -9,6 +9,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Plus, Send, Calendar, Users, Play, Pause, Ban, Trash2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { marketingService, type MarketingCampaign, type CampaignStatus } from '../services/marketingService';
@@ -31,6 +32,7 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [statsFor, setStatsFor] = useState<MarketingCampaign | null>(null);
+  const [page, setPage] = useState(1);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // #251 App Launcher deep-link: /marketing/email?new=campaign opens the Create Campaign modal.
@@ -46,7 +48,10 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
   const load = async () => {
     setLoading(true);
     try {
-      setCampaigns(await marketingService.listCampaigns(workspaceId));
+      const rows = await marketingService.listCampaigns(workspaceId);
+      setCampaigns(rows);
+      // Deleting a draft can shrink the list — don't strand the user on a now-empty page.
+      setPage((p) => clampPage(p, rows.length));
     } catch (e: any) {
       toast({ title: 'Error', description: e?.message || 'Failed to load campaigns', variant: 'destructive' });
     } finally {
@@ -81,7 +86,8 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
           <Button onClick={() => setShowCreate(true)} className="rounded-full"><Plus className="h-4 w-4 mr-2" /> Create Campaign</Button>
         </div>
       ) : (
-        <div className="dashboard-card overflow-x-auto">
+        <div className="dashboard-card">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="border-b border-border/50">
               <tr>
@@ -94,7 +100,7 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
               </tr>
             </thead>
             <tbody>
-              {campaigns.map((c) => {
+              {paginate(campaigns, page).map((c) => {
                 const blocked = c.status === 'paused' && c.metadata?.blocked_reason;
                 return (
                   <tr key={c.id} className="border-b last:border-0 hover:bg-muted/50">
@@ -153,6 +159,13 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
               })}
             </tbody>
           </table>
+          </div>
+          <TablePagination
+            page={page}
+            total={campaigns.length}
+            onPageChange={setPage}
+            label="campaigns"
+          />
         </div>
       )}
 

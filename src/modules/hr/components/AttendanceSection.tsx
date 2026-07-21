@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { hrService, type AttendanceRow, type HrSettings, type NotifyCandidate } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { PunchHistoryDialog, TimesheetDialog } from './AttendanceExtras';
 
 const fmtTime = (t: string | null) => (t ? String(t).slice(0, 5) : '—');
@@ -26,6 +27,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -33,6 +35,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
     try {
       const [a, s] = await Promise.all([hrService.attendanceToday(workspaceId), hrService.getHrSettings(workspaceId)]);
       setRows(a.attendance); setDate(a.date); setSettings(s.settings);
+      setPage((p) => clampPage(p, a.attendance.length));
     } catch (e) { toast({ title: 'Failed to load attendance', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, toast]);
@@ -58,6 +61,8 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
   if (loading) return <Skeleton className="h-64 w-full" />;
   const working = rows.filter((r) => r.status === 'active' && r.work_today);
   const others = rows.filter((r) => r.status === 'active' && !r.work_today);
+  // Working-today first, then the off-today tail — page over the combined order the table renders.
+  const board = [...working, ...others];
 
   return (
     <div className="space-y-4">
@@ -89,14 +94,14 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
 
       <Card>
         <CardContent className="p-0">
-          {working.length === 0 && others.length === 0 ? <EmptyState icon={Clock} title="No active employees" /> : (
+          {board.length === 0 ? <EmptyState icon={Clock} title="No active employees" /> : (
             <Table>
               <TableHeader><TableRow>
                 <TableHead>Employee</TableHead><TableHead>Expected</TableHead><TableHead>Status</TableHead><TableHead>Last punch</TableHead>
                 {canManage && <TableHead className="text-right">Action</TableHead>}
               </TableRow></TableHeader>
               <TableBody>
-                {[...working, ...others].map((r) => (
+                {paginate(board, page).map((r) => (
                   <TableRow key={r.employee_id} className={!r.work_today ? 'opacity-60' : ''}>
                     <TableCell className="font-medium">{r.name}{!r.work_today && <span className="ml-2 text-xs text-muted-foreground">(off today)</span>}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{fmtTime(r.work_start_time)}–{fmtTime(r.work_end_time)}</TableCell>
@@ -127,6 +132,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
               </TableBody>
             </Table>
           )}
+          <TablePagination page={page} total={board.length} onPageChange={setPage} label="employees" />
         </CardContent>
       </Card>
     </div>

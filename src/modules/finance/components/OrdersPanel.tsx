@@ -23,6 +23,7 @@ import { edgeErrorMessage } from '@/utils/edgeError';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { MoneyInput } from '@/components/core/ui/money-input';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
@@ -61,6 +62,7 @@ export const OrdersPanel: React.FC<{
   const [typeF, setTypeF] = useState<'all' | OrderType>('all');
   const [statusF, setStatusF] = useState<'all' | OrderStatus>('all');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   // What the New-order dropdown chose: sales/purchase + whether it's a draft (pre-order).
   const [createPreset, setCreatePreset] = useState<{ orderType: OrderType; draft: boolean }>({ orderType: 'sales', draft: false });
@@ -112,11 +114,18 @@ export const OrdersPanel: React.FC<{
   };
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, contactId, projectId, typeF, statusF]);
 
+  // A different filter/search is a different result set — start it at the first page.
+  useEffect(() => { setPage(1); }, [typeF, statusF, search, companyId, contactId, projectId]);
+
   const filtered = useMemo(() => {
     const t = search.trim().toLowerCase();
     if (!t) return rows;
     return rows.filter((r) => (r.party_name ?? '').toLowerCase().includes(t) || (r.order_number ?? '').toLowerCase().includes(t));
   }, [rows, search]);
+
+  // Keep the page inside the result set — narrowing the search or deleting an order would
+  // otherwise strand the user on a page that no longer exists.
+  useEffect(() => { setPage((p) => clampPage(p, filtered.length)); }, [filtered.length]);
 
   return (
     <div className="space-y-4">
@@ -197,6 +206,7 @@ export const OrdersPanel: React.FC<{
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">No orders yet. An accepted quote creates one automatically, or add one above.</div>
           ) : (
+            <>
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border/60">
@@ -210,7 +220,7 @@ export const OrdersPanel: React.FC<{
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
+                {paginate(filtered, page).map((r) => (
                   <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => setOpenId(r.id)}>
                     <td className="px-4 py-2 font-mono text-xs">{r.order_number ?? r.id.slice(0, 8)}</td>
                     <td className="px-4 py-2">{r.party_name ?? '—'}</td>
@@ -232,6 +242,8 @@ export const OrdersPanel: React.FC<{
                 ))}
               </tbody>
             </table>
+            <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="orders" />
+            </>
           )}
         </CardContent>
       </Card>

@@ -11,6 +11,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingOptout, MessagingChannelType } from '../services';
 import { format } from 'date-fns';
@@ -33,6 +34,7 @@ export const MessagingOptoutsTab: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [filterChannel, setFilterChannel] = useState<string>('all');
   const [searchPhone, setSearchPhone] = useState('');
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,6 +48,8 @@ export const MessagingOptoutsTab: React.FC = () => {
         filterChannel !== 'all' ? filterChannel as MessagingChannelType | 'all' : undefined,
       );
       setOptouts(data);
+      // Removing an opt-out can shrink the list — don't strand the user on a now-empty page.
+      setPage((p) => clampPage(p, data.length));
     } catch (error) {
       console.error('Error loading opt-outs:', error);
       toast({
@@ -103,7 +107,7 @@ export const MessagingOptoutsTab: React.FC = () => {
       {/* Filters */}
       <div className="dashboard-card">
         <div className="flex flex-wrap gap-4">
-          <Select value={filterChannel} onValueChange={setFilterChannel}>
+          <Select value={filterChannel} onValueChange={(v) => { setFilterChannel(v); setPage(1); }}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Channel" />
             </SelectTrigger>
@@ -117,7 +121,7 @@ export const MessagingOptoutsTab: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchPhone}
-                onChange={(e) => setSearchPhone(e.target.value)}
+                onChange={(e) => { setSearchPhone(e.target.value); setPage(1); }}
                 placeholder="Search by phone number..."
                 className="pl-9"
               />
@@ -151,6 +155,7 @@ export const MessagingOptoutsTab: React.FC = () => {
             {searchPhone ? 'No opt-outs found matching your search' : 'No opt-outs recorded'}
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
@@ -164,7 +169,7 @@ export const MessagingOptoutsTab: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredOptouts.map((optout) => (
+                {paginate(filteredOptouts, page).map((optout) => (
                   <tr key={optout.id} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-3 px-4">
                       <span className="font-mono">{optout.phone_number}</span>
@@ -207,6 +212,13 @@ export const MessagingOptoutsTab: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            total={filteredOptouts.length}
+            onPageChange={setPage}
+            label="opt-outs"
+          />
+          </>
         )}
       </div>
 

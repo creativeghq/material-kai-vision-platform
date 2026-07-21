@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { parseDecimal } from '@/utils/decimal';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { warehouseService, type Warehouse } from '@/services/warehouseService';
 import { stockService, type StockCount, type StockCountLine } from '../services/stockService';
 
@@ -25,6 +26,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
   const [openCountId, setOpenCountId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // #251 App Launcher deep-link: /warehouse?tab=counts&new=count opens the New stocktake dialog.
@@ -39,7 +41,8 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
 
   const load = async () => {
     setLoading(true);
-    try { setCounts(await stockService.listCounts(workspaceId)); }
+    // Cancelling a count drops it from the list, so re-clamp after every reload.
+    try { const next = await stockService.listCounts(workspaceId); setCounts(next); setPage((p) => clampPage(p, next.length)); }
     catch (err: any) { toast({ title: 'Failed to load counts', description: err?.message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };
@@ -71,7 +74,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
               </tr>
             </thead>
             <tbody>
-              {counts.map((c) => {
+              {paginate(counts, page).map((c) => {
                 const meta = STATUS_META[c.status] ?? STATUS_META.draft;
                 return (
                   <tr key={c.id} className="border-b border-border/30">
@@ -91,6 +94,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
             </tbody>
           </table>
         )}
+        {!loading && <TablePagination page={page} total={counts.length} onPageChange={setPage} label="counts" />}
       </CardContent>
 
       <NewCountDialog open={newOpen} onOpenChange={setNewOpen} workspaceId={workspaceId}

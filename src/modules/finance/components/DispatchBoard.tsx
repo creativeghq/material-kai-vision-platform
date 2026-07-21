@@ -13,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/modules/finance/services/financeService';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { deliveryNotesService, type DispatchQueueOrder } from '@/modules/finance/services/deliveryNotesService';
 
 type BucketKey = 'overdue' | 'today' | 'next7' | 'later' | 'undated';
@@ -27,6 +28,9 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Each day-bucket is its own table, so each keeps its own page — paging "Later" must not
+  // move the operator off the "Today" rows they're picking.
+  const [pages, setPages] = useState<Record<BucketKey, number>>({ overdue: 1, today: 1, next7: 1, later: 1, undated: 1 });
 
   const load = async () => {
     if (!workspaceId) return;
@@ -53,6 +57,16 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
     }
     return b;
   }, [orders]);
+
+  // Issuing/scheduling an order moves it between buckets (or off the board) — clamp so a
+  // shrunken bucket never leaves its table stranded on an empty page.
+  useEffect(() => {
+    setPages((prev) => {
+      const next = { ...prev };
+      for (const k of BUCKET_ORDER) next[k] = clampPage(prev[k], buckets[k].length);
+      return next;
+    });
+  }, [buckets]);
 
   const shortfallCount = orders.filter((o) => o.has_shortfall).length;
 
@@ -140,7 +154,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
             <CardContent className="p-0">
               <table className="w-full text-sm">
                 <tbody>
-                  {buckets[k].map((o) => {
+                  {paginate(buckets[k], pages[k]).map((o) => {
                     const isOpen = expanded.has(o.invoice_id);
                     return (
                       <React.Fragment key={o.invoice_id}>
@@ -233,6 +247,12 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                   })}
                 </tbody>
               </table>
+              <TablePagination
+                page={pages[k]}
+                total={buckets[k].length}
+                onPageChange={(p) => setPages((prev) => ({ ...prev, [k]: p }))}
+                label="orders"
+              />
             </CardContent>
           </Card>
         </div>

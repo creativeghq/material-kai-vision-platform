@@ -37,6 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import {
   Card,
   CardContent,
@@ -130,6 +131,7 @@ export function DuplicateDetectionPage() {
   const [scanning, setScanning] = useState(false);
   const [mergeTarget, setMergeTarget] = useState<DuplicatePair | null>(null);
   const [merging, setMerging] = useState(false);
+  const [page, setPage] = useState(1);
 
   const workspaceId =
     typeof localStorage !== 'undefined'
@@ -146,7 +148,9 @@ export function DuplicateDetectionPage() {
       .eq('workspace_id', workspaceId)
       .gte('overall_similarity_score', minSimilarity)
       .order('overall_similarity_score', { ascending: false })
-      .limit(200);
+      // Raised from 200 alongside pagination — a client-side pager over a truncated
+      // fetch would hide pairs that look like they're on a later page.
+      .limit(1000);
 
     if (statusFilter !== 'all') {
       query = query.eq('status', statusFilter);
@@ -166,14 +170,17 @@ export function DuplicateDetectionPage() {
       return;
     }
 
-    // Fetch product names
+    // Fetch product names. Batched because `in(...)` goes on the URL — 2000 uuids in one
+    // call blows past the request-line limit.
     const allIds = Array.from(new Set(data.flatMap((d) => [d.product_id_1, d.product_id_2])));
-    const { data: products } = await supabase
-      .from('products')
-      .select('id, name')
-      .in('id', allIds);
-
-    const productMap = Object.fromEntries((products ?? []).map((p) => [p.id, p]));
+    const productMap: Record<string, { id: string; name: string }> = {};
+    for (let i = 0; i < allIds.length; i += 200) {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, name')
+        .in('id', allIds.slice(i, i + 200));
+      for (const p of products ?? []) productMap[p.id] = p;
+    }
 
     const enriched: DuplicatePair[] = data.map((d) => ({
       ...d,
@@ -197,6 +204,10 @@ export function DuplicateDetectionPage() {
       p.product2?.name?.toLowerCase().includes(q)
     );
   });
+
+  // Reset on search; clamp when a status change / reload shrinks the result set.
+  useEffect(() => { setPage(1); }, [searchQuery, statusFilter, minSimilarity]);
+  useEffect(() => { setPage((p) => clampPage(p, filtered.length)); }, [filtered.length]);
 
   const updateStatus = async (pairId: string, newStatus: string) => {
     const { error } = await supabase
@@ -381,6 +392,7 @@ export function DuplicateDetectionPage() {
               </p>
             </div>
           ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -394,7 +406,7 @@ export function DuplicateDetectionPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((pair) => (
+                {paginate(filtered, page).map((pair) => (
                   <TableRow key={pair.id}>
                     <TableCell className="max-w-[150px]">
                       <button
@@ -507,6 +519,8 @@ export function DuplicateDetectionPage() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="pairs" />
+            </>
           )}
         </CardContent>
       </Card>

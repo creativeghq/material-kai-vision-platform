@@ -9,6 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingLog, MessagingChannelType, MessageStatus } from '../services';
 import { humanizeLabel } from '@/utils/humanize';
@@ -32,6 +33,7 @@ export const MessagingLogsTab: React.FC = () => {
   const [filterChannel, setFilterChannel] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchPhone, setSearchPhone] = useState('');
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,9 +46,12 @@ export const MessagingLogsTab: React.FC = () => {
       const data = await messagingService.getMessageLogs({
         channelType: filterChannel !== 'all' ? filterChannel as MessagingChannelType : undefined,
         status: filterStatus !== 'all' ? filterStatus as MessageStatus : undefined,
-        limit: 100,
+        // Raised from 100 so the paginated view isn't paging over a silently truncated slice.
+        limit: 500,
       });
       setLogs(data);
+      // Channel/status filters are applied server-side, so a reload is a fresh result set.
+      setPage(1);
     } catch (error) {
       console.error('Error loading logs:', error);
       toast({
@@ -115,7 +120,7 @@ export const MessagingLogsTab: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchPhone}
-                onChange={(e) => setSearchPhone(e.target.value)}
+                onChange={(e) => { setSearchPhone(e.target.value); setPage(1); }}
                 placeholder="Search by phone number..."
                 className="pl-9"
               />
@@ -135,6 +140,7 @@ export const MessagingLogsTab: React.FC = () => {
             No message logs found
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
@@ -149,7 +155,7 @@ export const MessagingLogsTab: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.map((log) => (
+                {paginate(filteredLogs, page).map((log) => (
                   <tr key={log.id} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -204,6 +210,13 @@ export const MessagingLogsTab: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            total={filteredLogs.length}
+            onPageChange={setPage}
+            label="messages"
+          />
+          </>
         )}
       </div>
     </div>

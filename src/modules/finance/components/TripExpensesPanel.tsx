@@ -17,6 +17,7 @@ import {
   type TripExpenseReport, type TripExpenseItem, type TripStatus, type ExpensePaymentMethod, type ExpenseCardType,
 } from '@/modules/finance/services/tripExpenseService';
 import { parseDecimal } from '@/utils/decimal';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 interface Props {
   workspaceId: string;
@@ -41,9 +42,13 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => { void supabase.auth.getUser().then(({ data }) => setUid(data?.user?.id ?? null)); }, []);
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId, canReview]);
+  // Switching scope (mine ↔ team) is a different list; deleting a card shrinks the current one.
+  useEffect(() => { setPage(1); }, [workspaceId, canReview]);
+  useEffect(() => { setPage((p) => clampPage(p, reports.length)); }, [reports.length]);
 
   const load = async () => {
     try {
@@ -85,8 +90,9 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
             ) : reports.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground">No trip cards yet.</div>
             ) : (
+              <>
               <ul className="divide-y divide-border/40">
-                {reports.map((r) => (
+                {paginate(reports, page).map((r) => (
                   <li key={r.id}>
                     <button
                       type="button"
@@ -111,6 +117,8 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
                   </li>
                 ))}
               </ul>
+              <TablePagination page={page} total={reports.length} onPageChange={setPage} label="cards" />
+              </>
             )}
           </CardContent>
         </Card>

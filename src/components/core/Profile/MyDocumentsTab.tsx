@@ -3,6 +3,7 @@ import { Loader2, Download, FileText, FileCheck, Receipt, Package, Wallet, Chevr
 import { Card } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import {
   customerDocumentsService,
@@ -54,6 +55,10 @@ export const MyDocumentsTab: React.FC = () => {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [invoices, setInvoices] = useState<CustomerInvoiceDoc[]>([]);
   const [receipts, setReceipts] = useState<CustomerReceiptDoc[]>([]);
+  // Each of the three lists grows independently, so each keeps its own page.
+  const [orderPage, setOrderPage] = useState(1);
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [receiptPage, setReceiptPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +66,10 @@ export const MyDocumentsTab: React.FC = () => {
       setLoading(true);
       try {
         const res = await customerDocumentsService.listMyDocuments();
-        if (!cancelled) { setSummary(res.summary); setOrders(res.orders); setInvoices(res.invoices); setReceipts(res.receipts); }
+        if (!cancelled) {
+          setSummary(res.summary); setOrders(res.orders); setInvoices(res.invoices); setReceipts(res.receipts);
+          setOrderPage(1); setInvoicePage(1); setReceiptPage(1);
+        }
       } catch (err) {
         if (!cancelled) toast({ title: 'Could not load your account', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
       } finally {
@@ -114,8 +122,9 @@ export const MyDocumentsTab: React.FC = () => {
         <div className="space-y-2">
           <h3 className="text-base font-semibold">Orders</h3>
           <div className="space-y-2">
-            {orders.map((o) => <OrderRow key={o.id} order={o} />)}
+            {paginate(orders, orderPage).map((o) => <OrderRow key={o.id} order={o} />)}
           </div>
+          <TablePagination page={orderPage} total={orders.length} onPageChange={setOrderPage} label="orders" />
         </div>
       )}
 
@@ -124,7 +133,7 @@ export const MyDocumentsTab: React.FC = () => {
         <div className="space-y-2">
           <h3 className="text-base font-semibold">Invoices &amp; receipts</h3>
           <div className="space-y-2">
-            {invoices.map((d) => (
+            {paginate(invoices, invoicePage).map((d) => (
               <Card key={d.id} className="dashboard-card p-3 flex items-center gap-3">
                 {d.kind === 'receipt' ? <FileCheck className="h-4 w-4 text-primary shrink-0" /> : <FileText className="h-4 w-4 text-primary shrink-0" />}
                 <div className="flex-1 min-w-0">
@@ -145,6 +154,7 @@ export const MyDocumentsTab: React.FC = () => {
               </Card>
             ))}
           </div>
+          <TablePagination page={invoicePage} total={invoices.length} onPageChange={setInvoicePage} label="documents" />
         </div>
       )}
 
@@ -153,7 +163,7 @@ export const MyDocumentsTab: React.FC = () => {
         <div className="space-y-2">
           <h3 className="text-base font-semibold">Payment receipts</h3>
           <div className="space-y-2">
-            {receipts.map((r) => (
+            {paginate(receipts, receiptPage).map((r) => (
               <Card key={r.id} className="dashboard-card p-3 flex items-center gap-3">
                 <Receipt className="h-4 w-4 text-primary shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -168,6 +178,7 @@ export const MyDocumentsTab: React.FC = () => {
               </Card>
             ))}
           </div>
+          <TablePagination page={receiptPage} total={receipts.length} onPageChange={setReceiptPage} label="receipts" />
         </div>
       )}
     </div>

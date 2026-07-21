@@ -36,6 +36,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
 import { humanizeLabel } from '@/utils/humanize';
 import { parseDecimalOr } from '@/utils/decimal';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch' | 'delivery_notes' | 'cheques' | 'expenses';
 
@@ -95,6 +96,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
   const [categoryFilter, setCategoryFilter] = useState<string>('all'); // 'all' | 'none' | <category id>
   const [query, setQuery] = useState('');
+  // Only one document table renders at a time (the type discriminates), so a single page
+  // cursor serves them all — it's reset on every type/filter change below.
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const categoryName = (id: any) => (id && categoryMap[id]) || '—';
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
@@ -121,10 +125,12 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     setLoading(true);
     try {
       const [inv, cn, inb, pmts, dns, chq, cats, bills] = await Promise.all([
-        financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 200 }),
+        // Paged client-side below, so the fetch cap is a safety ceiling, not a page size —
+        // 200 silently hid older documents once a workspace crossed it.
+        financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 1000 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
         inboundService.list(activeWorkspaceId).catch(() => []),
-        financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 200 }).catch(() => []),
+        financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 1000 }).catch(() => []),
         deliveryNotesService.list(activeWorkspaceId).catch(() => []),
         chequesService.list(activeWorkspaceId).catch(() => []),
         financeCategoriesService.list(activeWorkspaceId).catch(() => [] as FinanceCategory[]),
@@ -152,7 +158,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   };
   useEffect(() => { void load(); }, [activeWorkspaceId]);
   // Reset filters whenever the document type changes (categories are side-scoped).
-  useEffect(() => { setCategoryFilter('all'); setQuery(''); }, [type]);
+  useEffect(() => { setCategoryFilter('all'); setQuery(''); setPage(1); }, [type]);
+  // A narrowed category/search is a different result set — restart at the first page.
+  useEffect(() => { setPage(1); }, [categoryFilter, query]);
 
   // Which finance-category side applies to the active surface (drives filter + inline picker).
   const sideKind: 'income' | 'expense' | null =
@@ -183,6 +191,18 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     () => payments.filter((p) => matchesCategoryFilter((p as any).category_id)).filter((p: any) => hit(p.reference, p.method, p.counterparty_name)),
     [payments, categoryFilter, q],
   );
+
+  // The rows the active document type is showing — what pagination counts and slices.
+  const activeRows: any[] =
+    type === 'credit_notes' ? creditNotes
+    : type === 'expenses' ? filteredInbound
+    : type === 'payments' ? filteredPayments
+    : type === 'delivery_notes' ? deliveryNotes
+    : type === 'cheques' ? cheques
+    : rows;
+
+  // Issuing/dismissing a document shrinks the list — clamp so the last page never goes blank.
+  useEffect(() => { setPage((p) => clampPage(p, activeRows.length)); }, [activeRows.length]);
 
   // Inline category assignment — optimistic local update so the cell reflects the change at once.
   const setInvoiceCategory = async (invoiceId: string, categoryId: string | null) => {
@@ -272,15 +292,15 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 {loading || wsLoading ? (
                   <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : type === 'credit_notes' ? (
-                  <CreditNoteTable rows={creditNotes} financeBase={financeBase} />
+                  <CreditNoteTable rows={paginate(creditNotes, page)} financeBase={financeBase} />
                 ) : type === 'expenses' ? (
-                  <InboundTable rows={filteredInbound} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} />
+                  <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} />
                 ) : type === 'payments' ? (
-                  <PaymentsTable rows={filteredPayments} categoryName={categoryName} />
+                  <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} />
                 ) : type === 'delivery_notes' ? (
-                  <DeliveryNotesTable rows={deliveryNotes} readOnly={isAccountant} onChanged={load} />
+                  <DeliveryNotesTable rows={paginate(deliveryNotes, page)} readOnly={isAccountant} onChanged={load} />
                 ) : type === 'cheques' ? (
-                  <ChequesTable rows={cheques} readOnly={isAccountant} onChanged={load} />
+                  <ChequesTable rows={paginate(cheques, page)} readOnly={isAccountant} onChanged={load} />
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -299,7 +319,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                       {rows.length === 0 && (
                         <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No {DOC_LABEL[type].toLowerCase()} yet.</td></tr>
                       )}
-                      {rows.map((i) => (
+                      {paginate(rows, page).map((i) => (
                         <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`${financeBase}/invoices/${i.id}`)}>
                           <td className="px-4 py-2 font-mono text-xs">{i.internal_number}</td>
                           <td className="px-4 py-2">{i.issued_at ? new Date(i.issued_at).toLocaleDateString() : <span className="text-muted-foreground">Draft</span>}</td>
@@ -321,6 +341,11 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                       ))}
                     </tbody>
                   </table>
+                )}
+                {/* One footer for whichever document table is active — they all render inside
+                    this CardContent, so the border lines up with the last row. */}
+                {!loading && !wsLoading && (
+                  <TablePagination page={page} total={activeRows.length} onPageChange={setPage} label={DOC_LABEL[type].toLowerCase()} />
                 )}
               </CardContent>
             </Card>
@@ -406,6 +431,9 @@ const CADENCE_LABEL: Record<RecurringExpense['cadence'], string> = {
 const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: (id: any) => string; readOnly: boolean; onChanged: () => void }> = ({ rows, categoryName, readOnly, onChanged }) => {
   const { toast } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  // Deleting a template shrinks the list — don't strand the operator on a page that's gone.
+  useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
   const toggle = async (r: RecurringExpense) => {
     setBusyId(r.id);
     try { await financeService.setRecurringExpenseActive(r.id, !r.is_active); onChanged(); }
@@ -440,7 +468,7 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {paginate(rows, page).map((r) => (
               <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
                 <td className="px-4 py-2">{r.description || <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName(r.category_id)}</td>
@@ -465,6 +493,7 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
             ))}
           </tbody>
         </table>
+        <TablePagination page={page} total={rows.length} onPageChange={setPage} label="recurring expenses" />
       </CardContent>
     </Card>
   );
@@ -473,6 +502,8 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
 /** Recorded-expense spend log (manual + supplier bills) shown under the myDATA inbox on the
  *  Expenses tab. These are `supplier_bills` — they also appear in Payables (open ones age in AP). */
 const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: any) => string }> = ({ rows, categoryName }) => {
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
   const statusVar = (s: SupplierBillStatus) =>
     s === 'paid' ? 'default' : s === 'overdue' || s === 'disputed' ? 'destructive' : 'outline';
   return (
@@ -494,7 +525,7 @@ const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: 
             </tr>
           </thead>
           <tbody>
-            {rows.map((b) => (
+            {paginate(rows, page).map((b) => (
               <tr key={b.id} className="border-b border-border/30 hover:bg-muted/30">
                 <td className="px-4 py-2 font-mono text-xs">{b.supplier_bill_number || <span className="text-muted-foreground">{b.notes ? b.notes.slice(0, 40) : '—'}</span>}</td>
                 <td className="px-4 py-2">{b.issued_at ? new Date(b.issued_at).toLocaleDateString() : '—'}</td>
@@ -506,6 +537,7 @@ const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: 
             ))}
           </tbody>
         </table>
+        <TablePagination page={page} total={rows.length} onPageChange={setPage} label="bills" />
       </CardContent>
     </Card>
   );

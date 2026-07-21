@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -12,6 +12,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { toast } from 'sonner';
@@ -86,6 +87,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [expandedStages, setExpandedStages] = useState<Set<number>>(new Set());
   const [selectedTab, setSelectedTab] = useState<'all' | 'pdf_processing' | 'web_scraping' | 'xml_import'>('all');
+  // Each tab keeps its own page so switching tabs doesn't lose your place in the others.
+  const [allPage, setAllPage] = useState(1);
+  const [pdfPage, setPdfPage] = useState(1);
+  const [scrapingPage, setScrapingPage] = useState(1);
+  const [xmlPage, setXmlPage] = useState(1);
+  const [failedPage, setFailedPage] = useState(1);
   const [showDeleteJobModal, setShowDeleteJobModal] = useState(false);
   const [deleteJobId, setDeleteJobId] = useState('');
   const [pipelineActionLoading, setPipelineActionLoading] = useState<string | null>(null);
@@ -367,7 +374,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         .select('*')
         .in('job_type', ['pdf_processing', 'web_scraping', 'product_discovery_upload', 'image_embedding_regeneration'])
         .order('created_at', { ascending: false })
-        .limit(100);
+        // Both job sources are merged and filtered per-tab client-side, so server-side paging
+        // isn't available here; the cap is raised instead so pagination isn't paging a truncation.
+        .limit(500);
 
       if (bgJobsError) throw bgJobsError;
 
@@ -376,7 +385,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         .from('data_import_jobs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500);
 
       if (xmlJobsError) {
         console.warn('⚠️ Failed to fetch XML import jobs:', xmlJobsError);
@@ -500,8 +509,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   }, []);
 
-  // 🆕 Filter jobs by selected tab
-  const getFilteredJobs = (): BackgroundJob[] => {
+  // 🆕 Filter jobs by selected tab. Memoized because the render calls getFilteredJobs()
+  // several times per pass (list body, empty check, pagination total, bulk-action guards).
+  const filteredJobs = useMemo<BackgroundJob[]>(() => {
     if (selectedTab === 'all') {
       return jobs;
     }
@@ -515,7 +525,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
 
     return jobs.filter(job => job.job_type === selectedTab);
-  };
+  }, [jobs, selectedTab]);
+
+  const getFilteredJobs = (): BackgroundJob[] => filteredJobs;
+
+  const failedJobs = useMemo(() => jobs.filter((j) => j.status === 'failed'), [jobs]);
+
+  // Realtime refreshes and deletions shrink these lists constantly; clamping at render
+  // keeps a now-out-of-range page from showing an empty table with no way back.
+  const allPageSafe = clampPage(allPage, filteredJobs.length);
+  const pdfPageSafe = clampPage(pdfPage, filteredJobs.length);
+  const scrapingPageSafe = clampPage(scrapingPage, filteredJobs.length);
+  const xmlPageSafe = clampPage(xmlPage, filteredJobs.length);
+  const failedPageSafe = clampPage(failedPage, failedJobs.length);
 
   useEffect(() => {
     fetchQueueData();
@@ -1533,7 +1555,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         </div>
 
       {/* 🆕 Job Type Tabs */}
-      <Tabs value={selectedTab} onValueChange={(value) => setSelectedTab(value as any)} className="space-y-4">
+      <Tabs
+        value={selectedTab}
+        onValueChange={(value) => {
+          setSelectedTab(value as any);
+          // The tab IS the job-type filter, so the row set changes completely — start at page 1.
+          setAllPage(1);
+          setPdfPage(1);
+          setScrapingPage(1);
+          setXmlPage(1);
+        }}
+        className="space-y-4"
+      >
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
           <TabsTrigger value="all" className="flex items-center gap-2">
             All Jobs
@@ -1719,7 +1752,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   {getFilteredJobs().length === 0 ? (
                     <p className="text-muted-foreground text-sm">No jobs in queue</p>
                   ) : (
-                    getFilteredJobs().slice(0, 30).map((job) => (
+                    paginate(getFilteredJobs(), allPageSafe).map((job) => (
                       <div
                         key={job.id}
                         className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
@@ -1805,6 +1838,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     ))
                   )}
                 </div>
+                <TablePagination
+                  page={allPageSafe}
+                  total={getFilteredJobs().length}
+                  onPageChange={setAllPage}
+                  label="jobs"
+                />
               </div>
             </CardContent>
           </Card>
@@ -1960,7 +1999,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   {getFilteredJobs().length === 0 ? (
                     <p className="text-muted-foreground text-sm">No jobs in queue</p>
                   ) : (
-                    getFilteredJobs().slice(0, 30).map((job) => (
+                    paginate(getFilteredJobs(), pdfPageSafe).map((job) => (
                       <div
                         key={job.id}
                         className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
@@ -2010,6 +2049,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     ))
                   )}
                 </div>
+                <TablePagination
+                  page={pdfPageSafe}
+                  total={getFilteredJobs().length}
+                  onPageChange={setPdfPage}
+                  label="jobs"
+                />
               </div>
             </CardContent>
           </Card>
@@ -2165,7 +2210,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   {getFilteredJobs().length === 0 ? (
                     <p className="text-muted-foreground text-sm">No jobs in queue</p>
                   ) : (
-                    getFilteredJobs().slice(0, 30).map((job) => (
+                    paginate(getFilteredJobs(), scrapingPageSafe).map((job) => (
                       <div
                         key={job.id}
                         className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
@@ -2215,6 +2260,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     ))
                   )}
                 </div>
+                <TablePagination
+                  page={scrapingPageSafe}
+                  total={getFilteredJobs().length}
+                  onPageChange={setScrapingPage}
+                  label="jobs"
+                />
               </div>
             </CardContent>
           </Card>
@@ -2370,7 +2421,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   {getFilteredJobs().length === 0 ? (
                     <p className="text-muted-foreground text-sm">No jobs in queue</p>
                   ) : (
-                    getFilteredJobs().slice(0, 30).map((job) => (
+                    paginate(getFilteredJobs(), xmlPageSafe).map((job) => (
                       <div
                         key={job.id}
                         className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
@@ -2420,6 +2471,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     ))
                   )}
                 </div>
+                <TablePagination
+                  page={xmlPageSafe}
+                  total={getFilteredJobs().length}
+                  onPageChange={setXmlPage}
+                  label="jobs"
+                />
               </div>
             </CardContent>
           </Card>
@@ -2427,7 +2484,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       </Tabs>
 
       {/* Error Logs */}
-      {jobs.some((j) => j.status === 'failed') && (
+      {failedJobs.length > 0 && (
         <Card className="border-red-500/30 bg-red-500/10 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-red-400 flex items-center gap-2">
@@ -2440,9 +2497,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {jobs
-                .filter((j) => j.status === 'failed')
-                .slice(0, 15)
+              {paginate(failedJobs, failedPageSafe)
                 .map((job) => (
                   <div
                     key={job.id}
@@ -2469,6 +2524,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </div>
                 ))}
             </div>
+            <TablePagination
+              page={failedPageSafe}
+              total={failedJobs.length}
+              onPageChange={setFailedPage}
+              label="failed jobs"
+              className="-mx-6 -mb-6 mt-2"
+            />
           </CardContent>
         </Card>
       )}

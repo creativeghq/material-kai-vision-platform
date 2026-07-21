@@ -13,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { stockService, type PendingQuoteRequest, type FreightOffer } from '@/modules/stock/services/stockService';
 
@@ -24,6 +25,11 @@ export default function FreightQuoteRequestsPage() {
   const [rows, setRows] = useState<PendingQuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [answer, setAnswer] = useState<PendingQuoteRequest | null>(null);
+  const [page, setPage] = useState(1);
+
+  // Answering or declining a request removes it from the queue — clamp so the last
+  // row on the last page doesn't leave the table blank.
+  useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
 
   const load = async () => {
     setLoading(true);
@@ -52,6 +58,7 @@ export default function FreightQuoteRequestsPage() {
             ) : rows.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">No pending freight-quote requests.</div>
             ) : (
+              <>
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b border-border/60">
@@ -63,7 +70,7 @@ export default function FreightQuoteRequestsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((q) => (
+                  {paginate(rows, page).map((q) => (
                     <tr key={q.id} className="border-b border-border/30">
                       <td className="px-4 py-2 font-medium">{q.workspace_name}</td>
                       <td className="px-4 py-2">{q.origin} → {q.destination}{q.container_type ? <span className="ml-2 text-xs text-muted-foreground">{q.container_type}</span> : null}</td>
@@ -79,6 +86,8 @@ export default function FreightQuoteRequestsPage() {
                   ))}
                 </tbody>
               </table>
+              <TablePagination page={page} total={rows.length} onPageChange={setPage} label="requests" />
+              </>
             )}
           </CardContent>
         </Card>

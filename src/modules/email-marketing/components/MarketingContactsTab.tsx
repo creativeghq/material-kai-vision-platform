@@ -8,6 +8,7 @@ import { RefreshCw, Loader2, Users, AlertTriangle, CheckCircle2 } from 'lucide-r
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { marketingService, type ResendContactsResult } from '../services/marketingService';
@@ -18,10 +19,16 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [savingToggle, setSavingToggle] = useState(false);
+  const [page, setPage] = useState(1);
 
   const load = async () => {
     setLoading(true);
-    try { setData(await marketingService.listResendContacts(workspaceId)); }
+    try {
+      const res = await marketingService.listResendContacts(workspaceId);
+      setData(res);
+      // A re-sync can return a different-sized audience — keep the page in range.
+      setPage((p) => clampPage(p, res.contacts?.length ?? 0));
+    }
     catch (e: any) { toast({ title: 'Error', description: e?.message || 'Failed to load contacts', variant: 'destructive' }); }
     finally { setLoading(false); }
   };
@@ -117,6 +124,7 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
         {contacts.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">No contacts in your Resend audience yet. Click “Sync now”.</div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="border-b border-border/50">
@@ -127,7 +135,7 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
                 </tr>
               </thead>
               <tbody>
-                {contacts.map((c) => (
+                {paginate(contacts, page).map((c) => (
                   <tr key={c.id || c.email} className="border-b last:border-0">
                     <td className="py-2 px-3">{c.email}</td>
                     <td className="py-2 px-3 text-muted-foreground">{[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}</td>
@@ -141,6 +149,13 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            total={contacts.length}
+            onPageChange={setPage}
+            label="contacts"
+          />
+          </>
         )}
       </div>
     </div>

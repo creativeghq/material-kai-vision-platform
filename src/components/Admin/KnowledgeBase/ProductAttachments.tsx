@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -41,7 +41,9 @@ interface DocLite {
   title: string;
 }
 
-const PAGE_SIZE = 20;
+import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
+
+const PAGE_SIZE = TABLE_PAGE_SIZE;
 
 // One consistent pill style for every relationship type — same shape/weight,
 // only a subtle accent colour differs (the old map made `certification` a bright
@@ -310,38 +312,13 @@ export const ProductAttachments: React.FC = () => {
             </Table>
           )}
 
-          {attachments.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between gap-4 px-4 py-3 border-t">
-              <p className="text-sm text-muted-foreground">
-                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, attachments.length)} of {attachments.length}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-          )}
+          <TablePagination
+            page={page}
+            total={attachments.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+            label="attachments"
+          />
         </CardContent>
       </Card>
 

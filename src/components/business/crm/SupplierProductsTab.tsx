@@ -7,6 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import {
   PRODUCT_IMAGE_SELECT,
   getProductImageUrl,
@@ -60,6 +61,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +100,10 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
       || r.external_sku?.toLowerCase().includes(q),
     );
   }, [rows, search]);
+
+  // Filtering (or switching to another supplier) can shrink the list under the current page.
+  useEffect(() => { setPage(1); }, [search, companyId]);
+  useEffect(() => { setPage((p) => clampPage(p, filteredRows.length)); }, [filteredRows.length]);
 
   return (
     <Card>
@@ -157,7 +163,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.map((p) => {
+                {paginate(filteredRows, page).map((p) => {
                   const img = getProductImageUrl(p);
                   const cat = getMaterialCategory(p.metadata);
                   const maker = getManufacturer(p.metadata);
@@ -188,6 +194,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
                 })}
               </TableBody>
             </Table>
+            <TablePagination page={page} total={filteredRows.length} onPageChange={setPage} label="products" />
           </div>
         )}
       </CardContent>

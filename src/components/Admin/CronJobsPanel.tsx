@@ -19,6 +19,7 @@ import {
 } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import {
   Dialog,
   DialogContent,
@@ -112,6 +113,7 @@ export const CronJobsPanel: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [history, setHistory] = useState<CronRunHistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -131,10 +133,12 @@ export const CronJobsPanel: React.FC = () => {
   const openHistory = async (jobname: string) => {
     setSelectedJob(jobname);
     setHistory([]);
+    setHistoryPage(1); // opening a different job must not inherit the previous job's page
     setHistoryLoading(true);
     const { data, error: rpcError } = await supabase.rpc(
       'get_cron_run_history',
-      { p_jobname: jobname, p_limit: 30 },
+      // Raised from 30 now that the dialog pages — per-minute crons blew past 30 in half an hour.
+      { p_jobname: jobname, p_limit: 200 },
     );
     if (!rpcError) {
       setHistory((data ?? []) as CronRunHistoryRow[]);
@@ -297,7 +301,7 @@ export const CronJobsPanel: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((r) => (
+                  {paginate(history, historyPage).map((r) => (
                     <tr key={r.runid} className="border-b border-border/40 align-top">
                       <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
                         {new Date(r.start_time).toLocaleString()}
@@ -315,6 +319,13 @@ export const CronJobsPanel: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              <TablePagination
+                page={historyPage}
+                total={history.length}
+                onPageChange={setHistoryPage}
+                label="runs"
+                className="px-0"
+              />
             </div>
           )}
         </DialogContent>

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { stockService, type StockMovement } from '../services/stockService';
 
 const DIR_META: Record<string, { icon: React.ElementType; label: string; cls: string }> = {
@@ -21,13 +22,16 @@ export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceI
   const [rows, setRows] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const m = await stockService.listMovements(workspaceId, { limit: 300 });
+        // 500 is the server-side ceiling on `list-movements`; ask for all of it so the pager
+        // walks the full window instead of a silently truncated slice of it.
+        const m = await stockService.listMovements(workspaceId, { limit: 500 });
         if (!cancelled) setRows(m);
       } catch (err: any) {
         if (!cancelled) toast({ title: 'Failed to load movements', description: err?.message, variant: 'destructive' });
@@ -43,6 +47,9 @@ export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceI
     if (!s) return rows;
     return rows.filter((r) => `${r.item?.name ?? ''} ${r.item?.sku ?? ''} ${r.reason ?? ''} ${r.source_type ?? ''}`.toLowerCase().includes(s));
   }, [rows, q]);
+
+  // Narrowing the filter shrinks the row set — without this a deep page goes blank.
+  useEffect(() => { setPage((p) => clampPage(p, visible.length)); }, [visible.length]);
 
   return (
     <Card>
@@ -72,7 +79,7 @@ export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceI
               {visible.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">{rows.length === 0 ? 'No stock movements yet.' : 'No movements match the filter.'}</td></tr>
               )}
-              {visible.map((r) => {
+              {paginate(visible, page).map((r) => {
                 const meta = DIR_META[r.direction] ?? DIR_META.adjust;
                 const Icon = meta.icon;
                 return (
@@ -92,6 +99,7 @@ export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceI
             </tbody>
           </table>
         )}
+        {!loading && <TablePagination page={page} total={visible.length} onPageChange={setPage} label="movements" />}
       </CardContent>
     </Card>
   );

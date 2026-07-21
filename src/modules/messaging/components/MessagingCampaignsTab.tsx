@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Send, Calendar, Users, Play, Pause, Trash2, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { messagingCampaignService, MessagingCampaign } from '../services/messagingCampaignService';
 import { humanizeLabel } from '@/utils/humanize';
@@ -26,6 +27,7 @@ const statusColors: Record<string, string> = {
 export const MessagingCampaignsTab: React.FC = () => {
   const [campaigns, setCampaigns] = useState<MessagingCampaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -37,6 +39,8 @@ export const MessagingCampaignsTab: React.FC = () => {
       setLoading(true);
       const data = await messagingCampaignService.getCampaigns();
       setCampaigns(data);
+      // Cancelling a campaign can shrink the list — don't strand the user on a now-empty page.
+      setPage((p) => clampPage(p, data.length));
     } catch (error) {
       console.error('Error loading campaigns:', error);
       toast({
@@ -180,7 +184,7 @@ export const MessagingCampaignsTab: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {campaigns.map((campaign) => (
+                {paginate(campaigns, page).map((campaign) => (
                   <tr key={campaign.id} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-3 px-4">
                       <div className="font-medium">{campaign.name}</div>
@@ -264,6 +268,12 @@ export const MessagingCampaignsTab: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            total={campaigns.length}
+            onPageChange={setPage}
+            label="campaigns"
+          />
         </div>
       )}
     </div>

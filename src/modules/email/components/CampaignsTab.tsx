@@ -8,6 +8,7 @@ import { Plus, Send, Calendar, Users, BarChart3, Pause, Play, Trash2 } from 'luc
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CreateCampaignModal } from './CreateCampaignModal';
@@ -59,6 +60,7 @@ export const CampaignsTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -78,6 +80,8 @@ export const CampaignsTab: React.FC = () => {
 
       if (error) throw error;
       setCampaigns(data || []);
+      // Deleting a draft can shrink the list — don't strand the user on a now-empty page.
+      setPage((p) => clampPage(p, (data || []).length));
     } catch (error) {
       console.error('Error loading campaigns:', error);
       toast({
@@ -181,7 +185,7 @@ export const CampaignsTab: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {campaigns.map((campaign) => (
+                {paginate(campaigns, page).map((campaign) => (
                   <tr
                     key={campaign.id}
                     className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
@@ -242,6 +246,12 @@ export const CampaignsTab: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            total={campaigns.length}
+            onPageChange={setPage}
+            label="campaigns"
+          />
         </div>
       )}
 

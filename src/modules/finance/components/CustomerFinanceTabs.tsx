@@ -21,6 +21,7 @@ import { StatementActions } from '@/modules/finance/components/StatementActions'
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -264,13 +265,16 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PaymentWithAllocation[]>([]);
   const [payOpen, setPayOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
   const reload = useCallback(async () => {
     if (!activeWorkspaceId || (!contactId && !companyId)) { setRows([]); setLoading(false); return; }
     setLoading(true);
     try {
       const list = await financeService.listPayments({
-        workspaceId: activeWorkspaceId, counterpartyCompanyId: companyId, counterpartyContactId: contactId, limit: 50,
+        // Paged client-side below — the cap is a safety ceiling, not a page size. At 50 a
+        // long-standing customer's older payments were simply unreachable.
+        workspaceId: activeWorkspaceId, counterpartyCompanyId: companyId, counterpartyContactId: contactId, limit: 500,
       });
       setRows(list);
     } catch { setRows([]); }
@@ -278,6 +282,9 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
   }, [contactId, companyId, activeWorkspaceId]);
 
   useEffect(() => { void reload(); }, [reload]);
+  // A different party is a different list; deleting a payment shrinks the current one.
+  useEffect(() => { setPage(1); }, [contactId, companyId]);
+  useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
 
   return (
     <Card>
@@ -299,6 +306,7 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
             No payments recorded for this party yet. Use “Record payment” above to add one, or record it against a specific order.
           </div>
         ) : (
+          <>
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -311,7 +319,7 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
               </tr>
             </thead>
             <tbody>
-              {rows.map((p) => {
+              {paginate(rows, page).map((p) => {
                 const isIn = p.direction === 'in';
                 return (
                   <tr key={p.id} className="border-b border-border/30 hover:bg-muted/30">
@@ -337,6 +345,8 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
               })}
             </tbody>
           </table>
+          <TablePagination page={page} total={rows.length} onPageChange={setPage} label="payments" />
+          </>
         )}
       </CardContent>
       {activeWorkspaceId && (

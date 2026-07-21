@@ -33,6 +33,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/core/ui/command';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { CreateQuoteModal } from '../components/CreateQuoteModal';
@@ -71,6 +72,7 @@ export const QuotesPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
   // #251 App Launcher deep-link: /quotes?new=quote opens the Create Quote modal.
   useEffect(() => {
@@ -111,6 +113,10 @@ export const QuotesPage: React.FC = () => {
     }
     return true;
   });
+
+  // Narrowing the filter or deleting a quote can shrink the list under the current page.
+  useEffect(() => { setPage(1); }, [statusFilter]);
+  useEffect(() => { setPage((p) => clampPage(p, filteredQuotes.length)); }, [filteredQuotes.length]);
 
 
   // Handle quote click - navigate to detail page
@@ -300,6 +306,7 @@ export const QuotesPage: React.FC = () => {
                 )}
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
@@ -313,7 +320,7 @@ export const QuotesPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredQuotes.map((quote) => (
+                  {paginate(filteredQuotes, page).map((quote) => (
                     <tr
                       key={quote.id}
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
@@ -349,6 +356,8 @@ export const QuotesPage: React.FC = () => {
                 </tbody>
               </table>
               </div>
+              <TablePagination page={page} total={filteredQuotes.length} onPageChange={setPage} label="quotes" />
+              </>
             )}
           </div>
         </div>

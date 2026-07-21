@@ -53,6 +53,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Progress } from '@/components/core/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
@@ -127,6 +128,8 @@ const OperationsDashboardInner: React.FC = () => {
   const [searchAnalytics, setSearchAnalytics] = useState<SearchAnalytic[]>([]);
   const [apiUsage, setApiUsage] = useState<ApiUsageLog[]>([]);
   const [agentChats, setAgentChats] = useState<AgentChatMessage[]>([]);
+  const [agentChatPage, setAgentChatPage] = useState(1);
+  const [apiUsagePage, setApiUsagePage] = useState(1);
   const [subscriptionStats, setSubscriptionStats] = useState<SubscriptionStats>({
     totalUsers: 0,
     freeUsers: 0,
@@ -290,6 +293,7 @@ const OperationsDashboardInner: React.FC = () => {
       }));
 
       setAgentChats(agentChatMessages);
+      setAgentChatPage(1);
 
       // Filter and cast data to match expected types
       const filteredSearchData = (searchData || [])
@@ -331,6 +335,9 @@ const OperationsDashboardInner: React.FC = () => {
 
       setSearchAnalytics(filteredSearchData);
       setApiUsage(filteredApiData);
+      // A refetch replaces both result sets wholesale — restart at page 1 rather than
+      // leaving the reader on a page that may no longer exist.
+      setApiUsagePage(1);
 
       // Calculate aggregate statistics (include agent chats in search count)
       const totalSearches = (searchData?.length || 0) + agentChatMessages.length;
@@ -973,7 +980,7 @@ const OperationsDashboardInner: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {agentChats.slice(0, 20).map((chat) => {
+                    {paginate(agentChats, agentChatPage).map((chat) => {
                       const model = chat.metadata?.model || 'claude-opus-4-8';
                       const inputTokens = estimateTokens(chat.content);
                       const outputTokens = estimateTokens(chat.content);
@@ -1056,6 +1063,12 @@ const OperationsDashboardInner: React.FC = () => {
                     })}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  page={agentChatPage}
+                  total={agentChats.length}
+                  onPageChange={setAgentChatPage}
+                  label="responses"
+                />
                 {agentChats.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     No agent chat data available yet. Start chatting with the agent to see analytics.
@@ -1162,7 +1175,7 @@ const OperationsDashboardInner: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {apiUsage.slice(0, 15).map((log) => (
+                      {paginate(apiUsage, apiUsagePage).map((log) => (
                         <TableRow key={log.id}>
                           <TableCell className="font-mono text-sm max-w-xs truncate">
                             {log.request_path}
@@ -1192,6 +1205,12 @@ const OperationsDashboardInner: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination
+                    page={apiUsagePage}
+                    total={apiUsage.length}
+                    onPageChange={setApiUsagePage}
+                    label="requests"
+                  />
                 </CardContent>
               </Card>
             )}

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type ErganiCredsStatus, type ErganiSubmission, type ErganiSubmissionType } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 const statusBadge = (s: string) =>
   s === 'submitted' ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">Submitted</Badge>
@@ -33,6 +34,7 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -40,9 +42,12 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
     try {
       const [st, log] = await Promise.all([
         hrService.getErganiStatus(workspaceId).catch(() => null),
-        hrService.erganiSubmissionsLog(workspaceId, { limit: 200 }).catch(() => ({ submissions: [] as ErganiSubmission[] })),
+        // 500 is the server-side ceiling — take the whole window so the pager isn't walking a
+        // pre-truncated slice.
+        hrService.erganiSubmissionsLog(workspaceId, { limit: 500 }).catch(() => ({ submissions: [] as ErganiSubmission[] })),
       ]);
       setStatus(st); setSubs(log.submissions);
+      setPage((p) => clampPage(p, log.submissions.length));
     } catch (e) { toast({ title: 'Failed to load Ergani data', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, toast]);
@@ -136,7 +141,7 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
                 <TableHead>Protocol</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {subs.map((s) => (
+                {paginate(subs, page).map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs">{s.submission_type}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{s.entity_type ?? '—'}</TableCell>
@@ -162,6 +167,7 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
               </TableBody>
             </Table>
           )}
+          <TablePagination page={page} total={subs.length} onPageChange={setPage} label="submissions" />
         </CardContent>
       </Card>
     </div>

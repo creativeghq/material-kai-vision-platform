@@ -34,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import {
   Sheet,
   SheetContent,
@@ -88,6 +89,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
     topEndpoints: [], recentLogs: [],
   });
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [recentLogsPage, setRecentLogsPage] = useState(1);
 
   // Users for key generation
   const [users, setUsers] = useState<Array<{ id: string; full_name: string | null }>>([]);
@@ -131,8 +133,11 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
       setAnalyticsData({
         totalRequests, successfulRequests, rateLimitedRequests, avgResponseTime,
         topEndpoints,
-        recentLogs: logs.slice(0, 20),
+        // Keep every fetched log — the table pages through them rather than
+        // dropping all but the newest 20 before they ever reach the render.
+        recentLogs: logs,
       });
+      setRecentLogsPage(1);
     } catch (err) {
       console.error('Failed to load analytics:', err);
     } finally {
@@ -455,6 +460,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
               </CardHeader>
               <CardContent className="p-0">
                 {analyticsData.recentLogs.length > 0 ? (
+                  <>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -467,8 +473,9 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {analyticsData.recentLogs.map((log, i) => (
-                        <TableRow key={i}>
+                      {paginate(analyticsData.recentLogs, recentLogsPage).map((log, i) => (
+                        // Absolute index — a per-page index collides across pages.
+                        <TableRow key={(recentLogsPage - 1) * TABLE_PAGE_SIZE + i}>
                           <TableCell className="font-mono text-xs max-w-[200px] truncate">{log.request_path}</TableCell>
                           <TableCell><Badge variant="outline" className="text-xs">{log.request_method}</Badge></TableCell>
                           <TableCell>
@@ -486,6 +493,13 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination
+                    page={recentLogsPage}
+                    total={analyticsData.recentLogs.length}
+                    onPageChange={setRecentLogsPage}
+                    label="requests"
+                  />
+                  </>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <Activity className="mx-auto h-8 w-8 mb-2" />

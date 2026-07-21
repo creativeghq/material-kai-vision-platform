@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import {
   Dialog,
   DialogContent,
@@ -103,9 +104,9 @@ export const RelevancyManagement: React.FC = () => {
   const [relationshipType, setRelationshipType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Pagination
+  // Pagination. One shared page state is correct here because only one tab's table is
+  // ever mounted and the tab switch below resets it.
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
 
   // Statistics
   const [stats, setStats] = useState({
@@ -361,11 +362,13 @@ export const RelevancyManagement: React.FC = () => {
   };
 
   const currentData = getCurrentData();
-  const totalPages = Math.ceil(currentData.length / itemsPerPage);
-  const paginatedData = currentData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
+  const paginatedData = paginate(currentData, currentPage);
+
+  // Deleting a relationship reloads the tab — clamp rather than strand the user
+  // on a page that no longer exists.
+  useEffect(() => {
+    setCurrentPage((p) => clampPage(p, currentData.length));
+  }, [currentData.length]);
 
   // image_product_associations has no relationship_type column — hide filter for that tab
   const showRelTypeFilter = activeTab !== 'product-image';
@@ -520,7 +523,7 @@ export const RelevancyManagement: React.FC = () => {
               <TabsContent value="chunk-product" className="space-y-4">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">Loading relationships...</div>
-                ) : paginatedData.length === 0 ? (
+                ) : currentData.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No relationships found</div>
                 ) : (
                   <Table>
@@ -563,7 +566,7 @@ export const RelevancyManagement: React.FC = () => {
               <TabsContent value="product-image" className="space-y-4">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">Loading relationships...</div>
-                ) : paginatedData.length === 0 ? (
+                ) : currentData.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No relationships found</div>
                 ) : (
                   <Table>
@@ -614,7 +617,7 @@ export const RelevancyManagement: React.FC = () => {
               <TabsContent value="chunk-image" className="space-y-4">
                 {loading ? (
                   <div className="text-center py-8 text-gray-500">Loading relationships...</div>
-                ) : paginatedData.length === 0 ? (
+                ) : currentData.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No relationships found</div>
                 ) : (
                   <Table>
@@ -660,31 +663,14 @@ export const RelevancyManagement: React.FC = () => {
               </TabsContent>
             </Tabs>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-gray-600">
-                  Page {currentPage} of {totalPages} ({currentData.length} total)
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+            {!loading && (
+              <TablePagination
+                page={currentPage}
+                total={currentData.length}
+                onPageChange={setCurrentPage}
+                label="relationships"
+                className="-mx-6 mt-4 px-6"
+              />
             )}
           </CardContent>
         </Card>

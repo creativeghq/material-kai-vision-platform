@@ -29,6 +29,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -366,6 +367,20 @@ const FinancePage: React.FC = () => {
   };
   const arFiltered = useMemo(() => applyAgingFilters(ar, arQuery, arCat, arBucket), [ar, arQuery, arCat, arBucket]);
   const apFiltered = useMemo(() => applyAgingFilters(ap, apQuery, apCat, apBucket), [ap, apQuery, apCat, apBucket]);
+
+  // Client-side pagination — one page state per list (AR / AP / follow-ups / deposits).
+  const [arPage, setArPage] = useState(1);
+  const [apPage, setApPage] = useState(1);
+  const [followUpsPage, setFollowUpsPage] = useState(1);
+  const [depositsPage, setDepositsPage] = useState(1);
+  useEffect(() => { setArPage(1); }, [arQuery, arCat, arBucket]);
+  useEffect(() => { setApPage(1); }, [apQuery, apCat, apBucket]);
+  // Recording a payment / issuing a document drops rows out from under the current page.
+  useEffect(() => { setArPage((p) => clampPage(p, arFiltered.length)); }, [arFiltered.length]);
+  useEffect(() => { setApPage((p) => clampPage(p, apFiltered.length)); }, [apFiltered.length]);
+  useEffect(() => { setFollowUpsPage((p) => clampPage(p, followUps.length)); }, [followUps.length]);
+  useEffect(() => { setDepositsPage((p) => clampPage(p, deposits.rows.length)); }, [deposits.rows.length]);
+
   const incomeCats = useMemo(() => categories.filter((c) => c.kind === 'income' || c.kind === 'both'), [categories]);
   const expenseCats = useMemo(() => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'), [categories]);
 
@@ -532,7 +547,7 @@ const FinancePage: React.FC = () => {
                 <CardContent className="p-0">
                   <p className="px-5 pt-3 text-xs text-muted-foreground">Cash you've received that isn't a receipt/invoice yet — it's held as a customer deposit (not revenue, not in AR). Issue a document to recognise it.</p>
                   <ul className="divide-y divide-border/40 mt-2">
-                    {deposits.rows.slice(0, 8).map((d) => (
+                    {paginate(deposits.rows, depositsPage).map((d) => (
                       <li key={d.payment_id} className="flex items-center justify-between gap-3 px-5 py-2.5">
                         <div className="min-w-0">
                           <div className="text-sm">
@@ -552,6 +567,7 @@ const FinancePage: React.FC = () => {
                       </li>
                     ))}
                   </ul>
+                  <TablePagination page={depositsPage} total={deposits.rows.length} onPageChange={setDepositsPage} label="deposits" />
                 </CardContent>
               </Card>
             )}
@@ -715,7 +731,7 @@ const FinancePage: React.FC = () => {
                     {arFiltered.length === 0 && (
                       <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">{ar.length === 0 ? 'No open receivables.' : 'No receivables match the filters.'}</td></tr>
                     )}
-                    {arFiltered.map((r) => {
+                    {paginate(arFiltered, arPage).map((r) => {
                       const isOrder = r.entry_kind === 'order';
                       return (
                       <tr
@@ -769,6 +785,7 @@ const FinancePage: React.FC = () => {
                     })}
                   </tbody>
                 </table>
+                <TablePagination page={arPage} total={arFiltered.length} onPageChange={setArPage} label="receivables" />
               </CardContent>
             </Card>
           </TabsContent>
@@ -815,7 +832,7 @@ const FinancePage: React.FC = () => {
                     {apFiltered.length === 0 && (
                       <tr><td colSpan={isAccountant ? 9 : 10} className="px-4 py-8 text-center text-muted-foreground">{ap.length === 0 ? 'No open payables.' : 'No payables match the filters.'}</td></tr>
                     )}
-                    {apFiltered.map((r) => {
+                    {paginate(apFiltered, apPage).map((r) => {
                       const isOrder = r.entry_kind === 'order';
                       return (
                       <tr
@@ -873,6 +890,7 @@ const FinancePage: React.FC = () => {
                     })}
                   </tbody>
                 </table>
+                <TablePagination page={apPage} total={apFiltered.length} onPageChange={setApPage} label="payables" />
               </CardContent>
             </Card>
           </TabsContent>
@@ -943,6 +961,7 @@ const FinancePage: React.FC = () => {
                 {followUps.length === 0 ? (
                   <div className="p-8 text-center text-sm text-muted-foreground">No follow-ups outstanding.</div>
                 ) : (
+                  <>
                   <table className="w-full text-sm">
                     <thead className="text-xs text-muted-foreground">
                       <tr className="border-b border-border/60">
@@ -955,7 +974,7 @@ const FinancePage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {followUps.map((r) => (
+                      {paginate(followUps, followUpsPage).map((r) => (
                         <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
                           <td className="px-4 py-2">
                             <Link to={`/quotes/${r.id}`} className="text-primary hover:underline">{r.quote_number ?? r.name ?? r.id.slice(0, 8)}</Link>
@@ -969,6 +988,8 @@ const FinancePage: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                  <TablePagination page={followUpsPage} total={followUps.length} onPageChange={setFollowUpsPage} label="quotes" />
+                  </>
                 )}
               </CardContent>
             </Card>

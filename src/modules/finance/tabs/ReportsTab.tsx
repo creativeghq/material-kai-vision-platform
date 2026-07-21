@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, formatPct } from '@/modules/finance/services/financeService';
 import { AccountingExportCard } from '@/modules/finance/components/AccountingExportCard';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 type ReportKind =
   | 'cashflow_per_day' | 'pnl_per_category'
@@ -176,6 +177,13 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
 
   const totals = useMemo(() => computeTotals(report, rows), [report, rows]);
 
+  // Only the two DOCUMENT-level reports page (myDATA reconciliation lists one row per document,
+  // open tasks one row per task). The rest are aggregate summaries — one row per day/customer/
+  // product — and are meant to be read whole, so they stay unpaginated.
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [report, period, customFrom, customTo, sortDir]);
+  useEffect(() => { setPage((p) => clampPage(p, sorted.length)); }, [sorted.length]);
+
   return (
     <div className="space-y-4">
       {/* #207 — accounting export bridges (γέφυρες): download journals for the accountant. */}
@@ -267,7 +275,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           ) : sorted.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">No data for this report and period.</div>
           ) : (
-            renderReport(report, sorted, totals)
+            renderReport(report, sorted, totals, page, setPage)
           )}
         </CardContent>
       </Card>
@@ -464,7 +472,13 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
   }
 }
 
-function renderReport(report: ReportKind, rows: any[], totals: { label: string; value: string }[]): React.ReactNode {
+function renderReport(
+  report: ReportKind,
+  rows: any[],
+  totals: { label: string; value: string }[],
+  page: number,
+  onPageChange: (p: number) => void,
+): React.ReactNode {
   if (report === 'cashflow_per_day') {
     return (
       <Table headers={['Date', 'Receipts', 'Payments', 'Difference']} totals={totals} rows={rows.map((r: any) => [
@@ -546,7 +560,7 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
     );
   }
   if (report === 'mydata_reconciliation') {
-    return <MyDataReconTable rows={rows} totals={totals} />;
+    return <MyDataReconTable rows={rows} totals={totals} page={page} onPageChange={onPageChange} />;
   }
   if (report === 'myf') {
     return (
@@ -558,9 +572,14 @@ function renderReport(report: ReportKind, rows: any[], totals: { label: string; 
   }
   if (report === 'open_tasks') {
     return (
-      <Table headers={['Quote', 'Kind', 'Scheduled for', 'In', 'Note']} totals={totals} rows={rows.map((r: any) => [
-        r.quote_label, r.kind, r.scheduled_for ? new Date(r.scheduled_for).toLocaleString() : '—', `${r.days_until}d`, r.body ?? '—',
-      ])} />
+      <Table
+        headers={['Quote', 'Kind', 'Scheduled for', 'In', 'Note']}
+        totals={totals}
+        rows={paginate(rows, page).map((r: any) => [
+          r.quote_label, r.kind, r.scheduled_for ? new Date(r.scheduled_for).toLocaleString() : '—', `${r.days_until}d`, r.body ?? '—',
+        ])}
+        footer={<TablePagination page={page} total={rows.length} onPageChange={onPageChange} label="tasks" />}
+      />
     );
   }
   if (report === 'sales_per_factory') {
@@ -624,7 +643,9 @@ const BUCKET_META: Record<string, { label: string; cls: string; rank: number }> 
 };
 const DOC_KIND_LABEL: Record<string, string> = { invoice: 'Invoice', credit_note: 'Credit note', delivery_note: 'Delivery note' };
 
-const MyDataReconTable: React.FC<{ rows: any[]; totals: { label: string; value: string }[] }> = ({ rows, totals }) => {
+const MyDataReconTable: React.FC<{
+  rows: any[]; totals: { label: string; value: string }[]; page: number; onPageChange: (p: number) => void;
+}> = ({ rows, totals, page, onPageChange }) => {
   const ordered = [...rows].sort((a, b) => {
     const ra = BUCKET_META[a.bucket]?.rank ?? 5, rb = BUCKET_META[b.bucket]?.rank ?? 5;
     if (ra !== rb) return ra - rb;
@@ -647,7 +668,7 @@ const MyDataReconTable: React.FC<{ rows: any[]; totals: { label: string; value: 
           </tr>
         </thead>
         <tbody>
-          {ordered.map((r) => {
+          {paginate(ordered, page).map((r) => {
             const meta = BUCKET_META[r.bucket] ?? { label: r.bucket, cls: 'bg-muted text-muted-foreground border-border', rank: 5 };
             return (
               <tr key={`${r.doc_kind}-${r.doc_id}`} className="border-b border-border/30">
@@ -662,11 +683,17 @@ const MyDataReconTable: React.FC<{ rows: any[]; totals: { label: string; value: 
           })}
         </tbody>
       </table>
+      {/* The totals strip above counts every document, not just this page. */}
+      <TablePagination page={page} total={ordered.length} onPageChange={onPageChange} label="documents" />
     </div>
   );
 };
 
-const Table: React.FC<{ headers: string[]; rows: string[][]; totals: { label: string; value: string }[] }> = ({ headers, rows, totals }) => (
+const Table: React.FC<{
+  headers: string[]; rows: string[][]; totals: { label: string; value: string }[];
+  /** Pagination footer — only the document-level reports pass one. */
+  footer?: React.ReactNode;
+}> = ({ headers, rows, totals, footer }) => (
   <div>
     <div className="grid gap-2 border-b border-border/60 bg-muted/20 px-4 py-2 text-xs" style={{ gridTemplateColumns: `repeat(${totals.length}, minmax(0, 1fr))` }}>
       {totals.map((t) => (
@@ -687,5 +714,6 @@ const Table: React.FC<{ headers: string[]; rows: string[][]; totals: { label: st
         ))}
       </tbody>
     </table>
+    {footer}
   </div>
 );

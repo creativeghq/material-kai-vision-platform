@@ -8,6 +8,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { supabase } from '@/integrations/supabase/client';
 import { stockService, type InboundShipment } from '../services/stockService';
 
@@ -34,10 +35,12 @@ export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const load = async () => {
     setLoading(true);
-    try { setRows(await stockService.listShipments(workspaceId)); }
+    // Stop-tracking removes rows, so the current page may no longer exist after a reload.
+    try { const next = await stockService.listShipments(workspaceId); setRows(next); setPage((p) => clampPage(p, next.length)); }
     catch (err: any) { toast({ title: 'Failed to load shipments', description: err?.message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };
@@ -91,7 +94,7 @@ export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => {
+              {paginate(rows, page).map((s) => {
                 const arrived = ['arrived', 'discharged', 'gate_out', 'delivered'].includes(s.status);
                 const open = expanded === s.id;
                 return (
@@ -146,6 +149,7 @@ export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
             </tbody>
           </table>
         )}
+        {!loading && <TablePagination page={page} total={rows.length} onPageChange={setPage} label="shipments" />}
       </CardContent>
       <AddShipmentDialog open={addOpen} onOpenChange={setAddOpen} workspaceId={workspaceId} onAdded={async () => { setAddOpen(false); await load(); }} />
     </Card>

@@ -44,6 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+import { TablePagination, TABLE_PAGE_SIZE, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
@@ -89,8 +90,8 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   const [categoryAccess, setCategoryAccess] = useState<Map<string, string>>(new Map());
   const [categoryLocked, setCategoryLocked] = useState<Map<string, boolean>>(new Map());
 
-  // Pagination
-  const PAGE_SIZE = 20;
+  // Pagination — server-side (range + exact count), so `page` drives the query.
+  const PAGE_SIZE = TABLE_PAGE_SIZE;
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -226,6 +227,9 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 
       setDocuments(data || []);
       setTotalCount(count || 0);
+      // A delete can drop the row count below the current page — re-clamp so the
+      // next query lands on a page that still has rows.
+      setPage((p) => clampPage(p, count || 0, PAGE_SIZE));
     } catch (error) {
       console.error('Failed to load documents:', error);
       toast({
@@ -501,7 +505,6 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   // Search + filters are applied server-side (see loadDocuments), so the
   // current page is already the filtered set.
   const filteredDocuments = documents;
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
   const filteredIds = useMemo(() => filteredDocuments.map((d) => d.id), [filteredDocuments]);
@@ -717,34 +720,13 @@ export const DocumentList: React.FC<DocumentListProps> = ({
             </TableBody>
           </Table>
         )}
-        {totalCount > 0 && (
-          <div className="flex items-center justify-between px-6 py-3 border-t">
-            <span className="text-sm text-muted-foreground">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                disabled={page <= 1 || isLoading}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">Page {page} / {totalPages}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                disabled={page >= totalPages || isLoading}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
+        <TablePagination
+          page={page}
+          total={totalCount}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+          label="documents"
+        />
       </CardContent>
     </Card>
 

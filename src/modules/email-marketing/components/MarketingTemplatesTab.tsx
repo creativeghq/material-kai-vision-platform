@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { marketingService, type MarketingTemplate } from '../services/marketingService';
 
@@ -23,6 +24,7 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(1);
 
   // #251 App Launcher deep-link: /marketing/email?tab=templates&new=template opens the create modal.
   useEffect(() => {
@@ -38,7 +40,10 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
   const load = async () => {
     setLoading(true);
     try {
-      setTemplates(await marketingService.listTemplates(workspaceId));
+      const rows = await marketingService.listTemplates(workspaceId);
+      setTemplates(rows);
+      // Deleting a template can shrink the list — don't strand the user on a now-empty page.
+      setPage((p) => clampPage(p, rows.length));
     } catch (e: any) {
       toast({ title: 'Error', description: e?.message || 'Failed to load templates', variant: 'destructive' });
     } finally {
@@ -93,7 +98,8 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
           <Button onClick={() => setShowCreate(true)} className="rounded-full"><Plus className="h-4 w-4 mr-2" /> New Template</Button>
         </div>
       ) : (
-        <div className="dashboard-card overflow-x-auto">
+        <div className="dashboard-card">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="border-b border-border/50">
               <tr>
@@ -104,7 +110,7 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
               </tr>
             </thead>
             <tbody>
-              {templates.map((t) => (
+              {paginate(templates, page).map((t) => (
                 <tr key={t.id} className="border-b last:border-0 hover:bg-muted/50">
                   <td className="py-3 px-4">
                     <div className="font-medium">{t.name}</div>
@@ -128,6 +134,13 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
               ))}
             </tbody>
           </table>
+          </div>
+          <TablePagination
+            page={page}
+            total={templates.length}
+            onPageChange={setPage}
+            label="templates"
+          />
         </div>
       )}
 

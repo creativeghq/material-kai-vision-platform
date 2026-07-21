@@ -32,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { DocumentFactoriesCrmLinker } from '@/components/Admin/DocumentFactoriesCrmLinker';
@@ -56,11 +57,22 @@ export const PDFDocumentDetails: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [document, setDocument] = useState<DocumentDetails | null>(null);
+  // One page state per tab — a catalog PDF yields hundreds of chunks/images and the
+  // tabs are independent lists.
+  const [productsPage, setProductsPage] = useState(1);
+  const [chunksPage, setChunksPage] = useState(1);
+  const [imagesPage, setImagesPage] = useState(1);
+  const [entitiesPage, setEntitiesPage] = useState(1);
 
   useEffect(() => {
     if (documentId) {
       fetchDocumentDetails();
     }
+  }, [documentId]);
+
+  // Navigating to a different document replaces every list.
+  useEffect(() => {
+    setProductsPage(1); setChunksPage(1); setImagesPage(1); setEntitiesPage(1);
   }, [documentId]);
 
   const fetchDocumentDetails = async () => {
@@ -388,7 +400,7 @@ export const PDFDocumentDetails: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {document.products.map((product) => (
+                      {paginate(document.products, productsPage).map((product) => (
                         <TableRow key={product.id}>
                           <TableCell className="font-medium">
                             {product.name}
@@ -418,6 +430,7 @@ export const PDFDocumentDetails: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination page={productsPage} total={document.products.length} onPageChange={setProductsPage} label="products" />
                 </div>
               )}
             </CardContent>
@@ -450,7 +463,7 @@ export const PDFDocumentDetails: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {document.chunks.map((chunk) => (
+                      {paginate(document.chunks, chunksPage).map((chunk) => (
                         <TableRow key={chunk.id}>
                           <TableCell>
                             <Badge variant="outline">
@@ -484,6 +497,7 @@ export const PDFDocumentDetails: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination page={chunksPage} total={document.chunks.length} onPageChange={setChunksPage} label="chunks" />
                 </div>
               )}
             </CardContent>
@@ -519,8 +533,9 @@ export const PDFDocumentDetails: React.FC = () => {
                   No images extracted from this document
                 </p>
               ) : (
+                <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {document.images.map((image) => (
+                  {paginate(document.images, imagesPage).map((image) => (
                     <Card key={image.id}>
                       <CardContent className="p-4">
                         {image.image_url && (
@@ -564,6 +579,8 @@ export const PDFDocumentDetails: React.FC = () => {
                     </Card>
                   ))}
                 </div>
+                <TablePagination page={imagesPage} total={document.images.length} onPageChange={setImagesPage} label="images" className="mt-4" />
+                </>
               )}
             </CardContent>
           </Card>
@@ -597,7 +614,7 @@ export const PDFDocumentDetails: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {document.document_entities.map((entity) => (
+                      {paginate(document.document_entities, entitiesPage).map((entity) => (
                         <TableRow key={entity.id}>
                           <TableCell>
                             <Badge>{entity.entity_type}</Badge>
@@ -627,6 +644,7 @@ export const PDFDocumentDetails: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination page={entitiesPage} total={document.document_entities.length} onPageChange={setEntitiesPage} label="entities" />
                 </div>
               )}
             </CardContent>

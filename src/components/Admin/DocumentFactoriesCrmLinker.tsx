@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { companiesAPI } from '@/services/crm.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { Badge } from '@/components/core/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -100,6 +101,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
   } | null>(null);
 
   // Aggregate distinct factory names from both entities and products
+  const [page, setPage] = useState(1);
   const factories = useMemo<FactoryAggregate[]>(() => {
     const accum = new Map<string, FactoryAggregate>();
 
@@ -269,7 +271,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
               </TableRow>
             </TableHeader>
             <TableBody>
-              {factories.map((f) => {
+              {paginate(factories, page).map((f) => {
                 const match = matchesByKey.get(f.lowerKey) ?? null;
                 const isCreating = creatingKey === f.lowerKey;
                 return (
@@ -334,6 +336,12 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
               })}
             </TableBody>
           </Table>
+          <TablePagination
+            page={page}
+            total={factories.length}
+            onPageChange={setPage}
+            label="brands"
+          />
         </div>
       </CardContent>
 

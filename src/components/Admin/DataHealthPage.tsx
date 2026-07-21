@@ -6,6 +6,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Switch } from '@/components/core/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
@@ -25,6 +26,8 @@ export default function DataHealthPage() {
   const [checks, setChecks] = useState<IntegrityCheck[]>([]);
   const [findings, setFindings] = useState<IntegrityFinding[]>([]);
   const [runs, setRuns] = useState<IntegrityRun[]>([]);
+  const [findingsPage, setFindingsPage] = useState(1);
+  const [runsPage, setRunsPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -32,8 +35,12 @@ export default function DataHealthPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, f, r] = await Promise.all([svc.listChecks(), svc.listFindings({ status: 'open' }), svc.listRuns(8)]);
+      // Runs are paged, so pull a real window rather than the 8 that used to fit the card.
+      const [c, f, r] = await Promise.all([svc.listChecks(), svc.listFindings({ status: 'open' }), svc.listRuns(200)]);
       setChecks(c); setFindings(f); setRuns(r);
+      // Healing / ignoring shrinks the finding set — clamp so the reader isn't left on a blank page.
+      setFindingsPage((p) => clampPage(p, f.length));
+      setRunsPage((p) => clampPage(p, r.length));
     } catch (err: any) {
       toast({ title: 'Failed to load', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -133,6 +140,7 @@ export default function DataHealthPage() {
                 ) : findings.length === 0 ? (
                   <div className="p-8 text-center text-sm text-muted-foreground">No open findings. Everything checks out. ✓</div>
                 ) : (
+                  <>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -141,7 +149,7 @@ export default function DataHealthPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {findings.map((f) => {
+                      {paginate(findings, findingsPage).map((f) => {
                         const c = checkByKey.get(f.check_key);
                         return (
                           <TableRow key={f.id}>
@@ -162,6 +170,13 @@ export default function DataHealthPage() {
                       })}
                     </TableBody>
                   </Table>
+                  <TablePagination
+                    page={findingsPage}
+                    total={findings.length}
+                    onPageChange={setFindingsPage}
+                    label="findings"
+                  />
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -210,7 +225,7 @@ export default function DataHealthPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {runs.map((r) => (
+                    {paginate(runs, runsPage).map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="text-xs">{new Date(r.started_at).toLocaleString()}</TableCell>
                         <TableCell className="text-xs">{r.triggered_by === 'cron' ? 'cron' : r.autoheal ? 'admin · heal' : 'admin'}</TableCell>
@@ -221,6 +236,12 @@ export default function DataHealthPage() {
                     ))}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  page={runsPage}
+                  total={runs.length}
+                  onPageChange={setRunsPage}
+                  label="runs"
+                />
               </CardContent>
             </Card>
           </TabsContent>

@@ -8,6 +8,7 @@ import { edgeErrorMessage } from '@/utils/edgeError';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
 
@@ -47,6 +48,7 @@ function timeAgo(iso: string | null): string {
 export const SeoInterlinkingPanel: React.FC = () => {
   const { toast } = useToast();
   const [rows, setRows] = useState<AdminWebsiteRow[]>([]);
+  const [page, setPage] = useState(1);
   const [counters, setCounters] = useState<Counters>({ total_sites: 0, total_pages: 0, errored: 0, never_crawled: 0 });
   const [loading, setLoading] = useState(true);
   const [recrawling, setRecrawling] = useState<Record<string, boolean>>({});
@@ -81,6 +83,8 @@ export const SeoInterlinkingPanel: React.FC = () => {
     }));
 
     setRows(enriched);
+    // A reload can return fewer sites (one disconnected) — don't strand the operator past the end.
+    setPage((p) => clampPage(p, enriched.length));
     setCounters({
       total_sites: enriched.length,
       total_pages: enriched.reduce((sum, r) => sum + (r.page_count || 0), 0),
@@ -167,6 +171,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
                 No websites have been connected yet. Users add sites from <Link to="/profile" className="text-primary hover:underline">their profile page</Link>.
               </div>
             ) : (
+              <>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -179,7 +184,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((r) => (
+                  {paginate(rows, page).map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
@@ -250,6 +255,13 @@ export const SeoInterlinkingPanel: React.FC = () => {
                   ))}
                 </TableBody>
               </Table>
+              <TablePagination
+                page={page}
+                total={rows.length}
+                onPageChange={setPage}
+                label="websites"
+              />
+              </>
             )}
           </CardContent>
         </Card>

@@ -13,6 +13,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type PayrollRun, type PayrollItem, type PayrollStatus, type PayrollSummary, type PayrollSettings, type BracketReductions } from '../services/hrService';
 import { SectionHeader, EmptyState, hrMoney } from './_shared';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 
 const statusVariant: Record<PayrollStatus, 'secondary' | 'default' | 'outline'> = { draft: 'secondary', approved: 'default', paid: 'outline' };
@@ -46,11 +47,12 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [openRun, setOpenRun] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
     setLoading(true);
-    try { setRuns((await hrService.listPayrollRuns(workspaceId)).runs); }
+    try { const { runs: next } = await hrService.listPayrollRuns(workspaceId); setRuns(next); setPage((p) => clampPage(p, next.length)); }
     catch (e) { toast({ title: 'Failed to load payroll', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, toast]);
@@ -78,7 +80,7 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
             <Table>
               <TableHeader><TableRow><TableHead>Period</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Gross</TableHead><TableHead className="text-right">Net</TableHead><TableHead>Finance</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>
-                {runs.map((r) => (
+                {paginate(runs, page).map((r) => (
                   <TableRow key={r.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setOpenRun(r.id)}>
                     <TableCell className="font-medium">{r.period}</TableCell>
                     <TableCell><Badge variant={statusVariant[r.status]}>{r.status}</Badge></TableCell>
@@ -91,6 +93,7 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
               </TableBody>
             </Table>
           )}
+          <TablePagination page={page} total={runs.length} onPageChange={setPage} label="runs" />
         </CardContent>
       </Card>
     </div>
@@ -104,10 +107,11 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [itemPage, setItemPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const r = await hrService.getPayrollRun(workspaceId, runId); setRun(r.run); setItems(r.items); setSummary(r.summary); }
+    try { const r = await hrService.getPayrollRun(workspaceId, runId); setRun(r.run); setItems(r.items); setSummary(r.summary); setItemPage((p) => clampPage(p, r.items.length)); }
     catch (e) { toast({ title: 'Failed to load run', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, runId, toast]);
@@ -190,10 +194,11 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
                 <TableHead className="text-right">Employer EFKA</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {items.map((it) => <PayrollItemRow key={it.id} item={it} editable={editable} currency={cur} onSaveGross={saveGross} />)}
+                {paginate(items, itemPage).map((it) => <PayrollItemRow key={it.id} item={it} editable={editable} currency={cur} onSaveGross={saveGross} />)}
               </TableBody>
             </Table>
           )}
+          <TablePagination page={itemPage} total={items.length} onPageChange={setItemPage} label="employees" />
         </CardContent>
       </Card>
       <p className="text-xs text-muted-foreground">

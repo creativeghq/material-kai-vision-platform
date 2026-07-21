@@ -10,6 +10,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { NewPlannedPaymentDialog } from '@/modules/finance/components/NewPlannedPaymentDialog';
 import { humanizeLabel } from '@/utils/humanize';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 interface Props { workspaceId: string }
 
@@ -146,7 +147,8 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
           {grouped.later.length > 0 && <Section title="Later" rows={grouped.later} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />}
         </div>
       ) : (
-        <FlatTable rows={rows} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />
+        /* keyed on the filter so switching it remounts the table at page 1 */
+        <FlatTable key={filter} rows={rows} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />
       )}
 
       <NewPlannedPaymentDialog
@@ -177,7 +179,14 @@ const FlatTable: React.FC<{
   rows: PlannedPayment[];
   onMarkPaid: (r: PlannedPayment) => void; onCancel: (r: PlannedPayment) => void;
   markingId: string | null;
-}> = ({ rows, onMarkPaid, onCancel, markingId }) => (
+}> = ({ rows, onMarkPaid, onCancel, markingId }) => {
+  // Each bucket (Overdue / Today / Next 7 …) renders its own FlatTable, so each keeps its
+  // own page — paging "Later" must not move you off the overdue rows you're clearing.
+  const [page, setPage] = useState(1);
+  // Marking a row paid or cancelled removes it from this bucket.
+  useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
+  return (
+  <>
   <table className="w-full text-sm">
     <thead className="text-xs text-muted-foreground">
       <tr className="border-b border-border/60">
@@ -192,7 +201,7 @@ const FlatTable: React.FC<{
       </tr>
     </thead>
     <tbody>
-      {rows.map((r) => (
+      {paginate(rows, page).map((r) => (
         <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
           <td className="px-4 py-2"><div className="font-medium">{r.title}</div>{r.notes && <div className="text-[10px] text-muted-foreground line-clamp-1">{r.notes}</div>}</td>
           <td className="px-4 py-2 text-xs text-muted-foreground">{r.category}</td>
@@ -215,4 +224,7 @@ const FlatTable: React.FC<{
       ))}
     </tbody>
   </table>
-);
+  <TablePagination page={page} total={rows.length} onPageChange={setPage} label="planned payments" />
+  </>
+  );
+};

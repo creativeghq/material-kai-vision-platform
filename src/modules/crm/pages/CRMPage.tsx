@@ -32,7 +32,7 @@ import { CategoriesPanel } from './CategoriesPage';
 import { CrmFilters, type FilterDef } from '../components/CrmFilters';
 import { AddCompanyModal } from '../components/AddCompanyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
-import { CrmPager } from '@/components/business/crm/CrmPager';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import {
   ANY, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS, CLIENT_SUPPLIER_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
@@ -92,6 +92,9 @@ export const CRMManagement: React.FC = () => {
   const handleTabChange = (val: string) => {
     const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'users';
     setActiveTab(next);
+    // The search box is shared across tabs, so the incoming list is filtered by a term
+    // the user typed for a different tab — start it at page 1.
+    setUsersPage(1); setContactsPage(1); setCompaniesPage(1);
     const params = new URLSearchParams(searchParams);
     if (next === 'users') params.delete('tab'); else params.set('tab', next);
     setSearchParams(params, { replace: true });
@@ -112,10 +115,8 @@ export const CRMManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0 });
 
-  // Client-side pagination over the already-filtered lists. Contacts paginate at
-  // 10 rows/page; users/companies stay at 20.
-  const PAGE_SIZE = 20;
-  const CONTACTS_PAGE_SIZE = 10;
+  // Client-side pagination over the already-filtered lists — one page state per tab
+  // so switching tabs never lands on a page the other list doesn't have.
   const [usersPage, setUsersPage] = useState(1);
   const [contactsPage, setContactsPage] = useState(1);
   const [companiesPage, setCompaniesPage] = useState(1);
@@ -315,15 +316,15 @@ export const CRMManagement: React.FC = () => {
   useEffect(() => { setContactsPage(1); }, [q, contactF, contactCatIds]);
   useEffect(() => { setCompaniesPage(1); }, [q, companyF, companyCatIds, companyIndustryIds]);
 
-  const pagedUsers = useMemo(
-    () => filteredUsers.slice((usersPage - 1) * PAGE_SIZE, usersPage * PAGE_SIZE),
-    [filteredUsers, usersPage]);
-  const pagedContacts = useMemo(
-    () => filteredContacts.slice((contactsPage - 1) * CONTACTS_PAGE_SIZE, contactsPage * CONTACTS_PAGE_SIZE),
-    [filteredContacts, contactsPage]);
-  const pagedCompanies = useMemo(
-    () => filteredCompanies.slice((companiesPage - 1) * PAGE_SIZE, companiesPage * PAGE_SIZE),
-    [filteredCompanies, companiesPage]);
+  // A delete or a reload can shrink the list under the current page — clamp instead of
+  // stranding the user on an empty table.
+  useEffect(() => { setUsersPage((p) => clampPage(p, filteredUsers.length)); }, [filteredUsers.length]);
+  useEffect(() => { setContactsPage((p) => clampPage(p, filteredContacts.length)); }, [filteredContacts.length]);
+  useEffect(() => { setCompaniesPage((p) => clampPage(p, filteredCompanies.length)); }, [filteredCompanies.length]);
+
+  const pagedUsers = useMemo(() => paginate(filteredUsers, usersPage), [filteredUsers, usersPage]);
+  const pagedContacts = useMemo(() => paginate(filteredContacts, contactsPage), [filteredContacts, contactsPage]);
+  const pagedCompanies = useMemo(() => paginate(filteredCompanies, companiesPage), [filteredCompanies, companiesPage]);
 
   // ── selection helpers ─────────────────────────────────────────────────────
   const allUsersSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selUsers.has(u.user_id));
@@ -558,8 +559,8 @@ export const CRMManagement: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination page={usersPage} total={filteredUsers.length} onPageChange={setUsersPage} label="users" />
                 </div>
-                <CrmPager page={usersPage} pageSize={PAGE_SIZE} total={filteredUsers.length} onPageChange={setUsersPage} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -626,8 +627,8 @@ export const CRMManagement: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination page={contactsPage} total={filteredContacts.length} onPageChange={setContactsPage} label="contacts" />
                 </div>
-                <CrmPager page={contactsPage} pageSize={CONTACTS_PAGE_SIZE} total={filteredContacts.length} onPageChange={setContactsPage} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -694,8 +695,8 @@ export const CRMManagement: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination page={companiesPage} total={filteredCompanies.length} onPageChange={setCompaniesPage} label="companies" />
                 </div>
-                <CrmPager page={companiesPage} pageSize={PAGE_SIZE} total={filteredCompanies.length} onPageChange={setCompaniesPage} />
               </CardContent>
             </Card>
           </TabsContent>

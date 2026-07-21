@@ -13,6 +13,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Switch } from '@/components/core/ui/switch';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingTemplate } from '../services';
 import type { MessageType } from '../services/types';
@@ -32,6 +33,7 @@ export const MessagingTemplatesTab: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessagingTemplate | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<MessagingTemplate | null>(null);
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -43,6 +45,8 @@ export const MessagingTemplatesTab: React.FC = () => {
       setLoading(true);
       const data = await messagingService.getTemplates();
       setTemplates(data);
+      // Deleting a template can shrink the list — don't strand the user on a now-empty page.
+      setPage((p) => clampPage(p, data.length));
     } catch (error) {
       console.error('Error loading templates:', error);
       toast({
@@ -161,7 +165,7 @@ export const MessagingTemplatesTab: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTemplates.map((template) => (
+                {paginate(filteredTemplates, page).map((template) => (
                   <tr key={template.id} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-3 px-4">
                       <div className="font-medium">{template.name}</div>
@@ -241,6 +245,12 @@ export const MessagingTemplatesTab: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            total={filteredTemplates.length}
+            onPageChange={setPage}
+            label="templates"
+          />
         </div>
       )}
 

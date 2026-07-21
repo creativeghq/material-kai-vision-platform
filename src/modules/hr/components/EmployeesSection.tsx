@@ -18,6 +18,7 @@ import {
 } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
 import { parseDecimal } from '@/utils/decimal';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 const statusVariant: Record<EmployeeStatus, 'default' | 'secondary' | 'outline'> = { active: 'default', on_leave: 'secondary', terminated: 'outline' };
 const empName = (e: Employee) => e.contact?.name || [e.contact?.first_name, e.contact?.last_name].filter(Boolean).join(' ') || 'Unnamed';
@@ -28,6 +29,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -35,6 +37,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
     try {
       const [e, d] = await Promise.all([hrService.listEmployees(workspaceId), hrService.listDepartments(workspaceId)]);
       setEmployees(e.employees); setDepartments(d.departments);
+      setPage((p) => clampPage(p, e.employees.length));
     } catch (err) { toast({ title: 'Failed to load employees', description: (err as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, toast]);
@@ -57,7 +60,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
                 <TableHead className="text-right">Absence</TableHead><TableHead className="text-right">Leave left</TableHead><TableHead />
               </TableRow></TableHeader>
               <TableBody>
-                {employees.map((e) => (
+                {paginate(employees, page).map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{empName(e)}{e.on_leave_today && <Badge variant="secondary" className="ml-2">On leave</Badge>}</TableCell>
                     <TableCell>{e.contact?.position || '—'}</TableCell>
@@ -78,6 +81,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
               </TableBody>
             </Table>
           )}
+          <TablePagination page={page} total={employees.length} onPageChange={setPage} label="employees" />
         </CardContent>
       </Card>
 

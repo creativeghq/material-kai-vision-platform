@@ -16,6 +16,7 @@ import {
 import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { humanizeLabel } from '@/utils/humanize';
+import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
@@ -34,6 +35,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
   const [role, setRole] = useState<'all' | 'customer' | 'supplier' | 'both'>('all');
   const [segment, setSegment] = useState<string>('all');
   const [selected, setSelected] = useState<PartyRow | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => { void load(); }, [workspaceId, role]);
 
@@ -79,6 +81,11 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
       return true;
     });
   }, [rows, search, segment]);
+
+  // Role/segment/search all narrow the list — start the narrowed set at its first page.
+  useEffect(() => { setPage(1); }, [role, segment, search]);
+  // …and clamp on reload so a shrunken list can't leave an empty page showing.
+  useEffect(() => { setPage((p) => clampPage(p, filtered.length)); }, [filtered.length]);
 
   const agingFor = (r: PartyRow) => agingMap[`${r.party_type}:${r.party_id}`];
 
@@ -164,6 +171,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">No parties match.</div>
           ) : (
+            <>
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border/60">
@@ -177,7 +185,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
+                {paginate(filtered, page).map((r) => (
                   <tr key={`${r.party_type}-${r.party_id}`} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => setSelected(r)}>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-2">
@@ -219,6 +227,8 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                 ))}
               </tbody>
             </table>
+            <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="parties" />
+            </>
           )}
         </CardContent>
       </Card>
@@ -252,6 +262,12 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<SupplierBill[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  // Each drill-down list pages independently — these used to be `.slice(0, 15)` / `.slice(0, 10)`,
+  // which silently hid every older invoice/bill/payment with no way to reach it.
+  const [invPage, setInvPage] = useState(1);
+  const [billPage, setBillPage] = useState(1);
+  const [payPage, setPayPage] = useState(1);
+  const [ledgerPage, setLedgerPage] = useState(1);
   // Running ledger (καρτέλα)
   const [ledgerSide, setLedgerSide] = useState<'customer' | 'supplier'>('customer');
   const [ledger, setLedger] = useState<PartyLedgerRow[]>([]);
@@ -265,7 +281,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   useEffect(() => {
     if (!party) return;
     setLedgerSide(party.is_customer ? 'customer' : party.is_supplier ? 'supplier' : 'customer');
+    setInvPage(1); setBillPage(1); setPayPage(1); setLedgerPage(1);
   }, [party]);
+
+  // A new side/date range is a new ledger — don't land the user mid-way through it.
+  useEffect(() => { setLedgerPage(1); }, [ledgerSide, fromDate, toDate]);
 
   useEffect(() => {
     if (!party) { setLedger([]); setOpening(0); return; }
@@ -411,40 +431,49 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
               <>
                 <Section title={<><FileText className="h-4 w-4" /> Invoices ({invoices.length})</>} empty="No invoices.">
                   {invoices.length > 0 && (
+                    <>
                     <ul className="divide-y divide-border/40">
-                      {invoices.slice(0, 15).map((i) => (
+                      {paginate(invoices, invPage).map((i) => (
                         <li key={i.id} className="flex justify-between gap-2 px-3 py-2 text-sm">
                           <div><span className="font-mono">{i.internal_number}</span> · {humanizeLabel(i.status)}</div>
                           <div className="text-right tabular-nums">{formatMoney(Number(i.total), i.currency)}<div className="text-[10px] text-muted-foreground">Due {formatMoney(Number(i.amount_due), i.currency)}</div></div>
                         </li>
                       ))}
                     </ul>
+                    <TablePagination page={invPage} total={invoices.length} onPageChange={setInvPage} label="invoices" />
+                    </>
                   )}
                 </Section>
 
                 <Section title={<><Receipt className="h-4 w-4" /> Supplier bills ({bills.length})</>} empty="No supplier bills.">
                   {bills.length > 0 && (
+                    <>
                     <ul className="divide-y divide-border/40">
-                      {bills.slice(0, 15).map((b) => (
+                      {paginate(bills, billPage).map((b) => (
                         <li key={b.id} className="flex justify-between gap-2 px-3 py-2 text-sm">
                           <div><span className="font-mono">{b.supplier_bill_number ?? '—'}</span> · {humanizeLabel(b.status)}</div>
                           <div className="text-right tabular-nums">{formatMoney(Number(b.total), b.currency)}<div className="text-[10px] text-muted-foreground">Due {formatMoney(Number(b.amount_due), b.currency)}</div></div>
                         </li>
                       ))}
                     </ul>
+                    <TablePagination page={billPage} total={bills.length} onPageChange={setBillPage} label="bills" />
+                    </>
                   )}
                 </Section>
 
-                <Section title="Recent payments" empty="No payments recorded.">
+                <Section title="Payments" empty="No payments recorded.">
                   {payments.length > 0 && (
+                    <>
                     <ul className="divide-y divide-border/40">
-                      {payments.slice(0, 10).map((p) => (
+                      {paginate(payments, payPage).map((p) => (
                         <li key={p.id} className="flex justify-between gap-2 px-3 py-2 text-sm">
                           <div>{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'In' : 'Out'} · {p.method ?? '—'}</div>
                           <div className={`text-right tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</div>
                         </li>
                       ))}
                     </ul>
+                    <TablePagination page={payPage} total={payments.length} onPageChange={setPayPage} label="payments" />
+                    </>
                   )}
                 </Section>
 
@@ -491,14 +520,19 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className="border-b border-border/30 bg-muted/30">
-                            <td colSpan={7} className="px-3 py-1.5 text-xs font-medium text-muted-foreground">Opening balance</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(opening)}</td>
-                          </tr>
+                          {/* Carry-forward only belongs above the FIRST entry of the period. */}
+                          {ledgerPage === 1 && (
+                            <tr className="border-b border-border/30 bg-muted/30">
+                              <td colSpan={7} className="px-3 py-1.5 text-xs font-medium text-muted-foreground">Opening balance</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(opening)}</td>
+                            </tr>
+                          )}
                           {ledgerWithBalance.length === 0 ? (
                             <tr><td colSpan={8} className="px-3 py-4 text-center text-xs text-muted-foreground">No activity in this period.</td></tr>
-                          ) : ledgerWithBalance.map((r, idx) => (
-                            <tr key={idx} className="border-b border-border/30">
+                          ) : paginate(ledgerWithBalance, ledgerPage).map((r, idx) => (
+                            // Key on the ABSOLUTE row index — a per-page index collides across
+                            // pages and lets React reuse the previous page's rows.
+                            <tr key={(ledgerPage - 1) * TABLE_PAGE_SIZE + idx} className="border-b border-border/30">
                               <td className="px-3 py-1.5">{r.entry_date ? new Date(r.entry_date).toLocaleDateString() : '—'}</td>
                               <td className="px-3 py-1.5">{LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
                               <td className="px-3 py-1.5 font-mono">{r.doc_number ?? '—'}</td>
@@ -522,6 +556,10 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                         </tfoot>
                       </table>
                       </div>
+                    )}
+                    {/* Totals above are period-wide, not per page — Print still emits every row. */}
+                    {!ledgerLoading && (
+                      <TablePagination page={ledgerPage} total={ledgerWithBalance.length} onPageChange={setLedgerPage} label="entries" />
                     )}
                   </CardContent>
                 </Card>

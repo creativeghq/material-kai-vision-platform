@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { stockService, type ForecastCandidate } from '../services/stockService';
 
 const TrendBadge: React.FC<{ t: ForecastCandidate['trend'] }> = ({ t }) => {
@@ -19,10 +20,11 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
   const [aiBusy, setAiBusy] = useState(false);
   const [aiRan, setAiRan] = useState(false);
   const [reordering, setReordering] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const load = async () => {
     setLoading(true);
-    try { setRows(await stockService.forecast(workspaceId)); setAiRan(false); }
+    try { setRows(await stockService.forecast(workspaceId)); setAiRan(false); setPage(1); }
     catch (err: any) { toast({ title: 'Failed to load forecast', description: err?.message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };
@@ -37,6 +39,8 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
       // Prefer the AI-ranked list when present; else keep the deterministic order.
       setRows(res.recommendations.length ? res.recommendations : res.candidates);
       setAiRan(res.recommendations.length > 0);
+      // The AI list is re-ranked and usually shorter — start over at the top.
+      setPage(1);
       toast({ title: 'AI forecast ready', description: `${res.recommendations.length} prioritised recommendation(s).` });
     } catch (err: any) {
       toast({ title: 'AI forecast failed', description: err?.message, variant: 'destructive' });
@@ -88,7 +92,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
               </tr>
             </thead>
             <tbody>
-              {rows.map((c) => (
+              {paginate(rows, page).map((c) => (
                 <tr key={c.warehouse_item_id} className="border-b border-border/30 align-top">
                   {aiRan && <td className="px-3 py-2 font-medium">{c.priority ?? '—'}</td>}
                   <td className="px-4 py-2 font-medium">
@@ -119,6 +123,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
             </tbody>
           </table>
         )}
+        {!loading && <TablePagination page={page} total={rows.length} onPageChange={setPage} label="items" />}
       </CardContent>
     </Card>
   );

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type Absence, type Employee, type AbsenceType, type AbsenceStatus, type ErganiLeaveType, type ErganiSubmission, ABSENCE_TYPE_LABELS } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 const absVariant: Record<AbsenceStatus, 'default' | 'secondary' | 'destructive'> = { approved: 'default', pending: 'secondary', rejected: 'destructive' };
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
@@ -30,6 +31,7 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
   const [erganiOn, setErganiOn] = useState(false);
   const [leaveTypes, setLeaveTypes] = useState<ErganiLeaveType[]>([]);
   const [erganiByAbsence, setErganiByAbsence] = useState<Map<string, ErganiSubmission>>(new Map());
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -37,6 +39,7 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
     try {
       const [a, e] = await Promise.all([hrService.listAbsences(workspaceId), hrService.listEmployees(workspaceId)]);
       setAbsences(a.absences); setEmployees(e.employees);
+      setPage((p) => clampPage(p, a.absences.length));
     }
     catch (err) { toast({ title: 'Failed to load time off', description: (err as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
@@ -82,7 +85,7 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
             <Table>
               <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Type</TableHead><TableHead>From</TableHead><TableHead>To</TableHead><TableHead className="text-right">Days</TableHead><TableHead>Status</TableHead>{erganiOn && <TableHead>Ergani</TableHead>}<TableHead /></TableRow></TableHeader>
               <TableBody>
-                {absences.map((a) => {
+                {paginate(absences, page).map((a) => {
                   const filing = erganiByAbsence.get(a.id);
                   return (
                   <TableRow key={a.id}>
@@ -118,6 +121,7 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
               </TableBody>
             </Table>
           )}
+          <TablePagination page={page} total={absences.length} onPageChange={setPage} label="requests" />
         </CardContent>
       </Card>
     </div>

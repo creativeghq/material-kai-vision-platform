@@ -10,6 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 
 interface SubscriberRow {
@@ -44,6 +45,54 @@ const STATUS_VARIANT: Record<string, string> = {
   canceling: 'bg-amber-100 text-amber-700 border-amber-200',
   canceled: 'bg-gray-100 text-gray-600 border-gray-200',
   past_due: 'bg-red-100 text-red-700 border-red-200',
+};
+
+// One table per module, so each keeps its own page — a component rather than inline JSX
+// because page state can't live inside a .map().
+const SubscriberTable: React.FC<{ module: ModuleOverviewRow }> = ({ module: m }) => {
+  const [page, setPage] = useState(1);
+  // Page state outlives a Refresh (the component is keyed by module), so clamp when
+  // a refresh returns fewer subscribers than the current page covers.
+  const total = m.subscribers.length;
+  useEffect(() => { setPage((p) => clampPage(p, total)); }, [total]);
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Workspace</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Renews / ends</TableHead>
+            <TableHead>Since</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {paginate(m.subscribers, page).map((s) => (
+            <TableRow key={`${m.module_slug}:${s.workspace_id}`}>
+              <TableCell className="font-medium">{s.workspace_name || s.workspace_id.slice(0, 8)}</TableCell>
+              <TableCell>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_VARIANT[s.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                  {s.status}
+                </span>
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {s.current_period_end ? new Date(s.current_period_end).toLocaleDateString() : '—'}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {new Date(s.created_at).toLocaleDateString()}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <TablePagination
+        page={page}
+        total={m.subscribers.length}
+        onPageChange={setPage}
+        label="subscribers"
+      />
+    </>
+  );
 };
 
 export const ModuleSubscribersPanel: React.FC = () => {
@@ -109,34 +158,7 @@ export const ModuleSubscribersPanel: React.FC = () => {
                 {m.subscribers.length === 0 ? (
                   <p className="px-6 pb-4 text-sm text-muted-foreground">No paid subscribers.</p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Workspace</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Renews / ends</TableHead>
-                        <TableHead>Since</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {m.subscribers.map((s) => (
-                        <TableRow key={`${m.module_slug}:${s.workspace_id}`}>
-                          <TableCell className="font-medium">{s.workspace_name || s.workspace_id.slice(0, 8)}</TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_VARIANT[s.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                              {s.status}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {s.current_period_end ? new Date(s.current_period_end).toLocaleDateString() : '—'}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {new Date(s.created_at).toLocaleDateString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <SubscriberTable module={m} />
                 )}
               </CardContent>
             </Card>

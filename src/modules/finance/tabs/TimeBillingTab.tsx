@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { timeTrackingService, type TimeEntry, type TimeReportUserRow, type TimeReportContactRow } from '@/modules/finance/services/timeTrackingService';
 import { parseDecimal } from '@/utils/decimal';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 interface Props { workspaceId: string }
 type Customer = { type: 'company' | 'contact'; id: string; label: string };
@@ -126,6 +127,13 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   const unbilled = useMemo(() => entries.filter((e) => e.is_billable && !e.billed_invoice_id), [entries]);
   const billed = useMemo(() => entries.filter((e) => e.billed_invoice_id), [entries]);
 
+  const [unbilledPage, setUnbilledPage] = useState(1);
+  const [billedPage, setBilledPage] = useState(1);
+  // Billing or deleting entries moves them between the two lists — clamp both so neither
+  // is left showing an empty page. (Selection is by id, so it survives paging.)
+  useEffect(() => { setUnbilledPage((p) => clampPage(p, unbilled.length)); }, [unbilled.length]);
+  useEffect(() => { setBilledPage((p) => clampPage(p, billed.length)); }, [billed.length]);
+
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const selectedRows = unbilled.filter((e) => selected.has(e.id));
@@ -223,9 +231,10 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
           ) : unbilled.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No unbilled time. Log some above.</p>
           ) : (
+            <>
             <div className="divide-y divide-border/40">
               {mixedCustomers && <p className="px-4 py-1.5 text-[11px] text-amber-500">Selected entries span multiple customers — invoice one customer at a time.</p>}
-              {unbilled.map((e) => (
+              {paginate(unbilled, unbilledPage).map((e) => (
                 <label key={e.id} className="flex cursor-pointer items-center gap-3 px-4 py-2 text-sm hover:bg-muted/30">
                   <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
                   <div className="w-20 text-xs text-muted-foreground">{e.work_date}</div>
@@ -237,6 +246,8 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                 </label>
               ))}
             </div>
+            <TablePagination page={unbilledPage} total={unbilled.length} onPageChange={setUnbilledPage} label="entries" />
+            </>
           )}
         </CardContent>
       </Card>
@@ -326,7 +337,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
           <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Billed</CardTitle></CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border/40">
-              {billed.slice(0, 50).map((e) => (
+              {paginate(billed, billedPage).map((e) => (
                 <div key={e.id} className="flex items-center gap-3 px-4 py-2 text-sm">
                   <div className="w-20 text-xs text-muted-foreground">{e.work_date}</div>
                   <div className="min-w-0 flex-1 truncate text-muted-foreground">{e.description}</div>
@@ -336,6 +347,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                 </div>
               ))}
             </div>
+            <TablePagination page={billedPage} total={billed.length} onPageChange={setBilledPage} label="entries" />
           </CardContent>
         </Card>
       )}

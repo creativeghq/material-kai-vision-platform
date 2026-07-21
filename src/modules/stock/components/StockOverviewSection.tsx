@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { stockService, type StockOverview, type StockValuation, type LowStockItem } from '../services/stockService';
 
 const fmtMoney = (n: number, ccy?: string) => {
@@ -29,6 +30,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
   const [val, setVal] = useState<StockValuation | null>(null);
   const [low, setLow] = useState<LowStockItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lowPage, setLowPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +44,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
         setOv(overview);
         setVal(valuation);
         setLow(lowRes.items);
+        setLowPage((p) => clampPage(p, lowRes.items.length));
       } catch (err: any) {
         if (!cancelled) toast({ title: 'Failed to load stock overview', description: err?.message, variant: 'destructive' });
       } finally {
@@ -144,7 +147,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                 </tr>
               </thead>
               <tbody>
-                {low.map((it) => (
+                {paginate(low, lowPage).map((it) => (
                   <tr key={it.id} className="border-b border-border/30">
                     <td className="px-4 py-2 font-medium">{it.name} <span className="text-xs text-muted-foreground">/ {it.unit}</span></td>
                     <td className="px-4 py-2 font-mono text-xs">{it.sku ?? '—'}</td>
@@ -163,6 +166,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
               </tbody>
             </table>
           )}
+          <TablePagination page={lowPage} total={low.length} onPageChange={setLowPage} label="items" />
         </CardContent>
       </Card>
     </div>

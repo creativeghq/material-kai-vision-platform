@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -123,11 +124,13 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
     },
   });
   const [processingJobs, setProcessingJobs] = useState<ProcessingJob[]>([]);
+  const [processingJobsPage, setProcessingJobsPage] = useState(1);
   const [mlTasks, setMLTasks] = useState<MLTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Enhanced monitoring state
   const [enhancedJobs, setEnhancedJobs] = useState<EnhancedJobDetails[]>([]);
+  const [enhancedJobsPage, setEnhancedJobsPage] = useState(1);
   const [documentMetrics, setDocumentMetrics] =
     useState<DocumentAnalysisMetrics | null>(null);
 
@@ -232,6 +235,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
         (job): job is EnhancedJobDetails => job !== null,
       );
       setEnhancedJobs(validEnhancedJobs);
+      setEnhancedJobsPage(1);
     } catch (error) {
       console.error('Error loading enhanced job details:', error);
     }
@@ -267,6 +271,8 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
       if (analyticsError) throw analyticsError;
 
       setProcessingJobs((queueData as ProcessingJob[]) || []);
+      // Refetch replaces the whole result set — don't strand the reader on a page past the end.
+      setProcessingJobsPage(1);
       setMLTasks((mlData as MLTask[]) || []);
 
       // Calculate performance metrics
@@ -581,7 +587,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                 <CardContent>
                   <div className="space-y-4">
                     {enhancedJobs.length > 0 ? (
-                      enhancedJobs.slice(0, 5).map((job) => (
+                      // 5/page keeps the panel the same height as the old slice(0, 5)
+                      // while still making the remaining jobs reachable.
+                      paginate(enhancedJobs, enhancedJobsPage, 5).map((job) => (
                         <div key={job.job_id} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
                             <div className="font-medium">
@@ -634,6 +642,14 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                       </div>
                     )}
                   </div>
+                  <TablePagination
+                    page={enhancedJobsPage}
+                    total={enhancedJobs.length}
+                    pageSize={5}
+                    onPageChange={setEnhancedJobsPage}
+                    label="jobs"
+                    className="mt-4 -mx-6 -mb-6 px-6"
+                  />
                 </CardContent>
               </Card>
 
@@ -913,7 +929,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {processingJobs.slice(0, 15).map((job) => (
+                    {paginate(processingJobs, processingJobsPage).map((job) => (
                       <TableRow key={job.id}>
                         <TableCell className="font-medium">
                           {job.job_type}
@@ -944,6 +960,12 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                     ))}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  page={processingJobsPage}
+                  total={processingJobs.length}
+                  onPageChange={setProcessingJobsPage}
+                  label="jobs"
+                />
               </CardContent>
             </Card>
           </TabsContent>

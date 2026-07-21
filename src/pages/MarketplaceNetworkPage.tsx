@@ -6,6 +6,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -35,6 +36,7 @@ const MarketplaceNetworkPage: React.FC = () => {
   const [einvoicing, setEinvoicing] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   // Workspaces the caller owns/admins → their direct children are editable.
   const ownedIds = useMemo(
@@ -42,6 +44,10 @@ const MarketplaceNetworkPage: React.FC = () => {
     [memberships],
   );
   const nameById = useMemo(() => Object.fromEntries(rows.map((r) => [r.id, r.name])), [rows]);
+  // The root workspace is the caller's own node, not a sub-workspace — it never lists.
+  const childRows = useMemo(() => rows.filter((r) => !r.is_root), [rows]);
+
+  useEffect(() => { setPage((p) => clampPage(p, childRows.length)); }, [childRows.length]);
 
   const load = async () => {
     setLoading(true);
@@ -141,10 +147,10 @@ const MarketplaceNetworkPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {rows.filter((r) => !r.is_root).length === 0 && (
+                {childRows.length === 0 && (
                   <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No sub-workspaces yet. Create one from the workspace switcher.</td></tr>
                 )}
-                {rows.filter((r) => !r.is_root).map((r) => {
+                {paginate(childRows, page).map((r) => {
                   const canEdit = editable(r);
                   const d = drafts[r.id] ?? {
                     catalog_access: r.catalog_access,
@@ -212,6 +218,7 @@ const MarketplaceNetworkPage: React.FC = () => {
             </table>
             </div>
           )}
+          {!loading && <TablePagination page={page} total={childRows.length} onPageChange={setPage} label="sub-workspaces" />}
         </CardContent>
       </Card>
       </div>

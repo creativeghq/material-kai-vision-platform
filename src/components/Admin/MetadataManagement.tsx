@@ -44,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import {
   Dialog,
   DialogContent,
@@ -127,7 +128,6 @@ export const MetadataManagement: React.FC = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
 
   useEffect(() => {
     loadMetadata();
@@ -261,11 +261,13 @@ export const MetadataManagement: React.FC = () => {
     return true;
   });
 
-  const totalPages = Math.ceil(filteredMetadata.length / itemsPerPage);
-  const paginatedMetadata = filteredMetadata.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
+  const paginatedMetadata = paginate(filteredMetadata, currentPage);
+
+  // Deleting a field reloads the list — clamp so the last row on the last page
+  // doesn't leave an empty table behind.
+  useEffect(() => {
+    setCurrentPage((p) => clampPage(p, filteredMetadata.length));
+  }, [filteredMetadata.length]);
 
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 0.9) {
@@ -563,7 +565,7 @@ export const MetadataManagement: React.FC = () => {
           <CardContent>
             {loading ? (
               <div className="text-center py-8 text-gray-500">Loading metadata...</div>
-            ) : paginatedMetadata.length === 0 ? (
+            ) : filteredMetadata.length === 0 ? (
               <div className="text-center py-8 text-gray-500">No metadata found</div>
             ) : (
               <>
@@ -611,31 +613,13 @@ export const MetadataManagement: React.FC = () => {
                   </TableBody>
                 </Table>
 
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="text-sm text-gray-600">
-                      Page {currentPage} of {totalPages}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <TablePagination
+                  page={currentPage}
+                  total={filteredMetadata.length}
+                  onPageChange={setCurrentPage}
+                  label="fields"
+                  className="-mx-6 mt-4 px-6"
+                />
               </>
             )}
           </CardContent>

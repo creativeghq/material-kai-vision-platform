@@ -16,6 +16,7 @@ import {
 } from '@/services/marketplaceService';
 import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
 
@@ -41,6 +42,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const [fQtyMin, setFQtyMin] = useState('');
   const [fQtyMax, setFQtyMax] = useState('');
   const [fLocation, setFLocation] = useState('');
+  const [page, setPage] = useState(1);
 
   const units = useMemo(() => Array.from(new Set(items.map((i) => i.unit))).sort(), [items]);
   const visibleItems = useMemo(() => {
@@ -60,6 +62,11 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       return true;
     });
   }, [items, listings, fSearch, fUnit, fLowOnly, fListed, fQtyMin, fQtyMax, fLocation]);
+
+  // Any filter change (or switching warehouse) is a new result set; deleting/transferring an
+  // item shrinks the current one. Both must leave the table on a page that still has rows.
+  useEffect(() => { setPage(1); }, [selectedWh, fSearch, fUnit, fLowOnly, fListed, fQtyMin, fQtyMax, fLocation]);
+  useEffect(() => { setPage((p) => clampPage(p, visibleItems.length)); }, [visibleItems.length]);
 
   const load = async (whId?: string) => {
     setLoading(true);
@@ -208,7 +215,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
               {items.length > 0 && visibleItems.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No items match the filters.</td></tr>
               )}
-              {visibleItems.map((it) => {
+              {paginate(visibleItems, page).map((it) => {
                 const low = it.qty_on_hand <= it.reorder_point && it.reorder_point > 0;
                 const listed = listings[it.id];
                 const available = it.qty_on_hand - it.qty_reserved;
@@ -260,6 +267,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
             </tbody>
           </table>
         )}
+        {!loading && <TablePagination page={page} total={visibleItems.length} onPageChange={setPage} label="items" />}
       </CardContent>
 
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} workspaceId={workspaceId} warehouseId={selectedWh} onAdded={async () => { setAddOpen(false); await load(); }} />

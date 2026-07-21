@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type Punch, type TimesheetRow } from '../services/hrService';
 import { EmptyState } from './_shared';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const daysAgoISO = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
@@ -29,10 +30,12 @@ export function PunchHistoryDialog({ workspaceId, employeeId, name, onChanged }:
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [add, setAdd] = useState<{ type: 'arrival' | 'departure'; at: string }>({ type: 'arrival', at: '' });
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const r = await hrService.listPunches(workspaceId, { employee_id: employeeId, from: daysAgoISO(30), to: todayISO() }); setPunches(r.punches); }
+    // Deleting a punch can empty the last page — re-clamp on every reload.
+    try { const r = await hrService.listPunches(workspaceId, { employee_id: employeeId, from: daysAgoISO(30), to: todayISO() }); setPunches(r.punches); setPage((p) => clampPage(p, r.punches.length)); }
     catch (e) { toast({ title: 'Failed to load punches', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, employeeId, toast]);
@@ -77,8 +80,9 @@ export function PunchHistoryDialog({ workspaceId, employeeId, name, onChanged }:
         {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> : punches.length === 0 ? (
           <EmptyState icon={Clock} title="No punches in the last 30 days" />
         ) : (
+          <>
           <div className="divide-y divide-border/40">
-            {punches.map((p) => (
+            {paginate(punches, page).map((p) => (
               <div key={p.id} className="flex items-center gap-2 py-2 text-sm">
                 <Badge variant={p.punch_type === 'arrival' ? 'default' : 'secondary'} className="w-14 justify-center">{p.punch_type === 'arrival' ? 'In' : 'Out'}</Badge>
                 <input type="datetime-local" defaultValue={toLocalInput(p.punched_at)} onBlur={(e) => { const v = e.target.value; if (v && new Date(v).toISOString() !== p.punched_at) editTime(p, v); }}
@@ -90,6 +94,8 @@ export function PunchHistoryDialog({ workspaceId, employeeId, name, onChanged }:
               </div>
             ))}
           </div>
+          <TablePagination page={page} total={punches.length} onPageChange={setPage} label="punches" className="px-0" />
+          </>
         )}
       </DialogContent>
     </Dialog>
@@ -104,10 +110,12 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
   const [to, setTo] = useState(todayISO());
   const [rows, setRows] = useState<TimesheetRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
 
   const run = useCallback(async () => {
     setLoading(true);
-    try { const r = await hrService.timesheet(workspaceId, from, to); setRows(r.timesheet); }
+    // A new date range is a fresh result set.
+    try { const r = await hrService.timesheet(workspaceId, from, to); setRows(r.timesheet); setPage(1); }
     catch (e) { toast({ title: 'Failed to build timesheet', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, from, to, toast]);
@@ -137,10 +145,11 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
         {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> : rows.length === 0 ? (
           <EmptyState icon={CalendarRange} title="No data for this range" />
         ) : (
+          <>
           <Table>
             <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Days worked</TableHead><TableHead className="text-right">Total hours</TableHead></TableRow></TableHeader>
             <TableBody>
-              {rows.map((r) => (
+              {paginate(rows, page).map((r) => (
                 <TableRow key={r.employee_id}>
                   <TableCell className="font-medium">{r.name}{r.open && <span className="ml-2 text-xs text-amber-500" title="Has an unmatched clock-in">open</span>}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{r.days.length}</TableCell>
@@ -149,6 +158,8 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
               ))}
             </TableBody>
           </Table>
+          <TablePagination page={page} total={rows.length} onPageChange={setPage} label="employees" className="px-0" />
+          </>
         )}
       </DialogContent>
     </Dialog>
