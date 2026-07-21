@@ -50,6 +50,10 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
   const [isAddon, setIsAddon] = useState(false);
   const [productId, setProductId] = useState<string>('');
   const [summary, setSummary] = useState('');
+  // Credit disclosure shown on the tenant module card. Operator-authored: per-operation credit
+  // costs live as hardcoded constants across the TS/Python services and aren't derivable per-module.
+  const [consumesCredits, setConsumesCredits] = useState(false);
+  const [creditNote, setCreditNote] = useState('');
   // #256 — one-click "create & attach" a Stripe product so the operator never leaves the app.
   const [creating, setCreating] = useState(false);
   const [newAmount, setNewAmount] = useState(''); // major units, e.g. "9.00"
@@ -67,6 +71,8 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
       setIsAddon(!!mod?.is_addon);
       setProductId(mod?.addon_stripe_product_id ?? '');
       setSummary(mod?.summary ?? '');
+      setConsumesCredits(!!mod?.consumes_credits);
+      setCreditNote(mod?.credit_note ?? '');
       if (prErr) {
         toast({ title: 'Could not load Stripe products', description: 'Check the Stripe key at Payments → Keys.', variant: 'destructive' });
         setProducts([]);
@@ -107,12 +113,18 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
 
   const save = async () => {
     setSaving(true);
+    // Mirror the bound price's INTERVAL, not just its amount — the tenant card renders "/mo" vs
+    // "/yr" from this. Without it a yearly add-on advertised itself as monthly.
+    const interval = selected?.price?.interval === 'year' ? 'year' : 'month';
     const payload = {
       is_addon: isAddon,
       addon_stripe_product_id: isAddon ? (productId || null) : null,
       addon_price_cents: isAddon ? (selected?.price?.unit_amount ?? null) : null,
       addon_currency: isAddon ? (selected?.price?.currency ?? 'eur') : 'eur',
+      billing_interval: isAddon && selected?.price ? interval : null,
       summary: summary || null,
+      consumes_credits: consumesCredits,
+      credit_note: consumesCredits ? (creditNote.trim() || null) : null,
     };
     const { error } = await supabase.from('modules').update(payload).eq('slug', slug);
     setSaving(false);
@@ -202,6 +214,25 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
             <div className="space-y-2">
               <Label>Catalog summary (optional)</Label>
               <Input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One line shown on the activation card" />
+            </div>
+
+            {/* Credit disclosure — a metered module costs more than its subscription fee, and the
+                tenant has no other way to find that out before enabling it. */}
+            <div className="space-y-2 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Also uses credits</Label>
+                  <p className="text-xs text-muted-foreground">Shown as a chip on the tenant&apos;s module card.</p>
+                </div>
+                <Switch checked={consumesCredits} onCheckedChange={setConsumesCredits} />
+              </div>
+              {consumesCredits && (
+                <Input
+                  value={creditNote}
+                  onChange={(e) => setCreditNote(e.target.value)}
+                  placeholder="e.g. ~15 credits per LLM visibility probe"
+                />
+              )}
             </div>
           </div>
         )}

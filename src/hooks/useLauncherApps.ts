@@ -138,7 +138,7 @@ export function useLauncherApps(): LauncherApi {
         description: cat?.summary || cat?.description || i.description || undefined,
         active,
         isAddon: cat?.is_addon,
-        priceLabel: cat?.is_addon ? (formatAddonPrice(cat.addon_price_cents, cat.addon_currency) || undefined) : undefined,
+        priceLabel: cat?.is_addon ? (formatAddonPrice(cat.addon_price_cents, cat.addon_currency, cat.billing_interval) || undefined) : undefined,
         hub: i.hub,
       };
     };

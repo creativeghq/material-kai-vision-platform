@@ -28,6 +28,19 @@ export interface ModuleCatalogRow {
   addon_currency: string | null;
   addon_stripe_product_id: string | null;
   screenshot_url: string | null;
+  /** Display mirror of the bound Stripe price interval. NULL when no product is bound. */
+  billing_interval: 'month' | 'year' | null;
+  /** True when the module also debits credits per operation, on top of any subscription fee. */
+  consumes_credits: boolean;
+  /** Operator-authored credit disclosure, e.g. "~15 credits per LLM visibility probe". */
+  credit_note: string | null;
+}
+
+/** Live Stripe subscription state for one workspace add-on. */
+export interface ModuleSubscriptionRow {
+  module_slug: string;
+  status: string;
+  current_period_end: string | null;
 }
 
 export interface ActivateResult {
@@ -102,11 +115,34 @@ export async function deactivateModule(
   return (data ?? {}) as { status?: string; deactivated?: boolean };
 }
 
-/** Format an add-on price like "€19/mo" from cents + currency. */
-export function formatAddonPrice(cents: number | null, currency: string | null): string | null {
+/**
+ * Live Stripe subscription rows for the workspace's paid add-ons, keyed by module slug.
+ * This is what makes the tenant card able to say "renews 21 Aug" / "cancels 21 Aug" /
+ * "payment failed" instead of a flat "Active".
+ */
+export async function fetchModuleSubscriptions(workspaceId: string): Promise<Map<string, ModuleSubscriptionRow>> {
+  const { data, error } = await supabase
+    .from('workspace_module_subscriptions')
+    .select('module_slug, status, current_period_end')
+    .eq('workspace_id', workspaceId);
+  // Non-fatal: the card degrades to the plain Active state rather than failing the whole tab.
+  if (error) return new Map();
+  return new Map((data ?? []).map((r) => [r.module_slug, r as ModuleSubscriptionRow]));
+}
+
+/**
+ * Format an add-on price like "€19/mo" or "€190/yr". The interval comes from the bound Stripe
+ * product's default price (mirrored onto `modules.billing_interval`) — it is NOT assumed monthly,
+ * which is what previously made a yearly add-on advertise itself as "/mo".
+ */
+export function formatAddonPrice(
+  cents: number | null,
+  currency: string | null,
+  interval?: 'month' | 'year' | null,
+): string | null {
   if (cents == null) return null;
   const symbol = (currency || 'eur').toLowerCase() === 'eur' ? '€'
     : (currency || '').toLowerCase() === 'usd' ? '$' : `${(currency || '').toUpperCase()} `;
   const amount = cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
-  return `${symbol}${amount}/mo`;
+  return `${symbol}${amount}/${interval === 'year' ? 'yr' : 'mo'}`;
 }

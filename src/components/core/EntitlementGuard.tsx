@@ -60,7 +60,7 @@ export const EntitlementGuard: React.FC<Props> = ({ moduleSlug, moduleName, chil
   const label = moduleName ?? mod?.name ?? moduleSlug;
   const tier = tierOf(moduleSlug);
   const isOwner = workspaceRole === 'owner' || isPlatformOperator;
-  const price = mod?.is_addon ? formatAddonPrice(mod.addon_price_cents, mod.addon_currency) : null;
+  const price = mod?.is_addon ? formatAddonPrice(mod.addon_price_cents, mod.addon_currency, mod.billing_interval) : null;
 
   const onBuy = async () => {
     if (!activeWorkspaceId) return;

@@ -382,6 +382,9 @@ async function createAddonProduct(auth: AuthResult, body: Record<string, unknown
       addon_stripe_product_id: product.id,
       addon_price_cents: amountCents,
       addon_currency: currency,
+      // Mirror the interval so the tenant card renders "/yr" for a yearly product instead of
+      // unconditionally advertising "/mo".
+      billing_interval: interval,
     })
     .eq('slug', moduleSlug);
   if (updErr) {

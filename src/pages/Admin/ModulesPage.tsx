@@ -15,7 +15,13 @@ import { MIVAA_API_URL } from '@/config/mivaa';
 import { ModuleBillingDialog } from './ModuleBillingDialog';
 import { formatAddonPrice } from '@/services/moduleActivationService';
 
-interface BillingInfo { is_addon: boolean; addon_price_cents: number | null; addon_currency: string | null }
+interface BillingInfo {
+  is_addon: boolean;
+  addon_price_cents: number | null;
+  addon_currency: string | null;
+  /** Mirrored Stripe price interval — without it a yearly add-on renders as "/mo". */
+  billing_interval: 'month' | 'year' | null;
+}
 
 async function invalidateMivaaCache(): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -48,7 +54,12 @@ const ModulesPage: React.FC = () => {
     const { data } = await supabase.from('modules').select('*');
     const map = new Map<string, BillingInfo>();
     for (const r of (data ?? []) as (BillingInfo & { slug: string })[]) {
-      map.set(r.slug, { is_addon: !!r.is_addon, addon_price_cents: r.addon_price_cents, addon_currency: r.addon_currency });
+      map.set(r.slug, {
+        is_addon: !!r.is_addon,
+        addon_price_cents: r.addon_price_cents,
+        addon_currency: r.addon_currency,
+        billing_interval: r.billing_interval,
+      });
     }
     setBilling(map);
   }, []);
@@ -156,7 +167,7 @@ const ModulesPage: React.FC = () => {
             const enabled = enabledMap.get(manifest.slug) ?? false;
             const primaryRoute = routes[0]?.path;
             const bill = billing.get(manifest.slug);
-            const addonPrice = bill?.is_addon ? formatAddonPrice(bill.addon_price_cents, bill.addon_currency) : null;
+            const addonPrice = bill?.is_addon ? formatAddonPrice(bill.addon_price_cents, bill.addon_currency, bill.billing_interval) : null;
 
             return (
               <Card key={manifest.slug} className="dashboard-card">

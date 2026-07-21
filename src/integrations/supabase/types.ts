@@ -13810,6 +13810,9 @@ export type Database = {
       modules: {
         Row: {
           addon_currency: string
+          billing_interval: string | null
+          consumes_credits: boolean
+          credit_note: string | null
           addon_price_cents: number | null
           addon_stripe_product_id: string | null
           category: string | null
@@ -13829,6 +13832,9 @@ export type Database = {
         }
         Insert: {
           addon_currency?: string
+          billing_interval?: string | null
+          consumes_credits?: boolean
+          credit_note?: string | null
           addon_price_cents?: number | null
           addon_stripe_product_id?: string | null
           category?: string | null
@@ -13848,6 +13854,9 @@ export type Database = {
         }
         Update: {
           addon_currency?: string
+          billing_interval?: string | null
+          consumes_credits?: boolean
+          credit_note?: string | null
           addon_price_cents?: number | null
           addon_stripe_product_id?: string | null
           category?: string | null

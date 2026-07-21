@@ -6,7 +6,7 @@
 // costs and what happens if you click. Filter pills let the owner jump straight to what's
 // available to add vs. what's already running.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Check, Sparkles, Send, ArrowRight, Lock, LayoutGrid } from 'lucide-react';
+import { Loader2, Check, Sparkles, Send, ArrowRight, Lock, LayoutGrid, Coins } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -19,15 +19,30 @@ import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/core/ui/alert-dialog';
+import {
   fetchModuleCatalog,
   fetchActivatedSlugs,
+  fetchModuleSubscriptions,
   activateModule,
   deactivateModule,
   requestModule,
   formatAddonPrice,
   tierRank,
   type ModuleCatalogRow,
+  type ModuleSubscriptionRow,
 } from '@/services/moduleActivationService';
+
+/** "21 Aug 2026" — the renewal/cancellation date a cost line has to state to be honest. */
+function formatDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 // Tenant-facing modules to list here: registered modules that expose a workspace launcher entry
 // (Docs, …), the business surfaces moved into the App Launcher (surface:'app' with a moduleSlug —
@@ -56,6 +71,8 @@ interface ModuleTile {
   /** Purchasable right now (published add-on with a Stripe product). */
   purchasable: boolean;
   price: string | null;
+  /** Live Stripe subscription for this add-on, when the workspace has one. */
+  sub?: ModuleSubscriptionRow;
 }
 
 export const ModulesActivationTab: React.FC = () => {
@@ -66,10 +83,13 @@ export const ModulesActivationTab: React.FC = () => {
 
   const [catalog, setCatalog] = useState<ModuleCatalogRow[]>([]);
   const [activated, setActivated] = useState<Set<string>>(new Set());
+  const [subs, setSubs] = useState<Map<string, ModuleSubscriptionRow>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [requested, setRequested] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>('all');
+  /** Module pending cancellation confirmation — the dialog states the end date before acting. */
+  const [confirmCancel, setConfirmCancel] = useState<ModuleTile | null>(null);
 
   const isOwner = workspaceRole === 'owner' || isPlatformOperator;
 
@@ -77,12 +97,14 @@ export const ModulesActivationTab: React.FC = () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [cat, act] = await Promise.all([
+      const [cat, act, sub] = await Promise.all([
         fetchModuleCatalog(),
         fetchActivatedSlugs(activeWorkspaceId),
+        fetchModuleSubscriptions(activeWorkspaceId),
       ]);
       setCatalog(cat);
       setActivated(act);
+      setSubs(sub);
     } catch (e) {
       toast({ title: 'Could not load modules', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
     } finally {
@@ -121,11 +143,12 @@ export const ModulesActivationTab: React.FC = () => {
           isActivated,
           hasIt: covered || isActivated,
           purchasable: !!row.is_addon && !!row.addon_stripe_product_id,
-          price: formatAddonPrice(row.addon_price_cents, row.addon_currency),
+          price: formatAddonPrice(row.addon_price_cents, row.addon_currency, row.billing_interval),
+          sub: subs.get(row.slug),
         };
       })
       .sort((a, b) => a.row.name.localeCompare(b.row.name)),
-    [catalog, planLevel, activated, availableSlugs],
+    [catalog, planLevel, activated, availableSlugs, subs],
   );
 
   const counts = useMemo(() => ({
@@ -233,14 +256,31 @@ export const ModulesActivationTab: React.FC = () => {
   );
 
   const renderTile = (t: ModuleTile) => {
-    const { row: m, meta, covered, isActivated, hasIt, purchasable, price } = t;
+    const { row: m, meta, covered, isActivated, hasIt, purchasable, price, sub } = t;
     const Icon = meta.icon;
     const isBusy = busy === m.slug;
+    const periodEnd = formatDate(sub?.current_period_end);
+    const canceling = sub?.status === 'canceling' || sub?.status === 'cancelling';
 
-    // ── Status line (bottom-left): what the workspace has, in plain words. ──
+    // ── Cost line (bottom-left): what this actually costs, and what happens next. Driven by the
+    //    live Stripe subscription row so a cancelled-but-still-running add-on says so. ──
     let status: React.ReactNode;
     if (covered) {
       status = <span className="text-xs text-muted-foreground">Included in {planName}</span>;
+    } else if (hasIt && canceling) {
+      status = (
+        <span className="text-xs text-amber-500">
+          Cancels{periodEnd ? ` ${periodEnd}` : ' at period end'} — active until then
+        </span>
+      );
+    } else if (hasIt && sub?.status === 'past_due') {
+      status = <span className="text-xs text-destructive">Payment failed — update your card</span>;
+    } else if (hasIt && sub) {
+      status = (
+        <span className="text-xs text-emerald-500">
+          {price ?? 'Add-on'}{periodEnd ? ` · renews ${periodEnd}` : ''}
+        </span>
+      );
     } else if (hasIt) {
       status = <span className="text-xs text-emerald-500">Active add-on{price ? ` · ${price}` : ''}</span>;
     } else if (purchasable) {
@@ -257,8 +297,9 @@ export const ModulesActivationTab: React.FC = () => {
     // ── Action (bottom-right). ──
     let action: React.ReactNode;
     if (hasIt) {
-      const cancel = isOwner && isActivated && m.is_addon && !covered ? (
-        <Button size="sm" variant="ghost" className="text-muted-foreground" disabled={isBusy} onClick={() => handleDeactivate(m)}>
+      // Cancelling is destructive + billing-affecting → confirm with the end date first.
+      const cancel = isOwner && isActivated && m.is_addon && !covered && !canceling ? (
+        <Button size="sm" variant="ghost" className="text-muted-foreground" disabled={isBusy} onClick={() => setConfirmCancel(t)}>
           {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cancel'}
         </Button>
       ) : null;
@@ -321,6 +362,13 @@ export const ModulesActivationTab: React.FC = () => {
               </div>
               {meta.description && (
                 <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{meta.description}</p>
+              )}
+              {/* Credit disclosure — a subscription fee is not the whole cost for metered modules. */}
+              {m.consumes_credits && (
+                <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Coins className="h-3 w-3 shrink-0 text-amber-500" />
+                  <span className="truncate">{m.credit_note || 'Also uses credits per operation'}</span>
+                </div>
               )}
             </div>
           </div>
@@ -395,6 +443,37 @@ export const ModulesActivationTab: React.FC = () => {
           })}
         </>
       )}
+
+      {/* Unsubscribe confirmation — states the exact end date, because cancelling does NOT cut
+          access immediately (Stripe cancels at period end and the webhook revokes on delete). */}
+      <AlertDialog open={!!confirmCancel} onOpenChange={(o) => { if (!o) setConfirmCancel(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel {confirmCancel?.row.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const end = formatDate(confirmCancel?.sub?.current_period_end);
+                return end
+                  ? `Billing stops at the end of the current period. ${confirmCancel?.row.name} stays available until ${end}, then turns off for everyone in this workspace.`
+                  : `Billing stops at the end of the current period. ${confirmCancel?.row.name ?? 'The module'} stays available until then, then turns off for everyone in this workspace.`;
+              })()}
+              {' '}Your data is kept — you can re-activate later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = confirmCancel;
+                setConfirmCancel(null);
+                if (target) void handleDeactivate(target.row);
+              }}
+            >
+              Cancel subscription
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
