@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Loader2, CheckCircle2, AlertCircle, CreditCard, FileText } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, CreditCard, FileText, Landmark, Copy } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
@@ -23,12 +23,46 @@ interface PayInfo {
   deposit_amount: number | null;
   min_amount: number;
   max_amount: number;
+  providers: ProviderOption[];
+}
+
+interface ProviderOption {
+  slug: string;
+  label: string;
+  methods: Array<'card' | 'bank_reference'>;
+}
+
+/** One selectable way to pay = a (provider, method) pair. */
+interface PayOption {
+  key: string;
+  provider: string;
+  method: 'card' | 'bank_reference';
+  label: string;
+  hint: string;
+}
+
+function buildOptions(providers: ProviderOption[]): PayOption[] {
+  const out: PayOption[] = [];
+  for (const p of providers) {
+    for (const m of p.methods) {
+      out.push({
+        key: `${p.slug}:${m}`,
+        provider: p.slug,
+        method: m,
+        label: m === 'card' ? `Card — ${p.label}` : `Bank transfer — ${p.label}`,
+        hint: m === 'card'
+          ? 'Pay now by card. You will be redirected to a secure page.'
+          : 'Get a payment code to use in your banking app. No IBAN needed.',
+      });
+    }
+  }
+  return out;
 }
 
 const PayInvoicePage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [search] = useSearchParams();
-  const status = search.get('status'); // 'success' | 'cancelled' (redirect-back from Stripe)
+  const status = search.get('status'); // 'success' | 'cancelled' (redirect-back from the provider)
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<PayInfo | null>(null);
@@ -36,6 +70,10 @@ const PayInvoicePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [choice, setChoice] = useState<'deposit' | 'full' | 'custom'>('full');
   const [custom, setCustom] = useState<number | null>(null);
+  const [option, setOption] = useState<string | null>(null);
+  // Set when the buyer chose a bank-reference method: nothing to redirect to, we just
+  // show them the code to quote in their banking app.
+  const [bankRef, setBankRef] = useState<{ rf_code: string; amount: number; currency: string } | null>(null);
 
   // Load the document + payable options. No session, no side effects.
   useEffect(() => {
@@ -57,10 +95,15 @@ const PayInvoicePage: React.FC = () => {
           deposit_amount: res.deposit_amount ?? null,
           min_amount: Number(res.min_amount ?? 0),
           max_amount: Number(res.max_amount ?? 0),
+          providers: (res.providers ?? []) as ProviderOption[],
         };
         setInfo(next);
         setChoice(next.deposit_amount != null ? 'deposit' : 'full');
         setCustom(next.deposit_amount ?? next.amount_due);
+        // Preselect the first available way to pay, so a single-option seller behaves
+        // exactly as before (one click → straight to checkout, no extra chooser step).
+        const opts = buildOptions(next.providers);
+        setOption(opts[0]?.key ?? null);
       } catch (err: any) {
         setError(err?.message ?? 'Failed to resolve payment link');
       } finally {
@@ -88,15 +131,24 @@ const PayInvoicePage: React.FC = () => {
       setError(`That's more than the ${formatMoney(info.amount_due, info.currency)} outstanding.`);
       return;
     }
+    const picked = buildOptions(info.providers).find((o) => o.key === option);
     try {
       setBusy(true);
       setError(null);
       const res = await financeService.resolvePayToken(token, {
         amount,
+        provider: picked?.provider,
+        method: picked?.method,
         successUrl: `${window.location.origin}/pay/${token}?status=success`,
         cancelUrl: `${window.location.origin}/pay/${token}?status=cancelled`,
       });
       if (res.error) { setError(res.error); return; }
+      // Bank reference: no redirect — the buyer pays from their own banking app and
+      // settlement reaches us later by webhook.
+      if (res.payment_kind === 'bank_reference' && res.rf_code) {
+        setBankRef({ rf_code: res.rf_code, amount, currency: info.currency });
+        return;
+      }
       if (res.checkout_url) window.location.href = res.checkout_url;
       else setError('Could not start the checkout.');
     } catch (err: any) {
@@ -148,6 +200,42 @@ const PayInvoicePage: React.FC = () => {
     );
   }
 
+  // Bank-reference result: the customer now goes to their own banking app. There is no
+  // redirect and no "success" leg — the payment lands asynchronously.
+  if (bankRef) {
+    return shell(
+      <div>
+        <div className="text-center">
+          <Landmark className="mx-auto h-12 w-12 text-primary" />
+          <h1 className="mt-4 text-xl font-semibold">Pay by bank transfer</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Open your banking app, start a transfer of{' '}
+            <strong>{formatMoney(bankRef.amount, bankRef.currency)}</strong>, and paste this code
+            into the <strong>reference</strong> field. You don't need an IBAN.
+          </p>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4 text-center">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Payment code</p>
+          <p className="mt-1 font-mono text-lg font-semibold tracking-wider break-all">{bankRef.rf_code}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 rounded-full"
+            onClick={() => void navigator.clipboard.writeText(bankRef.rf_code)}
+          >
+            <Copy className="h-3.5 w-3.5 mr-2" /> Copy code
+          </Button>
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground text-center">
+          Transfer exactly this amount — banks reject a different one. Your invoice updates
+          automatically once the transfer clears, usually within one business day.
+        </p>
+      </div>,
+    );
+  }
+
   if (alreadyPaid) {
     return shell(
       <div className="text-center">
@@ -172,6 +260,8 @@ const PayInvoicePage: React.FC = () => {
 
   const partPaid = info.total > 0 && info.amount_due < info.total - 0.005;
   const canDeposit = info.deposit_amount != null;
+  const payOptions = buildOptions(info.providers);
+  const selected = payOptions.find((o) => o.key === option) ?? payOptions[0];
 
   return shell(
     <div className="space-y-5">
@@ -245,15 +335,60 @@ const PayInvoicePage: React.FC = () => {
         )}
       </div>
 
+      {/* Method chooser. Shown only when the seller genuinely offers more than one way
+          to pay — a single-option seller keeps the original one-click flow. */}
+      {payOptions.length > 1 && (
+        <div className="space-y-2">
+          <Label className="text-xs">How would you like to pay?</Label>
+          <div className="grid gap-2">
+            {payOptions.map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => setOption(o.key)}
+                className={`rounded-lg border px-3 py-2 text-sm text-left transition ${option === o.key ? 'border-primary bg-primary/10' : 'border-border/60 hover:bg-muted/40'}`}
+              >
+                <span className="flex items-center gap-2">
+                  {o.method === 'card'
+                    ? <CreditCard className="h-3.5 w-3.5 shrink-0" />
+                    : <Landmark className="h-3.5 w-3.5 shrink-0" />}
+                  {o.label}
+                </span>
+                <span className="block text-[11px] text-muted-foreground mt-0.5">{o.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-xs text-destructive">{error}</p>}
 
-      <Button className="w-full rounded-full" onClick={pay} disabled={busy}>
-        {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="h-4 w-4 mr-2" />}
-        Pay {formatMoney(chosenAmount() ?? 0, info.currency)}
-      </Button>
-      <p className="text-[11px] text-muted-foreground text-center">
-        Secure payment via Stripe. You&apos;ll be redirected to complete it.
-      </p>
+      {payOptions.length === 0 ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-center">
+          <p className="text-sm">Online payment isn&apos;t available yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The seller hasn&apos;t finished setting up a payment provider. Please contact
+            them to arrange payment.
+          </p>
+        </div>
+      ) : (
+        <>
+          <Button className="w-full rounded-full" onClick={pay} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              : selected?.method === 'bank_reference'
+                ? <Landmark className="h-4 w-4 mr-2" />
+                : <CreditCard className="h-4 w-4 mr-2" />}
+            {selected?.method === 'bank_reference'
+              ? `Get a code for ${formatMoney(chosenAmount() ?? 0, info.currency)}`
+              : `Pay ${formatMoney(chosenAmount() ?? 0, info.currency)}`}
+          </Button>
+          <p className="text-[11px] text-muted-foreground text-center">
+            {selected?.method === 'bank_reference'
+              ? `Secure payment via ${selected.label.split('—')[1]?.trim() || 'bank transfer'}. You'll get a code to use in your banking app.`
+              : `Secure payment via ${selected?.label.split('—')[1]?.trim() || 'our provider'}. You'll be redirected to complete it.`}
+          </p>
+        </>
+      )}
     </div>,
   );
 };

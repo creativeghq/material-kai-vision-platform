@@ -120,6 +120,7 @@ const ProjectInviteLandingPage = lazy(() => import('./modules/projects/pages/Inv
 const ProjectAcceptInvitePage = lazy(() => import('./modules/projects/pages/AcceptInvitePage').then(m => ({ default: m.AcceptInvitePage })));
 const PublicCatalogPage = lazy(() => import('./components/business/catalogs/PublicCatalogPage').then(m => ({ default: m.PublicCatalogPage })));
 const PayInvoicePage = lazy(() => import('./pages/PayInvoicePage'));
+const ProviderReturnPage = lazy(() => import('./pages/ProviderReturnPage'));
 const PublicAccountStatementPage = lazy(() => import('./pages/PublicAccountStatementPage'));
 const TripExpensesPage = lazy(() => import('./pages/TripExpensesPage'));
 const ClientPortalPage = lazy(() => import('./pages/ClientPortalPage'));
@@ -868,6 +869,9 @@ const App = () => (
 
                 {/* Public invoice payment (token-gated, no auth, no layout) */}
                 <Route path="/pay/:token" element={<PageErrorBoundary name="Pay invoice"><PayInvoicePage /></PageErrorBoundary>} />
+                {/* #273 — providers whose return URL is account-configured (Viva) land here
+                    with ?t=&s=; we map the order code back to the right invoice. */}
+                <Route path="/pay/return" element={<PageErrorBoundary name="Payment return"><ProviderReturnPage /></PageErrorBoundary>} />
 
                 {/* Public account statement (token + VAT/email gated, no auth, no layout) */}
                 <Route path="/statement/:token" element={<PageErrorBoundary name="Account statement"><PublicAccountStatementPage /></PageErrorBoundary>} />

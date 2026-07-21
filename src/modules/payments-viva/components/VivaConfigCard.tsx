@@ -97,6 +97,14 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
     toast({ title: 'Webhook URL copied' });
   };
 
+  // Where Viva sends the customer after checkout. Configured per payment source in
+  // their dashboard (Viva has no per-call return URL), so it's the same for everyone.
+  const returnUrl = `${window.location.origin}/pay/return`;
+  const copyReturnUrl = async () => {
+    await navigator.clipboard.writeText(returnUrl);
+    toast({ title: 'Return URL copied' });
+  };
+
   const toggleMethod = (method: VivaMethod, on: boolean) => {
     const current = new Set(status?.methods ?? ['card']);
     if (on) current.add(method); else current.delete(method);
@@ -211,7 +219,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
               />
               <p className="text-[11px] text-muted-foreground">
                 Case-sensitive. Your customer's return URL is configured on this source in
-                Viva, not by us.
+                Viva, not by us — see below.
               </p>
             </div>
             <div className="space-y-1.5">
@@ -233,10 +241,32 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
           </Button>
         </div>
 
-        {/* Step 2 — the manual webhook registration */}
+        {/* Step 1b — the source's return URLs */}
+        <div className="space-y-2 border-t border-white/8 pt-5">
+          <p className="text-sm font-medium">2. Set your payment source's return URL</p>
+          <p className="text-xs text-muted-foreground">
+            Viva sends customers back to the URL on your <strong>payment source</strong>, not
+            one we can pass per payment. Set both the success and failure URL of the{' '}
+            <code className="text-[11px]">{sourceCode || 'Default'}</code> source to:
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-[11px] bg-muted/40 rounded px-2 py-1.5 truncate">
+              {returnUrl}
+            </code>
+            <Button variant="outline" size="sm" onClick={() => void copyReturnUrl()}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Viva appends the order reference, which is how we land the customer back on the
+            right invoice.
+          </p>
+        </div>
+
+        {/* Step 3 — the manual webhook registration */}
         <div className="space-y-3 border-t border-white/8 pt-5">
           <p className="text-sm font-medium flex items-center gap-2">
-            2. Register the webhook in Viva
+            3. Register the webhook in Viva
             {webhookReady ? (
               <Badge variant="outline" className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -291,7 +321,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
 
         {/* Step 3 — methods + go live */}
         <div className="space-y-3 border-t border-white/8 pt-5">
-          <p className="text-sm font-medium">3. Payment methods</p>
+          <p className="text-sm font-medium">4. Payment methods</p>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm">Card (Smart Checkout)</p>
@@ -324,7 +354,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
               <p className="text-xs text-muted-foreground">
                 {fullyConnected
                   ? 'Buyers can pay with Viva on your invoices.'
-                  : 'Finish steps 1 and 2 before enabling.'}
+                  : 'Finish steps 1–3 before enabling.'}
               </p>
             </div>
             <Switch

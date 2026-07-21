@@ -5,6 +5,9 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+// #273 — multi-provider dispatch. Every gate (published ∧ entitled ∧ configured) is
+// re-checked server-side at charge time; the client only expresses an intent.
+import { dispatchToProvider, resolveWorkspacePaymentProviders } from '../_shared/payments/registry.ts';
 
 // Sales/Finance — create a Stripe Checkout session for an invoice.
 //
@@ -35,6 +38,26 @@ interface PublicBody {
   info_only?: boolean;
   /** Requested amount (deposit / part payment). Clamped server-side to [min, amount_due]. */
   amount?: number;
+  /**
+   * Which provider to charge with. Defaults to 'stripe' so every existing caller
+   * (storefront, statement, the pay page) is unchanged. Re-validated server-side
+   * against published ∧ entitled ∧ configured — never trusted as given.
+   */
+  provider?: string;
+  /** 'card' (hosted redirect) or 'bank_reference' (Viva RF code). Defaults to 'card'. */
+  method?: 'card' | 'bank_reference';
+}
+
+/**
+ * Viva return leg. Viva takes the customer's success/failure URL from the payment SOURCE
+ * configured in the merchant's dashboard — it cannot be set per call — and returns them
+ * with `?t={transactionId}&s={orderCode}`. This mode maps that orderCode back to the
+ * invoice's pay link so the app can land the customer on the right page.
+ */
+interface OrderReturnBody {
+  /** Viva's orderCode. ALWAYS a string: it is int64 and overflows JS Number. */
+  order_code: string;
+  provider?: string;
 }
 
 function json(body: any, status = 200): Response {
@@ -55,11 +78,11 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
   // Env-first / DB-fallback. No-op on subsequent requests (memoised).
   await bootstrapForFunction();
 
-  // Safety rail: payments require a configured provider. If STRIPE_SECRET_KEY
-  // is missing in BOTH env and platform_secrets, no provider can accept the
-  // invoice payment — canonical 503 routes the admin to the right settings.
+  // NOTE: we deliberately do NOT gate the whole function on Stripe being configured
+  // any more. Since #273 a workspace may collect via Viva (BYOK) with no platform
+  // Stripe key at all, so "no Stripe" is only fatal on the Stripe path itself —
+  // checked at the point of use below.
   const stripe = getStripe();
-  if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -67,7 +90,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 
-  let body: AdminBody | PublicBody;
+  let body: AdminBody | PublicBody | OrderReturnBody;
   try {
     body = await req.json();
   } catch {
@@ -76,11 +99,45 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
 
   const isAdminMode = 'invoice_id' in body && body.invoice_id;
   const isPublicMode = 'pay_token' in body && body.pay_token;
-  if (!isAdminMode && !isPublicMode) {
-    return json({ error: 'Provide invoice_id (admin) or pay_token (public)' }, 400);
+  const isOrderReturnMode = 'order_code' in body && body.order_code;
+  if (!isAdminMode && !isPublicMode && !isOrderReturnMode) {
+    return json({ error: 'Provide invoice_id (admin), pay_token (public), or order_code (provider return)' }, 400);
   }
 
   try {
+    // ─── Provider return leg (public, no token) ────────────────────────
+    // Resolves a provider order code → the invoice's pay link. Deliberately narrow:
+    // it returns only the pay token + a coarse status, never invoice contents, because
+    // an orderCode is guessable-ish and unauthenticated. The pay page then re-resolves
+    // the token through the usual guarded RPC to render anything.
+    if (isOrderReturnMode) {
+      const orb = body as OrderReturnBody;
+      const { data: intent } = await supabase
+        .from('invoice_payment_intents')
+        .select('invoice_id, status, method')
+        .eq('provider', orb.provider || 'viva')
+        .eq('provider_order_code', String(orb.order_code))
+        .maybeSingle();
+
+      if (!intent) return json({ error: 'unknown order' }, 404);
+
+      const { data: inv } = await supabase
+        .from('invoices')
+        .select('id, pay_token, status')
+        .eq('id', intent.invoice_id)
+        .maybeSingle();
+
+      if (!inv?.pay_token) return json({ error: 'unknown order' }, 404);
+
+      return json({
+        ok: true,
+        pay_token: inv.pay_token,
+        pay_link: `${publicAppUrl().replace(/\/$/, '')}/pay/${inv.pay_token}`,
+        intent_status: intent.status,
+        invoice_status: inv.status,
+      });
+    }
+
     // ─── Authenticated path (admin OR customer-self) ───────────────────
     if (isAdminMode) {
       const wantsLinkOnly = (body as AdminBody).link_only === true;
@@ -144,6 +201,9 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
         payLink = `${publicAppUrl().replace(/\/$/, '')}/pay/${token}`;
         return json({ ok: true, pay_link: payLink, pay_token: token, invoice_id: inv.id });
       }
+
+      // This branch creates a Stripe session directly, so Stripe specifically must exist.
+      if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
       // #182 route funds to the workspace's connected Stripe account when configured.
       const { data: destAcct } = await supabase.rpc('get_workspace_payout_account', { p_workspace_id: inv.workspace_id });
@@ -230,6 +290,15 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     const minAmount = Math.max(depositAmount ?? amountDue, MIN_CHARGE);
 
     if (pb.info_only) {
+      // Which providers can this seller actually charge with right now?
+      // `configuredOnly` matters on a customer-facing surface: a buyer must never be
+      // offered a method that cannot take their money.
+      const available = await resolveWorkspacePaymentProviders(supabase, row.workspace_id, {
+        configuredOnly: true,
+      });
+      // Stripe is only genuinely available if the platform key exists too.
+      const providers = available.filter((p) => p.slug !== 'stripe' || !!stripe);
+
       return json({
         ok: true,
         info: true,
@@ -245,6 +314,14 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
         deposit_amount: depositAmount,
         min_amount: Math.min(minAmount, amountDue),
         max_amount: amountDue,
+        // The pay page renders a method chooser from this. One entry with one method
+        // → it keeps the existing auto-redirect fast path (storefront/statement UX
+        // must not regress).
+        providers: providers.map((p) => ({
+          slug: p.slug,
+          label: p.label,
+          methods: p.methods,
+        })),
       });
     }
 
@@ -266,47 +343,67 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       ? `Deposit — ${docLabel} ${row.internal_number}`
       : `${docLabel} ${row.internal_number}`;
 
-    const { data: destAcctPublic } = row.workspace_id
-      ? await supabase.rpc('get_workspace_payout_account', { p_workspace_id: row.workspace_id })
-      : { data: null };
+    // ── Provider dispatch ────────────────────────────────────────────────
+    // Every gate is re-checked here, at the moment money is about to move: the
+    // client-supplied provider slug is an intent, never an authorisation.
+    const providerSlug = pb.provider || 'stripe';
+    const method = pb.method || 'card';
+    const currency = String(row.currency || 'EUR').toUpperCase();
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [
-        {
-          price_data: {
-            currency: String(row.currency || 'eur').toLowerCase(),
-            product_data: { name: lineName },
-            unit_amount: Math.round(chargeAmount * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      payment_intent_data: {
-        ...(destAcctPublic ? { transfer_data: { destination: destAcctPublic as string } } : {}),
-        metadata: {
-          type: 'invoice_payment',
-          invoice_id: row.invoice_id,
-          workspace_id: row.workspace_id,
-          internal_number: row.internal_number,
-        },
-      },
-      success_url: pb.success_url || `${publicAppUrl()}/pay/${pb.pay_token}?status=success`,
-      cancel_url: pb.cancel_url || `${publicAppUrl()}/pay/${pb.pay_token}?status=cancelled`,
+    const dispatch = await dispatchToProvider(supabase, row.workspace_id, providerSlug, currency);
+    if (!dispatch.ok) {
+      // 503 for "seller hasn't finished setup", 400 for a bad request.
+      const status = dispatch.code === 'not_configured' || dispatch.code === 'not_published' ? 503 : 400;
+      return json({ error: dispatch.error, code: dispatch.code }, status);
+    }
+    if (providerSlug === 'stripe' && !stripe) return noPaymentProviderResponse(corsHeaders);
+    if (!dispatch.provider.methods.includes(method)) {
+      return json({ error: `${dispatch.provider.label} does not support ${method}`, code: 'method_unsupported' }, 400);
+    }
+
+    let charge;
+    try {
+      charge = await dispatch.provider.createCharge({
+        invoiceId: row.invoice_id,
+        amount: chargeAmount,
+        currency,
+        description: lineName,
+        invoiceNumber: row.internal_number,
+        method,
+        successUrl: pb.success_url || `${publicAppUrl()}/pay/${pb.pay_token}?status=success`,
+        cancelUrl: pb.cancel_url || `${publicAppUrl()}/pay/${pb.pay_token}?status=cancelled`,
+      }, dispatch.ctx!);
+    } catch (err: any) {
+      console.error(`[finance-pay-invoice] ${providerSlug} createCharge failed`, err);
+      return json({ error: err?.message ?? 'the payment provider rejected the request', code: 'provider_error' }, 502);
+    }
+
+    // Record the intent so the webhook can map the provider's order code back to THIS
+    // invoice without trusting anything the provider sends us about identity.
+    await supabase.from('invoice_payment_intents').insert({
+      workspace_id: row.workspace_id,
+      invoice_id: row.invoice_id,
+      provider: providerSlug,
+      method,
+      amount: chargeAmount,
+      currency,
+      provider_order_code: charge.orderCode,
+      rf_code: charge.kind === 'bank_reference' ? charge.rfCode : null,
+      status: 'pending',
     });
 
-    await supabase
-      .from('invoices')
-      .update({
-        stripe_payment_intent_id: typeof session.payment_intent === 'string' ? session.payment_intent : null,
-        stripe_checkout_session_id: session.id,
-      })
-      .eq('id', row.invoice_id);
+    // Legacy Stripe columns on the invoice — kept for existing reporting.
+    if (providerSlug === 'stripe' && charge.kind === 'redirect') {
+      await supabase
+        .from('invoices')
+        .update({ stripe_checkout_session_id: charge.orderCode })
+        .eq('id', row.invoice_id);
+    }
 
-    return json({
+    const common = {
       ok: true,
-      checkout_url: session.url,
-      session_id: session.id,
+      provider: providerSlug,
+      method,
       invoice_id: row.invoice_id,
       internal_number: row.internal_number,
       amount: chargeAmount,
@@ -314,6 +411,26 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       partial: isPartial,
       currency: row.currency,
       customer_display: row.customer_display,
+    };
+
+    if (charge.kind === 'bank_reference') {
+      // Nothing to redirect to: the buyer pays from their own banking app quoting the
+      // RF code, and settlement arrives later via webhook.
+      return json({
+        ...common,
+        payment_kind: 'bank_reference',
+        rf_code: charge.rfCode,
+        order_code: charge.orderCode,
+      });
+    }
+
+    return json({
+      ...common,
+      payment_kind: 'redirect',
+      checkout_url: charge.url,
+      // `session_id` kept for back-compat with existing Stripe callers.
+      session_id: charge.orderCode,
+      order_code: charge.orderCode,
     });
   } catch (err: any) {
     console.error('finance-pay-invoice error', err);

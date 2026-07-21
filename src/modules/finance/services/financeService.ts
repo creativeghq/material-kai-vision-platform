@@ -2479,11 +2479,23 @@ const _financeServiceV2 = {
       infoOnly?: boolean;
       /** Requested amount (deposit / part payment). Re-validated + clamped server-side. */
       amount?: number;
+      /** #273 — which provider to charge with. Defaults server-side to 'stripe'. */
+      provider?: string;
+      /** 'card' (hosted redirect) or 'bank_reference' (Viva RF code). Defaults to 'card'. */
+      method?: 'card' | 'bank_reference';
     } = {},
   ): Promise<{
     ok: boolean;
     info?: boolean;
     checkout_url?: string;
+    /** Providers the seller can actually charge with (info_only responses). */
+    providers?: Array<{ slug: string; label: string; methods: Array<'card' | 'bank_reference'> }>;
+    provider?: string;
+    /** 'redirect' → follow checkout_url; 'bank_reference' → show rf_code. */
+    payment_kind?: 'redirect' | 'bank_reference';
+    rf_code?: string;
+    order_code?: string;
+    code?: string;
     invoice_id?: string;
     internal_number?: string;
     amount?: number;
@@ -2508,7 +2520,29 @@ const _financeServiceV2 = {
         cancel_url: opts.cancelUrl,
         ...(opts.infoOnly ? { info_only: true } : {}),
         ...(opts.amount != null ? { amount: opts.amount } : {}),
+        ...(opts.provider ? { provider: opts.provider } : {}),
+        ...(opts.method ? { method: opts.method } : {}),
       },
+    });
+    if (error) throw await edgeError(error);
+    return data as any;
+  },
+
+  /**
+   * #273 — resolve a provider order code back to the invoice's pay link.
+   *
+   * Viva takes the customer's return URL from the payment SOURCE configured in the
+   * merchant's dashboard (it cannot be set per call) and sends them back with
+   * `?t={transactionId}&s={orderCode}`. This maps that orderCode to the pay page.
+   *
+   * `orderCode` is int64 and overflows JS Number — it must stay a STRING the whole way.
+   */
+  async resolveProviderOrder(
+    orderCode: string,
+    provider = 'viva',
+  ): Promise<{ ok: boolean; pay_token?: string; pay_link?: string; intent_status?: string; invoice_status?: string; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
+      body: { order_code: String(orderCode), provider },
     });
     if (error) throw await edgeError(error);
     return data as any;
