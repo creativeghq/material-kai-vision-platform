@@ -313,8 +313,8 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
           </div>
           {!webhookReady && (
             <p className="text-[11px] text-muted-foreground">
-              This turns green automatically the first time Viva sends us anything for your
-              merchant account — a test payment on demo is the quickest way to confirm it.
+              This turns green as soon as Viva's <strong>Verify</strong> step reaches us —
+              press Verify in Viva, then press Check status here.
             </p>
           )}
         </div>

@@ -122,6 +122,19 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
       return json({ error: 'could not fetch the verification key from Viva' }, 502);
     }
 
+    // Stamp the registration here, not on the first delivery.
+    //
+    // This GET *is* Viva's "Verify" step: their dashboard calls it while the merchant
+    // registers the URL, so answering it correctly is the proof that registration
+    // happened. Waiting for a real POST instead would deadlock setup — the switch that
+    // lets a tenant offer Viva requires webhook_verified_at, a delivery only follows a
+    // payment, and a payment needs the switch on.
+    await db
+      .from('workspace_viva_config')
+      .update({ webhook_verified_at: new Date().toISOString() })
+      .eq('workspace_id', workspaceId)
+      .is('webhook_verified_at', null);
+
     // Echo Viva's own casing back rather than hardcoding it — merchant docs show
     // {"Key":...} while the ISV schema shows {"key":...}.
     const payload = await res.json();
