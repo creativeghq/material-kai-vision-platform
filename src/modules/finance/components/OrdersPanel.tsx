@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Check, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -1488,8 +1488,23 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                   </span>
                   <Input className="h-8 w-28 text-right text-sm" type="text" inputMode="decimal" placeholder="0.00" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
                   <span className="text-xs text-muted-foreground">{order.currency}</span>
-                  <Button size="sm" onClick={recordPay} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (editingPaymentId ? 'Update' : 'Save')}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setPayOpen(false); setEditingPaymentId(null); }}>Cancel</Button>
+                  {/* Icon-only confirm/dismiss — the row is already dense with inputs, so two
+                      more word-buttons read as further fields rather than as the actions. */}
+                  <Button
+                    size="icon" className="h-8 w-8 rounded-full" onClick={recordPay} disabled={saving}
+                    title={editingPaymentId ? 'Update payment' : 'Save payment'}
+                    aria-label={editingPaymentId ? 'Update payment' : 'Save payment'}
+                  >
+                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    size="icon" variant="ghost"
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => { setPayOpen(false); setEditingPaymentId(null); }}
+                    title="Cancel" aria-label="Cancel"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
                 {/* Money out: which supplier we're paying (so it registers against them) + a reason. */}
                 {payDir === 'out' && (

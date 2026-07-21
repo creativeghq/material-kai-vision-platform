@@ -84,7 +84,8 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
   { value: 'doc_credit_notes', type: 'credit_notes', label: 'Credit notes', icon: FileMinus },
   { value: 'doc_payments', type: 'payments', label: 'Payments', icon: Banknote },
   { value: 'doc_expenses', type: 'expenses', label: 'Expenses', icon: ArrowUpCircle },
-  { value: 'doc_dispatch', type: 'dispatch', label: 'Dispatch board', icon: PackageCheck },
+  // Dispatch board lives in the Warehouse module (it's a loading/fulfilment surface, not a
+  // finance document). Reachable from the WH shortcut at the top of this sidebar.
   { value: 'doc_delivery', type: 'delivery_notes', label: 'Delivery notes', icon: Truck },
   { value: 'doc_cheques', type: 'cheques', label: 'Cheques', icon: FileSignature },
 ];
@@ -422,13 +423,27 @@ const FinancePage: React.FC = () => {
 
         <Tabs value={activeTab} onValueChange={onTabChange} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+            {/* Shortcuts out of Finance into the two operational surfaces — icon-only so they
+                read as jump-offs, not as tabs of this page. */}
             {!isAccountant && (
-              <Link
-                to="/pos"
-                className="flex w-full items-center justify-start rounded-md px-3 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
-              >
-                <Receipt className="h-4 w-4 mr-2" /> Point of Sale
-              </Link>
+              <div className="flex w-full items-center gap-1">
+                <Link
+                  to="/pos"
+                  title="Point of Sale"
+                  aria-label="Point of Sale"
+                  className="flex h-9 flex-1 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary transition-colors hover:bg-primary/20"
+                >
+                  <Receipt className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/warehouse"
+                  title="Warehouse — stock, dispatch board & loading"
+                  aria-label="Warehouse"
+                  className="flex h-9 flex-1 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary transition-colors hover:bg-primary/20"
+                >
+                  <PackageCheck className="h-4 w-4" />
+                </Link>
+              </div>
             )}
             <TabsTrigger value="dashboard" className="w-full justify-start">
               <PieChart className="h-4 w-4 mr-2" /> Dashboard
@@ -897,7 +912,7 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── SUPPLIER PORTAL (inbound POs to your claimed identity) ─────────── */}
           <TabsContent value="supplier_portal" className="space-y-4">
-            <SupplierPortalPage />
+            <SupplierPortalPage embedded />
           </TabsContent>
 
           {/* ─────────── DOCUMENTS (folded in) ─────────── */}
@@ -930,6 +945,16 @@ const FinancePage: React.FC = () => {
           {/* ─────────── PARTIES ─────────── */}
           <TabsContent value="parties" className="space-y-4">
             <PartiesTab workspaceId={workspaceId} statementsEnabled={settings?.statements_enabled ?? false} autoOpenParty={autoOpenParty} financeBase={financeBase} />
+          </TabsContent>
+
+          {/* Dispatch board moved to the Warehouse module. Pointer for old ?tab=doc_dispatch links. */}
+          <TabsContent value="doc_dispatch" className="space-y-4">
+            <div className="dashboard-card p-8 text-center">
+              <PackageCheck className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+              <div className="text-sm font-medium mb-1">Dispatch board now lives in Warehouse</div>
+              <p className="text-sm text-muted-foreground mb-4">Loading, dispatch and fulfilment moved to the dedicated Warehouse module.</p>
+              <a href="/warehouse" className="text-sm text-primary hover:underline">Open Warehouse →</a>
+            </div>
           </TabsContent>
 
           {/* Warehouse/inventory moved out of Finance into its own paid Stock module. Keep a pointer

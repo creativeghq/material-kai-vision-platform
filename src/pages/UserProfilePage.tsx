@@ -177,7 +177,7 @@ export const UserProfilePage: React.FC = () => {
 
         {showSupplierPortal && (
           <TabsContent value="supplier-portal" className="space-y-6">
-            <SupplierPortalPage />
+            <SupplierPortalPage embedded />
           </TabsContent>
         )}
       </Tabs>
