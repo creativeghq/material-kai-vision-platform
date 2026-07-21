@@ -119,14 +119,6 @@ suite('hr-careers · public careers page', () => {
     expect(status).toBe(404);
   });
 
-  it('bot-checks a real anonymous applicant (Turnstile is enforced, not fail-open)', async () => {
-    const { body } = await careers({
-      action: 'apply', slug: wsSlug, job_slug: openSlug, name: 'E2E Bot Applicant',
-    });
-    expect(body?.error, 'tokenless anonymous apply was accepted — Turnstile is fail-open again')
-      .toMatch(/bot check/i);
-  });
-
   it('rejects a non-PDF résumé regardless of the filename', async () => {
     const notPdf = Buffer.from('hello world').toString('base64');
     const { body } = await careers({
@@ -136,7 +128,7 @@ suite('hr-careers · public careers page', () => {
     expect(body.error, 'résumé type check must run BEFORE the bot gate').toMatch(/PDF/i);
   });
 
-  it('reaches the bot gate only after the résumé and job checks pass', async () => {
+  it('enforces Turnstile — and only AFTER the résumé and job checks pass', async () => {
     // A well-formed application with a valid PDF gets all the way to the Turnstile check, which
     // proves every guard before it accepted the payload. The storage-prefix behaviour this used
     // to assert was verified against prod before Turnstile was switched on; it cannot be
@@ -146,6 +138,9 @@ suite('hr-careers · public careers page', () => {
       action: 'apply', slug: wsSlug, job_slug: openSlug, name: 'E2E Applicant',
       email: `e2e-appl2-${rid}@materialshub.gr`, resume_base64: pdf, resume_filename: 'cv.pdf',
     });
-    expect(body.error, 'expected the bot gate, not an earlier rejection').toMatch(/bot check/i);
+    // Reaching the gate proves every guard before it accepted the payload; matching /bot check/
+    // proves the gate is enforced rather than fail-open.
+    expect(body.error, 'tokenless anonymous apply was accepted — Turnstile is fail-open again')
+      .toMatch(/bot check/i);
   });
 });
