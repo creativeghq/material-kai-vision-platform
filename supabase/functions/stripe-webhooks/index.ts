@@ -5,6 +5,10 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getStripe, getPlatformBillingStripe, getSupabase, stripeWebhookSecret, platformBillingWebhookSecret } from '../_shared/stripe-clients.ts';
 import { moduleTierRank } from '../_shared/module-tiers.ts';
+// #273 Phase 0 — provider-neutral commerce-payment ingestion. Used ONLY by the
+// invoice_payment / statement_payment branches; platform billing (credits, subscriptions,
+// module add-ons) settles to the operator and deliberately does NOT route through here.
+import { recordInvoicePayment, recordStatementPayment } from '../_shared/payments/record-payment.ts';
 
 // Module-level handles re-assigned per-request from the memoised shared
 // factories. The downstream `handle*` functions reference these by name to
@@ -532,8 +536,11 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
 /**
  * Sales/Finance — Stripe PaymentIntent for an invoice in public.invoices.
- * Inserts payments + payment_allocations; the status-keeper trigger then flips
- * the invoice to paid / partially_paid via amount_paid. Idempotent on payment_intent.id.
+ *
+ * The actual bookkeeping (payments + payment_allocations + receipt + notifications)
+ * lives in `_shared/payments/record-payment.ts` so every provider ingests identically
+ * (#273 Phase 0). This function's only job is to translate Stripe's event shape into
+ * the shared `PaymentSource`.
  */
 async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   const invoiceId = paymentIntent.metadata?.invoice_id;
@@ -542,113 +549,28 @@ async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent
     return;
   }
 
-  // Idempotency: skip if we already recorded a payment for this intent
-  const { data: existing } = await supabase
-    .from('payments')
-    .select('id')
-    .eq('stripe_payment_intent_id', paymentIntent.id)
-    .maybeSingle();
-  if (existing) {
-    console.log(`invoice_payment ${paymentIntent.id} already recorded as payment ${existing.id}`);
-    return;
-  }
-
-  const { data: inv, error: invErr } = await supabase
-    .from('invoices')
-    .select('*, contact:crm_contacts!customer_contact_id(id, email, name), company:crm_companies!customer_company_id(id, email, name)')
-    .eq('id', invoiceId)
-    .single();
-  if (invErr || !inv) {
-    console.error('invoice not found for invoice_payment', invoiceId, invErr?.message);
-    return;
-  }
-
   const amount = paymentIntent.amount_received
     ? paymentIntent.amount_received / 100
     : paymentIntent.amount / 100;
-  const currency = (paymentIntent.currency || inv.currency || 'eur').toUpperCase();
 
-  const { data: paymentRow, error: payErr } = await supabase
-    .from('payments')
-    .insert({
-      workspace_id: inv.workspace_id,
-      direction: 'in',
-      amount,
-      currency,
-      method: 'card',
-      paid_at: new Date().toISOString(),
-      counterparty_contact_id: inv.customer_contact_id,
-      counterparty_company_id: inv.customer_company_id,
-      reference: `Stripe ${paymentIntent.id}`,
-      notes: `Inv ${inv.internal_number} via Stripe Checkout`,
-      stripe_payment_intent_id: paymentIntent.id,
-      stripe_checkout_session_id: inv.stripe_checkout_session_id,
-    })
-    .select('id')
-    .single();
-  if (payErr || !paymentRow) {
-    console.error('payments insert failed for invoice_payment', payErr?.message);
-    return;
-  }
-
-  const { error: allocErr } = await supabase.from('payment_allocations').insert({
-    payment_id: paymentRow.id,
-    invoice_id: inv.id,
+  const res = await recordInvoicePayment(supabase, invoiceId, {
+    provider: 'stripe',
+    providerRef: paymentIntent.id,
+    providerLabel: 'Stripe',
     amount,
+    currency: (paymentIntent.currency || 'eur').toUpperCase(),
+    method: 'card',
+    // notes/reference default to "Inv <number> via Stripe" in the shared helper — parity.
   });
-  if (allocErr) {
-    console.error('payment_allocations insert failed', allocErr.message);
-    return;
-  }
 
-  console.log(`Recorded Stripe payment ${paymentRow.id} for invoice ${inv.internal_number} (${amount} ${currency})`);
-
-  // Bell-notify the invoice creator (if known) — routed through Flows (#245 D)
-  // so admins can pause/retarget. The seeded `invoice_paid` system-default flow
-  // turns this into the create_notification bell.
-  if (inv.created_by) {
-    await emitFlowEvent('invoice_paid', {
-      user_id: inv.created_by,
-      type: 'invoice_paid',
-      title: `Invoice ${inv.internal_number} paid`,
-      body: `${currency} ${amount.toFixed(2)} received via card.`,
-      action_url: `/admin/finance/invoices/${inv.id}`,
-      invoice_id: inv.id,
-      amount,
-      currency,
-      payment_intent_id: paymentIntent.id,
-      workspace_id: inv.workspace_id,
-    }).catch(() => {});
-  }
-
-  // Customer-facing: notify + email the buyer that their payment was received (seeded flow),
-  // carrying the seller's own branded receipt — same document a manual payment produces.
-  const cust = (inv.company ?? inv.contact) as { email?: string; name?: string } | null;
-  await runInBackground((async () => {
-    const receiptUrl = await generatePaymentReceipt(paymentRow.id);
-    await emitFlowEvent('payment_received', {
-      type: 'payment_received',
-      customer_email: cust?.email ?? undefined,
-      customer_name: cust?.name ?? undefined,
-      invoice_id: inv.id,
-      payment_id: paymentRow.id,
-      amount: `${amount.toFixed(2)} ${currency}`,
-      currency,
-      workspace_id: inv.workspace_id,
-      receipt_url: receiptUrl ?? undefined,
-      receipt_line: receiptLineFor(receiptUrl),
-      title: `Payment received — ${amount.toFixed(2)} ${currency}`,
-      body: `We received your payment of ${amount.toFixed(2)} ${currency} for invoice ${inv.internal_number}.`,
-      action_url: `/finance/invoices/${inv.id}`,
-    }).catch(() => {});
-  })());
+  // Throw → non-2xx → Stripe retries. Only for real failures; a duplicate is a success.
+  if (!res.ok) throw new Error(`invoice_payment ingestion failed: ${res.error}`);
 }
 
 /**
  * Sales/Finance — a customer paid their WHOLE outstanding balance via the statement
- * "Pay balance" Stripe Payment Link (no single invoice_id). Records one inbound payment
- * for the party and allocates it across their open invoices oldest-first; any remainder
- * stays as unallocated on-account credit. Idempotent on payment_intent.id.
+ * "Pay balance" Stripe Payment Link (no single invoice_id). Allocation oldest-first +
+ * receipt + notifications all live in the shared helper.
  */
 async function handleStatementPaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   const meta = paymentIntent.metadata ?? {};
@@ -660,147 +582,25 @@ async function handleStatementPaymentSucceeded(paymentIntent: Stripe.PaymentInte
     return;
   }
 
-  // Idempotency: skip if already recorded for this intent.
-  const { data: existing } = await supabase
-    .from('payments').select('id').eq('stripe_payment_intent_id', paymentIntent.id).maybeSingle();
-  if (existing) {
-    console.log(`statement_payment ${paymentIntent.id} already recorded as payment ${existing.id}`);
-    return;
-  }
-
   const amount = (paymentIntent.amount_received ?? paymentIntent.amount) / 100;
-  const currency = (paymentIntent.currency || 'eur').toUpperCase();
-  const isCompany = partyType === 'company';
 
-  const { data: paymentRow, error: payErr } = await supabase
-    .from('payments')
-    .insert({
-      workspace_id: workspaceId,
-      direction: 'in',
+  const res = await recordStatementPayment(
+    supabase,
+    { workspaceId, partyType, partyId },
+    {
+      provider: 'stripe',
+      providerRef: paymentIntent.id,
+      providerLabel: 'Stripe',
       amount,
-      currency,
+      currency: (paymentIntent.currency || 'eur').toUpperCase(),
       method: 'card',
-      paid_at: new Date().toISOString(),
-      counterparty_contact_id: isCompany ? null : partyId,
-      counterparty_company_id: isCompany ? partyId : null,
-      reference: `Stripe ${paymentIntent.id}`,
       notes: 'Account balance via Stripe payment link',
-      stripe_payment_intent_id: paymentIntent.id,
-    })
-    .select('id')
-    .single();
-  if (payErr || !paymentRow) {
-    console.error('payments insert failed for statement_payment', payErr?.message);
-    return;
-  }
+    },
+  );
 
-  // Allocate oldest-first across open invoices for this party.
-  const { data: openInvoices } = await supabase
-    .from('invoices')
-    .select('id, amount_due, issued_at, status')
-    .eq('workspace_id', workspaceId)
-    .eq(isCompany ? 'customer_company_id' : 'customer_contact_id', partyId)
-    .order('issued_at', { ascending: true });
-
-  let remaining = amount;
-  const allocations: Array<{ payment_id: string; invoice_id: string; amount: number }> = [];
-  for (const inv of (openInvoices ?? [])) {
-    if (remaining <= 0) break;
-    if (inv.status === 'void' || inv.status === 'credit_noted' || inv.status === 'draft') continue;
-    const due = Number(inv.amount_due || 0);
-    if (due <= 0) continue;
-    const applied = Math.min(due, remaining);
-    allocations.push({ payment_id: paymentRow.id, invoice_id: inv.id, amount: applied });
-    remaining -= applied;
-  }
-  if (allocations.length > 0) {
-    const { error: allocErr } = await supabase.from('payment_allocations').insert(allocations);
-    if (allocErr) console.error('statement_payment allocations insert failed', allocErr.message);
-  }
-
-  // Customer-facing receipt + notify, via the same seeded flow as invoice payments.
-  const { data: partyRow } = await supabase
-    .from(isCompany ? 'crm_companies' : 'crm_contacts')
-    .select('email, name').eq('id', partyId).maybeSingle();
-  await runInBackground((async () => {
-    const stmtReceiptUrl = await generatePaymentReceipt(paymentRow.id);
-    await emitFlowEvent('payment_received', {
-      type: 'payment_received',
-      customer_email: (partyRow as any)?.email ?? undefined,
-      customer_name: (partyRow as any)?.name ?? undefined,
-      payment_id: paymentRow.id,
-      amount: `${amount.toFixed(2)} ${currency}`,
-      currency,
-      workspace_id: workspaceId,
-      receipt_url: stmtReceiptUrl ?? undefined,
-      receipt_line: receiptLineFor(stmtReceiptUrl),
-      title: `Payment received — ${amount.toFixed(2)} ${currency}`,
-      body: `We received your account payment of ${amount.toFixed(2)} ${currency}. Thank you.`,
-      action_url: '/finance',
-    }).catch(() => {});
-  })());
-
-  console.log(`Recorded statement balance payment ${paymentRow.id} (${amount} ${currency}); allocated to ${allocations.length} invoice(s), ${remaining.toFixed(2)} on account`);
+  if (!res.ok) throw new Error(`statement_payment ingestion failed: ${res.error}`);
 }
 
-/**
- * Generate the seller's own payment receipt (απόδειξη είσπραξης) for a payment we just
- * recorded, and return a link to it. Online payments used to skip this entirely — the
- * customer got only Stripe's generic receipt, never the workspace-branded document that
- * manually-recorded payments produce. `finance-invoice-pdf` accepts a service call
- * (x-cron-secret) for payment receipts specifically, since a webhook has no user.
- *
- * Best-effort by design: a receipt failure must never fail the webhook (Stripe would
- * retry the whole delivery). We just fall back to a receipt-less notification.
- */
-async function generatePaymentReceipt(paymentId: string): Promise<string | null> {
-  try {
-    const base = Deno.env.get('SUPABASE_URL');
-    const secret = Deno.env.get('CRON_SECRET');
-    if (!base || !secret) return null;
-    const res = await fetch(`${base}/functions/v1/finance-invoice-pdf`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
-      body: JSON.stringify({ payment_id: paymentId }),
-    });
-    if (!res.ok) {
-      console.error(`payment receipt generation failed (${res.status}) for ${paymentId}`);
-      return null;
-    }
-    const out = await res.json();
-    return (out?.pdf_url as string) ?? null;
-  } catch (err) {
-    console.error('payment receipt generation threw', err);
-    return null;
-  }
-}
-
-/** Customer-facing "download your receipt" line for the payment_received email. */
-function receiptLineFor(url: string | null): string {
-  return url ? `<p><a href="${url}">Download your receipt</a></p>` : '';
-}
-
-/**
- * Run follow-up work AFTER the webhook has already answered Stripe.
- *
- * Stripe gives a delivery ~10s before it times out and retries. Rendering a receipt PDF
- * (font fetch + layout) is slow enough to eat into that, and it is not something Stripe
- * needs to know about — the payment row is already committed by the time we get here.
- * `EdgeRuntime.waitUntil` keeps the worker alive past the response so the receipt + email
- * still complete, while Stripe gets its 200 immediately.
- *
- * Falls back to awaiting inline where the runtime doesn't support it (local dev), so the
- * behaviour is identical, just slower.
- */
-function runInBackground(work: Promise<unknown>): Promise<void> {
-  const guarded = work.catch((err) => console.error('[stripe-webhooks] background task failed', err));
-  const rt = (globalThis as any).EdgeRuntime;
-  if (typeof rt?.waitUntil === 'function') {
-    rt.waitUntil(guarded);
-    return Promise.resolve();
-  }
-  return guarded as Promise<void>;
-}
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   console.log(`Payment failed: ${paymentIntent.id}`);
