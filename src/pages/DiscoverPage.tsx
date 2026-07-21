@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
-  Search, Users, MapPin, Globe, Building2, Package,
-  Layers, X, Package2, ExternalLink, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
+  Users, MapPin, Globe, Building2, Package,
+  Layers, X, Package2, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
 } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
 import { Badge } from '@/components/core/ui/badge';
-import { Input } from '@/components/core/ui/input';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -14,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FollowButton } from '@/components/features/social/FollowButton';
@@ -26,9 +26,10 @@ import { ProfileModal } from '@/components/features/discover/ProfileModal';
 import { MarketplaceTab } from '@/components/features/discover/MarketplaceTab';
 import { marketplaceService } from '@/services/marketplaceService';
 import {
-  CAT_COLORS, MATERIAL_CATS, PROFESSIONAL_TYPE_LABELS,
+  CAT_COLORS, PROFESSIONAL_TYPE_LABELS,
   detectCat, catLabel, initials,
 } from '@/lib/materialCategories';
+import { buildFactoryFilters, buildProductFilters, buildProfileFilters } from '@/pages/discoverFilters';
 import {
   PRODUCT_IMAGE_SELECT,
   getManufacturer,
@@ -416,23 +417,14 @@ export const DiscoverPage: React.FC = () => {
 
   // Profiles
   const [creators, setCreators] = useState<PublicCreator[]>([]);
-  const [profileSearch, setProfileSearch] = useState('');
-  const [profileType, setProfileType] = useState('all');
 
   // Products / Factories
   const [products, setProducts] = useState<RawProduct[]>([]);
   const [searchParams] = useSearchParams();
-  const [productSearch, setProductSearch] = useState('');
-  const [productCat, setProductCat] = useState('all');
-  const [factorySearch, setFactorySearch] = useState('');
-  const [factoryCat, setFactoryCat] = useState('all');
 
-  // Extra filters / sorting
-  const [profileLocation, setProfileLocation] = useState('all');
+  // Sorting is a separate control from filtering — it never belongs in the filter modal.
   const [profileSort, setProfileSort] = useState<'followers' | 'views' | 'name'>('followers');
   const [factorySort, setFactorySort] = useState<'count' | 'name'>('count');
-  const [productFactory, setProductFactory] = useState('all');
-  const [productSurplusOnly, setProductSurplusOnly] = useState(false);
   const [productSort, setProductSort] = useState<'name' | 'factory'>('name');
   // Controlled so a deep-link (?tab=products&factory=…) can open the right tab.
   const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'profiles');
@@ -512,11 +504,9 @@ export const DiscoverPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, products]);
 
-  // Deep-link: /discover?tab=products&factory=<name> (from a CRM supplier's factory
-  // link or a factory page) opens the Products tab pre-filtered to that maker.
+  // Deep-link: /discover?tab=<name> opens that tab (the `factory` half of the link is
+  // consumed by `productInitial` below).
   useEffect(() => {
-    const f = searchParams.get('factory');
-    if (f) setProductFactory(f);
     const t = searchParams.get('tab');
     if (t) setActiveTab(t);
   }, [searchParams]);
@@ -536,81 +526,49 @@ export const DiscoverPage: React.FC = () => {
       .sort((a, b) => b.productCount - a.productCount);
   }, [products]);
 
-  const filteredProfiles = useMemo(() => {
-    let r = creators;
-    if (profileSearch.trim()) {
-      const q = profileSearch.toLowerCase();
-      r = r.filter((c) =>
-        c.full_name?.toLowerCase().includes(q) ||
-        c.company?.toLowerCase().includes(q) ||
-        c.bio?.toLowerCase().includes(q) ||
-        c.location?.toLowerCase().includes(q) ||
-        c.services.some((s) => s.toLowerCase().includes(q)),
-      );
-    }
-    if (profileType !== 'all') r = r.filter((c) => c.professional_type === profileType);
-    if (profileLocation !== 'all') r = r.filter((c) => c.location?.trim() === profileLocation);
-    r = [...r].sort((a, b) =>
+  const profileGroups = useMemo(() => buildProfileFilters(creators), [creators]);
+  const factoryGroups = useMemo(() => buildFactoryFilters(factories), [factories]);
+  const productGroups = useMemo(() => buildProductFilters(products, surplus), [products, surplus]);
+
+  // /discover?tab=products&factory=<name> seeds the brand facet; once the user touches the
+  // filters the `pf`/`bf`/`prf` URL bag takes over.
+  const productInitial = useMemo(() => {
+    const f = searchParams.get('factory');
+    return f ? { brand: [f] } : {};
+  }, [searchParams]);
+
+  const profileFilters = useFilters(creators, profileGroups, { urlKey: 'pf' });
+  const factoryFilters = useFilters(factories, factoryGroups, { urlKey: 'bf' });
+  const productFilters = useFilters(products, productGroups, { urlKey: 'prf', initial: productInitial });
+
+  const filteredProfiles = useMemo(() =>
+    [...profileFilters.filtered].sort((a, b) =>
       profileSort === 'name' ? (a.full_name || '').localeCompare(b.full_name || '') :
       profileSort === 'views' ? (b.profile_views || 0) - (a.profile_views || 0) :
       (b.follower_count || 0) - (a.follower_count || 0),
-    );
-    return r;
-  }, [creators, profileSearch, profileType, profileLocation, profileSort]);
+    ),
+    [profileFilters.filtered, profileSort],
+  );
 
-  const filteredFactories = useMemo(() => {
-    let r = factories;
-    if (factorySearch.trim()) {
-      const q = factorySearch.toLowerCase();
-      r = r.filter((f) => f.name.toLowerCase().includes(q));
-    }
-    if (factoryCat !== 'all') r = r.filter((f) => f.categories.includes(factoryCat));
-    r = [...r].sort((a, b) =>
+  const filteredFactories = useMemo(() =>
+    [...factoryFilters.filtered].sort((a, b) =>
       factorySort === 'name' ? a.name.localeCompare(b.name) : b.productCount - a.productCount,
-    );
-    return r;
-  }, [factories, factorySearch, factoryCat, factorySort]);
+    ),
+    [factoryFilters.filtered, factorySort],
+  );
 
-  const filteredProducts = useMemo(() => {
-    let r = products;
-    if (productSearch.trim()) {
-      const q = productSearch.toLowerCase();
-      r = r.filter((p) =>
-        p.name?.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q) ||
-        p.factoryName?.toLowerCase().includes(q),
-      );
-    }
-    if (productCat !== 'all') r = r.filter((p) => p.detectedCat === productCat);
-    if (productFactory !== 'all') r = r.filter((p) => p.factoryName === productFactory);
-    if (productSurplusOnly) r = r.filter((p) => !!surplus[p.id]);
-    r = [...r].sort((a, b) =>
+  const filteredProducts = useMemo(() =>
+    [...productFilters.filtered].sort((a, b) =>
       productSort === 'factory'
         ? a.factoryName.localeCompare(b.factoryName) || a.name.localeCompare(b.name)
         : a.name.localeCompare(b.name),
-    );
-    return r;
-  }, [products, productSearch, productCat, productFactory, productSurplusOnly, productSort, surplus]);
+    ),
+    [productFilters.filtered, productSort],
+  );
 
   const factoryModalProducts = useMemo(() =>
     selectedFactory ? products.filter((p) => p.factoryName === selectedFactory.name) : [],
     [products, selectedFactory],
-  );
-
-  const availableTypes = useMemo(() =>
-    Array.from(new Set(creators.filter((c) => c.professional_type).map((c) => c.professional_type!))),
-    [creators],
-  );
-
-  const availableLocations = useMemo(() =>
-    Array.from(new Set(creators.map((c) => c.location?.trim()).filter(Boolean) as string[])).sort(),
-    [creators],
-  );
-
-  // Factory names sorted A–Z for the Products → factory filter dropdown.
-  const factoryNamesAZ = useMemo(() =>
-    factories.map((f) => f.name).sort((a, b) => a.localeCompare(b)),
-    [factories],
   );
 
   return (
@@ -640,39 +598,23 @@ export const DiscoverPage: React.FC = () => {
 
           {/* ── PROFILES ──────────────────────────────────────────────── */}
           <TabsContent value="profiles" className="mt-6 space-y-4">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={profileSearch} onChange={(e) => setProfileSearch(e.target.value)}
-                  placeholder="Search by name, service, location…" className="pl-9" />
-              </div>
-              <Select value={profileType} onValueChange={setProfileType}>
-                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Professional type" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All types</SelectItem>
-                  {availableTypes.map((t) => (
-                    <SelectItem key={t} value={t}>{PROFESSIONAL_TYPE_LABELS[t] ?? t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {availableLocations.length > 0 && (
-                <Select value={profileLocation} onValueChange={setProfileLocation}>
-                  <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Location" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All locations</SelectItem>
-                    {availableLocations.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              )}
+            <FilterBar
+              groups={profileGroups}
+              values={profileFilters.values}
+              onChange={profileFilters.setValues}
+              previewCount={profileFilters.previewCount}
+              title="Filter profiles"
+              searchPlaceholder="Search by name, service, location…"
+            >
               <Select value={profileSort} onValueChange={(v) => setProfileSort(v as 'followers' | 'views' | 'name')}>
-                <SelectTrigger className="w-[48%] sm:w-40"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="followers">Most followed</SelectItem>
                   <SelectItem value="views">Most viewed</SelectItem>
                   <SelectItem value="name">Name A–Z</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </FilterBar>
 
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -756,29 +698,22 @@ export const DiscoverPage: React.FC = () => {
 
           {/* ── FACTORY ───────────────────────────────────────────────── */}
           <TabsContent value="factory" className="mt-6 space-y-4">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={factorySearch} onChange={(e) => setFactorySearch(e.target.value)}
-                  placeholder="Search brands…" className="pl-9" />
-              </div>
-              <Select value={factoryCat} onValueChange={setFactoryCat}>
-                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Material category" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {MATERIAL_CATS.map((c) => (
-                    <SelectItem key={c} value={c}>{catLabel(c)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <FilterBar
+              groups={factoryGroups}
+              values={factoryFilters.values}
+              onChange={factoryFilters.setValues}
+              previewCount={factoryFilters.previewCount}
+              title="Filter brands"
+              searchPlaceholder="Search brands…"
+            >
               <Select value={factorySort} onValueChange={(v) => setFactorySort(v as 'count' | 'name')}>
-                <SelectTrigger className="w-[48%] sm:w-40"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="count">Most materials</SelectItem>
                   <SelectItem value="name">Name A–Z</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </FilterBar>
 
             {loading ? (
               <SkeletonCards count={6} />
@@ -827,48 +762,22 @@ export const DiscoverPage: React.FC = () => {
 
           {/* ── PRODUCTS ──────────────────────────────────────────────── */}
           <TabsContent value="products" className="mt-6 space-y-4">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search materials by name or brand…" className="pl-9" />
-              </div>
-              <Select value={productCat} onValueChange={setProductCat}>
-                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {MATERIAL_CATS.map((c) => (
-                    <SelectItem key={c} value={c}>{catLabel(c)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={productFactory} onValueChange={setProductFactory}>
-                <SelectTrigger className="w-[48%] sm:w-44"><SelectValue placeholder="Brand" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All brands</SelectItem>
-                  {factoryNamesAZ.map((n) => (<SelectItem key={n} value={n}>{n}</SelectItem>))}
-                </SelectContent>
-              </Select>
+            <FilterBar
+              groups={productGroups}
+              values={productFilters.values}
+              onChange={productFilters.setValues}
+              previewCount={productFilters.previewCount}
+              title="Filter materials"
+              searchPlaceholder="Search materials by name or brand…"
+            >
               <Select value={productSort} onValueChange={(v) => setProductSort(v as 'name' | 'factory')}>
-                <SelectTrigger className="w-[48%] sm:w-36"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name">Name A–Z</SelectItem>
                   <SelectItem value="factory">By brand</SelectItem>
                 </SelectContent>
               </Select>
-              {Object.keys(surplus).length > 0 && (
-                <Button
-                  type="button"
-                  variant={productSurplusOnly ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-9 gap-1.5"
-                  onClick={() => setProductSurplusOnly((v) => !v)}
-                  title="Show only materials available as surplus on the Marketplace"
-                >
-                  <Store className="h-3.5 w-3.5" /> Surplus only
-                </Button>
-              )}
-            </div>
+            </FilterBar>
 
             {loading ? (
               <SkeletonRows count={8} />

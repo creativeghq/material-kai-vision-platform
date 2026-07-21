@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, FileText, Receipt, Printer, BookOpen } from 'lucide-react';
+import { Loader2, FileText, Receipt, Printer, BookOpen, Coins, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -17,12 +16,81 @@ import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanc
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { humanizeLabel } from '@/utils/humanize';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
+import { FilterBar, NONE_VALUE, useFilters, type FilterGroupDef } from '@/components/core/filters';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
   supplier_bill: 'Supplier bill', supplier_credit_note: 'Supplier credit note',
   manual_receivable: 'Receivable (un-invoiced)', manual_payable: 'Payable (un-invoiced)',
 };
+
+const SEGMENT_LABELS: Record<string, string> = {
+  b2b: 'B2B', retail: 'Retail', wholesale: 'Wholesale', public_sector: 'Public sector',
+};
+
+type PartyRole = 'customer' | 'supplier' | 'both';
+
+/**
+ * `role` carries NO accessor on purpose — it is pushed down to `listParties({role})` and
+ * re-fetches, so `applyFilters` must pass it through instead of matching it again in memory.
+ * Everything else narrows the loaded page client-side.
+ */
+function buildPartyFilters(rows: PartyRow[]): FilterGroupDef[] {
+  const bound = (pick: (r: PartyRow) => number) => {
+    const max = rows.reduce((m, r) => Math.max(m, Number(pick(r)) || 0), 0);
+    return { min: 0, max: Math.max(Math.ceil(max / 10) * 10, 10) };
+  };
+  const receivable = bound((r) => r.receivable_outstanding);
+  const payable = bound((r) => r.payable_outstanding);
+
+  return [
+    {
+      key: 'general', label: 'General', icon: Users,
+      fields: [
+        {
+          key: 'q', type: 'text', label: 'Search', placeholder: 'Name or email',
+          accessor: (r: PartyRow) => [r.display_name, r.email],
+        },
+        {
+          key: 'role', type: 'select', label: 'Role',
+          description: 'Applied server-side — changing it reloads the list.',
+          options: [
+            { value: 'customer', label: 'Customers' },
+            { value: 'supplier', label: 'Suppliers' },
+            { value: 'both', label: 'Both (customer + supplier)' },
+          ],
+        },
+        {
+          key: 'segment', type: 'multi', label: 'Segment',
+          options: [
+            ...Object.entries(SEGMENT_LABELS).map(([value, label]) => ({ value, label })),
+            { value: NONE_VALUE, label: 'Unsegmented' },
+          ],
+          accessor: (r: PartyRow) => r.contact_group ?? undefined,
+        },
+        {
+          key: 'over_limit', type: 'bool', label: 'Credit limit',
+          description: 'Outstanding receivable exceeds the party’s credit limit.',
+          trueLabel: 'Over credit limit', falseLabel: 'Within credit limit',
+          accessor: (r: PartyRow) => r.over_credit_limit,
+        },
+      ],
+    },
+    {
+      key: 'balances', label: 'Balances', icon: Coins,
+      fields: [
+        {
+          key: 'receivable_outstanding', type: 'range', label: 'They owe us',
+          min: receivable.min, max: receivable.max, accessor: (r: PartyRow) => r.receivable_outstanding,
+        },
+        {
+          key: 'payable_outstanding', type: 'range', label: 'We owe them',
+          min: payable.min, max: payable.max, accessor: (r: PartyRow) => r.payable_outstanding,
+        },
+      ],
+    },
+  ];
+}
 
 interface Props { workspaceId: string; statementsEnabled: boolean; autoOpenParty?: string | null; financeBase?: string }
 
@@ -31,11 +99,14 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
   const [rows, setRows] = useState<PartyRow[]>([]);
   const [agingMap, setAgingMap] = useState<Record<string, CustomerAgingBuckets>>({});
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [role, setRole] = useState<'all' | 'customer' | 'supplier' | 'both'>('all');
-  const [segment, setSegment] = useState<string>('all');
   const [selected, setSelected] = useState<PartyRow | null>(null);
   const [page, setPage] = useState(1);
+
+  const filterGroups = useMemo(() => buildPartyFilters(rows), [rows]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+    useFilters<PartyRow>(rows, filterGroups);
+  // The only server-side dimension: it changes what we fetch, not how we filter what we hold.
+  const role = (filterValues.role as PartyRole | undefined) ?? 'all';
 
   useEffect(() => { void load(); }, [workspaceId, role]);
 
@@ -69,21 +140,8 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
     }
   };
 
-  const SEGMENT_LABELS: Record<string, string> = {
-    b2b: 'B2B', retail: 'Retail', wholesale: 'Wholesale', public_sector: 'Public sector',
-  };
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (segment === 'unsegmented' ? !!r.contact_group : (segment !== 'all' && r.contact_group !== segment)) return false;
-      if (term && !(r.display_name?.toLowerCase().includes(term) || r.email?.toLowerCase().includes(term))) return false;
-      return true;
-    });
-  }, [rows, search, segment]);
-
-  // Role/segment/search all narrow the list — start the narrowed set at its first page.
-  useEffect(() => { setPage(1); }, [role, segment, search]);
+  // Any filter change narrows the list — start the narrowed set at its first page.
+  useEffect(() => { setPage(1); }, [filterValues]);
   // …and clamp on reload so a shrunken list can't leave an empty page showing.
   useEffect(() => { setPage((p) => clampPage(p, filtered.length)); }, [filtered.length]);
 
@@ -107,38 +165,14 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
           <h3 className="text-sm font-semibold">Customers &amp; Suppliers</h3>
           <p className="text-xs text-muted-foreground">Combined view of every CRM party with finance activity. Click a row for the full breakdown and to email a statement.</p>
         </div>
-        <div className="flex items-end gap-2">
-          <div className="space-y-1">
-            <label className="block text-[10px] text-muted-foreground">Role</label>
-            <Select value={role} onValueChange={(v: any) => setRole(v)}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="customer">Customers</SelectItem>
-                <SelectItem value="supplier">Suppliers</SelectItem>
-                <SelectItem value="both">Both (customer + supplier)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="block text-[10px] text-muted-foreground">Segment</label>
-            <Select value={segment} onValueChange={setSegment}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All segments</SelectItem>
-                <SelectItem value="b2b">B2B</SelectItem>
-                <SelectItem value="retail">Retail</SelectItem>
-                <SelectItem value="wholesale">Wholesale</SelectItem>
-                <SelectItem value="public_sector">Public sector</SelectItem>
-                <SelectItem value="unsegmented">Unsegmented</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="block text-[10px] text-muted-foreground">Search</label>
-            <Input placeholder="Name or email" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
-          </div>
-        </div>
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          searchPlaceholder="Name or email"
+          title="Filter parties"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

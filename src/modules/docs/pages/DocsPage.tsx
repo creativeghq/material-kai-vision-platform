@@ -2,7 +2,7 @@
 // owner can edit; other members read (and, as a follow-up, will propose edits). The KAI agent
 // searches published docs via FTS (no embeddings).
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { BookText, Plus, Save, Trash2, Loader2, Search, Pencil } from 'lucide-react';
+import { BookText, Plus, Save, Trash2, Loader2, Pencil } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { lazyWithRetry } from '@/utils/lazyWithRetry';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -29,6 +29,8 @@ function MarkdownEditor(props: React.ComponentProps<typeof MarkdownEditorLazy>) 
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildDocsFilters } from './docsFilters';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -47,7 +49,6 @@ const DocsPage: React.FC = () => {
   const [docs, setDocs] = useState<WorkspaceDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState(false);
 
   // editor fields
@@ -180,11 +181,9 @@ const DocsPage: React.FC = () => {
     }
   };
 
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return docs;
-    return docs.filter((d) => d.title.toLowerCase().includes(q) || (d.tags ?? []).some((t) => t.toLowerCase().includes(q)));
-  }, [docs, filter]);
+  const filterGroups = useMemo(() => buildDocsFilters(docs, user?.id), [docs, user?.id]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+    useFilters<WorkspaceDoc>(docs, filterGroups);
 
   if (!activeWorkspaceId) {
     return (
@@ -207,10 +206,14 @@ const DocsPage: React.FC = () => {
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
           {/* List */}
           <div className="space-y-3">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search docs…" className="pl-8" />
-            </div>
+            <FilterBar
+              groups={filterGroups}
+              values={filterValues}
+              onChange={setFilterValues}
+              previewCount={previewCount}
+              title="Filter docs"
+              searchPlaceholder="Search docs…"
+            />
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-6"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
             ) : filtered.length === 0 ? (

@@ -14,16 +14,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Activity, BookOpen, Eye, FileDown, Loader2, Mail, RefreshCw, ShieldAlert, Filter,
+  Activity, BookOpen, Eye, FileDown, Loader2, Mail, RefreshCw, ShieldAlert,
   ExternalLink, User as UserIcon,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { FilterBar, applyFilters, type FilterValues } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import {
   catalogsService,
@@ -31,16 +29,13 @@ import {
   type CatalogViewEventRow,
   type CatalogAccessLogRow,
 } from '@/services/catalogsService';
+import { buildCatalogOperationsFilters } from './catalogOperationsFilters';
 
-type EventFilter = 'all' | 'page_view' | 'pdf_download';
-type RangeFilter = '24h' | '7d' | '30d' | 'all';
-
-const RANGE_TO_HOURS: Record<RangeFilter, number | null> = {
-  '24h': 24,
-  '7d': 24 * 7,
-  '30d': 24 * 30,
-  'all': null,
-};
+/** Preserves the tab's previous default window now that the range Select is a dateRange field. */
+function defaultFilterValues(): FilterValues {
+  const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  return { created_at: { from: from.toISOString().slice(0, 10) } };
+}
 
 export const CatalogOperationsTab: React.FC = () => {
   const navigate = useNavigate();
@@ -52,16 +47,19 @@ export const CatalogOperationsTab: React.FC = () => {
   const [profiles, setProfiles] = useState<Record<string, { full_name: string | null; email: string | null; avatar_url: string | null }>>({});
   const [loading, setLoading] = useState(true);
 
-  const [selectedCatalogId, setSelectedCatalogId] = useState<string>('all');
-  const [eventFilter, setEventFilter] = useState<EventFilter>('all');
-  const [emailContains, setEmailContains] = useState('');
-  const [range, setRange] = useState<RangeFilter>('7d');
+  // Server-side surface: the values bag is held locally and turned into query params,
+  // rather than going through useFilters (which only knows how to match in memory).
+  const [filterValues, setFilterValues] = useState<FilterValues>(defaultFilterValues);
 
-  const sinceIso = useMemo(() => {
-    const hours = RANGE_TO_HOURS[range];
-    if (hours == null) return undefined;
-    return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-  }, [range]);
+  const selectedCatalogId = (filterValues.catalog_id as string) || 'all';
+  const eventFilter = (filterValues.event_type as string) || 'all';
+  const emailContains = (filterValues.q as string) || '';
+  const dateFrom = (filterValues.created_at as { from?: string } | undefined)?.from;
+
+  const sinceIso = useMemo(
+    () => (dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined),
+    [dateFrom],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,7 +71,7 @@ export const CatalogOperationsTab: React.FC = () => {
       catalogsService.listOperationsSummary(),
       catalogsService.listViewEvents({
         catalogId: selectedCatalogId === 'all' ? undefined : selectedCatalogId,
-        eventType: eventFilter,
+        eventType: eventFilter as 'all' | 'page_view' | 'pdf_download',
         emailContains: emailContains.trim() || undefined,
         sinceIso,
         limit: 200,
@@ -128,6 +126,15 @@ export const CatalogOperationsTab: React.FC = () => {
     unique_emails: acc.unique_emails + (s.unique_email_count || 0),
   }), { catalogs: 0, published: 0, page_views: 0, pdf_downloads: 0, gate_attempts: 0, gate_denials: 0, unique_emails: 0 }), [summary]);
 
+  const filterGroups = useMemo(
+    () => buildCatalogOperationsFilters(summary, [...events, ...gateLog]),
+    [summary, events, gateLog],
+  );
+  // The By-catalog rollup is deliberately NOT narrowed — it is the cross-catalog summary,
+  // and the catalog select already scopes it server-side.
+  const visibleEvents = useMemo(() => applyFilters(events, filterGroups, filterValues), [events, filterGroups, filterValues]);
+  const visibleGateLog = useMemo(() => applyFilters(gateLog, filterGroups, filterValues), [gateLog, filterGroups, filterValues]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -154,55 +161,19 @@ export const CatalogOperationsTab: React.FC = () => {
         <Stat icon={ShieldAlert} label="Denied" value={totals.gate_denials} variant={totals.gate_denials > 0 ? 'destructive' : 'default'} />
       </div>
 
-      <Card className="dashboard-card">
-        <CardContent className="p-3 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-          <div className="space-y-1">
-            <Label className="text-xs flex items-center gap-1"><Filter className="h-3 w-3" /> Catalog</Label>
-            <Select value={selectedCatalogId} onValueChange={setSelectedCatalogId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All catalogs</SelectItem>
-                {summary.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.title}{s.slug ? ` (/c/${s.slug})` : ''}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Event type</Label>
-            <Select value={eventFilter} onValueChange={(v) => setEventFilter(v as EventFilter)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All events</SelectItem>
-                <SelectItem value="page_view">Page views</SelectItem>
-                <SelectItem value="pdf_download">PDF downloads</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Range</Label>
-            <Select value={range} onValueChange={(v) => setRange(v as RangeFilter)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="24h">Last 24h</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="all">All time</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Email contains</Label>
-            <Input value={emailContains} onChange={(e) => setEmailContains(e.target.value)} placeholder="search by email" />
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar
+        groups={filterGroups}
+        values={filterValues}
+        onChange={setFilterValues}
+        title="Filter catalog activity"
+        searchPlaceholder="Search by email…"
+      />
 
       <Tabs defaultValue="catalogs">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="catalogs" className="flex items-center gap-2">By catalog ({summary.length})</TabsTrigger>
-          <TabsTrigger value="events" className="flex items-center gap-2">Events ({events.length})</TabsTrigger>
-          <TabsTrigger value="gate" className="flex items-center gap-2">Email-gate ({gateLog.length})</TabsTrigger>
+          <TabsTrigger value="events" className="flex items-center gap-2">Events ({visibleEvents.length})</TabsTrigger>
+          <TabsTrigger value="gate" className="flex items-center gap-2">Email-gate ({visibleGateLog.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalogs" className="mt-4">
@@ -255,7 +226,7 @@ export const CatalogOperationsTab: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="events" className="mt-4">
-          {loading ? <LoadingRow /> : events.length === 0 ? (
+          {loading ? <LoadingRow /> : visibleEvents.length === 0 ? (
             <Empty>No events for this filter set.</Empty>
           ) : (
             <Card className="dashboard-card">
@@ -273,7 +244,7 @@ export const CatalogOperationsTab: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {events.map((e) => (
+                    {visibleEvents.map((e) => (
                       <tr key={e.id} className="border-t hover:bg-muted/20">
                         <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</td>
                         <td className="px-3 py-2">
@@ -308,7 +279,7 @@ export const CatalogOperationsTab: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="gate" className="mt-4">
-          {loading ? <LoadingRow /> : gateLog.length === 0 ? (
+          {loading ? <LoadingRow /> : visibleGateLog.length === 0 ? (
             <Empty>No gate attempts for this filter set.</Empty>
           ) : (
             <Card className="dashboard-card">
@@ -326,7 +297,7 @@ export const CatalogOperationsTab: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {gateLog.map((row) => (
+                    {visibleGateLog.map((row) => (
                       <tr key={row.id} className="border-t hover:bg-muted/20">
                         <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</td>
                         <td className="px-3 py-2 font-medium">{row.email}</td>

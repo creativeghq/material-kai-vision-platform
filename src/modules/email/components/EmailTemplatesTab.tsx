@@ -9,17 +9,12 @@ import { Plus, Edit, Eye, Trash2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
 import CreateTemplateModal from './CreateTemplateModal';
+import { buildEmailTemplateFilters } from './emailFilters';
 
 /**
  * Topic groups — derived from the template's slug prefix. Lets admins filter
@@ -73,10 +68,6 @@ interface EmailTemplate {
  *  - "manual" (is_system=false) — user-sendable / marketing templates a person picks
  *    by hand. These are the ones that appear in the CRM send dropdown.
  */
-type TemplateKind = 'all' | 'manual' | 'system';
-const kindOf = (t: EmailTemplate): Exclude<TemplateKind, 'all'> =>
-  t.is_system ? 'system' : 'manual';
-
 interface EmailDefaults {
   fromEmail: string;
   fromName: string;
@@ -88,8 +79,6 @@ export const EmailTemplatesTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
-  const [topicFilter, setTopicFilter] = useState<string>('all');
-  const [kindFilter, setKindFilter] = useState<TemplateKind>('all');
   const [emailDefaults, setEmailDefaults] = useState<EmailDefaults>({ fromEmail: '', fromName: '' });
   const { toast } = useToast();
 
@@ -161,29 +150,26 @@ export const EmailTemplatesTab: React.FC = () => {
     return <Badge variant={colors[category] || 'outline'}>{humanizeLabel(category)}</Badge>;
   };
 
-  // Topics that actually have at least one template in the current list,
-  // so the filter dropdown only offers groups that aren't empty.
-  const availableTopics = useMemo(() => {
-    const present = new Set<string>();
-    for (const t of templates) present.add(topicOf(t.slug));
-    return TOPIC_GROUPS.filter((g) => present.has(g.id))
-      .map((g) => ({ id: g.id, label: g.label }));
+  // Only offer topic groups that actually have a template, and carry live counts so the
+  // kind/topic options stay as informative as the old Selects were.
+  const topicOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of templates) {
+      const id = topicOf(t.slug);
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    const ordered = TOPIC_GROUPS.filter((g) => counts.has(g.id))
+      .map((g) => ({ value: g.id, label: g.label, count: counts.get(g.id) }));
+    if (counts.has('other')) ordered.push({ value: 'other', label: 'Other', count: counts.get('other') });
+    return ordered;
   }, [templates]);
 
-  const kindCounts = useMemo(() => {
-    let manual = 0;
-    let system = 0;
-    for (const t of templates) (kindOf(t) === 'system' ? system++ : manual++);
-    return { manual, system };
-  }, [templates]);
-
-  const filteredTemplates = useMemo(() => {
-    return templates.filter((t) => {
-      if (topicFilter !== 'all' && topicOf(t.slug) !== topicFilter) return false;
-      if (kindFilter !== 'all' && kindOf(t) !== kindFilter) return false;
-      return true;
-    });
-  }, [templates, topicFilter, kindFilter]);
+  const filterGroups = useMemo(
+    () => buildEmailTemplateFilters(templates, (slug) => topicOf(slug), topicOptions),
+    [templates, topicOptions],
+  );
+  const { values: filterValues, setValues: setFilterValues, filtered: filteredTemplates, previewCount } =
+    useFilters<EmailTemplate>(templates, filterGroups);
 
   // Group filtered templates by topic for the section headers.
   const groupedTemplates = useMemo(() => {
@@ -217,33 +203,19 @@ export const EmailTemplatesTab: React.FC = () => {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={kindFilter} onValueChange={(v) => setKindFilter(v as TemplateKind)}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="All templates" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All templates ({templates.length})</SelectItem>
-              <SelectItem value="manual">Manual — user-sendable ({kindCounts.manual})</SelectItem>
-              <SelectItem value="system">System — automation ({kindCounts.system})</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={topicFilter} onValueChange={setTopicFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All topics" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All topics</SelectItem>
-              {availableTopics.map((t) => (
-                <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          title="Filter templates"
+          searchPlaceholder="Search name / slug…"
+        >
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Create Template
           </Button>
-        </div>
+        </FilterBar>
       </div>
 
       <div className="space-y-6">
@@ -256,9 +228,9 @@ export const EmailTemplatesTab: React.FC = () => {
         ) : filteredTemplates.length === 0 ? (
           <div className="dashboard-card">
             <div className="py-8 text-center text-muted-foreground">
-              {topicFilter === 'all'
+              {templates.length === 0
                 ? 'No templates found. Create your first template to get started.'
-                : 'No templates in this topic yet.'}
+                : 'No templates match the current filters.'}
             </div>
           </div>
         ) : (

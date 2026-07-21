@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import {
   RefreshCw,
@@ -15,16 +15,11 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { flowService } from '@/services/flows';
-import type { FlowRun, FlowRunStep, FlowRunStatus } from '@/services/flows';
+import type { Flow, FlowRun, FlowRunStep, FlowRunStatus } from '@/services/flows';
 import { useToast } from '@/hooks/use-toast';
+import { buildFlowRunFilters } from './flowRunFilters';
 
 const statusConfig: Record<FlowRunStatus, { icon: React.ElementType; color: string; label: string }> = {
   pending: { icon: Clock, color: 'text-gray-500 bg-gray-500/10', label: 'Pending' },
@@ -45,19 +40,31 @@ const stepStatusColors: Record<string, string> = {
 
 export function RunHistoryTab() {
   const [runs, setRuns] = useState<FlowRun[]>([]);
+  const [flows, setFlows] = useState<Flow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<FlowRunStep[]>([]);
   const [loadingSteps, setLoadingSteps] = useState(false);
   const { toast } = useToast();
 
+  const filterGroups = useMemo(() => buildFlowRunFilters(runs, flows), [runs, flows]);
+  const { values: filterValues, setValues: setFilterValues, filtered: visibleRuns, previewCount } =
+    useFilters<FlowRun>(runs, filterGroups);
+
+  // status + flow_id are the two server-side fields — they narrow the query itself so the
+  // 50-row page is 50 matching runs, not 50 recent runs of which a few match.
+  const statusFilter = filterValues.status as string | undefined;
+  const flowFilter = filterValues.flow_id as string | undefined;
+
   const loadRuns = useCallback(async () => {
     try {
       setLoading(true);
-      const filters = statusFilter !== 'all' ? { status: statusFilter } : undefined;
-      const data = await flowService.getFlowRuns(undefined, filters);
+      const [data, flowList] = await Promise.all([
+        flowService.getFlowRuns(flowFilter, statusFilter ? { status: statusFilter } : undefined),
+        flowService.listFlows(),
+      ]);
       setRuns(data);
+      setFlows(flowList);
     } catch (error) {
       toast({
         title: 'Error',
@@ -67,7 +74,7 @@ export function RunHistoryTab() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, toast]);
+  }, [statusFilter, flowFilter, toast]);
 
   useEffect(() => {
     loadRuns();
@@ -104,21 +111,17 @@ export function RunHistoryTab() {
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px] h-8 text-sm">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="running">Running</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            title="Filter flow runs"
+            searchPlaceholder="Search trigger / error…"
+          />
           <span className="text-sm text-muted-foreground">
-            {runs.length} run{runs.length !== 1 ? 's' : ''}
+            {visibleRuns.length} run{visibleRuns.length !== 1 ? 's' : ''}
           </span>
         </div>
         <Button size="sm" variant="outline" onClick={loadRuns} className="gap-1.5">
@@ -128,7 +131,7 @@ export function RunHistoryTab() {
       </div>
 
       {/* Empty state */}
-      {runs.length === 0 && (
+      {visibleRuns.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Play className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -142,7 +145,7 @@ export function RunHistoryTab() {
 
       {/* Runs list */}
       <div className="space-y-2">
-        {runs.map((run) => {
+        {visibleRuns.map((run) => {
           const cfg = statusConfig[run.status] || statusConfig.pending;
           const StatusIcon = cfg.icon;
           const isExpanded = expandedRunId === run.id;

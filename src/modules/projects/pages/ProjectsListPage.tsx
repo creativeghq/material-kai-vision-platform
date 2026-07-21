@@ -19,6 +19,8 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Progress } from '@/components/core/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildProjectFilters } from '../components/projectFilters';
 import {
   projectsService,
   type ProjectWithClient,
@@ -70,7 +72,6 @@ export const ProjectsListPage: React.FC = () => {
   const [projects, setProjects] = useState<ProjectWithClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // #251 App Launcher deep-link: /projects?new=project opens the New Project modal.
@@ -98,10 +99,10 @@ export const ProjectsListPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const visible = useMemo(
-    () => showArchived ? projects : projects.filter(p => p.status !== 'archived'),
-    [projects, showArchived],
-  );
+  const filterGroups = useMemo(() => buildProjectFilters(projects), [projects]);
+  // Archived is seeded off so the default view matches the old "Show archived" behaviour.
+  const { values: filterValues, setValues: setFilterValues, filtered: visible, previewCount, activeCount } =
+    useFilters<ProjectWithClient>(projects, filterGroups, { initial: { archived: false } });
 
   return (
     <div className="min-h-screen bg-background">
@@ -115,13 +116,6 @@ export const ProjectsListPage: React.FC = () => {
               <ClipboardList className="h-4 w-4 mr-2" />
               Blueprints
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowArchived(v => !v)}
-            >
-              {showArchived ? 'Hide archived' : 'Show archived'}
-            </Button>
             <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-full">
               <Plus className="h-4 w-4 mr-2" />
               New Project
@@ -130,7 +124,17 @@ export const ProjectsListPage: React.FC = () => {
         }
       />
 
-      <main className="px-4 sm:px-6 py-6">
+      <main className="px-4 sm:px-6 py-6 space-y-4">
+        {!loading && projects.length > 0 && (
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            title="Filter projects"
+            searchPlaceholder="Search projects…"
+          />
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -139,14 +143,26 @@ export const ProjectsListPage: React.FC = () => {
           <Card className="dashboard-card">
             <CardContent className="py-16 text-center">
               <FolderKanban className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <h3 className="text-lg font-light text-foreground mb-1">No projects yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                A project is a container for one engagement — its rooms, moodboards, quotes, and tasks.
-              </p>
-              <Button onClick={() => setShowCreate(true)} className="rounded-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Create your first project
-              </Button>
+              {projects.length > 0 && activeCount > 0 ? (
+                <>
+                  <h3 className="text-lg font-light text-foreground mb-1">No projects match your filters</h3>
+                  <p className="text-sm text-muted-foreground mb-4">Clear a constraint to widen the list.</p>
+                  <Button variant="outline" onClick={() => setFilterValues({})} className="rounded-full">
+                    Clear filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-light text-foreground mb-1">No projects yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    A project is a container for one engagement — its rooms, moodboards, quotes, and tasks.
+                  </p>
+                  <Button onClick={() => setShowCreate(true)} className="rounded-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create your first project
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         ) : (

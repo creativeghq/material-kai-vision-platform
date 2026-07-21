@@ -27,9 +27,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildAgingFilters, AGE_BUCKET_KEY } from '@/modules/finance/components/agingFilters';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -187,10 +188,7 @@ const FinancePage: React.FC = () => {
   const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
 
-  // AR/AP list filters (party search + category + age bucket), one set per side.
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
-  const [arQuery, setArQuery] = useState(''); const [arCat, setArCat] = useState('all'); const [arBucket, setArBucket] = useState<string>('all');
-  const [apQuery, setApQuery] = useState(''); const [apCat, setApCat] = useState('all'); const [apBucket, setApBucket] = useState<string>('all');
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -353,37 +351,38 @@ const FinancePage: React.FC = () => {
   const arBuckets = useMemo(() => bucketize(ar), [ar]);
   const apBuckets = useMemo(() => bucketize(ap), [ap]);
 
-  const applyAgingFilters = (rows: AgingRow[], q: string, cat: string, bucket: string) => {
-    const term = q.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (bucket !== 'all' && r.age_bucket !== bucket) return false;
-      if (cat === 'none' ? r.category_id : cat !== 'all' && r.category_id !== cat) return false;
-      if (term) {
-        const hay = [r.party_name, r.internal_number, r.supplier_bill_number, r.description, r.category_name]
-          .map((x) => String(x ?? '').toLowerCase());
-        if (!hay.some((h) => h.includes(term))) return false;
-      }
-      return true;
-    });
-  };
-  const arFiltered = useMemo(() => applyAgingFilters(ar, arQuery, arCat, arBucket), [ar, arQuery, arCat, arBucket]);
-  const apFiltered = useMemo(() => applyAgingFilters(ap, apQuery, apCat, apBucket), [ap, apQuery, apCat, apBucket]);
+  const incomeCats = useMemo(() => categories.filter((c) => c.kind === 'income' || c.kind === 'both'), [categories]);
+  const expenseCats = useMemo(() => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'), [categories]);
+
+  // AR/AP list filters — one declaration per side, both on the shared filter model. The age
+  // bucket lives in the same values bag the BucketCards row writes, so card and modal agree.
+  const arGroups = useMemo(() => buildAgingFilters('ar', { rows: ar, categories: incomeCats }), [ar, incomeCats]);
+  const apGroups = useMemo(() => buildAgingFilters('ap', { rows: ap, categories: expenseCats }), [ap, expenseCats]);
+  const {
+    values: arValues, setValues: setArValues, filtered: arFiltered, previewCount: arPreview,
+  } = useFilters<AgingRow>(ar, arGroups);
+  const {
+    values: apValues, setValues: setApValues, filtered: apFiltered, previewCount: apPreview,
+  } = useFilters<AgingRow>(ap, apGroups);
+
+  // Clicking a bucket card toggles the SAME field the modal edits — never a parallel piece of state.
+  const arBucket = (arValues[AGE_BUCKET_KEY] as string) ?? 'all';
+  const apBucket = (apValues[AGE_BUCKET_KEY] as string) ?? 'all';
+  const pickArBucket = (b: string) => setArValues({ ...arValues, [AGE_BUCKET_KEY]: b === 'all' ? undefined : b });
+  const pickApBucket = (b: string) => setApValues({ ...apValues, [AGE_BUCKET_KEY]: b === 'all' ? undefined : b });
 
   // Client-side pagination — one page state per list (AR / AP / follow-ups / deposits).
   const [arPage, setArPage] = useState(1);
   const [apPage, setApPage] = useState(1);
   const [followUpsPage, setFollowUpsPage] = useState(1);
   const [depositsPage, setDepositsPage] = useState(1);
-  useEffect(() => { setArPage(1); }, [arQuery, arCat, arBucket]);
-  useEffect(() => { setApPage(1); }, [apQuery, apCat, apBucket]);
+  useEffect(() => { setArPage(1); }, [arValues]);
+  useEffect(() => { setApPage(1); }, [apValues]);
   // Recording a payment / issuing a document drops rows out from under the current page.
   useEffect(() => { setArPage((p) => clampPage(p, arFiltered.length)); }, [arFiltered.length]);
   useEffect(() => { setApPage((p) => clampPage(p, apFiltered.length)); }, [apFiltered.length]);
   useEffect(() => { setFollowUpsPage((p) => clampPage(p, followUps.length)); }, [followUps.length]);
   useEffect(() => { setDepositsPage((p) => clampPage(p, deposits.rows.length)); }, [deposits.rows.length]);
-
-  const incomeCats = useMemo(() => categories.filter((c) => c.kind === 'income' || c.kind === 'both'), [categories]);
-  const expenseCats = useMemo(() => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'), [categories]);
 
   if (loading && !workspaceId) {
     return (
@@ -718,11 +717,12 @@ const FinancePage: React.FC = () => {
               )}
             </div>
 
-            <BucketCards buckets={arBuckets} active={arBucket} onPick={setArBucket} noun="receivable(s)" />
-            <AgingFilterBar
-              query={arQuery} setQuery={setArQuery} cat={arCat} setCat={setArCat}
-              bucket={arBucket} setBucket={setArBucket} categories={incomeCats}
+            <BucketCards buckets={arBuckets} active={arBucket} onPick={pickArBucket} noun="receivable(s)" />
+            <FilterBar
+              groups={arGroups} values={arValues} onChange={setArValues}
+              previewCount={arPreview}
               searchPlaceholder="Search customer / number…"
+              title="Filter receivables"
             />
 
             <Card>
@@ -819,11 +819,12 @@ const FinancePage: React.FC = () => {
               </div>
             </div>
 
-            <BucketCards buckets={apBuckets} active={apBucket} onPick={setApBucket} noun="bill(s)" />
-            <AgingFilterBar
-              query={apQuery} setQuery={setApQuery} cat={apCat} setCat={setApCat}
-              bucket={apBucket} setBucket={setApBucket} categories={expenseCats}
+            <BucketCards buckets={apBuckets} active={apBucket} onPick={pickApBucket} noun="bill(s)" />
+            <FilterBar
+              groups={apGroups} values={apValues} onChange={setApValues}
+              previewCount={apPreview}
               searchPlaceholder="Search supplier / bill #…"
+              title="Filter payables"
             />
 
             <Card>
@@ -1090,32 +1091,6 @@ function bucketize(rows: AgingRow[]): Record<AgeBucket, { count: number; total: 
   }
   return out;
 }
-
-/** Search + category filter bar for the AR/AP list views. */
-const AgingFilterBar: React.FC<{
-  query: string; setQuery: (v: string) => void;
-  cat: string; setCat: (v: string) => void;
-  bucket: string; setBucket: (v: string) => void;
-  categories: FinanceCategory[];
-  searchPlaceholder: string;
-}> = ({ query, setQuery, cat, setCat, bucket, setBucket, categories, searchPlaceholder }) => (
-  <div className="flex flex-wrap items-center gap-2">
-    <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder} className="h-8 w-60 text-xs" />
-    <Select value={cat} onValueChange={setCat}>
-      <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="All categories" /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All categories</SelectItem>
-        <SelectItem value="none">Uncategorized</SelectItem>
-        {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-      </SelectContent>
-    </Select>
-    {bucket !== 'all' && (
-      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setBucket('all')}>
-        Bucket: {ageBucketLabel(bucket as AgeBucket)} ✕
-      </Button>
-    )}
-  </div>
-);
 
 /** Clickable age-bucket cards — clicking toggles the active bucket filter. */
 const BucketCards: React.FC<{

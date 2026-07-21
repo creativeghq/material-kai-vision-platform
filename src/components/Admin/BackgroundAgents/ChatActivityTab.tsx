@@ -13,19 +13,15 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   MessageSquare, RefreshCw, CheckCircle, XCircle, Loader2,
-  ChevronDown, ChevronRight, Search, Wrench, User,
+  ChevronDown, ChevronRight, Wrench, User,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/core/ui/select';
-import { Input } from '@/components/core/ui/input';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { listChatToolCalls, formatDuration } from '@/services/backgroundAgents';
 import type { ChatToolCall } from '@/services/backgroundAgents';
 import { useToast } from '@/hooks/use-toast';
-
-type SuccessFilter = 'all' | 'success' | 'failed' | 'zero-result';
+import { buildChatToolCallFilters } from './backgroundAgentFilters';
 
 function relTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -42,9 +38,6 @@ export function ChatActivityTab() {
   const { toast } = useToast();
   const [calls, setCalls] = useState<ChatToolCall[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toolFilter, setToolFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<SuccessFilter>('all');
-  const [search, setSearch] = useState('');
   const [expandedConv, setExpandedConv] = useState<string | null>(null);
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
 
@@ -61,23 +54,9 @@ export function ChatActivityTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Filters + search ──────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let out = calls;
-    if (toolFilter !== 'all') out = out.filter(c => c.tool_name === toolFilter);
-    if (statusFilter === 'success')      out = out.filter(c => c.success);
-    if (statusFilter === 'failed')       out = out.filter(c => !c.success);
-    if (statusFilter === 'zero-result')  out = out.filter(c => !!c.zero_result);
-    if (search.trim()) {
-      const s = search.trim().toLowerCase();
-      out = out.filter(c =>
-        c.tool_name.toLowerCase().includes(s)
-        || JSON.stringify(c.tool_args ?? {}).toLowerCase().includes(s)
-        || (c.error_message ?? '').toLowerCase().includes(s),
-      );
-    }
-    return out;
-  }, [calls, toolFilter, statusFilter, search]);
+  const filterGroups = useMemo(() => buildChatToolCallFilters(calls), [calls]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+    useFilters<ChatToolCall>(calls, filterGroups);
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -140,11 +119,6 @@ export function ChatActivityTab() {
     );
   }, [filtered]);
 
-  const allToolNames = useMemo(
-    () => [...new Set(calls.map(c => c.tool_name))].sort(),
-    [calls],
-  );
-
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -192,7 +166,7 @@ export function ChatActivityTab() {
             {stats.topTools.map(([name, count]) => (
               <button
                 key={name}
-                onClick={() => setToolFilter(name)}
+                onClick={() => setFilterValues({ ...filterValues, tool: [name] })}
                 className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs hover:bg-muted/50"
               >
                 <Wrench className="h-3 w-3" />
@@ -204,40 +178,14 @@ export function ChatActivityTab() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search tool name, args, error message…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 rounded-full"
-          />
-        </div>
-        <Select value={toolFilter} onValueChange={setToolFilter}>
-          <SelectTrigger className="w-[220px] rounded-full">
-            <SelectValue placeholder="All tools" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All tools</SelectItem>
-            {allToolNames.map(t => (
-              <SelectItem key={t} value={t}><span className="font-mono">{t}</span></SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as SuccessFilter)}>
-          <SelectTrigger className="w-[180px] rounded-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="success">Successful</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-            <SelectItem value="zero-result">Zero result</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FilterBar
+        groups={filterGroups}
+        values={filterValues}
+        onChange={setFilterValues}
+        previewCount={previewCount}
+        title="Filter tool calls"
+        searchPlaceholder="Search tool name, args, error message…"
+      />
 
       {/* Conversation groups */}
       {loading ? (

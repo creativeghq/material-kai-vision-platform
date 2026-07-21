@@ -5,7 +5,7 @@ import {
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet,
-  Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2, Filter,
+  Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { marketplaceService } from '@/services/marketplaceService';
@@ -25,6 +25,8 @@ import { Sheet, SheetContent } from '@/components/core/ui/sheet';
 import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildInboxFilters } from './inboxFilters';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -129,16 +131,31 @@ const InboxPage: React.FC = () => {
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [loadingThreads, setLoadingThreads] = useState(true);
-  const [filter, setFilter] = useState<ChannelFilter>('all');
   const [query, setQuery] = useState('');
   const [allWorkspaces, setAllWorkspaces] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [unreadOnly, setUnreadOnly] = useState(false);
   const [statusTab, setStatusTab] = useState<InboxThreadStatus>('open');
   const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
-  const [labelFilter, setLabelFilter] = useState<string | null>(null);
   const [canManageLabels, setCanManageLabels] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(searchParams.get('thread'));
+
+  // One bag for every secondary dimension. `channel` and `label` are request parameters on
+  // listThreads (server-applied); the rest are matched client-side against the loaded page.
+  const filterGroups = useMemo(() => buildInboxFilters(wsLabels), [wsLabels]);
+  const { values: filterValues, setValues: setFilterValues, filtered: matchedThreads, previewCount } =
+    useFilters<InboxThread>(threads, filterGroups);
+  const filter = (filterValues.channel as ChannelFilter) || 'all';
+  const labelFilter = (filterValues.label as string) || null;
+  // The Unread mailbox folder and the modal's Unread toggle are the same constraint.
+  const unreadOnly = filterValues.unread === true;
+  const setUnreadOnly = useCallback(
+    (on: boolean) => setFilterValues({ ...filterValues, unread: on ? true : undefined }),
+    [filterValues, setFilterValues],
+  );
+  const setLabelFilter = useCallback(
+    (id: string | null) => setFilterValues({ ...filterValues, label: id ?? undefined }),
+    [filterValues, setFilterValues],
+  );
 
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [participants, setParticipants] = useState<InboxParticipant[]>([]);
@@ -394,16 +411,16 @@ const InboxPage: React.FC = () => {
   }, [activeThread, toast, loadThreads]);
 
   const visibleThreads = useMemo(() => {
-    let list = threads;
+    let list = matchedThreads;
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((t) =>
       (t.subject || '').toLowerCase().includes(q) || (t.last_message_preview || '').toLowerCase().includes(q));
-    // Folder + status semantics: Unread ignores status; Archived is its own view; otherwise the
-    // Open / Follow-up (snoozed) / Done (closed) tab narrows the working set.
-    if (unreadOnly) list = list.filter((t) => t.unread);
-    else if (!showArchived) list = list.filter((t) => t.status === statusTab);
+    // Folder + status semantics: Unread ignores status (the unread predicate itself already ran
+    // in the filter matcher); Archived is its own view; otherwise the Open / Follow-up (snoozed) /
+    // Done (closed) tab narrows the working set.
+    if (!unreadOnly && !showArchived) list = list.filter((t) => t.status === statusTab);
     return list;
-  }, [threads, query, unreadOnly, showArchived, statusTab]);
+  }, [matchedThreads, query, unreadOnly, showArchived, statusTab]);
 
   // Threads grouped into Today / Yesterday / This week / Earlier for the email-client day headers.
   const groupedThreads = useMemo(() => {
@@ -672,9 +689,11 @@ const InboxPage: React.FC = () => {
                 );
               })}
             </div>
-            {/* Status tabs (Open / Follow-up / Done) + channel filter. Hidden in the Unread / Archived views. */}
-            {!showArchived && !unreadOnly && (
-              <div className="flex items-center justify-between gap-2">
+            {/* Status tabs (Open / Follow-up / Done) narrow the working set; they are hidden in the
+                Unread / Archived views, where status is not the axis. The filter bar stays put in
+                every view — it is what carries the Unread toggle. */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {!showArchived && !unreadOnly ? (
                 <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as InboxThreadStatus)}>
                   <TabsList className="h-auto gap-1.5 bg-transparent p-0">
                     <TabsTrigger value="open" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Open</TabsTrigger>
@@ -682,28 +701,17 @@ const InboxPage: React.FC = () => {
                     <TabsTrigger value="closed" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Done</TabsTrigger>
                   </TabsList>
                 </Tabs>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="rounded-full h-8 gap-1.5 shrink-0">
-                      <Filter className="w-3.5 h-3.5" />
-                      {filter === 'all' ? 'All' : filter === 'internal' ? 'Team' : 'WhatsApp'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-40 p-1">
-                    {(['all', 'internal', 'whatsapp'] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`w-full flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg text-left ${filter === f ? 'bg-accent' : 'hover:bg-accent'}`}
-                      >
-                        {f === 'all' ? 'All channels' : f === 'internal' ? 'Team' : 'WhatsApp'}
-                        {filter === f && <Check className="w-3.5 h-3.5 ml-auto" />}
-                      </button>
-                    ))}
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
+              ) : <span />}
+              <FilterBar
+                groups={filterGroups}
+                values={filterValues}
+                onChange={setFilterValues}
+                previewCount={previewCount}
+                searchKey={null}
+                title="Filter conversations"
+                className="justify-end"
+              />
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto">
             {loadingThreads ? (

@@ -1,41 +1,121 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, CheckCircle2, X, Bell, Loader2 } from 'lucide-react';
+import { Plus, CheckCircle2, X, Bell, Loader2, CalendarDays, Coins, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
-  financeService, formatMoney, type PlannedPayment,
+  financeService, formatMoney,
+  type PlannedPayment, type PlannedPaymentStatus, type PlannedPaymentDirection,
 } from '@/modules/finance/services/financeService';
 import { NewPlannedPaymentDialog } from '@/modules/finance/components/NewPlannedPaymentDialog';
 import { humanizeLabel } from '@/utils/humanize';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import {
+  FilterBar, optionsFromRows, useFilters,
+  type DateRangeValue, type FilterGroupDef, type FilterValues,
+} from '@/components/core/filters';
 
 interface Props { workspaceId: string }
+
+const ALL_STATUSES: PlannedPaymentStatus[] = ['planned', 'overdue', 'paid', 'cancelled'];
+/** The two statuses that mean "still open" — the default view, and what the bucketed layout shows. */
+const OPEN_STATUSES: PlannedPaymentStatus[] = ['planned', 'overdue'];
+
+/**
+ * The old single Select conflated three dimensions (direction, status, "upcoming") into one flat
+ * list, so you could never ask for e.g. "outgoing AND overdue". They are separate fields now.
+ * Status / direction / date all have `column`-less, accessor-less defs: they are pushed into
+ * `listPlannedPayments` (SQL) and `applyFilters` passes them through.
+ */
+function buildPlanningFilters(rows: PlannedPayment[]): FilterGroupDef[] {
+  const maxAmount = rows.reduce((m, r) => Math.max(m, Number(r.amount) || 0), 0);
+  return [
+    {
+      key: 'flow', label: 'Flow', icon: ArrowLeftRight,
+      fields: [
+        {
+          key: 'q', type: 'text', label: 'Search', placeholder: 'Title or note…',
+          accessor: (r: PlannedPayment) => [r.title, r.notes],
+        },
+        {
+          key: 'direction', type: 'multi', label: 'Direction',
+          options: [{ value: 'in', label: 'Incoming' }, { value: 'out', label: 'Outgoing' }],
+        },
+        {
+          key: 'status', type: 'multi', label: 'Status',
+          description: 'Open statuses keep the grouped by-due-date layout.',
+          options: ALL_STATUSES.map((s) => ({ value: s, label: humanizeLabel(s) })),
+        },
+        {
+          key: 'category', type: 'multi', label: 'Category',
+          options: optionsFromRows(rows, (r) => r.category, humanizeLabel),
+          accessor: (r: PlannedPayment) => r.category,
+        },
+      ],
+    },
+    {
+      key: 'amounts', label: 'Amounts', icon: Coins,
+      fields: [
+        {
+          key: 'amount', type: 'range', label: 'Amount',
+          min: 0, max: Math.max(Math.ceil(maxAmount / 10) * 10, 10),
+          accessor: (r: PlannedPayment) => r.amount,
+        },
+        {
+          key: 'currency', type: 'multi', label: 'Currency',
+          options: optionsFromRows(rows, (r) => r.currency),
+          accessor: (r: PlannedPayment) => r.currency,
+        },
+      ],
+    },
+    {
+      key: 'dates', label: 'Dates', icon: CalendarDays,
+      fields: [
+        {
+          key: 'scheduled_for', type: 'dateRange', label: 'Scheduled date',
+          description: 'Applied server-side — changing it reloads the list.',
+        },
+        { key: 'reminder_at', type: 'dateRange', label: 'Reminder date', accessor: (r: PlannedPayment) => r.reminder_at },
+      ],
+    },
+  ];
+}
 
 export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<PlannedPayment[]>([]);
-  const [filter, setFilter] = useState<'upcoming' | 'all' | 'paid' | 'overdue' | 'incoming' | 'outgoing'>('upcoming');
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
 
-  useEffect(() => { void load(); }, [workspaceId, filter]);
+  const filterGroups = useMemo(() => buildPlanningFilters(rows), [rows]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+    useFilters<PlannedPayment>(rows, filterGroups, { initial: { status: OPEN_STATUSES } });
+
+  // The three server-side dimensions, read straight out of the values bag.
+  const statusSel = (filterValues.status as PlannedPaymentStatus[] | undefined) ?? [];
+  const directionSel = (filterValues.direction as PlannedPaymentDirection[] | undefined) ?? [];
+  const scheduled = (filterValues.scheduled_for as DateRangeValue | undefined) ?? {};
+  // Serialized so the fetch effect re-runs on a real change, not on every values-object identity.
+  const fetchKey = JSON.stringify([statusSel, directionSel, scheduled]);
+  const filterKey = JSON.stringify(filterValues);
+  // Open-only selections keep the by-due-date grouping; asking for paid/cancelled rows makes the
+  // buckets meaningless (they skip those statuses), so those views fall back to a flat table.
+  const groupedLayout = statusSel.length > 0 && statusSel.every((s) => OPEN_STATUSES.includes(s));
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, fetchKey]);
 
   const load = async () => {
     try {
       setLoading(true);
-      const filterStatus: ('planned' | 'overdue' | 'paid' | 'cancelled')[] | undefined =
-        filter === 'all' ? undefined :
-        filter === 'paid' ? ['paid'] :
-        filter === 'overdue' ? ['overdue'] :
-        filter === 'incoming' || filter === 'outgoing' || filter === 'upcoming' ? ['planned', 'overdue'] :
-        undefined;
-      const direction = filter === 'incoming' ? 'in' : filter === 'outgoing' ? 'out' : undefined;
       const data = await financeService.listPlannedPayments({
-        workspaceId, status: filterStatus, direction,
+        workspaceId,
+        status: statusSel.length > 0 ? statusSel : undefined,
+        // One direction narrows in SQL; both (or none) means no direction predicate at all.
+        direction: directionSel.length === 1 ? directionSel[0] : undefined,
+        from: scheduled.from,
+        to: scheduled.to,
       });
       setRows(data);
     } catch (err: any) {
@@ -48,7 +128,7 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
   const grouped = useMemo(() => {
     const buckets = { overdue: [] as PlannedPayment[], today: [] as PlannedPayment[], next7: [] as PlannedPayment[], next30: [] as PlannedPayment[], later: [] as PlannedPayment[] };
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    for (const r of rows) {
+    for (const r of filtered) {
       const d = new Date(r.scheduled_for);
       const diff = Math.floor((d.getTime() - today.getTime()) / 86_400_000);
       if (r.status === 'paid' || r.status === 'cancelled') continue;
@@ -59,17 +139,17 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
       else buckets.later.push(r);
     }
     return buckets;
-  }, [rows]);
+  }, [filtered]);
 
   const totals = useMemo(() => {
     let inSum = 0, outSum = 0;
-    for (const r of rows) {
+    for (const r of filtered) {
       if (r.status !== 'planned' && r.status !== 'overdue') continue;
       if (r.direction === 'in') inSum += Number(r.amount);
       else outSum += Number(r.amount);
     }
     return { inSum, outSum, net: inSum - outSum };
-  }, [rows]);
+  }, [filtered]);
 
   const markPaid = async (row: PlannedPayment) => {
     try {
@@ -101,17 +181,14 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
           <p className="text-xs text-muted-foreground">Scheduled future payments and expected receipts. Marking Paid creates a real payment + allocation.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="upcoming">Upcoming (open)</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="incoming">Incoming only</SelectItem>
-              <SelectItem value="outgoing">Outgoing only</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="all">All</SelectItem>
-            </SelectContent>
-          </Select>
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            searchPlaceholder="Title or note…"
+            title="Filter planned payments"
+          />
           <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add planned payment</Button>
         </div>
       </div>
@@ -134,11 +211,13 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-      ) : rows.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
-          No planned payments. Click "Add planned payment" to schedule one.
+          {rows.length === 0
+            ? 'No planned payments. Click "Add planned payment" to schedule one.'
+            : 'No planned payments match the filters.'}
         </CardContent></Card>
-      ) : (filter === 'upcoming' || filter === 'overdue') ? (
+      ) : groupedLayout ? (
         <div className="space-y-4">
           {grouped.overdue.length > 0 && <Section title="Overdue" rows={grouped.overdue} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} accent="destructive" />}
           {grouped.today.length > 0 && <Section title="Due today" rows={grouped.today} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />}
@@ -147,8 +226,8 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
           {grouped.later.length > 0 && <Section title="Later" rows={grouped.later} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />}
         </div>
       ) : (
-        /* keyed on the filter so switching it remounts the table at page 1 */
-        <FlatTable key={filter} rows={rows} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />
+        /* keyed on the filter state so changing it remounts the table at page 1 */
+        <FlatTable key={filterKey} rows={filtered} onMarkPaid={markPaid} onCancel={cancel} markingId={markingId} />
       )}
 
       <NewPlannedPaymentDialog

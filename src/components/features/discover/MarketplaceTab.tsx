@@ -1,29 +1,22 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Package, MapPin, Store, Loader2, Tag, Truck, ShieldAlert, Bell, X, SlidersHorizontal } from 'lucide-react';
+import { Package, MapPin, Store, Loader2, Tag, Truck, ShieldAlert, Bell, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Textarea } from '@/components/core/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
+import { FilterBar, type FilterValues, type RangeValue } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatMaterialCategory } from '@/utils/productMetadata';
-import { MATERIAL_CATS, catLabel } from '@/lib/materialCategories';
+import { catLabel } from '@/lib/materialCategories';
 import { marketplaceService, type MarketplaceListing, type WantList } from '@/services/marketplaceService';
-
-const CONDITION_LABEL: Record<string, string> = {
-  new: 'New', open_box: 'Open box', remnant: 'Remnant', lot: 'Mixed lot',
-};
-const DELIVERY_LABEL: Record<string, string> = {
-  pickup: 'Pickup only', ship: 'Shipping', both: 'Pickup or shipping',
-};
+import { CONDITION_LABEL, DELIVERY_LABEL, buildMarketplaceFilters, toBrowseFilters } from './marketplaceFilters';
 
 function Empty({ text }: { text: string }) {
   return (
@@ -179,12 +172,7 @@ function ListingDetailModal({
 
 // ─── Tab ──────────────────────────────────────────────────────────────────────
 
-const chipClass = (on: boolean) =>
-  `rounded-full border px-2.5 py-1 text-xs transition-colors cursor-pointer ${
-    on
-      ? 'border-primary bg-primary text-primary-foreground'
-      : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
-  }`;
+const PAGE_LIMIT = 60;
 
 export const MarketplaceTab: React.FC = () => {
   const { toast } = useToast();
@@ -192,26 +180,15 @@ export const MarketplaceTab: React.FC = () => {
   const { user } = useAuth();
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [cat, setCat] = useState('all');
-  // Multi-filters
-  const [conditions, setConditions] = useState<string[]>([]);
-  const [deliveries, setDeliveries] = useState<string[]>([]);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [city, setCity] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [values, setValues] = useState<FilterValues>({});
+  // Highest price seen so far — the slider end must not shrink as the result set narrows.
+  const [priceCeiling, setPriceCeiling] = useState(1000);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [selected, setSelected] = useState<MarketplaceListing | null>(null);
   const [wantLists, setWantLists] = useState<WantList[]>([]);
   const seq = useRef(0);
 
-  const activeFilterCount =
-    (conditions.length ? 1 : 0) + (deliveries.length ? 1 : 0) +
-    (minPrice ? 1 : 0) + (maxPrice ? 1 : 0) + (city.trim() ? 1 : 0);
-  const clearFilters = () => { setConditions([]); setDeliveries([]); setMinPrice(''); setMaxPrice(''); setCity(''); };
-  const toggle = (arr: string[], set: (v: string[]) => void, v: string) =>
-    set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
+  const groups = useMemo(() => buildMarketplaceFilters(priceCeiling), [priceCeiling]);
 
   const loadAlerts = async () => {
     try { setWantLists(await marketplaceService.listWantLists()); } catch { setWantLists([]); }
@@ -219,17 +196,19 @@ export const MarketplaceTab: React.FC = () => {
   useEffect(() => { void loadAlerts(); }, []);
 
   // A saved alert must carry at least a category or a keyword (no match-all alerts).
-  const canAlert = cat !== 'all' || search.trim().length > 0;
+  const keyword = ((values.q as string) ?? '').trim();
+  const category = (values.material_category as string) || '';
+  const canAlert = !!category || keyword.length > 0;
   const createAlert = async () => {
     if (!activeWorkspaceId || !user?.id) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
     try {
       await marketplaceService.createWantList({
         userId: user.id, workspaceId: activeWorkspaceId,
-        materialCategory: cat === 'all' ? null : cat,
-        keyword: search.trim() || null,
-        maxPrice: maxPrice ? parseFloat(maxPrice) : null,
-        locationCity: city.trim() || null,
-        label: search.trim() || (cat !== 'all' ? catLabel(cat) : 'Surplus alert'),
+        materialCategory: category || null,
+        keyword: keyword || null,
+        maxPrice: (values.price as RangeValue | undefined)?.max ?? null,
+        locationCity: ((values.city as string) ?? '').trim() || null,
+        label: keyword || (category ? catLabel(category) : 'Surplus alert'),
       });
       toast({ title: 'Alert saved', description: "We'll email you when matching surplus is listed." });
       await loadAlerts();
@@ -245,17 +224,12 @@ export const MarketplaceTab: React.FC = () => {
     const mySeq = ++seq.current;
     setLoading(true);
     try {
-      const rows = await marketplaceService.browse({
-        q: search.trim() || undefined,
-        materialCategory: cat === 'all' ? undefined : cat,
-        conditions: conditions.length ? conditions : undefined,
-        deliveries: deliveries.length ? deliveries : undefined,
-        minPrice: minPrice ? parseFloat(minPrice) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
-        city: city.trim() || undefined,
-        limit: 60,
-      });
-      if (mySeq === seq.current) setListings(rows);
+      const rows = await marketplaceService.browse({ ...toBrowseFilters(values), limit: PAGE_LIMIT });
+      if (mySeq === seq.current) {
+        setListings(rows);
+        const max = Math.max(0, ...rows.map((r) => Number(r.price) || 0));
+        setPriceCeiling((prev) => Math.max(prev, Math.ceil(max / 100) * 100));
+      }
     } catch {
       if (mySeq === seq.current) setListings([]);
     } finally {
@@ -268,81 +242,34 @@ export const MarketplaceTab: React.FC = () => {
     const t = setTimeout(() => { void load(); }, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, cat, conditions, deliveries, minPrice, maxPrice, city]);
+  }, [values]);
 
-  const count = useMemo(() => listings.length, [listings]);
+  // The modal's "Show N results" runs the same capped query the tab will run on Apply, so
+  // the number it promises is exactly what lands. Stable identity — the modal re-runs it on
+  // every identity change, and a fresh closure per render would refetch on unrelated renders.
+  const previewCount = useCallback(
+    async (draft: FilterValues) =>
+      (await marketplaceService.browse({ ...toBrowseFilters(draft), limit: PAGE_LIMIT })).length,
+    [],
+  );
+
+  const count = listings.length;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search surplus by name or seller…" className="pl-9" />
-        </div>
-        <Select value={cat} onValueChange={setCat}>
-          <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {MATERIAL_CATS.map((c) => <SelectItem key={c} value={c}>{catLabel(c)}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        {/* Multi-filters */}
-        <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="rounded-full gap-1.5 shrink-0">
-              <SlidersHorizontal className="h-4 w-4" /> Filters
-              {activeFilterCount > 0 && (
-                <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] text-primary-foreground">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-80 rounded-2xl p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="font-display text-sm font-semibold">Filters</span>
-              {activeFilterCount > 0 && (
-                <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">Clear all</button>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Condition</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {Object.entries(CONDITION_LABEL).map(([v, l]) => (
-                  <button key={v} type="button" onClick={() => toggle(conditions, setConditions, v)} className={chipClass(conditions.includes(v))}>{l}</button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Delivery</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {Object.entries(DELIVERY_LABEL).map(([v, l]) => (
-                  <button key={v} type="button" onClick={() => toggle(deliveries, setDeliveries, v)} className={chipClass(deliveries.includes(v))}>{l}</button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Price (€)</Label>
-              <div className="flex items-center gap-2">
-                <Input type="number" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="Min" className="h-9" />
-                <span className="text-muted-foreground">–</span>
-                <Input type="number" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Max" className="h-9" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">City</Label>
-              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Athens" className="h-9" />
-            </div>
-            <Button size="sm" className="w-full" onClick={() => setFiltersOpen(false)}>Show {count} result{count === 1 ? '' : 's'}</Button>
-          </PopoverContent>
-        </Popover>
-
-        {/* Surplus alerts */}
+      <FilterBar
+        groups={groups}
+        values={values}
+        onChange={setValues}
+        previewCount={previewCount}
+        title="Filter surplus"
+        searchPlaceholder="Search surplus by name or seller…"
+      >
+        {/* Surplus alerts — saves the CURRENT filter set as a want list. */}
         <Popover open={alertsOpen} onOpenChange={setAlertsOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="icon" className="rounded-full shrink-0 relative" title="Surplus alerts" aria-label="Surplus alerts">
-              <Bell className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-8 w-8 rounded-full shrink-0 relative" title="Surplus alerts" aria-label="Surplus alerts">
+              <Bell className="h-3.5 w-3.5" />
               {wantLists.length > 0 && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
             </Button>
           </PopoverTrigger>
@@ -370,20 +297,12 @@ export const MarketplaceTab: React.FC = () => {
             )}
           </PopoverContent>
         </Popover>
-      </div>
+      </FilterBar>
 
-      {/* Results meta + relocated context line */}
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          {loading ? 'Searching…' : `${count} listing${count === 1 ? '' : 's'}`}
-          <span className="hidden sm:inline"> · surplus &amp; last-stock, contact sellers directly</span>
-        </p>
-        {activeFilterCount > 0 && (
-          <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 cursor-pointer">
-            <X className="h-3 w-3" /> Clear filters
-          </button>
-        )}
-      </div>
+      <p className="text-xs text-muted-foreground">
+        {loading ? 'Searching…' : `${count} listing${count === 1 ? '' : 's'}`}
+        <span className="hidden sm:inline"> · surplus &amp; last-stock, contact sellers directly</span>
+      </p>
 
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

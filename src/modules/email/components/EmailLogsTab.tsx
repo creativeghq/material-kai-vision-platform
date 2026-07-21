@@ -3,15 +3,15 @@
  * View and filter email sending logs
  */
 
-import React, { useState, useEffect } from 'react';
-import { Mail, Filter, Download, Eye } from 'lucide-react';
-import { Card, CardContent } from '@/components/core/ui/card';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Download } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { emailService, EmailLog } from '../services/emailService';
+import { buildEmailLogFilters } from './emailFilters';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { humanizeLabel } from '@/utils/humanize';
@@ -19,14 +19,23 @@ import { humanizeLabel } from '@/utils/humanize';
 export const EmailLogsTab: React.FC = () => {
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const { toast } = useToast();
+
+  const filterGroups = useMemo(() => buildEmailLogFilters(logs), [logs]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+    useFilters<EmailLog>(logs, filterGroups);
+
+  // status + email_type are the server-side fields; changing either re-queries.
+  const statusFilter = (filterValues.status as string) || 'all';
+  const typeFilter = (filterValues.email_type as string) || 'all';
 
   useEffect(() => {
     loadLogs();
   }, [statusFilter, typeFilter]);
+
+  // Client-side narrowing shrinks the list — don't strand the user on a now-empty page.
+  useEffect(() => { setPage((p) => clampPage(p, filtered.length)); }, [filtered.length]);
 
   const loadLogs = async () => {
     try {
@@ -72,7 +81,7 @@ export const EmailLogsTab: React.FC = () => {
   const exportLogs = () => {
     const csv = [
       ['Date', 'To', 'From', 'Subject', 'Status', 'Type'].join(','),
-      ...logs.map(log => [
+      ...filtered.map(log => [
         log.sent_at ? format(new Date(log.sent_at), 'yyyy-MM-dd HH:mm:ss') : 'N/A',
         log.to_email,
         log.from_email,
@@ -105,39 +114,19 @@ export const EmailLogsTab: React.FC = () => {
             View all sent emails and their delivery status
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="queued">Queued</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="bounced">Bounced</SelectItem>
-              <SelectItem value="complained">Complained</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="transactional">Transactional</SelectItem>
-              <SelectItem value="marketing">Marketing</SelectItem>
-              <SelectItem value="notification">Notification</SelectItem>
-            </SelectContent>
-          </Select>
-
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          title="Filter email logs"
+          searchPlaceholder="Search recipient / subject…"
+        >
           <Button variant="outline" onClick={exportLogs}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-        </div>
+        </FilterBar>
       </div>
 
       <div className="dashboard-card p-0">
@@ -145,7 +134,7 @@ export const EmailLogsTab: React.FC = () => {
           <div className="py-8 text-center text-muted-foreground">
             Loading email logs...
           </div>
-        ) : logs.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
             No email logs found
           </div>
@@ -164,7 +153,7 @@ export const EmailLogsTab: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginate(logs, page).map((log) => (
+                {paginate(filtered, page).map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="text-sm">
                       {log.sent_at ? format(new Date(log.sent_at), 'MMM dd, HH:mm') : 'Pending'}
@@ -185,7 +174,7 @@ export const EmailLogsTab: React.FC = () => {
             </Table>
             <TablePagination
               page={page}
-              total={logs.length}
+              total={filtered.length}
               onPageChange={setPage}
               label="emails"
             />

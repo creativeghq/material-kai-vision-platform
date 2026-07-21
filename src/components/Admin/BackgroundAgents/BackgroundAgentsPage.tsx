@@ -14,12 +14,11 @@ import {
 import { Button }  from '@/components/core/ui/button';
 import { Badge }   from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/core/ui/select';
+import { FilterBar, applyFilters, useFilters } from '@/components/core/filters';
 import { AgentLogsViewer }     from './AgentLogsViewer';
 import { AgentRunHistoryDrawer } from './AgentRunHistoryDrawer';
 import { ChatActivityTab }     from './ChatActivityTab';
+import { buildAgentRunFilters } from './backgroundAgentFilters';
 import {
   listAgents, listAllRuns, cancelRun,
   formatDuration, statusColor, isStuck,
@@ -56,7 +55,6 @@ export function BackgroundAgentsPage() {
   const [runs,         setRuns]         = useState<AgentRun[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [agentFilter,  setAgentFilter]  = useState<string>('all');
   const [expanded,     setExpanded]     = useState<string | null>(null);
   const [historyAgent, setHistoryAgent] = useState<BackgroundAgent | null>(null);
 
@@ -98,14 +96,17 @@ export function BackgroundAgentsPage() {
     return agentMap.get(run.agent_id)?.name ?? 'Background Task';
   };
 
-  // Apply filters
+  const filterGroups = useMemo(() => buildAgentRunFilters(runs, agents), [runs, agents]);
+  const { values: filterValues, setValues: setFilterValues, filtered: scoped, previewCount } =
+    useFilters<AgentRun>(runs, filterGroups);
+
+  // Status is the tab strip, every other dimension is the modal — so the tab counters below
+  // are computed over the modal-narrowed set and the two can never disagree.
   const filtered = useMemo(() => {
-    let out = runs;
-    if (agentFilter !== 'all') out = out.filter(r => r.agent_id === agentFilter);
-    if (statusFilter === 'stuck') out = out.filter(isStuck);
-    else if (statusFilter !== 'all') out = out.filter(r => r.status === statusFilter);
-    return out;
-  }, [runs, agentFilter, statusFilter]);
+    if (statusFilter === 'stuck') return scoped.filter(isStuck);
+    if (statusFilter !== 'all') return scoped.filter(r => r.status === statusFilter);
+    return scoped;
+  }, [scoped, statusFilter]);
 
   // Synthetic "problem" rows injected at top of the tasks list — agent-level health
   // issues that aren't tied to a single run (disabled cron, never-fired schedule, etc.).
@@ -116,11 +117,10 @@ export function BackgroundAgentsPage() {
     detail: string;
   };
 
-  /** All agent-level alerts, respecting agentFilter only — used for tab counters. */
+  /** All agent-level alerts, narrowed by the same filter values — used for tab counters. */
   const allAlerts: AgentAlert[] = useMemo(() => {
     const alerts: AgentAlert[] = [];
     agents.forEach(a => {
-      if (agentFilter !== 'all' && a.id !== agentFilter) return;
       if (!a.enabled && (a.trigger_type === 'cron' || a.trigger_type === 'event')) {
         alerts.push({ key: `${a.id}-disabled`, agent: a, kind: 'disabled',
           detail: `${a.trigger_type} agent is disabled — it will never fire` });
@@ -131,8 +131,21 @@ export function BackgroundAgentsPage() {
       }
       // "last-failed" is already visible as the real failed run in the list.
     });
-    return alerts;
-  }, [agents, agentFilter]);
+    // An alert has no run row, so match it through a run-shaped stand-in — that way the
+    // agent / trigger / date constraints apply to alerts exactly as they do to runs.
+    return alerts.filter(al => applyFilters(
+      [{
+        agent_id:      al.agent.id,
+        input_data:    { task_prompt: `${al.agent.name} — ${al.detail}` },
+        error_message: al.detail,
+        model_used:    null,
+        created_at:    al.agent.last_run_at ?? al.agent.created_at,
+        started_at:    al.agent.last_run_at,
+      }],
+      filterGroups,
+      filterValues,
+    ).length > 0);
+  }, [agents, filterGroups, filterValues]);
 
   /** Alerts visible under the currently-selected status tab. */
   const agentAlerts: AgentAlert[] = useMemo(() => {
@@ -147,14 +160,14 @@ export function BackgroundAgentsPage() {
     // the user actually sees when they click that tab (no phantom rows).
     const alertsN = allAlerts.length;
     return {
-      total:     runs.length + alertsN,
-      running:   runs.filter(r => r.status === 'processing' || r.status === 'pending').length,
-      completed: runs.filter(r => r.status === 'completed').length,
-      failed:    runs.filter(r => r.status === 'failed').length + alertsN,
-      cancelled: runs.filter(r => r.status === 'cancelled').length,
-      stuck:     runs.filter(isStuck).length + alertsN,
+      total:     scoped.length + alertsN,
+      running:   scoped.filter(r => r.status === 'processing' || r.status === 'pending').length,
+      completed: scoped.filter(r => r.status === 'completed').length,
+      failed:    scoped.filter(r => r.status === 'failed').length + alertsN,
+      cancelled: scoped.filter(r => r.status === 'cancelled').length,
+      stuck:     scoped.filter(isStuck).length + alertsN,
     };
-  }, [runs, allAlerts]);
+  }, [scoped, allAlerts]);
 
   return (
     <div className="px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -221,17 +234,14 @@ export function BackgroundAgentsPage() {
           </TabsList>
         </Tabs>
 
-        <Select value={agentFilter} onValueChange={setAgentFilter}>
-          <SelectTrigger className="w-[220px] rounded-full">
-            <SelectValue placeholder="All agents" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All agents</SelectItem>
-            {agents.map(a => (
-              <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          title="Filter background runs"
+          searchPlaceholder="Search task, agent, error…"
+        />
       </div>
 
       {/* Task list */}

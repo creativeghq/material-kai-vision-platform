@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ClipboardList, CheckCircle2, XCircle, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -13,6 +13,8 @@ import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { warehouseService, type Warehouse } from '@/services/warehouseService';
 import { stockService, type StockCount, type StockCountLine } from '../services/stockService';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildStockCountFilters } from './stockCountFilters';
 
 const STATUS_META: Record<string, { cls: string; label: string }> = {
   draft: { cls: 'border-amber-500/50 text-amber-500', label: 'Draft' },
@@ -48,18 +50,38 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
   };
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId]);
 
+  const filterGroups = useMemo(() => buildStockCountFilters(counts), [counts]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount } =
+    useFilters<StockCount>(counts, filterGroups);
+  // A narrowed list is a different list — restart at the first page.
+  useEffect(() => { setPage(1); }, [filterValues]);
+
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle className="text-sm flex items-center gap-2"><ClipboardList className="h-4 w-4" /> Stock counts (stocktake)</CardTitle>
-        <Button size="sm" className="rounded-full" onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New count</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {counts.length > 0 && (
+            <FilterBar
+              groups={filterGroups}
+              values={filterValues}
+              onChange={setFilterValues}
+              previewCount={previewCount}
+              title="Filter stock counts"
+              searchPlaceholder="Search counts…"
+            />
+          )}
+          <Button size="sm" className="rounded-full" onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New count</Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-        ) : counts.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            No stock counts yet. Start one to reconcile physical stock against the system.
+            {activeCount > 0
+              ? 'No stock counts match your filters.'
+              : 'No stock counts yet. Start one to reconcile physical stock against the system.'}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -74,7 +96,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
               </tr>
             </thead>
             <tbody>
-              {paginate(counts, page).map((c) => {
+              {paginate(filtered, page).map((c) => {
                 const meta = STATUS_META[c.status] ?? STATUS_META.draft;
                 return (
                   <tr key={c.id} className="border-b border-border/30">
@@ -94,7 +116,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
             </tbody>
           </table>
         )}
-        {!loading && <TablePagination page={page} total={counts.length} onPageChange={setPage} label="counts" />}
+        {!loading && <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="counts" />}
       </CardContent>
 
       <NewCountDialog open={newOpen} onOpenChange={setNewOpen} workspaceId={workspaceId}

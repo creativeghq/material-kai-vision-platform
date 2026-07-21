@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap, ExternalLink, FileUp, FileText, Wand2, Zap, Trash2, Lock, LockOpen, Pencil, Link as LinkIcon } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -18,6 +18,8 @@ import {
 } from '../services/hrService';
 import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
 import { parseDecimal } from '@/utils/decimal';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildPostingFilters } from './hrFilters';
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'outline'> = { open: 'default', draft: 'secondary', closed: 'outline' };
 
@@ -42,6 +44,11 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
   }, [workspaceId, toast]);
   useEffect(() => { void load(); }, [load]);
 
+  // Status stays on the tab strip; the modal carries everything else.
+  const filterGroups = useMemo(() => buildPostingFilters(postings, departments), [postings, departments]);
+  const { values: filterValues, setValues: setFilterValues, filtered: matched, previewCount } =
+    useFilters<JobPosting>(postings, filterGroups);
+
   if (loading) return <Skeleton className="h-64 w-full" />;
   if (!workspaceId) return null;
 
@@ -57,7 +64,7 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
   }
 
   const counts = { open: postings.filter((p) => p.status === 'open').length, draft: postings.filter((p) => p.status === 'draft').length, closed: postings.filter((p) => p.status === 'closed').length };
-  const shown = posFilter === 'all' ? postings : postings.filter((p) => p.status === posFilter);
+  const shown = posFilter === 'all' ? matched : matched.filter((p) => p.status === posFilter);
 
   return (
     <div className="space-y-4">
@@ -75,14 +82,26 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
           </div>
         }
       />
-      <Tabs value={posFilter} onValueChange={(v) => setPosFilter(v as PostingStatus | 'all')}>
-        <TabsList>
-          <TabsTrigger value="open">Open ({counts.open})</TabsTrigger>
-          <TabsTrigger value="draft">Drafts ({counts.draft})</TabsTrigger>
-          <TabsTrigger value="closed">Closed ({counts.closed})</TabsTrigger>
-          <TabsTrigger value="all">All</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs value={posFilter} onValueChange={(v) => setPosFilter(v as PostingStatus | 'all')}>
+          <TabsList>
+            <TabsTrigger value="open">Open ({counts.open})</TabsTrigger>
+            <TabsTrigger value="draft">Drafts ({counts.draft})</TabsTrigger>
+            <TabsTrigger value="closed">Closed ({counts.closed})</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {postings.length > 0 && (
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            title="Filter positions"
+            searchPlaceholder="Search positions…"
+          />
+        )}
+      </div>
       {shown.length === 0 ? (
         <Card><CardContent><EmptyState icon={Briefcase} title={postings.length === 0 ? 'No job postings yet' : `No ${posFilter} positions`} hint={canManage && postings.length === 0 ? 'Create a job — the AI can draft the description for you.' : undefined} /></CardContent></Card>
       ) : (

@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
+import { buildContractFilters } from './contractFilters';
 
 const TABS = [
   { value: 'all', label: 'All' },
@@ -48,6 +49,7 @@ export default function ContractsPage() {
                 workspaceId={ws}
                 context={t.value}
                 heading={t.value === 'all' ? 'All contracts' : `${t.label} contracts`}
+                filterGroups={buildContractFilters}
               />
             </TabsContent>
           ))}

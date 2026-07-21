@@ -5,10 +5,8 @@
  * from PDF processing pipeline. Supports filtering, editing, and statistics.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Filter,
-  Search,
   Edit,
   Trash2,
   BarChart3,
@@ -30,13 +28,6 @@ import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -45,6 +36,12 @@ import {
   TableRow,
 } from '@/components/core/ui/table';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import {
+  FilterBar,
+  optionsFromRows,
+  useFilters,
+  type FilterGroupDef,
+} from '@/components/core/filters';
 import {
   Dialog,
   DialogContent,
@@ -122,12 +119,46 @@ export const MetadataManagement: React.FC = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Filters (applied client-side after one fetch)
-  const [confidenceFilter, setConfidenceFilter] = useState<string>('0.0');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Everything is client-side here: the whole metadata set is flattened out of one
+  // `products` fetch, so there is no column to push a predicate onto.
+  const filterGroups = useMemo<FilterGroupDef[]>(() => [
+    {
+      key: 'general', label: 'Field', icon: Database,
+      fields: [
+        {
+          key: 'q', type: 'text', label: 'Search',
+          placeholder: 'Search field name, value, product, or document…',
+          accessor: (i: MetadataItem) => [i.field_name, i.field_value, i.product_name, i.document_name],
+        },
+        {
+          key: 'field_name', type: 'multi', label: 'Field name',
+          options: optionsFromRows(metadata, (i: MetadataItem) => i.field_name),
+          accessor: (i: MetadataItem) => i.field_name,
+        },
+        {
+          key: 'document_name', type: 'multi', label: 'Document',
+          options: optionsFromRows(metadata, (i: MetadataItem) => i.document_name),
+          accessor: (i: MetadataItem) => i.document_name,
+        },
+      ],
+    },
+    {
+      key: 'quality', label: 'Quality', icon: BarChart3,
+      fields: [
+        {
+          key: 'confidence', type: 'range', label: 'Confidence',
+          description: 'Per-field confidence from _extraction_metadata, falling back to the product-level score.',
+          min: 0, max: 1, step: 0.05,
+          accessor: (i: MetadataItem) => i.confidence,
+        },
+      ],
+    },
+  ], [metadata]);
+
+  const { values, setValues, filtered: filteredMetadata, previewCount } = useFilters<MetadataItem>(metadata, filterGroups);
 
   useEffect(() => {
     loadMetadata();
@@ -136,7 +167,7 @@ export const MetadataManagement: React.FC = () => {
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [confidenceFilter, searchQuery]);
+  }, [values]);
 
   const loadMetadata = async () => {
     try {
@@ -241,25 +272,6 @@ export const MetadataManagement: React.FC = () => {
       setLoading(false);
     }
   };
-
-  // Client-side filtering — applied after the single DB fetch
-  const filteredMetadata = metadata.filter((item) => {
-    if (item.confidence < parseFloat(confidenceFilter)) return false;
-
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      if (
-        !item.field_name.toLowerCase().includes(q) &&
-        !item.field_value.toLowerCase().includes(q) &&
-        !item.product_name.toLowerCase().includes(q) &&
-        !item.document_name.toLowerCase().includes(q)
-      ) {
-        return false;
-      }
-    }
-
-    return true;
-  });
 
   const paginatedMetadata = paginate(filteredMetadata, currentPage);
 
@@ -516,51 +528,20 @@ export const MetadataManagement: React.FC = () => {
           </div>
         )}
 
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label>Min Confidence</Label>
-                <Select value={confidenceFilter} onValueChange={setConfidenceFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0.0">All (≥0.0)</SelectItem>
-                    <SelectItem value="0.5">Medium+ (≥0.5)</SelectItem>
-                    <SelectItem value="0.7">High+ (≥0.7)</SelectItem>
-                    <SelectItem value="0.9">Very High (≥0.9)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="md:col-span-2">
-                <Label>Search</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search field name, value, product, or document..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Metadata Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Metadata List ({filteredMetadata.length} items)</CardTitle>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle>Metadata List ({filteredMetadata.length} items)</CardTitle>
+              <FilterBar
+                groups={filterGroups}
+                values={values}
+                onChange={setValues}
+                previewCount={previewCount}
+                title="Filter metadata"
+                searchPlaceholder="Search field / value / product…"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (

@@ -22,6 +22,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildMentionFeedFilters } from './mentionFilters';
 import {
   TrackedMention, MentionRow, MentionSummary, LlmVisibilitySnapshot,
   trackProduct, untrackProduct, getProductMonitoring, refreshProduct,
@@ -65,7 +67,12 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [probing, setProbing] = useState(false);
-  const [filterSentiment, setFilterSentiment] = useState<string>('');
+
+  const feedFilterGroups = useMemo(() => buildMentionFeedFilters(feed), [feed]);
+  const {
+    values: feedFilterValues, setValues: setFeedFilterValues,
+    filtered: filteredFeed, previewCount: feedPreviewCount,
+  } = useFilters<MentionRow>(feed, feedFilterGroups);
 
 
   const load = useCallback(async () => {
@@ -167,11 +174,6 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
       toast({ title: 'Correction failed', description: String(e?.message || e), variant: 'destructive' });
     }
   }, [toast, load]);
-
-  const filteredFeed = useMemo(() => {
-    if (!filterSentiment) return feed;
-    return feed.filter((r) => r.sentiment === filterSentiment);
-  }, [feed, filterSentiment]);
 
   const enabled = !!tracked?.is_active;
 
@@ -281,19 +283,21 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
           {/* Main tabs */}
           <Tabs defaultValue="feed">
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-              <TabsTrigger value="feed" className="flex items-center gap-2">Feed ({feed.length})</TabsTrigger>
+              <TabsTrigger value="feed" className="flex items-center gap-2">Feed ({filteredFeed.length})</TabsTrigger>
               <TabsTrigger value="outlets" className="flex items-center gap-2">Outlets</TabsTrigger>
               <TabsTrigger value="llm" className="flex items-center gap-2">LLM Visibility</TabsTrigger>
             </TabsList>
 
             {/* Feed */}
             <TabsContent value="feed" className="space-y-3 mt-4">
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant={!filterSentiment ? 'default' : 'outline'} onClick={() => setFilterSentiment('')} className="rounded-full">All</Button>
-                <Button size="sm" variant={filterSentiment === 'positive' ? 'default' : 'outline'} onClick={() => setFilterSentiment('positive')} className="rounded-full">Positive</Button>
-                <Button size="sm" variant={filterSentiment === 'neutral' ? 'default' : 'outline'} onClick={() => setFilterSentiment('neutral')} className="rounded-full">Neutral</Button>
-                <Button size="sm" variant={filterSentiment === 'negative' ? 'default' : 'outline'} onClick={() => setFilterSentiment('negative')} className="rounded-full">Negative</Button>
-              </div>
+              <FilterBar
+                groups={feedFilterGroups}
+                values={feedFilterValues}
+                onChange={setFeedFilterValues}
+                previewCount={feedPreviewCount}
+                title="Filter mentions"
+                searchPlaceholder="Search title, excerpt, outlet…"
+              />
 
               <Card className="dashboard-card">
                 <CardContent className="p-0">

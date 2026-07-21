@@ -27,6 +27,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import { TablePagination, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
+import { FilterBar, type FilterGroupDef, type FilterValues } from '@/components/core/filters';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
@@ -37,6 +38,29 @@ import {
 const STATUS_TONE: Record<OrderStatus, string> = {
   draft: 'secondary', confirmed: 'outline', partially_fulfilled: 'outline', fulfilled: 'default', cancelled: 'destructive',
 };
+
+/**
+ * Orders filter every dimension in SQL (`search_orders` RPC), so NO field carries an accessor —
+ * they are read out of the values bag and passed as RPC params, and the list keeps the server's
+ * exact count. Date / total ranges are deliberately absent: the RPC has no parameters for them
+ * and post-filtering a page in the browser would make the count and the paging lie.
+ */
+const ORDER_FILTER_GROUPS: FilterGroupDef[] = [
+  {
+    key: 'general', label: 'General', icon: ShoppingCart,
+    fields: [
+      { key: 'q', type: 'text', label: 'Search', placeholder: 'Party or number' },
+      {
+        key: 'order_type', type: 'select', label: 'Type',
+        options: [{ value: 'sales', label: 'Sales' }, { value: 'purchase', label: 'Purchase' }],
+      },
+      {
+        key: 'status', type: 'select', label: 'Status',
+        options: (Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => ({ value: s, label: ORDER_STATUS_LABEL[s] })),
+      },
+    ],
+  },
+];
 
 type Party = { type: 'company' | 'contact'; id: string; name: string; vat?: string | null; sub?: string | null };
 const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct ?? 0;
@@ -64,11 +88,12 @@ export const OrdersPanel: React.FC<{
   // Total MATCHING rows as counted by the server — the list itself only ever holds one page.
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [typeF, setTypeF] = useState<'all' | OrderType>('all');
-  const [statusF, setStatusF] = useState<'all' | OrderStatus>('all');
-  // `search` is what the user is typing; `searchQ` is the debounced value the query actually runs
-  // on, so a fast typist doesn't fire a round trip per keystroke.
-  const [search, setSearch] = useState('');
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  const typeF = filterValues.order_type as OrderType | undefined;
+  const statusF = filterValues.status as OrderStatus | undefined;
+  // `filterValues.q` is what the user is typing; `searchQ` is the debounced value the query
+  // actually runs on, so a fast typist doesn't fire a round trip per keystroke.
+  const search = (filterValues.q as string | undefined) ?? '';
   const [searchQ, setSearchQ] = useState('');
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
@@ -117,8 +142,8 @@ export const OrdersPanel: React.FC<{
       setLoading(true);
       const res = await ordersService.search({
         workspaceId, companyId, contactId, projectId,
-        orderType: typeF === 'all' ? undefined : typeF,
-        status: statusF === 'all' ? undefined : statusF,
+        orderType: typeF,
+        status: statusF,
         search: searchQ || undefined,
         limit: TABLE_PAGE_SIZE,
         offset: (page - 1) * TABLE_PAGE_SIZE,
@@ -147,6 +172,19 @@ export const OrdersPanel: React.FC<{
   // A different party/project scope is a different result set — start it at the first page.
   useEffect(() => { setPage(1); }, [companyId, contactId, projectId]);
 
+  // The modal's live count comes from the server too (one row, exact total) — a client-side count
+  // would only ever see the current page.
+  const previewCount = async (v: FilterValues) => {
+    const res = await ordersService.search({
+      workspaceId, companyId, contactId, projectId,
+      orderType: v.order_type as OrderType | undefined,
+      status: v.status as OrderStatus | undefined,
+      search: (v.q as string | undefined)?.trim() || undefined,
+      limit: 1, offset: 0,
+    });
+    return res.count;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -158,35 +196,14 @@ export const OrdersPanel: React.FC<{
           {/* Filters only matter on the global Finance list. Inside a single party the list is
               short and already scoped — the dropdowns are just noise there. */}
           {!embedded && (
-            <>
-              <div className="space-y-1">
-                <Label className="block text-[10px] text-muted-foreground">Type</Label>
-                <Select value={typeF} onValueChange={(v: any) => { setTypeF(v); setPage(1); }}>
-                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="sales">Sales</SelectItem>
-                    <SelectItem value="purchase">Purchase</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="block text-[10px] text-muted-foreground">Status</Label>
-                <Select value={statusF} onValueChange={(v: any) => { setStatusF(v); setPage(1); }}>
-                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => (
-                      <SelectItem key={s} value={s}>{ORDER_STATUS_LABEL[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="block text-[10px] text-muted-foreground">Search</Label>
-                <Input placeholder="Party or number" value={search} onChange={(e) => setSearch(e.target.value)} className="w-52" />
-              </div>
-            </>
+            <FilterBar
+              groups={ORDER_FILTER_GROUPS}
+              values={filterValues}
+              onChange={(next) => { setFilterValues(next); setPage(1); }}
+              previewCount={previewCount}
+              searchPlaceholder="Party or number"
+              title="Filter orders"
+            />
           )}
           {/* One entry point, one dropdown — the order kind is an explicit choice in the menu
               (a "pre-order" is just a sales order saved as a draft). */}

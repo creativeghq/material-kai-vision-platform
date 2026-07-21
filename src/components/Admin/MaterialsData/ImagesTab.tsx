@@ -1,18 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
-import { Search, Eye, Loader2, FileText, Code, Globe, Image as ImageIcon, Database } from 'lucide-react';
+import { Loader2, FileText, Code, Globe, Image as ImageIcon, Database } from 'lucide-react';
+import { FilterBar, applyFiltersToQuery, type FilterValues } from '@/components/core/filters';
+import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -34,8 +28,6 @@ interface ImagesTabProps {
 export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
   const [images, setImages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
   const [imageEmbeddings, setImageEmbeddings] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -45,43 +37,33 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
 
   const ITEMS_PER_PAGE = 20;
 
-  useEffect(() => {
-    if (workspaceId) {
-      setCurrentPage(1);
-      loadImages(1);
-    }
-  }, [workspaceId, sourceFilter, jobIdFilter]);
+  const groups = useMemo(() => buildMaterialsDataFilters('images', { jobIdFilter }), [jobIdFilter]);
+  const [filterValues, setFilterValues] = useState<FilterValues>(
+    () => (jobIdFilter?.trim() ? { source_job_id: jobIdFilter.trim() } : {}),
+  );
 
+  // The `?jobId=` deep link lives on the page above; mirror it into the values bag so it
+  // shows up as a removable chip instead of an invisible predicate.
   useEffect(() => {
-    if (workspaceId) {
-      loadImages(currentPage);
-    }
-  }, [currentPage]);
+    setFilterValues((v) => ({ ...v, source_job_id: jobIdFilter?.trim() || undefined }));
+  }, [jobIdFilter]);
 
-  const loadImages = async (page: number) => {
+  const buildQuery = useCallback((values: FilterValues, head: boolean) => {
+    const query: any = supabase
+      .from('document_images')
+      .select(head ? 'id' : '*', { count: 'exact', head })
+      .eq('workspace_id', workspaceId);
+    return applyFiltersToQuery(query, groups, values);
+  }, [workspaceId, groups]);
+
+  const loadImages = useCallback(async (page: number) => {
     try {
       setIsLoading(true);
-      console.log('[ImagesTab] Loading images for workspace:', workspaceId, 'page:', page);
 
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      let query = supabase
-        .from('document_images')
-        .select('*', { count: 'exact' })
-        .eq('workspace_id', workspaceId);
-
-      // Apply source filter
-      if (sourceFilter !== 'all') {
-        query = query.eq('source_type', sourceFilter);
-      }
-
-      // Apply job ID filter
-      if (jobIdFilter && jobIdFilter.trim()) {
-        query = query.eq('source_job_id', jobIdFilter.trim());
-      }
-
-      const { data, error, count } = await query
+      const { data, error, count } = await buildQuery(filterValues, false)
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -90,7 +72,6 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
         throw error;
       }
 
-      console.log('[ImagesTab] Loaded images:', data?.length || 0, 'of', count);
       setImages(data || []);
       setTotalCount(count || 0);
     } catch (error) {
@@ -103,7 +84,22 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [buildQuery, filterValues, toast]);
+
+  useEffect(() => { setCurrentPage(1); }, [filterValues]);
+
+  // Debounced so typing in the search box doesn't fire a query per keystroke; the cleanup
+  // also collapses the extra render caused by the page reset above into one fetch.
+  useEffect(() => {
+    if (!workspaceId) return;
+    const timer = setTimeout(() => { void loadImages(currentPage); }, 250);
+    return () => clearTimeout(timer);
+  }, [workspaceId, currentPage, loadImages]);
+
+  const previewCount = useCallback(async (values: FilterValues) => {
+    const { count } = await buildQuery(values, true);
+    return count ?? 0;
+  }, [buildQuery]);
 
   const loadImageEmbeddings = async (imageId: string) => {
     try {
@@ -281,18 +277,6 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
     }
   };
 
-  const filteredImages = images.filter((image) => {
-    if (!searchQuery) return true; // Show all if no search query
-
-    const filename = image.metadata?.filename || image.caption || '';
-    const description = image.vision_analysis?.description || image.claude_validation?.description || '';
-    const pageNum = image.page_number?.toString() || '';
-
-    return filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           pageNum.includes(searchQuery);
-  });
-
   const getSourceBadge = (sourceType: string | null | undefined) => {
     if (!sourceType) return <Badge variant="outline">Unknown</Badge>;
 
@@ -328,28 +312,14 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 View and manage images extracted from documents
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sources</SelectItem>
-                  <SelectItem value="pdf_processing">PDF Processing</SelectItem>
-                  <SelectItem value="xml_import">XML Import</SelectItem>
-                  <SelectItem value="web_scraping">Web Scraping</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search images..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 w-64"
-                />
-              </div>
-            </div>
+            <FilterBar
+              groups={groups}
+              values={filterValues}
+              onChange={setFilterValues}
+              previewCount={previewCount}
+              title="Filter images"
+              searchPlaceholder="Search caption / OCR text…"
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -357,13 +327,13 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredImages.length === 0 ? (
+          ) : images.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No images found
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: 'var(--grid-gap)' }}>
-              {filteredImages.map((image) => (
+              {images.map((image) => (
                 <div
                   key={image.id}
                   className="dashboard-card transition-all duration-200 hover:shadow-md cursor-pointer"

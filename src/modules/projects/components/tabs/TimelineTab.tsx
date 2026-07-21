@@ -17,24 +17,15 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
-import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildTimelineFilters } from './timelineFilters';
 import { projectsService, type ProjectEvent } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
 
 interface TimelineTabProps {
   projectId: string;
 }
-
-// Filter chip groups (matches the trigger-emitted event_types from the Phase 3 migration)
-const FILTER_GROUPS: Array<{ label: string; events: string[] }> = [
-  { label: 'Project', events: ['project.created', 'project.status_changed', 'project.budget_changed', 'project.deadline_changed'] },
-  { label: 'Rooms', events: ['room.added', 'room.removed'] },
-  { label: 'Moodboards', events: ['moodboard.attached', 'moodboard.detached'] },
-  { label: 'Quotes', events: ['quote.attached', 'quote.detached', 'quote.status_changed', 'quote.revised'] },
-  { label: 'Tasks', events: ['task.created', 'task.completed', 'task.deleted', 'subtask.created', 'subtask.completed', 'subtask.deleted'] },
-];
 
 const EVENT_ICON: Record<string, React.ReactNode> = {
   'project.created': <FolderKanban className="h-3.5 w-3.5 text-primary" />,
@@ -108,7 +99,10 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({ projectId }) => {
   const { toast } = useToast();
   const [events, setEvents] = useState<ProjectEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+
+  const filterGroups = useMemo(() => buildTimelineFilters(events, describe), [events]);
+  const { values: filterValues, setValues: setFilterValues, filtered: visible, previewCount } =
+    useFilters<ProjectEvent>(events, filterGroups);
 
   const load = useCallback(async () => {
     try {
@@ -124,56 +118,16 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({ projectId }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const toggleFilter = (label: string) => {
-    setActiveFilters(prev => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
-      return next;
-    });
-  };
-
-  const visible = useMemo(() => {
-    if (activeFilters.size === 0) return events;
-    const allowed = new Set<string>();
-    for (const g of FILTER_GROUPS) {
-      if (activeFilters.has(g.label)) g.events.forEach(e => allowed.add(e));
-    }
-    return events.filter(e => allowed.has(e.event_type));
-  }, [events, activeFilters]);
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {FILTER_GROUPS.map(g => {
-          const active = activeFilters.has(g.label);
-          return (
-            <button
-              key={g.label}
-              type="button"
-              onClick={() => toggleFilter(g.label)}
-              className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-                active
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'border-border text-muted-foreground hover:bg-muted/60'
-              }`}
-            >
-              {g.label}
-            </button>
-          );
-        })}
-        {activeFilters.size > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => setActiveFilters(new Set())}
-            className="h-7 text-xs"
-          >
-            Clear
-          </Button>
-        )}
-      </div>
+      <FilterBar
+        groups={filterGroups}
+        values={filterValues}
+        onChange={setFilterValues}
+        previewCount={previewCount}
+        title="Filter activity"
+        searchPlaceholder="Search activity…"
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-12">

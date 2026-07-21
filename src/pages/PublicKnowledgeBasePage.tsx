@@ -18,6 +18,8 @@ import { SeoHead } from '@/components/seo/SeoHead';
 import { KbCommandSearch } from '@/components/features/knowledge/KbCommandSearch';
 import { ProductTeaser } from '@/components/features/knowledge/ProductTeaser';
 import { mdComponents } from '@/components/features/knowledge/markdownComponents';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildKbPublicFilters } from './publicKnowledgeBaseFilters';
 
 // ── TOC heading extraction (ids match rehype-slug / github-slugger) ──────────
 interface TocItem { id: string; text: string; level: number; }
@@ -193,7 +195,6 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const [scopeCatId, setScopeCatId] = useState<string>('');
   const [askingAI, setAskingAI] = useState(false);
 
   const docHref = (doc: { slug?: string | null; id: string }) =>
@@ -300,6 +301,13 @@ export const PublicKnowledgeBasePage: React.FC = () => {
 
   const allDocs = useMemo(() => Object.values(docsByCategory).flat(), [docsByCategory]);
 
+  // The category scope runs through the shared filter framework; free text keeps its own
+  // matcher below because it is fuzzier than a plain contains (collapsed + token match).
+  const filterGroups = useMemo(() => buildKbPublicFilters(categories), [categories]);
+  const { values: filterValues, setValues: setFilterValues, filtered: scopedDocs, previewCount } =
+    useFilters(allDocs, filterGroups);
+  const scopeCatId = (filterValues.category as string) || '';
+
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
     // Normalize away spaces/punctuation so "heatpump" matches "Heat Pump", and
@@ -307,15 +315,14 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     const collapse = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
     const qCollapsed = collapse(search);
     const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
-    const matched = allDocs.filter((d) => {
-      if (scopeCatId && d.category_id !== scopeCatId) return false;
+    const matched = scopedDocs.filter((d) => {
       const hay = `${d.title} ${d.summary || ''}`.toLowerCase();
       if (qCollapsed && collapse(hay).includes(qCollapsed)) return true;
       return tokens.length > 0 && tokens.every((t) => hay.includes(t));
     });
     // Secondary (brand/product) pages still appear, but high-value pages rank first.
     return matched.sort((a, b) => (((a as any).content_tier || 1) - ((b as any).content_tier || 1)));
-  }, [search, scopeCatId, allDocs]);
+  }, [search, scopedDocs]);
 
   // Featured section: high-value (tier 1) pages first, then by reads. Secondary
   // pages only surface here when there aren't enough featured ones.
@@ -636,7 +643,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="What do you need help with today?"
                 aria-label="Search knowledge base articles"
-                className="w-full pl-11 pr-4 py-3 bg-transparent rounded-l-full text-white placeholder:text-white/50 focus:outline-none text-sm"
+                className="w-full pl-11 pr-4 py-3 bg-transparent rounded-full text-white placeholder:text-white/50 focus:outline-none text-sm"
               />
               <button
                 type="button"
@@ -647,19 +654,6 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 <span className="font-sans">⌘</span>K
               </button>
             </div>
-            {categories.length > 0 && (
-              <select
-                value={scopeCatId}
-                onChange={(e) => setScopeCatId(e.target.value)}
-                aria-label="Filter by category"
-                className="shrink-0 max-w-[42%] bg-transparent border-l border-white/30 text-white text-xs px-3 rounded-r-full focus:outline-none cursor-pointer [&>option]:text-foreground"
-              >
-                <option value="">All categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            )}
           </div>
 
           <KbCommandSearch
@@ -714,6 +708,19 @@ export const PublicKnowledgeBasePage: React.FC = () => {
               Results for "{search}"
               {scopeCatId && <span className="text-muted-foreground"> in {categories.find((c) => c.id === scopeCatId)?.name}</span>}
             </h2>
+            {/* Topic scope for the query above — the hero input owns the free text, so the
+                bar carries only the category constraint (and its removable chip). */}
+            {categories.length > 0 && (
+              <FilterBar
+                groups={filterGroups}
+                values={filterValues}
+                onChange={setFilterValues}
+                searchKey={null}
+                previewCount={previewCount}
+                title="Filter articles"
+                className="mb-4"
+              />
+            )}
             {searchResults.length === 0 ? (
               <p className="text-muted-foreground text-sm">No articles found.</p>
             ) : (

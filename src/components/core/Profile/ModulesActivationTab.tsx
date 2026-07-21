@@ -18,6 +18,8 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildModuleFilters, type ModuleFilterRow } from './moduleFilters';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -151,15 +153,20 @@ export const ModulesActivationTab: React.FC = () => {
     [catalog, planLevel, activated, availableSlugs, subs],
   );
 
+  const filterGroups = useMemo(() => buildModuleFilters(tiles as ModuleFilterRow[]), [tiles]);
+  const { values: filterValues, setValues: setFilterValues, filtered: matched, previewCount } =
+    useFilters<ModuleTile>(tiles, filterGroups);
+
+  // Pill counts read off the modal-narrowed set so the two controls never disagree.
   const counts = useMemo(() => ({
-    all: tiles.length,
-    active: tiles.filter((t) => t.hasIt).length,
-    available: tiles.filter((t) => !t.hasIt).length,
-  }), [tiles]);
+    all: matched.length,
+    active: matched.filter((t) => t.hasIt).length,
+    available: matched.filter((t) => !t.hasIt).length,
+  }), [matched]);
 
   // Group the filtered tiles by Hub, preserving the launcher's Hub order.
   const groups = useMemo(() => {
-    const visible = tiles.filter((t) => filter === 'all' || (filter === 'active' ? t.hasIt : !t.hasIt));
+    const visible = matched.filter((t) => filter === 'all' || (filter === 'active' ? t.hasIt : !t.hasIt));
     const byHub = new Map<string, { label: string; hub: Hub | null; tiles: ModuleTile[]; order: number }>();
     for (const t of visible) {
       const key = t.meta.hub?.id ?? '__more__';
@@ -173,7 +180,7 @@ export const ModulesActivationTab: React.FC = () => {
       byHub.set(key, entry);
     }
     return [...byHub.values()].sort((a, b) => a.order - b.order);
-  }, [tiles, filter]);
+  }, [matched, filter]);
 
   const handleActivate = async (m: ModuleCatalogRow) => {
     if (!activeWorkspaceId) return;
@@ -409,10 +416,20 @@ export const ModulesActivationTab: React.FC = () => {
         </CardContent></Card>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2">
-            {filterPill('all', 'All', counts.all)}
-            {filterPill('active', 'Active', counts.active)}
-            {filterPill('available', 'Available to add', counts.available)}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {filterPill('all', 'All', counts.all)}
+              {filterPill('active', 'Active', counts.active)}
+              {filterPill('available', 'Available to add', counts.available)}
+            </div>
+            <FilterBar
+              groups={filterGroups}
+              values={filterValues}
+              onChange={setFilterValues}
+              previewCount={previewCount}
+              title="Filter modules"
+              searchPlaceholder="Search modules…"
+            />
           </div>
 
           {groups.length === 0 ? (

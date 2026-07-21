@@ -6,7 +6,7 @@
  * so the table renders without per-row history queries.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -23,8 +23,10 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { Play, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { refreshProduct, untrackProduct, trackProduct } from '@/services/priceMonitoringApi';
 import type { TrackedQuery } from '@/services/priceMonitoringApi';
+import { buildMonitoredProductFilters } from './monitoredProductFilters';
 
 interface MonitoredProductsListProps {
   products: TrackedQuery[];
@@ -40,10 +42,19 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
   const [page, setPage] = useState(1);
   const { toast } = useToast();
 
-  // `products` is owned by the parent — an untrack + onRefresh can shrink it under the current page.
+  const filterGroups = useMemo(
+    () => buildMonitoredProductFilters(products, (id) => productNames[id]),
+    [products, productNames],
+  );
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+    useFilters<TrackedQuery>(products, filterGroups);
+
+  // `products` is owned by the parent — an untrack + onRefresh can shrink it under the current
+  // page, and a narrowed result set is a different list entirely.
   useEffect(() => {
-    setPage((prev) => clampPage(prev, products.length));
-  }, [products.length]);
+    setPage((prev) => clampPage(prev, filtered.length));
+  }, [filtered.length]);
+  useEffect(() => { setPage(1); }, [filterValues]);
 
   useEffect(() => {
     const productIds = products.map((p) => p.product_id).filter((id): id is string => Boolean(id));
@@ -115,8 +126,18 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Monitored Products</CardTitle>
+        {products.length > 0 && (
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            title="Filter monitored products"
+            searchPlaceholder="Search product, query, manufacturer…"
+          />
+        )}
       </CardHeader>
       <CardContent>
         {products.length === 0 ? (
@@ -140,7 +161,14 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginate(products, page).map((tq) => {
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                    No monitored products match the current filters.
+                  </TableCell>
+                </TableRow>
+              )}
+              {paginate(filtered, page).map((tq) => {
                 const isBusy = busy[tq.id] ?? false;
                 const name = (tq.product_id && productNames[tq.product_id]) || tq.search_query;
                 return (
@@ -199,7 +227,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
           </Table>
           <TablePagination
             page={page}
-            total={products.length}
+            total={filtered.length}
             onPageChange={setPage}
             label="products"
           />

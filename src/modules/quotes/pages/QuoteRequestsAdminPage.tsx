@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2, UserPlus, ListChecks, Gift, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -36,6 +36,8 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildQuoteRequestFilters } from '../components/quoteFilters';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag } from '../services/QuotesService';
 import { usersAPI } from '@/services/crm.service';
@@ -63,7 +65,6 @@ export const QuoteRequestsAdmin: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
 
   // Slide-out panels state
@@ -215,14 +216,25 @@ export const QuoteRequestsAdmin: React.FC = () => {
     }
   };
 
-  const filteredQuoteRequests = quoteRequests.filter(
-    quote => selectedStatusFilter === 'all' || quote.status_tag_id === selectedStatusFilter,
+  // Requester ids only resolve to a name once the CRM user list has loaded; fall back to a
+  // truncated id so the option is still selectable for non-admins who can't list users.
+  const requesterName = React.useCallback((userId: string) => {
+    const u = users.find((x) => x.user_id === userId);
+    return u?.full_name?.trim() || u?.email || `${userId.substring(0, 8)}…`;
+  }, [users]);
+
+  const filterGroups = useMemo(
+    () => buildQuoteRequestFilters(quoteRequests, { statusTags, requesterName }),
+    [quoteRequests, statusTags, requesterName],
   );
+  const { values: filterValues, setValues: setFilterValues, filtered: filteredQuoteRequests, previewCount } =
+    useFilters<QuoteWithItems>(quoteRequests, filterGroups);
 
   // Deleting a request (or a reload returning fewer rows) can leave us past the last page.
   useEffect(() => {
     setPage(prev => clampPage(prev, filteredQuoteRequests.length));
   }, [filteredQuoteRequests.length]);
+  useEffect(() => { setPage(1); }, [filterValues]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -320,33 +332,15 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
         {/* Actions */}
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <h2 className="text-2xl font-bold">All Quote Requests</h2>
-            <Select
-              value={selectedStatusFilter}
-              onValueChange={(value) => {
-                setSelectedStatusFilter(value);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by status tag" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status Tags</SelectItem>
-                {statusTags.map((tag) => (
-                  <SelectItem key={tag.id} value={tag.id}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: tag.color }}
-                      />
-                      {tag.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterBar
+              groups={filterGroups}
+              values={filterValues}
+              onChange={setFilterValues}
+              previewCount={previewCount}
+              title="Filter quote requests"
+            />
           </div>
           <div className="flex items-center gap-3">
             <Button

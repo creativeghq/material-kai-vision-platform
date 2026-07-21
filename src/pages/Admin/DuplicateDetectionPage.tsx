@@ -13,14 +13,14 @@ import { MIVAA_API_URL } from '@/config/mivaa';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Input } from '@/components/core/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
+  FilterBar,
+  applyFiltersToQuery,
+  useFilters,
+  type FilterGroupDef,
+  type FilterValues,
+  type RangeValue,
+} from '@/components/core/filters';
 import {
   Dialog,
   DialogContent,
@@ -53,10 +53,9 @@ import {
 import {
   AlertTriangle,
   CheckCircle2,
-  Copy,
   GitMerge,
+  Percent,
   RefreshCw,
-  Search,
   Trash2,
   Eye,
 } from 'lucide-react';
@@ -84,7 +83,52 @@ interface DuplicatePair {
   product2?: { name: string };
 }
 
-type StatusFilter = 'all' | 'pending' | 'reviewed' | 'merged' | 'dismissed';
+/**
+ * `duplicate_detection_cache.status` carries no CHECK constraint; these are the four values
+ * the detection service and this page write.
+ */
+const STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'reviewed', label: 'Reviewed' },
+  { value: 'merged', label: 'Merged' },
+  { value: 'dismissed', label: 'Dismissed' },
+];
+
+const FILTER_GROUPS: FilterGroupDef[] = [
+  {
+    key: 'general', label: 'Review', icon: CheckCircle2,
+    fields: [
+      {
+        key: 'q', type: 'text', label: 'Search',
+        placeholder: 'Search product names…',
+        // Client-side: the product names come from a second batched fetch, not the row.
+        accessor: (p: any) => [p.product1?.name, p.product2?.name],
+      },
+      { key: 'status', type: 'multi', label: 'Status', column: 'status', options: STATUS_OPTIONS },
+      {
+        key: 'confidence_level', type: 'multi', label: 'Confidence',
+        column: 'confidence_level',
+        options: [
+          { value: 'high', label: 'High' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'low', label: 'Low' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'similarity', label: 'Similarity', icon: Percent,
+    fields: [
+      {
+        key: 'overall_similarity_score', type: 'range', label: 'Overall similarity',
+        description: 'Fraction, not percent — 0.6 is the detector default.',
+        column: 'overall_similarity_score', min: 0, max: 1, step: 0.05,
+      },
+      { key: 'name_similarity', type: 'range', label: 'Name similarity', column: 'name_similarity', min: 0, max: 1, step: 0.05 },
+      { key: 'visual_similarity', type: 'range', label: 'Visual similarity', column: 'visual_similarity', min: 0, max: 1, step: 0.05 },
+    ],
+  },
+];
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -125,36 +169,39 @@ export function DuplicateDetectionPage() {
 
   const [pairs, setPairs] = useState<DuplicatePair[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
-  const [minSimilarity, setMinSimilarity] = useState(0.6);
-  const [searchQuery, setSearchQuery] = useState('');
   const [scanning, setScanning] = useState(false);
   const [mergeTarget, setMergeTarget] = useState<DuplicatePair | null>(null);
   const [merging, setMerging] = useState(false);
   const [page, setPage] = useState(1);
+
+  // `filtered` only applies the client-side `q` field; status / confidence / the similarity
+  // ranges carry `column` and are pushed into the query below.
+  const { values, setValues, filtered } = useFilters<DuplicatePair>(pairs, FILTER_GROUPS, {
+    initial: { status: ['pending'], overall_similarity_score: { min: 0.6 } },
+  });
 
   const workspaceId =
     typeof localStorage !== 'undefined'
       ? localStorage.getItem('current_workspace_id')
       : null;
 
+  const buildQuery = useCallback((v: FilterValues, head: boolean) => {
+    const query: any = supabase
+      .from('duplicate_detection_cache')
+      .select(head ? 'id' : '*', head ? { count: 'exact', head: true } : undefined)
+      .eq('workspace_id', workspaceId);
+    return applyFiltersToQuery(query, FILTER_GROUPS, v);
+  }, [workspaceId]);
+
   const load = useCallback(async () => {
     if (!workspaceId) return;
     setLoading(true);
 
-    let query = supabase
-      .from('duplicate_detection_cache')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .gte('overall_similarity_score', minSimilarity)
+    const query = buildQuery(values, false)
       .order('overall_similarity_score', { ascending: false })
       // Raised from 200 alongside pagination — a client-side pager over a truncated
       // fetch would hide pairs that look like they're on a later page.
       .limit(1000);
-
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
-    }
 
     const { data, error } = await query;
 
@@ -172,7 +219,7 @@ export function DuplicateDetectionPage() {
 
     // Fetch product names. Batched because `in(...)` goes on the URL — 2000 uuids in one
     // call blows past the request-line limit.
-    const allIds = Array.from(new Set(data.flatMap((d) => [d.product_id_1, d.product_id_2])));
+    const allIds = Array.from(new Set(data.flatMap((d: any) => [d.product_id_1, d.product_id_2])));
     const productMap: Record<string, { id: string; name: string }> = {};
     for (let i = 0; i < allIds.length; i += 200) {
       const { data: products } = await supabase
@@ -182,7 +229,7 @@ export function DuplicateDetectionPage() {
       for (const p of products ?? []) productMap[p.id] = p;
     }
 
-    const enriched: DuplicatePair[] = data.map((d) => ({
+    const enriched: DuplicatePair[] = data.map((d: any) => ({
       ...d,
       product1: productMap[d.product_id_1],
       product2: productMap[d.product_id_2],
@@ -190,23 +237,19 @@ export function DuplicateDetectionPage() {
 
     setPairs(enriched);
     setLoading(false);
-  }, [workspaceId, statusFilter, minSimilarity, toast]);
+  }, [workspaceId, buildQuery, values, toast]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const filtered = pairs.filter((p) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      p.product1?.name?.toLowerCase().includes(q) ||
-      p.product2?.name?.toLowerCase().includes(q)
-    );
-  });
+  const previewCount = useCallback(async (v: FilterValues) => {
+    const { count } = await buildQuery(v, true);
+    return count ?? 0;
+  }, [buildQuery]);
 
-  // Reset on search; clamp when a status change / reload shrinks the result set.
-  useEffect(() => { setPage(1); }, [searchQuery, statusFilter, minSimilarity]);
+  // Reset on any filter change; clamp when a reload shrinks the result set.
+  useEffect(() => { setPage(1); }, [values]);
   useEffect(() => { setPage((p) => clampPage(p, filtered.length)); }, [filtered.length]);
 
   const updateStatus = async (pairId: string, newStatus: string) => {
@@ -237,7 +280,8 @@ export function DuplicateDetectionPage() {
         },
         body: JSON.stringify({
           workspace_id: workspaceId,
-          similarity_threshold: minSimilarity,
+          // The scan reuses whatever floor the operator is currently looking at.
+          similarity_threshold: (values.overall_similarity_score as RangeValue | undefined)?.min ?? 0.6,
           limit: 500,
         }),
       });
@@ -334,45 +378,14 @@ export function DuplicateDetectionPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search product names…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="reviewed">Reviewed</SelectItem>
-            <SelectItem value="merged">Merged</SelectItem>
-            <SelectItem value="dismissed">Dismissed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={String(minSimilarity)}
-          onValueChange={(v) => setMinSimilarity(Number(v))}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0.5">≥ 50% similarity</SelectItem>
-            <SelectItem value="0.6">≥ 60% similarity</SelectItem>
-            <SelectItem value="0.7">≥ 70% similarity</SelectItem>
-            <SelectItem value="0.8">≥ 80% similarity</SelectItem>
-            <SelectItem value="0.9">≥ 90% similarity</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FilterBar
+        groups={FILTER_GROUPS}
+        values={values}
+        onChange={setValues}
+        previewCount={previewCount}
+        title="Filter duplicate pairs"
+        searchPlaceholder="Search product names…"
+      />
 
       {/* Table */}
       <Card>
@@ -386,7 +399,7 @@ export function DuplicateDetectionPage() {
             <div className="p-12 text-center space-y-2">
               <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto" />
               <p className="text-muted-foreground">
-                {statusFilter === 'pending'
+                {Array.isArray(values.status) && values.status.length === 1 && values.status[0] === 'pending'
                   ? 'No pending duplicates. Run a scan to detect new ones.'
                   : 'No results matching filters.'}
               </p>

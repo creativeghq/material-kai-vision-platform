@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins, Tag } from 'lucide-react';
+import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins, Tag, Boxes } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -17,6 +17,7 @@ import {
 import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters, optionsFromRows, type FilterGroupDef } from '@/components/core/filters';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
 
@@ -34,38 +35,66 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   // #207 — editing the catalog-depth fields (codes / myDATA classification) of an item.
   const [editItem, setEditItem] = useState<WarehouseItem | null>(null);
 
-  // #223 — stock filters (sqm/qty range, unit, low-stock, location, marketplace status).
-  const [fSearch, setFSearch] = useState('');
-  const [fUnit, setFUnit] = useState('all');
-  const [fLowOnly, setFLowOnly] = useState(false);
-  const [fListed, setFListed] = useState('all'); // all | listed | unlisted
-  const [fQtyMin, setFQtyMin] = useState('');
-  const [fQtyMax, setFQtyMax] = useState('');
-  const [fLocation, setFLocation] = useState('');
   const [page, setPage] = useState(1);
 
-  const units = useMemo(() => Array.from(new Set(items.map((i) => i.unit))).sort(), [items]);
-  const visibleItems = useMemo(() => {
-    const q = fSearch.trim().toLowerCase();
-    const loc = fLocation.trim().toLowerCase();
-    const min = fQtyMin === '' ? null : parseDecimal(fQtyMin);
-    const max = fQtyMax === '' ? null : parseDecimal(fQtyMax);
-    return items.filter((it) => {
-      if (q && !(`${it.name} ${it.sku ?? ''}`.toLowerCase().includes(q))) return false;
-      if (fUnit !== 'all' && it.unit !== fUnit) return false;
-      if (fLowOnly && !(it.reorder_point > 0 && it.qty_on_hand <= it.reorder_point)) return false;
-      if (loc && !(it.location ?? '').toLowerCase().includes(loc)) return false;
-      if (min != null && it.qty_on_hand < min) return false;
-      if (max != null && it.qty_on_hand > max) return false;
-      if (fListed === 'listed' && !listings[it.id]) return false;
-      if (fListed === 'unlisted' && listings[it.id]) return false;
-      return true;
-    });
-  }, [items, listings, fSearch, fUnit, fLowOnly, fListed, fQtyMin, fQtyMax, fLocation]);
+  // #223 — stock filters, on the shared filter model. `listings` is keyed by item id, so the
+  // marketplace dimension is an accessor over the loaded map rather than a column on the row.
+  const filterGroups = useMemo<FilterGroupDef[]>(() => {
+    const maxQty = items.reduce((m, i) => Math.max(m, Number(i.qty_on_hand) || 0), 0);
+    return [
+      {
+        key: 'item', label: 'Item', icon: Package,
+        fields: [
+          {
+            key: 'q', type: 'text', label: 'Search', placeholder: 'Name or SKU…',
+            accessor: (i: WarehouseItem) => [i.name, i.sku],
+          },
+          {
+            key: 'unit', type: 'multi', label: 'Unit',
+            options: optionsFromRows(items, (i: WarehouseItem) => i.unit),
+            accessor: (i: WarehouseItem) => i.unit,
+          },
+          {
+            key: 'location', type: 'text', label: 'Location', placeholder: 'e.g. Aisle 3',
+            accessor: (i: WarehouseItem) => i.location,
+          },
+        ],
+      },
+      {
+        key: 'quantity', label: 'Quantity', icon: Boxes,
+        fields: [
+          {
+            key: 'qty', type: 'range', label: 'On hand',
+            min: 0, max: Math.max(Math.ceil(maxQty / 10) * 10, 10),
+            accessor: (i: WarehouseItem) => i.qty_on_hand,
+          },
+          {
+            key: 'low', type: 'bool', label: 'Low stock',
+            description: 'On hand at or below the reorder point.',
+            trueLabel: 'Low stock', falseLabel: 'Above reorder point',
+            accessor: (i: WarehouseItem) => i.reorder_point > 0 && i.qty_on_hand <= i.reorder_point,
+          },
+        ],
+      },
+      {
+        key: 'marketplace', label: 'Marketplace', icon: Store,
+        fields: [
+          {
+            key: 'listed', type: 'bool', label: 'Listing',
+            trueLabel: 'Listed', falseLabel: 'Not listed',
+            accessor: (i: WarehouseItem) => !!listings[i.id],
+          },
+        ],
+      },
+    ];
+  }, [items, listings]);
+
+  const { values: filterValues, setValues: setFilterValues, filtered: visibleItems, previewCount } =
+    useFilters<WarehouseItem>(items, filterGroups);
 
   // Any filter change (or switching warehouse) is a new result set; deleting/transferring an
   // item shrinks the current one. Both must leave the table on a page that still has rows.
-  useEffect(() => { setPage(1); }, [selectedWh, fSearch, fUnit, fLowOnly, fListed, fQtyMin, fQtyMax, fLocation]);
+  useEffect(() => { setPage(1); }, [selectedWh, filterValues]);
   useEffect(() => { setPage((p) => clampPage(p, visibleItems.length)); }, [visibleItems.length]);
 
   const load = async (whId?: string) => {
@@ -162,31 +191,14 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       {/* #223 — stock filters */}
       {!loading && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border/60 bg-muted/10">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input value={fSearch} onChange={(e) => setFSearch(e.target.value)} placeholder="Name or SKU…" className="h-8 w-40 pl-7 text-xs" />
-          </div>
-          <Select value={fUnit} onValueChange={setFUnit}>
-            <SelectTrigger className="h-8 w-24 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All units</SelectItem>
-              {units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Input value={fQtyMin} onChange={(e) => setFQtyMin(e.target.value)} type="text" inputMode="decimal" placeholder="min qty" className="h-8 w-24 text-xs" />
-          <Input value={fQtyMax} onChange={(e) => setFQtyMax(e.target.value)} type="text" inputMode="decimal" placeholder="max qty" className="h-8 w-24 text-xs" />
-          <Input value={fLocation} onChange={(e) => setFLocation(e.target.value)} placeholder="Location…" className="h-8 w-32 text-xs" />
-          <Select value={fListed} onValueChange={setFListed}>
-            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any status</SelectItem>
-              <SelectItem value="listed">Listed</SelectItem>
-              <SelectItem value="unlisted">Not listed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button size="sm" variant={fLowOnly ? 'default' : 'outline'} className="h-8 rounded-full text-xs" onClick={() => setFLowOnly((v) => !v)}>
-            <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Low stock
-          </Button>
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            searchPlaceholder="Name or SKU…"
+            title="Filter stock"
+          />
           {visibleItems.length !== items.length && (
             <span className="text-xs text-muted-foreground">{visibleItems.length}/{items.length}</span>
           )}

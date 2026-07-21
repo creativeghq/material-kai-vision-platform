@@ -7,17 +7,23 @@
  * logs matched a filter or to reach older ones.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
-import { Download, RefreshCw, Search, X, Trash2, Clock, AlertCircle, Database } from 'lucide-react';
+import { CalendarDays, Download, RefreshCw, Trash2, Clock, AlertCircle, Database, ListFilter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  FilterBar,
+  applyFiltersToQuery,
+  optionsFromRows,
+  type FilterGroupDef,
+  type FilterValues,
+  type DateRangeValue,
+} from '@/components/core/filters';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 
 type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
@@ -37,65 +43,97 @@ interface LogEntry {
 
 const PAGE_SIZE = TABLE_PAGE_SIZE;
 
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+/**
+ * Default window. system_logs holds hundreds of thousands of rows (INFO is pruned at 7d,
+ * WARNING+ at 30d), so the page must never open unbounded — the previous fixed "Last 24h"
+ * Select existed for the same reason and this preserves it as a real, editable dateRange.
+ */
+function defaultWindow(): DateRangeValue {
+  const from = new Date();
+  from.setDate(from.getDate() - 1);
+  return { from: iso(from), to: iso(new Date()) };
+}
+
 export function LogViewer() {
   const { toast } = useToast();
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedLevel, setSelectedLevel] = useState<string>('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [selectedLogger, setSelectedLogger] = useState<string>('all');
-  const [selectedSource, setSelectedSource] = useState<string>('all');
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [hours, setHours] = useState<number>(24);
   const [total, setTotal] = useState(0);
-  // 1-based page. Every filter change resets it via the wrappers below — otherwise narrowing the
+  // 1-based page. Reset by the effect below on every filter change — otherwise narrowing the
   // filters while on page 5 leaves you staring at an empty table with no obvious way back.
   const [page, setPage] = useState(1);
+  const [values, setValues] = useState<FilterValues>(() => ({ timestamp: defaultWindow() }));
 
-  const changeLevel = (v: string) => { setSelectedLevel(v); setPage(1); };
-  const changeLogger = (v: string) => { setSelectedLogger(v); setPage(1); };
-  const changeSource = (v: string) => { setSelectedSource(v); setPage(1); };
-  const changeSearch = (v: string) => { setSearchTerm(v); setPage(1); };
-  const changeHours = (v: number) => { setHours(v); setPage(1); };
+  // Loggers are free-form strings written by whatever module logged; the option list is
+  // derived from the rows currently loaded, which is what the old Select did too.
+  const loggerOptions = useMemo(() => optionsFromRows(logs, (l) => l.logger_name), [logs]);
 
-  // Get unique loggers from logs
-  const loggers = Array.from(new Set(logs.map(log => log.logger_name).filter(Boolean)));
+  const groups = useMemo<FilterGroupDef[]>(() => [
+    {
+      key: 'general', label: 'Log', icon: ListFilter,
+      fields: [
+        { key: 'q', type: 'text', label: 'Message', placeholder: 'Search logs…', column: 'message' },
+        {
+          key: 'level', type: 'multi', label: 'Level',
+          description: 'Multi-select — "everything at WARNING and above" is two clicks.',
+          column: 'level',
+          options: [
+            { value: 'DEBUG', label: 'Debug' },
+            { value: 'INFO', label: 'Info' },
+            { value: 'WARNING', label: 'Warning' },
+            { value: 'ERROR', label: 'Error' },
+            { value: 'CRITICAL', label: 'Critical' },
+          ],
+        },
+        { key: 'logger_name', type: 'multi', label: 'Logger', column: 'logger_name', options: loggerOptions, searchable: true },
+        {
+          // No `column`: this lives inside the `context` jsonb and needs `contains()`,
+          // which has no generic mapping. Composed by hand in buildQuery.
+          key: 'source', type: 'select', label: 'Source',
+          options: [{ value: 'backend', label: 'Backend' }, { value: 'frontend', label: 'Frontend' }],
+        },
+      ],
+    },
+    {
+      key: 'time', label: 'Time', icon: CalendarDays,
+      fields: [{
+        key: 'timestamp', type: 'dateRange', label: 'Time window',
+        description: 'Defaults to the last day so the page never loads all history.',
+        column: 'timestamp',
+      }],
+    },
+  ], [loggerOptions]);
 
-  // Build query with filters
+  const window_ = (values.timestamp as DateRangeValue | undefined) ?? {};
+
   const buildQuery = useCallback((offset: number, limit: number) => {
-    // Calculate cutoff time
-    const cutoffTime = new Date();
-    cutoffTime.setHours(cutoffTime.getHours() - hours);
-
-    // Build query
-    let query = supabase
+    let query: any = supabase
       .from('system_logs')
       .select('*', { count: 'exact' })
-      .gte('timestamp', cutoffTime.toISOString())
       .order('timestamp', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    // Apply filters
-    if (selectedLevel !== 'all') {
-      query = query.eq('level', selectedLevel.toUpperCase());
+    query = applyFiltersToQuery(query, groups, values);
+
+    // Backstop: "Clear all" can wipe the default window, and an exact count over the whole
+    // table (hundreds of thousands of rows) is not something a log page should ever issue.
+    const win = (values.timestamp as DateRangeValue | undefined) ?? {};
+    if (!win.from && !win.to) {
+      const floor = new Date();
+      floor.setDate(floor.getDate() - 30);
+      query = query.gte('timestamp', floor.toISOString());
     }
 
-    if (selectedLogger !== 'all') {
-      query = query.eq('logger_name', selectedLogger);
-    }
-
-    if (selectedSource !== 'all') {
-      query = query.contains('context', { source: selectedSource });
-    }
-
-    if (searchTerm) {
-      query = query.ilike('message', `%${searchTerm}%`);
-    }
+    const source = values.source;
+    if (source) query = query.contains('context', { source });
 
     return query;
-  }, [hours, selectedLevel, selectedLogger, selectedSource, searchTerm]);
+  }, [groups, values]);
 
   // Load initial logs from database
   const loadLogs = async () => {
@@ -135,19 +173,19 @@ export function LogViewer() {
     }
   };
 
-  // Clear all logs
+  // Clear the logs inside the active time window. Scoped to the window (not the other
+  // filters) so the button's blast radius stays something the operator can see on screen.
   const clearAllLogs = async () => {
+    if (!window_.from && !window_.to) {
+      toast({ title: 'Pick a time window first', description: 'Clearing is scoped to the selected window.', variant: 'destructive' });
+      return;
+    }
     try {
-      // Calculate cutoff time based on hours filter
-      const cutoffTime = new Date();
-      cutoffTime.setHours(cutoffTime.getHours() - hours);
+      let del: any = supabase.from('system_logs').delete();
+      if (window_.from) del = del.gte('timestamp', window_.from);
+      if (window_.to) del = del.lte('timestamp', `${window_.to}T23:59:59.999`);
 
-      // Delete logs within the current time range (newer than cutoff time)
-      const { error } = await supabase
-        .from('system_logs')
-        .delete()
-        .gte('timestamp', cutoffTime.toISOString());
-
+      const { error } = await del;
       if (error) throw error;
 
       setLogs([]);
@@ -155,7 +193,7 @@ export function LogViewer() {
 
       toast({
         title: 'Logs cleared',
-        description: `System logs from the last ${hours} hours have been cleared.`,
+        description: `System logs between ${window_.from ?? 'the beginning'} and ${window_.to ?? 'now'} have been cleared.`,
       });
 
       // Reload to show remaining logs
@@ -170,6 +208,8 @@ export function LogViewer() {
     }
   };
 
+  useEffect(() => { setPage(1); }, [values]);
+
   // Auto-refresh every 5 seconds
   useEffect(() => {
     loadLogs();
@@ -178,7 +218,8 @@ export function LogViewer() {
       const interval = setInterval(loadLogs, 5000);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, selectedLevel, selectedLogger, selectedSource, searchTerm, hours, page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, values, page]);
 
   // Get level badge color
   const getLevelBadge = (level: string) => {
@@ -306,86 +347,14 @@ export function LogViewer() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Filters */}
-            <div className="flex gap-4 mb-4 flex-wrap">
-              <div className="flex-1 min-w-[200px] relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search logs..."
-                  value={searchTerm}
-                  onChange={(e) => changeSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              <Select value={selectedLevel} onValueChange={changeLevel}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="All Levels" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  <SelectItem value="DEBUG">Debug</SelectItem>
-                  <SelectItem value="INFO">Info</SelectItem>
-                  <SelectItem value="WARNING">Warning</SelectItem>
-                  <SelectItem value="ERROR">Error</SelectItem>
-                  <SelectItem value="CRITICAL">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedLogger} onValueChange={changeLogger}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="All Loggers" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Loggers</SelectItem>
-                  {loggers.map(logger => (
-                    <SelectItem value="logger" key={logger}>{logger}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedSource} onValueChange={changeSource}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All Sources" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sources</SelectItem>
-                  <SelectItem value="frontend">Frontend</SelectItem>
-                  <SelectItem value="backend">Backend</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={hours.toString()} onValueChange={(v) => changeHours(Number(v))}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Last 1h</SelectItem>
-                  <SelectItem value="6">Last 6h</SelectItem>
-                  <SelectItem value="24">Last 24h</SelectItem>
-                  <SelectItem value="168">Last 7d</SelectItem>
-                  <SelectItem value="720">Last 30d</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {(searchTerm || selectedLevel !== 'all' || selectedLogger !== 'all' || selectedSource !== 'all') && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedLevel('all');
-                    setSelectedLogger('all');
-                    setSelectedSource('all');
-                    setPage(1);
-                  }}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
-              )}
-            </div>
+            <FilterBar
+              className="mb-4"
+              groups={groups}
+              values={values}
+              onChange={setValues}
+              title="Filter logs"
+              searchPlaceholder="Search logs…"
+            />
 
             {/* Logs Table */}
             <div className="border rounded-lg overflow-hidden">

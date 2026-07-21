@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   Search,
   Upload,
@@ -10,7 +10,6 @@ import {
   BookOpen,
   Brain,
   X,
-  Filter,
   Hash,
   Building,
   MapPin,
@@ -26,15 +25,12 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Label } from '@/components/core/ui/label';
-import { Checkbox } from '@/components/core/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import {
-  MaterialFiltersPanel,
-  type MaterialFilters,
-} from '@/components/features/search/MaterialFiltersPanel';
+import { FilterBar, useFilters, type FilterValues } from '@/components/core/filters';
+import { buildMaterialSearchFilters } from '@/components/features/search/materialSearchFilters';
 import {
   Select,
   SelectContent,
@@ -74,19 +70,8 @@ interface EntityData {
   confidence: number;
 }
 
-interface EntityFilters {
-  materials: string[];
-  organizations: string[];
-  locations: string[];
-  people: string[];
-}
-
-interface AvailableEntities {
-  materials: string[];
-  organizations: string[];
-  locations: string[];
-  people: string[];
-}
+// Post-filter selections survive a reload, as they did in the old sidebar panel.
+const FILTERS_STORAGE_KEY = 'materialSearchFilters';
 
 interface UnifiedSearchInterfaceProps {
   onResultsFound?: (results: SearchResult[]) => void;
@@ -107,102 +92,25 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [filteredResults, setFilteredResults] = useState<SearchResult[]>([]);
   const [searchType, setSearchType] = useState<'text' | 'image' | 'hybrid' | 'color' | 'texture' | 'style' | 'material'>('text');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [showEntityFilters, setShowEntityFilters] = useState(false);
-  const [entityFilters, setEntityFilters] = useState<EntityFilters>({
-    materials: [],
-    organizations: [],
-    locations: [],
-    people: [],
-  });
-  const [availableEntities, setAvailableEntities] = useState<AvailableEntities>(
-    {
-      materials: [],
-      organizations: [],
-      locations: [],
-      people: [],
-    },
-  );
-  const [materialFilters, setMaterialFilters] = useState<MaterialFilters>({
-    materialTypes: [],
-    colors: [],
-    priceRange: [0, 10000],
-    durabilityRating: [],
-    availabilityStatus: [],
-    suppliers: [],
-    applications: [],
-    textures: [],
-  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Load available entities from database
-  const loadAvailableEntities = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('materials_catalog')
-        .select('extracted_entities')
-        .not('extracted_entities', 'is', null);
-
-      if (error) throw error;
-
-      const allEntities: AvailableEntities = {
-        materials: [],
-        organizations: [],
-        locations: [],
-        people: [],
-      };
-
-      data?.forEach((item: unknown) => {
-        const entities =
-          ((item as any).extracted_entities as EntityData[]) || [];
-        entities.forEach((entity) => {
-          if (entity.confidence >= 0.7) {
-            // Only include high-confidence entities
-            switch (entity.type) {
-              case 'MATERIAL':
-                if (!allEntities.materials.includes(entity.text)) {
-                  allEntities.materials.push(entity.text);
-                }
-                break;
-              case 'ORG':
-                if (!allEntities.organizations.includes(entity.text)) {
-                  allEntities.organizations.push(entity.text);
-                }
-                break;
-              case 'LOCATION':
-                if (!allEntities.locations.includes(entity.text)) {
-                  allEntities.locations.push(entity.text);
-                }
-                break;
-              case 'PERSON':
-                if (!allEntities.people.includes(entity.text)) {
-                  allEntities.people.push(entity.text);
-                }
-                break;
-            }
-          }
-        });
-      });
-
-      // Sort entities alphabetically
-      Object.keys(allEntities).forEach((key) => {
-        (allEntities as any)[key].sort();
-      });
-
-      setAvailableEntities(allEntities);
-    } catch (error) {
-      console.error('Error loading entities:', error);
-    }
+  // Post-filters over the returned results. Facet options are derived from the current result
+  // set, so the modal only ever offers constraints that can actually narrow it.
+  const filterGroups = useMemo(() => buildMaterialSearchFilters(results), [results]);
+  const savedFilters = useMemo<FilterValues>(() => {
+    try { return JSON.parse(localStorage.getItem(FILTERS_STORAGE_KEY) ?? '{}') as FilterValues; }
+    catch { return {}; }
   }, []);
+  const { values, setValues, filtered, previewCount } = useFilters(results, filterGroups, { initial: savedFilters });
+  const filteredResults = filtered;
 
-  // Load entities on component mount
   useEffect(() => {
-    loadAvailableEntities();
-  }, [loadAvailableEntities]);
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(values));
+  }, [values]);
 
   const handleImageSelect = useCallback((file: File) => {
     setSelectedImage(file);
@@ -229,86 +137,6 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     },
     [selectedImage],
   );
-
-  // Apply entity filters to search results
-  const applyEntityFilters = useCallback(
-    (searchResults: SearchResult[]) => {
-      if (
-        !entityFilters.materials.length &&
-        !entityFilters.organizations.length &&
-        !entityFilters.locations.length &&
-        !entityFilters.people.length
-      ) {
-        return searchResults; // No filters applied
-      }
-
-      return searchResults.filter((result) => {
-        const entities = result.extracted_entities || [];
-
-        // Check if result matches any selected entity filters
-        let matchesFilter = false;
-
-        // Check material entities
-        if (entityFilters.materials.length > 0) {
-          const materialEntities = entities.filter(
-            (e) => e.type === 'MATERIAL',
-          );
-          if (
-            materialEntities.some((e) =>
-              entityFilters.materials.includes(e.text),
-            )
-          ) {
-            matchesFilter = true;
-          }
-        }
-
-        // Check organization entities
-        if (entityFilters.organizations.length > 0) {
-          const orgEntities = entities.filter((e) => e.type === 'ORG');
-          if (
-            orgEntities.some((e) =>
-              entityFilters.organizations.includes(e.text),
-            )
-          ) {
-            matchesFilter = true;
-          }
-        }
-
-        // Check location entities
-        if (entityFilters.locations.length > 0) {
-          const locationEntities = entities.filter(
-            (e) => e.type === 'LOCATION',
-          );
-          if (
-            locationEntities.some((e) =>
-              entityFilters.locations.includes(e.text),
-            )
-          ) {
-            matchesFilter = true;
-          }
-        }
-
-        // Check people entities
-        if (entityFilters.people.length > 0) {
-          const peopleEntities = entities.filter((e) => e.type === 'PERSON');
-          if (
-            peopleEntities.some((e) => entityFilters.people.includes(e.text))
-          ) {
-            matchesFilter = true;
-          }
-        }
-
-        return matchesFilter;
-      });
-    },
-    [entityFilters],
-  );
-
-  // Update filtered results when filters or results change
-  useEffect(() => {
-    const filtered = applyEntityFilters(results);
-    setFilteredResults(filtered);
-  }, [results, applyEntityFilters]);
 
   const performSearch = useCallback(async () => {
     // Validate input based on search type
@@ -676,328 +504,28 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         </CardContent>
       </Card>
 
-      {/* Filters */}
-      {results.length > 0 && showEntityFilters && (
-        <Card>
-          <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Material Filters */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 font-medium">
-                    <Hash className="h-4 w-4" />
-                    Materials ({availableEntities.materials.length})
-                  </Label>
-                  <div className="max-h-32 overflow-y-auto space-y-1">
-                    {availableEntities.materials
-                      .slice(0, 10)
-                      .map((material) => (
-                        <div
-                          key={material}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            id={`material-${material}`}
-                            checked={entityFilters.materials.includes(material)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setEntityFilters((prev) => ({
-                                  ...prev,
-                                  materials: [...prev.materials, material],
-                                }));
-                              } else {
-                                setEntityFilters((prev) => ({
-                                  ...prev,
-                                  materials: prev.materials.filter(
-                                    (m) => m !== material,
-                                  ),
-                                }));
-                              }
-                            }}
-                          />
-                          <Label
-                            htmlFor={`material-${material}`}
-                            className="text-sm"
-                          >
-                            {material}
-                          </Label>
-                        </div>
-                      ))}
-                    {availableEntities.materials.length > 10 && (
-                      <div className="text-xs text-muted-foreground">
-                        +{availableEntities.materials.length - 10} more
-                        materials
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Organization Filters */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 font-medium">
-                    <Building className="h-4 w-4" />
-                    Organizations ({availableEntities.organizations.length})
-                  </Label>
-                  <div className="max-h-32 overflow-y-auto space-y-1">
-                    {availableEntities.organizations.slice(0, 10).map((org) => (
-                      <div key={org} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`org-${org}`}
-                          checked={entityFilters.organizations.includes(org)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setEntityFilters((prev) => ({
-                                ...prev,
-                                organizations: [...prev.organizations, org],
-                              }));
-                            } else {
-                              setEntityFilters((prev) => ({
-                                ...prev,
-                                organizations: prev.organizations.filter(
-                                  (o) => o !== org,
-                                ),
-                              }));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`org-${org}`} className="text-sm">
-                          {org}
-                        </Label>
-                      </div>
-                    ))}
-                    {availableEntities.organizations.length > 10 && (
-                      <div className="text-xs text-muted-foreground">
-                        +{availableEntities.organizations.length - 10} more
-                        organizations
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Location Filters */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 font-medium">
-                    <MapPin className="h-4 w-4" />
-                    Locations ({availableEntities.locations.length})
-                  </Label>
-                  <div className="max-h-32 overflow-y-auto space-y-1">
-                    {availableEntities.locations
-                      .slice(0, 10)
-                      .map((location) => (
-                        <div
-                          key={location}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            id={`location-${location}`}
-                            checked={entityFilters.locations.includes(location)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setEntityFilters((prev) => ({
-                                  ...prev,
-                                  locations: [...prev.locations, location],
-                                }));
-                              } else {
-                                setEntityFilters((prev) => ({
-                                  ...prev,
-                                  locations: prev.locations.filter(
-                                    (l) => l !== location,
-                                  ),
-                                }));
-                              }
-                            }}
-                          />
-                          <Label
-                            htmlFor={`location-${location}`}
-                            className="text-sm"
-                          >
-                            {location}
-                          </Label>
-                        </div>
-                      ))}
-                    {availableEntities.locations.length > 10 && (
-                      <div className="text-xs text-muted-foreground">
-                        +{availableEntities.locations.length - 10} more
-                        locations
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* People Filters */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 font-medium">
-                    <User className="h-4 w-4" />
-                    People ({availableEntities.people.length})
-                  </Label>
-                  <div className="max-h-32 overflow-y-auto space-y-1">
-                    {availableEntities.people.slice(0, 10).map((person) => (
-                      <div key={person} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`person-${person}`}
-                          checked={entityFilters.people.includes(person)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setEntityFilters((prev) => ({
-                                ...prev,
-                                people: [...prev.people, person],
-                              }));
-                            } else {
-                              setEntityFilters((prev) => ({
-                                ...prev,
-                                people: prev.people.filter((p) => p !== person),
-                              }));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`person-${person}`} className="text-sm">
-                          {person}
-                        </Label>
-                      </div>
-                    ))}
-                    {availableEntities.people.length > 10 && (
-                      <div className="text-xs text-muted-foreground">
-                        +{availableEntities.people.length - 10} more people
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Clear Filters Button */}
-              <div className="mt-4 flex items-center justify-between">
-                <div className="flex flex-wrap gap-1">
-                  {entityFilters.materials.map((material) => (
-                    <Badge
-                      key={material}
-                      variant="secondary"
-                      className="text-xs"
-                    >
-                      <Hash className="h-2 w-2 mr-1" />
-                      {material}
-                      <X
-                        className="h-2 w-2 ml-1 cursor-pointer"
-                        onClick={() =>
-                          setEntityFilters((prev) => ({
-                            ...prev,
-                            materials: prev.materials.filter(
-                              (m) => m !== material,
-                            ),
-                          }))
-                        }
-                      />
-                    </Badge>
-                  ))}
-                  {entityFilters.organizations.map((org) => (
-                    <Badge key={org} variant="secondary" className="text-xs">
-                      <Building className="h-2 w-2 mr-1" />
-                      {org}
-                      <X
-                        className="h-2 w-2 ml-1 cursor-pointer"
-                        onClick={() =>
-                          setEntityFilters((prev) => ({
-                            ...prev,
-                            organizations: prev.organizations.filter(
-                              (o) => o !== org,
-                            ),
-                          }))
-                        }
-                      />
-                    </Badge>
-                  ))}
-                  {entityFilters.locations.map((location) => (
-                    <Badge
-                      key={location}
-                      variant="secondary"
-                      className="text-xs"
-                    >
-                      <MapPin className="h-2 w-2 mr-1" />
-                      {location}
-                      <X
-                        className="h-2 w-2 ml-1 cursor-pointer"
-                        onClick={() =>
-                          setEntityFilters((prev) => ({
-                            ...prev,
-                            locations: prev.locations.filter(
-                              (l) => l !== location,
-                            ),
-                          }))
-                        }
-                      />
-                    </Badge>
-                  ))}
-                  {entityFilters.people.map((person) => (
-                    <Badge key={person} variant="secondary" className="text-xs">
-                      <User className="h-2 w-2 mr-1" />
-                      {person}
-                      <X
-                        className="h-2 w-2 ml-1 cursor-pointer"
-                        onClick={() =>
-                          setEntityFilters((prev) => ({
-                            ...prev,
-                            people: prev.people.filter((p) => p !== person),
-                          }))
-                        }
-                      />
-                    </Badge>
-                  ))}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setEntityFilters({
-                      materials: [],
-                      organizations: [],
-                      locations: [],
-                      people: [],
-                    })
-                  }
-                  disabled={
-                    !entityFilters.materials.length &&
-                    !entityFilters.organizations.length &&
-                    !entityFilters.locations.length &&
-                    !entityFilters.people.length
-                  }
-                >
-                  Clear All Filters
-                </Button>
-              </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Material Property Filters */}
-      <MaterialFiltersPanel
-        filters={materialFilters}
-        onFiltersChange={setMaterialFilters}
-        onClearFilters={() =>
-          setMaterialFilters({
-            materialTypes: [],
-            colors: [],
-            priceRange: [0, 10000],
-            durabilityRating: [],
-            availabilityStatus: [],
-            suppliers: [],
-            applications: [],
-            textures: [],
-          })
-        }
-        collapsible={true}
-      />
-
       {/* Search Results */}
       {results.length > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="space-y-3">
             <CardTitle>
               Search Results ({filteredResults.length} of {results.length}{' '}
               found)
               {filteredResults.length !== results.length && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
-                  (filtered by entities)
+                  (post-filtered)
                 </span>
               )}
             </CardTitle>
+            {/* Post-filters only — the query box above drives retrieval, so no second search box. */}
+            <FilterBar
+              groups={filterGroups}
+              values={values}
+              onChange={setValues}
+              previewCount={previewCount}
+              searchKey={null}
+              title="Narrow results"
+            />
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

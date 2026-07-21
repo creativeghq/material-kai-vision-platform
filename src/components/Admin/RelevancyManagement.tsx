@@ -5,10 +5,8 @@
  * (Chunk→Product, Product→Image, Chunk→Image) with relevance scoring details.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Filter,
-  Search,
   Trash2,
   Link2,
   Image as ImageIcon,
@@ -18,16 +16,14 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
+  FilterBar,
+  applyFilters,
+  type FilterGroupDef,
+  type FilterValues,
+} from '@/components/core/filters';
 import {
   Table,
   TableBody,
@@ -47,7 +43,68 @@ import {
 import { Label } from '@/components/core/ui/label';
 import { Progress } from '@/components/core/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { applyFiltersToQuery } from '@/components/core/filters';
 import { supabase } from '@/integrations/supabase/client';
+
+type RelevancyTab = 'chunk-product' | 'product-image' | 'chunk-image';
+
+/**
+ * The three tabs read three different tables with different score columns, so the group def
+ * is rebuilt per active tab. The tabs themselves stay tabs — they are navigation, not a
+ * filter: switching one changes which table is queried.
+ */
+function buildRelevancyFilters(tab: RelevancyTab): FilterGroupDef[] {
+  const scoreColumn = tab === 'product-image' ? 'overall_score' : 'relevance_score';
+
+  const relTypeOptions = tab === 'chunk-product'
+    ? [
+        { value: 'source', label: 'Source' },
+        { value: 'related', label: 'Related' },
+        { value: 'component', label: 'Component' },
+        { value: 'alternative', label: 'Alternative' },
+      ]
+    : [
+        { value: 'illustrates', label: 'Illustrates' },
+        { value: 'depicts', label: 'Depicts' },
+        { value: 'related', label: 'Related' },
+        { value: 'example', label: 'Example' },
+      ];
+
+  return [
+    {
+      key: 'general', label: 'Relationship', icon: Link2,
+      fields: [
+        {
+          key: 'q', type: 'text', label: 'Search',
+          placeholder: 'Search content, product, or reasoning…',
+          // Client-side: chunk content / product name are joined in, not columns on the row.
+          accessor: (r: any) => [r.chunk_content, r.product_name, r.relationship_type, r.reasoning],
+        },
+        // image_product_associations has no relationship_type column.
+        ...(tab === 'product-image' ? [] : [{
+          key: 'relationship_type' as const, type: 'multi' as const, label: 'Relationship type',
+          column: 'relationship_type', options: relTypeOptions,
+        }]),
+      ],
+    },
+    {
+      key: 'scores', label: 'Scores', icon: BarChart3,
+      fields: [
+        {
+          key: 'score', type: 'range',
+          label: tab === 'product-image' ? 'Overall score' : 'Relevance score',
+          description: 'Fraction, not percent.',
+          column: scoreColumn, min: 0, max: 1, step: 0.05,
+        },
+        // Only image_product_associations stores a separate confidence.
+        ...(tab === 'product-image' ? [{
+          key: 'confidence' as const, type: 'range' as const, label: 'Confidence',
+          column: 'confidence', min: 0, max: 1, step: 0.05,
+        }] : []),
+      ],
+    },
+  ];
+}
 
 interface ChunkProductRelationship {
   id: string;
@@ -91,7 +148,7 @@ export const RelevancyManagement: React.FC = () => {
   const { toast } = useToast();
 
   // State
-  const [activeTab, setActiveTab] = useState<'chunk-product' | 'product-image' | 'chunk-image'>('chunk-product');
+  const [activeTab, setActiveTab] = useState<RelevancyTab>('chunk-product');
   const [chunkProductRels, setChunkProductRels] = useState<ChunkProductRelationship[]>([]);
   const [productImageRels, setProductImageRels] = useState<ProductImageRelationship[]>([]);
   const [chunkImageRels, setChunkImageRels] = useState<ChunkImageRelationship[]>([]);
@@ -99,10 +156,8 @@ export const RelevancyManagement: React.FC = () => {
   const [selectedRel, setSelectedRel] = useState<any>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
-  // Filters
-  const [minScore, setMinScore] = useState<string>('0.0');
-  const [relationshipType, setRelationshipType] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const groups = useMemo(() => buildRelevancyFilters(activeTab), [activeTab]);
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
 
   // Pagination. One shared page state is correct here because only one tab's table is
   // ever mounted and the tab switch below resets it.
@@ -115,14 +170,14 @@ export const RelevancyManagement: React.FC = () => {
     chunkImage: { total: 0, avgScore: 0 },
   });
 
-  // On mount: load all three in parallel to populate stats cards and tab counts
+  // On mount: load all three unfiltered in parallel to populate the stats cards.
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true);
       await Promise.all([
-        loadChunkProductRelationships('0.0', 'all'),
-        loadProductImageRelationships('0.0'),
-        loadChunkImageRelationships('0.0', 'all'),
+        loadChunkProductRelationships({}, []),
+        loadProductImageRelationships({}, []),
+        loadChunkImageRelationships({}, []),
       ]).catch(err => {
         console.error('Error during initial load:', err);
         toast({ title: 'Error', description: 'Failed to load relationships', variant: 'destructive' });
@@ -137,22 +192,18 @@ export const RelevancyManagement: React.FC = () => {
   useEffect(() => {
     loadRelationships();
     setCurrentPage(1);
-  }, [activeTab, minScore, relationshipType]);
-
-  // Reset page on search change too
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, filterValues]);
 
   const loadRelationships = async () => {
     try {
       setLoading(true);
       if (activeTab === 'chunk-product') {
-        await loadChunkProductRelationships(minScore, relationshipType);
+        await loadChunkProductRelationships(filterValues, groups);
       } else if (activeTab === 'product-image') {
-        await loadProductImageRelationships(minScore);
+        await loadProductImageRelationships(filterValues, groups);
       } else {
-        await loadChunkImageRelationships(minScore, relationshipType);
+        await loadChunkImageRelationships(filterValues, groups);
       }
     } catch (error) {
       console.error('Error loading relationships:', error);
@@ -162,8 +213,8 @@ export const RelevancyManagement: React.FC = () => {
     }
   };
 
-  const loadChunkProductRelationships = async (score: string, relType: string) => {
-    let query = supabase
+  const loadChunkProductRelationships = async (values: FilterValues, defs: FilterGroupDef[]) => {
+    let query: any = supabase
       .from('chunk_product_relationships')
       .select(`
         id,
@@ -175,13 +226,10 @@ export const RelevancyManagement: React.FC = () => {
         document_chunks!inner(content),
         products!inner(name)
       `)
-      .gte('relevance_score', parseFloat(score))
       .order('relevance_score', { ascending: false })
       .limit(1000);
 
-    if (relType !== 'all') {
-      query = query.eq('relationship_type', relType);
-    }
+    query = applyFiltersToQuery(query, defs, values);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -203,10 +251,10 @@ export const RelevancyManagement: React.FC = () => {
     setStats(prev => ({ ...prev, chunkProduct: { total: formatted.length, avgScore } }));
   };
 
-  const loadProductImageRelationships = async (score: string) => {
+  const loadProductImageRelationships = async (values: FilterValues, defs: FilterGroupDef[]) => {
     // image_product_associations columns: overall_score, spatial_score, caption_score,
     // clip_score, confidence, reasoning — there is NO relevance_score or relationship_type
-    const { data, error } = await supabase
+    let query: any = supabase
       .from('image_product_associations')
       .select(`
         id,
@@ -222,10 +270,12 @@ export const RelevancyManagement: React.FC = () => {
         products!inner(name),
         document_images!inner(image_url)
       `)
-      .gte('overall_score', parseFloat(score))
       .order('overall_score', { ascending: false })
       .limit(1000);
 
+    query = applyFiltersToQuery(query, defs, values);
+
+    const { data, error } = await query;
     if (error) throw error;
 
     const formatted: ProductImageRelationship[] = (data || []).map((item: any) => ({
@@ -249,8 +299,8 @@ export const RelevancyManagement: React.FC = () => {
     setStats(prev => ({ ...prev, productImage: { total: formatted.length, avgScore } }));
   };
 
-  const loadChunkImageRelationships = async (score: string, relType: string) => {
-    let query = supabase
+  const loadChunkImageRelationships = async (values: FilterValues, defs: FilterGroupDef[]) => {
+    let query: any = supabase
       .from('chunk_image_relationships')
       .select(`
         id,
@@ -262,13 +312,10 @@ export const RelevancyManagement: React.FC = () => {
         document_chunks!inner(content),
         document_images!inner(image_url)
       `)
-      .gte('relevance_score', parseFloat(score))
       .order('relevance_score', { ascending: false })
       .limit(1000);
 
-    if (relType !== 'all') {
-      query = query.eq('relationship_type', relType);
-    }
+    query = applyFiltersToQuery(query, defs, values);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -339,39 +386,24 @@ export const RelevancyManagement: React.FC = () => {
     }
   };
 
-  const filterBySearch = (items: any[]) => {
-    if (!searchQuery) return items;
-    const q = searchQuery.toLowerCase();
+  // Only the `q` field carries an accessor, so this applies the search and passes the
+  // server-side score / type constraints straight through.
+  const currentData = useMemo(() => {
+    const rows = activeTab === 'chunk-product' ? chunkProductRels
+      : activeTab === 'product-image' ? productImageRels
+      : chunkImageRels;
+    return applyFilters<any>(rows, groups, filterValues);
+  }, [activeTab, chunkProductRels, productImageRels, chunkImageRels, groups, filterValues]);
 
-    return items.filter((item) => {
-      if ('chunk_content' in item && item.chunk_content.toLowerCase().includes(q)) return true;
-      if ('product_name' in item && item.product_name.toLowerCase().includes(q)) return true;
-      if ('relationship_type' in item && item.relationship_type?.toLowerCase().includes(q)) return true;
-      if ('reasoning' in item && item.reasoning?.toLowerCase().includes(q)) return true;
-      return false;
-    });
-  };
-
-  const getCurrentData = () => {
-    switch (activeTab) {
-      case 'chunk-product': return filterBySearch(chunkProductRels);
-      case 'product-image': return filterBySearch(productImageRels);
-      case 'chunk-image':   return filterBySearch(chunkImageRels);
-      default:              return [];
-    }
-  };
-
-  const currentData = getCurrentData();
   const paginatedData = paginate(currentData, currentPage);
+  // No previewCount: the score / type fields are server-side here, so a client-side count of
+  // the already-loaded page would understate the result and mislead more than it helps.
 
   // Deleting a relationship reloads the tab — clamp rather than strand the user
   // on a page that no longer exists.
   useEffect(() => {
     setCurrentPage((p) => clampPage(p, currentData.length));
   }, [currentData.length]);
-
-  // image_product_associations has no relationship_type column — hide filter for that tab
-  const showRelTypeFilter = activeTab !== 'product-image';
 
   return (
     <div className="space-y-6">
@@ -423,84 +455,19 @@ export const RelevancyManagement: React.FC = () => {
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label>Min Relevance Score</Label>
-                <Select value={minScore} onValueChange={setMinScore}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0.0">All (≥0%)</SelectItem>
-                    <SelectItem value="0.5">Medium (≥50%)</SelectItem>
-                    <SelectItem value="0.7">High (≥70%)</SelectItem>
-                    <SelectItem value="0.9">Very High (≥90%)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Relationship type filter — not applicable to product-image tab */}
-              {showRelTypeFilter ? (
-                <div>
-                  <Label>Relationship Type</Label>
-                  <Select value={relationshipType} onValueChange={setRelationshipType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      {activeTab === 'chunk-product' && (
-                        <>
-                          <SelectItem value="source">Source</SelectItem>
-                          <SelectItem value="related">Related</SelectItem>
-                          <SelectItem value="component">Component</SelectItem>
-                          <SelectItem value="alternative">Alternative</SelectItem>
-                        </>
-                      )}
-                      {activeTab === 'chunk-image' && (
-                        <>
-                          <SelectItem value="illustrates">Illustrates</SelectItem>
-                          <SelectItem value="depicts">Depicts</SelectItem>
-                          <SelectItem value="related">Related</SelectItem>
-                          <SelectItem value="example">Example</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div /> /* spacer — keeps search in third column */
-              )}
-
-              <div>
-                <Label>Search</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search content, product, or reasoning..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Relationship Tabs */}
         <Card>
           <CardHeader>
-            <CardTitle>Entity Relationships</CardTitle>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle>Entity Relationships</CardTitle>
+              <FilterBar
+                groups={groups}
+                values={filterValues}
+                onChange={setFilterValues}
+                title="Filter relationships"
+                searchPlaceholder="Search content, product, or reasoning…"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>

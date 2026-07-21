@@ -10,17 +10,17 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
-import { Sparkles, RefreshCw, MessageSquare, ExternalLink } from 'lucide-react';
+import { Sparkles, RefreshCw, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { TrackedMention } from '@/services/mentionMonitoringApi';
+import { buildTrackedMentionFilters } from './mentionFilters';
 
 const MentionMonitoringDashboard: React.FC = () => {
   const { toast } = useToast();
   const [rows, setRows] = useState<TrackedMention[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [productNames, setProductNames] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -54,15 +54,12 @@ const MentionMonitoringDashboard: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const filtered = useMemo(() => {
-    if (!search) return rows;
-    const q = search.toLowerCase();
-    return rows.filter((r) =>
-      r.subject_label.toLowerCase().includes(q) ||
-      (r.brand_name && r.brand_name.toLowerCase().includes(q)) ||
-      (r.product_id && productNames[r.product_id] && productNames[r.product_id].toLowerCase().includes(q)),
-    );
-  }, [rows, search, productNames]);
+  const filterGroups = useMemo(
+    () => buildTrackedMentionFilters(rows, (id) => productNames[id]),
+    [rows, productNames],
+  );
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+    useFilters<TrackedMention>(rows, filterGroups);
 
   const totalActive = rows.filter((r) => r.is_active).length;
   const totalMentions7d = rows.reduce((sum, r) => sum + (r.current_mention_count_7d || 0), 0);
@@ -100,13 +97,15 @@ const MentionMonitoringDashboard: React.FC = () => {
       </div>
 
       <Card className="dashboard-card">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-sm">Subjects</CardTitle>
-          <Input
-            placeholder="Search subjects, brands, products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            title="Filter tracked subjects"
+            searchPlaceholder="Search subjects, brands, products…"
           />
         </CardHeader>
         <CardContent className="p-0">

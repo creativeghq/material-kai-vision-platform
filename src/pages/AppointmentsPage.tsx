@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, Clock, Loader2, User, Mail, MessageSquare, CheckCircle2,
@@ -10,9 +10,8 @@ import { Badge } from '@/components/core/ui/badge';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/core/ui/sheet';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/core/ui/select';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildAppointmentFilters } from './appointmentFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -34,8 +33,6 @@ export interface Appointment {
   inbox_conversation_id: string | null;
   created_at: string;
 }
-
-type StatusFilter = 'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -249,7 +246,6 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<StatusFilter>('all');
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -269,12 +265,11 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
     setLoading(false);
   };
 
-  const filtered = filter === 'all'
-    ? appointments
-    : appointments.filter((a) => a.status === filter);
+  const filterGroups = useMemo(() => buildAppointmentFilters(appointments), [appointments]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount } =
+    useFilters<Appointment>(appointments, filterGroups);
 
-  const counts: Record<string, number> = { all: appointments.length };
-  appointments.forEach((a) => { counts[a.status] = (counts[a.status] ?? 0) + 1; });
+  const pendingCount = appointments.filter((a) => a.status === 'pending').length;
 
   return (
     <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 max-w-4xl mx-auto space-y-6'}>
@@ -285,28 +280,20 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <Select value={filter} onValueChange={(v) => setFilter(v as StatusFilter)}>
-          <SelectTrigger className="w-48 rounded-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(['all', 'pending', 'confirmed', 'completed', 'cancelled'] as StatusFilter[]).map((s) => (
-              <SelectItem key={s} value={s} className="capitalize">
-                <span className="capitalize">{s}</span>
-                {counts[s] > 0 && (
-                  <span className="ml-2 text-xs text-muted-foreground">{counts[s]}</span>
-                )}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {counts.pending > 0 && (
+      <FilterBar
+        groups={filterGroups}
+        values={filterValues}
+        onChange={setFilterValues}
+        previewCount={previewCount}
+        title="Filter appointments"
+        searchPlaceholder="Search client / service…"
+      >
+        {pendingCount > 0 && (
           <Badge className="bg-amber-100 text-amber-700 border-amber-200 border text-xs">
-            {counts.pending} pending
+            {pendingCount} pending
           </Badge>
         )}
-      </div>
+      </FilterBar>
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -316,7 +303,7 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
         <Card className="rounded-2xl">
           <CardContent className="py-16 text-center text-muted-foreground">
             <Calendar className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p>No appointments {filter !== 'all' ? `with status "${filter}"` : ''} yet.</p>
+            <p>{activeCount > 0 ? 'No appointments match your filters.' : 'No appointments yet.'}</p>
           </CardContent>
         </Card>
       ) : (

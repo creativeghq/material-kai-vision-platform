@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, Building2, Trash2, Mail, CreditCard, Key, ExternalLink, Tags } from 'lucide-react';
+import { Users, Building2, Trash2, Mail, CreditCard, Key, ExternalLink, Tags, Plus } from 'lucide-react';
 
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -29,12 +29,13 @@ import { usersAPI, contactsAPI, companiesAPI, type CrmListFilters } from '@/serv
 import { crmCategoriesService, type CrmCategorySummary } from '@/services/crmCategoriesService';
 import { humanizeLabel } from '@/utils/humanize';
 import { CategoriesPanel } from './CategoriesPage';
-import { CrmFilters, type FilterDef } from '../components/CrmFilters';
 import { AddCompanyModal } from '../components/AddCompanyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters, type FilterValues } from '@/components/core/filters';
+import { buildCompanyFilters, buildContactFilters, buildUserFilters } from './crmFilters';
 import {
-  ANY, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS, CLIENT_SUPPLIER_OPTIONS,
+  PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
 } from '../crmConstants';
 
@@ -86,6 +87,21 @@ function toggle<T>(set: Set<T>, value: T): Set<T> {
  * and an EMPTY ARRAY when the active filters overlap on nothing — which the service sends
  * as an explicit empty `ids=` so the server returns an empty page instead of everything.
  */
+/** Read a single-valued filter out of the values bag; '' / unset both mean "no filter". */
+function str(v: unknown): string | undefined {
+  return typeof v === 'string' && v.trim() ? v : undefined;
+}
+
+/** ~300ms debounce for a free-text filter value that drives a server request. */
+function useDebouncedText(value: unknown, delay = 300): string | undefined {
+  const [debounced, setDebounced] = useState<string | undefined>(str(value));
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(str(value)?.trim()), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
 function intersectIds(...sets: Array<Set<string> | null>): string[] | undefined {
   const active = sets.filter((s): s is Set<string> => s !== null);
   if (active.length === 0) return undefined;
@@ -105,8 +121,6 @@ export const CRMManagement: React.FC = () => {
   const handleTabChange = (val: string) => {
     const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'users';
     setActiveTab(next);
-    // The search box is shared across tabs, so the incoming list is filtered by a term
-    // the user typed for a different tab — start it at page 1.
     setUsersPage(1); setContactsPage(1); setCompaniesPage(1);
     const params = new URLSearchParams(searchParams);
     if (next === 'users') params.delete('tab'); else params.set('tab', next);
@@ -129,10 +143,6 @@ export const CRMManagement: React.FC = () => {
   const [companiesTotal, setCompaniesTotal] = useState(0);
   const [roles, setRoles] = useState<Role[]>([]);
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  // Debounced copy of the search box — contacts/companies search hits the server, so
-  // firing on every keystroke would be a request per character.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0 });
 
   // Users are client-paginated (single edge-function payload). Contacts + companies are
@@ -141,10 +151,14 @@ export const CRMManagement: React.FC = () => {
   const [contactsPage, setContactsPage] = useState(1);
   const [companiesPage, setCompaniesPage] = useState(1);
 
-  // Per-tab filters (ANY = no filter)
-  const [userF, setUserF] = useState({ role: ANY, status: ANY, subscription: ANY, profession: ANY });
-  const [contactF, setContactF] = useState({ profession: ANY, status: ANY, company: ANY, clientSupplier: ANY, category: ANY });
-  const [companyF, setCompanyF] = useState({ profession: ANY, status: ANY, customerSupplier: ANY, industry: ANY, category: ANY });
+  // Per-tab filter values. Each tab owns its own bag, so a term typed for contacts no
+  // longer leaks into the users list.
+  const [contactValues, setContactValues] = useState<FilterValues>({});
+  const [companyValues, setCompanyValues] = useState<FilterValues>({});
+  // Contacts/companies search hits the server, so the raw box is debounced before it
+  // reaches the request — otherwise it is one fetch per keystroke.
+  const contactSearch = useDebouncedText(contactValues.q);
+  const companySearch = useDebouncedText(companyValues.q);
 
   // Category-filter member sets (fetched on demand)
   const [contactCatIds, setContactCatIds] = useState<Set<string> | null>(null);
@@ -156,7 +170,6 @@ export const CRMManagement: React.FC = () => {
   // crm_company_contacts junction. Resolve it to a contact-id allowlist and reuse the
   // same server-side `ids` param as the category filters, rather than teaching the list
   // endpoint a junction join.
-  const [contactCompanyIds, setContactCompanyIds] = useState<Set<string> | null>(null);
   // Bounded id+name lookup backing the company dropdowns (the contacts "company" filter
   // and the bulk "Assign company" action). Separate from the paged table feed, which no
   // longer holds every company — this is a picker, not the data set.
@@ -218,28 +231,30 @@ export const CRMManagement: React.FC = () => {
   // The `ids` allowlists sent to the server, one per tab. `undefined` = no membership
   // filter active; `[]` = the active filters matched nothing (→ empty page).
   const contactIdsFilter = useMemo(
-    () => intersectIds(contactCatIds, contactCompanyIds),
-    [contactCatIds, contactCompanyIds]);
+    () => intersectIds(contactCatIds),
+    [contactCatIds]);
   const companyIdsFilter = useMemo(
     () => intersectIds(companyCatIds, companyIndustryIds),
     [companyCatIds, companyIndustryIds]);
 
+  // The pass-through filter fields (no accessor, no column) are read straight out of the
+  // values bag here — this is the only place they are interpreted.
   const contactQuery: CrmListFilters = useMemo(() => ({
-    search: debouncedSearch || undefined,
-    profession: contactF.profession === ANY ? undefined : contactF.profession,
-    status: contactF.status === ANY ? undefined : contactF.status,
-    kind: contactF.clientSupplier === ANY
-      ? undefined : (contactF.clientSupplier as CrmListFilters['kind']),
+    search: contactSearch,
+    profession: str(contactValues.profession),
+    status: str(contactValues.status),
+    kind: str(contactValues.kind) as CrmListFilters['kind'],
+    companyName: str(contactValues.company),
     ids: contactIdsFilter,
-  }), [debouncedSearch, contactF.profession, contactF.status, contactF.clientSupplier, contactIdsFilter]);
+  }), [contactSearch, contactValues.profession, contactValues.status, contactValues.kind,
+       contactValues.company, contactIdsFilter]);
 
   const companyQuery: CrmListFilters = useMemo(() => ({
-    search: debouncedSearch || undefined,
-    profession: companyF.profession === ANY ? undefined : companyF.profession,
-    kind: companyF.customerSupplier === ANY
-      ? undefined : (companyF.customerSupplier as CrmListFilters['kind']),
+    search: companySearch,
+    profession: str(companyValues.profession),
+    kind: str(companyValues.kind) as CrmListFilters['kind'],
     ids: companyIdsFilter,
-  }), [debouncedSearch, companyF.profession, companyF.customerSupplier, companyIdsFilter]);
+  }), [companySearch, companyValues.profession, companyValues.kind, companyIdsFilter]);
 
   // Load through the crm-api edge function (same path as users/companies) rather than a
   // direct supabase query. The direct query is bound by the `is_workspace_member` RLS on
@@ -289,64 +304,40 @@ export const CRMManagement: React.FC = () => {
   useEffect(() => { loadContacts(); }, [loadContacts]);
   useEffect(() => { loadCompanies(); }, [loadCompanies]);
 
-  // Debounce the shared search box (~300ms) and drop back to page 1 — a narrower result
-  // set would otherwise strand the user on an out-of-range page.
+  // Membership dimensions are resolved client-side into the server's `ids[]` allowlist —
+  // the list endpoint knows nothing about category membership.
   useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(searchTerm.trim());
-      setContactsPage(1); setCompaniesPage(1);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchTerm]);
-
-  // Fetch member ids when the contacts category filter changes
-  useEffect(() => {
-    if (!contactF.category || contactF.category === ANY) { setContactCatIds(null); return; }
+    const catId = str(contactValues.category);
+    if (!catId) { setContactCatIds(null); return; }
     let cancelled = false;
-    crmCategoriesService.listMembers(contactF.category).then((members) => {
+    crmCategoriesService.listMembers(catId).then((members) => {
       if (cancelled) return;
       setContactCatIds(new Set(members.filter((m) => m.crm_contact_id).map((m) => m.crm_contact_id as string)));
     }).catch(() => setContactCatIds(new Set()));
     return () => { cancelled = true; };
-  }, [contactF.category]);
+  }, [contactValues.category]);
 
   useEffect(() => {
-    if (!companyF.category || companyF.category === ANY) { setCompanyCatIds(null); return; }
+    const catId = str(companyValues.category);
+    if (!catId) { setCompanyCatIds(null); return; }
     let cancelled = false;
-    crmCategoriesService.listMembers(companyF.category).then((members) => {
+    crmCategoriesService.listMembers(catId).then((members) => {
       if (cancelled) return;
       setCompanyCatIds(new Set(members.filter((m) => m.crm_company_id).map((m) => m.crm_company_id as string)));
     }).catch(() => setCompanyCatIds(new Set()));
     return () => { cancelled = true; };
-  }, [companyF.category]);
-
-  // Attached-company filter → contact ids. The company detail endpoint already returns the
-  // flattened `contacts[]` for the junction, so no new server capability is needed.
-  useEffect(() => {
-    if (!contactF.company || contactF.company === ANY) { setContactCompanyIds(null); return; }
-    let cancelled = false;
-    (async () => {
-      const match = companyLookup.find((c) => c.name === contactF.company);
-      // Unknown name → match nothing (an empty set), never "no filter".
-      if (!match) { if (!cancelled) setContactCompanyIds(new Set()); return; }
-      try {
-        const res = await companiesAPI.getCompany(match.id);
-        const attached = (res.data?.contacts ?? []) as Array<{ contact_id: string }>;
-        if (!cancelled) setContactCompanyIds(new Set(attached.map((a) => a.contact_id).filter(Boolean)));
-      } catch { if (!cancelled) setContactCompanyIds(new Set()); }
-    })();
-    return () => { cancelled = true; };
-  }, [contactF.company, companyLookup]);
+  }, [companyValues.category]);
 
   useEffect(() => {
-    if (!companyF.industry || companyF.industry === ANY) { setCompanyIndustryIds(null); return; }
+    const industryId = str(companyValues.industry);
+    if (!industryId) { setCompanyIndustryIds(null); return; }
     let cancelled = false;
-    crmCategoriesService.listMembers(companyF.industry).then((members) => {
+    crmCategoriesService.listMembers(industryId).then((members) => {
       if (cancelled) return;
       setCompanyIndustryIds(new Set(members.filter((m) => m.crm_company_id).map((m) => m.crm_company_id as string)));
     }).catch(() => setCompanyIndustryIds(new Set()));
     return () => { cancelled = true; };
-  }, [companyF.industry]);
+  }, [companyValues.industry]);
 
   // ── option lists ──────────────────────────────────────────────────────────
   const roleOptions: Option[] = useMemo(() => roles.map((r) => ({ value: r.id, label: roleLabel(r.name) })), [roles]);
@@ -369,15 +360,21 @@ export const CRMManagement: React.FC = () => {
     [...new Set(users.map((u) => u.subscription_tier).filter(Boolean))].sort().map((s) => ({ value: s as string, label: s as string })),
     [users]);
 
+  // ── filter groups ─────────────────────────────────────────────────────────
+  const userGroups = useMemo(
+    () => buildUserFilters({ roleOptions, subscriptionOptions }), [roleOptions, subscriptionOptions]);
+  const contactGroups = useMemo(
+    () => buildContactFilters({ categoryOptions, companyNameOptions }), [categoryOptions, companyNameOptions]);
+  const companyGroups = useMemo(
+    () => buildCompanyFilters({ categoryOptions: companyCategoryOptions, industryOptions }),
+    [companyCategoryOptions, industryOptions]);
+
   // ── filtered lists ────────────────────────────────────────────────────────
-  const q = searchTerm.toLowerCase();
-  const filteredUsers = useMemo(() => users.filter((u) =>
-    (u.email.toLowerCase().includes(q) || u.user_id.toLowerCase().includes(q)) &&
-    (userF.role === ANY || u.role_id === userF.role) &&
-    (userF.status === ANY || u.status === userF.status) &&
-    (userF.subscription === ANY || u.subscription_tier === userF.subscription) &&
-    (userF.profession === ANY || u.professional_type === userF.profession),
-  ), [users, q, userF]);
+  // Users are the only client-side tab, so they get the full hook (matching + preview).
+  const {
+    values: userValues, setValues: setUserValues,
+    filtered: filteredUsers, previewCount: userPreviewCount,
+  } = useFilters(users, userGroups);
 
   // The attached business: prefer the primary junction company, then any junction
   // company, falling back to the legacy free-text `company` field.
@@ -392,9 +389,9 @@ export const CRMManagement: React.FC = () => {
 
   // ── pagination ────────────────────────────────────────────────────────────
   // Users only: reset to page 1 whenever their client-side result set changes. The
-  // contacts/companies page reset lives in the search debounce + each filter's onChange,
-  // so the reset lands in the same commit as the change and doesn't cost an extra fetch.
-  useEffect(() => { setUsersPage(1); }, [q, userF]);
+  // contacts/companies reset lands in their filter onChange, so it commits with the change
+  // and doesn't cost an extra fetch.
+  useEffect(() => { setUsersPage(1); }, [userValues]);
 
   // A delete or a reload can shrink the list under the current page — clamp instead of
   // stranding the user on an empty table.
@@ -519,34 +516,10 @@ export const CRMManagement: React.FC = () => {
     } catch (error: any) { toast({ title: 'Error', description: error.message || 'Failed to send reset email', variant: 'destructive' }); }
   };
 
-  // ── filter defs ───────────────────────────────────────────────────────────
-  const userFilters: FilterDef[] = [
-    { key: 'role', label: 'role', value: userF.role, options: roleOptions, onChange: (v) => setUserF((f) => ({ ...f, role: v })) },
-    { key: 'status', label: 'status', value: userF.status, options: STATUS_OPTIONS, onChange: (v) => setUserF((f) => ({ ...f, status: v })) },
-    { key: 'subscription', label: 'plan', value: userF.subscription, options: subscriptionOptions, onChange: (v) => setUserF((f) => ({ ...f, subscription: v })) },
-    { key: 'profession', label: 'type', value: userF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setUserF((f) => ({ ...f, profession: v })) },
-  ];
   // Contacts/companies filters drive a server query, so each change also drops back to
   // page 1 — otherwise a narrower result set leaves the user on an out-of-range offset.
-  const setContact = (patch: Partial<typeof contactF>) => { setContactsPage(1); setContactF((f) => ({ ...f, ...patch })); };
-  const setCompany = (patch: Partial<typeof companyF>) => { setCompaniesPage(1); setCompanyF((f) => ({ ...f, ...patch })); };
-
-  const contactFilters: FilterDef[] = [
-    { key: 'profession', label: 'type', value: contactF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setContact({ profession: v }) },
-    { key: 'status', label: 'status', value: contactF.status, options: STATUS_OPTIONS, onChange: (v) => setContact({ status: v }) },
-    { key: 'company', label: 'company', value: contactF.company, options: companyNameOptions, onChange: (v) => setContact({ company: v }) },
-    { key: 'clientSupplier', label: 'kind', value: contactF.clientSupplier, options: CLIENT_SUPPLIER_OPTIONS, onChange: (v) => setContact({ clientSupplier: v }) },
-    { key: 'category', label: 'category', value: contactF.category, options: categoryOptions, onChange: (v) => setContact({ category: v }) },
-  ];
-  // No `status` filter here: crm_companies has no status column, so the old client-side
-  // `c.status === …` test could only ever match zero rows. Dropped rather than shipped as
-  // an inert control that 400s server-side.
-  const companyFilters: FilterDef[] = [
-    { key: 'profession', label: 'type', value: companyF.profession, options: PROFESSIONAL_TYPE_OPTIONS, onChange: (v) => setCompany({ profession: v }) },
-    { key: 'customerSupplier', label: 'kind', value: companyF.customerSupplier, options: CLIENT_SUPPLIER_OPTIONS, onChange: (v) => setCompany({ customerSupplier: v }) },
-    { key: 'industry', label: 'industry', value: companyF.industry, options: industryOptions, onChange: (v) => setCompany({ industry: v }) },
-    { key: 'category', label: 'category', value: companyF.category, options: companyCategoryOptions, onChange: (v) => setCompany({ category: v }) },
-  ];
+  const onContactFilters = (v: FilterValues) => { setContactsPage(1); setContactValues(v); };
+  const onCompanyFilters = (v: FilterValues) => { setCompaniesPage(1); setCompanyValues(v); };
 
   return (
     <div className="min-h-screen">
@@ -582,10 +555,16 @@ export const CRMManagement: React.FC = () => {
                 <CardDescription>Manage platform users, roles, and subscriptions</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <CrmFilters
-                  search={searchTerm} onSearch={setSearchTerm} searchPlaceholder="Search by email…"
-                  filters={userFilters} onAdd={handleAddUser} addLabel="Add User"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <FilterBar
+                    groups={userGroups} values={userValues} onChange={setUserValues}
+                    previewCount={userPreviewCount}
+                    title="Filter users" searchPlaceholder="Search by email…" className="flex-1"
+                  />
+                  <Button size="sm" onClick={handleAddUser}>
+                    <Plus className="h-4 w-4 mr-2" /> Add User
+                  </Button>
+                </div>
                 {selUsers.size > 0 && (
                   <CrmBulkBar
                     count={selUsers.size} actions={userBulkActions} busy={bulkBusy}
@@ -662,10 +641,15 @@ export const CRMManagement: React.FC = () => {
                 <CardDescription>Manage non-user contacts and relationships</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <CrmFilters
-                  search={searchTerm} onSearch={setSearchTerm} searchPlaceholder="Search contacts…"
-                  filters={contactFilters} onAdd={() => navigate('/admin/crm/contacts/new')} addLabel="Add Contact"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <FilterBar
+                    groups={contactGroups} values={contactValues} onChange={onContactFilters}
+                    title="Filter contacts" searchPlaceholder="Search contacts…" className="flex-1"
+                  />
+                  <Button size="sm" onClick={() => navigate('/admin/crm/contacts/new')}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Contact
+                  </Button>
+                </div>
                 {selContacts.size > 0 && (
                   <CrmBulkBar
                     count={selContacts.size} actions={contactBulkActions} busy={bulkBusy}
@@ -733,10 +717,15 @@ export const CRMManagement: React.FC = () => {
                 <CardDescription>Manage company accounts and business relationships</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <CrmFilters
-                  search={searchTerm} onSearch={setSearchTerm} searchPlaceholder="Search companies…"
-                  filters={companyFilters} onAdd={() => setShowAddCompany(true)} addLabel="Add Company"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <FilterBar
+                    groups={companyGroups} values={companyValues} onChange={onCompanyFilters}
+                    title="Filter companies" searchPlaceholder="Search companies…" className="flex-1"
+                  />
+                  <Button size="sm" onClick={() => setShowAddCompany(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Company
+                  </Button>
+                </div>
                 {selCompanies.size > 0 && (
                   <CrmBulkBar
                     count={selCompanies.size} actions={companyBulkActions} busy={bulkBusy}

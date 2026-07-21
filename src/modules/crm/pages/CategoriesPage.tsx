@@ -24,6 +24,8 @@ import {
   type CrmCategoryKind,
 } from '@/services/crmCategoriesService';
 import { supabase } from '@/integrations/supabase/client';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { CRM_CATEGORY_FILTERS } from './crmCategoryFilters';
 
 const KIND_LABELS: Record<CrmCategoryKind, string> = {
   professional_type: 'Professional type',
@@ -56,7 +58,6 @@ export const CategoriesPanel: React.FC = () => {
 
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
@@ -86,11 +87,7 @@ export const CategoriesPanel: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return categories;
-    const q = search.toLowerCase();
-    return categories.filter((c) => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q));
-  }, [categories, search]);
+  const { values, setValues, filtered, previewCount } = useFilters(categories, CRM_CATEGORY_FILTERS);
 
   const grouped = useMemo(() => {
     const out: Record<CrmCategoryKind, CrmCategorySummary[]> = {
@@ -206,12 +203,14 @@ export const CategoriesPanel: React.FC = () => {
           <MiniStat icon={Building2} label="Companies"  value={totals.companies} />
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search categories" className="pl-9" />
-          </div>
-        </div>
+        <FilterBar
+          groups={CRM_CATEGORY_FILTERS}
+          values={values}
+          onChange={setValues}
+          previewCount={previewCount}
+          title="Filter categories"
+          searchPlaceholder="Search categories"
+        />
 
         {loading ? (
           <div className="flex items-center gap-2 py-12 justify-center text-muted-foreground">

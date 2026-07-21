@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -9,15 +9,10 @@ import {
 } from '@/components/core/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
 import { Badge } from '@/components/core/ui/badge';
 import { Eye, Loader2, FileText, Code, Globe, Database } from 'lucide-react';
+import { FilterBar, applyFiltersToQuery, type FilterValues } from '@/components/core/filters';
+import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SmartPagination } from '@/components/core/ui/smart-pagination';
@@ -28,6 +23,19 @@ import {
   DialogTitle,
 } from '@/components/core/ui/dialog';
 
+// The workspace scope is a join onto documents, so it can't collapse into the filter groups.
+const SELECT_COLUMNS = `
+  id,
+  content,
+  text_embedding,
+  created_at,
+  document_id,
+  source_type,
+  embedding_model,
+  embedding_dimension,
+  documents!inner(workspace_id)
+`;
+
 interface EmbeddingsTabProps {
   workspaceId: string;
   jobIdFilter?: string;
@@ -37,8 +45,6 @@ interface EmbeddingsTabProps {
 export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
   const [embeddings, setEmbeddings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [selectedEmbedding, setSelectedEmbedding] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -46,39 +52,35 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
 
   const ITEMS_PER_PAGE = 20;
 
-  useEffect(() => {
-    if (workspaceId) {
-      setCurrentPage(1);
-      loadEmbeddings(1);
-    }
-  }, [workspaceId, typeFilter, sourceFilter, jobIdFilter]);
+  const groups = useMemo(() => buildMaterialsDataFilters('embeddings', { jobIdFilter }), [jobIdFilter]);
+  const [filterValues, setFilterValues] = useState<FilterValues>(
+    () => (jobIdFilter?.trim() ? { source_job_id: jobIdFilter.trim() } : {}),
+  );
 
+  // The `?jobId=` deep link lives on the page above; mirror it into the values bag so it
+  // shows up as a removable chip instead of an invisible predicate. Before this the tab
+  // rendered source/job/model Selects whose values were never applied to the query.
   useEffect(() => {
-    if (workspaceId) {
-      loadEmbeddings(currentPage);
-    }
-  }, [currentPage]);
+    setFilterValues((v) => ({ ...v, source_job_id: jobIdFilter?.trim() || undefined }));
+  }, [jobIdFilter]);
 
-  const loadEmbeddings = async (page: number) => {
+  const buildQuery = useCallback((values: FilterValues, head: boolean) => {
+    const query: any = supabase
+      .from('document_chunks')
+      .select(head ? 'id, documents!inner(workspace_id)' : SELECT_COLUMNS, { count: 'exact', head })
+      .eq('documents.workspace_id', workspaceId)
+      .not('text_embedding', 'is', null);
+    return applyFiltersToQuery(query, groups, values);
+  }, [workspaceId, groups]);
+
+  const loadEmbeddings = useCallback(async (page: number) => {
     try {
       setIsLoading(true);
 
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      // Query text embeddings from document_chunks with proper join
-      const { data: textData, error: textError, count: textCount } = await supabase
-        .from('document_chunks')
-        .select(`
-          id,
-          content,
-          text_embedding,
-          created_at,
-          document_id,
-          documents!inner(workspace_id)
-        `, { count: 'exact' })
-        .eq('documents.workspace_id', workspaceId)
-        .not('text_embedding', 'is', null)
+      const { data: textData, error: textError, count: textCount } = await buildQuery(filterValues, false)
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -87,12 +89,13 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
         throw textError;
       }
 
-      // Transform to unified format
-      const transformedData = (textData || []).map(chunk => ({
+      // Provenance comes off the row now — the previous hardcoded 'voyage-4' / 1024 would
+      // have contradicted the model + dimension filters this tab exposes.
+      const transformedData = (textData || []).map((chunk: any) => ({
         id: chunk.id,
-        source_type: 'text',
-        model_name: 'voyage-4',
-        embedding_dimension: 1024,
+        source_type: chunk.source_type,
+        model_name: chunk.embedding_model,
+        embedding_dimension: chunk.embedding_dimension,
         created_at: chunk.created_at,
         source_id: chunk.id,
         source_text: chunk.content?.substring(0, 200) + '...',
@@ -113,7 +116,22 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [buildQuery, filterValues, workspaceId, toast]);
+
+  useEffect(() => { setCurrentPage(1); }, [filterValues]);
+
+  // Debounced so typing in the search box doesn't fire a query per keystroke; the cleanup
+  // also collapses the extra render caused by the page reset above into one fetch.
+  useEffect(() => {
+    if (!workspaceId) return;
+    const timer = setTimeout(() => { void loadEmbeddings(currentPage); }, 250);
+    return () => clearTimeout(timer);
+  }, [workspaceId, currentPage, loadEmbeddings]);
+
+  const previewCount = useCallback(async (values: FilterValues) => {
+    const { count } = await buildQuery(values, true);
+    return count ?? 0;
+  }, [buildQuery]);
 
   const getSourceBadge = (sourceType: string | null | undefined) => {
     if (!sourceType) return <Badge variant="outline">Unknown</Badge>;
@@ -150,29 +168,14 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
                 View vector embeddings generated from text and images
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sources</SelectItem>
-                  <SelectItem value="pdf_processing">PDF Processing</SelectItem>
-                  <SelectItem value="xml_import">XML Import</SelectItem>
-                  <SelectItem value="web_scraping">Web Scraping</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[250px]">
-                  <SelectValue placeholder="Filter by model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Models</SelectItem>
-                  <SelectItem value="voyage-4">voyage-4 (Text)</SelectItem>
-                  <SelectItem value="siglip">SigLIP (Images)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <FilterBar
+              groups={groups}
+              values={filterValues}
+              onChange={setFilterValues}
+              previewCount={previewCount}
+              title="Filter embeddings"
+              searchPlaceholder="Search source text…"
+            />
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -199,7 +202,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
                 {embeddings.map((emb) => (
                   <TableRow key={emb.id}>
                     <TableCell>
-                      <Badge>{emb.model_name || 'text'}</Badge>
+                      <Badge>{emb.model_name || 'unknown'}</Badge>
                     </TableCell>
                     <TableCell>
                       {getSourceBadge(emb.source_type)}
@@ -247,7 +250,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
             <div className="space-y-4">
               <div>
                 <h4 className="font-semibold mb-2">Model</h4>
-                <Badge>{selectedEmbedding.model_name || 'text'}</Badge>
+                <Badge>{selectedEmbedding.model_name || 'unknown'}</Badge>
               </div>
               <div>
                 <h4 className="font-semibold mb-2">Source</h4>

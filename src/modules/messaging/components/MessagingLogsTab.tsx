@@ -3,15 +3,15 @@
  * View message delivery logs and status
  */
 
-import React, { useState, useEffect } from 'react';
-import { RefreshCw, MessageCircle, Search, Filter } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { RefreshCw, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Input } from '@/components/core/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingLog, MessagingChannelType, MessageStatus } from '../services';
+import { buildMessagingLogFilters } from './messagingFilters';
 import { humanizeLabel } from '@/utils/humanize';
 import { format } from 'date-fns';
 
@@ -30,15 +30,23 @@ const statusColors: Record<MessageStatus, string> = {
 export const MessagingLogsTab: React.FC = () => {
   const [logs, setLogs] = useState<MessagingLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterChannel, setFilterChannel] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [searchPhone, setSearchPhone] = useState('');
   const [page, setPage] = useState(1);
   const { toast } = useToast();
+
+  const filterGroups = useMemo(() => buildMessagingLogFilters(logs), [logs]);
+  const { values: filterValues, setValues: setFilterValues, filtered: filteredLogs, previewCount } =
+    useFilters<MessagingLog>(logs, filterGroups);
+
+  // channel_type + status are the server-side fields; changing either re-queries.
+  const filterChannel = (filterValues.channel_type as string) || 'all';
+  const filterStatus = (filterValues.status as string) || 'all';
 
   useEffect(() => {
     loadLogs();
   }, [filterChannel, filterStatus]);
+
+  // Client-side narrowing shrinks the list — keep the page in range.
+  useEffect(() => { setPage((p) => clampPage(p, filteredLogs.length)); }, [filteredLogs.length]);
 
   const loadLogs = async () => {
     try {
@@ -64,10 +72,6 @@ export const MessagingLogsTab: React.FC = () => {
     }
   };
 
-  const filteredLogs = searchPhone
-    ? logs.filter(log => log.to_number.includes(searchPhone))
-    : logs;
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -88,45 +92,14 @@ export const MessagingLogsTab: React.FC = () => {
 
       {/* Filters */}
       <div className="dashboard-card">
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Filters:</span>
-          </div>
-          <Select value={filterChannel} onValueChange={setFilterChannel}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Channel" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Channels</SelectItem>
-              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="queued">Queued</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="read">Read</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchPhone}
-                onChange={(e) => { setSearchPhone(e.target.value); setPage(1); }}
-                placeholder="Search by phone number..."
-                className="pl-9"
-              />
-            </div>
-          </div>
-        </div>
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          title="Filter message logs"
+          searchPlaceholder="Search phone number or content…"
+        />
       </div>
 
       {/* Logs Table */}

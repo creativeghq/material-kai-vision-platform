@@ -3,8 +3,8 @@
  * Manage phone number opt-outs for compliance
  */
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, UserX, Search, MessageCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Trash2, UserX, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -12,8 +12,10 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingOptout, MessagingChannelType } from '../services';
+import { buildMessagingOptoutFilters } from './messagingFilters';
 import { format } from 'date-fns';
 
 const channelIcons: Record<string, React.ReactNode> = {
@@ -32,14 +34,21 @@ export const MessagingOptoutsTab: React.FC = () => {
   const [optouts, setOptouts] = useState<MessagingOptout[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [filterChannel, setFilterChannel] = useState<string>('all');
-  const [searchPhone, setSearchPhone] = useState('');
   const [page, setPage] = useState(1);
   const { toast } = useToast();
+
+  const filterGroups = useMemo(() => buildMessagingOptoutFilters(optouts), [optouts]);
+  const { values: filterValues, setValues: setFilterValues, filtered: filteredOptouts, previewCount } =
+    useFilters<MessagingOptout>(optouts, filterGroups);
+
+  // channel_type is the one server-side field; changing it re-queries.
+  const filterChannel = (filterValues.channel_type as string) || 'all';
 
   useEffect(() => {
     loadOptouts();
   }, [filterChannel]);
+
+  useEffect(() => { setPage((p) => clampPage(p, filteredOptouts.length)); }, [filteredOptouts.length]);
 
   const loadOptouts = async () => {
     try {
@@ -82,10 +91,6 @@ export const MessagingOptoutsTab: React.FC = () => {
     }
   };
 
-  const filteredOptouts = searchPhone
-    ? optouts.filter(o => o.phone_number.includes(searchPhone))
-    : optouts;
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -106,28 +111,14 @@ export const MessagingOptoutsTab: React.FC = () => {
 
       {/* Filters */}
       <div className="dashboard-card">
-        <div className="flex flex-wrap gap-4">
-          <Select value={filterChannel} onValueChange={(v) => { setFilterChannel(v); setPage(1); }}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Channel" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Channels</SelectItem>
-              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchPhone}
-                onChange={(e) => { setSearchPhone(e.target.value); setPage(1); }}
-                placeholder="Search by phone number..."
-                className="pl-9"
-              />
-            </div>
-          </div>
-        </div>
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          title="Filter opt-outs"
+          searchPlaceholder="Search by phone number…"
+        />
       </div>
 
       {/* Stats */}
@@ -152,7 +143,7 @@ export const MessagingOptoutsTab: React.FC = () => {
           </div>
         ) : filteredOptouts.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
-            {searchPhone ? 'No opt-outs found matching your search' : 'No opt-outs recorded'}
+            {optouts.length === 0 ? 'No opt-outs recorded' : 'No opt-outs match the current filters'}
           </div>
         ) : (
           <>

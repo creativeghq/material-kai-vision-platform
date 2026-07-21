@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ShoppingCart,
@@ -6,7 +6,6 @@ import {
   Loader2,
   Eye,
   Trash2,
-  Filter,
   FileText,
   Clock,
   CheckCircle,
@@ -18,21 +17,9 @@ import { QuoteSettingsPage } from './QuoteSettingsPage';
 import { PageHeader } from '@/components/shared/PageHeader';
 
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/core/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/core/ui/command';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildQuoteFilters } from '../components/quoteFilters';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -40,7 +27,6 @@ import { CreateQuoteModal } from '../components/CreateQuoteModal';
 import { RequestsInboxPanel } from '../components/RequestsInboxPanel';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
 
-type StatusFilter = 'all' | 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
 type QuotesTab = 'quotes' | 'requests' | 'settings';
 
 /**
@@ -69,9 +55,7 @@ export const QuotesPage: React.FC = () => {
   // State
   const [quotes, setQuotes] = useState<QuoteWithItems[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
 
   // #251 App Launcher deep-link: /quotes?new=quote opens the Create Quote modal.
@@ -106,16 +90,12 @@ export const QuotesPage: React.FC = () => {
     loadQuotes();
   }, [loadQuotes]);
 
-  // Filter quotes based on status
-  const filteredQuotes = quotes.filter((quote) => {
-    if (statusFilter !== 'all' && quote.status !== statusFilter) {
-      return false;
-    }
-    return true;
-  });
+  const filterGroups = useMemo(() => buildQuoteFilters(quotes), [quotes]);
+  const { values: filterValues, setValues: setFilterValues, filtered: filteredQuotes, previewCount } =
+    useFilters<QuoteWithItems>(quotes, filterGroups);
 
   // Narrowing the filter or deleting a quote can shrink the list under the current page.
-  useEffect(() => { setPage(1); }, [statusFilter]);
+  useEffect(() => { setPage(1); }, [filterValues]);
   useEffect(() => { setPage((p) => clampPage(p, filteredQuotes.length)); }, [filteredQuotes.length]);
 
 
@@ -247,47 +227,18 @@ export const QuotesPage: React.FC = () => {
 
         {/* Quotes Table */}
         <div className="dashboard-card rounded-2xl border-0 shadow-sm p-3 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Quote Requests
-              {statusFilter !== 'all' && (
-                <span className="text-xs text-muted-foreground font-normal">· {statusFilter}</span>
-              )}
             </h3>
-            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`h-7 px-2 hover:bg-muted ${statusFilter !== 'all' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  <Filter className="h-3.5 w-3.5 mr-1.5" />
-                  <span className="text-xs">
-                    {statusFilter === 'all' ? 'Filter' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-0" align="end">
-                <Command>
-                  <CommandInput placeholder="Search status..." />
-                  <CommandList>
-                    <CommandEmpty>No status found.</CommandEmpty>
-                    <CommandGroup>
-                      {(['all', 'draft', 'submitted', 'quoted', 'accepted', 'rejected', 'expired'] as const).map((s) => (
-                        <CommandItem
-                          key={s}
-                          onSelect={() => { setStatusFilter(s); setFilterOpen(false); }}
-                          className={statusFilter === s ? 'bg-accent' : ''}
-                        >
-                          {s === 'all' ? 'All Statuses' : s.charAt(0).toUpperCase() + s.slice(1)}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <FilterBar
+              groups={filterGroups}
+              values={filterValues}
+              onChange={setFilterValues}
+              previewCount={previewCount}
+              title="Filter quotes"
+            />
           </div>
           <div className="overflow-hidden -mx-3 sm:-mx-6 -mb-6 mt-2">
             {filteredQuotes.length === 0 ? (

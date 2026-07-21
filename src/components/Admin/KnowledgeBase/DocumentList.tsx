@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -15,8 +15,6 @@ import {
   Lock,
   Unlock,
   Database,
-  Filter,
-  X,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -49,18 +47,14 @@ import { useToast } from '@/hooks/use-toast';
 import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError, edgeErrorMessage } from '@/utils/edgeError';
-import {
-  KbFilterModal,
-  EMPTY_KB_FILTERS,
-  countActiveFilters,
-  applyKbFiltersToQuery,
-  type KbDocFilters,
-} from './KbFilterModal';
+import { FilterBar, applyFiltersToQuery, countActive, type FilterValues } from '@/components/core/filters';
+import { buildKbDocFilters, type KbFilterCategory } from './kbDocFilters';
 
 interface DocumentListProps {
   onEdit: (docId: string) => void;
   onCreate: () => void;
-  searchQuery: string;
+  /** Optional externally-driven search term; seeds the toolbar's `q` field. */
+  searchQuery?: string;
   refreshTrigger?: number;
   /**
    * When set (with a changing `nonce`), seed the filters to show only this
@@ -78,9 +72,9 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 }) => {
   const [documents, setDocuments] = useState<KBDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [filters, setFilters] = useState<KbDocFilters>(EMPTY_KB_FILTERS);
-  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [values, setValues] = useState<FilterValues>({});
   const [workspaceId, setWorkspaceId] = useState<string>('');
+  const [categories, setCategories] = useState<KbFilterCategory[]>([]);
   const [viewingDoc, setViewingDoc] = useState<KBDocument | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -105,19 +99,26 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     loadWorkspace();
   }, []);
 
+  const filterGroups = useMemo(() => buildKbDocFilters(categories), [categories]);
+
   // Seed a single-category filter when the user clicks a category on the
   // Categories tab. Keyed on `nonce` so re-clicking the same category re-applies.
   useEffect(() => {
     if (applyCategoryFilter?.id) {
-      setFilters({ ...EMPTY_KB_FILTERS, categoryIds: [applyCategoryFilter.id] });
+      setValues({ category_id: [applyCategoryFilter.id] });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyCategoryFilter?.nonce]);
 
-  // Reset to first page whenever the result set changes (filters / search).
+  // The parent may drive the search term; mirror it onto the toolbar's `q` field.
+  useEffect(() => {
+    setValues((v) => (((v.q as string) ?? '') === (searchQuery ?? '') ? v : { ...v, q: searchQuery || undefined }));
+  }, [searchQuery]);
+
+  // Reset to first page whenever the result set changes.
   useEffect(() => {
     setPage(1);
-  }, [filters, searchQuery]);
+  }, [values]);
 
   useEffect(() => {
     if (workspaceId) {
@@ -125,18 +126,21 @@ export const DocumentList: React.FC<DocumentListProps> = ({
       loadCategoryAccessMap();
       loadEmbedBacklog();
     }
-  }, [workspaceId, filters, refreshTrigger, page, searchQuery]);
+  }, [workspaceId, values, refreshTrigger, page]);
 
   const loadCategoryAccessMap = async () => {
     const { data } = await supabase
       .from('kb_categories')
-      .select('id, access_level, is_locked')
-      .eq('workspace_id', workspaceId);
+      .select('id, name, icon, access_level, is_locked, sort_order')
+      .eq('workspace_id', workspaceId)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
     const m = new Map<string, string>();
     const lk = new Map<string, boolean>();
     (data ?? []).forEach((c: any) => { m.set(c.id, c.access_level); lk.set(c.id, c.is_locked === true); });
     setCategoryAccess(m);
     setCategoryLocked(lk);
+    setCategories((data ?? []).map((c: any) => ({ id: c.id, name: c.name, icon: c.icon })));
   };
 
   const loadEmbedBacklog = async () => {
@@ -197,17 +201,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false });
 
-      query = applyKbFiltersToQuery(query, filters);
-
-      const q = searchQuery.trim();
-      if (q) {
-        // PostgREST ilike-filter sanitizer (strips %,() so they can't break the .or() grammar).
-        // NOT an HTML escaper — do not rename back to `esc` (see src/utils/escapeHtml.ts).
-        const ilikeTerm = q.replace(/[%,()]/g, ' ');
-        query = query.or(`title.ilike.%${ilikeTerm}%,content.ilike.%${ilikeTerm}%`);
-      }
-
-      query = query.range(from, to);
+      query = applyFiltersToQuery(query, filterGroups, values).range(from, to);
 
       const { data, error, count } = await query;
 
@@ -326,7 +320,24 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     }
   };
 
-  const handleDeleteAllMatching = async (matchFilters: KbDocFilters, matchCount: number) => {
+  // Destructive bulk action scoped to the CURRENT filter set — not the current page.
+  // `totalCount` is the exact server count for exactly these filters, so it is the number
+  // shown on the button and the number confirmed against.
+  const handleDeleteAllMatching = async () => {
+    const matchCount = totalCount;
+    if (matchCount === 0) return;
+    if (countActive(filterGroups, values) === 0) {
+      toast({
+        title: 'Refusing to delete',
+        description: 'Pick at least one filter — deleting all documents requires explicit filters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!window.confirm(
+      `Delete ${matchCount} document${matchCount === 1 ? '' : 's'} matching the current filters? This cannot be undone.`,
+    )) return;
+
     setBulkBusy(true);
     try {
       // First fetch the candidate IDs + the fields needed to evaluate isDocLocked,
@@ -336,7 +347,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         .from('kb_docs')
         .select('id, category_id, metadata')
         .eq('workspace_id', workspaceId);
-      selectQ = applyKbFiltersToQuery(selectQ, matchFilters);
+      selectQ = applyFiltersToQuery(selectQ, filterGroups, values);
       const { data: candidates, error: selErr } = await selectQ;
       if (selErr) throw selErr;
       const deletable = (candidates ?? []).filter((d: any) => !isDocLocked(d as KBDocument));
@@ -506,7 +517,21 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   // current page is already the filtered set.
   const filteredDocuments = documents;
 
-  const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
+  const activeFilterCount = useMemo(() => countActive(filterGroups, values), [filterGroups, values]);
+
+  // Live match count for the modal's Apply button — a head-only count so the preview never
+  // pulls rows. Same defs as the list query, so the number is exact.
+  const previewCount = useCallback(async (draft: FilterValues) => {
+    if (!workspaceId) return 0;
+    let q: any = supabase
+      .from('kb_docs')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId);
+    q = applyFiltersToQuery(q, filterGroups, draft);
+    const { count } = await q;
+    return count ?? 0;
+  }, [workspaceId, filterGroups]);
+
   const filteredIds = useMemo(() => filteredDocuments.map((d) => d.id), [filteredDocuments]);
   const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
   const someFilteredSelected = filteredIds.some((id) => selectedIds.has(id));
@@ -521,32 +546,10 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   return (
     <>
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <CardTitle>Documents</CardTitle>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="rounded-full gap-2"
-              onClick={() => setFilterModalOpen(true)}
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="rounded-full ml-1">{activeFilterCount}</Badge>
-              )}
-            </Button>
-            {activeFilterCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-full"
-                onClick={() => setFilters(EMPTY_KB_FILTERS)}
-                title="Clear all filters"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
             {embedBacklog > 0 && (
               <Button
                 variant="outline"
@@ -565,6 +568,28 @@ export const DocumentList: React.FC<DocumentListProps> = ({
             </Button>
           </div>
         </div>
+        <FilterBar
+          groups={filterGroups}
+          values={values}
+          onChange={setValues}
+          previewCount={previewCount}
+          title="Filter documents"
+          searchPlaceholder="Search title or content…"
+        >
+          {activeFilterCount > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              disabled={bulkBusy || totalCount === 0}
+              onClick={handleDeleteAllMatching}
+              title="Delete every document matching the current filters"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {bulkBusy ? 'Deleting…' : `Delete ${totalCount} matching`}
+            </Button>
+          )}
+        </FilterBar>
       </CardHeader>
       <CardContent className="p-0">
         {selectedIds.size > 0 && (
@@ -729,15 +754,6 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         />
       </CardContent>
     </Card>
-
-    <KbFilterModal
-      open={filterModalOpen}
-      onClose={() => setFilterModalOpen(false)}
-      workspaceId={workspaceId}
-      initialFilters={filters}
-      onApply={(next) => setFilters(next)}
-      onDeleteAllMatching={handleDeleteAllMatching}
-    />
 
     {/* Document Viewer */}
     {viewingDoc && (

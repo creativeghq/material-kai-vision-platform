@@ -1,7 +1,7 @@
 // Reusable contracts panel — one component for all three contexts (hr | finance | project).
 // Pass a `subject` (e.g. { customer_company_id } or { hr_employee_id } or { project_id }) when
 // mounting under a specific entity; omit it for a standalone workspace-wide list (finance).
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, FileSignature, Plus, Link2, Ban, CheckCircle2, Send } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { FilterBar, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { contractsService, type Contract, type ContractContext, type ContractStatus } from '@/services/contractsService';
 
 const STATUS_TONE: Record<ContractStatus, string> = {
@@ -41,7 +42,13 @@ export const ContractsSection: React.FC<{
   context: ContractContext | 'all';
   subject?: Subject;
   heading?: string;
-}> = ({ workspaceId, context, subject, heading = 'Contracts' }) => {
+  /**
+   * Group definitions for the shared filter modal. Only the standalone Contracts page passes
+   * these — the entity-scoped mounts (employee dialog, project tab) show a handful of rows and
+   * would gain nothing from a filter bar.
+   */
+  filterGroups?: (rows: Contract[]) => FilterGroupDef[];
+}> = ({ workspaceId, context, subject, heading = 'Contracts', filterGroups: buildGroups }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +79,10 @@ export const ContractsSection: React.FC<{
   }, [workspaceId, context, JSON.stringify(subject), toast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { void load(); }, [load]);
+
+  const groups = useMemo(() => (buildGroups ? buildGroups(rows) : []), [buildGroups, rows]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount } =
+    useFilters<Contract>(rows, groups);
 
   const resetForm = () => {
     setTitle(''); setType(TYPE_OPTIONS[createContext][0]); setCounterparty(''); setCounterpartyEmail('');
@@ -136,13 +147,26 @@ export const ContractsSection: React.FC<{
             : null}
       </div>
 
+      {groups.length > 0 && rows.length > 0 && (
+        <FilterBar
+          groups={groups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          title="Filter contracts"
+          searchPlaceholder="Search contracts…"
+        />
+      )}
+
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground text-sm py-6"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">No contracts yet.</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4">
+          {activeCount > 0 ? 'No contracts match your filters.' : 'No contracts yet.'}
+        </p>
       ) : (
         <div className="space-y-2">
-          {rows.map((c) => (
+          {filtered.map((c) => (
             <div key={c.id} className="rounded-lg border border-border/60 p-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">

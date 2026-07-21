@@ -13,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters } from '@/components/core/filters';
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { toast } from 'sonner';
@@ -69,6 +70,7 @@ import { GLOBAL_PIPELINE_FLOW, XML_IMPORT_PIPELINE_FLOW, WEB_SCRAPING_PIPELINE_F
 import { LiveTimer } from './components/LiveTimer';
 import { hasRecentHeartbeat, getStatusBadge } from './components/StatusBadge';
 import { PipelineErrorsPanel } from './components/PipelineErrorsPanel';
+import { buildJobQueueFilters } from './jobQueueFilters';
 import { MIVAA_API_URL } from '@/config/mivaa';
 
 export const AsyncJobQueueMonitor: React.FC = () => {
@@ -509,27 +511,30 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   }, []);
 
+  const filterGroups = useMemo(() => buildJobQueueFilters(jobs), [jobs]);
+  const { values: filterValues, setValues: setFilterValues, filtered: scopedJobs, previewCount } =
+    useFilters<BackgroundJob>(jobs, filterGroups);
+
+  /** Rows of one job-type tab, within the modal-narrowed set — also drives the tab badges. */
+  const jobsOfType = useCallback((list: BackgroundJob[], type: typeof selectedTab): BackgroundJob[] => {
+    if (type === 'all') return list;
+    // product_discovery_upload is a PDF job under a different name.
+    if (type === 'pdf_processing') {
+      return list.filter(job => job.job_type === 'pdf_processing' || job.job_type === 'product_discovery_upload');
+    }
+    return list.filter(job => job.job_type === type);
+  }, []);
+
   // 🆕 Filter jobs by selected tab. Memoized because the render calls getFilteredJobs()
   // several times per pass (list body, empty check, pagination total, bulk-action guards).
-  const filteredJobs = useMemo<BackgroundJob[]>(() => {
-    if (selectedTab === 'all') {
-      return jobs;
-    }
-
-    // Group product_discovery_upload with pdf_processing
-    if (selectedTab === 'pdf_processing') {
-      return jobs.filter(job =>
-        job.job_type === 'pdf_processing' ||
-        job.job_type === 'product_discovery_upload',
-      );
-    }
-
-    return jobs.filter(job => job.job_type === selectedTab);
-  }, [jobs, selectedTab]);
+  const filteredJobs = useMemo<BackgroundJob[]>(
+    () => jobsOfType(scopedJobs, selectedTab),
+    [scopedJobs, selectedTab, jobsOfType],
+  );
 
   const getFilteredJobs = (): BackgroundJob[] => filteredJobs;
 
-  const failedJobs = useMemo(() => jobs.filter((j) => j.status === 'failed'), [jobs]);
+  const failedJobs = useMemo(() => scopedJobs.filter((j) => j.status === 'failed'), [scopedJobs]);
 
   // Realtime refreshes and deletions shrink these lists constantly; clamping at render
   // keeps a now-out-of-range page from showing an empty table with no way back.
@@ -538,6 +543,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const scrapingPageSafe = clampPage(scrapingPage, filteredJobs.length);
   const xmlPageSafe = clampPage(xmlPage, filteredJobs.length);
   const failedPageSafe = clampPage(failedPage, failedJobs.length);
+
+  // A narrowed result set is a different list in every tab — restart them all at page 1.
+  useEffect(() => {
+    setAllPage(1); setPdfPage(1); setScrapingPage(1); setXmlPage(1); setFailedPage(1);
+  }, [filterValues]);
 
   useEffect(() => {
     fetchQueueData();
@@ -1554,6 +1564,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           </div>
         </div>
 
+      <FilterBar
+        groups={filterGroups}
+        values={filterValues}
+        onChange={setFilterValues}
+        previewCount={previewCount}
+        title="Filter jobs"
+        searchPlaceholder="Search filename, source, job id…"
+      />
+
       {/* 🆕 Job Type Tabs */}
       <Tabs
         value={selectedTab}
@@ -1568,21 +1587,22 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         className="space-y-4"
       >
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+          {/* Badges count the modal-narrowed set so a tab never promises rows the filter hides. */}
           <TabsTrigger value="all" className="flex items-center gap-2">
             All Jobs
-            <Badge variant="secondary" className="ml-1">{metrics.all_jobs.total}</Badge>
+            <Badge variant="secondary" className="ml-1">{scopedJobs.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="pdf_processing" className="flex items-center gap-2">
             PDF Processing
-            <Badge variant="secondary" className="ml-1">{metrics.pdf_processing.total}</Badge>
+            <Badge variant="secondary" className="ml-1">{jobsOfType(scopedJobs, 'pdf_processing').length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="web_scraping" className="flex items-center gap-2">
             Web Scraping
-            <Badge variant="secondary" className="ml-1">{metrics.web_scraping.total}</Badge>
+            <Badge variant="secondary" className="ml-1">{jobsOfType(scopedJobs, 'web_scraping').length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="xml_import" className="flex items-center gap-2">
             XML Import
-            <Badge variant="secondary" className="ml-1">{metrics.xml_import.total}</Badge>
+            <Badge variant="secondary" className="ml-1">{jobsOfType(scopedJobs, 'xml_import').length}</Badge>
           </TabsTrigger>
         </TabsList>
 

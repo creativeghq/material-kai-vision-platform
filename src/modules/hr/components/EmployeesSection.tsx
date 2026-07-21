@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, ExternalLink, Loader2, Pencil, Users, Mail } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -19,6 +19,8 @@ import {
 import { SectionHeader, EmptyState } from './_shared';
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, useFilters } from '@/components/core/filters';
+import { buildEmployeeFilters } from './hrFilters';
 
 const statusVariant: Record<EmployeeStatus, 'default' | 'secondary' | 'outline'> = { active: 'default', on_leave: 'secondary', terminated: 'outline' };
 const empName = (e: Employee) => e.contact?.name || [e.contact?.first_name, e.contact?.last_name].filter(Boolean).join(' ') || 'Unnamed';
@@ -45,14 +47,36 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
 
   const deptName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? '—';
 
+  const filterGroups = useMemo(() => buildEmployeeFilters(employees, departments), [employees, departments]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount } =
+    useFilters<Employee>(employees, filterGroups);
+  // A narrowed roster is a different list — restart at the first page.
+  useEffect(() => { setPage(1); }, [filterValues]);
+
   if (loading) return <Skeleton className="h-64 w-full" />;
 
   return (
     <div className="space-y-4">
       <SectionHeader title="Employees" subtitle={`${employees.length} people`} actions={canManage && workspaceId ? <AddEmployeeDialog workspaceId={workspaceId} departments={departments} onDone={load} /> : undefined} />
+      {employees.length > 0 && (
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          title="Filter employees"
+          searchPlaceholder="Search employees…"
+        />
+      )}
       <Card>
         <CardContent className="p-0">
-          {employees.length === 0 ? <EmptyState icon={Users} title="No employees yet" hint={canManage ? 'Add your first employee.' : undefined} /> : (
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title={activeCount > 0 ? 'No employees match your filters' : 'No employees yet'}
+              hint={activeCount > 0 ? 'Clear a constraint to widen the list.' : canManage ? 'Add your first employee.' : undefined}
+            />
+          ) : (
             <Table>
               <TableHeader><TableRow>
                 <TableHead>Name</TableHead><TableHead>Position</TableHead><TableHead>Department</TableHead>
@@ -60,7 +84,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
                 <TableHead className="text-right">Absence</TableHead><TableHead className="text-right">Leave left</TableHead><TableHead />
               </TableRow></TableHeader>
               <TableBody>
-                {paginate(employees, page).map((e) => (
+                {paginate(filtered, page).map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{empName(e)}{e.on_leave_today && <Badge variant="secondary" className="ml-2">On leave</Badge>}</TableCell>
                     <TableCell>{e.contact?.position || '—'}</TableCell>
@@ -81,7 +105,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
               </TableBody>
             </Table>
           )}
-          <TablePagination page={page} total={employees.length} onPageChange={setPage} label="employees" />
+          <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="employees" />
         </CardContent>
       </Card>
 
