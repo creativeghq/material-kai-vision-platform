@@ -92,9 +92,12 @@ const AppsPage: React.FC = () => {
         ) : (
           hubGroups.map(({ hub, apps }) => (
             <section key={hub?.id ?? 'more'} className="space-y-3">
+              {/* Headline: [icon] Hub ───────────── [count] — same rule-line as the App Launcher. */}
               <div className="flex items-center gap-2">
-                {hub ? <hub.icon className="h-4 w-4 text-primary" /> : null}
-                <h2 className="text-sm font-semibold">{hub?.label ?? 'More'}</h2>
+                {hub ? <hub.icon className="h-4 w-4 shrink-0 text-primary" /> : null}
+                <h2 className="shrink-0 text-base font-semibold">{hub?.label ?? 'More'}</h2>
+                <span className="h-px flex-1 bg-muted" />
+                <span className="shrink-0 text-xs text-muted-foreground">{apps.length}</span>
               </div>
               {hub?.description && <p className="-mt-2 text-xs text-muted-foreground">{hub.description}</p>}
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -380,10 +380,12 @@ export const ModulesActivationTab: React.FC = () => {
             const HubIcon = g.hub?.icon;
             return (
               <section key={g.label} className="space-y-3">
+                {/* Headline: [icon] Hub ───────────── [count] — same rule-line as the App Launcher. */}
                 <div className="flex items-center gap-2">
-                  {HubIcon ? <HubIcon className="h-4 w-4 text-primary" /> : null}
-                  <h3 className="text-sm font-semibold">{g.label}</h3>
-                  <span className="text-xs text-muted-foreground">{g.tiles.length}</span>
+                  {HubIcon ? <HubIcon className="h-4 w-4 shrink-0 text-primary" /> : null}
+                  <h3 className="shrink-0 text-base font-semibold">{g.label}</h3>
+                  <span className="h-px flex-1 bg-muted" />
+                  <span className="shrink-0 text-xs text-muted-foreground">{g.tiles.length}</span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {g.tiles.map(renderTile)}
