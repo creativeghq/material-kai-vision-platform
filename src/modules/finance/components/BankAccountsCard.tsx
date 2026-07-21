@@ -62,7 +62,8 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   const load = async () => {
-    try { setLoading(true); setRows(await financeService.getBankAccountBalances(workspaceId)); }
+    // Management view — archived accounts must stay visible here so they can be reactivated.
+    try { setLoading(true); setRows(await financeService.getBankAccountBalances(workspaceId, { includeInactive: true })); }
     catch (err: any) { toast({ title: 'Failed to load accounts', description: err?.message, variant: 'destructive' }); }
     finally { setLoading(false); }
   };

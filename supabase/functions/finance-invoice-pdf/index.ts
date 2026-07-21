@@ -47,6 +47,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     vatAnalysis: 'Ανάλυση ΦΠΑ', subtotalNet: 'Καθαρή Αξία', totalVat: 'Σύνολο ΦΠΑ',
     price: 'Αξία', discount: 'Έκπτωση', priceAfterDiscount: 'Αξία μετά Έκπτωσης',
     withheld: 'Παρακρατήσεις', total: 'Πληρωτέο Ποσό', paid: 'Πληρωμένο', due2: 'Υπόλοιπο',
+    prevBalance: 'Προηγούμενο υπόλοιπο', prevCredit: 'Προηγούμενη πίστωση', totalWithPrev: 'Συνολικό οφειλόμενο',
     fees: 'Τέλη', stamp: 'Χαρτόσημο', otherTaxes: 'Λοιποί Φόροι', deductions: 'Κρατήσεις',
     digitalFee: 'Ψηφιακό Τέλος Συναλλαγής', related: 'Σχετ. Παραστατικό',
     paymentMethod: 'Τρόπος Πληρωμής', bank: 'Τραπεζικός Λογαριασμός', registry: 'ΓΕΜΗ', website: 'Ιστότοπος',
@@ -73,6 +74,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     vatAnalysis: 'VAT analysis', subtotalNet: 'Net total', totalVat: 'Total VAT',
     price: 'Price', discount: 'Discount', priceAfterDiscount: 'Price after Discount',
     withheld: 'Withholding', total: 'Amount due', paid: 'Paid', due2: 'Balance',
+    prevBalance: 'Previous balance', prevCredit: 'Previous credit', totalWithPrev: 'Total outstanding',
     fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
     digitalFee: 'Digital transaction fee', related: 'Related doc',
     paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',
@@ -218,23 +220,23 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
         const { data: ba } = await supabase.from('finance_bank_accounts').select('name').eq('id', row.bank_account_id).maybeSingle();
         bankAccountName = (ba as any)?.name ?? null;
       }
-      // New balance = the party's AR position after this payment (Σ issued invoice totals −
-      // net inbound payments). Positive = still owes; negative = in credit. Best-effort.
+      // New balance = the party's AR position after this payment. Positive = still owes;
+      // negative = in credit. Delegated to get_customer_open_balance so there is exactly ONE
+      // definition of a customer balance in the platform.
+      //
+      // Only ever computed for direction='in'. A receipt for money we paid OUT (an expense,
+      // a supplier bill) is an AP event: it moves the bank account, never the customer's
+      // receivable. The previous hand-rolled sum here counted BOTH directions, so paying a
+      // party inflated what that same party appeared to owe us.
       let newBalance: number | null = null;
-      if (row.counterparty_company_id || row.counterparty_contact_id) {
+      if (row.direction === 'in' && (row.counterparty_company_id || row.counterparty_contact_id)) {
         try {
-          const isCompany = !!row.counterparty_company_id;
-          const partyId = row.counterparty_company_id ?? row.counterparty_contact_id;
-          const [{ data: invs }, { data: pays }] = await Promise.all([
-            supabase.from('invoices').select('total').eq('workspace_id', row.workspace_id)
-              .eq(isCompany ? 'customer_company_id' : 'customer_contact_id', partyId)
-              .in('status', ['issued', 'partially_paid', 'paid', 'overdue']),
-            supabase.from('payments').select('amount, direction').eq('workspace_id', row.workspace_id)
-              .eq(isCompany ? 'counterparty_company_id' : 'counterparty_contact_id', partyId),
-          ]);
-          const invoiced = (invs ?? []).reduce((s: number, r: any) => s + Number(r.total || 0), 0);
-          const netPaid = (pays ?? []).reduce((s: number, r: any) => s + (r.direction === 'in' ? Number(r.amount || 0) : -Number(r.amount || 0)), 0);
-          newBalance = Math.round((invoiced - netPaid) * 100) / 100;
+          const { data: bal } = await supabase.rpc('get_customer_open_balance', {
+            p_workspace_id: row.workspace_id,
+            p_company_id: row.counterparty_company_id ?? null,
+            p_contact_id: row.counterparty_company_id ? null : (row.counterparty_contact_id ?? null),
+          });
+          if (bal && typeof (bal as any).net_balance === 'number') newBalance = (bal as any).net_balance;
         } catch { /* balance optional */ }
       }
       const langP: Lang = fsP?.default_doc_language === 'el' ? 'el' : 'en';
@@ -333,13 +335,32 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       } catch { /* logo optional */ }
     }
 
+    // Carry-forward: what this customer already owed us BEFORE this document, so the invoice
+    // shows their true position and not just this one line. Excludes the current invoice and
+    // counts only inbound payments (an expense we paid them is AP, not AR). Opt-out per
+    // workspace via finance_settings.invoice_show_previous_balance.
+    let priorBalance: number | null = null;
+    if (fs?.invoice_show_previous_balance !== false && (inv.customer_company_id || inv.customer_contact_id)) {
+      try {
+        const { data: pb } = await supabase.rpc('get_customer_prior_balance', {
+          p_workspace_id: inv.workspace_id,
+          p_company_id: inv.customer_company_id ?? null,
+          p_contact_id: inv.customer_company_id ? null : (inv.customer_contact_id ?? null),
+          p_exclude_invoice_id: inv.id,
+          p_as_of: inv.issued_at ?? null,
+        });
+        const v = (pb as any)?.prior_balance;
+        if (typeof v === 'number' && Math.abs(v) >= 0.01) priorBalance = v;
+      } catch { /* carry-forward is informational — never block the document */ }
+    }
+
     // English is the default; Greek only when explicitly chosen (until translations launch).
     const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
     // Template: per-invoice snapshot wins, else workspace setting, else 'classic'.
     const templateId = inv.template_id || fs?.invoice_template_id || 'classic';
     const spec = getSpec(templateId);
     const colors = toPdfColors(resolveColorsHex(templateId, inv.template_colors ?? fs?.invoice_template_colors));
-    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo, spec, colors });
+    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -357,8 +378,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, branch, lang, logo, spec, colors } = d;
+async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
   const currency = inv.currency ?? 'EUR';
@@ -734,6 +755,22 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   if (amountPaid > 0) {
     row(L.paid, `- ${money(amountPaid)}`);
     row(L.due2, money(Number(inv.amount_due ?? grand)), true);
+  }
+  // ── Carry-forward (informational) ──
+  // Sits BELOW the grand total and never feeds it: `grand` is the myDATA/MARK figure for this
+  // document alone. This block only tells the customer what they already owed on top of it.
+  if (typeof priorBalance === 'number' && Math.abs(priorBalance) >= 0.01) {
+    const thisDue = Number(inv.amount_due ?? grand);
+    page.drawLine({ start: { x: boxX, y: y + 5 }, end: { x: right, y: y + 5 }, thickness: 0.4, color: LINE });
+    y -= 3;
+    if (priorBalance > 0) {
+      row(L.prevBalance, money(priorBalance));
+      row(L.totalWithPrev, money(Math.round((thisDue + priorBalance) * 100) / 100), true);
+    } else {
+      // Customer is in credit — show it as a credit, and never print a negative "total due".
+      row(L.prevCredit, `- ${money(Math.abs(priorBalance))}`);
+      row(L.totalWithPrev, money(Math.max(0, Math.round((thisDue + priorBalance) * 100) / 100)), true);
+    }
   }
   if (spec.totalsBoxStyle === 'boxed') {
     page.drawRectangle({ x: boxX - 8, y: y - 2, width: (right - boxX) + 14, height: totalsTop - (y - 2), borderColor: LINE, borderWidth: 1 });

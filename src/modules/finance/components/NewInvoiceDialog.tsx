@@ -25,7 +25,7 @@ import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { formatAddressLine } from '@/services/crm.service';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
-import { financeService, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
@@ -430,15 +430,14 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         setIsB2g(true);
         if ((data as any).vat_number) setB2gBuyerReg(String((data as any).vat_number));
       }
-      // Outstanding = sum of still-owed amounts on issued/partially-paid/overdue invoices.
-      const col = customer.type === 'company' ? 'customer_company_id' : 'customer_contact_id';
-      const { data: openRows } = await supabase
-        .from('invoices')
-        .select('amount_due')
-        .eq('workspace_id', workspaceId)
-        .eq(col, customer.id)
-        .in('status', ['issued', 'partially_paid', 'overdue']);
-      setBuyerOutstanding((openRows ?? []).reduce((s: number, r: any) => s + (Number(r.amount_due) || 0), 0));
+      // Outstanding — via the canonical RPC so it nets unallocated on-account credit and counts
+      // only inbound payments. Same number the invoice PDF prints as "Previous balance", so the
+      // credit gate and the document can never disagree.
+      const bal = await financeService.getCustomerBalance(workspaceId, {
+        companyId: customer.type === 'company' ? customer.id : null,
+        contactId: customer.type === 'contact' ? customer.id : null,
+      }).catch(() => null);
+      setBuyerOutstanding(Number(bal?.net_balance ?? 0));
     })();
   }, [customer, workspaceId]);
 
@@ -922,6 +921,27 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       <Button size="sm" variant="ghost" className="h-6 text-xs" disabled={validatingVat} onClick={validateCounterpartVat}>
                         {validatingVat ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Validate via VIES'}
                       </Button>
+                    </div>
+                  )}
+
+                  {/* What this customer already owes, before this invoice. Same figure the PDF
+                      prints as "Previous balance" — shown here so you know it at issue time. */}
+                  {customer && Math.abs(buyerOutstanding) >= 0.01 && (
+                    <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">
+                        {buyerOutstanding > 0 ? 'Already owes you' : 'Has credit with you'}
+                      </span>
+                      <span className="flex items-center gap-3">
+                        <span className={`tabular-nums font-medium ${buyerOutstanding > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          {formatMoney(Math.abs(buyerOutstanding), currency)}
+                        </span>
+                        <span className="text-muted-foreground">
+                          → total after this invoice{' '}
+                          <span className="tabular-nums font-medium text-foreground">
+                            {formatMoney(Math.max(0, buyerOutstanding + (totals.total || 0)), currency)}
+                          </span>
+                        </span>
+                      </span>
                     </div>
                   )}
 

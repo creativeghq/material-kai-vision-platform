@@ -41,8 +41,13 @@ export const PartyAccountSummary: React.FC<{
   aging?: { not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null;
   /** Orders roll-up (count, total ordered value, amount still owed on un-invoiced orders). */
   orders?: { count: number; ordered: number; owedUninvoiced: number } | null;
+  /** Gross margin earned on this customer, from the invoice lines' cost snapshots. */
+  profitability?: {
+    revenue_net: number; cogs: number; gross_margin: number;
+    gross_margin_pct: number | null; cost_coverage_pct: number | null;
+  } | null;
   meta?: Array<{ label: string; value: React.ReactNode }>;
-}> = ({ customer, supplier, aging, orders, meta }) => {
+}> = ({ customer, supplier, aging, orders, profitability, meta }) => {
   const net = (customer?.outstanding ?? 0) - (supplier?.outstanding ?? 0);
   const netDir = net > 0 ? 'they owe us' : net < 0 ? 'we owe them' : 'settled';
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
@@ -126,6 +131,32 @@ export const PartyAccountSummary: React.FC<{
             {cell('Paid', formatMoney(customer.paid))}
             {cell('They owe us', formatMoney(customer.outstanding), customer.outstanding > 0)}
           </div>
+          {/* Profitability — what this customer is actually worth, not just what they bought.
+              Revenue is net of VAT and COGS comes from each line's cost snapshot, so this is
+              gross margin, not the cash position. `cost_coverage_pct` is shown whenever some
+              lines carry no cost, because those inflate the margin to 100%. */}
+          {profitability && profitability.revenue_net > 0 && (
+            <div className="grid grid-cols-3 gap-3 pt-0.5">
+              {cell('Revenue (net)', formatMoney(profitability.revenue_net))}
+              {cell('Cost of goods', formatMoney(profitability.cogs))}
+              <Card className="dashboard-card border-0">
+                <CardContent className="p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Gross margin</div>
+                  <div className={`text-lg font-semibold ${profitability.gross_margin < 0 ? 'text-destructive' : 'text-emerald-400'}`}>
+                    {formatMoney(profitability.gross_margin)}
+                    {profitability.gross_margin_pct != null && (
+                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">{profitability.gross_margin_pct}%</span>
+                    )}
+                  </div>
+                  {profitability.cost_coverage_pct != null && profitability.cost_coverage_pct < 99 && (
+                    <div className="mt-0.5 text-[10px] text-amber-500" title="Lines with no cost snapshot count as pure margin, so the real figure is lower.">
+                      only {profitability.cost_coverage_pct}% of revenue has a cost
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
           {aging && (aging.not_due + aging.due_0_30 + aging.due_31_90 + aging.due_90_plus) > 0 && (
             <div className="grid grid-cols-4 gap-2 pt-0.5">
               {agingCell('Not due', aging.not_due)}
@@ -170,6 +201,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   // Orders roll-up for the KPI strip. Receivables/payables now live PER ORDER (open an order),
   // not as a separate party-level section.
   const [orderStats, setOrderStats] = useState<{ count: number; ordered: number; owedUninvoiced: number } | null>(null);
+  const [profitability, setProfitability] = useState<Awaited<ReturnType<typeof financeService.getCustomerProfitability>> | null>(null);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
 
@@ -206,6 +238,11 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         const buckets = await financeService.getCustomerAgingBuckets({ workspaceId: activeWorkspaceId, companyId, contactId });
         const b = buckets[0];
         setAging(b ? { not_due: Number(b.not_due), due_0_30: Number(b.due_0_30), due_31_90: Number(b.due_31_90), due_90_plus: Number(b.due_90_plus) } : null);
+
+        // What we actually earned on this customer (revenue net − cost of goods on the lines).
+        setProfitability(await financeService
+          .getCustomerProfitability(activeWorkspaceId, { companyId, contactId })
+          .catch(() => null));
       }
     } catch (e) {
       console.error('account overview load failed', e);
@@ -242,6 +279,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         supplier={supplierAcct ? { billed: supplierAcct.billedTotal, paid: supplierAcct.paidTotal, outstanding: supplierAcct.outstandingTotal, ordered: supplierAcct.orderedTotal } : null}
         aging={aging}
         orders={orderStats}
+        profitability={profitability}
         meta={[
           { label: 'Open orders', value: openOrders },
           { label: 'Last payment', value: lastPayment ? new Date(lastPayment.paid_at).toLocaleDateString() : '—' },

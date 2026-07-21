@@ -136,6 +136,38 @@ export const paymentMethodLabel = (m: string | null | undefined): string =>
   (m && PAYMENT_METHOD_LABEL[m as PaymentMethod]) ||
   (m ? m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '');
 
+/**
+ * Which payment methods are meaningful for a given account kind.
+ *
+ * The account already says HOW the money moved for every kind except `bank` (a transfer and a
+ * cheque both clear through the same bank account) and `other`. So the UI only asks for a
+ * method in those two cases — everywhere else it is derived, not typed.
+ */
+export const methodsForAccountKind = (kind: BankAccountKind | null | undefined): PaymentMethod[] => {
+  switch (kind) {
+    case 'cash': return ['cash'];
+    case 'card': return ['card'];
+    case 'online': return ['other'];
+    case 'bank': return ['bank_transfer', 'check', 'other'];
+    default: return ['bank_transfer', 'cash', 'card', 'check', 'other'];
+  }
+};
+
+/** The method implied by an account kind — used when the UI doesn't ask. */
+export const defaultMethodForAccountKind = (kind: BankAccountKind | null | undefined): PaymentMethod =>
+  methodsForAccountKind(kind)[0];
+
+/** Group headings for the "Paid from" picker, in display order. */
+export const ACCOUNT_KIND_LABEL: Record<BankAccountKind, string> = {
+  bank: 'Banks',
+  cash: 'Cash',
+  card: 'Cards',
+  online: 'Online',
+  other: 'Other',
+};
+
+export const ACCOUNT_KIND_ORDER: BankAccountKind[] = ['bank', 'cash', 'card', 'online', 'other'];
+
 export interface Payment {
   id: string;
   workspace_id: string;
@@ -1037,6 +1069,30 @@ const _financeServiceCore = {
     return data as any;
   },
 
+  /**
+   * Gross margin earned on a customer, from the invoice lines' cost snapshots.
+   *
+   * `cost_coverage_pct` is the share of revenue whose line actually carries a cost — read the
+   * margin against it, because lines with no cost snapshot look like 100% margin.
+   */
+  async getCustomerProfitability(workspaceId: string, party: {
+    companyId?: string | null; contactId?: string | null; from?: string | null; to?: string | null;
+  }): Promise<{
+    revenue_net: number; cogs: number; gross_margin: number;
+    gross_margin_pct: number | null; cost_coverage_pct: number | null;
+    line_count: number; currency: string;
+  }> {
+    const { data, error } = await supabase.rpc('report_customer_profitability', {
+      p_workspace_id: workspaceId,
+      p_company_id: party.companyId ?? null,
+      p_contact_id: party.contactId ?? null,
+      p_from: party.from ?? null,
+      p_to: party.to ?? null,
+    });
+    if (error) throw error;
+    return data as any;
+  },
+
   async listPayments(opts: {
     workspaceId?: string;
     direction?: PaymentDirection;
@@ -1127,9 +1183,14 @@ const _financeServiceCore = {
   },
 
   /** Per-account running balances (opening + Σ in − Σ out). */
-  async getBankAccountBalances(workspaceId: string): Promise<BankAccountBalance[]> {
-    const { data, error } = await supabase.from('vw_bank_account_balances').select('*')
+  async getBankAccountBalances(
+    workspaceId: string,
+    opts: { includeInactive?: boolean } = {},
+  ): Promise<BankAccountBalance[]> {
+    let q = supabase.from('vw_bank_account_balances').select('*')
       .eq('workspace_id', workspaceId).order('sort_order', { ascending: true });
+    if (!opts.includeInactive) q = q.eq('is_active', true);
+    const { data, error } = await q;
     if (error) throw error;
     return (data ?? []) as BankAccountBalance[];
   },

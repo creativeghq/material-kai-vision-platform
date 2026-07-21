@@ -17,8 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  financeService, PAYMENT_METHOD_LABEL, type PaymentMethod, type BankAccount, type RecurringCadence,
+  financeService, type PaymentMethod, type BankAccountBalance, type RecurringCadence,
 } from '@/modules/finance/services/financeService';
+import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
@@ -32,14 +33,12 @@ interface Props {
   onCreated: () => void;
 }
 
-const METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'check', 'other'];
-
 export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
 
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
 
   const [categoryId, setCategoryId] = useState<string>('');
   const [description, setDescription] = useState('');
@@ -95,10 +94,11 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   useEffect(() => {
     if (!open || !workspaceId) return;
     void financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
-    void financeService.listBankAccounts(workspaceId).then((accts) => {
+    // Balances (not just names) so the picker can show what's left in each account.
+    void financeService.getBankAccountBalances(workspaceId).then((accts) => {
       setBankAccounts(accts);
       // Default to the workspace's default account when none picked yet.
-      setBankAccountId((cur) => cur || accts.find((a) => a.is_default)?.id || accts[0]?.id || '');
+      setBankAccountId((cur) => cur || accts.find((a) => a.is_default)?.bank_account_id || accts[0]?.bank_account_id || '');
     }).catch(() => setBankAccounts([]));
   }, [open, workspaceId]);
 
@@ -357,26 +357,14 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <Switch checked={paidNow} onCheckedChange={setPaidNow} />
             </div>
             {paidNow && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Paid from</Label>
-                  <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                    <SelectTrigger><SelectValue placeholder={bankAccounts.length ? 'Pick account' : 'No accounts'} /></SelectTrigger>
-                    <SelectContent>
-                      {bankAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}{a.is_default ? ' (default)' : ''}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Method</Label>
-                  <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {METHODS.map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABEL[m]}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <PaidFromSelect
+                workspaceId={workspaceId}
+                value={bankAccountId}
+                onChange={setBankAccountId}
+                method={method}
+                onMethodChange={setMethod}
+                accounts={bankAccounts}
+              />
             )}
           </div>
 

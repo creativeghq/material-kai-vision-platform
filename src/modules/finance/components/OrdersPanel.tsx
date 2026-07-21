@@ -8,14 +8,17 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Label } from '@/components/core/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel } from '@/modules/finance/services/financeService';
+import {
+  formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel,
+  ACCOUNT_KIND_LABEL, ACCOUNT_KIND_ORDER,
+} from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
@@ -743,6 +746,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const [bankAccounts, setBankAccounts] = useState<Awaited<ReturnType<typeof financeService.listBankAccounts>>>([]);
   const [payAccountId, setPayAccountId] = useState<string>('');
   const [payMethod, setPayMethod] = useState<string>('cash');
+  // Running balance per account, so you can see what's in an account while choosing it.
+  const [acctBalance, setAcctBalance] = useState<Map<string, number>>(new Map());
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
@@ -775,6 +780,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         financeService.listBankAccounts(res.order.workspace_id).catch(() => []),
         ordersService.listOrderPaymentAudit(id).catch(() => []),
       ]);
+      setAcctBalance(new Map(
+        (await financeService.getBankAccountBalances(res.order.workspace_id).catch(() => []))
+          .map((b) => [b.bank_account_id, Number(b.current_balance ?? 0)] as const),
+      ));
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
       setBankAccounts(accounts); setPayAudit(audit);
       setMatch(res.order.order_type === 'purchase'
@@ -1508,8 +1517,27 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                 <div className="flex items-center gap-2 flex-wrap">
                   {bankAccounts.length > 0 ? (
                     <Select value={payAccountId} onValueChange={(v) => { setPayAccountId(v); setPayMethod(methodForAccount(v)); }}>
-                      <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Account…" /></SelectTrigger>
-                      <SelectContent>{bankAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}{a.currency !== order.currency ? ` · ${a.currency}` : ''}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="Account…" /></SelectTrigger>
+                      <SelectContent>{ACCOUNT_KIND_ORDER
+                        .map((k) => ({ kind: k, items: bankAccounts.filter((a) => a.kind === k) }))
+                        .filter((g) => g.items.length > 0)
+                        .map((g) => (
+                          <SelectGroup key={g.kind}>
+                            <SelectLabel>{ACCOUNT_KIND_LABEL[g.kind]}</SelectLabel>
+                            {g.items.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                <span className="flex w-full items-center justify-between gap-4">
+                                  <span>{a.name}{a.currency !== order.currency ? ` · ${a.currency}` : ''}</span>
+                                  {acctBalance.has(a.id) && (
+                                    <span className={`tabular-nums text-[11px] ${(acctBalance.get(a.id) ?? 0) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                      {formatMoney(acctBalance.get(a.id) ?? 0, a.currency)}
+                                    </span>
+                                  )}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ))}</SelectContent>
                     </Select>
                   ) : (
                     <Button size="sm" variant="outline" className="h-8 text-xs" onClick={createCashAccount} disabled={creatingAccount}>

@@ -17,12 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { financeService, paymentMethodLabel, type Invoice, type PaymentMethod, type BankAccount } from '@/modules/finance/services/financeService';
+import { financeService, type Invoice, type PaymentMethod, type BankAccountBalance } from '@/modules/finance/services/financeService';
+import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { parseDecimal } from '@/utils/decimal';
 
 type Kind = 'received' | 'paid_out' | 'refund';
-const METHODS: PaymentMethod[] = ['cash', 'card', 'bank_transfer', 'check', 'other'];
 
 /** Deep-link the dialog straight to one invoice (Settle / refund action on a row). */
 export interface RecordPaymentPreset {
@@ -56,7 +56,7 @@ export const RecordPaymentDialog: React.FC<{
   const [sendReceipt, setSendReceipt] = useState(true);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
@@ -75,13 +75,14 @@ export const RecordPaymentDialog: React.FC<{
         financeCategoriesService.list(workspaceId).catch(() => []),
         // Include paid invoices too — a refund is usually against an already-settled invoice.
         financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'overdue', 'paid'], limit: 200 }).catch(() => []),
-        financeService.listBankAccounts(workspaceId).catch(() => [] as BankAccount[]),
+        // Balances, so the picker shows what's in each account at the point of choosing.
+        financeService.getBankAccountBalances(workspaceId).catch(() => [] as BankAccountBalance[]),
       ]);
       setCategories(cats);
       setInvoices(invs);
       setBankAccounts(banks);
       // Default to the workspace's default account so cash location is always captured.
-      setBankAccountId(banks.find((b) => b.is_default)?.id ?? '');
+      setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
   }, [open, workspaceId, preset]);
 
@@ -263,30 +264,21 @@ export const RecordPaymentDialog: React.FC<{
             </div>
           )}
 
-          <div className="space-y-1">
-            <Label>{kind === 'received' ? 'Deposit to account' : 'Pay from account'}</Label>
-            <Select value={bankAccountId || 'none'} onValueChange={(v) => setBankAccountId(v === 'none' ? '' : v)}>
-              <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Unassigned (no account)</SelectItem>
-                {bankAccounts.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}{b.currency !== 'EUR' ? ` · ${b.currency}` : ''}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {bankAccounts.length === 0
-              ? <p className="text-[11px] text-muted-foreground">No accounts yet — add bank/cash accounts in Settings → Bank accounts to track where money sits.</p>
-              : <p className="text-[11px] text-muted-foreground">{kind === 'received' ? 'Which account this money lands in.' : 'Which account this money is paid from.'}</p>}
-          </div>
+          <PaidFromSelect
+            workspaceId={workspaceId}
+            label={kind === 'received' ? 'Deposit to account' : 'Pay from account'}
+            value={bankAccountId}
+            onChange={setBankAccountId}
+            method={method}
+            onMethodChange={setMethod}
+            accounts={bankAccounts}
+            allowUnassigned
+          />
+          {bankAccounts.length === 0 && (
+            <p className="text-[11px] text-muted-foreground">No accounts yet — add bank/cash accounts in Settings → Bank accounts to track where money sits.</p>
+          )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="space-y-1">
-              <Label>Method</Label>
-              <Select value={method} onValueChange={(v: any) => setMethod(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <Label>Date</Label>
               <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
