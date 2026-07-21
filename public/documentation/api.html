@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / API</div>
+  <h1>API</h1>
+  <p class="lead">MaterialsHub is built on two APIs you can call directly — the <strong>MIVAA API</strong> (the Python backend that does the heavy lifting: PDF processing, search/RAG, price &amp; mention &amp; job tracking) and the <strong>Supabase API</strong> (the platform database, auth, storage and edge functions). On top of those, a handful of endpoints are <strong>fully public</strong> and need no key at all — most notably the <a href="api-jobs.html">Jobs board API</a>. This section explains what each API is for, how you authenticate, and where the live, always-current reference lives.</p>
+
+  <div class="callout"><p><strong>The live specs are the source of truth.</strong> Both APIs publish machine-readable, always-current documentation (Swagger/OpenAPI). The pages here orient you — the linked specs give you every endpoint, parameter and schema.</p></div>
+
+  <h2>The three surfaces</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>API</th><th>What it's for</th><th>Auth</th></tr></thead>
+    <tbody>
+      <tr><td><strong><a href="api-mivaa.html">MIVAA API</a></strong></td><td>The application backend — PDF/catalogue processing, multi-vector search &amp; RAG, and the partner tracking APIs (prices, mentions, jobs).</td><td>Session JWT, a platform key, or a <code>kai_*</code> partner key.</td></tr>
+      <tr><td><strong><a href="api-supabase.html">Supabase API</a></strong></td><td>The data layer — REST over your tables (row-level-security enforced), auth, file storage, and the platform's edge functions.</td><td>Session JWT + the public anon key; RLS decides what you can see.</td></tr>
+      <tr><td><strong><a href="api-jobs.html">Public Jobs API</a></strong></td><td>A public, key-less job board feed for your careers postings — for aggregators, no-code tools and your own site.</td><td><strong>None</strong> — public GET.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Which one do I want?</h2>
+  <ul class="feat">
+    <li><strong>You want to track prices, brand mentions or jobs from another product</strong> → the <a href="api-mivaa.html">MIVAA partner APIs</a> with a <code>kai_*</code> key you generate in <a href="account-subscription.html">Profile → Subscription</a>.</li>
+    <li><strong>You want to read/write your own workspace data</strong> (contacts, products, documents) → the <a href="api-supabase.html">Supabase REST API</a> as a signed-in user; RLS keeps you to your own workspace.</li>
+    <li><strong>You want to publish your open roles on your website or a job aggregator</strong> → the <a href="api-jobs.html">Public Jobs API</a>. No key, no auth, just a GET.</li>
+  </ul>
+
+  <h2>References</h2>
+  <div class="cards">
+    <a class="card" href="api-mivaa.html"><div class="ico">⚙️</div><h3>MIVAA API</h3><p>The backend API — base URL, auth models, the main surfaces, and the live Swagger / OpenAPI spec.</p></a>
+    <a class="card" href="api-supabase.html"><div class="ico">🗄️</div><h3>Supabase API</h3><p>REST over your data, auth, storage and edge functions — with RLS, keys and the per-function docs.</p></a>
+    <a class="card" href="api-jobs.html"><div class="ico">💼</div><h3>Public Jobs API</h3><p>The key-less job-board feed (Greenhouse/Lever/Ashby-style) — endpoints, fields and examples.</p></a>
+  </div>
+
+  <div class="callout tip"><p><strong>Rate limits &amp; cost:</strong> partner API calls are metered — some operations debit credits from the key owner's balance (documented per endpoint), and public endpoints are cached and safe to poll politely. Check each reference for specifics before building against it.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

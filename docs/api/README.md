@@ -2,18 +2,18 @@
 
 This directory contains per-function deep docs for Supabase Edge Function APIs.
 
-> **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **90+ edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
+> **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **96 edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
 >
 > **🧪 Machine-readable / Swagger.** Three OpenAPI surfaces cover the platform:
 > 1. **MIVAA Python API** — FastAPI-generated spec at `https://v1api.materialshub.gr/openapi.json` (Swagger UI `/docs`). Auto-generated; nothing to maintain.
-> 2. **Supabase Edge Functions (Deno)** — **not** in MIVAA's spec; their own OpenAPI at [**openapi-edge.json**](../../public/api/openapi-edge.json), browsable via [**edge-swagger.html**](../../public/api/edge-swagger.html). Covers all **93 edge functions**. (Single source: `public/api/` — committed to git AND served live; there is no second copy under `docs/api/`.)
+> 2. **Supabase Edge Functions (Deno)** — **not** in MIVAA's spec; their own OpenAPI at [**openapi-edge.json**](../../public/api/openapi-edge.json), browsable via [**edge-swagger.html**](../../public/api/edge-swagger.html). Covers all **96 edge functions**. (Single source: `public/api/` — committed to git AND served live; there is no second copy under `docs/api/`.)
 > 3. **Supabase PostgREST (tables/views/RPCs)** — PostgREST auto-serves a Swagger 2.0 spec at the REST root `https://<project>.supabase.co/rest/v1/`. **As of 2026-06 this endpoint is locked to the `service_role` key** (anon/publishable keys get `401 "Only the service_role API key can be used for this endpoint"`), so fetch it server-side: `curl -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" https://<project>.supabase.co/rest/v1/` → ~2.9 MB, 700+ paths / 340+ RPCs (includes every table + RPC, e.g. the Workstream-F `platform_suppliers` / `supplier_claim_requests` / `request_supplier_claim`). It's auto-generated from the live schema — fetch on demand rather than committing the blob.
 >
 > **Live URLs** (served from the frontend's `public/api/` after the next build+deploy; `/api/*` is excluded from the SPA rewrite in `vercel.json`):
 > - Swagger UI → `https://app.materialshub.gr/api/edge-swagger.html`
 > - Spec JSON → `https://app.materialshub.gr/api/openapi-edge.json`
 >
-> Regenerate the **edge** spec after changing a function: edit [`scripts/edge-endpoints.json`](../../scripts/edge-endpoints.json), run `npm run openapi:edge` (or `node scripts/build-openapi-edge.mjs`) — emits to both `docs/api/` and `public/api/`.
+> Regenerate the **edge** spec after changing a function: edit [`scripts/edge-endpoints.json`](../../scripts/edge-endpoints.json), run `npm run openapi:edge` (or `node scripts/build-openapi-edge.mjs`). It writes `public/api/openapi-edge.json` AND regenerates the complete edge-function index + count in [`api-master-reference.md`](../api-master-reference.md) (between the `AUTO-INDEX` markers) from the same single source, so the spec and the human index cannot drift apart.
 
 ## Overview
 
@@ -316,6 +316,14 @@ Tenant HR add-on — employee records + absences (first paid module on the entit
 - **Features:** Employees as tagged `crm_contacts` + `hr_employees` (1:1) + `hr_absences`; gate chain authenticate → `userCanAccessWorkspace` → `isModuleEnabled` → `assertEntitled` (402) → `hr.view` / `hr.manage`
 - **Access:** JWT, workspace-admin for PII; module entitlement required
 - **Architecture:** [hr-system.md](../hr-system.md)
+
+#### [Careers API](./careers-api.md)
+Public, anonymous careers surface for a workspace — a machine-readable **job board** plus the careers-page actions.
+- **Function:** `hr-careers` (`verify_jwt = false`)
+- **GET** `?slug=<company>[&job=<job-slug>]` — Greenhouse/Lever/Ashby-style JSON board for aggregators, scripts and partner sites. Jobs only (no Turnstile key / `apply_config`); each job carries `absolute_url` + `updated_at`; `Cache-Control: public, max-age=300`.
+- **POST** `{ action }` — `meta` / `get-job` / `apply`, used by our own careers page (includes the Turnstile site key + apply config it needs to render).
+- **Visibility:** a posting is public only while `status='open'` **and** not past `closes_at` — identical for both surfaces.
+- **Access:** none (public). `apply` is Turnstile-gated when configured (fail-open) + throttled 8/IP/10 min.
 
 ### Background Processing APIs
 

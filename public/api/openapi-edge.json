@@ -130,6 +130,10 @@
     {
       "name": "HR",
       "description": "HR functions."
+    },
+    {
+      "name": "Stock",
+      "description": "Stock functions."
     }
   ],
   "paths": {
@@ -13057,13 +13061,74 @@
       }
     },
     "/hr-careers": {
+      "get": {
+        "tags": [
+          "HR"
+        ],
+        "summary": "Public job board (JSON) - list open postings, or fetch one",
+        "operationId": "get_hr_careers",
+        "description": "Public job board. `?slug=<company>` returns `{ company, count, jobs[] }`; adding `&job=<job-slug>` returns `{ company, job }` with `description` + `requirements`.\n\nIntegration-shaped: excludes `turnstile_site_key` and `apply_config` (careers-page UI concerns). Every job includes `absolute_url` (deep link to /careers/{slug}/{job}) and `updated_at` for incremental polling. Responses send `Cache-Control: public, max-age=300`.\n\nErrors: 400 missing slug - 404 unknown company - 404 job not found / no longer open.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "query",
+            "required": true,
+            "description": "Workspace public slug (the company's board)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "job",
+            "in": "query",
+            "required": false,
+            "description": "Job posting slug - when present returns that single posting (with description + requirements) instead of the list",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
       "post": {
         "tags": [
           "HR"
         ],
-        "summary": "Public careers page — list a workspace's open postings and accept applications",
+        "summary": "Careers page actions - meta / get-job / apply",
         "operationId": "post_hr_careers",
-        "description": "Anonymous public careers API (#252). No session; resolves the workspace from slug (mirrors finance-storefront) using the service role. apply is Turnstile-gated when TURNSTILE_SECRET_KEY is set (fail-open when not) plus a per-IP throttle (8 applications per 10-minute window). Writes only hr_candidates + hr_applications.\n\n**Response:** `{}`",
+        "description": "Anonymous public careers API (#252). No session; resolves the workspace from `slug` (mirrors finance-storefront) using the service role.\n\nTWO surfaces on one function:\n- **GET** - an integration-shaped job board (Greenhouse/Lever/Ashby style) that a plain curl, job aggregator or no-code tool can poll. Jobs only: no Turnstile key, no apply_config. Each job carries `absolute_url` and `updated_at`. Cached `public, max-age=300`.\n- **POST** - the action API our own careers page uses (`meta` / `get-job` / `apply`).\n\nVisibility for BOTH is identical: a posting is public only while `status='open'` AND it is not past `closes_at`. `apply` is Turnstile-gated when TURNSTILE_SECRET_KEY is set (fail-open when not) plus a per-IP throttle (8 applications / 10 min). Writes only hr_candidates + hr_applications.\n\n**Response:** `{}`",
         "security": [],
         "responses": {
           "200": {
@@ -13128,8 +13193,7 @@
                     "type": "object",
                     "required": [
                       "action",
-                      "slug",
-                      "job_id"
+                      "slug"
                     ],
                     "properties": {
                       "action": {
@@ -13137,15 +13201,19 @@
                         "enum": [
                           "get-job"
                         ],
-                        "description": "Return one open posting's full detail (description + requirements)."
+                        "description": "Return one OPEN posting's full detail (description + requirements). Prefers job_slug; job_id still supported for old links."
                       },
                       "slug": {
                         "type": "string",
                         "description": "Workspace slug"
                       },
+                      "job_slug": {
+                        "type": "string",
+                        "description": "Posting slug (preferred - shareable URL)"
+                      },
                       "job_id": {
                         "type": "string",
-                        "description": "Posting id"
+                        "description": "Posting id (legacy links; one of job_slug/job_id is required)"
                       }
                     },
                     "description": "Returns: { ok, company, turnstile_site_key, job }"
@@ -14453,6 +14521,799 @@
                       }
                     },
                     "description": "Returns: { success, result }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contracts-api": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Contracts & e-signature - manage contracts and the public signer page",
+        "operationId": "post_contracts_api",
+        "description": "Contracts & e-signature. One entity, three contexts (hr | finance | project). verify_jwt is disabled so the PUBLIC token sign path works; management actions call authenticate() plus the module/entitlement gates and then write through a USER-context client, so the context-branched RLS (hr->admin, finance->finance-manager, project->member) is the real enforcement - no service-role body-trust (#250 invariant 1). status/token/workspace/created_by are server-set, never caller-writable.",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "resolve_token"
+                        ],
+                        "description": "PUBLIC (no auth) - resolve a signer token to its contract."
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "Signer token from the emailed link"
+                      }
+                    },
+                    "description": "Returns: { contract } | { not_found } | { signed }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token",
+                      "signer_name"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "sign"
+                        ],
+                        "description": "PUBLIC (no auth) - sign the contract behind a token."
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "Signer token"
+                      },
+                      "signer_name": {
+                        "type": "string",
+                        "description": "Full name typed by the signer"
+                      },
+                      "signer_email": {
+                        "type": "string"
+                      },
+                      "signature_image": {
+                        "type": "string",
+                        "description": "Data URL of the drawn signature"
+                      }
+                    },
+                    "description": "Returns: { success, contract_id }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create"
+                        ],
+                        "description": "Create a contract (hr | finance | project context)."
+                      }
+                    },
+                    "description": "Returns: { contract }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list"
+                        ],
+                        "description": "List contracts in the workspace."
+                      }
+                    },
+                    "description": "Returns: { contracts: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get"
+                        ],
+                        "description": "Read one contract."
+                      }
+                    },
+                    "description": "Returns: { contract }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update"
+                        ],
+                        "description": "Update a draft contract's caller-writable fields."
+                      }
+                    },
+                    "description": "Returns: { contract }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "send"
+                        ],
+                        "description": "Send the contract for e-signature (emails the signer a tokenised link)."
+                      }
+                    },
+                    "description": "Returns: { success }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "void"
+                        ],
+                        "description": "Void a contract."
+                      }
+                    },
+                    "description": "Returns: { success }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stock-api": {
+      "post": {
+        "tags": [
+          "Stock"
+        ],
+        "summary": "Stock / warehouse module - inventory, movements, counts, shipments and forecasting",
+        "operationId": "post_stock_api",
+        "description": "Stock Management API. Promotes the warehouse/inventory feature (previously a Finance tab) into a first-class PAID ADD-ON, mirroring hr-api (#252). Gate order: authenticate -> userCanAccessWorkspace -> isModuleEnabled('stock') -> assertEntitled(ws,'stock'), then finance-manager RBAC on writes.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "overview"
+                        ],
+                        "description": "Dashboard snapshot for the workspace."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-items"
+                        ],
+                        "description": "List stock items."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-item"
+                        ],
+                        "description": "Create a stock item."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-item"
+                        ],
+                        "description": "Update a stock item."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-item"
+                        ],
+                        "description": "Delete a stock item."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-warehouses"
+                        ],
+                        "description": "List warehouses."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-warehouse"
+                        ],
+                        "description": "Create a warehouse."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ensure-default-warehouse"
+                        ],
+                        "description": "Create the default warehouse if none exists."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "adjust-stock"
+                        ],
+                        "description": "Manual stock adjustment."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "transfer"
+                        ],
+                        "description": "Transfer stock between warehouses."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-movements"
+                        ],
+                        "description": "Stock movement ledger."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-low-stock"
+                        ],
+                        "description": "Items at/below reorder point."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "reorder"
+                        ],
+                        "description": "Raise a reorder for a low-stock item."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-pending"
+                        ],
+                        "description": "Pending stock changes awaiting approval."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "approve-pending"
+                        ],
+                        "description": "Approve a pending change."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "dismiss-pending"
+                        ],
+                        "description": "Dismiss a pending change."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-count"
+                        ],
+                        "description": "Start a stocktake."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-count"
+                        ],
+                        "description": "Read a stocktake."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-counts"
+                        ],
+                        "description": "List stocktakes."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-count-line"
+                        ],
+                        "description": "Set a counted quantity on a line."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "post-count"
+                        ],
+                        "description": "Post the stocktake (applies variances)."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "cancel-count"
+                        ],
+                        "description": "Cancel a stocktake."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "shipment-list"
+                        ],
+                        "description": "List inbound shipments."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "shipment-add"
+                        ],
+                        "description": "Add a shipment."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "shipment-remove"
+                        ],
+                        "description": "Remove a shipment."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "shipment-receive"
+                        ],
+                        "description": "Receive a shipment into stock."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "shipment-refresh"
+                        ],
+                        "description": "Refresh shipment tracking."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "shipping-quote"
+                        ],
+                        "description": "Request a shipping quote."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "shipping-quotes-list"
+                        ],
+                        "description": "List shipping quotes."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "valuation"
+                        ],
+                        "description": "Stock valuation report."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "forecast"
+                        ],
+                        "description": "Demand forecast."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ai-forecast"
+                        ],
+                        "description": "AI-assisted demand forecast."
+                      }
+                    }
                   }
                 ],
                 "discriminator": {

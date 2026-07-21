@@ -6837,13 +6837,14 @@
   {
     "name": "hr-careers",
     "tag": "HR",
-    "summary": "Public careers page — list a workspace's open postings and accept applications",
-    "description": "Anonymous public careers API (#252). No session; resolves the workspace from slug (mirrors finance-storefront) using the service role. apply is Turnstile-gated when TURNSTILE_SECRET_KEY is set (fail-open when not) plus a per-IP throttle (8 applications per 10-minute window). Writes only hr_candidates + hr_applications.",
+    "summary": "Public careers page + job-board API - list a workspace's open postings, read one, accept applications",
+    "description": "Anonymous public careers API (#252). No session; resolves the workspace from `slug` (mirrors finance-storefront) using the service role.\n\nTWO surfaces on one function:\n- **GET** - an integration-shaped job board (Greenhouse/Lever/Ashby style) that a plain curl, job aggregator or no-code tool can poll. Jobs only: no Turnstile key, no apply_config. Each job carries `absolute_url` and `updated_at`. Cached `public, max-age=300`.\n- **POST** - the action API our own careers page uses (`meta` / `get-job` / `apply`).\n\nVisibility for BOTH is identical: a posting is public only while `status='open'` AND it is not past `closes_at`. `apply` is Turnstile-gated when TURNSTILE_SECRET_KEY is set (fail-open when not) plus a per-IP throttle (8 applications / 10 min). Writes only hr_candidates + hr_applications.",
     "security": [
       "public"
     ],
     "docs": null,
     "methods": [
+      "GET",
       "POST"
     ],
     "actions": [
@@ -6862,7 +6863,7 @@
       },
       {
         "action": "get-job",
-        "description": "Return one open posting's full detail (description + requirements).",
+        "description": "Return one OPEN posting's full detail (description + requirements). Prefers job_slug; job_id still supported for old links.",
         "params": [
           {
             "name": "slug",
@@ -6871,10 +6872,16 @@
             "desc": "Workspace slug"
           },
           {
+            "name": "job_slug",
+            "type": "string",
+            "required": false,
+            "desc": "Posting slug (preferred - shareable URL)"
+          },
+          {
             "name": "job_id",
             "type": "string",
-            "required": true,
-            "desc": "Posting id"
+            "required": false,
+            "desc": "Posting id (legacy links; one of job_slug/job_id is required)"
           }
         ],
         "response": "{ ok, company, turnstile_site_key, job }"
@@ -6936,7 +6943,36 @@
       }
     ],
     "request": [],
-    "response": "{}"
+    "response": "{}",
+    "methodDocs": {
+      "get": {
+        "summary": "Public job board (JSON) - list open postings, or fetch one",
+        "description": "Public job board. `?slug=<company>` returns `{ company, count, jobs[] }`; adding `&job=<job-slug>` returns `{ company, job }` with `description` + `requirements`.\n\nIntegration-shaped: excludes `turnstile_site_key` and `apply_config` (careers-page UI concerns). Every job includes `absolute_url` (deep link to /careers/{slug}/{job}) and `updated_at` for incremental polling. Responses send `Cache-Control: public, max-age=300`.\n\nErrors: 400 missing slug - 404 unknown company - 404 job not found / no longer open."
+      },
+      "post": {
+        "summary": "Careers page actions - meta / get-job / apply"
+      }
+    },
+    "query": [
+      {
+        "name": "slug",
+        "type": "string",
+        "required": true,
+        "desc": "Workspace public slug (the company's board)",
+        "methods": [
+          "get"
+        ]
+      },
+      {
+        "name": "job",
+        "type": "string",
+        "required": false,
+        "desc": "Job posting slug - when present returns that single posting (with description + requirements) instead of the list",
+        "methods": [
+          "get"
+        ]
+      }
+    ]
   },
   {
     "name": "hr-checkin-cron",
@@ -7482,5 +7518,275 @@
     ],
     "request": [],
     "response": "{}"
+  },
+  {
+    "name": "contracts-api",
+    "tag": "Finance",
+    "summary": "Contracts & e-signature - manage contracts and the public signer page",
+    "description": "Contracts & e-signature. One entity, three contexts (hr | finance | project). verify_jwt is disabled so the PUBLIC token sign path works; management actions call authenticate() plus the module/entitlement gates and then write through a USER-context client, so the context-branched RLS (hr->admin, finance->finance-manager, project->member) is the real enforcement - no service-role body-trust (#250 invariant 1). status/token/workspace/created_by are server-set, never caller-writable.",
+    "security": [
+      "supabaseJwt",
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "resolve_token",
+        "description": "PUBLIC (no auth) - resolve a signer token to its contract.",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "Signer token from the emailed link"
+          }
+        ],
+        "response": "{ contract } | { not_found } | { signed }"
+      },
+      {
+        "action": "sign",
+        "description": "PUBLIC (no auth) - sign the contract behind a token.",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "Signer token"
+          },
+          {
+            "name": "signer_name",
+            "type": "string",
+            "required": true,
+            "desc": "Full name typed by the signer"
+          },
+          {
+            "name": "signer_email",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "signature_image",
+            "type": "string",
+            "required": false,
+            "desc": "Data URL of the drawn signature"
+          }
+        ],
+        "response": "{ success, contract_id }"
+      },
+      {
+        "action": "create",
+        "description": "Create a contract (hr | finance | project context).",
+        "params": [],
+        "response": "{ contract }"
+      },
+      {
+        "action": "list",
+        "description": "List contracts in the workspace.",
+        "params": [],
+        "response": "{ contracts: [...] }"
+      },
+      {
+        "action": "get",
+        "description": "Read one contract.",
+        "params": [],
+        "response": "{ contract }"
+      },
+      {
+        "action": "update",
+        "description": "Update a draft contract's caller-writable fields.",
+        "params": [],
+        "response": "{ contract }"
+      },
+      {
+        "action": "send",
+        "description": "Send the contract for e-signature (emails the signer a tokenised link).",
+        "params": [],
+        "response": "{ success }"
+      },
+      {
+        "action": "void",
+        "description": "Void a contract.",
+        "params": [],
+        "response": "{ success }"
+      }
+    ]
+  },
+  {
+    "name": "stock-api",
+    "tag": "Stock",
+    "summary": "Stock / warehouse module - inventory, movements, counts, shipments and forecasting",
+    "description": "Stock Management API. Promotes the warehouse/inventory feature (previously a Finance tab) into a first-class PAID ADD-ON, mirroring hr-api (#252). Gate order: authenticate -> userCanAccessWorkspace -> isModuleEnabled('stock') -> assertEntitled(ws,'stock'), then finance-manager RBAC on writes.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "overview",
+        "description": "Dashboard snapshot for the workspace.",
+        "params": []
+      },
+      {
+        "action": "list-items",
+        "description": "List stock items.",
+        "params": []
+      },
+      {
+        "action": "create-item",
+        "description": "Create a stock item.",
+        "params": []
+      },
+      {
+        "action": "update-item",
+        "description": "Update a stock item.",
+        "params": []
+      },
+      {
+        "action": "delete-item",
+        "description": "Delete a stock item.",
+        "params": []
+      },
+      {
+        "action": "list-warehouses",
+        "description": "List warehouses.",
+        "params": []
+      },
+      {
+        "action": "create-warehouse",
+        "description": "Create a warehouse.",
+        "params": []
+      },
+      {
+        "action": "ensure-default-warehouse",
+        "description": "Create the default warehouse if none exists.",
+        "params": []
+      },
+      {
+        "action": "adjust-stock",
+        "description": "Manual stock adjustment.",
+        "params": []
+      },
+      {
+        "action": "transfer",
+        "description": "Transfer stock between warehouses.",
+        "params": []
+      },
+      {
+        "action": "list-movements",
+        "description": "Stock movement ledger.",
+        "params": []
+      },
+      {
+        "action": "list-low-stock",
+        "description": "Items at/below reorder point.",
+        "params": []
+      },
+      {
+        "action": "reorder",
+        "description": "Raise a reorder for a low-stock item.",
+        "params": []
+      },
+      {
+        "action": "list-pending",
+        "description": "Pending stock changes awaiting approval.",
+        "params": []
+      },
+      {
+        "action": "approve-pending",
+        "description": "Approve a pending change.",
+        "params": []
+      },
+      {
+        "action": "dismiss-pending",
+        "description": "Dismiss a pending change.",
+        "params": []
+      },
+      {
+        "action": "create-count",
+        "description": "Start a stocktake.",
+        "params": []
+      },
+      {
+        "action": "get-count",
+        "description": "Read a stocktake.",
+        "params": []
+      },
+      {
+        "action": "list-counts",
+        "description": "List stocktakes.",
+        "params": []
+      },
+      {
+        "action": "update-count-line",
+        "description": "Set a counted quantity on a line.",
+        "params": []
+      },
+      {
+        "action": "post-count",
+        "description": "Post the stocktake (applies variances).",
+        "params": []
+      },
+      {
+        "action": "cancel-count",
+        "description": "Cancel a stocktake.",
+        "params": []
+      },
+      {
+        "action": "shipment-list",
+        "description": "List inbound shipments.",
+        "params": []
+      },
+      {
+        "action": "shipment-add",
+        "description": "Add a shipment.",
+        "params": []
+      },
+      {
+        "action": "shipment-remove",
+        "description": "Remove a shipment.",
+        "params": []
+      },
+      {
+        "action": "shipment-receive",
+        "description": "Receive a shipment into stock.",
+        "params": []
+      },
+      {
+        "action": "shipment-refresh",
+        "description": "Refresh shipment tracking.",
+        "params": []
+      },
+      {
+        "action": "shipping-quote",
+        "description": "Request a shipping quote.",
+        "params": []
+      },
+      {
+        "action": "shipping-quotes-list",
+        "description": "List shipping quotes.",
+        "params": []
+      },
+      {
+        "action": "valuation",
+        "description": "Stock valuation report.",
+        "params": []
+      },
+      {
+        "action": "forecast",
+        "description": "Demand forecast.",
+        "params": []
+      },
+      {
+        "action": "ai-forecast",
+        "description": "AI-assisted demand forecast.",
+        "params": []
+      }
+    ]
   }
 ]

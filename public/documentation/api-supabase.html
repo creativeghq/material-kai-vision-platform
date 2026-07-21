@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supabase API | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="api.html">API</a> / Supabase API</div>
+  <h1>Supabase API</h1>
+  <div class="routes"><span class="badge route">https://bgbavxtjlbvgplozizxu.supabase.co</span></div>
+  <p class="lead">MaterialsHub runs on <strong>Supabase</strong>, and its API is the platform's <strong>data layer</strong>: a REST interface over your tables (with row-level security enforced on every request), plus authentication, file storage, realtime, and the <strong>edge functions</strong> that implement the platform's server-side actions. If you want to read or write your own workspace's records programmatically, this is usually the shortest path.</p>
+
+  <div class="callout warn"><p><strong>Security model — read this first.</strong> Every request is executed <em>as the caller</em> and filtered by <strong>row-level security (RLS)</strong>. The public <strong>anon key</strong> is not a master key — on its own it sees only what's public. Your <strong>session token</strong> is what grants access to your workspace's rows. Never embed a service-role key in a browser, app or anything a user can see.</p></div>
+
+  <h2>The endpoints</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Surface</th><th>Base path</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>REST (PostgREST)</strong></td><td><code>/rest/v1/&lt;table&gt;</code></td><td>Query and modify tables directly — filtering, ordering, pagination, embedded relations. RLS-enforced.</td></tr>
+      <tr><td><strong>Edge Functions</strong></td><td><code>/functions/v1/&lt;name&gt;</code></td><td>The platform's server-side actions (invoicing, email, agent chat, careers, and more).</td></tr>
+      <tr><td><strong>Auth</strong></td><td><code>/auth/v1</code></td><td>Sign-up/sign-in, sessions and token refresh — how you obtain the JWT the other calls use.</td></tr>
+      <tr><td><strong>Storage</strong></td><td><code>/storage/v1</code></td><td>Files — uploads, and public or signed URLs for private buckets.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Authenticating</h2>
+  <ol>
+    <li><strong>Send the anon key</strong> on every request as the <code>apikey</code> header — it identifies the project. It's a public, publishable key (it's already in the web app).</li>
+    <li><strong>Sign in</strong> via Auth to get a <strong>session JWT</strong>, then send it as <code>Authorization: Bearer &lt;jwt&gt;</code>.</li>
+    <li><strong>RLS does the rest</strong> — you get exactly the rows your user/workspace is allowed to see. No extra filtering needed (and none you can bypass).</li>
+  </ol>
+  <p>The official reference for the request syntax (filters, ordering, embedding, upserts) is Supabase's own documentation: <a href="https://supabase.com/docs/guides/api" target="_blank" rel="noopener">supabase.com/docs/guides/api</a>. Client libraries exist for JavaScript, Python, Dart and more.</p>
+
+  <h2>Edge functions — the platform's actions</h2>
+  <p>Most things the app <em>does</em> (rather than just reads) run through an edge function at <code>/functions/v1/&lt;name&gt;</code> — issuing an invoice, sending email, the agent chat, the careers board, and so on. They take a JSON body and are authenticated with the same session JWT (a few are deliberately public, like the <a href="api-jobs.html">Jobs API</a>).</p>
+  <div class="callout"><p><strong>Per-function references</strong> for the main ones (agent chat, CRM, finance, email, flow engine, generation endpoints and more) live in the repository's <code>docs/api/</code> folder — one Markdown reference per function, with request/response shapes.</p></div>
+
+  <h2>Realtime</h2>
+  <p>Tables the platform streams (job progress, inbox messages, agent runs) can be subscribed to over Supabase <strong>realtime</strong>, so an integration can react to changes instead of polling.</p>
+
+  <div class="callout tip"><p><strong>Rule of thumb:</strong> use the <strong>Supabase API</strong> for your own data and for reacting to changes; use the <a href="api-mivaa.html">MIVAA API</a> when you need the platform to <em>do</em> heavy work (process a catalogue, run a search, track prices/mentions/jobs).</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

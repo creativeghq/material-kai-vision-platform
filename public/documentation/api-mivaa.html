@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MIVAA API | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="api.html">API</a> / MIVAA API</div>
+  <h1>MIVAA API</h1>
+  <div class="routes"><span class="badge route">https://v1api.materialshub.gr</span></div>
+  <p class="lead">MIVAA is the platform's <strong>application backend</strong> — the Python service that does the heavy lifting behind the product: processing supplier PDFs into structured catalogues, running the multi-vector material search and RAG, and serving the <strong>partner tracking APIs</strong> (prices, brand mentions and jobs) that other projects integrate with. It's a documented REST API with a live OpenAPI spec.</p>
+
+  <h2>Base URL &amp; live documentation</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>What</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Base URL</strong></td><td><code>https://v1api.materialshub.gr</code></td></tr>
+      <tr><td><strong>Swagger UI</strong> (interactive)</td><td><a href="https://v1api.materialshub.gr/docs" target="_blank" rel="noopener">https://v1api.materialshub.gr/docs</a> — browse and <em>try</em> every endpoint in the browser.</td></tr>
+      <tr><td><strong>ReDoc</strong> (reference)</td><td><a href="https://v1api.materialshub.gr/redoc" target="_blank" rel="noopener">https://v1api.materialshub.gr/redoc</a> — a clean, readable reference view.</td></tr>
+      <tr><td><strong>OpenAPI spec</strong> (machine-readable)</td><td><a href="https://v1api.materialshub.gr/openapi.json" target="_blank" rel="noopener">https://v1api.materialshub.gr/openapi.json</a> — generate a client from it.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout tip"><p>The spec is generated from the running service, so it's <strong>always current</strong>. Use the tag filters in Swagger to jump to a family of endpoints (e.g. <em>Mention Tracking (Public API)</em>).</p></div>
+
+  <h2>Authentication</h2>
+  <p>Which credential you use depends on who you are:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Credential</th><th>Used by</th><th>How</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Session JWT</strong></td><td>The MaterialsHub app itself (a signed-in user).</td><td><code>Authorization: Bearer &lt;jwt&gt;</code>. Requests are bound to the caller's workspace.</td></tr>
+      <tr><td><strong>Partner API key</strong> (<code>kai_*</code>)</td><td><strong>You</strong>, integrating from another product.</td><td><code>Authorization: Bearer kai_...</code>. Generate and test keys in <a href="account-subscription.html">Profile → Subscription → API Keys</a>.</td></tr>
+      <tr><td><strong>Platform key</strong> / cron secret</td><td>Internal server-to-server &amp; scheduled jobs.</td><td>Not for third-party use.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><p><strong>Keys are workspace-scoped and metered.</strong> A <code>kai_*</code> key acts for the workspace that owns it, and billable operations <strong>debit credits</strong> from that owner's balance (each endpoint documents its cost). Deleting a key cascades — it also removes the tracked subjects created with it.</p></div>
+
+  <h2>What's on the API</h2>
+  <ul class="feat">
+    <li><strong>Partner tracking APIs</strong> — the ones designed for external integration:
+      <ul>
+        <li><strong>Price tracking</strong> — <code>/api/v1/prices/track/*</code>: track a product/query, refresh it, read price history and retailer results.</li>
+        <li><strong>Mention tracking</strong> — <code>/api/v1/mentions/track/*</code>: track a brand/keyword across news, blogs, RSS, YouTube and LLMs; read the feed, summary and LLM-visibility snapshot.</li>
+        <li><strong>Job tracking</strong> — <code>/api/v1/jobs/track/*</code>: recurring job discovery with matches and digests.</li>
+      </ul>
+    </li>
+    <li><strong>Catalogue &amp; document processing</strong> — upload a supplier PDF and get back structured products, images and knowledge (the pipeline behind <a href="knowledge-base.html">the Knowledge Base</a>).</li>
+    <li><strong>Search &amp; RAG</strong> — the multi-vector material search and knowledge-base retrieval that powers the <a href="agent-hub.html">assistant</a>.</li>
+    <li><strong>Admin/operational endpoints</strong> — internal, admin-gated; not part of the partner surface.</li>
+  </ul>
+
+  <h2>Calling it — a quick example</h2>
+  <p>Every partner call is a normal HTTPS request with your key in the header:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Step</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>1. Get a key</td><td>In <a href="account-subscription.html">Profile → Subscription → API Keys</a>, generate a <code>kai_*</code> key (shown masked afterwards — copy it once).</td></tr>
+      <tr><td>2. Send it</td><td>Add the header <code>Authorization: Bearer kai_your_key</code> to each request.</td></tr>
+      <tr><td>3. Find the endpoint</td><td>Open <a href="https://v1api.materialshub.gr/docs" target="_blank" rel="noopener">/docs</a>, filter by the tag you need, and use <em>Try it out</em> to see the exact request/response.</td></tr>
+      <tr><td>4. Watch the cost</td><td>Metered operations debit credits — check your balance in <a href="account-credits.html">Credits</a>.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout"><p><strong>Looking for something simpler?</strong> If you only need to publish your open roles, use the key-less <a href="api-jobs.html">Public Jobs API</a> instead. For reading your own workspace records, the <a href="api-supabase.html">Supabase API</a> is usually the shorter path.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

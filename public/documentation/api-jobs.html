@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Public Jobs API | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="api.html">API</a> / Public Jobs API</div>
+  <h1>Public Jobs API <span class="badge public">no key required</span></h1>
+  <div class="routes"><span class="badge route">GET /functions/v1/hr-careers</span></div>
+  <p class="lead">A <strong>public, key-less job-board feed</strong> for the roles you publish from <a href="hr-recruitment.html">HR → Recruitment</a>. It's a plain <code>GET</code> you can curl, drop into your own website, or hand to a job aggregator or no-code tool to poll — modelled on the boards you already integrate with (Greenhouse, Lever, Ashby). Two endpoints: <strong>list the open roles</strong>, and <strong>fetch one role</strong> with its full description.</p>
+
+  <div class="callout"><p><strong>No authentication.</strong> These are public GETs — no API key, no token, no CORS gymnastics. Responses are <strong>briefly cached</strong> so aggregators and CDNs can poll them politely.</p></div>
+
+  <h2>Base URL</h2>
+  <p><code>https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/hr-careers</code></p>
+
+  <h2>Endpoints</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Request</th><th>Returns</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET ?slug=&lt;company&gt;</code></td><td><code>{ company, count, jobs: [ … ] }</code> — every currently-open role.</td></tr>
+      <tr><td><code>GET ?slug=&lt;company&gt;&amp;job=&lt;job-slug&gt;</code></td><td><code>{ company, job: { … } }</code> — one role, <strong>plus its <code>description</code> and <code>requirements</code></strong>.</td></tr>
+    </tbody>
+  </table></div>
+  <p><code>slug</code> is your workspace's slug (the same one in your careers-page URL) and is <strong>required</strong>.</p>
+
+  <h3>Example</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Call</th></tr></thead>
+    <tbody>
+      <tr><td><code>curl "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/hr-careers?slug=acme"</code></td></tr>
+      <tr><td><code>curl "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/hr-careers?slug=acme&amp;job=senior-installer"</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Response fields</h2>
+  <h3><code>company</code></h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><code>name</code>, <code>slug</code></td><td>Your company name and board slug.</td></tr>
+      <tr><td><code>website</code></td><td>Your website, if set.</td></tr>
+      <tr><td><code>logo_url</code></td><td>Your logo, if set — handy for rendering the board.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Each job</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code>, <code>slug</code>, <code>title</code></td><td>Identity of the posting (<code>slug</code> is what you pass back as <code>&amp;job=</code>).</td></tr>
+      <tr><td><code>department</code></td><td>The department name (flattened to a plain string).</td></tr>
+      <tr><td><code>location</code>, <code>location_type</code>, <code>remote</code></td><td>Where the role is based and whether it's remote.</td></tr>
+      <tr><td><code>employment_type</code>, <code>level</code></td><td>e.g. full-time / part-time, and seniority.</td></tr>
+      <tr><td><code>salary_min</code>, <code>salary_max</code>, <code>currency</code></td><td>Salary range where published.</td></tr>
+      <tr><td><code>compensation</code>, <code>compensation_note</code></td><td>Free-form compensation detail.</td></tr>
+      <tr><td><code>published_at</code>, <code>closes_at</code>, <code>status</code></td><td>Publication window and state.</td></tr>
+      <tr><td><code>absolute_url</code></td><td><strong>A direct link to the posting</strong> on the careers page — link straight to it from your site or the aggregator.</td></tr>
+      <tr><td><code>updated_at</code></td><td>Last change — use it to <strong>poll incrementally</strong> instead of re-reading everything.</td></tr>
+      <tr><td><code>description</code>, <code>requirements</code></td><td><em>Single-job response only</em> — the full body copy.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>What's published (and what isn't)</h2>
+  <ul class="feat">
+    <li><strong>Only live roles.</strong> A posting appears only while it is <strong>open</strong> <em>and</em> not past its <strong>close date</strong> — the same visibility rule as your public careers page. Closed roles simply disappear from the feed.</li>
+    <li><strong>Jobs only, deliberately.</strong> The feed carries no UI concerns (no bot-check keys, no apply-form config) — that's noise for an integrator. To let people <em>apply</em>, link them to <code>absolute_url</code>, which opens the real posting with its apply form.</li>
+  </ul>
+
+  <h2>Errors</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>When</th></tr></thead>
+    <tbody>
+      <tr><td><code>400</code> <em>slug is required</em></td><td>You didn't pass <code>?slug=</code>.</td></tr>
+      <tr><td><code>404</code> <em>not found</em></td><td>No company matches that slug.</td></tr>
+      <tr><td><code>404</code> <em>This position is no longer open.</em></td><td>The requested job has closed or isn't published.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout tip"><p><strong>Typical use:</strong> render your open roles on your own marketing site by fetching the list endpoint at build time (or client-side), and link each card to its <code>absolute_url</code>. Aggregators can poll the same URL and use <code>updated_at</code> to pick up changes. Create and manage the postings themselves in <a href="hr-recruitment.html">HR → Recruitment</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -120,6 +120,13 @@
       { file: "flows.html", title: "Flows (Automations)", icon: "🔀" },
       { file: "team-docs.html", title: "Team Docs", icon: "📓" },
     ]},
+    { title: "API", items: [
+      { file: "api.html", title: "API overview", icon: "🔌", children: [
+        { file: "api-mivaa.html", title: "MIVAA API" },
+        { file: "api-supabase.html", title: "Supabase API" },
+        { file: "api-jobs.html", title: "Public Jobs API" },
+      ]},
+    ]},
     { title: "Account", items: [
       { file: "account.html", title: "Account & Billing", icon: "⚙️", children: [
         { file: "account-profile.html", title: "Profile" },
