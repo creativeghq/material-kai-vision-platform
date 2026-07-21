@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { useAuth } from '@/contexts/AuthContext';
 import { CreditsService, type CreditTransaction } from '@/services/credits.service';
 
@@ -22,18 +23,27 @@ export const BillingHistoryTab: React.FC = () => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  // Server-side paging: getTransactions() only ever returns one page, so paging client-side over
+  // its result would have made every row past the first page unreachable.
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     loadTransactions();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, page]);
 
   const loadTransactions = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
-      const { data } = await creditsService.getTransactions();
+      const { data, count } = await creditsService.getTransactions(
+        TABLE_PAGE_SIZE,
+        (page - 1) * TABLE_PAGE_SIZE,
+      );
       setTransactions(data || []);
+      setTotal(count || 0);
     } catch (error) {
       console.error('Error loading transactions:', error);
     } finally {
@@ -123,6 +133,12 @@ export const BillingHistoryTab: React.FC = () => {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              page={page}
+              total={total}
+              onPageChange={setPage}
+              label="transactions"
+            />
           </div>
         )}
       </CardContent>

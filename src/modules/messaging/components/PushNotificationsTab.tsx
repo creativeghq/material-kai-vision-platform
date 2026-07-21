@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,7 @@ export const PushNotificationsTab: React.FC = () => {
     recentActivity: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [testDialogOpen, setTestDialogOpen] = useState(false);
   const [testNotification, setTestNotification] = useState({
     title: 'Test Notification',
@@ -96,6 +98,8 @@ export const PushNotificationsTab: React.FC = () => {
       if (error) throw error;
 
       setSubscriptions(subs || []);
+      // "Cleanup inactive" can delete a whole trailing page out from under us.
+      setPage((p) => clampPage(p, (subs || []).length));
 
       // Calculate analytics
       const active = (subs || []).filter(s => s.is_active);
@@ -421,7 +425,7 @@ export const PushNotificationsTab: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                subscriptions.map((sub) => (
+                paginate(subscriptions, page).map((sub) => (
                   <TableRow key={sub.id}>
                     <TableCell className="font-mono text-xs">
                       {sub.user_id.substring(0, 8)}...
@@ -459,6 +463,12 @@ export const PushNotificationsTab: React.FC = () => {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            page={page}
+            total={subscriptions.length}
+            onPageChange={setPage}
+            label="subscriptions"
+          />
         </CardContent>
       </Card>
 

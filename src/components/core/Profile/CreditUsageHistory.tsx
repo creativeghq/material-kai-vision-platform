@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { History, Loader2, TrendingDown, ArrowDownRight, ArrowUpRight, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { TablePagination } from '@/components/core/ui/table-pagination';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
@@ -57,8 +58,9 @@ export const CreditUsageHistory: React.FC = () => {
 
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [listLoading, setListLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  // Server-side pagination: only the current page is fetched, `total` comes from the query count.
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const loadSummary = useCallback(async () => {
     if (!user) return;
@@ -73,34 +75,19 @@ export const CreditUsageHistory: React.FC = () => {
     }
   }, [user, windowDays]);
 
-  const loadFirstPage = useCallback(async () => {
+  const loadPage = useCallback(async () => {
     if (!user) return;
     setListLoading(true);
     try {
-      const { data, count } = await creditsService.getTransactions(PAGE_SIZE, 0);
+      const { data, count } = await creditsService.getTransactions(PAGE_SIZE, (page - 1) * PAGE_SIZE);
       setTransactions(data || []);
-      setHasMore((data?.length || 0) < (count || 0));
+      setTotal(count || 0);
     } catch (error) {
       console.error('Error loading transactions:', error);
     } finally {
       setListLoading(false);
     }
-  }, [user]);
-
-  const loadMore = async () => {
-    if (!user) return;
-    setLoadingMore(true);
-    try {
-      const { data, count } = await creditsService.getTransactions(PAGE_SIZE, transactions.length);
-      const next = [...transactions, ...(data || [])];
-      setTransactions(next);
-      setHasMore(next.length < (count || 0));
-    } catch (error) {
-      console.error('Error loading more transactions:', error);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  }, [user, page]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,8 +108,8 @@ export const CreditUsageHistory: React.FC = () => {
   }, [loadSummary]);
 
   useEffect(() => {
-    loadFirstPage();
-  }, [loadFirstPage]);
+    loadPage();
+  }, [loadPage]);
 
   const topCategory = summary?.by_category?.[0];
   const maxCategorySpend = topCategory?.total_spent || 1;
@@ -258,7 +245,7 @@ export const CreditUsageHistory: React.FC = () => {
           </CardTitle>
           <CardDescription>Every credit charge, refund, and top-up, newest first</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {listLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -268,62 +255,75 @@ export const CreditUsageHistory: React.FC = () => {
               No activity yet. Your credit charges will show up here.
             </div>
           ) : (
-            <div className="divide-y divide-border">
-              {transactions.map((t) => {
-                const isSpend = Number(t.amount) < 0;
-                const category = creditOperationCategory(
-                  (t.metadata?.operation_type as string) ?? t.transaction_type,
-                );
-                return (
-                  <div key={t.id} className="flex items-center gap-3 py-3">
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                        isSpend ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'
-                      }`}
-                    >
-                      {isSpend ? (
-                        <ArrowDownRight className="h-4 w-4" />
-                      ) : (
-                        <ArrowUpRight className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">
-                        {t.description || category}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
-                          {category}
-                        </Badge>
-                        <span>{formatDate(t.created_at)}</span>
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div
-                        className={`text-sm font-semibold tabular-nums ${
-                          isSpend ? 'text-red-500' : 'text-green-500'
-                        }`}
-                      >
-                        {isSpend ? '' : '+'}
-                        {Number(t.amount).toFixed(2)}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground tabular-nums">
-                        bal {(t.balance_after ?? 0).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {hasMore && !listLoading && (
-            <div className="pt-4 text-center">
-              <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Load more
-              </Button>
-            </div>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Activity</TableHead>
+                    <TableHead className="hidden sm:table-cell">Category</TableHead>
+                    <TableHead className="hidden md:table-cell">When</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Balance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.map((t) => {
+                    const isSpend = Number(t.amount) < 0;
+                    const category = creditOperationCategory(
+                      (t.metadata?.operation_type as string) ?? t.transaction_type,
+                    );
+                    return (
+                      <TableRow key={t.id}>
+                        <TableCell className="max-w-[22rem]">
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                                isSpend ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'
+                              }`}
+                            >
+                              {isSpend ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium">{t.description || category}</div>
+                              {/* Category + timestamp collapse into this cell on small screens,
+                                  where their own columns are hidden. */}
+                              <div className="text-xs text-muted-foreground sm:hidden">
+                                {category} · {formatDate(t.created_at)}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
+                            {category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground md:table-cell">
+                          {formatDate(t.created_at)}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right text-sm font-semibold tabular-nums ${
+                            isSpend ? 'text-red-500' : 'text-green-500'
+                          }`}
+                        >
+                          {isSpend ? '' : '+'}{Number(t.amount).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="hidden text-right text-xs text-muted-foreground tabular-nums sm:table-cell">
+                          {(t.balance_after ?? 0).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              <TablePagination
+                page={page}
+                total={total}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                label="transactions"
+              />
+            </>
           )}
         </CardContent>
       </Card>

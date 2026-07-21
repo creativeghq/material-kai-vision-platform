@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag } from '../services/QuotesService';
 import { usersAPI } from '@/services/crm.service';
@@ -63,6 +64,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
 
   // Slide-out panels state
   const [showTimelinePanel, setShowTimelinePanel] = useState(false);
@@ -213,6 +215,15 @@ export const QuoteRequestsAdmin: React.FC = () => {
     }
   };
 
+  const filteredQuoteRequests = quoteRequests.filter(
+    quote => selectedStatusFilter === 'all' || quote.status_tag_id === selectedStatusFilter,
+  );
+
+  // Deleting a request (or a reload returning fewer rows) can leave us past the last page.
+  useEffect(() => {
+    setPage(prev => clampPage(prev, filteredQuoteRequests.length));
+  }, [filteredQuoteRequests.length]);
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       draft: { icon: Clock, className: 'bg-gray-100 text-gray-800 hover:bg-gray-100' },
@@ -311,7 +322,13 @@ export const QuoteRequestsAdmin: React.FC = () => {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
             <h2 className="text-2xl font-bold">All Quote Requests</h2>
-            <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}>
+            <Select
+              value={selectedStatusFilter}
+              onValueChange={(value) => {
+                setSelectedStatusFilter(value);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filter by status tag" />
               </SelectTrigger>
@@ -382,18 +399,14 @@ export const QuoteRequestsAdmin: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {quoteRequests.length === 0 ? (
+              {filteredQuoteRequests.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No quote requests found
                   </TableCell>
                 </TableRow>
               ) : (
-                quoteRequests
-                  .filter(quote =>
-                    selectedStatusFilter === 'all' || quote.status_tag_id === selectedStatusFilter,
-                  )
-                  .map((quote) => {
+                paginate(filteredQuoteRequests, page).map((quote) => {
                     const statusTag = statusTags.find(tag => tag.id === quote.status_tag_id);
                     return (
                   <TableRow key={quote.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleViewQuote(quote.id)}>
@@ -454,6 +467,12 @@ export const QuoteRequestsAdmin: React.FC = () => {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            page={page}
+            total={filteredQuoteRequests.length}
+            onPageChange={setPage}
+            label="requests"
+          />
         </div>
       </div>
 

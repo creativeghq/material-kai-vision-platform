@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
 import { QuoteRequestModal } from '../components/QuoteRequestModal';
@@ -25,10 +26,16 @@ export const QuoteRequestsPage: React.FC = () => {
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithItems | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     loadQuoteRequests();
   }, []);
+
+  // Deleting a request can leave us past the last page.
+  useEffect(() => {
+    setPage(prev => clampPage(prev, quoteRequests.length));
+  }, [quoteRequests.length]);
 
   const loadQuoteRequests = async () => {
     try {
@@ -201,7 +208,7 @@ export const QuoteRequestsPage: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {quoteRequests.map((quote) => (
+                    {paginate(quoteRequests, page).map((quote) => (
                       <TableRow key={quote.id} className="border-border">
                         <TableCell className="text-card-foreground font-mono text-sm">
                           {quote.id.substring(0, 8)}...
@@ -243,6 +250,12 @@ export const QuoteRequestsPage: React.FC = () => {
                   </TableBody>
                 </Table>
             </div>
+            <TablePagination
+              page={page}
+              total={quoteRequests.length}
+              onPageChange={setPage}
+              label="requests"
+            />
           </div>
         )}
       </div>

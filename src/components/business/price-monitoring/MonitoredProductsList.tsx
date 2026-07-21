@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
+import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { Play, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +37,13 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
 }) => {
   const [productNames, setProductNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
+
+  // `products` is owned by the parent — an untrack + onRefresh can shrink it under the current page.
+  useEffect(() => {
+    setPage((prev) => clampPage(prev, products.length));
+  }, [products.length]);
 
   useEffect(() => {
     const productIds = products.map((p) => p.product_id).filter((id): id is string => Boolean(id));
@@ -120,6 +127,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
             </p>
           </div>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -132,7 +140,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((tq) => {
+              {paginate(products, page).map((tq) => {
                 const isBusy = busy[tq.id] ?? false;
                 const name = (tq.product_id && productNames[tq.product_id]) || tq.search_query;
                 return (
@@ -189,6 +197,13 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
               })}
             </TableBody>
           </Table>
+          <TablePagination
+            page={page}
+            total={products.length}
+            onPageChange={setPage}
+            label="products"
+          />
+          </>
         )}
       </CardContent>
     </Card>

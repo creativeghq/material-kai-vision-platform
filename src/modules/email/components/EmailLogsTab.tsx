@@ -10,6 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { emailService, EmailLog } from '../services/emailService';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -20,6 +21,7 @@ export const EmailLogsTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -40,6 +42,8 @@ export const EmailLogsTab: React.FC = () => {
 
       const data = await emailService.getEmailLogs(filters);
       setLogs(data);
+      // Filters are applied server-side, so a reload is always a fresh result set.
+      setPage(1);
     } catch (error) {
       console.error('Error loading logs:', error);
       toast({
@@ -146,6 +150,7 @@ export const EmailLogsTab: React.FC = () => {
             No email logs found
           </div>
         ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -159,7 +164,7 @@ export const EmailLogsTab: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.map((log) => (
+                {paginate(logs, page).map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="text-sm">
                       {log.sent_at ? format(new Date(log.sent_at), 'MMM dd, HH:mm') : 'Pending'}
@@ -178,6 +183,13 @@ export const EmailLogsTab: React.FC = () => {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              page={page}
+              total={logs.length}
+              onPageChange={setPage}
+              label="emails"
+            />
+            </>
           )}
       </div>
     </div>

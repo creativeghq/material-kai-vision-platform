@@ -3,20 +3,22 @@
  *
  * Displays backend Python logs from the database.
  * Shows recent logs with filtering, search, and export capabilities.
- * Supports infinite scroll for loading more logs.
+ * Paginated with numbered pages — an append-forever list made it impossible to tell how many
+ * logs matched a filter or to reach older ones.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
-import { Download, RefreshCw, Search, X, Trash2, Clock, AlertCircle, Database, Loader2 } from 'lucide-react';
+import { Download, RefreshCw, Search, X, Trash2, Clock, AlertCircle, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 
 type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
@@ -33,7 +35,7 @@ interface LogEntry {
   created_at: string;
 }
 
-const PAGE_SIZE = 100; // Logs per page for infinite scroll
+const PAGE_SIZE = TABLE_PAGE_SIZE;
 
 export function LogViewer() {
   const { toast } = useToast();
@@ -46,15 +48,17 @@ export function LogViewer() {
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [hours, setHours] = useState<number>(24);
   const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(0);
+  // 1-based page. Every filter change resets it via the wrappers below — otherwise narrowing the
+  // filters while on page 5 leaves you staring at an empty table with no obvious way back.
+  const [page, setPage] = useState(1);
 
-  // Ref for infinite scroll observer
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const changeLevel = (v: string) => { setSelectedLevel(v); setPage(1); };
+  const changeLogger = (v: string) => { setSelectedLogger(v); setPage(1); };
+  const changeSource = (v: string) => { setSelectedSource(v); setPage(1); };
+  const changeSearch = (v: string) => { setSearchTerm(v); setPage(1); };
+  const changeHours = (v: number) => { setHours(v); setPage(1); };
 
   // Get unique loggers from logs
   const loggers = Array.from(new Set(logs.map(log => log.logger_name).filter(Boolean)));
@@ -97,9 +101,8 @@ export function LogViewer() {
   const loadLogs = async () => {
     try {
       setLoading(true);
-      setPage(0);
 
-      const query = buildQuery(0, PAGE_SIZE);
+      const query = buildQuery((page - 1) * PAGE_SIZE, PAGE_SIZE);
       const { data, error, count } = await query;
 
       if (error) {
@@ -112,7 +115,6 @@ export function LogViewer() {
           });
           setLogs([]);
           setTotal(0);
-          setHasMore(false);
           return;
         }
         throw error;
@@ -120,7 +122,6 @@ export function LogViewer() {
 
       setLogs(data || []);
       setTotal(count || 0);
-      setHasMore((data?.length || 0) >= PAGE_SIZE && (count || 0) > PAGE_SIZE);
 
     } catch (error) {
       console.error('Failed to load logs:', error);
@@ -133,66 +134,6 @@ export function LogViewer() {
       setLoading(false);
     }
   };
-
-  // Load more logs (for infinite scroll)
-  const loadMoreLogs = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
-
-    try {
-      setLoadingMore(true);
-      const nextPage = page + 1;
-      const offset = nextPage * PAGE_SIZE;
-
-      const query = buildQuery(offset, PAGE_SIZE);
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        setLogs(prev => [...prev, ...data]);
-        setPage(nextPage);
-        setHasMore(data.length >= PAGE_SIZE);
-      } else {
-        setHasMore(false);
-      }
-
-    } catch (error) {
-      console.error('Failed to load more logs:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load more logs',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [page, hasMore, loadingMore, buildQuery, toast]);
-
-  // Setup intersection observer for infinite scroll
-  useEffect(() => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
-          loadMoreLogs();
-        }
-      },
-      { threshold: 0.1 },
-    );
-
-    if (loadMoreRef.current) {
-      observerRef.current.observe(loadMoreRef.current);
-    }
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [hasMore, loading, loadingMore, loadMoreLogs]);
 
   // Clear all logs
   const clearAllLogs = async () => {
@@ -237,7 +178,7 @@ export function LogViewer() {
       const interval = setInterval(loadLogs, 5000);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, selectedLevel, selectedLogger, selectedSource, searchTerm, hours]);
+  }, [autoRefresh, selectedLevel, selectedLogger, selectedSource, searchTerm, hours, page]);
 
   // Get level badge color
   const getLevelBadge = (level: string) => {
@@ -373,12 +314,12 @@ export function LogViewer() {
                   type="text"
                   placeholder="Search logs..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => changeSearch(e.target.value)}
                   className="pl-10"
                 />
               </div>
 
-              <Select value={selectedLevel} onValueChange={setSelectedLevel}>
+              <Select value={selectedLevel} onValueChange={changeLevel}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="All Levels" />
                 </SelectTrigger>
@@ -392,7 +333,7 @@ export function LogViewer() {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedLogger} onValueChange={setSelectedLogger}>
+              <Select value={selectedLogger} onValueChange={changeLogger}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="All Loggers" />
                 </SelectTrigger>
@@ -404,7 +345,7 @@ export function LogViewer() {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedSource} onValueChange={setSelectedSource}>
+              <Select value={selectedSource} onValueChange={changeSource}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All Sources" />
                 </SelectTrigger>
@@ -415,7 +356,7 @@ export function LogViewer() {
                 </SelectContent>
               </Select>
 
-              <Select value={hours.toString()} onValueChange={(v) => setHours(Number(v))}>
+              <Select value={hours.toString()} onValueChange={(v) => changeHours(Number(v))}>
                 <SelectTrigger className="w-32">
                   <SelectValue />
                 </SelectTrigger>
@@ -437,6 +378,7 @@ export function LogViewer() {
                     setSelectedLevel('all');
                     setSelectedLogger('all');
                     setSelectedSource('all');
+                    setPage(1);
                   }}
                 >
                   <X className="h-4 w-4 mr-2" />
@@ -522,33 +464,13 @@ export function LogViewer() {
                       </tbody>
                     </table>
 
-                    {/* Infinite scroll trigger */}
-                    <div
-                      ref={loadMoreRef}
-                      className="h-16 flex items-center justify-center"
-                    >
-                      {loadingMore && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">Loading more logs...</span>
-                        </div>
-                      )}
-                      {!loadingMore && hasMore && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={loadMoreLogs}
-                          className="text-muted-foreground"
-                        >
-                          Load more ({logs.length} of {total})
-                        </Button>
-                      )}
-                      {!hasMore && logs.length > 0 && (
-                        <span className="text-sm text-muted-foreground">
-                          All {logs.length} logs loaded
-                        </span>
-                      )}
-                    </div>
+                    <TablePagination
+                      page={page}
+                      total={total}
+                      pageSize={PAGE_SIZE}
+                      onPageChange={setPage}
+                      label="logs"
+                    />
                   </>
                 )}
               </div>
