@@ -14,6 +14,14 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
+/** Board (GET) responses are public + pollable, so let aggregators/CDNs cache them briefly. */
+function jsonCached(body: any, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' },
+  });
+}
+
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
   const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
   if (!secret) return true; // not configured → fail-open (careers form still works)
@@ -56,6 +64,63 @@ const isLive = (j: any) => !!j && j.status === 'open' && (!j.closes_at || new Da
 
 Deno.serve(withApiLogging('hr-careers', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
+
+  // ── PUBLIC JOB-BOARD API (GET) ─────────────────────────────────────────────
+  // Integration-shaped sibling of the POST `meta` / `get-job` actions, modelled on
+  // Greenhouse (/v1/boards/{board}/jobs), Lever and Ashby: a plain GET a human can
+  // curl and an aggregator / no-code tool can poll. The POST+action envelope those
+  // actions use is unusable for those consumers, which is the whole reason this exists.
+  //
+  //   GET ?slug=<company>             → { company, count, jobs: [...] }
+  //   GET ?slug=<company>&job=<slug>  → { company, job: {...} }  (adds description/requirements)
+  //
+  // Deliberately jobs-only: no turnstile_site_key and no apply_config — those are UI
+  // concerns for our own careers page, noise (and needless surface) for an integrator.
+  // Each job carries `absolute_url` so a consumer can link straight to the posting and
+  // `updated_at` so it can poll incrementally. Same visibility rule as the page: isLive().
+  if (req.method === 'GET') {
+    const reqUrl = new URL(req.url);
+    const boardSlug = String(reqUrl.searchParams.get('slug') ?? '').trim();
+    const boardJobSlug = String(reqUrl.searchParams.get('job') ?? '').trim();
+    if (!boardSlug) return json({ error: 'slug is required' }, 400);
+
+    const sb = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+    const { data: bws } = await sb
+      .from('workspaces').select('id, name, slug, description, settings').eq('slug', boardSlug).maybeSingle();
+    if (!bws) return json({ error: 'not found' }, 404);
+
+    const bs = (bws as any).settings ?? {};
+    const boardCompany = {
+      name: bws.name,
+      slug: bws.slug,
+      website: bs.website ?? null,
+      logo_url: bs.logo_url ?? bs.company_logo_url ?? null,
+    };
+    const appUrl = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
+    const forBoard = (j: any) => {
+      const { apply_config: _uiOnly, ...rest } = shapeJob(j);
+      return { ...rest, absolute_url: `${appUrl}/careers/${bws.slug}/${j.slug}` };
+    };
+
+    if (boardJobSlug) {
+      const { data: one } = await sb
+        .from('hr_job_postings').select(`${JOB_DETAIL_COLS}, updated_at`)
+        .eq('workspace_id', bws.id).eq('slug', boardJobSlug).maybeSingle();
+      if (!isLive(one)) return json({ error: 'This position is no longer open.' }, 404);
+      return jsonCached({ company: boardCompany, job: forBoard(one) });
+    }
+
+    const { data: boardJobs } = await sb
+      .from('hr_job_postings').select(`${JOB_SUMMARY_COLS}, updated_at`)
+      .eq('workspace_id', bws.id).eq('status', 'open').order('published_at', { ascending: false });
+    const live = (boardJobs ?? []).filter(isLive).map(forBoard);
+    return jsonCached({ company: boardCompany, count: live.length, jobs: live });
+  }
+
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const supabase = createClient(
