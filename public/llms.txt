@@ -1,0 +1,30 @@
+# MaterialsHub
+
+> Materials intelligence platform for the building-materials trade: product/material search across supplier catalogs, AI interior design and visualisation, quotes and orders, and a hiring/careers surface. This file maps the parts of the platform that are PUBLIC and useful to an AI agent or crawler. Everything else requires an authenticated session.
+
+Most of the platform is behind login. The public surfaces below are safe to read, link to, and integrate with. Where a machine-readable API exists we list it in preference to the HTML page.
+
+## Public APIs
+
+- [Job board API (JSON)](https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/hr-careers?slug=COMPANY_SLUG): Open job postings for one company. Anonymous, no API key. `GET ?slug=<company-slug>` returns `{ company, count, jobs[] }`; add `&job=<job-slug>` for one posting with its full description and requirements. Each job carries `absolute_url` and `updated_at`. Cached 5 minutes. Greenhouse/Lever/Ashby-style — intended for aggregators, partner sites and scripts.
+- [Edge Functions OpenAPI spec](https://app.materialshub.gr/api/openapi-edge.json): OpenAPI 3.0.3 description of the platform's Supabase Edge Function surface (96 functions). Most require authentication; the spec marks which are public.
+- [Swagger UI](https://app.materialshub.gr/api/edge-swagger.html): Browsable version of the spec above.
+
+## Public pages
+
+- [Careers page](https://app.materialshub.gr/careers/COMPANY_SLUG): A company's public job listings. Individual postings live at `/careers/{company-slug}/{job-slug}` and emit schema.org `JobPosting` JSON-LD, so job search engines can index them directly.
+- [Knowledge base](https://app.materialshub.gr/knowledge-base): Published articles on materials, specification and application. Individual articles at `/knowledge-base/{slug}`.
+- [Documentation](https://app.materialshub.gr/documentation/): Product and API documentation.
+- [Free tools](https://app.materialshub.gr/tools): Public utilities — price scan, mention scan, project-plan estimator, heat-pump sizer, heating-cost comparison.
+
+## Notes for agents
+
+- Company slugs are per-workspace and are not enumerable; substitute a real slug you already have (the same slug appears in that company's careers URL).
+- A job posting is public only while its status is open AND it is not past its close date. Closed postings return 404 from the API and disappear from the board.
+- Share links of the form `/q/{token}`, `/cv/{token}`, `/sign/{token}`, `/i/{token}` and `/sheets/share/{token}` are private, single-purpose links. Do not crawl, index or share them.
+- Applications cannot be submitted through the job board API; it is read-only.
+
+## Optional
+
+- [Sitemap](https://app.materialshub.gr/sitemap.xml): Machine-readable index of public pages.
+- [robots.txt](https://app.materialshub.gr/robots.txt): Crawl policy.
