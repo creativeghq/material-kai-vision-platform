@@ -370,8 +370,10 @@ export interface AgingRow {
   age_bucket: AgeBucket;
   days_overdue: number;
   /** 'invoice' = real invoice/supplier bill; 'manual' = un-invoiced receivable/payable;
-   *  'order' = a confirmed order not yet invoiced (synthesised client-side, not from the view). */
-  entry_kind?: 'invoice' | 'manual' | 'order';
+   *  'order' = a confirmed order not yet invoiced (synthesised client-side, not from the view);
+   *  'credit' = customer money held on account (a NEGATIVE receivable — synthesised client-side
+   *  from unallocated inbound payments). It nets against what the customer owes. */
+  entry_kind?: 'invoice' | 'manual' | 'order' | 'credit';
   /** Free-text label for manual entries (null for invoices/bills). */
   description?: string | null;
   /** Resolved counterparty (supplier/customer) display name, for search + display. */
@@ -379,6 +381,11 @@ export interface AgingRow {
   /** Internal finance category on the document (nullable). */
   category_id?: string | null;
   category_name?: string | null;
+  /** Linked order (for 'order' and 'credit' rows) — lets the row open the specific order. */
+  order_id?: string | null;
+  order_number?: string | null;
+  /** Credit document number (for 'credit' rows). */
+  credit_number?: string | null;
 }
 
 /**

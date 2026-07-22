@@ -298,6 +298,35 @@ const FinancePage: React.FC = () => {
         arWithOrders = [...arWithOrders, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
         apWithOrders = [...apWithOrders, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
       } catch { /* orders overlay is best-effort — invoices/bills still render */ }
+      // Customer money held on account (unallocated inbound payments) is folded into the
+      // receivables list as a NEGATIVE receivable, not shown as a separate "in credit" section.
+      // Rationale (per operator): a credit is money already on OUR account — a receivable, not a
+      // liability tied to any one order. It nets against whatever the customer owes; the leftover
+      // can fund other orders or be used elsewhere. So each credit becomes one negative AR row and
+      // the totals "play between the numbers" automatically.
+      const depositsData = await financeService.getDepositsOnAccount(wsId).catch(() => ({ total: 0, currency: 'EUR', rows: [] }));
+      setDeposits(depositsData);
+      const creditRows: AgingRow[] = depositsData.rows.map((d) => ({
+        id: d.payment_id,
+        workspace_id: wsId,
+        total: -d.unallocated,
+        amount_paid: 0,
+        amount_due: -d.unallocated, // negative → nets against this customer's open receivables
+        due_at: null,
+        issued_at: d.paid_at,
+        status: 'credit',
+        age_bucket: 'no_due_date' as AgeBucket,
+        days_overdue: 0,
+        entry_kind: 'credit' as const,
+        description: d.credit_number ? `Credit ${d.credit_number}` : 'Credit on account',
+        party_name: d.party_name,
+        category_id: null,
+        category_name: null,
+        order_id: d.order_id,
+        order_number: d.order_number,
+        credit_number: d.credit_number,
+      }));
+      arWithOrders = [...arWithOrders, ...creditRows];
       // Sort each side by how overdue it is (most overdue first) so aging orders interleave with
       // invoices instead of always sitting below them. 'no_due_date' (unaged) sinks to the bottom.
       const byOverdue = (a: AgingRow, b: AgingRow) => (b.days_overdue || 0) - (a.days_overdue || 0);
@@ -324,8 +353,6 @@ const FinancePage: React.FC = () => {
       setCashPosition((pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'in' ? Number(p.amount) : -Number(p.amount)), 0));
       // Per-account balances (where the money actually sits).
       setBankBalances(await financeService.getBankAccountBalances(wsId).catch(() => [] as BankAccountBalance[]));
-      // Deposits / on-account — cash received that isn't a document (revenue) yet.
-      setDeposits(await financeService.getDepositsOnAccount(wsId).catch(() => ({ total: 0, currency: 'EUR', rows: [] })));
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load finance data');
       toast({ title: 'Load failed', description: err?.message, variant: 'destructive' });
@@ -345,7 +372,8 @@ const FinancePage: React.FC = () => {
     const monthMargin = Number(lastMonth?.gross_margin ?? 0);
     const monthMarginPct = lastMonth?.gross_margin_pct ?? null;
     // Invoiced AR only ages (uninvoiced orders have no due date) → DSO is over invoiced receivables.
-    const invoicedAr = ar.filter((r) => r.entry_kind !== 'order').reduce((acc, r) => acc + (r.amount_due || 0), 0);
+    // Credit rows (money on account) are not invoices, so they stay out of the DSO base.
+    const invoicedAr = ar.filter((r) => r.entry_kind !== 'order' && r.entry_kind !== 'credit').reduce((acc, r) => acc + (r.amount_due || 0), 0);
     // True DSO = AR ÷ trailing-12-mo revenue × 365. Null when there's no revenue to divide by.
     const annualRevenue = pnl.reduce((acc, p) => acc + Number(p.revenue_net ?? 0), 0);
     const dso = annualRevenue > 0 ? Math.round((invoicedAr / annualRevenue) * 365) : null;
@@ -760,17 +788,31 @@ const FinancePage: React.FC = () => {
                     )}
                     {paginate(arFiltered, arPage).map((r) => {
                       const isOrder = r.entry_kind === 'order';
+                      const isCredit = r.entry_kind === 'credit';
+                      // Every receivable belongs to a user — clicking it opens that document:
+                      // an order → the specific order; a credit → the order it came from (if any);
+                      // an invoice → the invoice page.
+                      const onRowClick = isOrder
+                        ? () => openOrder(r.id)
+                        : isCredit
+                          ? (r.order_id ? () => openOrder(r.order_id!) : undefined)
+                          : () => navigate(`${financeBase}/invoices/${r.id}`);
                       return (
                       <tr
                         key={r.id}
-                        className="border-b border-border/30 hover:bg-muted/30 cursor-pointer"
-                        onClick={isOrder ? () => onTabChange('doc_orders') : () => navigate(`${financeBase}/invoices/${r.id}`)}
+                        className={`border-b border-border/30 hover:bg-muted/30 ${onRowClick ? 'cursor-pointer' : ''}`}
+                        onClick={onRowClick}
                       >
                         <td className="px-4 py-2">
                           {isOrder ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.description}</span>
                               <Badge variant="secondary" className="text-[10px]">Order · not invoiced</Badge>
+                            </span>
+                          ) : isCredit ? (
+                            <span className="flex items-center gap-2">
+                              <span className="text-xs text-emerald-700">{r.credit_number ?? r.description}</span>
+                              <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-600/40">Credit · on account</Badge>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.internal_number}</span>
@@ -785,11 +827,13 @@ const FinancePage: React.FC = () => {
                           ) : (r.category_name ?? '—')}
                         </td>
                         <td className="px-4 py-2">
-                          <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
+                          {isCredit
+                            ? <span className="text-xs text-muted-foreground">—</span>
+                            : <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>}
                         </td>
-                        <td className="px-4 py-2 text-right">{formatMoney(r.total)}</td>
-                        <td className="px-4 py-2 text-right">{formatMoney(r.amount_paid)}</td>
-                        <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
+                        <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.total)}</td>
+                        <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.amount_paid)}</td>
+                        <td className={`px-4 py-2 text-right font-medium ${isCredit ? 'text-emerald-700' : ''}`}>{formatMoney(r.amount_due)}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
                             <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
@@ -803,6 +847,12 @@ const FinancePage: React.FC = () => {
                             <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(r.id)}>
                               <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
                             </Button>
+                          ) : isCredit ? (
+                            r.order_id ? (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(r.order_id!)}>
+                                <ShoppingCart className="h-3.5 w-3.5 mr-1" /> {r.order_number ?? 'Open order'}
+                              </Button>
+                            ) : <span className="text-xs text-muted-foreground">—</span>
                           ) : (
                             <InvoiceActionsMenu invoiceId={r.id} financeBase={financeBase} onChanged={() => loadAll(workspaceId)} />
                           )}
@@ -815,51 +865,9 @@ const FinancePage: React.FC = () => {
                 <TablePagination page={arPage} total={arFiltered.length} onPageChange={setArPage} label="receivables" />
               </CardContent>
             </Card>
-
-            {/* In credit — customers who have PAID US MORE than they owe (prepayments held on
-                account). This is a liability, NOT a receivable, so it is shown separately and is
-                never folded into the aging buckets above — otherwise it would understate what
-                customers actually owe. Chasing a customer who sits here would be a mistake. */}
-            {deposits.rows.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <ArrowDownCircle className="h-4 w-4 text-emerald-600" />
-                    In credit — held on account
-                    <Badge variant="outline" className="ml-1 text-[10px]">{formatMoney(deposits.total, deposits.currency)}</Badge>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">Money received beyond what these customers owe. Apply it to an order to settle without new cash.</p>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <table className="w-full text-sm">
-                    <thead className="text-xs text-muted-foreground">
-                      <tr className="border-b border-border/60">
-                        <th className="px-4 py-2 text-left">Credit</th>
-                        <th className="px-4 py-2 text-left">Customer</th>
-                        <th className="px-4 py-2 text-left">Received</th>
-                        <th className="px-4 py-2 text-left">Order</th>
-                        <th className="px-4 py-2 text-right">Held on account</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {deposits.rows.map((d) => (
-                        <tr key={d.payment_id} className="border-b border-border/30">
-                          <td className="px-4 py-2 text-xs text-emerald-700">{d.credit_number ?? '—'}</td>
-                          <td className="px-4 py-2 truncate max-w-[200px]" title={d.party_name ?? undefined}>{d.party_name ?? '—'}</td>
-                          <td className="px-4 py-2 text-muted-foreground">{d.paid_at ? new Date(d.paid_at).toLocaleDateString() : '—'}</td>
-                          <td className="px-4 py-2">
-                            {d.order_id
-                              ? <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(d.order_id!)}><ShoppingCart className="h-3.5 w-3.5 mr-1" />{d.order_number ?? 'open'}</Button>
-                              : <span className="text-muted-foreground">—</span>}
-                          </td>
-                          <td className="px-4 py-2 text-right font-medium text-emerald-700">{formatMoney(d.unallocated, d.currency)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            )}
+            {/* Customer credit (money held on account) is no longer a separate section — it is
+                folded into the receivables list above as a negative row per customer, so the
+                totals net automatically. See loadAll's creditRows. */}
           </TabsContent>
 
           {/* ─────────── PAYABLES ─────────── */}
@@ -911,7 +919,7 @@ const FinancePage: React.FC = () => {
                       <tr
                         key={r.id}
                         className={`border-b border-border/30 hover:bg-muted/30 ${isOrder ? 'cursor-pointer' : ''}`}
-                        onClick={isOrder ? () => onTabChange('doc_orders') : undefined}
+                        onClick={isOrder ? () => openOrder(r.id) : undefined}
                       >
                         <td className="px-4 py-2">
                           {isOrder ? (
