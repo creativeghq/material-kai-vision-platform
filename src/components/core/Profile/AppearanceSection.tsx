@@ -99,20 +99,13 @@ export const AppearanceSection: React.FC = () => {
           })}
         </div>
 
-        {/* Accent color picker — gradient swatches, applies to both light & dark */}
-        <div className="mt-8">
-          <div className="flex items-baseline justify-between mb-1">
-            <h3 className="text-sm font-medium">Accent color</h3>
-            <span className="text-[11px] text-muted-foreground">Applies to light &amp; dark</span>
+        {/* Accent color picker — small inline chips, applies to both light & dark */}
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium">Accent</h3>
+            <span className="text-[11px] text-muted-foreground">light &amp; dark</span>
           </div>
-          <p className="text-sm text-muted-foreground mb-4">
-            Sets the primary buttons, focus rings, active nav and identity gradient.
-          </p>
-          <div
-            role="radiogroup"
-            aria-label="Accent color"
-            className="grid grid-cols-1 sm:grid-cols-2 gap-3"
-          >
+          <div role="radiogroup" aria-label="Accent color" className="flex flex-wrap gap-2">
             {ACCENT_OPTIONS.map((opt) => {
               const active = accent === opt.value;
               return (
@@ -121,38 +114,22 @@ export const AppearanceSection: React.FC = () => {
                   type="button"
                   role="radio"
                   aria-checked={active}
+                  title={opt.description}
                   onClick={() => setAccent(opt.value)}
                   className={cn(
-                    'group relative flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-colors',
+                    'inline-flex items-center gap-2 rounded-full border pl-1.5 pr-3 py-1 text-xs font-medium transition-colors',
                     active
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/40 hover:bg-muted/50',
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50',
                   )}
                 >
-                  {/* Gradient preview bar with a solid-primary chip riding on it */}
                   <span
-                    className="relative h-14 w-full overflow-hidden rounded-lg ring-1 ring-black/10"
+                    className="flex h-5 w-5 items-center justify-center rounded-full ring-1 ring-black/10"
                     style={{ background: opt.gradient }}
                   >
-                    <span
-                      className="absolute bottom-2 left-2 h-7 w-7 rounded-full ring-2 ring-white/80 shadow"
-                      style={{ background: opt.solid }}
-                    />
-                    {active && (
-                      <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-black shadow">
-                        <Check className="h-3.5 w-3.5" />
-                      </span>
-                    )}
+                    {active && <Check className="h-3 w-3 text-white drop-shadow" />}
                   </span>
-                  <span className="min-w-0">
-                    <span className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{opt.label}</span>
-                      {active && (
-                        <span className="text-[10px] uppercase tracking-wide text-primary">Active</span>
-                      )}
-                    </span>
-                    <span className="block text-xs text-muted-foreground mt-0.5">{opt.description}</span>
-                  </span>
+                  {opt.label}
                 </button>
               );
             })}
