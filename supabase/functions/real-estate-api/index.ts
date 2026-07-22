@@ -21,6 +21,60 @@ import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { checkPublishRequirements } from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
+
+/** Does a buyer requirement's saved-search criteria match a listing? (deterministic facets) */
+function matchesCriteria(c: any, p: any): boolean {
+  if (!c) return false;
+  if (c.type && c.type !== p.property_type) return false;
+  if (c.transaction_type && c.transaction_type !== p.transaction_type) return false;
+  if (c.price_min != null && p.price != null && Number(p.price) < Number(c.price_min)) return false;
+  if (c.price_max != null && p.price != null && Number(p.price) > Number(c.price_max)) return false;
+  if (c.beds != null && p.bedrooms != null && Number(p.bedrooms) < Number(c.beds)) return false;
+  if (c.baths != null && p.bathrooms != null && Number(p.bathrooms) < Number(c.baths)) return false;
+  if (c.location) { const loc = `${p.town ?? ''} ${p.region ?? ''}`.toLowerCase(); if (!loc.includes(String(c.location).toLowerCase())) return false; }
+  return true;
+}
+
+/** Active saved searches in the workspace that match this listing (with their contact). */
+async function findMatchingBuyers(supabase: any, workspaceId: string, property: any): Promise<any[]> {
+  const { data: reqs } = await supabase.from('property_buyer_requirements')
+    .select('id, criteria, label, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( id, name, email )')
+    .eq('workspace_id', workspaceId).eq('is_active', true);
+  return (reqs ?? []).filter((r: any) => matchesCriteria(r.criteria, property));
+}
+
+/**
+ * Emit the buyer-match Flow event (D10). The seeded system-default flow delivers to the listing
+ * agent: bell + email now, WhatsApp when the workspace connects Zernio. Never hardcode the send —
+ * this only emits; the Flows engine owns delivery. `reason` distinguishes new-listing vs price-drop.
+ */
+async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property: any, reason: 'new_listing' | 'price_drop'): Promise<void> {
+  try {
+    const matches = await findMatchingBuyers(supabase, workspaceId, property);
+    if (!matches.length) return;
+    const agentUserId = property.listing_agent_id ?? property.created_by;
+    if (!agentUserId) return;
+    const { data: prof } = await supabase.from('user_profiles').select('email, phone').eq('user_id', agentUserId).maybeSingle();
+    const names = matches.map((m: any) => m.contact?.name || m.contact?.email || 'a buyer').slice(0, 5).join(', ');
+    const label = property.title || property.reference_code || 'your listing';
+    const lead = reason === 'price_drop' ? 'Price drop' : 'New listing';
+    await emitFlowEvent('realestate.buyer_matches_found', {
+      workspace_id: workspaceId,
+      user_id: agentUserId,
+      email: prof?.email ?? null,
+      phone: prof?.phone ?? null,
+      type: 'realestate_buyer_match',
+      title: `${matches.length} buyer${matches.length > 1 ? 's' : ''} match “${label}”`,
+      subject: `${lead}: ${matches.length} matching buyer${matches.length > 1 ? 's' : ''}`,
+      body: `${lead} — ${matches.length} registered buyer(s) match this listing: ${names}.`,
+      action_url: `/properties/${property.id}`,
+      property_id: property.id,
+      match_count: matches.length,
+      reason,
+    });
+  } catch (_) { /* non-fatal — alerting must never block the listing op */ }
+}
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -174,15 +228,18 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (!id) return json({ error: 'property_id is required' }, 400);
         await loadEditable(id);
         const payload = pick(body, PROPERTY_WRITABLE);
-        // record a price-history row when price changes
+        // record a price-history row when price changes; flag a drop for buyer-match alerts
+        let priceDropped = false;
         if (payload.price !== undefined) {
           const { data: cur } = await supabase.from('properties').select('price, currency').eq('id', id).single();
           if (cur && Number(cur.price) !== Number(payload.price)) {
             await supabase.from('property_price_history').insert({ workspace_id: workspaceId, property_id: id, price: payload.price, currency: (payload.currency as string) ?? cur.currency, note: 'list price updated' });
+            if (payload.price != null && cur.price != null && Number(payload.price) < Number(cur.price)) priceDropped = true;
           }
         }
         const { data, error } = await supabase.from('properties').update(payload).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
         if (error) throw new HttpError(400, error.message);
+        if (priceDropped && data.is_public && data.listing_status === 'active') await emitBuyerMatchAlert(supabase, workspaceId, data, 'price_drop');
         return json({ property: data });
       }
 
@@ -212,6 +269,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (!property.listing_date) patch.listing_date = new Date().toISOString().slice(0, 10);
         const { data, error } = await supabase.from('properties').update(patch).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
         if (error) throw new HttpError(400, error.message);
+        await emitBuyerMatchAlert(supabase, workspaceId, data, 'new_listing'); // D10 — alert agent of matching buyers
         return json({ property: data, warnings: gate.warnings });
       }
 
@@ -501,17 +559,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const { data: reqs } = await supabase.from('property_buyer_requirements')
           .select('*, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( id, name, email )')
           .eq('workspace_id', workspaceId).eq('is_active', true);
-        const matches = (reqs ?? []).filter((r: any) => {
-          const c = r.criteria ?? {};
-          if (c.type && c.type !== p.property_type) return false;
-          if (c.transaction_type && c.transaction_type !== p.transaction_type) return false;
-          if (c.price_min != null && p.price != null && p.price < Number(c.price_min)) return false;
-          if (c.price_max != null && p.price != null && p.price > Number(c.price_max)) return false;
-          if (c.beds != null && p.bedrooms != null && p.bedrooms < Number(c.beds)) return false;
-          if (c.baths != null && p.bathrooms != null && p.bathrooms < Number(c.baths)) return false;
-          if (c.location) { const loc = `${p.town ?? ''} ${p.region ?? ''}`.toLowerCase(); if (!loc.includes(String(c.location).toLowerCase())) return false; }
-          return true;
-        });
+        const matches = (reqs ?? []).filter((r: any) => matchesCriteria(r.criteria, p));
         return json({ matches });
       }
 

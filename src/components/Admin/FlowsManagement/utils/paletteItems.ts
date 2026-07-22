@@ -179,6 +179,11 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Inbox Thread Assigned', description: 'A thread is assigned/handed to a member', icon: 'UserPlus', color: 'emerald',
     defaultData: { label: 'Inbox Thread Assigned', category: 'trigger', triggerType: 'inbox.thread_assigned', config: {} } as TriggerNodeData },
 
+  // #249 — real estate
+  { type: 'triggerNode', category: 'trigger', subType: 'realestate.buyer_matches_found', group: 'Real Estate',
+    label: 'Buyer Matches Found', description: 'A new/updated listing matches a buyer\'s saved search — alert the agent', icon: 'Home', color: 'emerald',
+    defaultData: { label: 'Buyer Matches Found', category: 'trigger', triggerType: 'realestate.buyer_matches_found', config: {} } as TriggerNodeData },
+
   // #225 — surplus marketplace
   { type: 'triggerNode', category: 'trigger', subType: 'marketplace_want_match', group: 'Marketplace',
     label: 'Surplus Match', description: 'A new surplus listing matched a buyer\'s saved alert', icon: 'Package', color: 'emerald',

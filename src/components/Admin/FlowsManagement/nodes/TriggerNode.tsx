@@ -10,6 +10,7 @@ import {
   Megaphone, MailX, MailWarning,
   Building2, MailOpen, MousePointerClick, TrendingDown, AtSign, Briefcase,
   Ship, Truck,
+  Home,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -110,6 +111,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   rfq_lines_requested: Send,
   rfq_lines_priced: CheckCircle2,
   upstream_order_created: ShoppingCart,
+  'realestate.buyer_matches_found': Home,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

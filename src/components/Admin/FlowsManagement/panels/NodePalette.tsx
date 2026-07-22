@@ -16,7 +16,7 @@ import {
   Inbox, ClipboardCheck, FileCheck, Eye, Star, Package,
   CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
   MailX, MailWarning, MailOpen, MousePointerClick, AtSign, Briefcase,
-  Ship, Truck,
+  Ship, Truck, Home,
 } from 'lucide-react';
 import {
   Accordion,
@@ -44,7 +44,7 @@ const iconMap: Record<string, React.ElementType> = {
   Inbox, ClipboardCheck, FileCheck, Eye, Star, Package,
   CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
   MailX, MailWarning, MailOpen, MousePointerClick, AtSign, Briefcase,
-  Ship, Truck,
+  Ship, Truck, Home,
 };
 
 const categoryColors: Record<string, string> = {

@@ -52,6 +52,7 @@ import {
   Building2,
   Ship,
   Truck,
+  Home,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -182,6 +183,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   rfq_lines_requested: Send,
   rfq_lines_priced: CheckCircle2,
   upstream_order_created: ShoppingCart,
+  'realestate.buyer_matches_found': Home,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -281,6 +283,7 @@ const triggerLabels: Record<TriggerType, string> = {
   rfq_lines_requested: 'RFQ Lines Requested (upstream)',
   rfq_lines_priced: 'RFQ Lines Priced (supplier)',
   upstream_order_created: 'Reseller Order Created (supplier)',
+  'realestate.buyer_matches_found': 'Buyer Matches Found',
 };
 
 const statusColors: Record<FlowStatus, string> = {
