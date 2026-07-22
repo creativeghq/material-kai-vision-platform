@@ -24,6 +24,7 @@ import {
   CalendarClock,
   BookOpen,
   ImagePlus,
+  Building2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -139,6 +140,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // All-users via agent.use + module gate; the full admin dashboard stays at /admin/monitoring.
   // Appointments — agent-driven scheduling over CRM Meetings (self-reminders); page is the Calendar tab.
   { id: 'appointments', label: 'Appointments', path: '/agent-hub?capability=appointments', icon: CalendarClock, requireCapability: 'agent.use', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'List & schedule appointments with reminders — in the AI studio.' },
+  // #249 — Real Estate module: appears only when the workspace is entitled to 'real-estate' AND the
+  // persona holds realestate.view (owner/admin at P0; P1 adds the scoped realestate_agent persona).
+  { id: 'real-estate', label: 'Real Estate', path: '/properties', icon: Building2, requireCapability: 'realestate.view', moduleSlug: 'real-estate', surface: 'app', hub: 'sales', description: 'List, manage and publish properties.' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Invoices, payments, and reports.' },
   // Warehouse: inventory extracted from the Finance tab into its own paid add-on (module slug stays
   // 'stock' internally). Appears only when the workspace is entitled AND the persona holds warehouse.manage.

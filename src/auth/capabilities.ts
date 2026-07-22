@@ -46,7 +46,9 @@ export type Capability =
   | 'hr.view'               // #252 HR module: see employees + absences (sensitive PII)
   | 'hr.manage'             // #252 HR module: create/edit employees, approve/reject absences
   | 'hr.self'               // #252 HR self-service: an employee sees/acts on ONLY their own record
-  | 'marketing.email';      // #255 Email Marketing module: design templates + send bulk campaigns
+  | 'marketing.email'       // #255 Email Marketing module: design templates + send bulk campaigns
+  | 'realestate.view';      // #249 Real Estate module: list/manage properties (owner/admin). P1 adds
+                            // realestate.listings.manage / realestate.leads.view + the realestate_agent persona.
 
 const ALL_BUSINESS: Capability[] = [
   'network.manage', 'pricing.manage', 'finance.manage', 'invoice.issue', 'crm.view',
@@ -59,6 +61,9 @@ const ALL_BUSINESS: Capability[] = [
   // #255 Email Marketing — sending from the company's own verified domain is an owner/admin
   // function (BYOK config is finance-manager-gated). Module entitlement gates it per-workspace.
   'marketing.email',
+  // #249 Real Estate — owner/admin manage properties. Module entitlement gates it per-workspace.
+  // P1 splits leads/viewings out to the scoped realestate_agent persona.
+  'realestate.view',
 ];
 
 /**

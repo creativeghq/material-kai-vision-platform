@@ -1,0 +1,9 @@
+{
+  "slug": "real-estate",
+  "name": "Real Estate",
+  "description": "List, manage and publish properties — enriched with the platform AI stack, surfaced in Discovery and on your business profile, and syndicated to external portals. Purchasable add-on built on the module framework (#251).",
+  "category": "operations",
+  "priceTier": "pro",
+  "icon": "Building2",
+  "version": "0.1.0"
+}
