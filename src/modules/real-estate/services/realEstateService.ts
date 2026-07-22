@@ -1,0 +1,127 @@
+import { supabase } from '@/integrations/supabase/client';
+import { edgeError } from '@/utils/edgeError';
+
+// #249 — client for the `real-estate-api` (authed) + `real-estate-public` (token page) edge functions.
+// Every management call passes the active workspace_id; the edge fn re-derives access from the caller
+// (JWT) and enforces entitlement + realestate.* RBAC. `properties` post-dates the last gen-types run,
+// so rows are loosely typed here (same safety level hrService uses for its post-types tables).
+
+export type ListingStatus = 'draft' | 'active' | 'under_offer' | 'sold' | 'rented' | 'withdrawn' | 'archived';
+export type PropertyType = 'residential' | 'commercial' | 'land' | 'other';
+export type TransactionType = 'sale' | 'rent' | 'short_let' | 'business_transfer' | 'auction';
+
+export interface PropertyListItem {
+  id: string;
+  reference_code: string | null;
+  title: string | null;
+  property_type: PropertyType;
+  subtype: string | null;
+  transaction_type: TransactionType;
+  listing_status: ListingStatus;
+  price: number | null;
+  currency: string;
+  town: string | null;
+  region: string | null;
+  is_public: boolean;
+  in_discovery: boolean;
+  syndicate_to: string[];
+  listing_agent_id: string | null;
+  view_count: number;
+  updated_at: string;
+  created_at: string;
+}
+
+// The full row carries ~110 columns (category-segmented §3) — kept as an open record so the workbench
+// can bind any field without churning this type on every schema addition.
+export type Property = Record<string, any> & { id: string; workspace_id: string };
+
+export interface PropertyPhoto {
+  id: string; property_id: string; storage_path: string; kind: 'photo' | 'floor_plan' | 'render';
+  sort_order: number; is_cover: boolean; caption: string | null; ai_tags: string[]; created_at: string;
+}
+export interface PropertyInquiry {
+  id: string; property_id: string; crm_contact_id: string | null; name: string | null; email: string | null;
+  phone: string | null; message: string | null; status: string; source: string; created_at: string;
+  property?: { id: string; title: string | null; reference_code: string | null; listing_agent_id: string | null } | null;
+}
+export interface PropertyViewing {
+  id: string; property_id: string; crm_contact_id: string | null; agent_id: string | null;
+  scheduled_at: string; type: string; status: string; feedback: string | null; created_at: string;
+  property?: { id: string; title: string | null; reference_code: string | null } | null;
+}
+
+async function call<T>(workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('real-estate-api', {
+    body: { action, workspace_id: workspaceId, ...extra },
+  });
+  if (error) throw await edgeError(error);
+  return data as T;
+}
+
+export const realEstateService = {
+  // Properties
+  listProperties: (ws: string, filters: { status?: string; property_type?: string } = {}) =>
+    call<{ properties: PropertyListItem[] }>(ws, 'list-properties', filters).then((r) => r.properties),
+  getProperty: (ws: string, propertyId: string) =>
+    call<{ property: Property; photos: PropertyPhoto[]; inquiries: PropertyInquiry[]; viewings: PropertyViewing[]; price_history: any[]; open_houses: any[]; documents: any[] }>(ws, 'get-property', { property_id: propertyId }),
+  createProperty: (ws: string, fields: Record<string, unknown>) =>
+    call<{ property: Property }>(ws, 'create-property', fields).then((r) => r.property),
+  updateProperty: (ws: string, propertyId: string, fields: Record<string, unknown>) =>
+    call<{ property: Property }>(ws, 'update-property', { property_id: propertyId, ...fields }).then((r) => r.property),
+  deleteProperty: (ws: string, propertyId: string) => call<{ ok: true }>(ws, 'delete-property', { property_id: propertyId }),
+  /** May reject with a `publish_blocked` payload — see isPublishBlocked(). */
+  publishProperty: (ws: string, propertyId: string) =>
+    call<{ property: Property; warnings: string[] }>(ws, 'publish-property', { property_id: propertyId }),
+  unpublishProperty: (ws: string, propertyId: string) =>
+    call<{ property: Property }>(ws, 'unpublish-property', { property_id: propertyId }).then((r) => r.property),
+
+  // Photos
+  photoUploadUrl: (ws: string, propertyId: string, ext: string) =>
+    call<{ path: string; token: string; signed_url: string }>(ws, 'photo-upload-url', { property_id: propertyId, ext }),
+  addPhoto: (ws: string, propertyId: string, storagePath: string, kind = 'photo', caption?: string) =>
+    call<{ photo: PropertyPhoto }>(ws, 'add-photo', { property_id: propertyId, storage_path: storagePath, kind, caption }).then((r) => r.photo),
+  deletePhoto: (ws: string, photoId: string) => call<{ ok: true }>(ws, 'delete-photo', { photo_id: photoId }),
+  setCover: (ws: string, propertyId: string, photoId: string) => call<{ ok: true }>(ws, 'set-cover', { property_id: propertyId, photo_id: photoId }),
+  reorderPhotos: (ws: string, photoIds: string[]) => call<{ ok: true }>(ws, 'reorder-photos', { photo_ids: photoIds }),
+
+  // Inquiries / viewings
+  listInquiries: (ws: string, filters: { status?: string; property_id?: string } = {}) =>
+    call<{ inquiries: PropertyInquiry[] }>(ws, 'list-inquiries', filters).then((r) => r.inquiries),
+  updateInquiry: (ws: string, inquiryId: string, status: string) =>
+    call<{ inquiry: PropertyInquiry }>(ws, 'update-inquiry', { inquiry_id: inquiryId, status }).then((r) => r.inquiry),
+  listViewings: (ws: string, filters: { property_id?: string } = {}) =>
+    call<{ viewings: PropertyViewing[] }>(ws, 'list-viewings', filters).then((r) => r.viewings),
+  createViewing: (ws: string, fields: { property_id: string; scheduled_at: string; type?: string; crm_contact_id?: string; agent_id?: string }) =>
+    call<{ viewing: PropertyViewing }>(ws, 'create-viewing', fields).then((r) => r.viewing),
+  updateViewing: (ws: string, viewingId: string, fields: { status?: string; scheduled_at?: string; feedback?: string }) =>
+    call<{ viewing: PropertyViewing }>(ws, 'update-viewing', { viewing_id: viewingId, ...fields }).then((r) => r.viewing),
+
+  /** Upload a File to the signed URL returned by photoUploadUrl, then register the row. */
+  async uploadPhoto(ws: string, propertyId: string, file: File, kind = 'photo'): Promise<PropertyPhoto> {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const { path, token } = await this.photoUploadUrl(ws, propertyId, ext);
+    const { error } = await supabase.storage.from('property-media').uploadToSignedUrl(path, token, file, { contentType: file.type });
+    if (error) throw error;
+    return this.addPhoto(ws, propertyId, path, kind);
+  },
+};
+
+/** Detect the 422 publish-gate rejection so the UI can list the missing fields. */
+export function isPublishBlocked(e: unknown): e is { code: 'publish_blocked'; errors: string[]; warnings: string[] } {
+  return !!e && typeof e === 'object' && (e as any).code === 'publish_blocked';
+}
+
+// ── Public token page (no auth) ──
+export interface PublicListing { listing: Record<string, any>; photos: { id: string; kind: string; caption: string | null; is_cover: boolean; url: string | null }[] }
+
+export const realEstatePublic = {
+  async getListing(token: string): Promise<PublicListing> {
+    const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'get', token } });
+    if (error) throw await edgeError(error);
+    return data as PublicListing;
+  },
+  async inquire(token: string, payload: { name: string; email: string; phone?: string; message?: string; gdpr_consent: boolean }): Promise<void> {
+    const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'inquire', token, ...payload } });
+    if (error) throw await edgeError(error);
+  },
+};

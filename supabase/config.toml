@@ -107,9 +107,14 @@ verify_jwt = false
 [functions.hr-api]
 verify_jwt = false
 
-# #249 — Real Estate module API (P0 scaffold). Does its own auth
+# #249 — Real Estate module API. Does its own auth
 # (authenticate + userCanAccessWorkspace + isModuleEnabled('real-estate') + assertEntitled('real-estate')).
 [functions.real-estate-api]
+verify_jwt = false
+
+# #249 — Real Estate PUBLIC listing page (anonymous, token-gated). verify_jwt off so /p/:token works;
+# access is bound to the opaque public_listing_token and returns only the toPublic() projection.
+[functions.real-estate-public]
 verify_jwt = false
 
 # Contracts & e-signature API. verify_jwt off so the public /sign token path works; management

@@ -113,6 +113,7 @@ const HeatPumpToolPage = lazy(() => import('./pages/Tools/HeatPumpToolPage'));
 const HeatingCostPage = lazy(() => import('./pages/Tools/HeatingCostPage'));
 const PublicQuotePage = lazy(() => import('./pages/PublicQuotePage'));
 const PublicClientViewPage = lazy(() => import('./pages/PublicClientViewPage'));
+const PublicListingPage = lazy(() => import('./pages/PublicListingPage'));
 const PublicContractSignPage = lazy(() => import('./pages/PublicContractSignPage'));
 // Project Workspace passwordless invite flow (public landing + auth-required accept)
 const ProjectInviteLandingPage = lazy(() => import('./modules/projects/pages/InviteLandingPage').then(m => ({ default: m.InviteLandingPage })));
@@ -181,6 +182,8 @@ const App = () => (
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
                 <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
                 <Route path="/cv/:token" element={<PageErrorBoundary name="Client View"><PublicClientViewPage /></PageErrorBoundary>} />
+                {/* #249 — public property listing page (anonymous, token-gated) */}
+                <Route path="/p/:token" element={<PageErrorBoundary name="Property Listing"><PublicListingPage /></PageErrorBoundary>} />
                 <Route path="/sign/:token" element={<PageErrorBoundary name="Contract Signing"><PublicContractSignPage /></PageErrorBoundary>} />
                 {/* #209 — public customer inbox thread (tokenized, no auth) */}
                 <Route path="/i/:token" element={<PageErrorBoundary name="Inbox Thread"><PublicInboxThreadPage /></PageErrorBoundary>} />

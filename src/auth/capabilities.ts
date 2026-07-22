@@ -23,6 +23,8 @@ export type Persona =
   | 'accountant' // invited external accountant — Finance surface only (#202)
   | 'sales'      // invited sales rep — Sales portal only: build quotes/orders for customers (#201)
   | 'employee'   // invited staff member — HR self-service ONLY (#252): their own record, nothing else
+  | 'realestate_agent' // invited property agent — Real Estate portal only (#249): manage listings +
+                       // own leads/viewings (scoped via responsible_sales_user_ids / listing_agent_id)
   | 'end_user';  // project client / referral-joined member — restricted surface
 
 /** Every gateable capability on the platform. Keep verbs coarse + surface-oriented. */
@@ -47,8 +49,9 @@ export type Capability =
   | 'hr.manage'             // #252 HR module: create/edit employees, approve/reject absences
   | 'hr.self'               // #252 HR self-service: an employee sees/acts on ONLY their own record
   | 'marketing.email'       // #255 Email Marketing module: design templates + send bulk campaigns
-  | 'realestate.view';      // #249 Real Estate module: list/manage properties (owner/admin). P1 adds
-                            // realestate.listings.manage / realestate.leads.view + the realestate_agent persona.
+  | 'realestate.view'           // #249 Real Estate: see the module + listings (owner/admin + agent)
+  | 'realestate.listings.manage' // #249 create/edit/publish listings (owner/admin + realestate_agent)
+  | 'realestate.leads.view';     // #249 property leads/viewings pipeline (owner/admin see all; agent own)
 
 const ALL_BUSINESS: Capability[] = [
   'network.manage', 'pricing.manage', 'finance.manage', 'invoice.issue', 'crm.view',
@@ -61,9 +64,9 @@ const ALL_BUSINESS: Capability[] = [
   // #255 Email Marketing — sending from the company's own verified domain is an owner/admin
   // function (BYOK config is finance-manager-gated). Module entitlement gates it per-workspace.
   'marketing.email',
-  // #249 Real Estate — owner/admin manage properties. Module entitlement gates it per-workspace.
-  // P1 splits leads/viewings out to the scoped realestate_agent persona.
-  'realestate.view',
+  // #249 Real Estate — owner/admin (broker) get the full surface: view + manage listings + all leads.
+  // Module entitlement gates it per-workspace; the invited realestate_agent persona gets a scoped subset.
+  'realestate.view', 'realestate.listings.manage', 'realestate.leads.view',
 ];
 
 /**
@@ -109,6 +112,11 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // employee_id — hr-api resolves the subject from their own JWT. Note the cost side: agent use
   // draws on the workspace's pooled credits, so an employee can spend the owner's balance.
   employee: ['hr.self', 'agent.use'],
+  // Invited property agent (#249): the Real Estate surface only. Manages listings (shared team asset,
+  // D1) and works their own leads/viewings (self-scoped via responsible_sales_user_ids / listing_agent_id
+  // in real-estate-api, D7). Gets crm.view (leads ARE crm_contacts, D9) + agent.use (reach listings from
+  // chat), but NO finance/pricing/network/warehouse. Broker (owner/admin) holds the full realestate.* set.
+  realestate_agent: ['realestate.view', 'realestate.listings.manage', 'realestate.leads.view', 'crm.view', 'agent.use'],
   // Project clients / referral end-users: their own work only, no business back-office.
   end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
 };
@@ -148,6 +156,9 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
   // Invited employee (#252) — HR self-service only. Must precede the member/staff fallback so an
   // 'employee' role never inherits staff finance/CRM/warehouse capabilities.
   if (role === 'employee') return 'employee';
+  // Invited property agent (#249) — Real Estate portal only. Before the member/staff fallback so a
+  // 'realestate_agent' role never inherits staff finance/warehouse capabilities.
+  if (role === 'realestate_agent') return 'realestate_agent';
   // Invited sales rep (#201) — Sales portal only. Must come BEFORE the member/staff fallback,
   // otherwise a 'sales' role falls through to 'staff' and wrongly inherits finance/CRM/invoice.
   if (role === 'sales') return 'sales';

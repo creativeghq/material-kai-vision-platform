@@ -3,6 +3,7 @@ import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
 const RealEstatePage = lazy(() => import('./pages/RealEstatePage'));
+const PropertyWorkbench = lazy(() => import('./pages/PropertyWorkbench'));
 
 // #249 — Real Estate module (purchasable add-on on the #251 framework, sibling of HR #252). The
 // `/properties` route carries NO requireAdmin, so buildModuleRoutes() wraps it in EntitlementGuard
@@ -14,6 +15,7 @@ const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
     { path: '/properties', component: RealEstatePage },
+    { path: '/properties/:id', component: PropertyWorkbench },
   ],
   navItems: [],
 };

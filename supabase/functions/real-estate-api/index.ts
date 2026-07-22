@@ -1,28 +1,38 @@
 // deno-lint-ignore-file no-explicit-any
-// #249 — Real Estate module API (P0 scaffold). Authed CRUD/publish/inquiry/viewing router for the
-// `real-estate` add-on. This is the shell: it establishes the exact security spine every future
-// action rides on, plus a `ping` action to verify the full gate chain end-to-end. Property tables,
-// listing/publish/inquiry actions land in P1.
+// #249 — Real Estate module API (P1). Authed CRUD/publish/media/inquiry/viewing router for the
+// `real-estate` add-on. The public token page lives in a SEPARATE fn (real-estate-public).
 //
 // SECURITY (pen-test #250 baseline — cloned from hr-api):
 //  • authenticate() yields a SERVICE-ROLE client (RLS bypassed) → every action re-derives the
 //    workspace from the caller and calls userCanAccessWorkspace() (systemic root #2, no body trust).
-//  • Module gates: isModuleEnabled('real-estate') [global publish] + assertEntitled(ws,'real-estate')
-//    [402 upsell per-workspace].
-//  • Evaluate in strict priority order (access 404 → module 404 → entitlement 402) so responses are
-//    enumeration-safe (404, never 403, on an unowned workspace id).
-//  • P1 will add: RBAC (realestate_agent persona), allowlisted writes (no mass-assignment/BOPLA),
-//    the toPublic() projection as the single public read, and the token-gated public page in a
-//    SEPARATE `real-estate-public` edge fn.
+//  • Module gates: isModuleEnabled('real-estate') [publish] + assertEntitled [402], strict priority.
+//  • RBAC: resolveRealEstateAccess — broker (owner/admin) manage + see all leads; realestate_agent
+//    manages listings + OWN leads/viewings (D7); other members read the shared listings only (D1).
+//  • Writes go through PROPERTY_WRITABLE allowlist (no mass-assignment/BOPLA). Trust/derived/system
+//    fields (workspace_id, view_count, public_listing_token, published_at, …) are server-set only.
+//  • Publish runs the compliance gate (GR hard-block); toPublic() is never applied here (management
+//    sees full rows) — it is the public fn's contract.
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
+import { checkPublishRequirements } from '../_shared/real-estate.ts';
+import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+const INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'];
+const VIEWING_STATUSES = ['scheduled', 'completed', 'cancelled', 'no_show'];
+const VIEWING_TYPES = ['viewing', 'tour', 'open_house'];
+const INTEREST_TYPES = ['viewed', 'interested', 'favorite', 'offer_made'];
+
+/** url-safe random token for the public listing page. */
+function newToken(): string {
+  return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
 }
 
 Deno.serve(withApiLogging('real-estate-api', async (req) => {
@@ -47,24 +57,326 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
   if (!action) return json({ error: 'action is required' }, 400);
   if (!workspaceId) return json({ error: 'workspace_id is required' }, 400);
 
-  // Gates 1–2 are mutually independent DB checks — fire concurrently, EVALUATE in strict priority
-  // order (access 404 → module 404 → entitlement 402). All three helpers resolve (never throw).
+  // Gates 1–2 concurrent, evaluate access 404 → module 404 → entitlement 402.
   const accessP = userCanAccessWorkspace(supabase, userId, workspaceId);
   const moduleP = isModuleEnabled(supabase, 'real-estate');
   const entP = assertEntitled(supabase, workspaceId, 'real-estate');
-
-  // 1) Bind caller ↔ workspace (service-role client bypasses RLS — this is the real tenancy gate).
-  if (!(await accessP)) return json({ error: 'not found' }, 404); // 404 (not 403) — no id enumeration.
-  // 2) Module gates: global publish switch + per-workspace entitlement (402 upsell).
+  if (!(await accessP)) return json({ error: 'not found' }, 404);
   if (!(await moduleP)) throw new HttpError(404, 'Real Estate module is not available');
   const ent = await entP;
   if (!ent.ok) return ent.response;
 
-  // 3) Actions. P0 ships only the gate-chain verifier; P1 adds the property CRUD/publish/inquiry router.
+  // 3) RBAC.
+  const access = await resolveRealEstateAccess(supabase, userId, workspaceId);
+  if (!access.canView) return json({ error: 'You do not have access to Real Estate in this workspace.' }, 403);
+  const requireManage = () => {
+    if (!access.canManage) throw new HttpError(403, 'You need the listings-manage role for this action.');
+  };
+
+  /** Load a property scoped to the workspace, or throw 404 (enumeration-safe). */
+  async function loadProperty(id: string): Promise<any> {
+    const { data, error } = await supabase.from('properties').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+    if (error) throw new HttpError(400, error.message);
+    if (!data) throw new HttpError(404, 'not found');
+    return data;
+  }
+
   try {
     switch (action) {
       case 'ping':
-        return json({ ok: true, module: 'real-estate', workspace_id: workspaceId, user_id: userId });
+        return json({ ok: true, module: 'real-estate', workspace_id: workspaceId, access });
+
+      // ── Properties ─────────────────────────────────────────────────────
+      case 'list-properties': {
+        let q = supabase.from('properties')
+          .select('id, reference_code, title, property_type, subtype, transaction_type, listing_status, price, currency, town, region, is_public, in_discovery, syndicate_to, listing_agent_id, view_count, updated_at, created_at')
+          .eq('workspace_id', workspaceId)
+          .order('updated_at', { ascending: false });
+        if (body.status) q = q.eq('listing_status', String(body.status));
+        if (body.property_type) q = q.eq('property_type', String(body.property_type));
+        // Agent scoping (D7) is applied to leads/viewings, NOT to listings (shared team asset, D1).
+        const { data, error } = await q;
+        if (error) throw new HttpError(400, error.message);
+        return json({ properties: data ?? [] });
+      }
+
+      case 'get-property': {
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        const property = await loadProperty(id);
+        const [{ data: photos }, { data: inquiries }, { data: viewings }, { data: priceHistory }, { data: openHouses }, { data: documents }] = await Promise.all([
+          supabase.from('property_photos').select('*').eq('property_id', id).order('sort_order'),
+          supabase.from('property_inquiries').select('*').eq('property_id', id).order('created_at', { ascending: false }),
+          supabase.from('property_viewings').select('*').eq('property_id', id).order('scheduled_at', { ascending: false }),
+          supabase.from('property_price_history').select('*').eq('property_id', id).order('changed_at', { ascending: false }),
+          supabase.from('property_open_houses').select('*').eq('property_id', id).order('starts_at'),
+          supabase.from('property_documents').select('*').eq('property_id', id).order('created_at', { ascending: false }),
+        ]);
+        return json({ property, photos: photos ?? [], inquiries: inquiries ?? [], viewings: viewings ?? [], price_history: priceHistory ?? [], open_houses: openHouses ?? [], documents: documents ?? [] });
+      }
+
+      case 'create-property': {
+        requireManage();
+        const payload = pick(body, PROPERTY_WRITABLE);
+        const { data, error } = await supabase.from('properties')
+          .insert({ ...payload, workspace_id: workspaceId, created_by: userId })
+          .select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ property: data });
+      }
+
+      case 'update-property': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadProperty(id); // 404 if not in workspace
+        const payload = pick(body, PROPERTY_WRITABLE);
+        // record a price-history row when price changes
+        if (payload.price !== undefined) {
+          const { data: cur } = await supabase.from('properties').select('price, currency').eq('id', id).single();
+          if (cur && Number(cur.price) !== Number(payload.price)) {
+            await supabase.from('property_price_history').insert({ workspace_id: workspaceId, property_id: id, price: payload.price, currency: (payload.currency as string) ?? cur.currency, note: 'list price updated' });
+          }
+        }
+        const { data, error } = await supabase.from('properties').update(payload).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ property: data });
+      }
+
+      case 'delete-property': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        const { error } = await supabase.from('properties').delete().eq('id', id).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      case 'publish-property': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        const property = await loadProperty(id);
+        const gate = checkPublishRequirements(property);
+        if (!gate.ok) return json({ code: 'publish_blocked', errors: gate.hardErrors, warnings: gate.warnings }, 422);
+        const patch: Record<string, unknown> = {
+          listing_status: 'active',
+          is_public: true,
+          published_at: new Date().toISOString(),
+          public_listing_token: property.public_listing_token ?? newToken(),
+        };
+        if (!property.listing_date) patch.listing_date = new Date().toISOString().slice(0, 10);
+        const { data, error } = await supabase.from('properties').update(patch).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ property: data, warnings: gate.warnings });
+      }
+
+      case 'unpublish-property': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadProperty(id);
+        const { data, error } = await supabase.from('properties')
+          .update({ is_public: false, in_discovery: false, listing_status: 'draft' })
+          .eq('id', id).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ property: data });
+      }
+
+      // ── Photos (protected property-media bucket) ───────────────────────
+      case 'photo-upload-url': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        const ext = String(body.ext ?? 'jpg').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'jpg';
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadProperty(id);
+        const path = `${workspaceId}/${id}/${crypto.randomUUID()}.${ext}`;
+        const { data, error } = await supabase.storage.from('property-media').createSignedUploadUrl(path);
+        if (error) throw new HttpError(400, error.message);
+        return json({ path, token: data.token, signed_url: data.signedUrl });
+      }
+
+      case 'add-photo': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        const storagePath = String(body.storage_path ?? '');
+        if (!id || !storagePath) return json({ error: 'property_id and storage_path are required' }, 400);
+        await loadProperty(id);
+        const kind = ['photo', 'floor_plan', 'render'].includes(body.kind) ? body.kind : 'photo';
+        const { count } = await supabase.from('property_photos').select('id', { count: 'exact', head: true }).eq('property_id', id);
+        const { data, error } = await supabase.from('property_photos').insert({
+          workspace_id: workspaceId, property_id: id, storage_path: storagePath, kind,
+          caption: body.caption ?? null, sort_order: count ?? 0, is_cover: (count ?? 0) === 0,
+        }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ photo: data });
+      }
+
+      case 'delete-photo': {
+        requireManage();
+        const photoId = String(body.photo_id ?? '');
+        if (!photoId) return json({ error: 'photo_id is required' }, 400);
+        const { data: photo } = await supabase.from('property_photos').select('storage_path').eq('id', photoId).eq('workspace_id', workspaceId).maybeSingle();
+        if (photo?.storage_path) await supabase.storage.from('property-media').remove([photo.storage_path]);
+        const { error } = await supabase.from('property_photos').delete().eq('id', photoId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      case 'set-cover': {
+        requireManage();
+        const photoId = String(body.photo_id ?? '');
+        const id = String(body.property_id ?? '');
+        if (!photoId || !id) return json({ error: 'photo_id and property_id are required' }, 400);
+        await supabase.from('property_photos').update({ is_cover: false }).eq('property_id', id).eq('workspace_id', workspaceId);
+        const { error } = await supabase.from('property_photos').update({ is_cover: true }).eq('id', photoId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      case 'reorder-photos': {
+        requireManage();
+        const orderedIds: string[] = Array.isArray(body.photo_ids) ? body.photo_ids : [];
+        for (let i = 0; i < orderedIds.length; i++) {
+          await supabase.from('property_photos').update({ sort_order: i }).eq('id', orderedIds[i]).eq('workspace_id', workspaceId);
+        }
+        return json({ ok: true });
+      }
+
+      // ── Inquiries / leads (agent-scoped read, D7) ──────────────────────
+      case 'list-inquiries': {
+        let q = supabase.from('property_inquiries')
+          .select('*, property:properties!property_inquiries_property_id_fkey ( id, title, reference_code, listing_agent_id )')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false });
+        if (body.status) q = q.eq('status', String(body.status));
+        if (body.property_id) q = q.eq('property_id', String(body.property_id));
+        const { data, error } = await q;
+        if (error) throw new HttpError(400, error.message);
+        // Non-broker agent sees only inquiries on the listings they own (D7).
+        const rows = (data ?? []).filter((r: any) => access.isBroker || r.property?.listing_agent_id === userId);
+        return json({ inquiries: rows });
+      }
+
+      case 'update-inquiry': {
+        const inqId = String(body.inquiry_id ?? '');
+        const status = String(body.status ?? '');
+        if (!inqId || !INQUIRY_STATUSES.includes(status)) return json({ error: 'inquiry_id and a valid status are required' }, 400);
+        const { data, error } = await supabase.from('property_inquiries').update({ status }).eq('id', inqId).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ inquiry: data });
+      }
+
+      // ── Viewings (agent-scoped, Google Calendar sync in P2) ────────────
+      case 'list-viewings': {
+        let q = supabase.from('property_viewings')
+          .select('*, property:properties!property_viewings_property_id_fkey ( id, title, reference_code )')
+          .eq('workspace_id', workspaceId)
+          .order('scheduled_at', { ascending: false });
+        if (!access.isBroker) q = q.eq('agent_id', userId);       // D7 self-scope
+        if (body.property_id) q = q.eq('property_id', String(body.property_id));
+        const { data, error } = await q;
+        if (error) throw new HttpError(400, error.message);
+        return json({ viewings: data ?? [] });
+      }
+
+      case 'create-viewing': {
+        const id = String(body.property_id ?? '');
+        const scheduledAt = String(body.scheduled_at ?? '');
+        if (!id || !scheduledAt) return json({ error: 'property_id and scheduled_at are required' }, 400);
+        await loadProperty(id);
+        const type = VIEWING_TYPES.includes(body.type) ? body.type : 'viewing';
+        const { data, error } = await supabase.from('property_viewings').insert({
+          workspace_id: workspaceId, property_id: id, scheduled_at: scheduledAt, type,
+          crm_contact_id: body.crm_contact_id ?? null,
+          agent_id: body.agent_id ?? userId,          // defaults to the caller (the acting agent)
+        }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ viewing: data });
+      }
+
+      case 'update-viewing': {
+        const vId = String(body.viewing_id ?? '');
+        if (!vId) return json({ error: 'viewing_id is required' }, 400);
+        const patch: Record<string, unknown> = {};
+        if (body.status !== undefined) {
+          if (!VIEWING_STATUSES.includes(String(body.status))) return json({ error: 'invalid status' }, 400);
+          patch.status = body.status;
+        }
+        if (body.scheduled_at !== undefined) patch.scheduled_at = body.scheduled_at;
+        if (body.feedback !== undefined) patch.feedback = body.feedback;
+        const { data, error } = await supabase.from('property_viewings').update(patch).eq('id', vId).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ viewing: data });
+      }
+
+      // ── Interests (contact ↔ property) ─────────────────────────────────
+      case 'add-interest': {
+        const id = String(body.property_id ?? '');
+        const contactId = String(body.crm_contact_id ?? '');
+        const interestType = INTEREST_TYPES.includes(body.interest_type) ? body.interest_type : 'interested';
+        if (!id || !contactId) return json({ error: 'property_id and crm_contact_id are required' }, 400);
+        await loadProperty(id);
+        const { data, error } = await supabase.from('property_interests')
+          .upsert({ workspace_id: workspaceId, property_id: id, crm_contact_id: contactId, interest_type: interestType, note: body.note ?? null },
+            { onConflict: 'property_id,crm_contact_id,interest_type' })
+          .select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ interest: data });
+      }
+
+      // ── Buyer requirements (saved searches; auto-match in P2) ───────────
+      case 'list-buyer-requirements': {
+        let q = supabase.from('property_buyer_requirements').select('*').eq('workspace_id', workspaceId).order('updated_at', { ascending: false });
+        if (body.crm_contact_id) q = q.eq('crm_contact_id', String(body.crm_contact_id));
+        const { data, error } = await q;
+        if (error) throw new HttpError(400, error.message);
+        return json({ requirements: data ?? [] });
+      }
+
+      case 'upsert-buyer-requirement': {
+        const contactId = String(body.crm_contact_id ?? '');
+        if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
+        const row: Record<string, unknown> = {
+          workspace_id: workspaceId, crm_contact_id: contactId,
+          label: body.label ?? null, criteria: body.criteria ?? {}, is_active: body.is_active ?? true,
+        };
+        if (body.requirement_id) {
+          const { data, error } = await supabase.from('property_buyer_requirements').update(row).eq('id', String(body.requirement_id)).eq('workspace_id', workspaceId).select('*').single();
+          if (error) throw new HttpError(400, error.message);
+          return json({ requirement: data });
+        }
+        const { data, error } = await supabase.from('property_buyer_requirements').insert(row).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ requirement: data });
+      }
+
+      case 'delete-buyer-requirement': {
+        const reqId = String(body.requirement_id ?? '');
+        if (!reqId) return json({ error: 'requirement_id is required' }, 400);
+        const { error } = await supabase.from('property_buyer_requirements').delete().eq('id', reqId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      // ── Contact real-estate extension (1:1) ────────────────────────────
+      case 'get-contact-ext': {
+        const contactId = String(body.crm_contact_id ?? '');
+        if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
+        const { data } = await supabase.from('property_contacts_ext').select('*').eq('crm_contact_id', contactId).eq('workspace_id', workspaceId).maybeSingle();
+        return json({ ext: data ?? null });
+      }
+
+      case 'upsert-contact-ext': {
+        const contactId = String(body.crm_contact_id ?? '');
+        if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
+        const EXT_WRITABLE = ['contact_role', 'pre_approval_status', 'pre_approval_amount', 'lender', 'budget_min', 'budget_max', 'owned_property_value', 'owned_property_address', 'owned_property_equity'];
+        const row = { ...pick(body, EXT_WRITABLE), crm_contact_id: contactId, workspace_id: workspaceId };
+        const { data, error } = await supabase.from('property_contacts_ext').upsert(row, { onConflict: 'crm_contact_id' }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ ext: data });
+      }
+
       default:
         return json({ error: `Unknown action: ${action}` }, 400);
     }
