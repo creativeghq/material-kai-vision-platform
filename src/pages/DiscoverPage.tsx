@@ -17,6 +17,7 @@ import { Dialog, DialogContent } from '@/components/core/ui/dialog';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { FollowButton } from '@/components/features/social/FollowButton';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
@@ -416,6 +417,12 @@ function FactoryModal({
 
 export const DiscoverPage: React.FC = () => {
   const { user } = useAuth();
+  // The catalog (Products tab) is open to anyone who reaches this page (clients building
+  // moodboards/quotes included). The network-discovery tabs — Profiles, Brand, Marketplace —
+  // stay marketplace-only. CapabilityGuard blocks render until permissions load, so `can` is
+  // reliable here (no default-tab flicker).
+  const { can } = usePermissions();
+  const canMarketplace = can('marketplace.browse');
 
   // Profiles
   const [creators, setCreators] = useState<PublicCreator[]>([]);
@@ -428,8 +435,13 @@ export const DiscoverPage: React.FC = () => {
   const [profileSort, setProfileSort] = useState<'followers' | 'views' | 'name'>('followers');
   const [factorySort, setFactorySort] = useState<'count' | 'name'>('count');
   const [productSort, setProductSort] = useState<'name' | 'factory'>('name');
-  // Controlled so a deep-link (?tab=products&factory=…) can open the right tab.
-  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'profiles');
+  // Controlled so a deep-link (?tab=products&factory=…) can open the right tab. Non-marketplace
+  // personas only get Products, so gated tabs coerce to it.
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const t = searchParams.get('tab');
+    if (t && (canMarketplace || t === 'products')) return t;
+    return canMarketplace ? 'profiles' : 'products';
+  });
 
   // Products tab has two modes: "browse" (the filterable catalog list) and "smart" (the
   // 7-vector fusion search moved here from the old /search page). `?mode=smart&q=…` deep-links
@@ -449,9 +461,16 @@ export const DiscoverPage: React.FC = () => {
   const [surplus, setSurplus] = useState<Record<string, { price: number; currency: string }>>({});
 
   useEffect(() => {
-    Promise.all([loadCreators(), loadProducts()]).finally(() => setLoading(false));
-    marketplaceService.surplusByProduct().then(setSurplus).catch(() => setSurplus({}));
-  }, []);
+    // Everyone loads the catalog (Products). Profiles + surplus badges are marketplace-only, so
+    // clients don't fire those cross-tenant reads.
+    const tasks: Promise<unknown>[] = [loadProducts()];
+    if (canMarketplace) {
+      tasks.push(loadCreators());
+      marketplaceService.surplusByProduct().then(setSurplus).catch(() => setSurplus({}));
+    }
+    Promise.all(tasks).finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canMarketplace]);
 
   async function loadCreators() {
     const { data } = await supabase
@@ -518,11 +537,11 @@ export const DiscoverPage: React.FC = () => {
   // consumed by `productInitial` below).
   useEffect(() => {
     const t = searchParams.get('tab');
-    if (t) setActiveTab(t);
+    if (t) setActiveTab(canMarketplace || t === 'products' ? t : 'products');
     const m = searchParams.get('mode');
     if (m === 'smart') setProductMode('smart');
     else if (m === 'browse') setProductMode('browse');
-  }, [searchParams]);
+  }, [searchParams, canMarketplace]);
 
   // Derived factories
   const factories = useMemo<Factory[]>(() => {
@@ -587,27 +606,33 @@ export const DiscoverPage: React.FC = () => {
   return (
     <div className="min-h-full w-full">
       <PageHeader
-        icon={Layers}
-        title="Discover"
-        subtitle="Explore profiles, brands, and materials from the community."
+        icon={canMarketplace ? Layers : Package}
+        title={canMarketplace ? 'Discover' : 'Products'}
+        subtitle={canMarketplace
+          ? 'Explore profiles, brands, and materials from the community.'
+          : 'Browse and search the material catalog.'}
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="profiles" className="flex items-center gap-2">
-              <Users className="h-4 w-4" /> Profiles
-            </TabsTrigger>
-            <TabsTrigger value="factory" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" /> Brand
-            </TabsTrigger>
-            <TabsTrigger value="products" className="flex items-center gap-2">
-              <Package className="h-4 w-4" /> Products
-            </TabsTrigger>
-            <TabsTrigger value="marketplace" className="flex items-center gap-2">
-              <Store className="h-4 w-4" /> Marketplace
-            </TabsTrigger>
-          </TabsList>
+          {/* Network-discovery tabs are marketplace-only; Products is always available. When the
+              user only has Products, drop the single-tab bar entirely. */}
+          {canMarketplace && (
+            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+              <TabsTrigger value="profiles" className="flex items-center gap-2">
+                <Users className="h-4 w-4" /> Profiles
+              </TabsTrigger>
+              <TabsTrigger value="factory" className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" /> Brand
+              </TabsTrigger>
+              <TabsTrigger value="products" className="flex items-center gap-2">
+                <Package className="h-4 w-4" /> Products
+              </TabsTrigger>
+              <TabsTrigger value="marketplace" className="flex items-center gap-2">
+                <Store className="h-4 w-4" /> Marketplace
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           {/* ── PROFILES ──────────────────────────────────────────────── */}
           <TabsContent value="profiles" className="mt-6 space-y-4">

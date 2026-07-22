@@ -26,6 +26,7 @@ import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { SIDEBAR_NAV_ITEMS, filterNavItems, type SidebarNavItem } from '@/config/nav-items';
+import { PRODUCT_BROWSE_ANY } from '@/auth/capabilities';
 import {
   PRODUCT_IMAGE_SELECT,
   getManufacturer,
@@ -56,10 +57,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
   const [products, setProducts] = useState<ProductHit[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
-  // Product lookups + the full material search both land on Discover, which is gated behind
-  // marketplace.browse. For personas without it we keep the palette to page navigation so we
-  // never offer a dead link.
-  const browseOk = can('marketplace.browse');
+  // Product lookups + the full material search both land on Discover → Products, open to anyone
+  // who works with the catalog (marketplace buyers + clients building moodboards/quotes). For
+  // personas without any of those (finance-only, HR-only) we keep the palette to page navigation.
+  const browseOk = PRODUCT_BROWSE_ANY.some(can);
 
   // ── ⌘K / Ctrl+K toggles the palette anywhere. Only one GlobalSearch mounts at a time
   //    (Sidebar renders either the desktop bar OR the mobile icon), so no double-binding. ──

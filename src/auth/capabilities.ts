@@ -61,6 +61,17 @@ const ALL_BUSINESS: Capability[] = [
   'marketing.email',
 ];
 
+/**
+ * Personas that work with the product catalog — browse it and run material search. Broader than
+ * `marketplace.browse`: project clients / end-users don't buy on the marketplace but DO pick
+ * materials for moodboards and quotes, so the Products tab + Spotlight product results are gated
+ * on ANY of these, not marketplace membership. (Deliberately excludes `agent.use`, which an
+ * HR-only employee holds — so a pure employee still gets no catalog access.)
+ */
+export const PRODUCT_BROWSE_ANY: Capability[] = [
+  'marketplace.browse', 'moodboards.use', 'quotes.use', 'projects.use',
+];
+
 /** Persona → granted capabilities. The ONE place gating policy lives. */
 export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   operator: [

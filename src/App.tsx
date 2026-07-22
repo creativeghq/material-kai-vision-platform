@@ -14,6 +14,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from './components/core/AdminGuard';
 import { CapabilityGuard } from './components/core/CapabilityGuard';
+import { PRODUCT_BROWSE_ANY } from './auth/capabilities';
 import { EntitlementGuard } from './components/core/EntitlementGuard';
 import { Layout } from './components/core/Layout';
 import {
@@ -825,13 +826,16 @@ const App = () => (
                   }
                 />
 
-                {/* Discover creators — authenticated */}
+                {/* Discover — authenticated. Reachable by anyone who works with the catalog
+                    (browse + material search): marketplace buyers AND clients who build
+                    moodboards/quotes. The Profiles/Brand/Marketplace tabs self-gate on
+                    marketplace.browse inside the page; the Products tab is open to all who reach it. */}
                 <Route
                   path="/discover"
                   element={
                     <PageErrorBoundary name="Discover">
                       <AuthGuard>
-                        <CapabilityGuard capability="marketplace.browse">
+                        <CapabilityGuard anyOf={PRODUCT_BROWSE_ANY}>
                           <Layout>
                             <DiscoverPage />
                           </Layout>

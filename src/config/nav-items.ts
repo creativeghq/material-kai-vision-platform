@@ -26,7 +26,7 @@ import {
   ImagePlus,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { Capability } from '@/auth/capabilities';
+import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
 
 export type NavRoleRequirement = 'factory' | 'admin';
 
@@ -68,6 +68,8 @@ export interface SidebarNavItem {
   requirePlatform?: boolean;
   /** #195 capability gate — hide unless the active persona holds this capability. */
   requireCapability?: Capability;
+  /** OR-gate — hide unless the active persona holds ANY of these (e.g. catalog browse). */
+  requireAnyCapability?: Capability[];
   /** Optional module gate. When set, item is only shown if the referenced module is enabled. */
   moduleSlug?: string;
   /** One-line description shown on the App Launcher / Profile → Modules cards (surface:'app'). */
@@ -101,7 +103,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Material Search no longer has its own top-bar entry — it moved under Discover → Products
   // (the "Smart search" mode) so browsing and searching materials live in one place, and the
   // universal Mac-style Spotlight (⌘K, top bar) is the always-available quick-search entry point.
-  { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireCapability: 'marketplace.browse' },
+  // Reachable by anyone who works with the catalog (marketplace buyers + clients building
+  // moodboards/quotes). The marketplace-only tabs (Profiles/Brand/Marketplace) self-gate inside.
+  { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireAnyCapability: PRODUCT_BROWSE_ANY },
 
   // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251),
   //    grouped into Hubs (#251 follow-up) via the `hub` field. ──
@@ -207,6 +211,8 @@ export function filterNavItems(
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
     // #195 capability gate (the unified persona model — drives end-user restriction).
     if (item.requireCapability && !ctx.can(item.requireCapability)) return false;
+    // OR-gate — visible if the persona holds ANY of the listed capabilities.
+    if (item.requireAnyCapability && !item.requireAnyCapability.some(ctx.can)) return false;
     // #212 entitlement gate — hide a paid module unless the active workspace owns it.
     if (item.moduleSlug && !ctx.isModuleAvailable(item.moduleSlug)) return false;
     return true;

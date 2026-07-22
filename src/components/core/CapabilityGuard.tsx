@@ -15,17 +15,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/core/ui/button';
 
 interface Props {
-  capability: Capability;
+  /** Single required capability. */
+  capability?: Capability;
+  /** OR-gate: access is granted if the persona holds ANY of these (e.g. catalog browse). */
+  anyOf?: Capability[];
   children: React.ReactNode;
   fallbackPath?: string;
 }
 
-export const CapabilityGuard: React.FC<Props> = ({ capability, children, fallbackPath = '/' }) => {
+export const CapabilityGuard: React.FC<Props> = ({ capability, anyOf, children, fallbackPath = '/' }) => {
   const { can, loading, persona } = usePermissions();
   const navigate = useNavigate();
 
   if (loading) return null;
-  if (can(capability)) return <>{children}</>;
+  const allowed = (capability ? can(capability) : false) || (anyOf ? anyOf.some(can) : false);
+  if (allowed) return <>{children}</>;
 
   return (
     <div className="container mx-auto py-12">
