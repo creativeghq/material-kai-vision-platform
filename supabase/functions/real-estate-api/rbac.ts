@@ -29,7 +29,7 @@ export const PROPERTY_WRITABLE = [
   'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status',
   'listing_agent_id', 'parent_development_id',
   // pricing (incl. 🔒 internal — writable by managers, just not public)
-  'price', 'currency', 'price_period', 'price_on_request', 'common_charges',
+  'price', 'currency', 'price_period', 'price_on_request', 'common_charges', 'previous_price',
   'cost_basis', 'min_offer', 'commission_pct',
   // location
   'country_code', 'region', 'prefecture', 'municipality', 'town', 'postcode', 'lat', 'lng',
@@ -47,10 +47,14 @@ export const PROPERTY_WRITABLE = [
   // AVM / derived-ish (manager-supplied)
   'estimated_value', 'avm_source', 'price_reduced', 'listing_date',
   // residential
-  'area_built', 'area_plot', 'bedrooms', 'bathrooms', 'wc', 'kitchens', 'living_rooms', 'levels',
+  'area_built', 'area_plot', 'bedrooms', 'rooms', 'bathrooms', 'wc', 'kitchens', 'living_rooms', 'levels',
   'floor', 'floors_total', 'year_built', 'year_renovated', 'condition', 'furnished', 'heating_medium',
   'air_conditioning', 'underfloor_heating', 'orientation', 'view_types', 'balcony_area',
   'parking_spaces', 'parking_type', 'storage', 'pets_allowed', 'suitable_for',
+  // amenities (Spitogatos/portal-mapped) + agent contact + construction
+  'elevator', 'fireplace', 'garden', 'pool', 'alarm', 'solar_heater', 'security_door', 'double_glazing',
+  'screens', 'awning', 'night_current', 'has_view', 'open_parking_spots', 'closed_parking_spots',
+  'is_new_development', 'construction_status', 'agent_name', 'agent_phone', 'agent_email', 'agent_website',
   // commercial
   'gross_area', 'net_area', 'frontage', 'ceiling_height', 'floors_included', 'storefront_windows',
   'wc_count', 'loading_dock', 'goods_lift', 'three_phase_power', 'power_capacity_kva',

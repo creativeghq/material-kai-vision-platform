@@ -70,12 +70,21 @@ export function toPublic(p: any): Record<string, unknown> {
     virtual_tour_url: p.virtual_tour_url, video_url: p.video_url, vr_world_id: p.vr_world_id,
     // agent (public)
     agent_license_no: p.agent_license_no, agency_logo_url: p.agency_logo_url,
+    agent_name: p.agent_name, agent_phone: p.agent_phone, agent_email: p.agent_email, agent_website: p.agent_website,
     listing_date: p.listing_date, days_on_market: p.days_on_market, view_count: p.view_count,
+    previous_price: p.previous_price, price_reduced: p.price_reduced, is_new_development: p.is_new_development, construction_status: p.construction_status,
     // facetable physical (safe subset)
     area_built: p.area_built, area_plot: p.area_plot, plot_area: p.plot_area,
-    bedrooms: p.bedrooms, bathrooms: p.bathrooms, wc: p.wc, floor: p.floor, floors_total: p.floors_total,
-    year_built: p.year_built, condition: p.condition, furnished: p.furnished, orientation: p.orientation,
-    parking_spaces: p.parking_spaces, view_types: p.view_types, max_guests: p.max_guests,
+    bedrooms: p.bedrooms, rooms: p.rooms, bathrooms: p.bathrooms, wc: p.wc, kitchens: p.kitchens, living_rooms: p.living_rooms,
+    floor: p.floor, floors_total: p.floors_total, levels: p.levels,
+    year_built: p.year_built, year_renovated: p.year_renovated, condition: p.condition, furnished: p.furnished, orientation: p.orientation,
+    parking_spaces: p.parking_spaces, parking_type: p.parking_type, open_parking_spots: p.open_parking_spots, closed_parking_spots: p.closed_parking_spots,
+    view_types: p.view_types, max_guests: p.max_guests, balcony_area: p.balcony_area,
+    // amenities (public booleans)
+    elevator: p.elevator, fireplace: p.fireplace, garden: p.garden, pool: p.pool, storage: p.storage,
+    air_conditioning: p.air_conditioning, underfloor_heating: p.underfloor_heating, solar_heater: p.solar_heater,
+    security_door: p.security_door, double_glazing: p.double_glazing, screens: p.screens, awning: p.awning,
+    alarm: p.alarm, night_current: p.night_current, has_view: p.has_view, pets_allowed: p.pets_allowed, heating_medium: p.heating_medium,
     // full category detail for rich display (already non-sensitive)
     category_attributes: p.category_attributes,
   };

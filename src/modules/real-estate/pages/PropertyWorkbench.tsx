@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles, FileText, UserPlus } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
+  FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
+  Contact, CalendarClock, Image as ImageIcon,
+} from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +17,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Skeleton } from '@/components/core/ui/skeleton';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import {
   realEstateService, isPublishBlocked,
@@ -22,14 +28,31 @@ const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
 const LISTING_STATUSES = ['draft', 'active', 'under_offer', 'sold', 'rented', 'withdrawn', 'archived'];
 const ENERGY_CLASSES = ['A+', 'A', 'B+', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+const CONSTRUCTION = ['', 'new', 'under_construction', 'resale', 'renovated'];
 
-// Fields the Overview form binds (a pragmatic core of the §3 catalog; category-specific editors expand later).
+// Amenity boolean fields (Spitogatos-aligned) rendered as a checkbox grid.
+const AMENITIES: readonly (readonly [string, string])[] = [
+  ['elevator', 'Elevator'], ['storage', 'Storage'], ['fireplace', 'Fireplace'], ['garden', 'Garden'],
+  ['pool', 'Pool'], ['has_view', 'View'], ['air_conditioning', 'A/C'], ['underfloor_heating', 'Underfloor heating'],
+  ['solar_heater', 'Solar heater'], ['security_door', 'Security door'], ['double_glazing', 'Double glazing'],
+  ['screens', 'Screens (σήτες)'], ['awning', 'Awnings (τέντες)'], ['alarm', 'Alarm'], ['night_current', 'Night rate'],
+  ['pets_allowed', 'Pets allowed'], ['is_new_development', 'New development'],
+];
+
 const FORM_FIELDS = [
+  // basics
   'title', 'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status',
-  'price', 'currency', 'price_period', 'price_on_request', 'common_charges',
+  // pricing
+  'price', 'currency', 'price_period', 'price_on_request', 'common_charges', 'previous_price',
+  // location
   'country_code', 'region', 'prefecture', 'municipality', 'town', 'postcode', 'address', 'street_number', 'hide_exact_address', 'lat', 'lng',
-  'energy_class', 'electronic_building_id', 'atak', 'heating_type', 'short_term_rental_license', 'land_use',
-  'bedrooms', 'bathrooms', 'wc', 'area_built', 'area_plot', 'floor', 'floors_total', 'year_built', 'parking_spaces', 'furnished',
+  // energy & legal
+  'energy_class', 'electronic_building_id', 'atak', 'heating_type', 'heating_medium', 'short_term_rental_license', 'land_use',
+  // residential physical
+  'bedrooms', 'rooms', 'bathrooms', 'wc', 'kitchens', 'living_rooms', 'area_built', 'area_plot', 'floor', 'floors_total',
+  'levels', 'year_built', 'year_renovated', 'condition', 'furnished', 'orientation', 'parking_spaces', 'parking_type', 'balcony_area',
+  // amenities
+  ...AMENITIES.map(([k]) => k), 'open_parking_spots', 'closed_parking_spots', 'construction_status', 'view_types', 'suitable_for',
   // commercial / business
   'gross_area', 'net_area', 'frontage', 'ceiling_height', 'floors_included', 'wc_count', 'storefront_windows',
   'loading_dock', 'goods_lift', 'three_phase_power', 'power_capacity_kva', 'fire_safety_cert', 'accessibility_amea',
@@ -42,11 +65,21 @@ const FORM_FIELDS = [
   // short-let
   'max_guests', 'bed_config', 'min_stay_nights', 'check_in_time', 'check_out_time', 'cleaning_fee', 'deposit',
   'instant_book', 'cancellation_policy', 'house_rules', 'smoking_allowed', 'events_allowed',
-  'features', 'amenities', 'description_i18n',
+  // content & agent
+  'features', 'amenities', 'description_i18n', 'agent_name', 'agent_phone', 'agent_email', 'agent_website',
 ] as const;
 
-// Comma-separated text[] fields (split on save, joined on load).
-const ARRAY_FIELDS = new Set(['features', 'amenities', 'utilities_available', 'legal_clearances']);
+const ARRAY_FIELDS = new Set(['features', 'amenities', 'utilities_available', 'legal_clearances', 'view_types', 'suitable_for']);
+
+const STEPS: { id: string; label: string; icon: LucideIcon }[] = [
+  { id: 'basics', label: 'Basics', icon: Home },
+  { id: 'pricing', label: 'Pricing', icon: Tag },
+  { id: 'location', label: 'Location', icon: MapPin },
+  { id: 'details', label: 'Details', icon: Ruler },
+  { id: 'amenities', label: 'Amenities', icon: ListChecks },
+  { id: 'energy', label: 'Energy & legal', icon: Zap },
+  { id: 'content', label: 'Content & agent', icon: Contact },
+];
 
 export default function PropertyWorkbench() {
   const { id = '' } = useParams();
@@ -61,6 +94,7 @@ export default function PropertyWorkbench() {
   const [inquiries, setInquiries] = useState<PropertyInquiry[]>([]);
   const [viewings, setViewings] = useState<PropertyViewing[]>([]);
   const [form, setForm] = useState<Record<string, any>>({});
+  const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [newViewingAt, setNewViewingAt] = useState('');
@@ -137,7 +171,15 @@ export default function PropertyWorkbench() {
     void navigator.clipboard.writeText(url); toast({ title: 'Public link copied' });
   };
 
-  if (wsLoading || !property) return <div className="p-6 space-y-3"><Skeleton className="h-10 w-64" /><Skeleton className="h-96 w-full" /></div>;
+  // Loading state — header + centered spinner (matches Finance/CRM), never a full-page skeleton block.
+  if (wsLoading || !property) {
+    return (
+      <div className="min-h-screen">
+        <PageHeader icon={Building2} title="Listing" subtitle="Loading…" />
+        <div className="flex h-[calc(100vh-200px)] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      </div>
+    );
+  }
 
   const isGRbuilding = ['EL', 'GR'].includes(String(form.country_code ?? '').toUpperCase());
   const cat = form.property_type;
@@ -147,6 +189,7 @@ export default function PropertyWorkbench() {
   const isShortLet = form.transaction_type === 'short_let';
   const isBusinessSale = form.transaction_type === 'business_transfer';
   const publicUrl = property.public_listing_token ? `${window.location.origin}/p/${property.public_listing_token}` : null;
+  const stepId = STEPS[step].id;
 
   return (
     <div className="min-h-screen">
@@ -179,174 +222,229 @@ export default function PropertyWorkbench() {
 
         <Tabs defaultValue="overview">
           <TabsList className="mb-4 bg-muted">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="media">Media {photos.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="inquiries">Leads {inquiries.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="viewings">Viewings {viewings.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="overview"><Home className="mr-1.5 h-4 w-4" /> Overview</TabsTrigger>
+            <TabsTrigger value="media"><ImageIcon className="mr-1.5 h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="inquiries"><Contact className="mr-1.5 h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
           </TabsList>
 
-          {/* ── Overview / edit form ── */}
-          <TabsContent value="overview" className="space-y-6">
+          {/* ── Overview / multi-step edit form ── */}
+          <TabsContent value="overview" className="space-y-4">
             {!property.is_public && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">To publish{isGRbuilding ? ' in Greece' : ''}:</span>{' '}
-                title/description + price{isShortLet ? ', short-let licence (ΑΜΑ)' : isLand ? ', land use / zoning' : ', energy class + Electronic Building ID'}
-                {isGRbuilding ? ' are required.' : ' are recommended.'}
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-muted-foreground">
+                <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                <span><span className="font-medium text-foreground">To publish{isGRbuilding ? ' in Greece' : ''}:</span>{' '}
+                  title/description + price{isShortLet ? ', short-let licence (ΑΜΑ)' : isLand ? ', land use / zoning' : ', energy class + Electronic Building ID'}
+                  {isGRbuilding ? ' are required.' : ' are recommended.'}</span>
               </div>
             )}
-            <FormSection title="Classification">
-              <F label="Title"><Input value={form.title ?? ''} onChange={(e) => set('title', e.target.value)} /></F>
-              <F label="Reference code"><Input value={form.reference_code ?? ''} onChange={(e) => set('reference_code', e.target.value)} /></F>
-              <F label="Category"><Sel value={form.property_type} opts={PROPERTY_TYPES} onChange={(v) => set('property_type', v)} /></F>
-              <F label="Subtype"><Input value={form.subtype ?? ''} onChange={(e) => set('subtype', e.target.value)} placeholder="apartment, warehouse, plot…" /></F>
-              <F label="Transaction"><Sel value={form.transaction_type} opts={TRANSACTION_TYPES} onChange={(v) => set('transaction_type', v)} /></F>
-              <F label="Status"><Sel value={form.listing_status} opts={LISTING_STATUSES} onChange={(v) => set('listing_status', v)} /></F>
-            </FormSection>
 
-            <FormSection title="Pricing">
-              <F label="Price"><Input type="number" value={form.price ?? ''} onChange={(e) => set('price', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-              <F label="Currency"><Input value={form.currency ?? 'EUR'} onChange={(e) => set('currency', e.target.value)} /></F>
-              <F label="Period (rent)"><Input value={form.price_period ?? ''} onChange={(e) => set('price_period', e.target.value)} placeholder="month, year…" /></F>
-              <F label="Common charges"><Input type="number" value={form.common_charges ?? ''} onChange={(e) => set('common_charges', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-              <Chk label="Price on request" checked={!!form.price_on_request} onChange={(v) => set('price_on_request', v)} />
-            </FormSection>
+            {/* Stepper */}
+            <div className="flex flex-wrap gap-1.5">
+              {STEPS.map((s, i) => {
+                const Icon = s.icon;
+                const active = i === step;
+                return (
+                  <button key={s.id} onClick={() => setStep(i)}
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${active ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted'}`}>
+                    <Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{s.label}</span>
+                    <span className="ml-0.5 rounded-full bg-black/10 px-1.5 text-[10px] dark:bg-white/10">{i + 1}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-            <FormSection title="Location">
-              <F label="Country code"><Input value={form.country_code ?? ''} onChange={(e) => set('country_code', e.target.value.toUpperCase())} placeholder="EL, GR, ES…" /></F>
-              <F label="Region"><Input value={form.region ?? ''} onChange={(e) => set('region', e.target.value)} /></F>
-              <F label="Prefecture (Νομός)"><Input value={form.prefecture ?? ''} onChange={(e) => set('prefecture', e.target.value)} /></F>
-              <F label="Municipality (Δήμος)"><Input value={form.municipality ?? ''} onChange={(e) => set('municipality', e.target.value)} /></F>
-              <F label="Town"><Input value={form.town ?? ''} onChange={(e) => set('town', e.target.value)} /></F>
-              <F label="Postcode"><Input value={form.postcode ?? ''} onChange={(e) => set('postcode', e.target.value)} /></F>
-              <F label="Address"><Input value={form.address ?? ''} onChange={(e) => set('address', e.target.value)} /></F>
-              <F label="Street number"><Input value={form.street_number ?? ''} onChange={(e) => set('street_number', e.target.value)} /></F>
-              <F label="Latitude"><Input type="number" value={form.lat ?? ''} onChange={(e) => set('lat', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-              <F label="Longitude"><Input type="number" value={form.lng ?? ''} onChange={(e) => set('lng', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-              <Chk label="Hide exact address publicly" checked={!!form.hide_exact_address} onChange={(v) => set('hide_exact_address', v)} />
-            </FormSection>
-
-            <FormSection title="Energy & compliance">
-              <F label="Energy class"><Sel value={form.energy_class ?? ''} opts={['', ...ENERGY_CLASSES]} onChange={(v) => set('energy_class', v)} /></F>
-              <F label={`Electronic Building ID${isGRbuilding ? ' *' : ''}`}><Input value={form.electronic_building_id ?? ''} onChange={(e) => set('electronic_building_id', e.target.value)} /></F>
-              <F label="ΑΤΑΚ (tax id, internal)"><Input value={form.atak ?? ''} onChange={(e) => set('atak', e.target.value)} /></F>
-              <F label="Heating type"><Input value={form.heating_type ?? ''} onChange={(e) => set('heating_type', e.target.value)} /></F>
-              {form.transaction_type === 'short_let' && <F label="Short-let licence (ΑΜΑ)"><Input value={form.short_term_rental_license ?? ''} onChange={(e) => set('short_term_rental_license', e.target.value)} /></F>}
-              {form.property_type === 'land' && <F label="Land use / zoning"><Input value={form.land_use ?? ''} onChange={(e) => set('land_use', e.target.value)} /></F>}
-            </FormSection>
-
-            {isResidential && (
-              <FormSection title="Physical">
-                <F label="Bedrooms"><Input type="number" value={form.bedrooms ?? ''} onChange={(e) => set('bedrooms', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-                <F label="Bathrooms"><Input type="number" value={form.bathrooms ?? ''} onChange={(e) => set('bathrooms', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-                <F label="WC"><Input type="number" value={form.wc ?? ''} onChange={(e) => set('wc', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-                <F label="Built area (m²)"><Input type="number" value={form.area_built ?? ''} onChange={(e) => set('area_built', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-                <F label="Plot area (m²)"><Input type="number" value={form.area_plot ?? ''} onChange={(e) => set('area_plot', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-                <F label="Floor"><Input value={form.floor ?? ''} onChange={(e) => set('floor', e.target.value)} /></F>
-                <F label="Floors total"><Input type="number" value={form.floors_total ?? ''} onChange={(e) => set('floors_total', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-                <F label="Year built"><Input type="number" value={form.year_built ?? ''} onChange={(e) => set('year_built', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-                <F label="Parking spaces"><Input type="number" value={form.parking_spaces ?? ''} onChange={(e) => set('parking_spaces', e.target.value === '' ? '' : Number(e.target.value))} /></F>
-                <F label="Furnished"><Input value={form.furnished ?? ''} onChange={(e) => set('furnished', e.target.value)} placeholder="yes / no / partial" /></F>
+            {/* Step content */}
+            {stepId === 'basics' && (
+              <FormSection title="Classification" icon={Home}>
+                <F label="Title"><Input value={form.title ?? ''} onChange={(e) => set('title', e.target.value)} /></F>
+                <F label="Reference code"><Input value={form.reference_code ?? ''} onChange={(e) => set('reference_code', e.target.value)} /></F>
+                <F label="Category"><Sel value={form.property_type} opts={PROPERTY_TYPES} onChange={(v) => set('property_type', v)} /></F>
+                <F label="Subtype"><Input value={form.subtype ?? ''} onChange={(e) => set('subtype', e.target.value)} placeholder="apartment, warehouse, plot…" /></F>
+                <F label="Transaction"><Sel value={form.transaction_type} opts={TRANSACTION_TYPES} onChange={(v) => set('transaction_type', v)} /></F>
+                <F label="Status"><Sel value={form.listing_status} opts={LISTING_STATUSES} onChange={(v) => set('listing_status', v)} /></F>
               </FormSection>
             )}
 
-            {isCommercial && (
-              <FormSection title="Commercial / business">
-                <F label="Gross area (m²)"><NumInput v={form.gross_area} on={(x) => set('gross_area', x)} /></F>
-                <F label="Net / usable area (m²)"><NumInput v={form.net_area} on={(x) => set('net_area', x)} /></F>
-                <F label="Frontage / πρόσοψη (m)"><NumInput v={form.frontage} on={(x) => set('frontage', x)} /></F>
-                <F label="Ceiling height / καθαρό ύψος (m)"><NumInput v={form.ceiling_height} on={(x) => set('ceiling_height', x)} /></F>
-                <F label="Floors included"><NumInput v={form.floors_included} on={(x) => set('floors_included', x)} /></F>
-                <F label="WC count"><NumInput v={form.wc_count} on={(x) => set('wc_count', x)} /></F>
-                <F label="Permitted use / χρήση γης"><Input value={form.permitted_use ?? ''} onChange={(e) => set('permitted_use', e.target.value)} /></F>
-                <F label="Current use"><Input value={form.current_use ?? ''} onChange={(e) => set('current_use', e.target.value)} /></F>
-                <F label="Operating licence"><Input value={form.operating_license ?? ''} onChange={(e) => set('operating_license', e.target.value)} /></F>
-                <F label="Power capacity (kVA)"><NumInput v={form.power_capacity_kva} on={(x) => set('power_capacity_kva', x)} /></F>
-                <Chk label="Three-phase power (τριφασικό)" checked={!!form.three_phase_power} onChange={(v) => set('three_phase_power', v)} />
-                <Chk label="Storefront windows (βιτρίνα)" checked={!!form.storefront_windows} onChange={(v) => set('storefront_windows', v)} />
-                <Chk label="Loading dock" checked={!!form.loading_dock} onChange={(v) => set('loading_dock', v)} />
-                <Chk label="Goods lift" checked={!!form.goods_lift} onChange={(v) => set('goods_lift', v)} />
-                <Chk label="Fire-safety cert" checked={!!form.fire_safety_cert} onChange={(v) => set('fire_safety_cert', v)} />
-                <Chk label="Accessibility (ΑμεΑ)" checked={!!form.accessibility_amea} onChange={(v) => set('accessibility_amea', v)} />
-                <F label="Occupancy status"><Input value={form.occupancy_status ?? ''} onChange={(e) => set('occupancy_status', e.target.value)} placeholder="vacant / tenanted" /></F>
-                <F label="Current rent"><NumInput v={form.current_rent} on={(x) => set('current_rent', x)} /></F>
-                <F label="Yield / cap rate (%)"><NumInput v={form.cap_rate} on={(x) => set('cap_rate', x)} /></F>
-                <F label="Lease expiry"><Input type="date" value={form.lease_expiry ?? ''} onChange={(e) => set('lease_expiry', e.target.value)} /></F>
+            {stepId === 'pricing' && (
+              <FormSection title="Pricing" icon={Tag}>
+                <F label="Price"><NumInput v={form.price} on={(x) => set('price', x)} /></F>
+                <F label="Currency"><Input value={form.currency ?? 'EUR'} onChange={(e) => set('currency', e.target.value)} /></F>
+                <F label="Period (rent)"><Input value={form.price_period ?? ''} onChange={(e) => set('price_period', e.target.value)} placeholder="month, year…" /></F>
+                <F label="Previous price (was)"><NumInput v={form.previous_price} on={(x) => set('previous_price', x)} /></F>
+                <F label="Common charges"><NumInput v={form.common_charges} on={(x) => set('common_charges', x)} /></F>
+                <Chk label="Price on request" checked={!!form.price_on_request} onChange={(v) => set('price_on_request', v)} />
               </FormSection>
             )}
 
-            {isBusinessSale && (
-              <FormSection title="Business for sale (going concern)">
-                <F label="Key money / αέρας"><NumInput v={form.key_money} on={(x) => set('key_money', x)} /></F>
-                <F label="Business type"><Input value={form.business_type ?? ''} onChange={(e) => set('business_type', e.target.value)} /></F>
-                <F label="Annual turnover"><NumInput v={form.annual_turnover} on={(x) => set('annual_turnover', x)} /></F>
-                <F label="Staff count"><NumInput v={form.staff_count} on={(x) => set('staff_count', x)} /></F>
-                <Chk label="Inventory included" checked={!!form.inventory_included} onChange={(v) => set('inventory_included', v)} />
-                <F label="Reason for sale" wide><Input value={form.reason_for_sale ?? ''} onChange={(e) => set('reason_for_sale', e.target.value)} /></F>
+            {stepId === 'location' && (
+              <FormSection title="Location" icon={MapPin}>
+                <F label="Country code"><Input value={form.country_code ?? ''} onChange={(e) => set('country_code', e.target.value.toUpperCase())} placeholder="EL, GR, ES…" /></F>
+                <F label="Region"><Input value={form.region ?? ''} onChange={(e) => set('region', e.target.value)} /></F>
+                <F label="Prefecture (Νομός)"><Input value={form.prefecture ?? ''} onChange={(e) => set('prefecture', e.target.value)} /></F>
+                <F label="Municipality (Δήμος)"><Input value={form.municipality ?? ''} onChange={(e) => set('municipality', e.target.value)} /></F>
+                <F label="Town"><Input value={form.town ?? ''} onChange={(e) => set('town', e.target.value)} /></F>
+                <F label="Postcode"><Input value={form.postcode ?? ''} onChange={(e) => set('postcode', e.target.value)} /></F>
+                <F label="Address"><Input value={form.address ?? ''} onChange={(e) => set('address', e.target.value)} /></F>
+                <F label="Street number"><Input value={form.street_number ?? ''} onChange={(e) => set('street_number', e.target.value)} /></F>
+                <F label="Latitude"><NumInput v={form.lat} on={(x) => set('lat', x)} /></F>
+                <F label="Longitude"><NumInput v={form.lng} on={(x) => set('lng', x)} /></F>
+                <Chk label="Hide exact address publicly" checked={!!form.hide_exact_address} onChange={(v) => set('hide_exact_address', v)} />
               </FormSection>
             )}
 
-            {isLand && (
-              <FormSection title="Land / plot">
-                <F label="Plot area (m²)"><NumInput v={form.plot_area} on={(x) => set('plot_area', x)} /></F>
-                <F label="Building coefficient (ΣΔ)"><NumInput v={form.building_coefficient} on={(x) => set('building_coefficient', x)} /></F>
-                <F label="Coverage ratio (Συντ. κάλυψης)"><NumInput v={form.coverage_ratio} on={(x) => set('coverage_ratio', x)} /></F>
-                <F label="Max building height (m)"><NumInput v={form.max_building_height} on={(x) => set('max_building_height', x)} /></F>
-                <F label="Allowed floors"><NumInput v={form.allowed_floors} on={(x) => set('allowed_floors', x)} /></F>
-                <F label="Land use / zoning"><Input value={form.land_use ?? ''} onChange={(e) => set('land_use', e.target.value)} /></F>
-                <F label="Road frontage (m)"><NumInput v={form.frontage_to_road} on={(x) => set('frontage_to_road', x)} /></F>
-                <F label="Distance to sea (m)"><NumInput v={form.distance_to_sea} on={(x) => set('distance_to_sea', x)} /></F>
-                <F label="Slope / terrain"><Input value={form.slope ?? ''} onChange={(e) => set('slope', e.target.value)} /></F>
-                <Chk label="Buildable (άρτιο & οικοδομήσιμο)" checked={!!form.buildable} onChange={(v) => set('buildable', v)} />
-                <Chk label="Inside city plan (εντός σχεδίου)" checked={!!form.inside_city_plan} onChange={(v) => set('inside_city_plan', v)} />
-                <Chk label="Within settlement (εντός οικισμού)" checked={!!form.within_settlement} onChange={(v) => set('within_settlement', v)} />
-                <Chk label="Road access" checked={!!form.road_access} onChange={(v) => set('road_access', v)} />
-                <Chk label="Corner plot" checked={!!form.corner_plot} onChange={(v) => set('corner_plot', v)} />
-                <F label="Utilities available (comma)" wide><Input value={form.utilities_available ?? ''} onChange={(e) => set('utilities_available', e.target.value)} placeholder="water, electricity, sewage, gas" /></F>
-                <F label="Legal clearances (comma)" wide><Input value={form.legal_clearances ?? ''} onChange={(e) => set('legal_clearances', e.target.value)} placeholder="topographic, forestry, archaeological" /></F>
-                <F label="Existing structures" wide><Input value={form.existing_structures ?? ''} onChange={(e) => set('existing_structures', e.target.value)} /></F>
+            {stepId === 'details' && (
+              <>
+                {isResidential && (
+                  <FormSection title="Physical" icon={Ruler}>
+                    <F label="Bedrooms"><NumInput v={form.bedrooms} on={(x) => set('bedrooms', x)} /></F>
+                    <F label="Rooms (total)"><NumInput v={form.rooms} on={(x) => set('rooms', x)} /></F>
+                    <F label="Bathrooms"><NumInput v={form.bathrooms} on={(x) => set('bathrooms', x)} /></F>
+                    <F label="WC"><NumInput v={form.wc} on={(x) => set('wc', x)} /></F>
+                    <F label="Kitchens"><NumInput v={form.kitchens} on={(x) => set('kitchens', x)} /></F>
+                    <F label="Living rooms"><NumInput v={form.living_rooms} on={(x) => set('living_rooms', x)} /></F>
+                    <F label="Built area (m²)"><NumInput v={form.area_built} on={(x) => set('area_built', x)} /></F>
+                    <F label="Plot area (m²)"><NumInput v={form.area_plot} on={(x) => set('area_plot', x)} /></F>
+                    <F label="Floor"><Input value={form.floor ?? ''} onChange={(e) => set('floor', e.target.value)} placeholder="ground, 2, penthouse…" /></F>
+                    <F label="Floors total"><NumInput v={form.floors_total} on={(x) => set('floors_total', x)} /></F>
+                    <F label="Levels"><NumInput v={form.levels} on={(x) => set('levels', x)} /></F>
+                    <F label="Year built"><NumInput v={form.year_built} on={(x) => set('year_built', x)} /></F>
+                    <F label="Year renovated"><NumInput v={form.year_renovated} on={(x) => set('year_renovated', x)} /></F>
+                    <F label="Condition"><Input value={form.condition ?? ''} onChange={(e) => set('condition', e.target.value)} placeholder="new / good / needs renovation" /></F>
+                    <F label="Orientation"><Input value={form.orientation ?? ''} onChange={(e) => set('orientation', e.target.value)} placeholder="south, east…" /></F>
+                    <F label="Furnished"><Input value={form.furnished ?? ''} onChange={(e) => set('furnished', e.target.value)} placeholder="yes / no / partial" /></F>
+                    <F label="Balcony area (m²)"><NumInput v={form.balcony_area} on={(x) => set('balcony_area', x)} /></F>
+                  </FormSection>
+                )}
+                {isCommercial && (
+                  <FormSection title="Commercial / business" icon={Building2}>
+                    <F label="Gross area (m²)"><NumInput v={form.gross_area} on={(x) => set('gross_area', x)} /></F>
+                    <F label="Net / usable area (m²)"><NumInput v={form.net_area} on={(x) => set('net_area', x)} /></F>
+                    <F label="Frontage / πρόσοψη (m)"><NumInput v={form.frontage} on={(x) => set('frontage', x)} /></F>
+                    <F label="Ceiling height (m)"><NumInput v={form.ceiling_height} on={(x) => set('ceiling_height', x)} /></F>
+                    <F label="Floors included"><NumInput v={form.floors_included} on={(x) => set('floors_included', x)} /></F>
+                    <F label="WC count"><NumInput v={form.wc_count} on={(x) => set('wc_count', x)} /></F>
+                    <F label="Permitted use / χρήση γης"><Input value={form.permitted_use ?? ''} onChange={(e) => set('permitted_use', e.target.value)} /></F>
+                    <F label="Current use"><Input value={form.current_use ?? ''} onChange={(e) => set('current_use', e.target.value)} /></F>
+                    <F label="Operating licence"><Input value={form.operating_license ?? ''} onChange={(e) => set('operating_license', e.target.value)} /></F>
+                    <F label="Power capacity (kVA)"><NumInput v={form.power_capacity_kva} on={(x) => set('power_capacity_kva', x)} /></F>
+                    <F label="Occupancy status"><Input value={form.occupancy_status ?? ''} onChange={(e) => set('occupancy_status', e.target.value)} placeholder="vacant / tenanted" /></F>
+                    <F label="Current rent"><NumInput v={form.current_rent} on={(x) => set('current_rent', x)} /></F>
+                    <F label="Yield / cap rate (%)"><NumInput v={form.cap_rate} on={(x) => set('cap_rate', x)} /></F>
+                    <F label="Lease expiry"><Input type="date" value={form.lease_expiry ?? ''} onChange={(e) => set('lease_expiry', e.target.value)} /></F>
+                    <ChkGrid items={[['three_phase_power', 'Three-phase (τριφασικό)'], ['storefront_windows', 'Storefront (βιτρίνα)'], ['loading_dock', 'Loading dock'], ['goods_lift', 'Goods lift'], ['fire_safety_cert', 'Fire-safety cert'], ['accessibility_amea', 'Accessibility (ΑμεΑ)']]} form={form} set={set} />
+                  </FormSection>
+                )}
+                {isBusinessSale && (
+                  <FormSection title="Business for sale (going concern)" icon={Tag}>
+                    <F label="Key money / αέρας"><NumInput v={form.key_money} on={(x) => set('key_money', x)} /></F>
+                    <F label="Business type"><Input value={form.business_type ?? ''} onChange={(e) => set('business_type', e.target.value)} /></F>
+                    <F label="Annual turnover"><NumInput v={form.annual_turnover} on={(x) => set('annual_turnover', x)} /></F>
+                    <F label="Staff count"><NumInput v={form.staff_count} on={(x) => set('staff_count', x)} /></F>
+                    <Chk label="Inventory included" checked={!!form.inventory_included} onChange={(v) => set('inventory_included', v)} />
+                    <F label="Reason for sale" wide><Input value={form.reason_for_sale ?? ''} onChange={(e) => set('reason_for_sale', e.target.value)} /></F>
+                  </FormSection>
+                )}
+                {isLand && (
+                  <FormSection title="Land / plot" icon={Ruler}>
+                    <F label="Plot area (m²)"><NumInput v={form.plot_area} on={(x) => set('plot_area', x)} /></F>
+                    <F label="Building coefficient (ΣΔ)"><NumInput v={form.building_coefficient} on={(x) => set('building_coefficient', x)} /></F>
+                    <F label="Coverage ratio"><NumInput v={form.coverage_ratio} on={(x) => set('coverage_ratio', x)} /></F>
+                    <F label="Max building height (m)"><NumInput v={form.max_building_height} on={(x) => set('max_building_height', x)} /></F>
+                    <F label="Allowed floors"><NumInput v={form.allowed_floors} on={(x) => set('allowed_floors', x)} /></F>
+                    <F label="Land use / zoning"><Input value={form.land_use ?? ''} onChange={(e) => set('land_use', e.target.value)} /></F>
+                    <F label="Road frontage (m)"><NumInput v={form.frontage_to_road} on={(x) => set('frontage_to_road', x)} /></F>
+                    <F label="Distance to sea (m)"><NumInput v={form.distance_to_sea} on={(x) => set('distance_to_sea', x)} /></F>
+                    <F label="Slope / terrain"><Input value={form.slope ?? ''} onChange={(e) => set('slope', e.target.value)} /></F>
+                    <ChkGrid items={[['buildable', 'Buildable (άρτιο)'], ['inside_city_plan', 'Inside city plan'], ['within_settlement', 'Within settlement'], ['road_access', 'Road access'], ['corner_plot', 'Corner plot']]} form={form} set={set} />
+                    <F label="Utilities available (comma)" wide><Input value={form.utilities_available ?? ''} onChange={(e) => set('utilities_available', e.target.value)} placeholder="water, electricity, sewage, gas" /></F>
+                    <F label="Legal clearances (comma)" wide><Input value={form.legal_clearances ?? ''} onChange={(e) => set('legal_clearances', e.target.value)} placeholder="topographic, forestry, archaeological" /></F>
+                    <F label="Existing structures" wide><Input value={form.existing_structures ?? ''} onChange={(e) => set('existing_structures', e.target.value)} /></F>
+                  </FormSection>
+                )}
+                {isShortLet && (
+                  <FormSection title="Short-let" icon={CalendarClock}>
+                    <F label="Licence (ΑΜΑ)"><Input value={form.short_term_rental_license ?? ''} onChange={(e) => set('short_term_rental_license', e.target.value)} /></F>
+                    <F label="Max guests"><NumInput v={form.max_guests} on={(x) => set('max_guests', x)} /></F>
+                    <F label="Bed config"><Input value={form.bed_config ?? ''} onChange={(e) => set('bed_config', e.target.value)} placeholder="1 double, 2 single" /></F>
+                    <F label="Min stay (nights)"><NumInput v={form.min_stay_nights} on={(x) => set('min_stay_nights', x)} /></F>
+                    <F label="Check-in time"><Input value={form.check_in_time ?? ''} onChange={(e) => set('check_in_time', e.target.value)} placeholder="15:00" /></F>
+                    <F label="Check-out time"><Input value={form.check_out_time ?? ''} onChange={(e) => set('check_out_time', e.target.value)} placeholder="11:00" /></F>
+                    <F label="Cleaning fee"><NumInput v={form.cleaning_fee} on={(x) => set('cleaning_fee', x)} /></F>
+                    <F label="Deposit"><NumInput v={form.deposit} on={(x) => set('deposit', x)} /></F>
+                    <F label="Cancellation policy"><Input value={form.cancellation_policy ?? ''} onChange={(e) => set('cancellation_policy', e.target.value)} /></F>
+                    <ChkGrid items={[['instant_book', 'Instant book'], ['smoking_allowed', 'Smoking allowed'], ['events_allowed', 'Events allowed']]} form={form} set={set} />
+                    <F label="House rules" wide><Textarea rows={2} value={form.house_rules ?? ''} onChange={(e) => set('house_rules', e.target.value)} /></F>
+                  </FormSection>
+                )}
+              </>
+            )}
+
+            {stepId === 'amenities' && (
+              <FormSection title="Amenities & parking" icon={ListChecks}>
+                <ChkGrid items={AMENITIES} form={form} set={set} />
+                <F label="Parking spaces"><NumInput v={form.parking_spaces} on={(x) => set('parking_spaces', x)} /></F>
+                <F label="Open parking spots"><NumInput v={form.open_parking_spots} on={(x) => set('open_parking_spots', x)} /></F>
+                <F label="Closed parking spots"><NumInput v={form.closed_parking_spots} on={(x) => set('closed_parking_spots', x)} /></F>
+                <F label="Parking type"><Input value={form.parking_type ?? ''} onChange={(e) => set('parking_type', e.target.value)} placeholder="garage, pilotis, street" /></F>
+                <F label="Construction status"><Sel value={form.construction_status ?? ''} opts={CONSTRUCTION} onChange={(v) => set('construction_status', v)} /></F>
+                <F label="View types (comma)"><Input value={form.view_types ?? ''} onChange={(e) => set('view_types', e.target.value)} placeholder="sea, mountain, city" /></F>
+                <F label="Suitable for (comma)"><Input value={form.suitable_for ?? ''} onChange={(e) => set('suitable_for', e.target.value)} placeholder="family, investment, airbnb" /></F>
               </FormSection>
             )}
 
-            {isShortLet && (
-              <FormSection title="Short-let">
-                <F label="Licence (ΑΜΑ)"><Input value={form.short_term_rental_license ?? ''} onChange={(e) => set('short_term_rental_license', e.target.value)} /></F>
-                <F label="Max guests"><NumInput v={form.max_guests} on={(x) => set('max_guests', x)} /></F>
-                <F label="Bed config"><Input value={form.bed_config ?? ''} onChange={(e) => set('bed_config', e.target.value)} placeholder="1 double, 2 single" /></F>
-                <F label="Min stay (nights)"><NumInput v={form.min_stay_nights} on={(x) => set('min_stay_nights', x)} /></F>
-                <F label="Check-in time"><Input value={form.check_in_time ?? ''} onChange={(e) => set('check_in_time', e.target.value)} placeholder="15:00" /></F>
-                <F label="Check-out time"><Input value={form.check_out_time ?? ''} onChange={(e) => set('check_out_time', e.target.value)} placeholder="11:00" /></F>
-                <F label="Cleaning fee"><NumInput v={form.cleaning_fee} on={(x) => set('cleaning_fee', x)} /></F>
-                <F label="Deposit"><NumInput v={form.deposit} on={(x) => set('deposit', x)} /></F>
-                <F label="Cancellation policy"><Input value={form.cancellation_policy ?? ''} onChange={(e) => set('cancellation_policy', e.target.value)} /></F>
-                <Chk label="Instant book" checked={!!form.instant_book} onChange={(v) => set('instant_book', v)} />
-                <Chk label="Smoking allowed" checked={!!form.smoking_allowed} onChange={(v) => set('smoking_allowed', v)} />
-                <Chk label="Events allowed" checked={!!form.events_allowed} onChange={(v) => set('events_allowed', v)} />
-                <F label="House rules" wide><Textarea rows={2} value={form.house_rules ?? ''} onChange={(e) => set('house_rules', e.target.value)} /></F>
+            {stepId === 'energy' && (
+              <FormSection title="Energy & compliance" icon={Zap}>
+                <F label="Energy class"><Sel value={form.energy_class ?? ''} opts={['', ...ENERGY_CLASSES]} onChange={(v) => set('energy_class', v)} /></F>
+                <F label={`Electronic Building ID${isGRbuilding ? ' *' : ''}`}><Input value={form.electronic_building_id ?? ''} onChange={(e) => set('electronic_building_id', e.target.value)} /></F>
+                <F label="ΑΤΑΚ (tax id, internal)"><Input value={form.atak ?? ''} onChange={(e) => set('atak', e.target.value)} /></F>
+                <F label="Heating type"><Input value={form.heating_type ?? ''} onChange={(e) => set('heating_type', e.target.value)} placeholder="autonomous, central, none" /></F>
+                <F label="Heating medium"><Input value={form.heating_medium ?? ''} onChange={(e) => set('heating_medium', e.target.value)} placeholder="gas, oil, heat pump" /></F>
+                {isShortLet && <F label="Short-let licence (ΑΜΑ)"><Input value={form.short_term_rental_license ?? ''} onChange={(e) => set('short_term_rental_license', e.target.value)} /></F>}
+                {isLand && <F label="Land use / zoning"><Input value={form.land_use ?? ''} onChange={(e) => set('land_use', e.target.value)} /></F>}
               </FormSection>
             )}
 
-            <FormSection title="Content">
-              {canManage && (
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={async () => {
-                    if (!ws) return;
-                    setBusy(true);
-                    try {
-                      // Save current edits first so the AI sees the latest facts, then generate.
-                      const copy = await realEstateService.draftDescription(ws, id);
-                      setForm((p) => ({ ...p, title: p.title || copy.title, description_en: copy.description_en, description_el: copy.description_el }));
-                      toast({ title: 'Draft generated', description: `${copy.credits} credit(s) used — review, then Save.` });
-                    } catch (e) { toast({ title: 'Generation failed', description: (e as Error).message, variant: 'destructive' }); }
-                    finally { setBusy(false); }
-                  }}><Sparkles className="mr-1.5 h-4 w-4" /> Generate description with AI</Button>
-                  <p className="mt-1 text-[11px] text-muted-foreground">Uses the listing’s facts. Review before saving — you’re responsible for the published copy.</p>
-                </div>
-              )}
-              <F label="Description (EN)" wide><Textarea rows={4} value={form.description_en ?? ''} onChange={(e) => set('description_en', e.target.value)} /></F>
-              <F label="Description (EL)" wide><Textarea rows={4} value={form.description_el ?? ''} onChange={(e) => set('description_el', e.target.value)} /></F>
-              <F label="Features (comma-separated)" wide><Input value={form.features ?? ''} onChange={(e) => set('features', e.target.value)} /></F>
-              <F label="Amenities (comma-separated)" wide><Input value={form.amenities ?? ''} onChange={(e) => set('amenities', e.target.value)} /></F>
-            </FormSection>
+            {stepId === 'content' && (
+              <>
+                <FormSection title="Content" icon={FileText}>
+                  {canManage && (
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={async () => {
+                        if (!ws) return;
+                        setBusy(true);
+                        try {
+                          const copy = await realEstateService.draftDescription(ws, id);
+                          setForm((p) => ({ ...p, title: p.title || copy.title, description_en: copy.description_en, description_el: copy.description_el }));
+                          toast({ title: 'Draft generated', description: `${copy.credits} credit(s) used — review, then Save.` });
+                        } catch (e) { toast({ title: 'Generation failed', description: (e as Error).message, variant: 'destructive' }); }
+                        finally { setBusy(false); }
+                      }}><Sparkles className="mr-1.5 h-4 w-4" /> Generate description with AI</Button>
+                      <p className="mt-1 text-[11px] text-muted-foreground">Uses the listing’s facts. Review before saving — you’re responsible for the published copy.</p>
+                    </div>
+                  )}
+                  <F label="Description (EN)" wide><Textarea rows={4} value={form.description_en ?? ''} onChange={(e) => set('description_en', e.target.value)} /></F>
+                  <F label="Description (EL)" wide><Textarea rows={4} value={form.description_el ?? ''} onChange={(e) => set('description_el', e.target.value)} /></F>
+                  <F label="Features (comma-separated)" wide><Input value={form.features ?? ''} onChange={(e) => set('features', e.target.value)} /></F>
+                  <F label="Amenities notes (comma-separated)" wide><Input value={form.amenities ?? ''} onChange={(e) => set('amenities', e.target.value)} /></F>
+                </FormSection>
+                <FormSection title="Listing agent" icon={Contact}>
+                  <F label="Agent name"><Input value={form.agent_name ?? ''} onChange={(e) => set('agent_name', e.target.value)} /></F>
+                  <F label="Agent phone"><Input value={form.agent_phone ?? ''} onChange={(e) => set('agent_phone', e.target.value)} /></F>
+                  <F label="Agent email"><Input value={form.agent_email ?? ''} onChange={(e) => set('agent_email', e.target.value)} /></F>
+                  <F label="Agent website"><Input value={form.agent_website ?? ''} onChange={(e) => set('agent_website', e.target.value)} /></F>
+                </FormSection>
+              </>
+            )}
+
+            {/* Step nav */}
+            <div className="flex items-center justify-between">
+              <Button variant="outline" size="sm" className="rounded-full" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}><ChevronLeft className="mr-1 h-4 w-4" /> Back</Button>
+              <span className="text-xs text-muted-foreground">Step {step + 1} of {STEPS.length} · {STEPS[step].label}</span>
+              {step < STEPS.length - 1
+                ? <Button size="sm" className="rounded-full" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Next <ChevronRight className="ml-1 h-4 w-4" /></Button>
+                : (canManage && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>)}
+            </div>
           </TabsContent>
 
           {/* ── Media ── */}
@@ -420,7 +518,7 @@ export default function PropertyWorkbench() {
                   try { await realEstateService.createViewing(ws, { property_id: id, scheduled_at: new Date(newViewingAt).toISOString() }); setNewViewingAt(''); await load(); toast({ title: 'Viewing scheduled' }); }
                   catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
                   finally { setBusy(false); }
-                }}>Schedule viewing</Button>
+                }}><CalendarClock className="mr-1 h-4 w-4" /> Schedule viewing</Button>
               </div>
             )}
             {viewings.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No viewings scheduled.</div> : (
@@ -452,7 +550,7 @@ const BuyersForListing: React.FC<{ ws: string | null; propertyId: string }> = ({
   if (!rows || rows.length === 0) return null;
   return (
     <Card><CardContent className="p-3">
-      <div className="mb-1.5 text-xs font-semibold text-muted-foreground">Matching buyers ({rows.length})</div>
+      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Contact className="h-3.5 w-3.5" /> Matching buyers ({rows.length})</div>
       <div className="flex flex-wrap gap-2">
         {rows.slice(0, 12).map((r) => (
           <Link key={r.id} to={`/crm/contacts/${r.crm_contact_id}`} className="rounded-full bg-muted px-3 py-1 text-xs hover:bg-muted/70">
@@ -465,9 +563,9 @@ const BuyersForListing: React.FC<{ ws: string | null; propertyId: string }> = ({
 };
 
 // ── small form primitives ──
-const FormSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+const FormSection: React.FC<{ title: string; icon?: LucideIcon; children: React.ReactNode }> = ({ title, icon: Icon, children }) => (
   <Card><CardContent className="p-4">
-    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+    <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{Icon && <Icon className="h-3.5 w-3.5 text-primary" />}{title}</h3>
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
   </CardContent></Card>
 );
@@ -480,7 +578,17 @@ const Sel: React.FC<{ value: any; opts: string[]; onChange: (v: string) => void 
   </select>
 );
 const Chk: React.FC<{ label: string; checked: boolean; onChange: (v: boolean) => void }> = ({ label, checked, onChange }) => (
-  <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /> {label}</label>
+  <label className="flex cursor-pointer items-center gap-2 self-end pb-2 text-sm">
+    <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} /> {label}
+  </label>
+);
+// A grid of boolean checkboxes spanning the section width.
+const ChkGrid: React.FC<{ items: readonly (readonly [string, string])[]; form: Record<string, any>; set: (k: string, v: any) => void }> = ({ items, form, set }) => (
+  <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-3 lg:col-span-3">
+    {items.map(([k, label]) => (
+      <label key={k} className="flex cursor-pointer items-center gap-2 text-sm"><Checkbox checked={!!form[k]} onCheckedChange={(v) => set(k, v === true)} /> {label}</label>
+    ))}
+  </div>
 );
 // Numeric input that emits number | '' (so a cleared field saves as null).
 const NumInput: React.FC<{ v: any; on: (x: number | '') => void }> = ({ v, on }) => (

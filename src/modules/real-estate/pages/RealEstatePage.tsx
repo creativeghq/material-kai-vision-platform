@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -8,7 +8,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Skeleton } from '@/components/core/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings } from '../services/realEstateService';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
@@ -20,6 +19,11 @@ const STATUS_VARIANT: Record<ListingStatus, string> = {
   archived: 'bg-muted text-muted-foreground',
 };
 const money = (n: number | null, ccy: string) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+
+// Lightweight in-content loader (matches Finance/CRM — never a full-bleed skeleton block).
+const InlineLoader: React.FC = () => (
+  <div className="flex items-center justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+);
 
 export default function RealEstatePage() {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
@@ -40,7 +44,14 @@ export default function RealEstatePage() {
     finally { setCreating(false); }
   };
 
-  if (wsLoading) return <div className="p-6"><Skeleton className="h-64 w-full" /></div>;
+  if (wsLoading) {
+    return (
+      <div className="min-h-screen">
+        <PageHeader icon={Building2} title="Real Estate" subtitle="Listings, leads and viewings" />
+        <div className="flex h-[calc(100vh-200px)] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      </div>
+    );
+  }
   if (!can('realestate.view')) {
     return (
       <div className="min-h-screen">
@@ -82,7 +93,7 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
     realEstateService.dashboard(ws).then(setD).catch((e) => { toast({ title: 'Failed to load overview', description: (e as Error).message, variant: 'destructive' }); });
   }, [ws, toast]);
 
-  if (!d) return <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}</div>;
+  if (!d) return <InlineLoader />;
 
   const kpi = (label: string, value: number, tint = 'text-foreground') => (
     <Card><CardContent className="p-4"><div className={`text-2xl font-semibold ${tint}`}>{value}</div><div className="mt-0.5 text-xs text-muted-foreground">{label}</div></CardContent></Card>
@@ -180,7 +191,7 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
   }, [ws, toast]);
   useEffect(() => { void load(); }, [load]);
 
-  if (rows === null) return <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
+  if (rows === null) return <InlineLoader />;
   if (rows.length === 0) return (
     <div className="dashboard-card p-10 text-center">
       <Building2 className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
@@ -217,7 +228,7 @@ const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
     realEstateService.listInquiries(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load leads', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
 
-  if (rows === null) return <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)}</div>;
+  if (rows === null) return <InlineLoader />;
   if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No leads yet. Inquiries from your public listing pages appear here.</div>;
   return (
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
@@ -245,7 +256,7 @@ const ViewingsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
     realEstateService.listViewings(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load viewings', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
 
-  if (rows === null) return <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)}</div>;
+  if (rows === null) return <InlineLoader />;
   if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No viewings scheduled.</div>;
   return (
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
