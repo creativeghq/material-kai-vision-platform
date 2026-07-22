@@ -192,6 +192,7 @@ export interface NavGateContext {
   isPlatformOperator: boolean;
   isAccountant: boolean;
   isSalesRep: boolean;
+  isRealEstateAgent: boolean;
   isModuleAvailable: (slug: string) => boolean;
   can: (c: Capability) => boolean;
 }
@@ -209,6 +210,8 @@ export function filterNavItems(
     // Scoped invited roles see a focused subset only (overrides the gates below).
     if (ctx.isAccountant) return item.id === 'dashboard' || item.id === 'finance';
     if (ctx.isSalesRep) return item.id === 'dashboard' || item.id === 'quotes';
+    // #249 — Estate Agent: Real Estate surface only (their own listings/leads + open-for-all).
+    if (ctx.isRealEstateAgent) return item.id === 'dashboard' || item.id === 'real-estate';
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
     // Factory analytics is for verified factories only — not dealers/operators.
     if (item.requireRole === 'factory' && !ctx.isFactory) return false;

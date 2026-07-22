@@ -60,7 +60,7 @@ export const workspaceManagementService = {
   },
 
   /** Owner/admin mints a role-carrying invite (#201/#202); returns the code. */
-  async createInvite(workspaceId: string, role: 'member' | 'accountant' | 'sales'): Promise<string> {
+  async createInvite(workspaceId: string, role: 'member' | 'accountant' | 'sales' | 'realestate_agent'): Promise<string> {
     const { data, error } = await supabase.rpc('create_workspace_invite', { p_workspace_id: workspaceId, p_role: role });
     if (error) throw error;
     return data as string;

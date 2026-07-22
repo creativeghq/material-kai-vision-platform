@@ -74,12 +74,25 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
     if (!access.canManage) throw new HttpError(403, 'You need the listings-manage role for this action.');
   };
 
-  /** Load a property scoped to the workspace, or throw 404 (enumeration-safe). */
+  // #249 agent scoping: a non-broker (realestate_agent) owns a listing when they're its listing agent
+  // or its creator; "open_for_all" makes a listing VIEWABLE (not editable) by all agents. Brokers see all.
+  const ownsProperty = (p: any) => access.isBroker || p.listing_agent_id === userId || p.created_by === userId;
+  const canViewProperty = (p: any) => ownsProperty(p) || !!p.open_for_all;
+
+  /** Load a property scoped to the workspace + view permission, or throw 404 (enumeration-safe). */
   async function loadProperty(id: string): Promise<any> {
     const { data, error } = await supabase.from('properties').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
     if (error) throw new HttpError(400, error.message);
     if (!data) throw new HttpError(404, 'not found');
+    if (!canViewProperty(data)) throw new HttpError(404, 'not found'); // agent can't see others' private listings
     return data;
+  }
+
+  /** Load a property the caller may EDIT (own or broker), else 403. */
+  async function loadEditable(id: string): Promise<any> {
+    const p = await loadProperty(id);
+    if (!ownsProperty(p)) throw new HttpError(403, 'This listing belongs to another agent.');
+    return p;
   }
 
   try {
@@ -116,12 +129,13 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       // ── Properties ─────────────────────────────────────────────────────
       case 'list-properties': {
         let q = supabase.from('properties')
-          .select('id, reference_code, title, property_type, subtype, transaction_type, listing_status, price, currency, town, region, is_public, in_discovery, syndicate_to, listing_agent_id, view_count, updated_at, created_at')
+          .select('id, reference_code, title, property_type, subtype, transaction_type, listing_status, price, currency, town, region, is_public, in_discovery, syndicate_to, listing_agent_id, created_by, open_for_all, view_count, updated_at, created_at')
           .eq('workspace_id', workspaceId)
           .order('updated_at', { ascending: false });
         if (body.status) q = q.eq('listing_status', String(body.status));
         if (body.property_type) q = q.eq('property_type', String(body.property_type));
-        // Agent scoping (D7) is applied to leads/viewings, NOT to listings (shared team asset, D1).
+        // Estate-agent scoping: own listings + any flagged open_for_all. Brokers (owner/admin) see all.
+        if (!access.isBroker) q = q.or(`listing_agent_id.eq.${userId},created_by.eq.${userId},open_for_all.eq.true`);
         const { data, error } = await q;
         if (error) throw new HttpError(400, error.message);
         return json({ properties: data ?? [] });
@@ -139,12 +153,14 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           supabase.from('property_open_houses').select('*').eq('property_id', id).order('starts_at'),
           supabase.from('property_documents').select('*').eq('property_id', id).order('created_at', { ascending: false }),
         ]);
-        return json({ property, photos: photos ?? [], inquiries: inquiries ?? [], viewings: viewings ?? [], price_history: priceHistory ?? [], open_houses: openHouses ?? [], documents: documents ?? [] });
+        return json({ property, can_edit: ownsProperty(property), photos: photos ?? [], inquiries: inquiries ?? [], viewings: viewings ?? [], price_history: priceHistory ?? [], open_houses: openHouses ?? [], documents: documents ?? [] });
       }
 
       case 'create-property': {
         requireManage();
         const payload = pick(body, PROPERTY_WRITABLE);
+        // The creator becomes the listing agent (owner) unless a broker explicitly assigns another.
+        if (payload.listing_agent_id === undefined) payload.listing_agent_id = userId;
         const { data, error } = await supabase.from('properties')
           .insert({ ...payload, workspace_id: workspaceId, created_by: userId })
           .select('*').single();
@@ -156,7 +172,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
-        await loadProperty(id); // 404 if not in workspace
+        await loadEditable(id);
         const payload = pick(body, PROPERTY_WRITABLE);
         // record a price-history row when price changes
         if (payload.price !== undefined) {
@@ -174,6 +190,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadEditable(id);
         const { error } = await supabase.from('properties').delete().eq('id', id).eq('workspace_id', workspaceId);
         if (error) throw new HttpError(400, error.message);
         return json({ ok: true });
@@ -183,7 +200,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
-        const property = await loadProperty(id);
+        const property = await loadEditable(id);
         const gate = checkPublishRequirements(property);
         if (!gate.ok) return json({ code: 'publish_blocked', errors: gate.hardErrors, warnings: gate.warnings }, 422);
         const patch: Record<string, unknown> = {
@@ -202,7 +219,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
-        const property = await loadProperty(id);
+        const property = await loadEditable(id);
         // Credit-metered (reserve → call → settle inside draftListingCopy). Returns a draft the
         // workbench fills into the form for human review before Save (fair-housing safety).
         const copy = await draftListingCopy(supabase, userId, workspaceId, property);
@@ -213,7 +230,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
-        await loadProperty(id);
+        await loadEditable(id);
         const { data, error } = await supabase.from('properties')
           .update({ is_public: false, in_discovery: false, listing_status: 'draft' })
           .eq('id', id).eq('workspace_id', workspaceId).select('*').single();
@@ -227,7 +244,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const id = String(body.property_id ?? '');
         const ext = String(body.ext ?? 'jpg').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'jpg';
         if (!id) return json({ error: 'property_id is required' }, 400);
-        await loadProperty(id);
+        await loadEditable(id);
         const path = `${workspaceId}/${id}/${crypto.randomUUID()}.${ext}`;
         const { data, error } = await supabase.storage.from('property-media').createSignedUploadUrl(path);
         if (error) throw new HttpError(400, error.message);
@@ -239,7 +256,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const id = String(body.property_id ?? '');
         const storagePath = String(body.storage_path ?? '');
         if (!id || !storagePath) return json({ error: 'property_id and storage_path are required' }, 400);
-        await loadProperty(id);
+        await loadEditable(id);
         const kind = ['photo', 'floor_plan', 'render'].includes(body.kind) ? body.kind : 'photo';
         const { count } = await supabase.from('property_photos').select('id', { count: 'exact', head: true }).eq('property_id', id);
         const { data, error } = await supabase.from('property_photos').insert({
@@ -254,7 +271,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
-        await loadProperty(id);
+        await loadEditable(id);
         const { data: photos } = await supabase.from('property_photos').select('id, storage_path').eq('property_id', id).order('sort_order');
         if (!photos?.length) return json({ error: 'no photos to analyze' }, 400);
         const result = await analyzePropertyPhotos(supabase, userId, workspaceId, photos);

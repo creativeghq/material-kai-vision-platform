@@ -53,6 +53,7 @@ interface PublicProfile {
   featured_moodboard_id: string | null;
   profile_views: number;
   professional_type: string | null;
+  show_listings?: boolean;
 }
 
 interface ReviewStats {
@@ -215,7 +216,7 @@ export const PublicProfilePage: React.FC = () => {
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select(
-          'user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, preferred_factories, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public',
+          'user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, preferred_factories, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public, show_listings',
         )
         .eq('user_id', userId)
         .eq('is_public', true)
@@ -499,7 +500,7 @@ export const PublicProfilePage: React.FC = () => {
                 <Star className="h-4 w-4" /> Reviews
                 {reviewStats && <span className="text-xs opacity-70">{reviewStats.count}</span>}
               </TabsTrigger>
-              {propertyListings.length > 0 && (
+              {profile.show_listings !== false && propertyListings.length > 0 && (
                 <TabsTrigger value="listings" className="flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" /> Listings
                   <span className="text-xs opacity-70">{propertyListings.length}</span>
@@ -739,7 +740,7 @@ export const PublicProfilePage: React.FC = () => {
             </TabsContent>
 
             {/* #249 — public property listings for this agency/profile */}
-            {propertyListings.length > 0 && (
+            {profile.show_listings !== false && propertyListings.length > 0 && (
               <TabsContent value="listings" className="mt-5">
                 <PropertyCardGrid listings={propertyListings} />
               </TabsContent>

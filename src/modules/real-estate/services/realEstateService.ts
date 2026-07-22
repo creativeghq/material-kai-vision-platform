@@ -94,7 +94,7 @@ export const realEstateService = {
   listProperties: (ws: string, filters: { status?: string; property_type?: string } = {}) =>
     call<{ properties: PropertyListItem[] }>(ws, 'list-properties', filters).then((r) => r.properties),
   getProperty: (ws: string, propertyId: string) =>
-    call<{ property: Property; photos: PropertyPhoto[]; inquiries: PropertyInquiry[]; viewings: PropertyViewing[]; price_history: any[]; open_houses: any[]; documents: any[] }>(ws, 'get-property', { property_id: propertyId }),
+    call<{ property: Property; can_edit: boolean; photos: PropertyPhoto[]; inquiries: PropertyInquiry[]; viewings: PropertyViewing[]; price_history: any[]; open_houses: any[]; documents: any[] }>(ws, 'get-property', { property_id: propertyId }),
   createProperty: (ws: string, fields: Record<string, unknown>) =>
     call<{ property: Property }>(ws, 'create-property', fields).then((r) => r.property),
   updateProperty: (ws: string, propertyId: string, fields: Record<string, unknown>) =>

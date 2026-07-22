@@ -49,7 +49,7 @@ interface GlobalSearchProps {
 export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) => {
   const navigate = useNavigate();
   const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
-  const { can, isAccountant, isSalesRep } = usePermissions();
+  const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
 
   const [open, setOpen] = useState(false);
@@ -125,11 +125,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
       isPlatformOperator,
       isAccountant,
       isSalesRep,
+      isRealEstateAgent,
       isModuleAvailable,
       can,
     });
     return [...gated, { id: 'profile', label: 'Profile', path: '/profile', icon: User }];
-  }, [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isModuleAvailable, can]);
+  }, [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can]);
 
   const navMatches = useMemo(() => {
     const q = query.trim().toLowerCase();

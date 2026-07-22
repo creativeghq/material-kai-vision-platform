@@ -29,6 +29,8 @@ export interface PermissionsApi {
   isAccountant: boolean;
   /** Invited sales rep (#201): Sales portal only. */
   isSalesRep: boolean;
+  /** Invited estate agent (#249): Real Estate surface only — own listings/leads + open-for-all. */
+  isRealEstateAgent: boolean;
   /** Owner/admin of the ACTIVE workspace (vs. a plain member). */
   isWorkspaceManager: boolean;
   /** Can add/price own products (operator or dealer rank). */
@@ -58,6 +60,7 @@ export function usePermissions(): PermissionsApi {
     // already allows finance + owner/admin).
     const isAccountant = workspaceRole === 'accountant';
     const isSalesRep = persona === 'sales';
+    const isRealEstateAgent = persona === 'realestate_agent';
     const isBusinessNode = persona === 'operator' || persona === 'dealer' || persona === 'architect';
     // Manages THIS node: a workspace owner/admin, or any business-tier persona.
     const isWorkspaceManager = (!!workspaceRole && ADMIN_ROLES.includes(workspaceRole)) || isBusinessNode;
@@ -72,6 +75,7 @@ export function usePermissions(): PermissionsApi {
       isEndUser: persona === 'end_user',
       isAccountant,
       isSalesRep,
+      isRealEstateAgent,
       isWorkspaceManager,
       canSupplyProducts,
       // Day-to-day finance ops: managers + anyone on the Finance surface (finance role

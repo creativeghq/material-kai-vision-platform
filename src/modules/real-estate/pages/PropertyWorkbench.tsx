@@ -41,7 +41,7 @@ const AMENITIES: readonly (readonly [string, string])[] = [
 
 const FORM_FIELDS = [
   // basics
-  'title', 'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status',
+  'title', 'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status', 'open_for_all',
   // pricing
   'price', 'currency', 'price_period', 'price_on_request', 'common_charges', 'previous_price',
   // location
@@ -90,6 +90,7 @@ export default function PropertyWorkbench() {
   const canManage = can('realestate.listings.manage');
 
   const [property, setProperty] = useState<Property | null>(null);
+  const [canEdit, setCanEdit] = useState(true);
   const [photos, setPhotos] = useState<PropertyPhoto[]>([]);
   const [inquiries, setInquiries] = useState<PropertyInquiry[]>([]);
   const [viewings, setViewings] = useState<PropertyViewing[]>([]);
@@ -106,7 +107,7 @@ export default function PropertyWorkbench() {
     if (!ws || !id) return;
     try {
       const r = await realEstateService.getProperty(ws, id);
-      setProperty(r.property); setPhotos(r.photos); setInquiries(r.inquiries); setViewings(r.viewings);
+      setProperty(r.property); setCanEdit(r.can_edit !== false); setPhotos(r.photos); setInquiries(r.inquiries); setViewings(r.viewings);
       const f: Record<string, any> = {};
       for (const k of FORM_FIELDS) f[k] = ARRAY_FIELDS.has(k) ? (r.property[k] ?? []).join(', ') : r.property[k];
       f.description_en = r.property.description_i18n?.en ?? '';
@@ -181,6 +182,9 @@ export default function PropertyWorkbench() {
     );
   }
 
+  // Edits require the listings-manage capability AND ownership (own listing or broker). An estate
+  // agent viewing an "open for all" listing they don't own gets a read-only view.
+  const editable = canManage && canEdit;
   const isGRbuilding = ['EL', 'GR'].includes(String(form.country_code ?? '').toUpperCase());
   const cat = form.property_type;
   const isResidential = cat === 'residential' || cat === 'other';
@@ -203,10 +207,10 @@ export default function PropertyWorkbench() {
               catch (e) { toast({ title: 'Brochure failed', description: (e as Error).message, variant: 'destructive' }); }
               finally { setBusy(false); }
             }}><FileText className="mr-1 h-4 w-4" /> Brochure</Button>
-            {canManage && (property.is_public
+            {editable && (property.is_public
               ? <Button variant="outline" size="sm" className="rounded-full" onClick={unpublish} disabled={busy}><EyeOff className="mr-1 h-4 w-4" /> Unpublish</Button>
               : <Button size="sm" className="rounded-full" onClick={publish} disabled={busy}><Globe className="mr-1 h-4 w-4" /> Publish</Button>)}
-            {canManage && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>}
+            {editable && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>}
           </div>
         } />
 
@@ -230,6 +234,11 @@ export default function PropertyWorkbench() {
 
           {/* ── Overview / multi-step edit form ── */}
           <TabsContent value="overview" className="space-y-4">
+            {canManage && !canEdit && (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+                <EyeOff className="h-3.5 w-3.5" /> This listing belongs to another agent (shared “open for all”) — read-only.
+              </div>
+            )}
             {!property.is_public && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-muted-foreground">
                 <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
@@ -263,6 +272,7 @@ export default function PropertyWorkbench() {
                 <F label="Subtype"><Input value={form.subtype ?? ''} onChange={(e) => set('subtype', e.target.value)} placeholder="apartment, warehouse, plot…" /></F>
                 <F label="Transaction"><Sel value={form.transaction_type} opts={TRANSACTION_TYPES} onChange={(v) => set('transaction_type', v)} /></F>
                 <F label="Status"><Sel value={form.listing_status} opts={LISTING_STATUSES} onChange={(v) => set('listing_status', v)} /></F>
+                <Chk label="Open for all agents (visible to the whole team)" checked={!!form.open_for_all} onChange={(v) => set('open_for_all', v)} />
               </FormSection>
             )}
 
@@ -408,7 +418,7 @@ export default function PropertyWorkbench() {
             {stepId === 'content' && (
               <>
                 <FormSection title="Content" icon={FileText}>
-                  {canManage && (
+                  {editable && (
                     <div className="sm:col-span-2 lg:col-span-3">
                       <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={async () => {
                         if (!ws) return;
@@ -443,7 +453,7 @@ export default function PropertyWorkbench() {
               <span className="text-xs text-muted-foreground">Step {step + 1} of {STEPS.length} · {STEPS[step].label}</span>
               {step < STEPS.length - 1
                 ? <Button size="sm" className="rounded-full" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Next <ChevronRight className="ml-1 h-4 w-4" /></Button>
-                : (canManage && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>)}
+                : (editable && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>)}
             </div>
           </TabsContent>
 
@@ -451,8 +461,8 @@ export default function PropertyWorkbench() {
           <TabsContent value="media">
             <div className="mb-4 flex flex-wrap gap-2">
               <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onUpload} />
-              {canManage && <Button variant="outline" className="rounded-full" onClick={() => fileRef.current?.click()} disabled={busy}><Upload className="mr-2 h-4 w-4" /> Upload photos</Button>}
-              {canManage && photos.length > 0 && (
+              {editable && <Button variant="outline" className="rounded-full" onClick={() => fileRef.current?.click()} disabled={busy}><Upload className="mr-2 h-4 w-4" /> Upload photos</Button>}
+              {editable && photos.length > 0 && (
                 <Button variant="outline" className="rounded-full" disabled={busy} onClick={async () => {
                   if (!ws) return;
                   setBusy(true);
@@ -467,7 +477,7 @@ export default function PropertyWorkbench() {
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {photos.map((ph) => (
-                  <PhotoCard key={ph.id} photo={ph} ws={ws!} canManage={canManage}
+                  <PhotoCard key={ph.id} photo={ph} ws={ws!} canManage={editable}
                     onCover={async () => { await realEstateService.setCover(ws!, id, ph.id); await load(); }}
                     onDelete={async () => { await realEstateService.deletePhoto(ws!, ph.id); await load(); }} />
                 ))}
@@ -488,7 +498,7 @@ export default function PropertyWorkbench() {
                       <div className="mt-0.5 text-[11px] text-muted-foreground">{new Date(q.created_at).toLocaleString()}</div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      {!q.crm_contact_id && canManage && (
+                      {!q.crm_contact_id && editable && (
                         <Button variant="outline" size="sm" className="rounded-full text-xs" disabled={busy} onClick={async () => {
                           setBusy(true);
                           try { await realEstateService.convertInquiry(ws!, q.id); await load(); toast({ title: 'Converted to CRM lead' }); }
@@ -509,7 +519,7 @@ export default function PropertyWorkbench() {
 
           {/* ── Viewings ── */}
           <TabsContent value="viewings" className="space-y-4">
-            {canManage && (
+            {editable && (
               <div className="flex flex-wrap items-end gap-2">
                 <input type="datetime-local" value={newViewingAt} onChange={(e) => setNewViewingAt(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm" />
                 <Button size="sm" className="rounded-full" disabled={!newViewingAt || busy} onClick={async () => {
@@ -527,7 +537,7 @@ export default function PropertyWorkbench() {
                 {viewings.map((v) => (
                   <div key={v.id} className="flex items-center gap-4 px-4 py-3 text-sm">
                     <div className="flex-1">{new Date(v.scheduled_at).toLocaleString()} · <span className="capitalize text-muted-foreground">{v.type.replace('_', ' ')}</span></div>
-                    {canManage && (
+                    {editable && (
                       <select className="rounded-md border bg-background px-2 py-1 text-xs" value={v.status}
                         onChange={async (e) => { const upd = await realEstateService.updateViewing(ws!, v.id, { status: e.target.value }); setViewings((prev) => prev.map((x) => x.id === v.id ? upd : x)); }}>
                         {['scheduled', 'completed', 'cancelled', 'no_show'].map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}

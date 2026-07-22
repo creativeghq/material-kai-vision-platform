@@ -62,7 +62,7 @@ export const MembersCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     <div className="text-sm font-medium">{m.profile?.full_name || m.profile?.email || m.user_id.slice(0, 8)}</div>
                     {m.profile?.email && <div className="text-xs text-muted-foreground">{m.profile.email}</div>}
                   </div>
-                  <Badge variant="outline" className="text-[10px] capitalize">{m.role}</Badge>
+                  <Badge variant="outline" className="text-[10px] capitalize">{m.role === 'realestate_agent' ? 'Estate Agent' : m.role}</Badge>
                 </div>
               ))}
             </div>

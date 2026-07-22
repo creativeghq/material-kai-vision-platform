@@ -77,7 +77,7 @@ export function groupAppsByHub(apps: LauncherApp[]): HubGroup[] {
 
 export function useLauncherApps(): LauncherApi {
   const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
-  const { can, isAccountant, isSalesRep } = usePermissions();
+  const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
   const { isModuleAvailable, loading: entLoading } = useEntitlements();
   const { activeWorkspaceId, workspaceRole } = useWorkspace();
   // Only a workspace OWNER (or platform operator) can activate/purchase a module server-side
@@ -120,7 +120,7 @@ export function useLauncherApps(): LauncherApi {
   }, [activeWorkspaceId, canActivateModules]);
 
   const api = useMemo(() => {
-    const base = { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, can };
+    const base = { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, can };
     const activeItems = filterNavItems(SIDEBAR_NAV_ITEMS, { ...base, isModuleAvailable })
       .filter((i) => i.surface === 'app');
     const usableItems = filterNavItems(SIDEBAR_NAV_ITEMS, { ...base, isModuleAvailable: () => true })
@@ -167,7 +167,7 @@ export function useLauncherApps(): LauncherApi {
       enabling,
       enable,
     };
-  }, [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, can, isModuleAvailable,
+  }, [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, can, isModuleAvailable,
       moduleEntries, catalog, catalogLoaded, entLoading, localActivated, canActivateModules, enabling, enable]);
 
   return api;

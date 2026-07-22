@@ -30,7 +30,7 @@ export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
-  const { can, isAccountant, isSalesRep } = usePermissions();
+  const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -51,10 +51,11 @@ export const MobileBottomNav: React.FC = () => {
         isPlatformOperator,
         isAccountant,
         isSalesRep,
+        isRealEstateAgent,
         isModuleAvailable,
         can,
       }),
-    [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isModuleAvailable, can],
+    [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can],
   );
 
   // Order the visible items by bottom-nav priority, then split into bar + overflow.

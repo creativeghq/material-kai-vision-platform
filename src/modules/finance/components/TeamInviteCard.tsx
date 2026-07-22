@@ -12,17 +12,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Users, Copy, Link2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { workspaceManagementService } from '@/services/workspaceManagementService';
+import { useModule } from '@/modules/_core';
 
-type Role = 'accountant' | 'sales' | 'member';
+type Role = 'accountant' | 'sales' | 'member' | 'realestate_agent';
 
 const ROLE_HINT: Record<Role, string> = {
   accountant: 'Finance only: view invoices/bills/reports, record payments, submit to myDATA. No settings, pricing, CRM, or new documents.',
   sales: 'Sales portal — create quotes/orders for customers. No finance or settings.',
   member: 'Standard member access to this workspace.',
+  realestate_agent: 'Estate agent — Real Estate only: their own listings + leads, plus any listing marked “open for all”. No finance, pricing, or settings.',
 };
 
 export const TeamInviteCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
+  const { enabled: realEstateEnabled } = useModule('real-estate');
   const [role, setRole] = useState<Role>('accountant');
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,6 +56,7 @@ export const TeamInviteCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
             <SelectContent>
               <SelectItem value="accountant">Accountant (finance ops, no settings)</SelectItem>
               <SelectItem value="sales">Sales rep</SelectItem>
+              {realEstateEnabled && <SelectItem value="realestate_agent">Estate Agent</SelectItem>}
               <SelectItem value="member">Member</SelectItem>
             </SelectContent>
           </Select>

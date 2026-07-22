@@ -13,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
+import { useModule } from '@/modules/_core';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/core/ui/avatar';
@@ -503,6 +504,8 @@ export const ProfileTab: React.FC = () => {
   const [savingPersonal, setSavingPersonal] = useState(false);
 
   const [isPublic, setIsPublic] = useState(false);
+  const [showListings, setShowListings] = useState(true); // #249 — show property listings on public profile
+  const { enabled: realEstateEnabled } = useModule('real-estate');
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [factories, setFactories] = useState<{ name: string; country?: string }[]>([]);
   const [skillTags, setSkillTags] = useState<string[]>([]);
@@ -581,6 +584,7 @@ export const ProfileTab: React.FC = () => {
     };
     setPersonal(p); setPersonalForm(p);
     setIsPublic(data.is_public ?? false);
+    setShowListings((data as any).show_listings ?? true);
     setServices((data.services_detail as ServiceItem[]) ?? []);
     setFactories((data.preferred_factories as { name: string; country?: string }[]) ?? []);
     setSkillTags(data.skill_tags ?? []);
@@ -911,6 +915,19 @@ export const ProfileTab: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* #249 — Public sections: show property listings on the public profile */}
+      {isPublic && realEstateEnabled && (
+        <Card className="rounded-2xl">
+          <CardContent className="flex items-center justify-between gap-3 py-4">
+            <div>
+              <p className="text-sm font-medium">Show property listings</p>
+              <p className="text-xs text-muted-foreground">Display your live real-estate listings as a “Listings” tab on your public profile.</p>
+            </div>
+            <Switch checked={showListings} onCheckedChange={async (v) => { setShowListings(v); await patch({ show_listings: v }); }} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Appearance / theme */}
       <AppearanceSection />
