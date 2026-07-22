@@ -361,8 +361,9 @@ All colors MUST be HSL.
     --popover: 48 30% 98%;
     --popover-foreground: 46 14% 21%;
 
-    /* Primary — muted khaki-olive (quiet-luxury); white text stays legible. */
-    --primary: 56 23% 40%;           /* #7d7a4e */
+    /* Primary — muted khaki-olive (quiet-luxury); darkened to 37% L so white text
+       clears WCAG AA (≥4.5:1) in fills and the assistant chat bubble. */
+    --primary: 56 24% 37%;           /* #6b6842 — white text ~4.9:1 */
     --primary-foreground: 0 0% 100%;
 
     /* Secondary — warm sand, deeper than cards (active-nav pill tone) */
@@ -371,7 +372,7 @@ All colors MUST be HSL.
 
     /* Muted */
     --muted: 44 26% 90%;
-    --muted-foreground: 48 14% 52%;  /* #8f8b79 olive-grey */
+    --muted-foreground: 48 16% 38%;  /* #767056 olive-grey — ~4.7:1 on oat bg (AA) */
 
     /* Accent — warm sand hover */
     --accent: 44 26% 87%;
@@ -392,12 +393,12 @@ All colors MUST be HSL.
     /* Borders / inputs — warm olive-grey lines */
     --border: 46 18% 82%;
     --input: 46 18% 83%;
-    --ring: 56 23% 40%;
+    --ring: 56 24% 37%;
 
     /* Sidebar / TopNav — ivory bar, olive active */
     --sidebar-background: 48 30% 97%;
     --sidebar-foreground: 48 12% 40%;
-    --sidebar-accent: 56 23% 40%;
+    --sidebar-accent: 56 24% 37%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 46 18% 82%;
 
@@ -520,7 +521,7 @@ All colors MUST be HSL.
     --secondary: 214 32% 91%;        /* #e2e8f0 — cool sand replacement */
     --secondary-foreground: 217 28% 27%;
     --muted: 214 30% 93%;
-    --muted-foreground: 215 16% 47%; /* #64748b slate-500 */
+    --muted-foreground: 215 19% 40%; /* #525f73 slate — ~5.5:1 on cool page (AA) */
     --accent: 214 32% 91%;
     --accent-foreground: 217 28% 27%;
 

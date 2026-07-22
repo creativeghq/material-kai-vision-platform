@@ -133,16 +133,8 @@ export const AppLauncher: React.FC = () => {
 
         {hasLinks ? (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {sections.map((s) => (
-              <button
-                key={s.to}
-                type="button"
-                onClick={() => go(s.to, app.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
-              >
-                <s.icon className="h-3.5 w-3.5 text-primary/80" /> {s.label}
-              </button>
-            ))}
+            {/* Create actions lead (e.g. "New Quote"), then nested sections (e.g.
+                "Price monitoring") — the card's primary verb comes first. */}
             {actions.map((a) => (
               <button
                 key={a.to}
@@ -151,6 +143,16 @@ export const AppLauncher: React.FC = () => {
                 className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5 text-primary/80" /> {a.label}
+              </button>
+            ))}
+            {sections.map((s) => (
+              <button
+                key={s.to}
+                type="button"
+                onClick={() => go(s.to, app.id)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+              >
+                <s.icon className="h-3.5 w-3.5 text-primary/80" /> {s.label}
               </button>
             ))}
             {cap && quickStarts.map((qs) => (
