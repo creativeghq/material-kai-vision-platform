@@ -101,16 +101,16 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
   return (
     <div className={cn(
       'flex min-w-0 flex-1 flex-col bg-background',
-      !singlePane && 'border-r border-white/8',
+      !singlePane && 'border-r border-border',
     )}>
       {/* Tab strip + close */}
-      <div className="flex h-[52px] shrink-0 items-center gap-1 border-b border-white/8 px-2">
+      <div className="flex h-[52px] shrink-0 items-center gap-1 border-b border-border px-2">
         {singlePane ? (
           <button
             onClick={onClose}
             title="Back to chat"
             aria-label="Back to chat"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -131,8 +131,8 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
                 className={cn(
                   'flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm transition-colors',
                   active
-                    ? 'border-white/15 bg-white/8 text-foreground'
-                    : 'border-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground',
+                    ? 'border-border bg-accent text-foreground'
+                    : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground',
                 )}
                 title={a.title}
               >
@@ -146,7 +146,7 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
           <button
             onClick={onClose}
             title="Close canvas"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <PanelRightClose className="h-4 w-4" />
           </button>
@@ -170,7 +170,7 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
           )}
         </div>
         {inspector && (
-          <aside className="max-h-[45%] shrink-0 overflow-auto border-t border-white/8 bg-white/[0.015] custom-scrollbar lg:max-h-none lg:w-[288px] lg:border-l lg:border-t-0">
+          <aside className="max-h-[45%] shrink-0 overflow-auto border-t border-border bg-muted/20 custom-scrollbar lg:max-h-none lg:w-[288px] lg:border-l lg:border-t-0">
             {inspector}
           </aside>
         )}

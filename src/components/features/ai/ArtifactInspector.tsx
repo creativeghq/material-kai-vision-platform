@@ -25,7 +25,7 @@ const SectionH: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 const Field: React.FC<{ k: string; v: React.ReactNode }> = ({ k, v }) => (
-  <div className="flex items-center justify-between gap-3 border-b border-white/8 py-2 text-[13px] last:border-0">
+  <div className="flex items-center justify-between gap-3 border-b border-border py-2 text-[13px] last:border-0">
     <span className="text-muted-foreground">{k}</span>
     <span className="max-w-[62%] truncate text-right font-medium text-foreground">{v}</span>
   </div>
@@ -40,6 +40,29 @@ const Shell: React.FC<{ kicker: string; title: string; children: React.ReactNode
     {children}
   </div>
 );
+
+export const QuoteInspector: React.FC<{ data: any }> = ({ data }) => {
+  const sym = data?.currency === 'USD' ? '$' : data?.currency === 'GBP' ? '£' : '€';
+  const fmt = (v?: number | null) => (v == null ? '—' : `${sym}${Number(v).toFixed(2)}`);
+  return (
+    <Shell kicker="Quote" title={data?.name || 'Quote'}>
+      {data?.quote_number && <div className="-mt-3.5 text-[13px] text-muted-foreground">{data.quote_number}</div>}
+      <div>
+        <SectionH>Totals</SectionH>
+        {data?.item_count != null && <Field k="Items" v={String(data.item_count)} />}
+        <Field k="Subtotal" v={fmt(data?.subtotal)} />
+        <Field k={`VAT${data?.vat_rate != null ? ` (${data.vat_rate}%)` : ''}`} v={fmt(data?.vat_amount)} />
+        <Field k="Total" v={<span className="font-semibold text-foreground">{fmt(data?.grand_total)}</span>} />
+      </div>
+      <button
+        onClick={() => window.open(`/quotes/${data?.quote_id}`, '_blank')}
+        className="inline-flex items-center gap-1.5 self-start text-[13px] font-medium text-primary transition-opacity hover:opacity-80"
+      >
+        Open in Quotes <ArrowUpRight className="h-3.5 w-3.5" />
+      </button>
+    </Shell>
+  );
+};
 
 export const SheetInspector: React.FC<{ data: any }> = ({ data }) => (
   <Shell kicker={`Sheet · ${humanize(data.sheet_type) || 'sheet'}`} title={data.title || 'Presentation sheet'}>
@@ -71,7 +94,7 @@ export const StagingInspector: React.FC<{ data: any }> = ({ data }) => (
         <img
           src={data.source_image_url}
           alt="Source room"
-          className="w-full rounded-lg border border-white/10 object-cover"
+          className="w-full rounded-lg border border-border object-cover"
           style={{ maxHeight: 140 }}
         />
       </div>
@@ -117,7 +140,7 @@ export const RenderInspector: React.FC<{ data: any }> = ({ data }) => {
           <SectionH>Models</SectionH>
           <div className="flex flex-wrap gap-1.5">
             {models.map((m, i) => (
-              <span key={m?.id || i} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-muted-foreground">
+              <span key={m?.id || i} className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
                 {m?.name || m?.id || 'model'}
               </span>
             ))}
@@ -163,7 +186,7 @@ export const ProductsInspector: React.FC<{ data: any }> = ({ data }) => {
           <SectionH>Categories</SectionH>
           <div className="flex flex-wrap gap-1.5">
             {categories.slice(0, 8).map((c) => (
-              <span key={c} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-muted-foreground">
+              <span key={c} className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
                 {c}
               </span>
             ))}
@@ -177,7 +200,7 @@ export const ProductsInspector: React.FC<{ data: any }> = ({ data }) => {
             const url = primaryImageUrl(p);
             return (
               <div key={p?.id || i} className="flex items-center gap-2.5">
-                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/10 bg-white/5">
+                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-border bg-muted/40">
                   {url && <img src={url} alt="" className="h-full w-full object-cover" />}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -261,7 +284,7 @@ export const MentionSummaryInspector: React.FC<{ data: any }> = ({ data }) => {
           <SectionH>Top outlets</SectionH>
           <div className="flex flex-wrap gap-1.5">
             {s.top_outlets.slice(0, 8).map((o: any) => (
-              <span key={o.domain} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-muted-foreground">
+              <span key={o.domain} className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
                 {o.domain} · {o.count}
               </span>
             ))}

@@ -70,7 +70,7 @@ import { CanvasPanel, ArtifactChip, type CanvasArtifact } from './CanvasPanel';
 import {
   SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector, RenderInspector,
   JobFindingsInspector, SourcingInspector, OrderInspector, MentionSummaryInspector, MentionFeedInspector,
-  LlmVisibilityInspector, CatalogInspector,
+  LlmVisibilityInspector, CatalogInspector, QuoteInspector,
 } from './ArtifactInspector';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
@@ -4563,34 +4563,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const renderCanvasInspector = (message: Message): React.ReactNode => {
     if (message.generation_job) return <RenderInspector data={message.generation_job} />;
     if (message.sheetPdfData) return <SheetInspector data={message.sheetPdfData} />;
-    if (message.quoteData) {
-      const q = message.quoteData;
-      const sym = q.currency === 'USD' ? '$' : q.currency === 'GBP' ? '£' : '€';
-      const fmt = (v?: number | null) => (v == null ? '—' : `${sym}${Number(v).toFixed(2)}`);
-      return (
-        <div className="space-y-3 text-xs">
-          <div>
-            <div className="text-muted-foreground uppercase tracking-wider text-[10px] mb-1">Quote</div>
-            <div className="font-medium text-foreground">{q.name || 'Quote'}</div>
-            {q.quote_number && <div className="text-muted-foreground">{q.quote_number}</div>}
-          </div>
-          <div className="space-y-1">
-            {q.item_count != null && (
-              <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span>{q.item_count}</span></div>
-            )}
-            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{fmt(q.subtotal)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">VAT{q.vat_rate != null ? ` (${q.vat_rate}%)` : ''}</span><span>{fmt(q.vat_amount)}</span></div>
-            <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-white/10"><span>Total</span><span>{fmt(q.grand_total)}</span></div>
-          </div>
-          <button
-            onClick={() => window.open(`/quotes/${q.quote_id}`, '_blank')}
-            className="text-primary hover:underline"
-          >
-            Open in Quotes →
-          </button>
-        </div>
-      );
-    }
+    if (message.quoteData) return <QuoteInspector data={message.quoteData} />;
     if (message.virtualStagingData) return <StagingInspector data={message.virtualStagingData} />;
     if (message.materialData?.products && message.materialData.products.length > 0) {
       return <ProductsInspector data={message.materialData} />;

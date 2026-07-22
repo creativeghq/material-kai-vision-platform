@@ -1370,7 +1370,28 @@ html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foregr
    (the "In canvas" label) vanished. Keep the dark-theme look and
    give light a warm dark-olive so every child clears AA contrast. */
 .msg-assistant { background-color: hsl(var(--primary)); }
-html.light .msg-assistant { background-color: hsl(46 20% 20%); }
+
+/* LIGHT theme: the dark-olive slab read heavy/cheap on the cream UI. Render the
+   assistant message as a clean ivory card (dark ink, soft border) instead, and
+   re-theme its dark-surface children generically — every child (artifact chips,
+   timestamps, rating buttons, markdown code/tables/rules) is a descendant of
+   .msg-assistant, so these scoped rules flip them all without touching each
+   component. Dark theme is unchanged (the plum bubble + white children stay). */
+html.light .msg-assistant {
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+}
+html.light .msg-assistant [class*="text-white"] { color: hsl(var(--foreground)); }
+html.light .msg-assistant .text-white\/60,
+html.light .msg-assistant .text-white\/70,
+html.light .msg-assistant .text-white\/80,
+html.light .msg-assistant .text-white\/85,
+html.light .msg-assistant .text-white\/90 { color: hsl(var(--muted-foreground)); }
+html.light .msg-assistant [class*="bg-white"] { background-color: hsl(var(--muted)); }
+html.light .msg-assistant [class*="bg-black"] { background-color: hsl(var(--secondary)); }
+html.light .msg-assistant [class*="border-white"] { border-color: hsl(var(--border)); }
+html.light .msg-assistant a { color: hsl(var(--primary)); }
 
 /* ============================================================
    BRAND GRADIENT ON PRIMARY FILLS — global
