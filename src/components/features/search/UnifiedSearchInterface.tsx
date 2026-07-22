@@ -365,45 +365,11 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     <div className="space-y-6">
       {/* Unified Search Interface */}
       <Card>
-        <CardContent className="space-y-4 pt-6">
-          {/* Main Search Input */}
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Input
-                placeholder="Search materials: 'Cement tile 60x120', 'Fire resistance', 'Waterproof flooring'..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    performSearch();
-                  }
-                }}
-                className="pr-10"
-              />
-              <Type className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            </div>
-            <Button
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-              onClick={() => handleQuickSearch(query)}
-              disabled={isSearching || !query.trim()}
-            >
-              Quick
-            </Button>
-            <Button onClick={() => performSearch()} disabled={isSearching}>
-              {isSearching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              Search
-            </Button>
-          </div>
-
-          {/* Search Type Selector */}
-          <div className="flex items-center gap-4">
-            <Label className="text-sm font-medium">Search Type:</Label>
+        <CardContent className="space-y-3 pt-6">
+          {/* Single-line search bar: type selector · query · actions */}
+          <div className="flex items-center gap-2">
             <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger className="w-[150px] shrink-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -451,18 +417,53 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 </SelectItem>
               </SelectContent>
             </Select>
-            <span className="text-xs text-muted-foreground">
-              {searchType === 'text' && 'Natural language processing for material specifications'}
-              {searchType === 'image' && 'AI will analyze the image to identify materials'}
-              {searchType === 'hybrid' && 'Using both text and image for enhanced matching'}
-              {searchType === 'color' && 'Find materials with similar color palettes'}
-              {searchType === 'texture' && 'Find materials with similar texture patterns'}
-              {searchType === 'style' && 'Find materials with similar design styles'}
-              {searchType === 'material' && 'Find materials of similar types'}
-            </span>
+
+            <div className="flex-1 relative">
+              <Input
+                placeholder="Search materials: 'Cement tile 60x120', 'Fire resistance', 'Waterproof flooring'..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    performSearch();
+                  }
+                }}
+                className="pr-9"
+              />
+              <Type className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            </div>
+
+            <Button
+              variant="outline"
+              className="h-10 shrink-0"
+              onClick={() => handleQuickSearch(query)}
+              disabled={isSearching || !query.trim()}
+            >
+              Quick
+            </Button>
+            <Button className="h-10 shrink-0" onClick={() => performSearch()} disabled={isSearching}>
+              {isSearching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              Search
+            </Button>
           </div>
 
-          {/* Image Upload Section */}
+          {/* Contextual helper for the selected mode */}
+          <p className="text-xs text-muted-foreground">
+            {searchType === 'text' && 'Natural language processing for material specifications'}
+            {searchType === 'image' && 'AI will analyze the image to identify materials'}
+            {searchType === 'hybrid' && 'Using both text and image for enhanced matching'}
+            {searchType === 'color' && 'Find materials with similar color palettes'}
+            {searchType === 'texture' && 'Find materials with similar texture patterns'}
+            {searchType === 'style' && 'Find materials with similar design styles'}
+            {searchType === 'material' && 'Find materials of similar types'}
+          </p>
+
+          {/* Image Upload Section — only when the mode can use an image */}
+          {searchType !== 'text' && (
           <div className="border border-dashed border-muted-foreground/25 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <Label className="flex items-center gap-2">
@@ -470,10 +471,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 Material Image {['color', 'texture', 'style', 'material', 'image'].includes(searchType) ? '(Required)' : '(Optional)'}
               </Label>
               {selectedImage && (
-                <Button
-                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3"
-                  onClick={removeImage}
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={removeImage}>
                   <X className="h-4 w-4" />
                 </Button>
               )}
@@ -519,8 +517,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
               }}
             />
           </div>
-
-
+          )}
         </CardContent>
       </Card>
 
