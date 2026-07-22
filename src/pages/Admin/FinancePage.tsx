@@ -144,6 +144,14 @@ const FinancePage: React.FC = () => {
     if (v !== 'parties') p.delete('party');
     setSearchParams(p, { replace: true });
   };
+  /** Jump to the Orders tab AND open one order — OrdersPanel consumes `?order=` then clears it. */
+  const openOrder = (orderId: string) => {
+    const p = new URLSearchParams(searchParams);
+    p.set('tab', 'doc_orders');
+    p.delete('party');
+    p.set('order', orderId);
+    setSearchParams(p, { replace: true });
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Seed the standard income/expense category set once per workspace when finance is first
@@ -516,7 +524,11 @@ const FinancePage: React.FC = () => {
                 label="AR outstanding"
                 value={formatMoney(kpis.arOutstanding)}
                 accent={kpis.overdueTotal > 0 ? 'destructive' : 'default'}
-                subtext={kpis.overdueTotal > 0 ? `${formatMoney(kpis.overdueTotal)} overdue` : 'All on schedule'}
+                // Owed-to-us only; prepayments are a liability and are shown as "held on account",
+                // never netted into this figure (that would understate what customers owe).
+                subtext={kpis.overdueTotal > 0
+                  ? `${formatMoney(kpis.overdueTotal)} overdue`
+                  : (deposits.total > 0 ? `${formatMoney(deposits.total)} held on account` : 'All on schedule')}
               />
               <KpiCard
                 icon={ArrowUpCircle}
@@ -788,7 +800,7 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                           {isOrder ? (
-                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onTabChange('doc_orders')}>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(r.id)}>
                               <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
                             </Button>
                           ) : (
@@ -803,6 +815,51 @@ const FinancePage: React.FC = () => {
                 <TablePagination page={arPage} total={arFiltered.length} onPageChange={setArPage} label="receivables" />
               </CardContent>
             </Card>
+
+            {/* In credit — customers who have PAID US MORE than they owe (prepayments held on
+                account). This is a liability, NOT a receivable, so it is shown separately and is
+                never folded into the aging buckets above — otherwise it would understate what
+                customers actually owe. Chasing a customer who sits here would be a mistake. */}
+            {deposits.rows.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <ArrowDownCircle className="h-4 w-4 text-emerald-600" />
+                    In credit — held on account
+                    <Badge variant="outline" className="ml-1 text-[10px]">{formatMoney(deposits.total, deposits.currency)}</Badge>
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">Money received beyond what these customers owe. Apply it to an order to settle without new cash.</p>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-muted-foreground">
+                      <tr className="border-b border-border/60">
+                        <th className="px-4 py-2 text-left">Credit</th>
+                        <th className="px-4 py-2 text-left">Customer</th>
+                        <th className="px-4 py-2 text-left">Received</th>
+                        <th className="px-4 py-2 text-left">Order</th>
+                        <th className="px-4 py-2 text-right">Held on account</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deposits.rows.map((d) => (
+                        <tr key={d.payment_id} className="border-b border-border/30">
+                          <td className="px-4 py-2 text-xs text-emerald-700">{d.credit_number ?? '—'}</td>
+                          <td className="px-4 py-2 truncate max-w-[200px]" title={d.party_name ?? undefined}>{d.party_name ?? '—'}</td>
+                          <td className="px-4 py-2 text-muted-foreground">{d.paid_at ? new Date(d.paid_at).toLocaleDateString() : '—'}</td>
+                          <td className="px-4 py-2">
+                            {d.order_id
+                              ? <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(d.order_id!)}><ShoppingCart className="h-3.5 w-3.5 mr-1" />{d.order_number ?? 'open'}</Button>
+                              : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="px-4 py-2 text-right font-medium text-emerald-700">{formatMoney(d.unallocated, d.currency)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* ─────────── PAYABLES ─────────── */}
@@ -891,7 +948,7 @@ const FinancePage: React.FC = () => {
                         {!isAccountant && (
                           <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                             {isOrder ? (
-                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onTabChange('doc_orders')}>
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(r.id)}>
                                 <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
                               </Button>
                             ) : (
@@ -1247,7 +1304,7 @@ const BankBalancesCard: React.FC<{ rows: BankAccountBalance[]; onManage?: () => 
       <CardContent className="p-0">
         {active.length === 0 ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
-            No bank or cash accounts yet. Add them in Settings → Bank accounts to track where your money sits, then pick an account whenever you record a payment.
+            No accounts yet. Add them in Settings → Accounts to track where your money sits, then pick an account whenever you record a payment.
           </div>
         ) : (
           <>

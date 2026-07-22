@@ -283,7 +283,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 ) : type === 'expenses' ? (
                   <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} />
                 ) : type === 'payments' ? (
-                  <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} />
+                  <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} financeBase={financeBase} />
                 ) : type === 'delivery_notes' ? (
                   <DeliveryNotesTable rows={paginate(activeRows as DeliveryNote[], page)} readOnly={isAccountant} onChanged={load} />
                 ) : type === 'cheques' ? (
@@ -713,14 +713,15 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
   );
 };
 
-const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string }> = ({ rows, categoryName }) => (
+const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string; financeBase: string }> = ({ rows, categoryName, financeBase }) => (
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">
       <tr>
         <th className="px-4 py-2 text-left">Date</th>
         <th className="px-4 py-2 text-left">Direction</th>
+        <th className="px-4 py-2 text-left">Party</th>
+        <th className="px-4 py-2 text-left">Order</th>
         <th className="px-4 py-2 text-left">Method</th>
-        <th className="px-4 py-2 text-left">Category</th>
         <th className="px-4 py-2 text-left">Reference</th>
         <th className="px-4 py-2 text-right">Amount</th>
         <th className="px-4 py-2 text-right">Allocated</th>
@@ -729,20 +730,34 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
     </thead>
     <tbody>
       {rows.length === 0 && (
-        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
+        <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
       )}
       {rows.map((p: any) => {
         const allocated = (p.allocations ?? []).reduce((s: number, a: any) => s + Number(a.amount ?? 0), 0);
+        // On-account remainder — the credit still available on a money-in payment.
+        const onAccount = p.direction === 'in' ? Math.round((Number(p.amount ?? 0) - allocated) * 100) / 100 : 0;
         return (
           <tr key={p.id} className="border-b border-border/30">
             <td className="px-4 py-2">{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
             <td className="px-4 py-2">
               <Badge variant={p.direction === 'in' ? 'default' : 'outline'} className="text-[10px]">{p.direction === 'in' ? 'Received' : 'Paid out'}</Badge>
             </td>
+            <td className="px-4 py-2 truncate max-w-[180px]" title={p.party_name ?? undefined}>{p.party_name ?? '—'}</td>
+            <td className="px-4 py-2">
+              {p.order_id
+                ? <Link to={`${financeBase}?tab=doc_orders&order=${p.order_id}`} className="text-primary hover:underline text-xs">{p.order_number ?? 'open'}</Link>
+                : <span className="text-muted-foreground">—</span>}
+            </td>
             <td className="px-4 py-2">{p.method ? paymentMethodLabel(p.method) : '—'}</td>
-            <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName(p.category_id)}</td>
-            <td className="px-4 py-2 text-muted-foreground">{p.reference ?? '—'}</td>
-            <td className="px-4 py-2 text-right font-medium">{formatMoney(p.amount, p.currency)}</td>
+            <td className="px-4 py-2 text-muted-foreground truncate max-w-[200px]" title={p.reference ?? undefined}>
+              {p.reference ?? (p.category_id ? categoryName(p.category_id) : '—')}
+            </td>
+            <td className="px-4 py-2 text-right font-medium">
+              {formatMoney(p.amount, p.currency)}
+              {p.credit_number && onAccount > 0.005 && (
+                <span className="block text-[10px] font-normal text-emerald-600">{p.credit_number} · {formatMoney(onAccount, p.currency)} on account</span>
+              )}
+            </td>
             <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(allocated, p.currency)}</td>
             <td className="px-4 py-2 text-right"><PaymentReceiptActions paymentId={p.id} direction={p.direction} /></td>
           </tr>

@@ -111,7 +111,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
       patch.business_company_type = data.business_company_type ?? null;
       patch.business_seasonal = !!data.business_seasonal;
       patch.main_activity = data.main_activity ?? null;
-      // Bank accounts are managed in Settings → Bank accounts (single source), not here.
+      // Accounts are managed in Settings → Accounts (single source), not here.
       const { error } = await supabase.from('finance_settings').upsert(patch, { onConflict: 'workspace_id' });
       if (error) throw error;
       toast({ title: 'Business profile saved' });
@@ -299,7 +299,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
             </div>
 
             {/* Logo lives here now (the separate "Bank & Logo" tab was retired — bank
-                details are managed in Settings → Bank accounts and print from there). */}
+                details are managed in Settings → Accounts and print from there). */}
             <div className="space-y-2 pt-2 border-t border-border/60">
               <Label>Logo (printed on invoices)</Label>
               <div className="flex items-center gap-4">

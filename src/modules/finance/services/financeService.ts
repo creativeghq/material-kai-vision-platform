@@ -234,6 +234,10 @@ export interface PaymentAllocation {
 
 export interface PaymentWithAllocation extends Payment {
   allocations: PaymentAllocation[];
+  credit_number?: string | null;
+  // Enriched by listPayments for the Payments list (party label + order number for the row).
+  party_name?: string | null;
+  order_number?: string | null;
 }
 
 export type SupplierBillStatus =
@@ -1102,7 +1106,9 @@ const _financeServiceCore = {
   } = {}): Promise<PaymentWithAllocation[]> {
     let q = supabase
       .from('payments')
-      .select('*, allocations:payment_allocations(*)')
+      // Join the order (provenance) so the list can show its number, and the allocations so the
+      // row can show what's settled vs still on-account. Party name is resolved in a 2nd batch.
+      .select('*, allocations:payment_allocations(*), order:orders(order_number)')
       .order('paid_at', { ascending: false });
     if (opts.workspaceId) q = q.eq('workspace_id', opts.workspaceId);
     if (opts.direction) q = q.eq('direction', opts.direction);
@@ -1111,7 +1117,25 @@ const _financeServiceCore = {
     if (opts.limit) q = q.limit(opts.limit);
     const { data, error } = await q;
     if (error) throw error;
-    return (data ?? []) as PaymentWithAllocation[];
+    const rows = (data ?? []) as any[];
+
+    // Batch-resolve counterparty names (companies + bare contacts) in two queries, not N.
+    const companyIds = [...new Set(rows.map((r) => r.counterparty_company_id).filter(Boolean))] as string[];
+    const contactIds = [...new Set(rows.map((r) => r.counterparty_contact_id).filter(Boolean))] as string[];
+    const [companies, contacts] = await Promise.all([
+      companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
+      contactIds.length ? supabase.from('crm_contacts').select('id, name, first_name, last_name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const companyName = new Map<string, string>((companies.data ?? []).map((c: any) => [c.id, c.name]));
+    const contactName = new Map<string, string>((contacts.data ?? []).map((c: any) => [c.id, c.name || [c.first_name, c.last_name].filter(Boolean).join(' ')]));
+
+    return rows.map((r) => ({
+      ...r,
+      order_number: r.order?.order_number ?? null,
+      party_name: r.counterparty_company_id
+        ? (companyName.get(r.counterparty_company_id) ?? null)
+        : (r.counterparty_contact_id ? (contactName.get(r.counterparty_contact_id) ?? null) : null),
+    })) as PaymentWithAllocation[];
   },
 
   async deletePayment(paymentId: string): Promise<void> {
@@ -1724,13 +1748,13 @@ const _financeServiceCore = {
    */
   async getDepositsOnAccount(workspaceId: string): Promise<{
     total: number; currency: string;
-    rows: Array<{ payment_id: string; paid_at: string; amount: number; unallocated: number; currency: string; reference: string | null; order_id: string | null; order_number: string | null; party_name: string | null }>;
+    rows: Array<{ payment_id: string; paid_at: string; amount: number; unallocated: number; currency: string; reference: string | null; credit_number: string | null; order_id: string | null; order_number: string | null; party_name: string | null }>;
   }> {
     const { data: pays } = await supabase.from('payments')
-      .select('id, amount, currency, paid_at, reference, order_id, counterparty_company_id, counterparty_contact_id')
+      .select('id, amount, currency, paid_at, reference, credit_number, order_id, counterparty_company_id, counterparty_contact_id')
       .eq('workspace_id', workspaceId).eq('direction', 'in')
       .order('paid_at', { ascending: false }).limit(500);
-    const payments = (pays ?? []) as Array<{ id: string; amount: number; currency: string; paid_at: string; reference: string | null; order_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null }>;
+    const payments = (pays ?? []) as Array<{ id: string; amount: number; currency: string; paid_at: string; reference: string | null; credit_number: string | null; order_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null }>;
     if (payments.length === 0) return { total: 0, currency: 'EUR', rows: [] };
     const ids = payments.map((p) => p.id);
 
@@ -1758,7 +1782,7 @@ const _financeServiceCore = {
       const unallocated = Math.round((Number(p.amount) - (allocated.get(p.id) ?? 0)) * 100) / 100;
       return {
         payment_id: p.id, paid_at: p.paid_at, amount: Number(p.amount), unallocated, currency: p.currency,
-        reference: p.reference, order_id: p.order_id, order_number: p.order_id ? (omap.get(p.order_id) ?? null) : null,
+        reference: p.reference, credit_number: p.credit_number, order_id: p.order_id, order_number: p.order_id ? (omap.get(p.order_id) ?? null) : null,
         party_name: p.counterparty_company_id ? (cmap.get(p.counterparty_company_id) ?? null) : (p.counterparty_contact_id ? (ctmap.get(p.counterparty_contact_id) ?? null) : null),
       };
     }).filter((r) => r.unallocated > 0.005);

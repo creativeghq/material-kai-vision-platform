@@ -47,7 +47,7 @@ const SETTINGS_SECTIONS = [
   { value: 'services', label: 'Services', icon: Wrench },
   { value: 'team', label: 'Team', icon: Users },
   { value: 'storefront', label: 'Online Store', icon: Store },
-  { value: 'banks', label: 'Bank accounts', icon: Landmark },
+  { value: 'banks', label: 'Accounts', icon: Landmark },
   { value: 'digest', label: 'Statements & Digest', icon: Mail },
   { value: 'payments', label: 'Payments', icon: CreditCard },
 ] as const;

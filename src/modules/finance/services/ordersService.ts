@@ -283,10 +283,12 @@ export const ordersService = {
 
     // Batch the finance lookups (3 queries total, not 3 per order). We only need presence of an
     // invoice/bill and the settled amount — not the full getOrderFinance payload.
-    const [inv, bills, pays] = await Promise.all([
+    // Settlement now reads the allocation ledger (#280): payment_allocations rows targeting the
+    // order, joined to their payment's direction. `payments.order_id` is provenance only.
+    const [inv, bills, allocs] = await Promise.all([
       supabase.from('invoices').select('order_id').in('order_id', ids),
       supabase.from('supplier_bills').select('order_id').in('order_id', ids),
-      supabase.from('payments').select('order_id, direction, amount').in('order_id', ids),
+      supabase.from('payment_allocations').select('order_id, amount, payment:payments(direction)').in('order_id', ids),
     ]);
     const invoiced = new Set<string>((inv.data ?? []).map((r: any) => r.order_id));
     (bills.data ?? []).forEach((r: any) => invoiced.add(r.order_id));
@@ -300,9 +302,11 @@ export const ordersService = {
     }
     const settledIn = new Map<string, number>();
     const settledOut = new Map<string, number>();
-    for (const p of (pays.data ?? []) as Array<{ order_id: string; direction: 'in' | 'out'; amount: number }>) {
-      const map = p.direction === 'in' ? settledIn : settledOut;
-      map.set(p.order_id, (map.get(p.order_id) ?? 0) + Number(p.amount));
+    for (const a of (allocs.data ?? []) as Array<{ order_id: string; amount: number; payment: { direction: 'in' | 'out' } | { direction: 'in' | 'out' }[] | null }>) {
+      const dir = (Array.isArray(a.payment) ? a.payment[0]?.direction : a.payment?.direction);
+      if (!dir) continue;
+      const map = dir === 'in' ? settledIn : settledOut;
+      map.set(a.order_id, (map.get(a.order_id) ?? 0) + Number(a.amount));
     }
     const hasCash = (id: string) => settledIn.has(id) || settledOut.has(id);
 

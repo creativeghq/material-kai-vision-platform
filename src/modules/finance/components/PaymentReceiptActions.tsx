@@ -32,16 +32,28 @@ export const PaymentReceiptActions: React.FC<{
     } finally { setBusy(false); }
   };
 
-  const copyLink = async () => {
+  // The clipboard write MUST be issued synchronously inside the click handler. Awaiting the
+  // PDF generation first spends the transient user activation, and Safari/Firefox then reject
+  // the write — which is why this used to "not copy" and surface a generic failure toast.
+  // ClipboardItem accepts a pending Promise<Blob>, so we hand it the in-flight request instead.
+  const copyLink = () => {
     setBusy(true);
-    try {
-      const { pdf_url } = await financeService.generatePaymentReceiptPdf(paymentId);
-      if (!pdf_url) { toast({ title: 'Receipt not available yet', variant: 'destructive' }); return; }
-      await navigator.clipboard.writeText(pdf_url);
-      toast({ title: 'Receipt link copied', description: 'A shareable link to the receipt PDF is on your clipboard.' });
-    } catch (err: any) {
-      toast({ title: 'Failed to copy link', description: err?.message, variant: 'destructive' });
-    } finally { setBusy(false); }
+    const url = financeService.generatePaymentReceiptPdf(paymentId)
+      .then(({ pdf_url }) => {
+        if (!pdf_url) throw new Error('Receipt not available yet');
+        return pdf_url;
+      });
+    const write = typeof ClipboardItem !== 'undefined' && 'write' in navigator.clipboard
+      ? navigator.clipboard.write([
+          new ClipboardItem({ 'text/plain': url.then((u) => new Blob([u], { type: 'text/plain' })) }),
+        ])
+      // Older browsers with no ClipboardItem: fall back to the (activation-spending) text write.
+      : url.then((u) => navigator.clipboard.writeText(u));
+
+    write
+      .then(() => toast({ title: 'Receipt link copied', description: 'A shareable link to the receipt PDF is on your clipboard.' }))
+      .catch((err: any) => toast({ title: 'Failed to copy link', description: err?.message, variant: 'destructive' }))
+      .finally(() => setBusy(false));
   };
 
   const download = async () => {

@@ -136,6 +136,11 @@ export const PaidFromSelect: React.FC<Props> = ({
                 ))}
               </SelectContent>
             </Select>
+            {/* The account says WHERE the money sits; for kinds that clear more than one way this
+                says HOW it left. Cash/card/online accounts derive it and never render this. */}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {selected ? `How it cleared this ${ACCOUNT_KIND_LABEL[kind as BankAccountKind].replace(/s$/, '').toLowerCase()} account.` : 'How the money moved.'}
+            </p>
           </div>
         )}
       </div>

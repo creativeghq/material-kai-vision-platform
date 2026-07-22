@@ -209,7 +209,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       const [{ data: fsP }, { data: allocs }, { data: orderP }] = await Promise.all([
         supabase.from('finance_settings').select('*').eq('workspace_id', row.workspace_id).maybeSingle(),
         supabase.from('payment_allocations')
-          .select('amount, invoice:invoices(internal_number, legal_number, fiscal_mark), supplier_bill:supplier_bills(supplier_bill_number)')
+          .select('amount, invoice:invoices(internal_number, legal_number, fiscal_mark), supplier_bill:supplier_bills(supplier_bill_number), order:orders(order_number)')
           .eq('payment_id', docId),
         row.order_id
           ? supabase.from('orders').select('order_number, notes').eq('id', row.order_id).maybeSingle()
@@ -1060,14 +1060,17 @@ async function buildPaymentReceiptPdf(d: {
     customer?.tax_office ? `${L.taxOffice}: ${customer.tax_office}` : '',
   ].filter(Boolean) as string[];
   const invRefs = [...new Set((allocations ?? []).map((a: any) => a.invoice?.legal_number || a.invoice?.internal_number).filter(Boolean))];
+  const ordRefs = [...new Set((allocations ?? []).map((a: any) => a.order?.order_number).filter(Boolean))];
   const marks = [...new Set((allocations ?? []).map((a: any) => a.invoice?.fiscal_mark).filter(Boolean))];
   const allocated = (allocations ?? []).reduce((s: number, a: any) => s + Number(a.amount ?? 0), 0);
   const settleLines = [
-    invRefs.length ? `${L.invoiceNo}: ${invRefs.join(', ')}` : L.onAccount,
+    invRefs.length ? `${L.invoiceNo}: ${invRefs.join(', ')}` : '',
+    ordRefs.length ? `${L.order}: ${ordRefs.join(', ')}` : '',
+    (!invRefs.length && !ordRefs.length) ? L.onAccount : '',
     marks.length ? `${L.mark}: ${marks.join(', ')}` : '',
     `${L.allocated}: ${num(allocated)}`,
     Math.abs(Number(payment.amount ?? 0) - allocated) >= 0.01
-      ? `${L.unallocated}: ${num(Number(payment.amount ?? 0) - allocated)}` : '',
+      ? `${L.unallocated}: ${num(Number(payment.amount ?? 0) - allocated)}${payment.credit_number ? ` (${payment.credit_number})` : ''}` : '',
   ].filter(Boolean) as string[];
 
   const columns: [BadgeGlyph, string, string, string[]][] = [

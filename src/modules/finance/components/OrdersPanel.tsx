@@ -157,6 +157,19 @@ export const OrdersPanel: React.FC<{
     }
   }, [embedded, searchParams, setSearchParams]);
 
+  // Deep-link straight into ONE order: /finance?tab=doc_orders&order=<id>. Used by the AR/AP
+  // aging tables' "Open order" button and by the purchase_order.received flow notification —
+  // both previously landed on the bare list because nothing read this param.
+  useEffect(() => {
+    if (embedded) return;
+    const target = searchParams.get('order');
+    if (!target) return;
+    setOpenId(target);
+    const p = new URLSearchParams(searchParams);
+    p.delete('order');
+    setSearchParams(p, { replace: true });
+  }, [embedded, searchParams, setSearchParams]);
+
   // Role-aware New-order menu. No role context (global Finance list / project tab) or an
   // unclassified party → offer both kinds, unchanged. A customer-only party can't be a
   // supplier we buy from, so Purchase is hidden — and vice versa.
@@ -1154,7 +1167,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           user_id: u?.user?.id ?? null,
           title: `Purchase order ${order.order_number ?? order.id.slice(0, 8)} received`,
           body: `${data ?? 0} warehouse line(s) updated`,
-          action_url: `/finance?tab=orders&order=${order.id}`,
+          action_url: `/finance?tab=doc_orders&order=${order.id}`,
           order_id: order.id,
           order_number: order.order_number,
           supplier_id: order.supplier_company_id,

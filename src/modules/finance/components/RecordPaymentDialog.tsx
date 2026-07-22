@@ -275,7 +275,7 @@ export const RecordPaymentDialog: React.FC<{
             allowUnassigned
           />
           {bankAccounts.length === 0 && (
-            <p className="text-[11px] text-muted-foreground">No accounts yet — add bank/cash accounts in Settings → Bank accounts to track where money sits.</p>
+            <p className="text-[11px] text-muted-foreground">No accounts yet — add bank/cash accounts in Settings → Accounts to track where money sits.</p>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

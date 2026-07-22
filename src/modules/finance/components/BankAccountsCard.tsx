@@ -140,7 +140,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm flex items-center gap-2"><Landmark className="h-4 w-4" /> Bank &amp; cash accounts</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><Landmark className="h-4 w-4" /> Accounts</CardTitle>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           {Object.entries(totalsByCurrency).map(([cur, total]) => (
             <span key={cur}>Total: <span className="font-semibold text-foreground">{formatMoney(total, cur)}</span></span>
