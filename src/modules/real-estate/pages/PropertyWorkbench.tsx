@@ -48,6 +48,7 @@ export default function PropertyWorkbench() {
   const [form, setForm] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [newViewingAt, setNewViewingAt] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const ws = activeWorkspaceId;
@@ -263,13 +264,30 @@ export default function PropertyWorkbench() {
           </TabsContent>
 
           {/* ── Viewings ── */}
-          <TabsContent value="viewings">
+          <TabsContent value="viewings" className="space-y-4">
+            {canManage && (
+              <div className="flex flex-wrap items-end gap-2">
+                <input type="datetime-local" value={newViewingAt} onChange={(e) => setNewViewingAt(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm" />
+                <Button size="sm" className="rounded-full" disabled={!newViewingAt || busy} onClick={async () => {
+                  if (!ws || !newViewingAt) return;
+                  setBusy(true);
+                  try { await realEstateService.createViewing(ws, { property_id: id, scheduled_at: new Date(newViewingAt).toISOString() }); setNewViewingAt(''); await load(); toast({ title: 'Viewing scheduled' }); }
+                  catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+                  finally { setBusy(false); }
+                }}>Schedule viewing</Button>
+              </div>
+            )}
             {viewings.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No viewings scheduled.</div> : (
               <Card><CardContent className="p-0"><div className="divide-y divide-border">
                 {viewings.map((v) => (
                   <div key={v.id} className="flex items-center gap-4 px-4 py-3 text-sm">
                     <div className="flex-1">{new Date(v.scheduled_at).toLocaleString()} · <span className="capitalize text-muted-foreground">{v.type.replace('_', ' ')}</span></div>
-                    <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{v.status.replace('_', ' ')}</Badge>
+                    {canManage && (
+                      <select className="rounded-md border bg-background px-2 py-1 text-xs" value={v.status}
+                        onChange={async (e) => { const upd = await realEstateService.updateViewing(ws!, v.id, { status: e.target.value }); setViewings((prev) => prev.map((x) => x.id === v.id ? upd : x)); }}>
+                        {['scheduled', 'completed', 'cancelled', 'no_show'].map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                      </select>
+                    )}
                   </div>
                 ))}
               </div></CardContent></Card>
