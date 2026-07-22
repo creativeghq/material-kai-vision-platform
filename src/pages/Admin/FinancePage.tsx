@@ -811,8 +811,8 @@ const FinancePage: React.FC = () => {
                             </span>
                           ) : isCredit ? (
                             <span className="flex items-center gap-2">
-                              <span className="text-xs text-emerald-700">{r.credit_number ?? r.description}</span>
-                              <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-600/40">Credit · on account</Badge>
+                              <span className="text-xs">{r.credit_number ?? r.description}</span>
+                              <Badge variant="outline" className="text-[10px]">Credit · on account</Badge>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.internal_number}</span>
@@ -833,7 +833,7 @@ const FinancePage: React.FC = () => {
                         </td>
                         <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.total)}</td>
                         <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.amount_paid)}</td>
-                        <td className={`px-4 py-2 text-right font-medium ${isCredit ? 'text-emerald-700' : ''}`}>{formatMoney(r.amount_due)}</td>
+                        <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
                             <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
