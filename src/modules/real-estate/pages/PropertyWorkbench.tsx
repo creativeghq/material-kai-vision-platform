@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles } from 'lucide-react';
+import { Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles, FileText } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -154,6 +154,12 @@ export default function PropertyWorkbench() {
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" className="rounded-full" onClick={() => navigate('/properties')}><ArrowLeft className="mr-1 h-4 w-4" /> Portfolio</Button>
+            <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={async () => {
+              setBusy(true);
+              try { const r = await realEstateService.generateBrochure(id); if (r.pdf_url) window.open(r.pdf_url, '_blank'); toast({ title: 'Brochure ready', description: `${r.page_count} page(s)` }); }
+              catch (e) { toast({ title: 'Brochure failed', description: (e as Error).message, variant: 'destructive' }); }
+              finally { setBusy(false); }
+            }}><FileText className="mr-1 h-4 w-4" /> Brochure</Button>
             {canManage && (property.is_public
               ? <Button variant="outline" size="sm" className="rounded-full" onClick={unpublish} disabled={busy}><EyeOff className="mr-1 h-4 w-4" /> Unpublish</Button>
               : <Button size="sm" className="rounded-full" onClick={publish} disabled={busy}><Globe className="mr-1 h-4 w-4" /> Publish</Button>)}

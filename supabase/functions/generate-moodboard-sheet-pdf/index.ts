@@ -71,6 +71,7 @@ import type {
 } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { createSheet, refundSheetCredits, type SheetType } from './create-sheet.ts';
+import { buildPropertyBrochurePdf } from './brochure-realestate.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -108,6 +109,12 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     // Project-level Client View deck — assembled from sheets across any of the
     // project's moodboards. Same builders, project scope. (Folded in here rather
     // than a separate function — see the merge-functions rule.)
+    // #249 — Real Estate property brochure. Same pdf-lib/layout stack, property scope + module
+    // gates. Folded in here rather than a separate function (merge-functions rule).
+    if ((body as any).property_brochure_id) {
+      return await buildPropertyBrochurePdf(supabase, auth, String((body as any).property_brochure_id));
+    }
+
     if (body.client_view_id) {
       return await buildClientViewPdf(supabase, auth, body.client_view_id, !!body.regenerate);
     }

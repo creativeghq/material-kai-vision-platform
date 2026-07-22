@@ -77,6 +77,12 @@ export const realEstateService = {
   /** AI listing copy (credit-metered). Returns a draft to fill into the form — not auto-saved. */
   draftDescription: (ws: string, propertyId: string) =>
     call<{ title: string; description_en: string; description_el: string; credits: number }>(ws, 'draft-description', { property_id: propertyId }),
+  /** Render a client-ready brochure PDF (property-media bucket). Returns a 7-day signed URL. */
+  async generateBrochure(propertyId: string): Promise<{ pdf_url: string | null; page_count: number }> {
+    const { data, error } = await supabase.functions.invoke('generate-moodboard-sheet-pdf', { body: { property_brochure_id: propertyId } });
+    if (error) throw await edgeError(error);
+    return data as { pdf_url: string | null; page_count: number };
+  },
 
   // Photos
   photoUploadUrl: (ws: string, propertyId: string, ext: string) =>
