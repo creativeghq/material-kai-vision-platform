@@ -19,6 +19,7 @@ import {
 } from '@/components/core/ui/dropdown-menu';
 import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
 import { AppLauncher } from '@/components/core/AppLauncher';
+import { GlobalSearch } from '@/components/core/GlobalSearch';
 
 /** #227 — header toggle to hide/show all prices across browse surfaces (demos / material research). */
 const ShowPricesToggle: React.FC = () => {
@@ -135,6 +136,7 @@ export const Sidebar: React.FC = () => {
           </Link>
 
           <div className="flex items-center gap-0.5 shrink-0">
+            <GlobalSearch variant="icon" />
             <WorkspaceSwitcher />
             <ModuleHeaderActions />
             {profileMenu}
@@ -178,6 +180,8 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       <div className="flex items-center gap-2 shrink-0 pl-2">
+        {/* Mac-style Spotlight search — sits right after the App Launcher (end of nav). */}
+        <GlobalSearch variant="bar" />
         <ShowPricesToggle />
         <WorkspaceSwitcher />
         <ModuleHeaderActions />

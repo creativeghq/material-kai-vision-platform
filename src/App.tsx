@@ -98,7 +98,6 @@ const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
-const MaterialSearchPage = lazy(() => import('./pages/MaterialSearchPage'));
 const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
@@ -537,21 +536,16 @@ const App = () => (
                 {/* Relocated into AI Configurations → API Gateway tab (2026-07-15). */}
                 <Route path="/admin/api-gateway" element={<Navigate to="/admin/ai-configs?tab=api-gateway" replace />} />
 
-                {/* Material Search — primary catalog search surface (7-vector fusion). */}
+                {/* Material Search moved under Discover → Products ("Smart search" mode). The
+                    standalone /search + legacy /search-hub now redirect there; the universal
+                    Mac-style Spotlight (⌘K) is the always-available quick-search entry point. */}
                 <Route
                   path="/search"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <MaterialSearchPage />
-                      </Layout>
-                    </AuthGuard>
-                  }
+                  element={<Navigate to="/discover?tab=products&mode=smart" replace />}
                 />
-                {/* Legacy /search-hub now lands on the real search page (was → agent-hub). */}
                 <Route
                   path="/search-hub"
-                  element={<Navigate to="/search" replace />}
+                  element={<Navigate to="/discover?tab=products&mode=smart" replace />}
                 />
                 <Route
                   path="/agent-hub"

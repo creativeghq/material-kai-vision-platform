@@ -76,11 +76,14 @@ const FILTERS_STORAGE_KEY = 'materialSearchFilters';
 interface UnifiedSearchInterfaceProps {
   onResultsFound?: (results: SearchResult[]) => void;
   onMaterialSelect?: (materialId: string) => void;
+  /** When set, seeds the query box and runs a text search once on mount (e.g. from Spotlight). */
+  initialQuery?: string;
 }
 
 export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   onResultsFound,
   onMaterialSelect,
+  initialQuery,
 }) => {
   // Using modern MaterialSearchService
   // const materialSearchService is imported as singleton
@@ -112,6 +115,19 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(values));
   }, [values]);
 
+  // Seed + auto-run when opened with an initial query (Spotlight "Smart search", capability
+  // deep-links). Runs once per distinct initialQuery so re-renders don't re-fire the search.
+  const autoRanFor = useRef<string | null>(null);
+  useEffect(() => {
+    const q = initialQuery?.trim();
+    if (!q || autoRanFor.current === q) return;
+    autoRanFor.current = q;
+    setSearchType('text');
+    setQuery(q);
+    void performSearch(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
+
   const handleImageSelect = useCallback((file: File) => {
     setSelectedImage(file);
     const reader = new FileReader();
@@ -138,9 +154,13 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     [selectedImage],
   );
 
-  const performSearch = useCallback(async () => {
+  const performSearch = useCallback(async (overrideQuery?: string) => {
+    // `overrideQuery` lets callers (e.g. the auto-run from `initialQuery`) drive a search without
+    // waiting on the async `query` state update. NEVER pass this as a raw onClick handler — the
+    // click event would arrive here as `overrideQuery`; wrap it as `() => performSearch()`.
+    const effectiveQuery = typeof overrideQuery === 'string' ? overrideQuery : query;
     // Validate input based on search type
-    if (searchType === 'text' && !query.trim()) {
+    if (searchType === 'text' && !effectiveQuery.trim()) {
       toast({
         title: 'Search Input Required',
         description: 'Please enter a search query',
@@ -191,7 +211,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       // multi_vector is the only supported strategy — it handles text, image,
       // color, texture, style, and material searches.
       searchResponse = await UnifiedSearchService.searchMultiVector({
-        query: searchType === 'text' ? query.trim() : (selectedImage?.name || `${searchType}_search`),
+        query: searchType === 'text' ? effectiveQuery.trim() : (selectedImage?.name || `${searchType}_search`),
         workspace_id: workspaceId,
         limit: 15,
         image_base64: imageBase64,
@@ -369,7 +389,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
             >
               Quick
             </Button>
-            <Button onClick={performSearch} disabled={isSearching}>
+            <Button onClick={() => performSearch()} disabled={isSearching}>
               {isSearching ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (

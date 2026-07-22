@@ -15,7 +15,6 @@ import {
   Package,
   Workflow,
   Headset,
-  Search,
   Sofa,
   Share2,
   TrendingUp,
@@ -99,10 +98,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // ── Top bar: universal surfaces every user relies on ──
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
-  // Material Search is the platform's most-used, cross-cutting capability, so it lives in the
-  // lean top bar (always one click away) rather than inside a single Hub. 7-vector fusion search
-  // over materials/catalogs/KB — the same MIVAA backend the agent's material_search tool uses.
-  { id: 'search', label: 'Search', path: '/search', icon: Search },
+  // Material Search no longer has its own top-bar entry — it moved under Discover → Products
+  // (the "Smart search" mode) so browsing and searching materials live in one place, and the
+  // universal Mac-style Spotlight (⌘K, top bar) is the always-available quick-search entry point.
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireCapability: 'marketplace.browse' },
 
   // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251),
@@ -223,6 +221,5 @@ export function filterNavItems(
 export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'dashboard',
   'agent-hub',
-  'search',
   'discover',
 ];

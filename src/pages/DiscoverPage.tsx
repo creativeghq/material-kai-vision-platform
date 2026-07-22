@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
   Users, MapPin, Globe, Building2, Package,
   Layers, X, Package2, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
+  Sparkles, LayoutList,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
@@ -24,6 +25,7 @@ import ProductDetailModal from '@/components/features/products/ProductDetailModa
 import { Product } from '@/components/features/products/types';
 import { ProfileModal } from '@/components/features/discover/ProfileModal';
 import { MarketplaceTab } from '@/components/features/discover/MarketplaceTab';
+import { UnifiedSearchInterface } from '@/components/features/search/UnifiedSearchInterface';
 import { marketplaceService } from '@/services/marketplaceService';
 import {
   CAT_COLORS, PROFESSIONAL_TYPE_LABELS,
@@ -429,6 +431,14 @@ export const DiscoverPage: React.FC = () => {
   // Controlled so a deep-link (?tab=products&factory=…) can open the right tab.
   const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'profiles');
 
+  // Products tab has two modes: "browse" (the filterable catalog list) and "smart" (the
+  // 7-vector fusion search moved here from the old /search page). `?mode=smart&q=…` deep-links
+  // (Spotlight action, /search redirect, capability links) open smart mode pre-searched.
+  const [productMode, setProductMode] = useState<'browse' | 'smart'>(
+    searchParams.get('mode') === 'smart' ? 'smart' : 'browse',
+  );
+  const smartInitialQuery = searchParams.get('q') || undefined;
+
   // Modals
   const [selectedFactory, setSelectedFactory] = useState<Factory | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
@@ -509,6 +519,9 @@ export const DiscoverPage: React.FC = () => {
   useEffect(() => {
     const t = searchParams.get('tab');
     if (t) setActiveTab(t);
+    const m = searchParams.get('mode');
+    if (m === 'smart') setProductMode('smart');
+    else if (m === 'browse') setProductMode('browse');
   }, [searchParams]);
 
   // Derived factories
@@ -762,29 +775,62 @@ export const DiscoverPage: React.FC = () => {
 
           {/* ── PRODUCTS ──────────────────────────────────────────────── */}
           <TabsContent value="products" className="mt-6 space-y-4">
-            <FilterBar
-              groups={productGroups}
-              values={productFilters.values}
-              onChange={productFilters.setValues}
-              previewCount={productFilters.previewCount}
-              title="Filter materials"
-              searchPlaceholder="Search materials by name or brand…"
-            >
-              <Select value={productSort} onValueChange={(v) => setProductSort(v as 'name' | 'factory')}>
-                <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Name A–Z</SelectItem>
-                  <SelectItem value="factory">By brand</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterBar>
+            {/* Browse the catalog, or run the 7-vector "smart" search (text / image / color /
+                texture / style / material) — both live here now that /search folded in. */}
+            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 p-1">
+              <Button
+                variant={productMode === 'browse' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 rounded-full px-3 text-xs"
+                onClick={() => setProductMode('browse')}
+              >
+                <LayoutList className="h-3.5 w-3.5 mr-1.5" /> Browse
+              </Button>
+              <Button
+                variant={productMode === 'smart' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 rounded-full px-3 text-xs"
+                onClick={() => setProductMode('smart')}
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Smart search
+              </Button>
+            </div>
 
-            {loading ? (
-              <SkeletonRows count={8} />
-            ) : filteredProducts.length === 0 ? (
-              <Empty icon={Package} text="No materials found." />
+            {productMode === 'smart' ? (
+              <UnifiedSearchInterface
+                initialQuery={smartInitialQuery}
+                onMaterialSelect={(id) => {
+                  const raw = products.find((p) => p.id === id);
+                  if (raw) openProduct(raw);
+                }}
+              />
             ) : (
-              <ProductList products={filteredProducts} onView={openProduct} surplus={surplus} />
+              <>
+                <FilterBar
+                  groups={productGroups}
+                  values={productFilters.values}
+                  onChange={productFilters.setValues}
+                  previewCount={productFilters.previewCount}
+                  title="Filter materials"
+                  searchPlaceholder="Search materials by name or brand…"
+                >
+                  <Select value={productSort} onValueChange={(v) => setProductSort(v as 'name' | 'factory')}>
+                    <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name">Name A–Z</SelectItem>
+                      <SelectItem value="factory">By brand</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FilterBar>
+
+                {loading ? (
+                  <SkeletonRows count={8} />
+                ) : filteredProducts.length === 0 ? (
+                  <Empty icon={Package} text="No materials found." />
+                ) : (
+                  <ProductList products={filteredProducts} onView={openProduct} surplus={surplus} />
+                )}
+              </>
             )}
           </TabsContent>
 

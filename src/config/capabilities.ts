@@ -45,8 +45,8 @@ export interface CapabilityDef {
  */
 export const CAPABILITIES: readonly CapabilityDef[] = [
   // ── Search (core, cross-cutting) ──
-  { id: 'material-search', label: 'Material Search', pageRoute: '/search', agentId: 'kai', agentTool: 'material_search', toolkitId: 'core', quickStartLabel: 'Find materials', canvasKind: 'products' },
-  { id: 'visual-search', label: 'Visual Search', pageRoute: '/search', agentId: 'kai', agentTool: 'visual_search', toolkitId: 'core', canvasKind: 'products' },
+  { id: 'material-search', label: 'Material Search', pageRoute: '/discover?tab=products&mode=smart', agentId: 'kai', agentTool: 'material_search', toolkitId: 'core', quickStartLabel: 'Find materials', canvasKind: 'products' },
+  { id: 'visual-search', label: 'Visual Search', pageRoute: '/discover?tab=products&mode=smart', agentId: 'kai', agentTool: 'visual_search', toolkitId: 'core', canvasKind: 'products' },
 
   // ── Studio ──
   { id: 'interior', label: 'Interior Design', hub: 'studio', agentId: 'interior-designer', agentTool: 'generate_3d', toolkitId: 'generation', canvasKind: 'render' },
