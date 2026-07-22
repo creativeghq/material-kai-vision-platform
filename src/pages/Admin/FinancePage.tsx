@@ -1161,21 +1161,28 @@ function bucketize(rows: AgingRow[]): Record<AgeBucket, { count: number; total: 
 const BucketCards: React.FC<{
   buckets: Record<AgeBucket, { count: number; total: number }>;
   active: string; onPick: (b: string) => void; noun: string;
-}> = ({ buckets, active, onPick, noun }) => (
-  <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-    {AGE_BUCKETS.map((b) => (
-      <button key={b} type="button" onClick={() => onPick(active === b ? 'all' : b)} className="text-left">
-        <Card className={`dashboard-card border-0 transition ${active === b ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}>
-          <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground">{ageBucketLabel(b)}</div>
-            <div className="text-lg font-semibold">{formatMoney(buckets[b].total)}</div>
-            <div className="text-[10px] text-muted-foreground">{buckets[b].count} {noun}</div>
-          </CardContent>
-        </Card>
-      </button>
-    ))}
-  </div>
-);
+}> = ({ buckets, active, onPick, noun }) => {
+  // Include 'no_due_date' whenever it carries money/rows — otherwise a workspace whose
+  // receivables/payables are all uninvoiced orders or on-account credit (neither of which
+  // ages) would show five €0 cards while the table below is full. Only rendered when it has
+  // content so dated books keep the clean five-card row.
+  const cards: AgeBucket[] = buckets.no_due_date.count > 0 ? [...AGE_BUCKETS, 'no_due_date'] : AGE_BUCKETS;
+  return (
+    <div className={`grid grid-cols-2 gap-3 ${cards.length > 5 ? 'md:grid-cols-3 lg:grid-cols-6' : 'md:grid-cols-5'}`}>
+      {cards.map((b) => (
+        <button key={b} type="button" onClick={() => onPick(active === b ? 'all' : b)} className="text-left">
+          <Card className={`dashboard-card border-0 transition ${active === b ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}>
+            <CardContent className="p-3">
+              <div className="text-xs text-muted-foreground">{b === 'no_due_date' ? 'No due date / expected' : ageBucketLabel(b)}</div>
+              <div className="text-lg font-semibold">{formatMoney(buckets[b].total)}</div>
+              <div className="text-[10px] text-muted-foreground">{buckets[b].count} {noun}</div>
+            </CardContent>
+          </Card>
+        </button>
+      ))}
+    </div>
+  );
+};
 
 const BucketSummary: React.FC<{
   title: string;
