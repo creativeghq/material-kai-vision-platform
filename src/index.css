@@ -488,6 +488,34 @@ All colors MUST be HSL.
     /* ===== REFINED SHADOWS (Light) ===== */
     --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.14), 0 5px 20px -5px rgba(0, 0, 0, 0.08);
   }
+
+  /* ========================================
+     ACCENT: BLUE  (opt-in via html[data-accent="blue"])
+     Retints ONLY the accent tokens — primary, focus ring, active nav pill and
+     the identity brand-gradient — from the default green/olive to the B2B blue.
+     Everything else (surfaces, borders, radii, typography) is inherited from the
+     base theme, so this is a pure hue swap in both modes. `green` is the default
+     and needs no block. Selector carries .light/.dark so it beats the base
+     token blocks on specificity and never leaks across modes.
+     ======================================== */
+
+  /* Blue — LIGHT theme (navy→blue identity gradient, deep AA-safe blue primary) */
+  html.light[data-accent='blue'] {
+    --primary: 218 74% 46%;          /* #1e5ecc */
+    --ring: 218 74% 46%;
+    --sidebar-accent: 218 74% 46%;
+    --brand-gradient: linear-gradient(135deg, #0f2547 0%, #1c5091 46%, #2f6fed 100%);
+  }
+
+  /* Blue — DARK theme (brightened blue accent on near-black, deep-navy gradient) */
+  html.dark[data-accent='blue'] {
+    --primary: 212 74% 54%;          /* #2f80d6 */
+    --brand-blue: 216 60% 28%;
+    --brand-red: 212 74% 54%;
+    --ring: 212 74% 54%;
+    --sidebar-accent: 212 74% 54%;
+    --brand-gradient: linear-gradient(135deg, #0c1e3d 0%, #1a4a86 46%, #3a86e0 100%);
+  }
 }
 
 @layer base {
