@@ -146,6 +146,8 @@ export const realEstateService = {
     call<{ requirement: BuyerRequirement; matches: PropertyListItem[] }>(ws, 'match-buyer-requirement', { requirement_id: requirementId }),
   buyersForProperty: (ws: string, propertyId: string) =>
     call<{ matches: (BuyerRequirement & { contact?: { id: string; name: string | null; email: string | null } | null })[] }>(ws, 'buyers-for-property', { property_id: propertyId }).then((r) => r.matches),
+  scoreLead: (ws: string, crmContactId: string) =>
+    call<{ lead_score: number; health_score: number; rationale?: string; credits: number }>(ws, 'score-lead', { crm_contact_id: crmContactId }),
   getContactExt: (ws: string, crmContactId: string) =>
     call<{ ext: ContactExt | null }>(ws, 'get-contact-ext', { crm_contact_id: crmContactId }).then((r) => r.ext),
   upsertContactExt: (ws: string, crmContactId: string, fields: Partial<ContactExt>) =>

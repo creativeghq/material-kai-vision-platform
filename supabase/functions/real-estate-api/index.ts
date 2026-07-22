@@ -20,7 +20,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { checkPublishRequirements } from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
-import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
+import { draftListingCopy, analyzePropertyPhotos, scoreLead } from './ai.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -488,6 +488,18 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       // ── Contact real-estate extension (1:1) ────────────────────────────
+      case 'score-lead': {
+        requireManage();
+        const contactId = String(body.crm_contact_id ?? '');
+        if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
+        // Ensure the contact is in this workspace before scoring/writing.
+        const { data: c } = await supabase.from('crm_contacts').select('id').eq('id', contactId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!c) return json({ error: 'not found' }, 404);
+        const s = await scoreLead(supabase, userId, workspaceId, contactId);
+        await supabase.from('crm_contacts').update({ lead_score: s.lead_score, health_score: s.health_score }).eq('id', contactId).eq('workspace_id', workspaceId);
+        return json(s);
+      }
+
       case 'get-contact-ext': {
         const contactId = String(body.crm_contact_id ?? '');
         if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);

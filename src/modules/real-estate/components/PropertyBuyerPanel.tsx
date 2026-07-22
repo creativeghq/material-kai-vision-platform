@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Plus, Search, Trash2, Save } from 'lucide-react';
+import { Home, Plus, Search, Trash2, Save, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -17,6 +17,8 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
   const [reqs, setReqs] = useState<BuyerRequirement[]>([]);
   const [savingExt, setSavingExt] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [score, setScore] = useState<{ lead_score: number; health_score: number; rationale?: string } | null>(null);
+  const [scoring, setScoring] = useState(false);
 
   const load = useCallback(async () => {
     if (!ws) return;
@@ -50,8 +52,15 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
   return (
     <div className="space-y-4">
       <Card><CardContent className="p-4">
-        <div className="mb-3 flex items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Buyer / seller profile</span>
-          <Button size="sm" variant="outline" className="ml-auto rounded-full" onClick={saveExt} disabled={savingExt}><Save className="mr-1 h-3.5 w-3.5" /> Save</Button>
+        <div className="mb-3 flex flex-wrap items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Buyer / seller profile</span>
+          {score && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title={score.rationale}>Lead {score.lead_score} · Health {score.health_score}</Badge>}
+          <Button size="sm" variant="ghost" className="ml-auto rounded-full" disabled={scoring} onClick={async () => {
+            if (!ws) return; setScoring(true);
+            try { const s = await realEstateService.scoreLead(ws, contactId); setScore(s); toast({ title: `Lead scored ${s.lead_score}/100`, description: `${s.rationale ?? ''} · ${s.credits} credit(s)` }); }
+            catch (e) { toast({ title: 'Scoring failed', description: (e as Error).message, variant: 'destructive' }); }
+            finally { setScoring(false); }
+          }}><Sparkles className="mr-1 h-3.5 w-3.5" /> {scoring ? 'Scoring…' : 'AI score'}</Button>
+          <Button size="sm" variant="outline" className="rounded-full" onClick={saveExt} disabled={savingExt}><Save className="mr-1 h-3.5 w-3.5" /> Save</Button>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Fld label="Role"><select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={ext.contact_role ?? ''} onChange={(e) => setE('contact_role', e.target.value)}>

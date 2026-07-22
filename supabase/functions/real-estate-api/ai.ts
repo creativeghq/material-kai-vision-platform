@@ -214,3 +214,83 @@ export async function analyzePropertyPhotos(
 
   return { cover_index: block.input.cover_index ?? 0, photos: block.input.photos ?? [], credits };
 }
+
+const LEAD_TOOL = {
+  name: 'emit_lead_score',
+  description: 'Score a real-estate lead 0-100 (likelihood to transact) and health 0-100 (engagement/fit).',
+  input_schema: {
+    type: 'object',
+    properties: {
+      lead_score: { type: 'integer', description: '0-100 likelihood this lead transacts soon.' },
+      health_score: { type: 'integer', description: '0-100 relationship health / fit.' },
+      rationale: { type: 'string', description: 'one short sentence.' },
+    },
+    required: ['lead_score', 'health_score'],
+  },
+};
+const LEAD_CEILING = 3;
+
+/** Score a lead from CRM + property signals. Credit-metered. Caller writes the scores to crm_contacts. */
+export async function scoreLead(
+  supabase: any, userId: string, workspaceId: string, contactId: string,
+): Promise<{ lead_score: number; health_score: number; rationale?: string; credits: number }> {
+  const key = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!key) throw new HttpError(400, 'AI is not configured (ANTHROPIC_API_KEY missing)');
+
+  const [{ data: contact }, { data: ext }, inq, interests, viewings] = await Promise.all([
+    supabase.from('crm_contacts').select('name, contact_type, lead_status, lead_source, created_at').eq('id', contactId).eq('workspace_id', workspaceId).maybeSingle(),
+    supabase.from('property_contacts_ext').select('*').eq('crm_contact_id', contactId).maybeSingle(),
+    supabase.from('property_inquiries').select('id', { count: 'exact', head: true }).eq('crm_contact_id', contactId).eq('workspace_id', workspaceId),
+    supabase.from('property_interests').select('interest_type').eq('crm_contact_id', contactId).eq('workspace_id', workspaceId),
+    supabase.from('property_viewings').select('id, status').eq('crm_contact_id', contactId).eq('workspace_id', workspaceId),
+  ]);
+  if (!contact) throw new HttpError(404, 'contact not found');
+  const signals = {
+    lead_status: contact.lead_status, lead_source: contact.lead_source, contact_type: contact.contact_type,
+    days_known: contact.created_at ? Math.round((Date.now() - new Date(contact.created_at).getTime()) / 864e5) : null,
+    inquiries: inq?.count ?? 0,
+    interests: (interests ?? []).map((i: any) => i.interest_type),
+    viewings: (viewings ?? []).length, completed_viewings: (viewings ?? []).filter((v: any) => v.status === 'completed').length,
+    budget_min: ext?.budget_min ?? null, budget_max: ext?.budget_max ?? null,
+    pre_approval_status: ext?.pre_approval_status ?? null, pre_approval_amount: ext?.pre_approval_amount ?? null,
+    made_offer: (interests ?? []).some((i: any) => i.interest_type === 'offer_made'),
+  };
+  const prompt = `Score this real-estate lead from its signals. Higher lead_score = more likely to transact soon (offers/viewings/pre-approval push it up; cold/no-engagement pushes it down).\n\nSIGNALS (JSON):\n${JSON.stringify(signals, null, 2)}`;
+
+  const model = RE_MODEL();
+  await reserveCredits(supabase, userId, workspaceId, LEAD_CEILING);
+  let data: any;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 300, tools: [LEAD_TOOL], tool_choice: { type: 'tool', name: LEAD_TOOL.name }, messages: [{ role: 'user', content: prompt }] }),
+    });
+    if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
+    data = await res.json();
+  } catch (e) {
+    await refund(supabase, userId, workspaceId, LEAD_CEILING, { reason: 'lead_score_failed' });
+    if (e instanceof HttpError) throw e; throw new HttpError(502, 'AI request failed');
+  }
+  const block = (data.content || []).find((b: any) => b.type === 'tool_use');
+  if (!block?.input) { await refund(supabase, userId, workspaceId, LEAD_CEILING, { reason: 'no_output' }); throw new HttpError(502, 'AI returned no result'); }
+
+  const inTok = Number(data?.usage?.input_tokens ?? 0), outTok = Number(data?.usage?.output_tokens ?? 0);
+  const p = priceFor(model);
+  const rawUsd = (inTok / 1e6) * p.input + (outTok / 1e6) * p.output;
+  const billedUsd = rawUsd * MARKUP_MULTIPLIER;
+  const credits = Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
+  try {
+    await supabase.from('ai_usage_logs').insert({
+      user_id: userId, workspace_id: workspaceId, module_slug: 'real-estate',
+      operation_type: 'real_estate_lead_score', model_name: model,
+      input_tokens: inTok, output_tokens: outTok, raw_cost_usd: rawUsd, markup_multiplier: MARKUP_MULTIPLIER,
+      billed_cost_usd: billedUsd, credits_debited: credits, metadata: { crm_contact_id: contactId },
+    });
+  } catch (e) { console.warn('[re-ai] lead usage log failed (non-fatal):', e); }
+  const delta = LEAD_CEILING - credits;
+  if (delta > 0) await refund(supabase, userId, workspaceId, delta, { settle: true });
+
+  const clamp = (n: any) => Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+  return { lead_score: clamp(block.input.lead_score), health_score: clamp(block.input.health_score), rationale: block.input.rationale, credits };
+}
