@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink } from 'lucide-react';
+import { Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -216,6 +216,22 @@ export default function PropertyWorkbench() {
             </FormSection>
 
             <FormSection title="Content">
+              {canManage && (
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={async () => {
+                    if (!ws) return;
+                    setBusy(true);
+                    try {
+                      // Save current edits first so the AI sees the latest facts, then generate.
+                      const copy = await realEstateService.draftDescription(ws, id);
+                      setForm((p) => ({ ...p, title: p.title || copy.title, description_en: copy.description_en, description_el: copy.description_el }));
+                      toast({ title: 'Draft generated', description: `${copy.credits} credit(s) used — review, then Save.` });
+                    } catch (e) { toast({ title: 'Generation failed', description: (e as Error).message, variant: 'destructive' }); }
+                    finally { setBusy(false); }
+                  }}><Sparkles className="mr-1.5 h-4 w-4" /> Generate description with AI</Button>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Uses the listing’s facts. Review before saving — you’re responsible for the published copy.</p>
+                </div>
+              )}
               <F label="Description (EN)" wide><Textarea rows={4} value={form.description_en ?? ''} onChange={(e) => set('description_en', e.target.value)} /></F>
               <F label="Description (EL)" wide><Textarea rows={4} value={form.description_el ?? ''} onChange={(e) => set('description_el', e.target.value)} /></F>
               <F label="Features (comma-separated)" wide><Input value={form.features ?? ''} onChange={(e) => set('features', e.target.value)} /></F>

@@ -74,6 +74,9 @@ export const realEstateService = {
     call<{ property: Property; warnings: string[] }>(ws, 'publish-property', { property_id: propertyId }),
   unpublishProperty: (ws: string, propertyId: string) =>
     call<{ property: Property }>(ws, 'unpublish-property', { property_id: propertyId }).then((r) => r.property),
+  /** AI listing copy (credit-metered). Returns a draft to fill into the form — not auto-saved. */
+  draftDescription: (ws: string, propertyId: string) =>
+    call<{ title: string; description_en: string; description_el: string; credits: number }>(ws, 'draft-description', { property_id: propertyId }),
 
   // Photos
   photoUploadUrl: (ws: string, propertyId: string, ext: string) =>

@@ -20,6 +20,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { checkPublishRequirements } from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
+import { draftListingCopy } from './ai.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -169,6 +170,17 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const { data, error } = await supabase.from('properties').update(patch).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ property: data, warnings: gate.warnings });
+      }
+
+      case 'draft-description': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        const property = await loadProperty(id);
+        // Credit-metered (reserve → call → settle inside draftListingCopy). Returns a draft the
+        // workbench fills into the form for human review before Save (fair-housing safety).
+        const copy = await draftListingCopy(supabase, userId, workspaceId, property);
+        return json(copy);
       }
 
       case 'unpublish-property': {
