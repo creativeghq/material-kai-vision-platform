@@ -1,19 +1,34 @@
-/* Open Sans — body/UI text (Google Fonts). Bricolage Grotesque (display face)
-   is SELF-HOSTED + preloaded (see index.html + @font-face below) so it's ready
-   before first paint and doesn't reflow headings/numbers on font-swap. */
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap');
+/* Brand fonts are SELF-HOSTED (see index.html preloads + @font-face below):
+   Averta = body/UI text, Aleo = headings/display. Both are ready before first
+   paint so text/headings don't reflow on font-swap. */
 /* GrapesJS editor styles — loaded globally so they are available when the lazy chunk mounts */
 @import 'grapesjs/dist/css/grapes.min.css';
 
-/* Bricolage Grotesque — self-hosted variable display face (latin subset). Loaded
-   once, preloaded in index.html, so headings/numbers don't reflow on swap. */
-@font-face {
-  font-family: 'Bricolage Grotesque';
-  font-style: normal;
-  font-weight: 400 800;
-  font-display: swap;
-  src: url('/fonts/bricolage-latin.woff2') format('woff2');
-}
+/* ===== Averta — body / UI sans-serif (self-hosted, latin) ===== */
+@font-face { font-family: 'Averta'; font-style: normal;  font-weight: 100; font-display: swap; src: url('/fonts/Averta-Extrathin.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: italic;  font-weight: 100; font-display: swap; src: url('/fonts/Averta-ExtrathinItalic.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: normal;  font-weight: 200; font-display: swap; src: url('/fonts/Averta-Thin.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: italic;  font-weight: 200; font-display: swap; src: url('/fonts/Averta-ThinItalic.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: normal;  font-weight: 300; font-display: swap; src: url('/fonts/Averta-Light.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: italic;  font-weight: 300; font-display: swap; src: url('/fonts/Averta-LightItalic.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: normal;  font-weight: 400; font-display: swap; src: url('/fonts/Averta-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: italic;  font-weight: 400; font-display: swap; src: url('/fonts/Averta-RegularItalic.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: normal;  font-weight: 600; font-display: swap; src: url('/fonts/Averta-Semibold.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: italic;  font-weight: 600; font-display: swap; src: url('/fonts/Averta-SemiboldItalic.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: normal;  font-weight: 700; font-display: swap; src: url('/fonts/Averta-Bold.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: italic;  font-weight: 700; font-display: swap; src: url('/fonts/Averta-BoldItalic.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: normal;  font-weight: 800; font-display: swap; src: url('/fonts/Averta-ExtraBold.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: italic;  font-weight: 800; font-display: swap; src: url('/fonts/Averta-ExtraboldItalic.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: normal;  font-weight: 900; font-display: swap; src: url('/fonts/Averta-Black.woff2') format('woff2'); }
+@font-face { font-family: 'Averta'; font-style: italic;  font-weight: 900; font-display: swap; src: url('/fonts/Averta-BlackItalic.woff2') format('woff2'); }
+
+/* ===== Aleo — headings / display serif (self-hosted, latin) ===== */
+@font-face { font-family: 'Aleo'; font-style: normal;  font-weight: 300; font-display: swap; src: url('/fonts/Aleo-Light.woff2') format('woff2'); }
+@font-face { font-family: 'Aleo'; font-style: italic;  font-weight: 300; font-display: swap; src: url('/fonts/Aleo-LightItalic.woff2') format('woff2'); }
+@font-face { font-family: 'Aleo'; font-style: normal;  font-weight: 400; font-display: swap; src: url('/fonts/Aleo-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Aleo'; font-style: italic;  font-weight: 400; font-display: swap; src: url('/fonts/Aleo-Italic.woff2') format('woff2'); }
+@font-face { font-family: 'Aleo'; font-style: normal;  font-weight: 700; font-display: swap; src: url('/fonts/Aleo-Bold.woff2') format('woff2'); }
+@font-face { font-family: 'Aleo'; font-style: italic;  font-weight: 700; font-display: swap; src: url('/fonts/Aleo-BoldItalic.woff2') format('woff2'); }
 
 @tailwind base;
 @tailwind components;
@@ -155,8 +170,8 @@ All colors MUST be HSL.
     --text-7xl: 4.5rem;    /* 72px */
 
     /* ===== FONT FAMILY ===== */
-    --font-sans: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    --font-display: 'Bricolage Grotesque', 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-sans: 'Averta', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Aleo', Georgia, 'Times New Roman', serif;
 
     /* ===== FONT WEIGHTS (Open Sans - Complete Range) ===== */
     --font-light: 300;     /* Light */
@@ -487,9 +502,9 @@ All colors MUST be HSL.
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);   /* Bricolage Grotesque display face */
-    font-weight: var(--font-semibold);  /* 600 — expressive hierarchy, not crushed to 300 */
-    letter-spacing: -0.02em;
+    font-family: var(--font-display);   /* Aleo — slab-serif display face */
+    font-weight: var(--font-semibold);  /* 600 → resolves to Aleo Bold (700) */
+    letter-spacing: -0.01em;
   }
 
   strong, b {

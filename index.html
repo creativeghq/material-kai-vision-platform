@@ -43,15 +43,11 @@
       });
     </script>
 
-    <!-- Preconnect to Google Fonts for faster loading -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-    <!-- Bricolage Grotesque (display face) is self-hosted — preload it so it's
-         ready before first paint and headings/numbers don't reflow on swap. -->
-    <link rel="preload" href="/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-    <!-- Open Sans — body / UI text (Google Fonts). -->
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet">
+    <!-- Self-hosted brand fonts — Averta (body/UI) + Aleo (headings). Preload the
+         two most-used faces so text and headings are ready before first paint and
+         don't reflow on swap. -->
+    <link rel="preload" href="/fonts/Averta-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" href="/fonts/Aleo-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
 
     <!-- SEO:START — default head. For /knowledge-base/:slug, the api/kb-prerender
          serverless function replaces everything between these markers at request

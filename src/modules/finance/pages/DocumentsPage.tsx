@@ -755,7 +755,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
             <td className="px-4 py-2 text-right font-medium">
               {formatMoney(p.amount, p.currency)}
               {p.credit_number && onAccount > 0.005 && (
-                <span className="block text-[10px] font-normal text-emerald-600">{p.credit_number} · {formatMoney(onAccount, p.currency)} on account</span>
+                <span className="block text-[10px] font-normal text-muted-foreground">{p.credit_number} · {formatMoney(onAccount, p.currency)} on account</span>
               )}
             </td>
             <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(allocated, p.currency)}</td>
