@@ -87,6 +87,32 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       case 'ping':
         return json({ ok: true, module: 'real-estate', workspace_id: workspaceId, access });
 
+      // ── Dashboard rollup (one round trip; leads/viewings honor agent scoping, D7) ──
+      case 'dashboard': {
+        const now = new Date();
+        const weekAhead = new Date(now.getTime() + 7 * 864e5).toISOString();
+        const [{ data: statusRows }, { data: recentLeads }, { data: upcoming }] = await Promise.all([
+          supabase.from('properties').select('listing_status, is_public').eq('workspace_id', workspaceId),
+          supabase.from('property_inquiries')
+            .select('id, name, email, status, created_at, property_id, property:properties!property_inquiries_property_id_fkey ( title, listing_agent_id )')
+            .eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(40),
+          supabase.from('property_viewings')
+            .select('id, scheduled_at, type, status, agent_id, property_id, property:properties!property_viewings_property_id_fkey ( title )')
+            .eq('workspace_id', workspaceId).gte('scheduled_at', now.toISOString()).lte('scheduled_at', weekAhead).order('scheduled_at').limit(50),
+        ]);
+        const byStatus: Record<string, number> = {};
+        let publicCount = 0;
+        for (const r of statusRows ?? []) { byStatus[r.listing_status] = (byStatus[r.listing_status] ?? 0) + 1; if (r.is_public) publicCount++; }
+        const leads = (recentLeads ?? []).filter((r: any) => access.isBroker || r.property?.listing_agent_id === userId);
+        const viewings = (upcoming ?? []).filter((r: any) => access.isBroker || r.agent_id === userId);
+        return json({
+          totals: { listings: (statusRows ?? []).length, public: publicCount, active: byStatus['active'] ?? 0, draft: byStatus['draft'] ?? 0, under_offer: byStatus['under_offer'] ?? 0 },
+          new_leads: leads.filter((l: any) => l.status === 'new').length,
+          recent_leads: leads.slice(0, 6),
+          upcoming_viewings: viewings.slice(0, 8),
+        });
+      }
+
       // ── Properties ─────────────────────────────────────────────────────
       case 'list-properties': {
         let q = supabase.from('properties')

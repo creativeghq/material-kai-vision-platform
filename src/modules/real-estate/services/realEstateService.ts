@@ -58,7 +58,15 @@ async function call<T>(workspaceId: string, action: string, extra: Record<string
   return data as T;
 }
 
+export interface RealEstateDashboard {
+  totals: { listings: number; public: number; active: number; draft: number; under_offer: number };
+  new_leads: number;
+  recent_leads: (PropertyInquiry & { property?: { title: string | null } | null })[];
+  upcoming_viewings: (PropertyViewing & { property?: { title: string | null } | null })[];
+}
+
 export const realEstateService = {
+  dashboard: (ws: string) => call<RealEstateDashboard>(ws, 'dashboard'),
   // Properties
   listProperties: (ws: string, filters: { status?: string; property_type?: string } = {}) =>
     call<{ properties: PropertyListItem[] }>(ws, 'list-properties', filters).then((r) => r.properties),
