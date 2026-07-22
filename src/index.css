@@ -499,22 +499,82 @@ All colors MUST be HSL.
      token blocks on specificity and never leaks across modes.
      ======================================== */
 
-  /* Blue — LIGHT theme (navy→blue identity gradient, deep AA-safe blue primary) */
+  /* Blue — LIGHT theme. Cool corporate palette from the B2B screenshot: a light
+     slate-grey page, pure-white cards that lift, slate ink, and a navy→blue
+     identity gradient. Retints the neutral SURFACES too (not just the accent) so
+     the warm-cream base doesn't fight the blue. */
   html.light[data-accent='blue'] {
-    --primary: 218 74% 46%;          /* #1e5ecc */
+    --background: 214 32% 95%;        /* #eef2f7 — cool slate-grey page */
+    --page-background: 214 32% 95%;
+    --surface-hover: 214 30% 92%;     /* cool row/card hover */
+    --foreground: 217 30% 20%;        /* #232f43 — slate ink */
+
+    --card: 0 0% 100%;                /* white cards lift on the cool page */
+    --card-foreground: 217 30% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 217 30% 20%;
+
+    --primary: 218 74% 46%;          /* #1e5ecc — deep AA-safe blue */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 214 32% 91%;        /* #e2e8f0 — cool sand replacement */
+    --secondary-foreground: 217 28% 27%;
+    --muted: 214 30% 93%;
+    --muted-foreground: 215 16% 47%; /* #64748b slate-500 */
+    --accent: 214 32% 91%;
+    --accent-foreground: 217 28% 27%;
+
+    --border: 214 25% 88%;           /* #dbe1ea cool hairlines */
+    --input: 214 25% 88%;
     --ring: 218 74% 46%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 16% 42%;
     --sidebar-accent: 218 74% 46%;
+    --sidebar-border: 214 25% 88%;
+
+    --hero-background: 0 0% 100%;
+    --card-gradient-start: 0 0% 100%;
+    --card-gradient-end: 214 30% 96%;
+
     --brand-gradient: linear-gradient(135deg, #0f2547 0%, #1c5091 46%, #2f6fed 100%);
   }
 
-  /* Blue — DARK theme (brightened blue accent on near-black, deep-navy gradient) */
+  /* Blue — DARK theme. Shifts the plum-black command center to a deep navy-black
+     with a brightened blue accent + deep-navy identity gradient. */
   html.dark[data-accent='blue'] {
+    --background: 220 40% 6%;        /* deep navy-black */
+    --page-background: 220 40% 6%;
+    --foreground: 210 20% 93%;
+
+    --card: 220 34% 9%;
+    --card-foreground: 210 20% 93%;
+    --popover: 220 30% 12%;
+    --popover-foreground: 210 20% 93%;
+
     --primary: 212 74% 54%;          /* #2f80d6 */
+    --primary-foreground: 0 0% 100%;
     --brand-blue: 216 60% 28%;
     --brand-red: 212 74% 54%;
-    --ring: 212 74% 54%;
-    --sidebar-accent: 212 74% 54%;
     --brand-gradient: linear-gradient(135deg, #0c1e3d 0%, #1a4a86 46%, #3a86e0 100%);
+
+    --secondary: 218 30% 15%;
+    --secondary-foreground: 0 0% 85%;
+    --muted: 218 30% 15%;
+    --muted-foreground: 215 16% 62%;
+    --accent: 217 30% 16%;
+    --accent-foreground: 210 40% 88%;
+
+    --border: 217 25% 18%;
+    --input: 217 25% 18%;
+    --ring: 212 74% 54%;
+
+    --sidebar-background: 220 34% 8%;
+    --sidebar-foreground: 215 14% 60%;
+    --sidebar-accent: 212 74% 54%;
+    --sidebar-border: 217 25% 18%;
+
+    --hero-background: 220 34% 9%;
   }
 }
 
