@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -44,6 +44,8 @@ import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
 import { LeadFieldSelect } from '@/components/business/crm/LeadFieldSelect';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useModule } from '@/modules/_core';
+import { PropertyBuyerPanel } from '@/modules/real-estate/components/PropertyBuyerPanel';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
 
@@ -114,6 +116,7 @@ export const ContactDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
+  const { enabled: realEstateEnabled } = useModule('real-estate'); // #249 — Property tab when module on
   const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
   const [loading, setLoading] = useState(false);
@@ -634,6 +637,9 @@ export const ContactDetailPage: React.FC = () => {
                 {hasCompany && (
                   <TabsTrigger value="company" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Building2 className="h-4 w-4 mr-2" />Company</TabsTrigger>
                 )}
+                {realEstateEnabled && (
+                  <TabsTrigger value="property" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Home className="h-4 w-4 mr-2" />Property</TabsTrigger>
+                )}
               </TabsList>
 
               {/* Activity — the unified feed (notes live here). */}
@@ -862,6 +868,11 @@ export const ContactDetailPage: React.FC = () => {
                     <p className="text-sm text-muted-foreground">This contact belongs to <button type="button" className="font-medium text-primary hover:underline" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}>{primaryCompany.name}</button> — orders, invoices, VAT &amp; balance are managed on the company record.</p>
                   </CardContent></Card>
                   <Button variant="outline" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}><Building2 className="h-4 w-4 mr-2" />Open {primaryCompany.name}</Button>
+                </TabsContent>
+              )}
+              {realEstateEnabled && (
+                <TabsContent value="property" className="space-y-4">
+                  <PropertyBuyerPanel contactId={contact.id} workspaceId={activeWorkspaceId} />
                 </TabsContent>
               )}
             </Tabs>

@@ -50,6 +50,16 @@ export interface PropertyViewing {
   property?: { id: string; title: string | null; reference_code: string | null } | null;
 }
 
+export interface BuyerRequirement {
+  id: string; crm_contact_id: string; label: string | null; criteria: Record<string, any>; is_active: boolean; created_at: string; updated_at: string;
+}
+export interface ContactExt {
+  crm_contact_id: string; workspace_id: string; contact_role: string | null;
+  pre_approval_status: string | null; pre_approval_amount: number | null; lender: string | null;
+  budget_min: number | null; budget_max: number | null;
+  owned_property_value: number | null; owned_property_address: string | null; owned_property_equity: number | null;
+}
+
 async function call<T>(workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke('real-estate-api', {
     body: { action, workspace_id: workspaceId, ...extra },
@@ -125,6 +135,21 @@ export const realEstateService = {
   /** Turn an anonymous inquiry into a CRM lead (contact) linked to the property + assigned to caller. */
   convertInquiry: (ws: string, inquiryId: string) =>
     call<{ crm_contact_id: string; already_linked?: boolean }>(ws, 'convert-inquiry', { inquiry_id: inquiryId }),
+
+  // Buyer requirements (saved searches) + auto-match
+  listBuyerRequirements: (ws: string, crmContactId?: string) =>
+    call<{ requirements: BuyerRequirement[] }>(ws, 'list-buyer-requirements', { crm_contact_id: crmContactId }).then((r) => r.requirements),
+  upsertBuyerRequirement: (ws: string, fields: { requirement_id?: string; crm_contact_id: string; label?: string; criteria?: Record<string, any>; is_active?: boolean }) =>
+    call<{ requirement: BuyerRequirement }>(ws, 'upsert-buyer-requirement', fields).then((r) => r.requirement),
+  deleteBuyerRequirement: (ws: string, requirementId: string) => call<{ ok: true }>(ws, 'delete-buyer-requirement', { requirement_id: requirementId }),
+  matchBuyerRequirement: (ws: string, requirementId: string) =>
+    call<{ requirement: BuyerRequirement; matches: PropertyListItem[] }>(ws, 'match-buyer-requirement', { requirement_id: requirementId }),
+  buyersForProperty: (ws: string, propertyId: string) =>
+    call<{ matches: (BuyerRequirement & { contact?: { id: string; name: string | null; email: string | null } | null })[] }>(ws, 'buyers-for-property', { property_id: propertyId }).then((r) => r.matches),
+  getContactExt: (ws: string, crmContactId: string) =>
+    call<{ ext: ContactExt | null }>(ws, 'get-contact-ext', { crm_contact_id: crmContactId }).then((r) => r.ext),
+  upsertContactExt: (ws: string, crmContactId: string, fields: Partial<ContactExt>) =>
+    call<{ ext: ContactExt }>(ws, 'upsert-contact-ext', { crm_contact_id: crmContactId, ...fields }).then((r) => r.ext),
   listViewings: (ws: string, filters: { property_id?: string } = {}) =>
     call<{ viewings: PropertyViewing[] }>(ws, 'list-viewings', filters).then((r) => r.viewings),
   createViewing: (ws: string, fields: { property_id: string; scheduled_at: string; type?: string; crm_contact_id?: string; agent_id?: string }) =>

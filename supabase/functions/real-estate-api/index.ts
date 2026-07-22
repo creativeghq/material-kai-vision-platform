@@ -434,6 +434,51 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ requirement: data });
       }
 
+      case 'match-buyer-requirement': {
+        // Deterministic criteria match of a saved buyer search against the workspace's active
+        // listings (facet-style; Voyage semantic re-rank is a MIVAA follow-up once text_embedding lands).
+        const reqId = String(body.requirement_id ?? '');
+        if (!reqId) return json({ error: 'requirement_id is required' }, 400);
+        const { data: req } = await supabase.from('property_buyer_requirements').select('*').eq('id', reqId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!req) return json({ error: 'not found' }, 404);
+        const c = (req.criteria ?? {}) as Record<string, any>;
+        let q = supabase.from('properties')
+          .select('id, title, reference_code, property_type, transaction_type, price, currency, town, region, bedrooms, bathrooms, area_built, is_public, public_listing_token')
+          .eq('workspace_id', workspaceId).in('listing_status', ['active', 'under_offer']);
+        if (c.type) q = q.eq('property_type', String(c.type));
+        if (c.transaction_type) q = q.eq('transaction_type', String(c.transaction_type));
+        if (c.price_min != null) q = q.gte('price', Number(c.price_min));
+        if (c.price_max != null) q = q.lte('price', Number(c.price_max));
+        if (c.beds != null) q = q.gte('bedrooms', Number(c.beds));
+        if (c.baths != null) q = q.gte('bathrooms', Number(c.baths));
+        if (c.location) q = q.or(`town.ilike.%${String(c.location)}%,region.ilike.%${String(c.location)}%`);
+        const { data, error } = await q.limit(50);
+        if (error) throw new HttpError(400, error.message);
+        return json({ requirement: req, matches: data ?? [] });
+      }
+
+      case 'buyers-for-property': {
+        // The inverse: which active saved searches would match this listing (buyer leads for it).
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        const p = await loadProperty(id);
+        const { data: reqs } = await supabase.from('property_buyer_requirements')
+          .select('*, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( id, name, email )')
+          .eq('workspace_id', workspaceId).eq('is_active', true);
+        const matches = (reqs ?? []).filter((r: any) => {
+          const c = r.criteria ?? {};
+          if (c.type && c.type !== p.property_type) return false;
+          if (c.transaction_type && c.transaction_type !== p.transaction_type) return false;
+          if (c.price_min != null && p.price != null && p.price < Number(c.price_min)) return false;
+          if (c.price_max != null && p.price != null && p.price > Number(c.price_max)) return false;
+          if (c.beds != null && p.bedrooms != null && p.bedrooms < Number(c.beds)) return false;
+          if (c.baths != null && p.bathrooms != null && p.bathrooms < Number(c.baths)) return false;
+          if (c.location) { const loc = `${p.town ?? ''} ${p.region ?? ''}`.toLowerCase(); if (!loc.includes(String(c.location).toLowerCase())) return false; }
+          return true;
+        });
+        return json({ matches });
+      }
+
       case 'delete-buyer-requirement': {
         const reqId = String(body.requirement_id ?? '');
         if (!reqId) return json({ error: 'requirement_id is required' }, 400);

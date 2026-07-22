@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles, FileText, UserPlus } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -378,7 +378,8 @@ export default function PropertyWorkbench() {
           </TabsContent>
 
           {/* ── Leads / inquiries ── */}
-          <TabsContent value="inquiries">
+          <TabsContent value="inquiries" className="space-y-4">
+            <BuyersForListing ws={ws} propertyId={id} />
             {inquiries.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No inquiries yet.</div> : (
               <Card><CardContent className="p-0"><div className="divide-y divide-border">
                 {inquiries.map((q) => (
@@ -443,6 +444,25 @@ export default function PropertyWorkbench() {
     </div>
   );
 }
+
+// Buyers whose saved searches match this listing (inverse auto-match).
+const BuyersForListing: React.FC<{ ws: string | null; propertyId: string }> = ({ ws, propertyId }) => {
+  const [rows, setRows] = useState<any[] | null>(null);
+  useEffect(() => { if (ws) realEstateService.buyersForProperty(ws, propertyId).then(setRows).catch(() => setRows([])); }, [ws, propertyId]);
+  if (!rows || rows.length === 0) return null;
+  return (
+    <Card><CardContent className="p-3">
+      <div className="mb-1.5 text-xs font-semibold text-muted-foreground">Matching buyers ({rows.length})</div>
+      <div className="flex flex-wrap gap-2">
+        {rows.slice(0, 12).map((r) => (
+          <Link key={r.id} to={`/crm/contacts/${r.crm_contact_id}`} className="rounded-full bg-muted px-3 py-1 text-xs hover:bg-muted/70">
+            {r.contact?.name || r.contact?.email || 'Buyer'} · <span className="text-muted-foreground">{r.label || 'search'}</span>
+          </Link>
+        ))}
+      </div>
+    </CardContent></Card>
+  );
+};
 
 // ── small form primitives ──
 const FormSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
