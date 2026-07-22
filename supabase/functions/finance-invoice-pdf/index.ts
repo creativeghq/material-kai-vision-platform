@@ -16,7 +16,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { getSpec, resolveColorsHex, toPdfColors, hexToRgb, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
+import { getSpec, resolveColorsHex, toPdfColors, type TemplateSpec, type InvoicePdfColors } from './templates.ts';
 
 // Open Sans — the platform-wide typeface. Static TTFs cover full Greek + Latin +
 // Cyrillic + Euro (verified), so Greek invoice text renders correctly. SemiBold is
@@ -61,6 +61,9 @@ const LABELS: Record<Lang, Record<string, string>> = {
     orderDetails: 'ΣΤΟΙΧΕΙΑ ΠΑΡΑΓΓΕΛΙΑΣ', billTo: 'ΣΤΟΙΧΕΙΑ ΧΡΕΩΣΗΣ', shipTo: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ',
     itemCode: 'Κωδ. Είδους', itemDescr: 'Περιγραφή Είδους', itemComment: 'Σχόλιο Είδους',
     order: 'Παραγγελία', invoiceNo: 'Τιμολόγιο', orderNotes: 'Σημείωση παραγγελίας',
+    receiptDetails: 'ΣΤΟΙΧΕΙΑ ΑΠΟΔΕΙΞΗΣ', paidTo: 'ΣΤΟΙΧΕΙΑ ΔΙΚΑΙΟΥΧΟΥ', settledDocs: 'ΣΤΟΙΧΕΙΑ ΕΞΟΦΛΗΣΗΣ',
+    document: 'Παραστατικό', supplierBill: 'Παραστατικό προμηθευτή', onAccount: 'Πληρωμή έναντι λογαριασμού',
+    allocated: 'Κατανεμημένο', unallocated: 'Έναντι λογαριασμού', remarks: 'Παρατηρήσεις',
     preInvoice: 'ΠΡΟΤΙΜΟΛΟΓΙΟ', preInvoiceNote: 'Δεν αποτελεί φορολογικό παραστατικό.',
   },
   en: {
@@ -88,6 +91,9 @@ const LABELS: Record<Lang, Record<string, string>> = {
     orderDetails: 'ORDER DETAILS', billTo: 'BILL TO', shipTo: 'SHIP TO',
     itemCode: 'Item code', itemDescr: 'Description', itemComment: 'Comment',
     order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order note',
+    receiptDetails: 'RECEIPT DETAILS', paidTo: 'PAID TO', settledDocs: 'SETTLEMENT DETAILS',
+    document: 'Document', supplierBill: 'Supplier bill', onAccount: 'Payment on account',
+    allocated: 'Allocated', unallocated: 'On account', remarks: 'Remarks',
     preInvoice: 'PRE-INVOICE', preInvoiceNote: 'Not a tax document.',
   },
 };
@@ -183,6 +189,16 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: row.pdf_storage_path, cached: true });
   }
 
+  // #280 — a payment receipt (απόδειξη είσπραξης) is a proof-of-payment the customer already
+  // holds. Once one has been issued (receipt_number assigned + PDF stored), never silently
+  // re-render it for a DIFFERENT amount — that would hand the customer a second receipt whose
+  // figure no longer matches the one they have. Applying credit no longer mutates payment
+  // amounts (it allocates), so this is defense-in-depth: serve the issued copy unchanged.
+  if (kind === 'payment_receipt' && (row as any).receipt_number && row.pdf_storage_path) {
+    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(row.pdf_storage_path, 60 * 60 * 24 * 7);
+    return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: row.pdf_storage_path, cached: true });
+  }
+
   try {
     await supabase.from(TABLE).update({ pdf_generation_status: 'generating' }).eq('id', docId);
 
@@ -240,11 +256,13 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
         } catch { /* balance optional */ }
       }
       const langP: Lang = fsP?.default_doc_language === 'el' ? 'el' : 'en';
-      // Same primary/accent color as the workspace's invoices, so the receipt is on-brand.
-      const accentHex = resolveColorsHex(fsP?.invoice_template_id, fsP?.invoice_template_colors).accent;
+      // Same palette as the workspace's invoices, so the receipt is on-brand. The receipt is
+      // always drawn in the "commercial" (delivery-note) visual language regardless of the
+      // chosen invoice template — colors are the only thing the template contributes.
+      const colorsP = toPdfColors(resolveColorsHex(fsP?.invoice_template_id, fsP?.invoice_template_colors));
       const bytes = await buildPaymentReceiptPdf({
         payment: row, allocations: allocs ?? [], fs: fsP, customer: custP, lang: langP, logo: logoP,
-        receiptNumber, bankAccountName, newBalance, accentHex,
+        receiptNumber, bankAccountName, newBalance, colors: colorsP,
         orderNumber: orderP?.order_number ?? null, orderNotes: orderP?.notes ?? null,
       });
       const pPath = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
@@ -563,7 +581,8 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
       const cx = colX[i];
       drawBadge(page, glyph, cx + 8, y - 8, 8, colors.accent);
       text(header, cx + 22, y - 11, 8, bold, colors.accent);
-      let cyy = y - 26;
+      page.drawLine({ start: { x: cx + 22, y: y - 17 }, end: { x: cx + colW, y: y - 17 }, thickness: 0.4, color: LINE });
+      let cyy = y - 28;
       if (name) { text(name, cx, cyy, 9, bold, INK); cyy -= 12; }
       for (const l of lines) {
         for (const wl of wrap(l, font, 8, colW - 4)) { text(wl, cx, cyy, 8, font, MUTED); cyy -= 10; }
@@ -698,6 +717,14 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   const boxX = right - 220;
   const totalsTop = y + 10;
   const row = (k: string, v: string, b = false) => {
+    if (isCommercial) {
+      // Reference layout: label left-aligned in the totals column, value right, hairline under.
+      text(k, boxX, y, b ? 10 : 9, b ? bold : font, INK);
+      textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
+      page.drawLine({ start: { x: boxX, y: y - 6 }, end: { x: right, y: y - 6 }, thickness: 0.4, color: LINE });
+      y -= 20;
+      return;
+    }
     textR(k, right - 110, y, b ? 10 : 9, b ? bold : font, b ? INK : MUTED);
     textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
     y -= b ? 16 : 13;
@@ -727,9 +754,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   if (withheld > 0) row(L.withheld, `- ${money(withheld)}`);
   // Grand total — presentation per template.
   if (isCommercial) {
-    // Large amount-due like the reference receipt.
-    page.drawLine({ start: { x: boxX, y: y + 6 }, end: { x: right, y: y + 6 }, thickness: 0.8, color: LINE });
-    y -= 4;
+    // Large amount-due like the reference receipt (the preceding row already ruled off).
     text(L.total, boxX, y - 10, 10, bold, INK);
     textR(money(grand), right, y - 16, 22, bold, INK);
     y -= 28;
@@ -865,10 +890,12 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   return await pdf.save();
 }
 
-// Payment receipt (απόδειξη είσπραξης) — a clean money-received acknowledgment.
-// Deliberately NOT the VAT invoice layout: issuer header, a big "Received" amount,
-// method/date/reference, the invoice(s) it settles, and a thank-you line.
-// Document title mirrors the payment method (like the reference layout: ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ …).
+// Payment receipt (απόδειξη είσπραξης) — rendered in the SAME "commercial" visual language
+// as the delivery-style invoice template (the reference document): logo top-left, title
+// top-right, home-badged issuer identity, three icon-headed columns (receipt · bill-to ·
+// settlement), a banded line table, bottom-left remarks and a bottom-right totals stack
+// ending in the large amount. Only the content differs — money received, not goods sold.
+// Document title mirrors the payment method (ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ …).
 const PAYMENT_METHOD_TITLE: Record<string, { en: string; el: string }> = {
   bank_transfer: { en: 'BANK TRANSFER', el: 'ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ' },
   cash: { en: 'CASH', el: 'ΜΕΤΡΗΤΑ' },
@@ -950,164 +977,205 @@ function amountInWords(amount: number, currency: string, lang: Lang): string {
 async function buildPaymentReceiptPdf(d: {
   payment: any; allocations: any[]; fs: any; customer: any; lang: Lang; logo?: Uint8Array | null;
   receiptNumber: string; bankAccountName?: string | null; newBalance?: number | null;
-  accentHex?: string | null; orderNumber?: string | null; orderNotes?: string | null;
+  colors: InvoicePdfColors; orderNumber?: string | null; orderNotes?: string | null;
 }): Promise<Uint8Array> {
-  const { payment, allocations, fs, customer, lang, logo, receiptNumber, bankAccountName, newBalance, accentHex, orderNumber, orderNotes } = d;
+  const { payment, allocations, fs, customer, lang, logo, receiptNumber, bankAccountName, newBalance, colors, orderNumber, orderNotes } = d;
   const L = LABELS[lang];
   const currency = payment.currency ?? 'EUR';
   const money = (n: any) => fmtMoney(n, currency, lang);
+  // Bare (symbol-less) amounts inside the table + totals stack, exactly like the reference.
   const num = (n: any) => new Intl.NumberFormat(lang === 'el' ? 'el-GR' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n ?? 0));
-  const INK = rgb(0.11, 0.11, 0.13), SUB = rgb(0.43, 0.43, 0.47);
-  const ACC = hexToRgb(accentHex || '#0e7490'); // workspace invoice primary color
-  const BAND = rgb(0.93, 0.93, 0.94), BAND2 = rgb(0.965, 0.965, 0.97), HAIR = rgb(0.84, 0.84, 0.86);
+  const fmtDate = (v: any) => (v ? new Date(v).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') : '');
+  const INK = colors.text, MUTED = colors.muted, LINE = colors.line, ACC = colors.accent, HEADBG = colors.tableHeaderBg;
 
   const fonts = await loadFonts();
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   const font = await pdf.embedFont(fonts.regular, { subset: true });
   const bold = await pdf.embedFont(fonts.bold, { subset: true });
-  const page = pdf.addPage([A4.w, A4.h]);
+  let page = pdf.addPage([A4.w, A4.h]);
   const right = A4.w - M;
-  const contentW = right - M;
   let y = A4.h - M;
   const text = (s: any, x: number, yy: number, size: number, f: PDFFont = font, color = INK) =>
     page.drawText(String(s ?? ''), { x, y: yy, size, font: f, color });
   const textR = (s: any, xRight: number, yy: number, size: number, f: PDFFont = font, color = INK) =>
     page.drawText(String(s ?? ''), { x: xRight - f.widthOfTextAtSize(String(s ?? ''), size), y: yy, size, font: f, color });
-  const fill = (yTop: number, h: number, color: any) => page.drawRectangle({ x: M, y: yTop - h, width: contentW, height: h, color });
+  const rule = (x1: number, x2: number, yy: number, thickness = 0.4, color = LINE) =>
+    page.drawLine({ start: { x: x1, y: yy }, end: { x: x2, y: yy }, thickness, color });
 
-  // ── Header: logo (left) · issuer name + Contact / Registered-office columns (right) ──
-  let logoBottom = y;
+  // ── Header: logo top-left · document title top-right ──
+  const topY = y;
+  let leftBottom = topY;
   if (logo) {
     try {
       const img = await (async () => { try { return await pdf.embedPng(logo); } catch { return await pdf.embedJpg(logo); } })();
-      const s = Math.min(150 / img.width, 46 / img.height);
-      page.drawImage(img, { x: M, y: y - img.height * s, width: img.width * s, height: img.height * s });
-      logoBottom = y - img.height * s;
+      const s = Math.min(120 / img.width, 46 / img.height);
+      page.drawImage(img, { x: M, y: topY - img.height * s, width: img.width * s, height: img.height * s });
+      leftBottom = topY - img.height * s;
     } catch { /* logo optional */ }
-  } else {
-    text(fs?.business_name || '', M, y - 14, 15, bold, INK);
-    logoBottom = y - 20;
   }
+  // Title = the payment method (ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ / BANK TRANSFER …), with the receipt
+  // kind spelled out underneath so the document still names itself.
+  const title = payment.method ? (PAYMENT_METHOD_TITLE[String(payment.method)]?.[lang] ?? L.paymentReceipt) : L.paymentReceipt;
+  textR(title, right, topY - 11, 12, bold, ACC);
+  textR(L.paymentReceipt, right, topY - 23, 7.5, font, MUTED);
 
-  const ix = Math.round(A4.w * 0.47);          // issuer block starts in the right half
-  const officeX = ix + 160;
-  text(fs?.business_name || '', ix, y - 12, 14, bold, INK);
-  let cy = y - 30;
-  text(L.contact.toUpperCase(), ix, cy, 8, bold, INK);
-  text(L.office.toUpperCase(), officeX, cy, 8, bold, INK);
-  cy -= 11;
-  const contactLines = [fs?.business_phone, fs?.contact_phone, fs?.business_email, fs?.contact_website].filter((v: any, i: number, a: any[]) => v && a.indexOf(v) === i) as string[];
-  const officeLines = [
-    [fs?.business_address, fs?.business_street_number].filter(Boolean).join(' '),
-    [fs?.business_postal_code, fs?.business_city].filter(Boolean).join(' '),
+  // ── Issuer identity, home-badged (reference layout) ──
+  const iy = Math.min(logo ? leftBottom - 16 : topY - 20, topY - 20);
+  drawBadge(page, 'home', M + 9, iy - 9, 9, ACC);
+  text(fs?.business_name || '', M + 26, iy - 12, 15, bold, INK);
+  const issuerLines = [
+    [fs?.business_address, fs?.business_street_number, fs?.business_postal_code, fs?.business_city].filter(Boolean).join(', '),
+    fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '',
+    fs?.business_email || '',
     fs?.business_vat ? `${L.vatNo}: ${fs.business_vat}` : '',
     fs?.business_tax_office ? `${L.taxOffice}: ${fs.business_tax_office}` : '',
   ].filter(Boolean) as string[];
-  const rows = Math.max(contactLines.length, officeLines.length);
-  for (let i = 0; i < rows; i++) {
-    if (contactLines[i]) text(contactLines[i], ix, cy, 8, font, SUB);
-    if (officeLines[i]) text(officeLines[i], officeX, cy, 8, font, SUB);
-    cy -= 10;
+  let jy = iy - 26;
+  for (const l of issuerLines) {
+    for (const wl of wrapText(l, font, 8.5, 300)) { text(wl, M + 26, jy, 8.5, font, MUTED); jy -= 11; }
   }
+  y = jy - 10;
 
-  y = Math.min(logoBottom, cy) - 6;
-  page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 1, color: ACC });
-  y -= 22;
-
-  // ── Title = payment method (BANK TRANSFER / ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ …) ──
-  const title = payment.method ? (PAYMENT_METHOD_TITLE[String(payment.method)]?.[lang] ?? L.paymentReceipt) : L.paymentReceipt;
-  text(title, M, y, 13, bold, ACC);
-  y -= 22;
-
-  // ── Customer band (Customer · No. · Date) ──
-  const dateColX = right - 100;
-  const noColX = dateColX - 100;
-  const HH = 17, DH = 32;
-  fill(y, HH, BAND);
-  text(L.customer.toUpperCase(), M + 8, y - 12, 8, bold, SUB);
-  text(L.serial, noColX + 8, y - 12, 8, bold, SUB);
-  textR(L.date.toUpperCase(), right - 8, y - 12, 8, bold, SUB);
-  y -= HH;
-  fill(y, DH, BAND2);
+  // ── Three icon-headed columns: receipt details · payer/payee · settlement ──
+  const colW = (right - M - 20) / 3;
+  const colX = [M, M + colW + 10, M + 2 * colW + 20];
+  const isOut = payment.direction === 'out';
   const custName = customer ? (customer.name || [customer.first_name, customer.last_name].filter(Boolean).join(' ')) : '—';
   const custCode = customer ? (customer.code || customer.customer_code || customer.customer_number) : null;
-  text(custName, M + 8, y - 14, 10.5, bold, INK);
-  if (custCode) text(`${L.code} ${custCode}`, M + 8, y - 25, 8, font, SUB);
-  text(receiptNumber, noColX + 8, y - 14, 9.5, font, INK);
-  textR(payment.paid_at ? new Date(payment.paid_at).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') : '', right - 8, y - 14, 9.5, font, INK);
-  y -= DH + 14;
-
-  // ── Reference row — order + settled invoice(s) + myDATA MARK (when transmitted) ──
-  const invRefs = (allocations ?? []).map((a: any) => a.invoice?.legal_number || a.invoice?.internal_number).filter(Boolean);
-  const marks = (allocations ?? []).map((a: any) => a.invoice?.fiscal_mark).filter(Boolean);
-  const refBits: string[] = [];
-  if (orderNumber) refBits.push(`${L.order}: ${orderNumber}`);
-  if (invRefs.length) refBits.push(`${L.invoiceNo}: ${[...new Set(invRefs)].join(', ')}`);
-  if (marks.length) refBits.push(`${L.mark}: ${[...new Set(marks)].join(', ')}`);
-  if (refBits.length) {
-    for (const rl of wrapText(refBits.join('   ·   '), font, 8.5, contentW)) { text(rl, M, y, 8.5, font, SUB); y -= 11; }
-    y -= 5;
-  }
-
-  // ── Payment method band (method + bank · value), with a filler area below ──
-  fill(y, HH, BAND);
-  text(L.method.toUpperCase(), M + 8, y - 12, 8, bold, SUB);
-  textR(L.value.toUpperCase(), right - 8, y - 12, 8, bold, SUB);
-  y -= HH;
   const methodLabel = payment.method ? (PAYMENT_METHOD_LABELS[String(payment.method)] ?? String(payment.method)) : '';
-  const methodDetail = [methodLabel, bankAccountName].filter(Boolean).join(': ');
-  fill(y, DH, BAND2);
-  text(methodDetail, M + 8, y - 14, 10, font, INK);
-  if (payment.reference) text(`${L.reference}: ${payment.reference}`, M + 8, y - 25, 8, font, SUB);
-  textR(num(payment.amount), right - 8, y - 14, 11, bold, INK);
-  y -= DH;
-  // filler grey area (space for extra lines), like the reference layout
-  fill(y, 66, BAND2);
-  // applied-to invoices rendered inside the filler
-  let ay = y - 14;
-  for (const a of (allocations ?? [])) {
-    const docNo = a.invoice?.legal_number || a.invoice?.internal_number || a.supplier_bill?.supplier_bill_number || '';
-    if (!docNo) continue;
-    text(`${L.appliedTo}: ${docNo}`, M + 8, ay, 8.5, font, SUB);
-    textR(num(a.amount), right - 8, ay, 8.5, font, SUB);
-    ay -= 11;
-  }
-  y -= 66;
 
-  // ── Notes ──
-  y -= 6;
-  text(`${L.notes}:`, M, y, 8.5, bold, SUB);
-  y -= 12;
-  if (payment.notes) {
-    for (const nl of wrapText(String(payment.notes), font, 8.5, contentW)) { text(nl, M, y, 8.5, font, SUB); y -= 11; }
+  const receiptLines = [
+    `${L.date}: ${fmtDate(payment.paid_at)}`,
+    `${L.serial} ${L.paymentReceipt.toLowerCase()}: ${receiptNumber}`,
+    orderNumber ? `${L.order}: ${orderNumber}` : '',
+    `${L.method}: ${[methodLabel, bankAccountName].filter(Boolean).join(' — ')}`,
+    payment.reference ? `${L.reference}: ${payment.reference}` : '',
+  ].filter(Boolean) as string[];
+  const partyLines = [
+    custCode ? `${L.code}: ${custCode}` : '',
+    [customer?.street ?? customer?.address, customer?.street_number].filter(Boolean).join(' '),
+    [customer?.postal_code, customer?.city].filter(Boolean).join(' '),
+    customer?.vat_number ? `${L.vatNo}: ${customer.vat_number}` : '',
+    customer?.tax_office ? `${L.taxOffice}: ${customer.tax_office}` : '',
+  ].filter(Boolean) as string[];
+  const invRefs = [...new Set((allocations ?? []).map((a: any) => a.invoice?.legal_number || a.invoice?.internal_number).filter(Boolean))];
+  const marks = [...new Set((allocations ?? []).map((a: any) => a.invoice?.fiscal_mark).filter(Boolean))];
+  const allocated = (allocations ?? []).reduce((s: number, a: any) => s + Number(a.amount ?? 0), 0);
+  const settleLines = [
+    invRefs.length ? `${L.invoiceNo}: ${invRefs.join(', ')}` : L.onAccount,
+    marks.length ? `${L.mark}: ${marks.join(', ')}` : '',
+    `${L.allocated}: ${num(allocated)}`,
+    Math.abs(Number(payment.amount ?? 0) - allocated) >= 0.01
+      ? `${L.unallocated}: ${num(Number(payment.amount ?? 0) - allocated)}` : '',
+  ].filter(Boolean) as string[];
+
+  const columns: [BadgeGlyph, string, string, string[]][] = [
+    ['order', L.receiptDetails, '', receiptLines],
+    ['bill', isOut ? L.paidTo : L.billTo, custName, partyLines],
+    ['ship', L.settledDocs, '', settleLines],
+  ];
+  let colBottom = y;
+  for (let i = 0; i < columns.length; i++) {
+    const [glyph, header, name, lines] = columns[i];
+    const cx = colX[i];
+    drawBadge(page, glyph, cx + 8, y - 8, 8, ACC);
+    text(header, cx + 22, y - 11, 8, bold, ACC);
+    rule(cx + 22, cx + colW, y - 17);
+    let cyy = y - 28;
+    if (name) { for (const wl of wrapText(name, bold, 9, colW - 4)) { text(wl, cx, cyy, 9, bold, INK); cyy -= 12; } }
+    for (const l of lines) {
+      for (const wl of wrapText(l, font, 8, colW - 4)) { text(wl, cx, cyy, 8, font, MUTED); cyy -= 10; }
+    }
+    colBottom = Math.min(colBottom, cyy);
   }
-  if (orderNotes) {
-    y -= 2;
-    text(`${L.orderNotes}:`, M, y, 8.5, bold, ACC); y -= 11;
-    for (const nl of wrapText(String(orderNotes), font, 8.5, contentW)) { text(nl, M, y, 8.5, font, SUB); y -= 11; }
+  y = colBottom - 18;
+
+  // ── Settlement table (one row per settled document) ──
+  const cDoc = M + 2, cDescr = 130, cMark = 260, cDate = 430, cAmt = right;
+  const drawHead = () => {
+    page.drawRectangle({ x: M, y: y - 3, width: right - M, height: 15, color: HEADBG });
+    text(L.document, cDoc, y, 7.5, bold);
+    text(L.itemDescr, cDescr, y, 7.5, bold);
+    text(L.mark, cMark, y, 7.5, bold);
+    textR(L.date, cDate, y, 7.5, bold);
+    textR(L.value, cAmt, y, 7.5, bold);
+    y -= 18;
+  };
+  const newPage = () => { page = pdf.addPage([A4.w, A4.h]); y = A4.h - M; };
+  drawHead();
+
+  type Row = { doc: string; descr: string; mark: string; date: string; amount: number };
+  const rows: Row[] = (allocations ?? []).map((a: any) => ({
+    doc: a.invoice?.legal_number || a.invoice?.internal_number || a.supplier_bill?.supplier_bill_number || '—',
+    descr: a.invoice ? L.invoiceNo : a.supplier_bill ? L.supplierBill : L.appliedTo,
+    mark: a.invoice?.fiscal_mark ?? '',
+    date: '',
+    amount: Number(a.amount ?? 0),
+  }));
+  // Money received with nothing (or only partly) allocated still needs a printed line.
+  const residual = Math.round((Number(payment.amount ?? 0) - allocated) * 100) / 100;
+  if (rows.length === 0 || Math.abs(residual) >= 0.01) {
+    rows.push({ doc: '—', descr: L.onAccount, mark: '', date: '', amount: rows.length === 0 ? Number(payment.amount ?? 0) : residual });
+  }
+  for (const r of rows) {
+    const docLines = wrapText(r.doc, font, 8, 92);
+    const dLines = wrapText(r.descr, font, 8, 120);
+    const mLines = wrapText(r.mark, font, 7.5, 160);
+    const rowH = Math.max(13, Math.max(docLines.length, dLines.length, mLines.length, 1) * 10 + 4);
+    if (y - rowH < M + 170) { newPage(); drawHead(); }
+    let a1 = y; for (const l of docLines) { text(l, cDoc, a1, 8, font, MUTED); a1 -= 10; }
+    let a2 = y; for (const l of dLines) { text(l, cDescr, a2, 8); a2 -= 10; }
+    let a3 = y; for (const l of mLines) { text(l, cMark, a3, 7.5, font, MUTED); a3 -= 10; }
+    textR(r.date, cDate, y, 8, font, MUTED);
+    textR(num(r.amount), cAmt, y, 8);
+    y -= rowH;
+    rule(M, right, y + 4);
   }
 
-  // ── Foot: amount paid (words + big total) · received-by signature ──
-  y -= 26;
-  text(L.amountPaid.toUpperCase(), M, y, 8.5, bold, SUB);
-  textR(L.receivedBy.toUpperCase(), right, y, 8.5, bold, SUB);
-  page.drawLine({ start: { x: right - 165, y: y - 34 }, end: { x: right, y: y - 34 }, thickness: 0.6, color: HAIR });
-  y -= 14;
-  const words = `${L.inWords}: ${amountInWords(Number(payment.amount), currency, lang)}`;
-  for (const wl of wrapText(words, font, 10, contentW - 190)) { text(wl, M, y, 10, font, INK); y -= 13; }
-  y -= 6;
-  text(money(payment.amount), M + 2, y - 15, 20, bold, INK);
-  page.drawLine({ start: { x: M, y: y - 21 }, end: { x: M + 190, y: y - 21 }, thickness: 1.4, color: ACC });
-  y -= 21;
+  // ── Bottom: remarks (left) · totals stack (right) ──
+  if (y < M + 175) newPage();
+  y -= 18;
+  const totalsX = right - 240;
+  const notesW = totalsX - M - 24;
 
-  // ── New balance ──
-  if (newBalance != null && Number.isFinite(newBalance)) {
-    y -= 28;
-    const lbl = `${L.newBalance}: `;
-    text(lbl, M, y, 9, font, SUB);
-    text(money(newBalance), M + font.widthOfTextAtSize(lbl, 9), y, 9, bold, INK);
+  let ny = y;
+  text(L.remarks, M, ny, 9, bold, INK);
+  rule(M, M + notesW, ny - 6, 0.6);
+  ny -= 20;
+  const noteBlocks: [string | null, string][] = [
+    [null, payment.notes ? String(payment.notes) : ''],
+    [L.orderNotes, orderNotes ? String(orderNotes) : ''],
+    [L.inWords, amountInWords(Number(payment.amount), currency, lang)],
+  ];
+  for (const [head, body] of noteBlocks) {
+    if (!body) continue;
+    if (head) { text(`${head}:`, M, ny, 8, bold, MUTED); ny -= 11; }
+    for (const nl of wrapText(body, font, 8.5, notesW)) { text(nl, M, ny, 8.5, font, MUTED); ny -= 11; }
+    ny -= 4;
   }
+
+  let ty = y;
+  const totalRow = (k: string, v: string) => {
+    text(k, totalsX, ty, 9, font, INK);
+    textR(v, right, ty, 9, font, INK);
+    rule(totalsX, right, ty - 6);
+    ty -= 20;
+  };
+  totalRow(L.allocated, num(allocated));
+  if (Math.abs(residual) >= 0.01) totalRow(L.unallocated, num(residual));
+  if (newBalance != null && Number.isFinite(newBalance)) totalRow(L.newBalance, num(newBalance));
+  // Large amount, exactly like the reference's "Πληρωτέο Ποσό".
+  ty -= 4;
+  text(L.amountPaid, totalsX, ty - 12, 10, bold, INK);
+  textR(money(payment.amount), right, ty - 18, 22, bold, INK);
+  ty -= 34;
+
+  // ── Signature line (received by) ──
+  y = Math.min(ny, ty) - 24;
+  if (y < M + 40) { newPage(); y = A4.h - M - 40; }
+  rule(right - 165, right, y, 0.6);
+  textR(L.receivedBy.toUpperCase(), right, y - 11, 7.5, font, MUTED);
 
   return await pdf.save();
 }
