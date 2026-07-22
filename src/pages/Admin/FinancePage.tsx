@@ -552,11 +552,11 @@ const FinancePage: React.FC = () => {
                 label="AR outstanding"
                 value={formatMoney(kpis.arOutstanding)}
                 accent={kpis.overdueTotal > 0 ? 'destructive' : 'default'}
-                // Owed-to-us only; prepayments are a liability and are shown as "held on account",
-                // never netted into this figure (that would understate what customers owe).
+                // NET position: open invoices + uninvoiced orders LESS on-account credit (credit is
+                // money already on our account, folded into receivables — see loadAll creditRows).
                 subtext={kpis.overdueTotal > 0
                   ? `${formatMoney(kpis.overdueTotal)} overdue`
-                  : (deposits.total > 0 ? `${formatMoney(deposits.total)} held on account` : 'All on schedule')}
+                  : (deposits.total > 0 ? `net of ${formatMoney(deposits.total)} credit on account` : 'All on schedule')}
               />
               <KpiCard
                 icon={ArrowUpCircle}
@@ -586,7 +586,7 @@ const FinancePage: React.FC = () => {
 
             {/* AR / AP buckets side-by-side */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" expected={arExpected} />
+              <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" expected={arExpected} credit={deposits.total} />
               <BucketSummary title="Payables by age" buckets={apBuckets} viewLink="ap" expected={apExpected} />
             </div>
 
@@ -1191,7 +1191,15 @@ const BucketSummary: React.FC<{
   /** Money from confirmed-but-uninvoiced orders (no due date, so it can't age) — shown as a
    *  separate "expected" line so committed revenue/spend isn't invisible here. */
   expected?: number;
-}> = ({ title, buckets, viewLink, expected = 0 }) => (
+  /** On-account customer credit (positive = money held). Subtracted below so the summary shows
+   *  the true NET position. AR only — payables have no credit. */
+  credit?: number;
+}> = ({ title, buckets, viewLink, expected = 0, credit = 0 }) => {
+  // Aged rows (invoices/bills) + uninvoiced orders − credit held = the net position, matching the
+  // AR/AP-outstanding KPI. Shown as a footer so the dashboard summary is a complete picture.
+  const aged = AGE_BUCKETS.reduce((s, b) => s + buckets[b].total, 0);
+  const net = Math.round((aged + expected - credit) * 100) / 100;
+  return (
   <Card>
     <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
       <CardTitle className="text-sm">{title}</CardTitle>
@@ -1214,11 +1222,24 @@ const BucketSummary: React.FC<{
               <td className="px-4 py-2 text-right font-medium text-amber-600">{formatMoney(expected)}</td>
             </tr>
           )}
+          {credit > 0 && (
+            <tr className="border-b border-border/30 bg-muted/20">
+              <td className="px-4 py-2 text-xs text-muted-foreground" title="Customer money held on account — nets against what they owe">Credit on account</td>
+              <td className="px-4 py-2" />
+              <td className="px-4 py-2 text-right font-medium text-emerald-700">− {formatMoney(credit)}</td>
+            </tr>
+          )}
+          <tr className="bg-muted/40">
+            <td className="px-4 py-2 text-xs font-semibold">Net {viewLink === 'ar' ? 'receivable' : 'payable'}</td>
+            <td className="px-4 py-2" />
+            <td className="px-4 py-2 text-right font-semibold">{formatMoney(net)}</td>
+          </tr>
         </tbody>
       </table>
     </CardContent>
   </Card>
-);
+  );
+};
 
 const CashFlowCard: React.FC<{ rows: CashFlowRow[] }> = ({ rows }) => {
   const grouped = useMemo(() => {
