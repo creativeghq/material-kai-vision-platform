@@ -100,6 +100,9 @@ export const realEstateService = {
   deletePhoto: (ws: string, photoId: string) => call<{ ok: true }>(ws, 'delete-photo', { photo_id: photoId }),
   setCover: (ws: string, propertyId: string, photoId: string) => call<{ ok: true }>(ws, 'set-cover', { property_id: propertyId, photo_id: photoId }),
   reorderPhotos: (ws: string, photoIds: string[]) => call<{ ok: true }>(ws, 'reorder-photos', { photo_ids: photoIds }),
+  /** Vision AI: tag photos + auto-pick the cover (credit-metered). */
+  analyzePhotos: (ws: string, propertyId: string) =>
+    call<{ ok: true; cover_photo_id: string | null; tagged: number; credits: number }>(ws, 'analyze-photos', { property_id: propertyId }),
 
   // Inquiries / viewings
   listInquiries: (ws: string, filters: { status?: string; property_id?: string } = {}) =>

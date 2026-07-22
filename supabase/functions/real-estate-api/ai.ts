@@ -128,3 +128,89 @@ export async function draftListingCopy(
 
   return { title: block.input.title, description_en: block.input.description_en, description_el: block.input.description_el, credits };
 }
+
+const PHOTO_TOOL = {
+  name: 'emit_photo_analysis',
+  description: 'Analyze property photos: recommend the best cover and tag each image.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      cover_index: { type: 'integer', description: 'Index of the single best cover photo (bright, wide, appealing exterior/living space).' },
+      photos: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            index: { type: 'integer' },
+            room_type: { type: 'string', description: 'e.g. kitchen, bedroom, exterior, bathroom, living room, plot, facade' },
+            tags: { type: 'array', items: { type: 'string' }, description: 'lowercase descriptive tags (features/materials/style visible)' },
+          },
+          required: ['index', 'tags'],
+        },
+      },
+    },
+    required: ['cover_index', 'photos'],
+  },
+};
+const PHOTO_CEILING = 10;
+
+/** Vision-analyze up to 6 photos: pick the cover + per-photo tags. Credit-metered (reserve→settle). */
+export async function analyzePropertyPhotos(
+  supabase: any, userId: string, workspaceId: string, photos: Array<{ id: string; storage_path: string }>,
+): Promise<{ cover_index: number; photos: Array<{ index: number; room_type?: string; tags: string[] }>; credits: number }> {
+  const key = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!key) throw new HttpError(400, 'AI is not configured (ANTHROPIC_API_KEY missing)');
+  const picked = photos.slice(0, 6);
+  if (!picked.length) throw new HttpError(400, 'no photos to analyze');
+
+  // Build image content blocks from signed bytes.
+  const blocks: any[] = [{ type: 'text', text: `Analyze these ${picked.length} property photos (indexed 0..${picked.length - 1}). Pick the best cover and tag each. Use ONLY what is visible.` }];
+  for (let i = 0; i < picked.length; i++) {
+    const { data: s } = await supabase.storage.from('property-media').createSignedUrl(picked[i].storage_path, 600);
+    if (!s?.signedUrl) continue;
+    const res = await fetch(s.signedUrl);
+    if (!res.ok) continue;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const mediaType = bytes[0] === 0x89 && bytes[1] === 0x50 ? 'image/png' : 'image/jpeg';
+    // deno base64
+    let bin = ''; for (const b of bytes) bin += String.fromCharCode(b);
+    blocks.push({ type: 'text', text: `Image index ${i}:` });
+    blocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: btoa(bin) } });
+  }
+
+  const model = RE_MODEL();
+  await reserveCredits(supabase, userId, workspaceId, PHOTO_CEILING);
+  let data: any;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 1500, tools: [PHOTO_TOOL], tool_choice: { type: 'tool', name: PHOTO_TOOL.name }, messages: [{ role: 'user', content: blocks }] }),
+    });
+    if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
+    data = await res.json();
+  } catch (e) {
+    await refund(supabase, userId, workspaceId, PHOTO_CEILING, { reason: 'photo_ai_failed' });
+    if (e instanceof HttpError) throw e; throw new HttpError(502, 'AI request failed');
+  }
+  const block = (data.content || []).find((b: any) => b.type === 'tool_use');
+  if (!block?.input) { await refund(supabase, userId, workspaceId, PHOTO_CEILING, { reason: 'no_output' }); throw new HttpError(502, 'AI returned no result'); }
+
+  const inTok = Number(data?.usage?.input_tokens ?? 0), outTok = Number(data?.usage?.output_tokens ?? 0);
+  const p = priceFor(model);
+  const rawUsd = (inTok / 1e6) * p.input + (outTok / 1e6) * p.output;
+  const billedUsd = rawUsd * MARKUP_MULTIPLIER;
+  const credits = Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
+  try {
+    await supabase.from('ai_usage_logs').insert({
+      user_id: userId, workspace_id: workspaceId, module_slug: 'real-estate',
+      operation_type: 'real_estate_photo_analysis', model_name: model,
+      input_tokens: inTok, output_tokens: outTok, raw_cost_usd: rawUsd, markup_multiplier: MARKUP_MULTIPLIER,
+      billed_cost_usd: billedUsd, credits_debited: credits, metadata: { photo_count: picked.length },
+    });
+  } catch (e) { console.warn('[re-ai] photo usage log failed (non-fatal):', e); }
+  const delta = PHOTO_CEILING - credits;
+  if (delta > 0) await refund(supabase, userId, workspaceId, delta, { settle: true });
+
+  return { cover_index: block.input.cover_index ?? 0, photos: block.input.photos ?? [], credits };
+}

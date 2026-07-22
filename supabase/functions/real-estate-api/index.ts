@@ -20,7 +20,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { checkPublishRequirements } from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
-import { draftListingCopy } from './ai.ts';
+import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -248,6 +248,27 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         }).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ photo: data });
+      }
+
+      case 'analyze-photos': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadProperty(id);
+        const { data: photos } = await supabase.from('property_photos').select('id, storage_path').eq('property_id', id).order('sort_order');
+        if (!photos?.length) return json({ error: 'no photos to analyze' }, 400);
+        const result = await analyzePropertyPhotos(supabase, userId, workspaceId, photos);
+        // Write ai_tags per analyzed photo + set the recommended cover.
+        for (const a of result.photos) {
+          const ph = photos[a.index];
+          if (ph) await supabase.from('property_photos').update({ ai_tags: a.tags ?? [] }).eq('id', ph.id).eq('workspace_id', workspaceId);
+        }
+        const coverPhoto = photos[result.cover_index];
+        if (coverPhoto) {
+          await supabase.from('property_photos').update({ is_cover: false }).eq('property_id', id).eq('workspace_id', workspaceId);
+          await supabase.from('property_photos').update({ is_cover: true }).eq('id', coverPhoto.id).eq('workspace_id', workspaceId);
+        }
+        return json({ ok: true, cover_photo_id: coverPhoto?.id ?? null, tagged: result.photos.length, credits: result.credits });
       }
 
       case 'delete-photo': {

@@ -351,9 +351,18 @@ export default function PropertyWorkbench() {
 
           {/* ── Media ── */}
           <TabsContent value="media">
-            <div className="mb-4">
+            <div className="mb-4 flex flex-wrap gap-2">
               <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onUpload} />
               {canManage && <Button variant="outline" className="rounded-full" onClick={() => fileRef.current?.click()} disabled={busy}><Upload className="mr-2 h-4 w-4" /> Upload photos</Button>}
+              {canManage && photos.length > 0 && (
+                <Button variant="outline" className="rounded-full" disabled={busy} onClick={async () => {
+                  if (!ws) return;
+                  setBusy(true);
+                  try { const r = await realEstateService.analyzePhotos(ws, id); await load(); toast({ title: 'Photos analyzed', description: `Tagged ${r.tagged}, cover auto-picked · ${r.credits} credit(s)` }); }
+                  catch (e) { toast({ title: 'Analysis failed', description: (e as Error).message, variant: 'destructive' }); }
+                  finally { setBusy(false); }
+                }}><Sparkles className="mr-2 h-4 w-4" /> AI tag &amp; pick cover</Button>
+              )}
             </div>
             {photos.length === 0 ? (
               <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No photos yet.</div>
