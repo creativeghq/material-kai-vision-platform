@@ -107,6 +107,11 @@ verify_jwt = false
 [functions.hr-api]
 verify_jwt = false
 
+# #249/#279 — Canonical platform lead scorer (CRM-wide; not module-gated). Generic CRM signals +
+# property enrichment when real-estate is enabled. Writes shared crm_contacts.lead_score/health_score.
+[functions.crm-lead-score]
+verify_jwt = false
+
 # #249 — Real Estate module API. Does its own auth
 # (authenticate + userCanAccessWorkspace + isModuleEnabled('real-estate') + assertEntitled('real-estate')).
 [functions.real-estate-api]

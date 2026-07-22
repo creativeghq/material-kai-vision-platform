@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
+import { leadScoreTint } from '@/modules/crm/services/leadScoring';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -688,9 +689,14 @@ export const CRMManagement: React.FC = () => {
                             <Checkbox checked={selContacts.has(contact.id)} onCheckedChange={() => setSelContacts((s) => toggle(s, contact.id))} aria-label="Select row" />
                           </TableCell>
                           <TableCell className="font-medium">
-                            <button onClick={() => navigate(`/crm/contacts/${contact.id}`)} className="text-primary hover:underline flex items-center gap-1">
-                              {contact.name}<ExternalLink className="h-3 w-3" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => navigate(`/crm/contacts/${contact.id}`)} className="text-primary hover:underline flex items-center gap-1">
+                                {contact.name}<ExternalLink className="h-3 w-3" />
+                              </button>
+                              {(contact as any).lead_score != null && (
+                                <Badge className={`${leadScoreTint((contact as any).lead_score)} rounded-full border-0 text-[10px]`} title="Lead score">{(contact as any).lead_score}</Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>{contact.email ? <a href={`mailto:${contact.email}`} className="text-primary hover:underline">{contact.email}</a> : '-'}</TableCell>
                           <TableCell>{contact.phone ? <a href={`tel:${contact.phone}`} className="text-primary hover:underline">{contact.phone}</a> : '-'}</TableCell>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home, Sparkles } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -46,6 +46,7 @@ import { LeadFieldSelect } from '@/components/business/crm/LeadFieldSelect';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useModule } from '@/modules/_core';
 import { PropertyBuyerPanel } from '@/modules/real-estate/components/PropertyBuyerPanel';
+import { scoreLead, leadScoreTint } from '@/modules/crm/services/leadScoring';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
 
@@ -69,6 +70,8 @@ interface Contact {
   facebook?: string;
   lead_source?: string | null;
   lead_status?: string | null;
+  lead_score?: number | null;
+  health_score?: number | null;
   industry?: string;
   annual_revenue?: string;
   employee_count?: string;
@@ -300,6 +303,18 @@ export const ContactDetailPage: React.FC = () => {
    * revert on failure. Skipped on the create-new flow (handleSave persists
    * the whole row there).
    */
+  const [scoringLead, setScoringLead] = useState(false);
+  const runLeadScore = async () => {
+    if (!contact || !id || isNew || !activeWorkspaceId) return;
+    setScoringLead(true);
+    try {
+      const s = await scoreLead(activeWorkspaceId, id);
+      setContact((prev) => prev ? { ...prev, lead_score: s.lead_score, health_score: s.health_score } : prev);
+      toast({ title: `Lead scored ${s.lead_score}/100`, description: `${s.rationale ?? ''} · ${s.credits} credit(s)` });
+    } catch (e) { toast({ title: 'Scoring failed', description: e instanceof Error ? e.message : 'Try again', variant: 'destructive' }); }
+    finally { setScoringLead(false); }
+  };
+
   const patchInline = async (updates: Partial<Contact>) => {
     if (!contact || !id || isNew) {
       if (contact) setContact((prev) => prev ? { ...prev, ...updates } : prev);
@@ -703,6 +718,19 @@ export const ContactDetailPage: React.FC = () => {
                             )}
                           </div>
                         </div>
+                        {/* #279 — platform lead score (shared crm_contacts columns; scored generically + property-enriched) */}
+                        {!isNew && (
+                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Lead score</span>
+                            {contact.lead_score != null
+                              ? <Badge className={`${leadScoreTint(contact.lead_score)} rounded-full border-0`}>{contact.lead_score}/100</Badge>
+                              : <span className="text-xs text-muted-foreground">Not scored</span>}
+                            {contact.health_score != null && <Badge className={`${leadScoreTint(contact.health_score)} rounded-full border-0`} title="Relationship health">Health {contact.health_score}</Badge>}
+                            <Button variant="ghost" size="sm" className="ml-auto rounded-full" disabled={scoringLead} onClick={runLeadScore}>
+                              <Sparkles className="mr-1 h-3.5 w-3.5" /> {scoringLead ? 'Scoring…' : 'AI score'}
+                            </Button>
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => { patchInline({ lead_status: v }); if (v) logActivity('lead_status_changed', `Lead status set to "${v}"`); }} placeholder="Not set" />
                           <LeadFieldSelect alwaysEdit={isNew} kind="lead_source" label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="Not set" />

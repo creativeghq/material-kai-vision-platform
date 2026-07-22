@@ -8,6 +8,7 @@ import { Label } from '@/components/core/ui/label';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { realEstateService, type BuyerRequirement, type ContactExt, type PropertyListItem } from '../services/realEstateService';
+import { scoreLead } from '@/modules/crm/services/leadScoring';
 
 // #249 — real-estate panel on the CRM contact page: buyer profile (budget / pre-approval / seller AVM)
 // + saved searches with an on-demand match against the workspace inventory.
@@ -56,7 +57,7 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
           {score && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title={score.rationale}>Lead {score.lead_score} · Health {score.health_score}</Badge>}
           <Button size="sm" variant="ghost" className="ml-auto rounded-full" disabled={scoring} onClick={async () => {
             if (!ws) return; setScoring(true);
-            try { const s = await realEstateService.scoreLead(ws, contactId); setScore(s); toast({ title: `Lead scored ${s.lead_score}/100`, description: `${s.rationale ?? ''} · ${s.credits} credit(s)` }); }
+            try { const s = await scoreLead(ws, contactId); setScore(s); toast({ title: `Lead scored ${s.lead_score}/100`, description: `${s.rationale ?? ''} · ${s.credits} credit(s)` }); }
             catch (e) { toast({ title: 'Scoring failed', description: (e as Error).message, variant: 'destructive' }); }
             finally { setScoring(false); }
           }}><Sparkles className="mr-1 h-3.5 w-3.5" /> {scoring ? 'Scoring…' : 'AI score'}</Button>
