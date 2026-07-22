@@ -361,9 +361,8 @@ All colors MUST be HSL.
     --popover: 48 30% 98%;
     --popover-foreground: 46 14% 21%;
 
-    /* Primary — deep raspberry (light-tuned sibling of the dark-mode magenta brand);
-       cleaner and richer than the old khaki-olive, white text passes AA. */
-    --primary: 335 62% 45%;          /* #ba2c67 */
+    /* Primary — muted khaki-olive (quiet-luxury); white text stays legible. */
+    --primary: 56 23% 40%;           /* #7d7a4e */
     --primary-foreground: 0 0% 100%;
 
     /* Secondary — warm sand, deeper than cards (active-nav pill tone) */
@@ -387,18 +386,18 @@ All colors MUST be HSL.
     --destructive: 12 51% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Magenta brand gradient for identity surfaces (light) — matches the new primary */
-    --brand-gradient: linear-gradient(135deg, #3a1230 0%, #7a2456 46%, #c93d84 100%);
+    /* Olive brand gradient for identity surfaces (light) */
+    --brand-gradient: linear-gradient(135deg, #4a4726 0%, #65623c 46%, #8f8c5a 100%);
 
     /* Borders / inputs — warm olive-grey lines */
     --border: 46 18% 82%;
     --input: 46 18% 83%;
-    --ring: 335 62% 45%;
+    --ring: 56 23% 40%;
 
-    /* Sidebar / TopNav — ivory bar, magenta active (matches primary) */
+    /* Sidebar / TopNav — ivory bar, olive active */
     --sidebar-background: 48 30% 97%;
     --sidebar-foreground: 48 12% 40%;
-    --sidebar-accent: 335 62% 45%;
+    --sidebar-accent: 56 23% 40%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 46 18% 82%;
 
