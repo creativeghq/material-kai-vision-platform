@@ -2,9 +2,11 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
   Users, MapPin, Globe, Building2, Package,
   Layers, X, Package2, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
-  Sparkles, LayoutList,
+  Sparkles, LayoutList, Home,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { useModule } from '@/modules/_core';
+import { PropertyDiscoveryTab } from '@/modules/real-estate/components/PropertyDiscoveryTab';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -423,6 +425,8 @@ export const DiscoverPage: React.FC = () => {
   // reliable here (no default-tab flicker).
   const { can } = usePermissions();
   const canMarketplace = can('marketplace.browse');
+  // #249 — Properties discovery tab shows only when the platform has the Real Estate module enabled.
+  const { enabled: realEstateEnabled } = useModule('real-estate');
 
   // Profiles
   const [creators, setCreators] = useState<PublicCreator[]>([]);
@@ -631,6 +635,11 @@ export const DiscoverPage: React.FC = () => {
               <TabsTrigger value="marketplace" className="flex items-center gap-2">
                 <Store className="h-4 w-4" /> Marketplace
               </TabsTrigger>
+              {realEstateEnabled && (
+                <TabsTrigger value="properties" className="flex items-center gap-2">
+                  <Home className="h-4 w-4" /> Properties
+                </TabsTrigger>
+              )}
             </TabsList>
           )}
 
@@ -863,6 +872,13 @@ export const DiscoverPage: React.FC = () => {
           <TabsContent value="marketplace" className="mt-6">
             <MarketplaceTab />
           </TabsContent>
+
+          {/* ── PROPERTIES (#249 real-estate cross-workspace discovery) ── */}
+          {realEstateEnabled && (
+            <TabsContent value="properties" className="mt-6">
+              <PropertyDiscoveryTab />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 

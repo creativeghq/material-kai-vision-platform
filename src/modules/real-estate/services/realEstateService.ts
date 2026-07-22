@@ -111,8 +111,10 @@ export function isPublishBlocked(e: unknown): e is { code: 'publish_blocked'; er
   return !!e && typeof e === 'object' && (e as any).code === 'publish_blocked';
 }
 
-// ── Public token page (no auth) ──
+// ── Public token page + cross-workspace discovery (no auth; toPublic-projected) ──
 export interface PublicListing { listing: Record<string, any>; photos: { id: string; kind: string; caption: string | null; is_cover: boolean; url: string | null }[] }
+export type PublicListingCard = Record<string, any> & { id: string; cover_url: string | null };
+export interface DiscoverFilters { property_type?: string; transaction_type?: string; town?: string; price_min?: number; price_max?: number; bedrooms_min?: number }
 
 export const realEstatePublic = {
   async getListing(token: string): Promise<PublicListing> {
@@ -124,4 +126,20 @@ export const realEstatePublic = {
     const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'inquire', token, ...payload } });
     if (error) throw await edgeError(error);
   },
+  /** Cross-workspace marketplace discovery — only active + public + in_discovery listings. */
+  async discover(filters: DiscoverFilters = {}): Promise<PublicListingCard[]> {
+    const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'discover', ...filters } });
+    if (error) throw await edgeError(error);
+    return (data as { listings: PublicListingCard[] }).listings;
+  },
+  /** A live public listings index for the agency profile Listings tab — by workspace_id OR the
+   *  profile owner's user_id (resolves their owned workspaces server-side). */
+  async agencyListings(by: { workspaceId?: string; userId?: string }): Promise<PublicListingCard[]> {
+    const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'agency-listings', workspace_id: by.workspaceId, user_id: by.userId } });
+    if (error) throw await edgeError(error);
+    return (data as { listings: PublicListingCard[] }).listings;
+  },
 };
+
+/** Shared listing-card link target for the public page. */
+export const listingHref = (l: PublicListingCard) => `/p/${l.public_listing_token ?? ''}`;

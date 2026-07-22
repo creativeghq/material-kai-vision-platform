@@ -26,6 +26,9 @@ import { Badge } from '@/components/core/ui/badge';
 // Card/CardContent replaced with dashboard-card divs for dark theme compliance
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { useModule } from '@/modules/_core';
+import { realEstatePublic, type PublicListingCard } from '@/modules/real-estate/services/realEstateService';
+import { PropertyCardGrid } from '@/modules/real-estate/components/PropertyCardGrid';
 import { useAuth } from '@/contexts/AuthContext';
 import { HireMeModal } from '@/components/core/Profile/HireMeModal';
 import type { ServiceItem } from '@/components/core/Profile/ProfileTab';
@@ -171,6 +174,14 @@ function ServiceRow({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export const PublicProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
+  // #249 — live property listings for this profile's owner (agency Listings tab); shows only when the
+  // Real Estate module is enabled AND the profile owner has published listings.
+  const { enabled: realEstateEnabled } = useModule('real-estate');
+  const [propertyListings, setPropertyListings] = useState<PublicListingCard[]>([]);
+  useEffect(() => {
+    if (!realEstateEnabled || !userId) return;
+    realEstatePublic.agencyListings({ userId }).then(setPropertyListings).catch(() => {});
+  }, [realEstateEnabled, userId]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
@@ -488,6 +499,12 @@ export const PublicProfilePage: React.FC = () => {
                 <Star className="h-4 w-4" /> Reviews
                 {reviewStats && <span className="text-xs opacity-70">{reviewStats.count}</span>}
               </TabsTrigger>
+              {propertyListings.length > 0 && (
+                <TabsTrigger value="listings" className="flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4" /> Listings
+                  <span className="text-xs opacity-70">{propertyListings.length}</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* ── About ─────────────────────────────────────────────────── */}
@@ -720,6 +737,13 @@ export const PublicProfilePage: React.FC = () => {
                 services={richServices.map((s) => ({ id: s.id, name: s.name }))}
               />
             </TabsContent>
+
+            {/* #249 — public property listings for this agency/profile */}
+            {propertyListings.length > 0 && (
+              <TabsContent value="listings" className="mt-5">
+                <PropertyCardGrid listings={propertyListings} />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>

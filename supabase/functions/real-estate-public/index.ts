@@ -33,6 +33,58 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
   try { body = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
 
   const action = String(body?.action ?? 'get').trim();
+
+  /** Sign the cover photo for a set of listings in one round trip → { property_id: url }. */
+  async function coverUrls(propertyIds: string[]): Promise<Record<string, string | null>> {
+    if (!propertyIds.length) return {};
+    const { data } = await supabase.from('property_photos')
+      .select('property_id, storage_path, is_cover, sort_order').in('property_id', propertyIds).order('sort_order');
+    const chosen = new Map<string, string>();
+    for (const p of data ?? []) { if (!chosen.has(p.property_id) || p.is_cover) chosen.set(p.property_id, p.storage_path); }
+    const out: Record<string, string | null> = {};
+    await Promise.all([...chosen.entries()].map(async ([pid, path]) => {
+      const { data: s } = await supabase.storage.from('property-media').createSignedUrl(path, 3600);
+      out[pid] = s?.signedUrl ?? null;
+    }));
+    return out;
+  }
+
+  // ── Cross-workspace Discovery (no token) — only active+public+in_discovery listings, toPublic-projected.
+  if (action === 'discover' || action === 'agency-listings') {
+    let q = supabase.from('properties').select('*')
+      .eq('is_public', true).eq('listing_status', 'active')
+      .order('published_at', { ascending: false }).limit(60);
+    if (action === 'discover') q = q.eq('in_discovery', true);
+    if (action === 'agency-listings') {
+      const wsId = String(body?.workspace_id ?? '').trim();
+      const userId = String(body?.user_id ?? '').trim();
+      if (wsId) {
+        q = q.eq('workspace_id', wsId);
+      } else if (userId) {
+        // Resolve the user's OWNED workspaces (the "agency") — public profile is keyed on user_id.
+        const { data: owned } = await supabase.from('workspace_members').select('workspace_id').eq('user_id', userId).eq('role', 'owner').eq('status', 'active');
+        const wsIds = (owned ?? []).map((m: any) => m.workspace_id);
+        if (!wsIds.length) return json({ listings: [] });
+        q = q.in('workspace_id', wsIds);
+      } else {
+        return json({ error: 'workspace_id or user_id is required' }, 400);
+      }
+    }
+    // Optional facet filters (discover)
+    if (body?.property_type) q = q.eq('property_type', String(body.property_type));
+    if (body?.transaction_type) q = q.eq('transaction_type', String(body.transaction_type));
+    if (body?.town) q = q.ilike('town', `%${String(body.town)}%`);
+    if (body?.price_max != null) q = q.lte('price', Number(body.price_max));
+    if (body?.price_min != null) q = q.gte('price', Number(body.price_min));
+    if (body?.bedrooms_min != null) q = q.gte('bedrooms', Number(body.bedrooms_min));
+    const { data, error: qErr } = await q;
+    if (qErr) throw new HttpError(400, qErr.message);
+    const rows = data ?? [];
+    const covers = await coverUrls(rows.map((r: any) => r.id));
+    // toPublic strips 🔒 fields; attach the signed cover url per listing.
+    return json({ listings: rows.map((r: any) => ({ ...toPublic(r), cover_url: covers[r.id] ?? null })) });
+  }
+
   const token = String(body?.token ?? '').trim();
   if (!token) return json({ error: 'token is required' }, 400);
 

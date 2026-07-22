@@ -44,6 +44,7 @@ export function toPublic(p: any): Record<string, unknown> {
   const hide = !!p.hide_exact_address;
   return {
     id: p.id,
+    public_listing_token: p.public_listing_token, // the public URL capability (safe: these are published listings)
     reference_code: p.reference_code,
     property_type: p.property_type,
     subtype: p.subtype,
