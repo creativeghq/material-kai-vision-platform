@@ -44,6 +44,14 @@ interface ToolEntry {
 
 const TOOLS: ToolEntry[] = [
   {
+    slug: 'product-search',
+    title: 'Material search',
+    description:
+      'Search the material catalog by name, brand or category and see matching products instantly.',
+    icon: ScanSearch,
+    badge: 'Free · 2/day',
+  },
+  {
     slug: 'heat-pump',
     title: 'Heat-pump sizer',
     description:

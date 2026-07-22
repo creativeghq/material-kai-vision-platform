@@ -22,6 +22,7 @@ import {
   LogOut,
   Newspaper,
   PackageCheck,
+  PackageSearch,
   PackageX,
   Search,
   Sparkles,
@@ -41,20 +42,22 @@ import {
   type PublicMentionScanResponse,
   type PublicPriceResult,
   type PublicPriceScanResponse,
+  type PublicProductResult,
+  type PublicProductSearchResponse,
   type PublicQuota,
 } from '@/services/publicToolsService';
 
 // ── Quota hook ────────────────────────────────────────────────────────────
 
-export function useToolsQuota(accessToken: string | null) {
+export function useToolsQuota(accessToken: string | null, scanType?: string) {
   const [quota, setQuota] = useState<PublicQuota | null>(null);
   const [quotaError, setQuotaError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchQuota(accessToken)
+    fetchQuota(accessToken, scanType)
       .then(setQuota)
       .catch((e: unknown) => setQuotaError(e instanceof Error ? e.message : 'Failed to load quota'));
-  }, [accessToken]);
+  }, [accessToken, scanType]);
 
   return { quota, setQuota, quotaError };
 }
@@ -146,19 +149,29 @@ export function QuotaBadge({ quota, isAuthenticated }: { quota: PublicQuota | nu
 
 // ── Scanning skeleton ──────────────────────────────────────────────────────
 
-export function ScanningPanel({ kind }: { kind: 'price' | 'mention' }) {
-  const isPrice = kind === 'price';
-  const steps = isPrice
-    ? [
-        { label: 'Searching retailers across the web', icon: Globe },
-        { label: 'Reading product pages to verify prices', icon: PackageCheck },
-        { label: 'Ranking by price and availability', icon: TrendingDown },
-      ]
-    : [
-        { label: 'Querying news outlets and blogs', icon: Newspaper },
-        { label: 'Filtering for relevant mentions', icon: Search },
-        { label: 'Grouping by outlet', icon: Globe },
-      ];
+export function ScanningPanel({ kind }: { kind: 'price' | 'mention' | 'product' }) {
+  const steps =
+    kind === 'price'
+      ? [
+          { label: 'Searching retailers across the web', icon: Globe },
+          { label: 'Reading product pages to verify prices', icon: PackageCheck },
+          { label: 'Ranking by price and availability', icon: TrendingDown },
+        ]
+      : kind === 'product'
+        ? [
+            { label: 'Searching the material catalog', icon: Search },
+            { label: 'Matching by name, brand and category', icon: PackageCheck },
+            { label: 'Ranking the closest matches', icon: TrendingDown },
+          ]
+        : [
+            { label: 'Querying news outlets and blogs', icon: Newspaper },
+            { label: 'Filtering for relevant mentions', icon: Search },
+            { label: 'Grouping by outlet', icon: Globe },
+          ];
+  const title =
+    kind === 'price' ? 'Scanning live retailers…'
+    : kind === 'product' ? 'Searching the catalog…'
+    : 'Scanning recent mentions…';
 
   return (
     <Card className="mt-6 dashboard-card overflow-hidden">
@@ -171,9 +184,7 @@ export function ScanningPanel({ kind }: { kind: 'price' | 'mention' }) {
             </div>
           </div>
           <div>
-            <CardTitle className="text-lg">
-              {isPrice ? 'Scanning live retailers…' : 'Scanning recent mentions…'}
-            </CardTitle>
+            <CardTitle className="text-lg">{title}</CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               This usually takes 5–20 seconds. We're calling several sources in parallel.
             </p>
@@ -206,7 +217,7 @@ export function ScanningPanel({ kind }: { kind: 'price' | 'mention' }) {
                 <Skeleton className="h-4 w-1/3" />
                 <Skeleton className="h-3 w-2/3" />
               </div>
-              {isPrice && <Skeleton className="h-5 w-20 shrink-0" />}
+              {kind === 'price' && <Skeleton className="h-5 w-20 shrink-0" />}
             </div>
           ))}
         </div>
@@ -385,6 +396,101 @@ function RetailerFavicon({ domain }: { domain: string | null }) {
         }}
       />
     </div>
+  );
+}
+
+// ── Product results (public catalog search) ────────────────────────────────
+
+export function ProductResultsCard({ data, isAuthenticated }: { data: PublicProductSearchResponse; isAuthenticated: boolean }) {
+  if (!data.success) {
+    return (
+      <Card className="mt-6 border-destructive/40">
+        <CardContent className="py-4 text-sm text-destructive flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          <span>{data.error || 'Search failed.'}</span>
+        </CardContent>
+      </Card>
+    );
+  }
+  if (data.total_results === 0) {
+    return (
+      <Card className="mt-6 dashboard-card">
+        <CardContent className="py-10 text-center text-muted-foreground">
+          <PackageSearch className="h-8 w-8 mx-auto mb-3 opacity-40" />
+          <p>No materials matched “{data.query}”.</p>
+          <p className="text-xs mt-1">Try a broader term — a material, a brand, or a category.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <Card className="mt-6 dashboard-card overflow-hidden">
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <PackageSearch className="h-4 w-4 text-primary" />
+            {data.total_results} material{data.total_results === 1 ? '' : 's'} found
+          </CardTitle>
+          {data.from_cache && (
+            <Badge variant="secondary" className="gap-1.5 rounded-full">
+              <CheckCircle2 className="h-3 w-3" />
+              Cached · instant
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {data.results.map((p) => (
+            <ProductCard key={p.id} p={p} isAuthenticated={isAuthenticated} />
+          ))}
+        </div>
+        {!isAuthenticated && (
+          <p className="text-xs text-muted-foreground text-center mt-5">
+            <Link to="/auth?mode=signup&redirect=/discover" className="text-primary hover:underline">
+              Create a free account
+            </Link>{' '}
+            to open full specs, add materials to a quote, and search more.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProductCard({ p, isAuthenticated }: { p: PublicProductResult; isAuthenticated: boolean }) {
+  // Anonymous → the product route bounces to signup (conversion); signed-in → opens the product.
+  const to = isAuthenticated
+    ? `/discover?product=${p.id}`
+    : `/auth?mode=signup&redirect=${encodeURIComponent(`/discover?product=${p.id}`)}`;
+  return (
+    <Link
+      to={to}
+      className="group rounded-xl border border-border/50 bg-card overflow-hidden hover:ring-1 hover:ring-primary/40 hover:shadow-md transition-all"
+    >
+      <div className="aspect-square bg-muted/40 flex items-center justify-center overflow-hidden">
+        {p.image_url ? (
+          <img
+            src={p.image_url}
+            alt={p.name}
+            loading="lazy"
+            className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <PackageSearch className="h-8 w-8 text-muted-foreground/40" />
+        )}
+      </div>
+      <div className="p-2.5">
+        <p className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">{p.name}</p>
+        {p.brand && <p className="text-[11px] text-muted-foreground truncate mt-0.5">{p.brand}</p>}
+        {p.category && (
+          <Badge variant="outline" className="mt-1.5 text-[10px] px-1.5 py-0 h-4 rounded font-normal capitalize">
+            {p.category.replace(/_/g, ' ')}
+          </Badge>
+        )}
+      </div>
+    </Link>
   );
 }
 

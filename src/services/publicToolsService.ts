@@ -77,6 +77,25 @@ export interface PublicMentionScanResponse {
   error?: string;
 }
 
+export interface PublicProductResult {
+  id: string;
+  name: string;
+  brand: string | null;
+  category: string | null;
+  image_url: string | null;
+  snippet: string | null;
+}
+
+export interface PublicProductSearchResponse {
+  success: boolean;
+  query: string;
+  results: PublicProductResult[];
+  total_results: number;
+  from_cache: boolean;
+  quota: PublicQuota;
+  error?: string;
+}
+
 export type PublicScanError =
   | { kind: 'quota_exceeded'; quota: PublicQuota; message: string }
   | { kind: 'insufficient_credits'; quota: PublicQuota; message: string }
@@ -143,8 +162,11 @@ async function postJson<T>(path: string, body: unknown, accessToken?: string | n
   throw new PublicToolsApiError({ kind: 'upstream', message: msg || `HTTP ${resp.status}` }, resp.status);
 }
 
-export async function fetchQuota(accessToken?: string | null): Promise<PublicQuota> {
-  const resp = await fetch(`${MIVAA_BASE}/api/v1/public/quota`, {
+export async function fetchQuota(accessToken?: string | null, scanType?: string): Promise<PublicQuota> {
+  // `scanType` asks the backend for that tool's per-scan credit cost (e.g. product = 1 vs
+  // price/mention = 2). Omitted → the standard cost.
+  const qs = scanType ? `?scan_type=${encodeURIComponent(scanType)}` : '';
+  const resp = await fetch(`${MIVAA_BASE}/api/v1/public/quota${qs}`, {
     headers: authHeaders(accessToken),
   });
   if (!resp.ok) {
@@ -189,6 +211,22 @@ export async function mentionScan(input: {
       subject_label: input.subjectLabel,
       aliases: input.aliases,
       country_code: input.countryCode,
+    },
+    input.accessToken,
+    signal,
+  );
+}
+
+export async function productSearch(input: {
+  turnstileToken: string;
+  query: string;
+  accessToken?: string | null;
+}, signal?: AbortSignal): Promise<PublicProductSearchResponse> {
+  return postJson<PublicProductSearchResponse>(
+    '/api/v1/public/product-search',
+    {
+      turnstile_token: input.turnstileToken,
+      query: input.query,
     },
     input.accessToken,
     signal,

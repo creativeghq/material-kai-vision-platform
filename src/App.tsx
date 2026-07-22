@@ -106,6 +106,7 @@ const ToolsHubPage = lazy(() => import('./pages/Tools/ToolsHubPage'));
 const PublicCareersPage = lazy(() => import('./pages/Careers/PublicCareersPage'));
 const PublicJobPage = lazy(() => import('./pages/Careers/PublicJobPage'));
 const ClockInKioskPage = lazy(() => import('./modules/hr/pages/ClockInKioskPage'));
+const ProductSearchPage = lazy(() => import('./pages/Tools/ProductSearchPage'));
 const PriceScanPage = lazy(() => import('./pages/Tools/PriceScanPage'));
 const MentionScanPage = lazy(() => import('./pages/Tools/MentionScanPage'));
 const ProjectPlanPage = lazy(() => import('./pages/Tools/ProjectPlanPage'));
@@ -192,6 +193,7 @@ const App = () => (
                 {/* #252 — public workspace clock-in kiosk: app.materialshub.gr/{workspace-slug}/clockin */}
                 <Route path="/:slug/clockin" element={<PageErrorBoundary name="Clock-in Kiosk"><ClockInKioskPage /></PageErrorBoundary>} />
                 <Route path="/tools" element={<PageErrorBoundary name="Tools Hub"><ToolsHubPage /></PageErrorBoundary>} />
+                <Route path="/tools/product-search" element={<PageErrorBoundary name="Material Search"><ProductSearchPage /></PageErrorBoundary>} />
                 <Route path="/tools/price-scan" element={<PageErrorBoundary name="Price Scan"><PriceScanPage /></PageErrorBoundary>} />
                 <Route path="/tools/mention-scan" element={<PageErrorBoundary name="Mention Scan"><MentionScanPage /></PageErrorBoundary>} />
                 <Route path="/tools/project-plan" element={<PageErrorBoundary name="Project Plan Estimator"><ProjectPlanPage /></PageErrorBoundary>} />
