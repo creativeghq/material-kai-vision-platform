@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles, FileText } from 'lucide-react';
+import { Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles, FileText, UserPlus } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -388,10 +388,20 @@ export default function PropertyWorkbench() {
                       {q.message && <div className="mt-0.5 text-sm text-muted-foreground line-clamp-2">{q.message}</div>}
                       <div className="mt-0.5 text-[11px] text-muted-foreground">{new Date(q.created_at).toLocaleString()}</div>
                     </div>
-                    <select className="rounded-md border bg-background px-2 py-1 text-xs" value={q.status}
-                      onChange={async (e) => { const upd = await realEstateService.updateInquiry(ws!, q.id, e.target.value); setInquiries((prev) => prev.map((x) => x.id === q.id ? upd : x)); }}>
-                      {['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!q.crm_contact_id && canManage && (
+                        <Button variant="outline" size="sm" className="rounded-full text-xs" disabled={busy} onClick={async () => {
+                          setBusy(true);
+                          try { await realEstateService.convertInquiry(ws!, q.id); await load(); toast({ title: 'Converted to CRM lead' }); }
+                          catch (e) { toast({ title: 'Convert failed', description: (e as Error).message, variant: 'destructive' }); }
+                          finally { setBusy(false); }
+                        }}><UserPlus className="mr-1 h-3.5 w-3.5" /> To lead</Button>
+                      )}
+                      <select className="rounded-md border bg-background px-2 py-1 text-xs" value={q.status}
+                        onChange={async (e) => { const upd = await realEstateService.updateInquiry(ws!, q.id, e.target.value); setInquiries((prev) => prev.map((x) => x.id === q.id ? upd : x)); }}>
+                        {['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'].map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
                   </div>
                 ))}
               </div></CardContent></Card>

@@ -317,6 +317,30 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ inquiries: rows });
       }
 
+      case 'convert-inquiry': {
+        // Turn an anonymous inquiry into a trackable CRM lead (D9: the lead IS a crm_contact),
+        // link it to the inquiry + property, and assign it to the caller (responsible_sales_user_ids).
+        const inqId = String(body.inquiry_id ?? '');
+        if (!inqId) return json({ error: 'inquiry_id is required' }, 400);
+        const { data: inq } = await supabase.from('property_inquiries').select('*').eq('id', inqId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!inq) return json({ error: 'not found' }, 404);
+        if (inq.crm_contact_id) return json({ crm_contact_id: inq.crm_contact_id, already_linked: true });
+
+        const { data: contact, error: cErr } = await supabase.from('crm_contacts').insert({
+          workspace_id: workspaceId, name: inq.name || inq.email || 'Website lead', email: inq.email, phone: inq.phone,
+          contact_type: 'buyer', lead_source: 'property_portal', lead_status: 'new',
+          responsible_sales_user_ids: [userId],
+        }).select('id').single();
+        if (cErr) throw new HttpError(400, cErr.message);
+
+        await supabase.from('property_inquiries').update({ crm_contact_id: contact.id, status: 'contacted' }).eq('id', inqId).eq('workspace_id', workspaceId);
+        await supabase.from('property_interests').upsert(
+          { workspace_id: workspaceId, property_id: inq.property_id, crm_contact_id: contact.id, interest_type: 'interested', note: 'from listing enquiry' },
+          { onConflict: 'property_id,crm_contact_id,interest_type' });
+        await supabase.from('property_contacts_ext').upsert({ crm_contact_id: contact.id, workspace_id: workspaceId, contact_role: 'buyer' }, { onConflict: 'crm_contact_id' });
+        return json({ crm_contact_id: contact.id });
+      }
+
       case 'update-inquiry': {
         const inqId = String(body.inquiry_id ?? '');
         const status = String(body.status ?? '');

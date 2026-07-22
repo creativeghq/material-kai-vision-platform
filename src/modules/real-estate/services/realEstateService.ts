@@ -122,6 +122,9 @@ export const realEstateService = {
     call<{ inquiries: PropertyInquiry[] }>(ws, 'list-inquiries', filters).then((r) => r.inquiries),
   updateInquiry: (ws: string, inquiryId: string, status: string) =>
     call<{ inquiry: PropertyInquiry }>(ws, 'update-inquiry', { inquiry_id: inquiryId, status }).then((r) => r.inquiry),
+  /** Turn an anonymous inquiry into a CRM lead (contact) linked to the property + assigned to caller. */
+  convertInquiry: (ws: string, inquiryId: string) =>
+    call<{ crm_contact_id: string; already_linked?: boolean }>(ws, 'convert-inquiry', { inquiry_id: inquiryId }),
   listViewings: (ws: string, filters: { property_id?: string } = {}) =>
     call<{ viewings: PropertyViewing[] }>(ws, 'list-viewings', filters).then((r) => r.viewings),
   createViewing: (ws: string, fields: { property_id: string; scheduled_at: string; type?: string; crm_contact_id?: string; agent_id?: string }) =>
