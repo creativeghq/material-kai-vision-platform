@@ -505,9 +505,9 @@ All colors MUST be HSL.
      identity gradient. Retints the neutral SURFACES too (not just the accent) so
      the warm-cream base doesn't fight the blue. */
   html.light[data-accent='blue'] {
-    --background: 214 32% 95%;        /* #eef2f7 — cool slate-grey page */
-    --page-background: 214 32% 95%;
-    --surface-hover: 214 30% 92%;     /* cool row/card hover */
+    --background: 210 40% 98%;        /* #f6f9fd — near-white cool page */
+    --page-background: 210 40% 98%;
+    --surface-hover: 214 32% 93%;     /* cool row/card hover */
     --foreground: 217 30% 20%;        /* #232f43 — slate ink */
 
     --card: 0 0% 100%;                /* white cards lift on the cool page */
@@ -1425,6 +1425,17 @@ html.light body {
   background-attachment: fixed;
 }
 
+/* Blue accent (light) canvas — WHITE ground with soft blue corner glows, no warm
+   cream. Overrides the warm html.light body above (higher specificity). */
+html.light[data-accent='blue'] body {
+  background:
+    radial-gradient(1100px 820px at -6% 112%, rgba(37, 99, 235, 0.15), transparent 56%),
+    radial-gradient(820px 600px at 108% 110%, rgba(59, 130, 246, 0.10), transparent 58%),
+    radial-gradient(920px 700px at 92% -10%, rgba(37, 99, 235, 0.10), transparent 60%),
+    linear-gradient(180deg, #ffffff 0%, #f5f8fd 58%, #eaf1fb 100%);
+  background-attachment: fixed;
+}
+
 /* ============================================================
    WARM-GLASS DESIGN HELPERS (glass-over-gradient system)
    ------------------------------------------------------------
@@ -1442,6 +1453,10 @@ html.light body {
 html.light .tinted-card {
   background: rgba(236, 228, 208, 0.5);
   border-color: rgba(180, 165, 120, 0.28);
+}
+html.light[data-accent='blue'] .tinted-card {
+  background: rgba(226, 232, 240, 0.5);
+  border-color: rgba(148, 163, 184, 0.28);
 }
 
 .tabs-underline [role="tab"] {
