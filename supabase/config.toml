@@ -117,6 +117,11 @@ verify_jwt = false
 [functions.real-estate-public]
 verify_jwt = false
 
+# #249 — Real Estate syndication PULL feed (anonymous, feed-token gated). Portals GET tokenized XML
+# (Kyero/generic) of a workspace's live public listings. verify_jwt off; token resolves the workspace.
+[functions.real-estate-feed]
+verify_jwt = false
+
 # Contracts & e-signature API. verify_jwt off so the public /sign token path works; management
 # actions call authenticate + isModuleEnabled('contracts') + assertEntitled('contracts') and write
 # through a user-JWT client so the context-branched RLS (hr/finance/project) enforces access.

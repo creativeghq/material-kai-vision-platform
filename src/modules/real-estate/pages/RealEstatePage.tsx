@@ -10,7 +10,8 @@ import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { realEstateService, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard } from '../services/realEstateService';
+import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings } from '../services/realEstateService';
+import { Rss, Copy, RefreshCw } from 'lucide-react';
 
 const STATUS_VARIANT: Record<ListingStatus, string> = {
   draft: 'bg-muted text-muted-foreground', active: 'bg-emerald-500/15 text-emerald-500',
@@ -62,7 +63,7 @@ export default function RealEstatePage() {
             <TabsTrigger value="leads"><Inbox className="mr-1.5 h-4 w-4" /> Leads</TabsTrigger>
             <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings</TabsTrigger>
           </TabsList>
-          <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
+          <TabsContent value="overview" className="space-y-5"><DashboardPanel ws={ws} />{canManage && <FeedCard ws={ws} />}</TabsContent>
           <TabsContent value="listings"><ListingsPanel ws={ws} canManage={canManage} creating={creating} onCreate={createDraft} /></TabsContent>
           <TabsContent value="leads"><LeadsPanel ws={ws} /></TabsContent>
           <TabsContent value="viewings"><ViewingsPanel ws={ws} /></TabsContent>
@@ -122,6 +123,49 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         </CardContent></Card>
       </div>
     </div>
+  );
+};
+
+const FeedCard: React.FC<{ ws: string | null }> = ({ ws }) => {
+  const { toast } = useToast();
+  const [s, setS] = useState<FeedSettings | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (ws) realEstateService.getFeedSettings(ws).then(setS).catch(() => {}); }, [ws]);
+  if (!ws) return null;
+
+  const patch = async (p: { feed_enabled?: boolean; feed_format?: string }) => {
+    setBusy(true);
+    try { setS(await realEstateService.updateFeedSettings(ws, p)); } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); } finally { setBusy(false); }
+  };
+  const url = s ? feedUrl(s.feed_token, s.feed_format) : '';
+
+  return (
+    <Card><CardContent className="p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Rss className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">Portal syndication feed</span>
+        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={!!s?.feed_enabled} disabled={busy || !s} onChange={(e) => patch({ feed_enabled: e.target.checked })} /> Enabled
+        </label>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">Portals (Kyero network, OpenImmo-compatible, custom) pull this URL to import your live public listings. Only <span className="font-medium">active + public</span> listings are included.</p>
+      {s && (
+        <>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Format</span>
+            <select className="h-8 rounded-md border bg-background px-2 text-xs" value={s.feed_format} disabled={busy} onChange={(e) => patch({ feed_format: e.target.value })}>
+              <option value="kyero">Kyero v3</option>
+              <option value="generic">Generic XML</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/40 px-2 py-1.5 text-[11px]">{s.feed_enabled ? url : 'Enable the feed to reveal the URL'}</code>
+            <Button variant="ghost" size="sm" className="rounded-full" disabled={!s.feed_enabled} onClick={() => { void navigator.clipboard.writeText(url); toast({ title: 'Feed URL copied' }); }}><Copy className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="sm" className="rounded-full" disabled={busy} title="Rotate token" onClick={async () => { setBusy(true); try { setS(await realEstateService.rotateFeedToken(ws)); toast({ title: 'Token rotated — update your portals' }); } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); } finally { setBusy(false); } }}><RefreshCw className="h-3.5 w-3.5" /></Button>
+          </div>
+        </>
+      )}
+    </CardContent></Card>
   );
 };
 

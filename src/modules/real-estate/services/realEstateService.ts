@@ -58,6 +58,14 @@ async function call<T>(workspaceId: string, action: string, extra: Record<string
   return data as T;
 }
 
+export interface FeedSettings { workspace_id: string; feed_token: string; feed_enabled: boolean; feed_format: string }
+
+/** Public syndication feed URL a portal can pull. */
+export function feedUrl(token: string, format: string): string {
+  const base = (supabase as any).supabaseUrl || '';
+  return `${base}/functions/v1/real-estate-feed?token=${encodeURIComponent(token)}&format=${encodeURIComponent(format)}`;
+}
+
 export interface RealEstateDashboard {
   totals: { listings: number; public: number; active: number; draft: number; under_offer: number };
   new_leads: number;
@@ -67,6 +75,11 @@ export interface RealEstateDashboard {
 
 export const realEstateService = {
   dashboard: (ws: string) => call<RealEstateDashboard>(ws, 'dashboard'),
+  // Syndication feed
+  getFeedSettings: (ws: string) => call<{ settings: FeedSettings | null }>(ws, 'get-feed-settings').then((r) => r.settings),
+  updateFeedSettings: (ws: string, patch: { feed_enabled?: boolean; feed_format?: string }) =>
+    call<{ settings: FeedSettings }>(ws, 'update-feed-settings', patch).then((r) => r.settings),
+  rotateFeedToken: (ws: string) => call<{ settings: FeedSettings }>(ws, 'rotate-feed-token').then((r) => r.settings),
   // Properties
   listProperties: (ws: string, filters: { status?: string; property_type?: string } = {}) =>
     call<{ properties: PropertyListItem[] }>(ws, 'list-properties', filters).then((r) => r.properties),

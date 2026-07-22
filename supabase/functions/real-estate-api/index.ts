@@ -436,6 +436,41 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ ext: data });
       }
 
+      // ── Syndication feed settings ──────────────────────────────────────
+      case 'get-feed-settings': {
+        let { data: row } = await supabase.from('real_estate_settings').select('*').eq('workspace_id', workspaceId).maybeSingle();
+        if (!row) {
+          if (!access.canManage) return json({ settings: null });
+          const ins = await supabase.from('real_estate_settings').insert({ workspace_id: workspaceId }).select('*').single();
+          if (ins.error) throw new HttpError(400, ins.error.message);
+          row = ins.data;
+        }
+        return json({ settings: row });
+      }
+
+      case 'update-feed-settings': {
+        requireManage();
+        const patch: Record<string, unknown> = {};
+        if (body.feed_enabled !== undefined) patch.feed_enabled = !!body.feed_enabled;
+        if (body.feed_format !== undefined) {
+          if (!['kyero', 'generic'].includes(String(body.feed_format))) return json({ error: 'invalid feed_format' }, 400);
+          patch.feed_format = body.feed_format;
+        }
+        const { data, error } = await supabase.from('real_estate_settings')
+          .upsert({ workspace_id: workspaceId, ...patch }, { onConflict: 'workspace_id' }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ settings: data });
+      }
+
+      case 'rotate-feed-token': {
+        requireManage();
+        const token = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
+        const { data, error } = await supabase.from('real_estate_settings')
+          .upsert({ workspace_id: workspaceId, feed_token: token }, { onConflict: 'workspace_id' }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ settings: data });
+      }
+
       default:
         return json({ error: `Unknown action: ${action}` }, 400);
     }

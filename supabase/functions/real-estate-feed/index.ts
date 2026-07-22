@@ -1,0 +1,122 @@
+// deno-lint-ignore-file no-explicit-any
+// #249 P3 — Real Estate syndication PULL feed. A portal fetches a tokenized XML feed of a workspace's
+// live public listings (GET .../real-estate-feed?token=...&format=kyero|generic). This is the in-repo
+// half of syndication; FTP/POST push to specific portals lives on the MIVAA backend. Exposes ONLY
+// toPublic() fields for active + public listings; the token gates cross-workspace enumeration.
+import { createClient } from '@supabase/supabase-js';
+import { withApiLogging } from '../_shared/api-logger.ts';
+import { toPublic } from '../_shared/real-estate.ts';
+
+const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type' };
+const xml = (s: string) => new Response(s, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/xml; charset=utf-8' } });
+const err = (msg: string, status = 400) => new Response(`<?xml version="1.0"?><error>${esc(msg)}</error>`, { status, headers: { ...corsHeaders, 'Content-Type': 'application/xml; charset=utf-8' } });
+
+/** XML text/attribute escape (predefined entities). */
+function esc(v: any): string {
+  return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+Deno.serve(withApiLogging('real-estate-feed', async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
+
+  const url = new URL(req.url);
+  let token = url.searchParams.get('token') ?? '';
+  let format = url.searchParams.get('format') ?? '';
+  if (req.method === 'POST') { try { const b = await req.json(); token = token || b.token; format = format || b.format; } catch { /* ignore */ } }
+  if (!token) return err('token is required', 400);
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
+
+  const { data: settings } = await supabase.from('real_estate_settings').select('workspace_id, feed_enabled, feed_format').eq('feed_token', token).maybeSingle();
+  if (!settings || !settings.feed_enabled) return err('feed not found or disabled', 404);
+  format = format || settings.feed_format || 'kyero';
+
+  const { data: rows } = await supabase.from('properties').select('*')
+    .eq('workspace_id', settings.workspace_id).eq('is_public', true).eq('listing_status', 'active')
+    .order('published_at', { ascending: false }).limit(500);
+  const listings = rows ?? [];
+
+  // Sign all photos per listing (one query).
+  const ids = listings.map((l: any) => l.id);
+  const photosByProp: Record<string, string[]> = {};
+  if (ids.length) {
+    const { data: photos } = await supabase.from('property_photos').select('property_id, storage_path, sort_order').in('property_id', ids).order('sort_order');
+    await Promise.all((photos ?? []).map(async (ph: any) => {
+      const { data: s } = await supabase.storage.from('property-media').createSignedUrl(ph.storage_path, 60 * 60 * 24 * 7);
+      if (s?.signedUrl) (photosByProp[ph.property_id] ||= []).push(s.signedUrl);
+    }));
+  }
+
+  const pubs = listings.map((l: any) => ({ raw: l, pub: toPublic(l), images: photosByProp[l.id] ?? [] }));
+  return xml(format === 'generic' ? renderGeneric(pubs) : renderKyero(pubs));
+}));
+
+function priceFreq(tx: string): string {
+  if (tx === 'rent' || tx === 'short_let') return 'rent';
+  return 'sale';
+}
+
+function renderKyero(items: Array<{ raw: any; pub: any; images: string[] }>): string {
+  const props = items.map(({ pub, images }) => {
+    const imgs = images.map((u, i) => `      <image id="${i + 1}"><url>${esc(u)}</url></image>`).join('\n');
+    return `  <property>
+    <id>${esc(pub.id)}</id>
+    <ref>${esc(pub.reference_code ?? pub.id)}</ref>
+    <price>${esc(pub.price ?? 0)}</price>
+    <currency>${esc(pub.currency ?? 'EUR')}</currency>
+    <price_freq>${esc(priceFreq(pub.transaction_type))}</price_freq>
+    <type>${esc(pub.subtype || pub.property_type)}</type>
+    <town>${esc(pub.town ?? '')}</town>
+    <province>${esc(pub.region ?? pub.prefecture ?? '')}</province>
+    <country>${esc(pub.country_code ?? '')}</country>
+    <location><latitude>${esc(pub.lat ?? '')}</latitude><longitude>${esc(pub.lng ?? '')}</longitude></location>
+    <beds>${esc(pub.bedrooms ?? '')}</beds>
+    <baths>${esc(pub.bathrooms ?? '')}</baths>
+    <surface_area><built>${esc(pub.area_built ?? '')}</built><plot>${esc(pub.plot_area ?? pub.area_plot ?? '')}</plot></surface_area>
+    <energy_rating><consumption>${esc(pub.energy_class ?? '')}</consumption></energy_rating>
+    <desc><en>${esc(pub.description_i18n?.en ?? '')}</en><el>${esc(pub.description_i18n?.el ?? '')}</el></desc>
+    <images>
+${imgs}
+    </images>
+  </property>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <kyero><feed_version>3</feed_version></kyero>
+${props}
+</root>`;
+}
+
+function renderGeneric(items: Array<{ raw: any; pub: any; images: string[] }>): string {
+  const props = items.map(({ pub, images }) => {
+    const imgs = images.map((u) => `      <image>${esc(u)}</image>`).join('\n');
+    const feats = (Array.isArray(pub.features) ? pub.features : []).map((f: string) => `      <feature>${esc(f)}</feature>`).join('\n');
+    return `  <listing>
+    <id>${esc(pub.id)}</id>
+    <reference>${esc(pub.reference_code ?? '')}</reference>
+    <title>${esc(pub.title ?? '')}</title>
+    <property_type>${esc(pub.property_type)}</property_type>
+    <transaction_type>${esc(pub.transaction_type)}</transaction_type>
+    <price>${esc(pub.price ?? '')}</price>
+    <currency>${esc(pub.currency ?? 'EUR')}</currency>
+    <town>${esc(pub.town ?? '')}</town>
+    <region>${esc(pub.region ?? '')}</region>
+    <country>${esc(pub.country_code ?? '')}</country>
+    <bedrooms>${esc(pub.bedrooms ?? '')}</bedrooms>
+    <bathrooms>${esc(pub.bathrooms ?? '')}</bathrooms>
+    <area_built>${esc(pub.area_built ?? '')}</area_built>
+    <energy_class>${esc(pub.energy_class ?? '')}</energy_class>
+    <description>${esc(pub.description_i18n?.en || pub.description_i18n?.el || '')}</description>
+    <features>
+${feats}
+    </features>
+    <images>
+${imgs}
+    </images>
+  </listing>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="utf-8"?>
+<listings count="${items.length}">
+${props}
+</listings>`;
+}
