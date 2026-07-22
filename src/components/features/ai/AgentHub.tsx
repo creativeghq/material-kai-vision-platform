@@ -296,6 +296,10 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Reviews
   reviews_list: 'Reviews about you',
   review_reply_posted: 'Reply posted',
+  // Real Estate (#249)
+  real_estate_properties: 'Property listings',
+  real_estate_property: 'Property',
+  real_estate_leads: 'Property leads',
   // Appointments
   appointments_list: 'Upcoming appointments',
   appointment_scheduled: 'Appointment scheduled',

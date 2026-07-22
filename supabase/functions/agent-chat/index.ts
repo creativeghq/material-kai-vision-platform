@@ -944,6 +944,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_my_hr',
       // Stock toolkit (module-gated stock + workspace entitlement; finance-manager RBAC enforced in stock-api)
       'manage_stock',
+      // Real Estate toolkit (#249; module-gated real-estate + workspace entitlement; realestate.* RBAC in real-estate-api)
+      'manage_real_estate',
       // Sourcing / fulfillment (#237; RPC-gated — resolve=member, create_po=finance-manager; 0 cr)
       'source_product', 'create_purchase_order', 'send_purchase_order',
       // Presentation catalogs (admin/owner only — gated at injection time)
@@ -1522,6 +1524,7 @@ async function executeAgent(
   const needsHr = config.tools.includes('manage_hr');
   const needsMyHr = config.tools.includes('manage_my_hr');
   const needsStock = config.tools.includes('manage_stock');
+  const needsRealEstate = config.tools.includes('manage_real_estate');
   const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat'].includes(t));
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
@@ -1535,7 +1538,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1558,6 +1561,7 @@ async function executeAgent(
     needsHr           ? import('../_shared/tools/hr-tools.ts') : null,
     needsMyHr         ? import('../_shared/tools/my-hr-tools.ts') : null,
     needsStock        ? import('../_shared/tools/stock-tools.ts') : null,
+    needsRealEstate   ? import('../_shared/tools/real-estate-tools.ts') : null,
     needsCrm          ? import('../_shared/tools/crm-tools.ts') : null,
     needsQuotes       ? import('../_shared/tools/quote-tools.ts') : null,
     needsSocial       ? import('../_shared/tools/social-tools.ts') : null,
@@ -1660,6 +1664,7 @@ async function executeAgent(
   const createManageHrTool = hrToolsMod?.createManageHrTool;
   const createManageMyHrTool = myHrToolsMod?.createManageMyHrTool;
   const createManageStockTool = stockToolsMod?.createManageStockTool;
+  const createManageRealEstateTool = realEstateToolsMod?.createManageRealEstateTool;
   const createCreateQuoteTool = quotesMod?.createCreateQuoteTool;
   const createGenerateQuotePdfTool = quotesMod?.createGenerateQuotePdfTool;
   const createListMyQuotesTool = quotesMod?.createListMyQuotesTool;
@@ -1971,6 +1976,11 @@ async function executeAgent(
   // Stock toolkit (module-gated stock + entitlement; finance-manager RBAC enforced server-side in stock-api)
   if (config.tools.includes('manage_stock') && createManageStockTool) {
     tools.push(createManageStockTool(userId, workspaceId, userJwt, onChunk));
+  }
+  // Real Estate toolkit (#249; module-gated real-estate + entitlement; realestate.* RBAC + agent
+  // lead-scoping enforced server-side in real-estate-api). Read-only actions → 0 cr.
+  if (config.tools.includes('manage_real_estate') && createManageRealEstateTool) {
+    tools.push(createManageRealEstateTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Quotes toolkit (0 cr — DB writes + deterministic PDF; workspace-scoped; user_id/workspace_id
