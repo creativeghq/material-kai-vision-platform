@@ -367,12 +367,23 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const id = String(body.property_id ?? '');
         const scheduledAt = String(body.scheduled_at ?? '');
         if (!id || !scheduledAt) return json({ error: 'property_id and scheduled_at are required' }, 400);
-        await loadProperty(id);
+        const prop = await loadProperty(id);
         const type = VIEWING_TYPES.includes(body.type) ? body.type : 'viewing';
+        const contactId = body.crm_contact_id ?? null;
+        const agentId = body.agent_id ?? userId;
+        // Mirror into the platform calendar (crm_meetings) so it shows in Profile→Calendar /
+        // Appointments and gets the reminder cron. reminder_at is computed by crm_meetings_sync_trg.
+        const subject = `${type === 'open_house' ? 'Open house' : type === 'tour' ? 'Property tour' : 'Viewing'} — ${prop.title || prop.reference_code || 'listing'}`;
+        const location = [prop.hide_exact_address ? null : prop.address, prop.town, prop.region].filter(Boolean).join(', ') || null;
+        const { data: meeting } = await supabase.from('crm_meetings').insert({
+          workspace_id: workspaceId, owner_user_id: agentId,
+          target_kind: contactId ? 'contact' : null, target_id: contactId,
+          subject, notes: prop.reference_code ? `Ref ${prop.reference_code}` : null,
+          meeting_at: scheduledAt, location, remind_email: true, reminder_minutes_before: 60, status: 'scheduled',
+        }).select('id').single();
         const { data, error } = await supabase.from('property_viewings').insert({
           workspace_id: workspaceId, property_id: id, scheduled_at: scheduledAt, type,
-          crm_contact_id: body.crm_contact_id ?? null,
-          agent_id: body.agent_id ?? userId,          // defaults to the caller (the acting agent)
+          crm_contact_id: contactId, agent_id: agentId, meeting_id: meeting?.id ?? null,
         }).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ viewing: data });
@@ -390,6 +401,14 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (body.feedback !== undefined) patch.feedback = body.feedback;
         const { data, error } = await supabase.from('property_viewings').update(patch).eq('id', vId).eq('workspace_id', workspaceId).select('*').single();
         if (error) throw new HttpError(400, error.message);
+        // Keep the linked calendar meeting in sync (reschedule + status; trigger recomputes reminder_at).
+        if (data?.meeting_id && (body.status !== undefined || body.scheduled_at !== undefined)) {
+          const mPatch: Record<string, unknown> = {};
+          if (body.scheduled_at !== undefined) mPatch.meeting_at = body.scheduled_at;
+          // crm_meetings.status ∈ {scheduled, done, cancelled}
+          if (body.status !== undefined) mPatch.status = body.status === 'completed' ? 'done' : (body.status === 'cancelled' || body.status === 'no_show') ? 'cancelled' : 'scheduled';
+          await supabase.from('crm_meetings').update(mPatch).eq('id', data.meeting_id).eq('workspace_id', workspaceId);
+        }
         return json({ viewing: data });
       }
 

@@ -519,6 +519,7 @@ export default function PropertyWorkbench() {
                   catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
                   finally { setBusy(false); }
                 }}><CalendarClock className="mr-1 h-4 w-4" /> Schedule viewing</Button>
+                <span className="text-[11px] text-muted-foreground">Added to your calendar with a reminder.</span>
               </div>
             )}
             {viewings.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No viewings scheduled.</div> : (
