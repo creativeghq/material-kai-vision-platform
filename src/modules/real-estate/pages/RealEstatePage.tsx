@@ -112,6 +112,18 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         {kpi('Under offer', d.totals.under_offer, 'text-amber-500')}
         {kpi('New leads', d.new_leads, 'text-primary')}
       </div>
+      {d.commission && d.commission.sold_count > 0 && (() => {
+        const money = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: d.commission.currency || 'EUR', maximumFractionDigits: 0 }).format(n);
+        return (
+          <Card><CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 p-4">
+            <div className="text-sm font-semibold">Commissions <span className="text-xs font-normal text-muted-foreground">(year to date)</span></div>
+            <div><div className="text-[11px] text-muted-foreground">Sold</div><div className="text-base font-semibold">{d.commission.sold_count}</div></div>
+            <div><div className="text-[11px] text-muted-foreground">Gross sales</div><div className="text-base font-semibold">{money(d.commission.gross_sales)}</div></div>
+            <div><div className="text-[11px] text-muted-foreground">Commission (net)</div><div className="text-base font-semibold text-emerald-500">{money(d.commission.commission_net)}</div></div>
+            <div><div className="text-[11px] text-muted-foreground">Invoiced</div><div className="text-base font-semibold">{d.commission.invoiced_count}/{d.commission.sold_count}</div></div>
+          </CardContent></Card>
+        );
+      })()}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card><CardContent className="p-0">
           <div className="border-b border-border px-4 py-2.5 text-sm font-semibold">Upcoming viewings (7 days)</div>

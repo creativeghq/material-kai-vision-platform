@@ -106,6 +106,16 @@ export interface LandlordStatement {
   summary: { rent_charged: number; rent_received: number; rent_outstanding: number; maintenance_spend: number; net_to_landlord: number };
 }
 
+// ── Sale completion + commission (#281) ──
+export interface PropertySale {
+  id: string; property_id: string; offer_id: string | null; sale_price: number; currency: string;
+  commission_pct: number; commission_fixed: number; vat_pct: number; commission_base: number; commission_total: number;
+  seller_contact_id: string | null; buyer_contact_id: string | null; completed_at: string;
+  invoice_id: string | null; invoice_status: string | null; notes: string | null;
+  property?: { id: string; title: string | null; reference_code: string | null; town: string | null } | null;
+  seller?: { id: string; name: string | null; email: string | null } | null;
+}
+
 export interface FeedSettings { workspace_id: string; feed_token: string; feed_enabled: boolean; feed_format: string }
 
 /** Public syndication feed URL a portal can pull. */
@@ -115,7 +125,8 @@ export function feedUrl(token: string, format: string): string {
 }
 
 export interface RealEstateDashboard {
-  totals: { listings: number; public: number; active: number; draft: number; under_offer: number };
+  totals: { listings: number; public: number; active: number; draft: number; under_offer: number; sold: number };
+  commission: { sold_count: number; gross_sales: number; commission_net: number; invoiced_count: number; currency: string };
   new_leads: number;
   recent_leads: (PropertyInquiry & { property?: { title: string | null } | null })[];
   upcoming_viewings: (PropertyViewing & { property?: { title: string | null } | null })[];
@@ -177,6 +188,14 @@ export const realEstateService = {
   updateOffer: (ws: string, offerId: string, fields: { status?: string; amount?: number; terms?: string; note?: string }) =>
     call<{ offer: PropertyOffer }>(ws, 'update-offer', { offer_id: offerId, ...fields }).then((r) => r.offer),
   acceptOffer: (ws: string, offerId: string) => call<{ ok: true; cancelled_viewings: number }>(ws, 'accept-offer', { offer_id: offerId }),
+
+  // Sale completion + commission (#281)
+  completeSale: (ws: string, fields: { offer_id?: string; property_id?: string; sale_price: number; currency?: string; commission_pct?: number; commission_fixed?: number; vat_pct?: number; completed_at?: string; buyer_contact_id?: string; notes?: string }) =>
+    call<{ sale: PropertySale }>(ws, 'complete-sale', fields).then((r) => r.sale),
+  listSales: (ws: string, propertyId?: string) =>
+    call<{ sales: PropertySale[] }>(ws, 'list-sales', propertyId ? { property_id: propertyId } : {}).then((r) => r.sales),
+  linkSaleInvoice: (ws: string, saleId: string, invoiceId: string, invoiceStatus = 'issued') =>
+    call<{ sale: PropertySale }>(ws, 'link-sale-invoice', { sale_id: saleId, invoice_id: invoiceId, invoice_status: invoiceStatus }).then((r) => r.sale),
   listInquiries: (ws: string, filters: { status?: string; property_id?: string } = {}) =>
     call<{ inquiries: PropertyInquiry[] }>(ws, 'list-inquiries', filters).then((r) => r.inquiries),
   updateInquiry: (ws: string, inquiryId: string, status: string) =>

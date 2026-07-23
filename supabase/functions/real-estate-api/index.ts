@@ -177,7 +177,8 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       case 'dashboard': {
         const now = new Date();
         const weekAhead = new Date(now.getTime() + 7 * 864e5).toISOString();
-        const [{ data: statusRows }, { data: recentLeads }, { data: upcoming }] = await Promise.all([
+        const yearStart = new Date(now.getUTCFullYear(), 0, 1).toISOString().slice(0, 10);
+        const [{ data: statusRows }, { data: recentLeads }, { data: upcoming }, { data: sales }] = await Promise.all([
           supabase.from('properties').select('listing_status, is_public').eq('workspace_id', workspaceId),
           supabase.from('property_inquiries')
             .select('id, name, email, status, created_at, property_id, property:properties!property_inquiries_property_id_fkey ( title, listing_agent_id )')
@@ -185,14 +186,28 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           supabase.from('property_viewings')
             .select('id, scheduled_at, type, status, agent_id, property_id, property:properties!property_viewings_property_id_fkey ( title )')
             .eq('workspace_id', workspaceId).gte('scheduled_at', now.toISOString()).lte('scheduled_at', weekAhead).order('scheduled_at').limit(50),
+          supabase.from('property_sales')
+            .select('sale_price, commission_base, currency, invoice_id, completed_at, agent_id, property:properties!property_sales_property_id_fkey ( listing_agent_id, created_by, open_for_all )')
+            .eq('workspace_id', workspaceId).gte('completed_at', yearStart),
         ]);
         const byStatus: Record<string, number> = {};
         let publicCount = 0;
         for (const r of statusRows ?? []) { byStatus[r.listing_status] = (byStatus[r.listing_status] ?? 0) + 1; if (r.is_public) publicCount++; }
         const leads = (recentLeads ?? []).filter((r: any) => access.isBroker || r.property?.listing_agent_id === userId);
         const viewings = (upcoming ?? []).filter((r: any) => access.isBroker || r.agent_id === userId);
+        // Commission rollup (year-to-date), agent-scoped like everything else.
+        const myOwn = (s: any) => access.isBroker || s.property?.listing_agent_id === userId || s.property?.created_by === userId || s.agent_id === userId;
+        const mySales = (sales ?? []).filter(myOwn);
+        const commission = {
+          sold_count: mySales.length,
+          gross_sales: mySales.reduce((t: number, s: any) => t + Number(s.sale_price ?? 0), 0),
+          commission_net: mySales.reduce((t: number, s: any) => t + Number(s.commission_base ?? 0), 0),
+          invoiced_count: mySales.filter((s: any) => s.invoice_id).length,
+          currency: (mySales[0]?.currency) ?? 'EUR',
+        };
         return json({
-          totals: { listings: (statusRows ?? []).length, public: publicCount, active: byStatus['active'] ?? 0, draft: byStatus['draft'] ?? 0, under_offer: byStatus['under_offer'] ?? 0 },
+          totals: { listings: (statusRows ?? []).length, public: publicCount, active: byStatus['active'] ?? 0, draft: byStatus['draft'] ?? 0, under_offer: byStatus['under_offer'] ?? 0, sold: byStatus['sold'] ?? 0 },
+          commission,
           new_leads: leads.filter((l: any) => l.status === 'new').length,
           recent_leads: leads.slice(0, 6),
           upcoming_viewings: viewings.slice(0, 8),
@@ -583,6 +598,78 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           if (v.meeting_id) await supabase.from('crm_meetings').update({ status: 'cancelled' }).eq('id', v.meeting_id);
         }
         return json({ ok: true, cancelled_viewings: (fv ?? []).length });
+      }
+
+      // ── Sale completion + commission (#281) ────────────────────────────
+      // Captures the agreed sale price, computes commission (price × pct + fixed, + VAT),
+      // marks the listing sold, and (if from an offer) runs the accept-cascade. The commission
+      // invoice is issued deliberately from Finance later (link-sale-invoice stamps it back).
+      case 'complete-sale': {
+        const offerId = String(body.offer_id ?? '');
+        let propertyId = String(body.property_id ?? '');
+        let acceptedOffer: any = null;
+        if (offerId) {
+          const { data: o } = await supabase.from('property_offers').select('id, property_id, amount, currency, buyer_contact_id').eq('id', offerId).eq('workspace_id', workspaceId).maybeSingle();
+          if (!o) return json({ error: 'offer not found' }, 404);
+          acceptedOffer = o; propertyId = o.property_id;
+        }
+        if (!propertyId) return json({ error: 'property_id or offer_id is required' }, 400);
+        const property = await loadEditable(propertyId);
+        const salePrice = Number(body.sale_price ?? acceptedOffer?.amount);
+        if (!salePrice || salePrice <= 0) return json({ error: 'sale_price is required' }, 400);
+        const commissionPct = body.commission_pct != null ? Number(body.commission_pct) : Number(property.commission_pct ?? 0);
+        const commissionFixed = body.commission_fixed != null ? Number(body.commission_fixed) : 0;
+        const vatPct = body.vat_pct != null ? Number(body.vat_pct) : 0;
+        const currency = String(body.currency ?? acceptedOffer?.currency ?? property.currency ?? 'EUR');
+        const saleRow = {
+          workspace_id: workspaceId, property_id: propertyId, offer_id: offerId || null,
+          sale_price: salePrice, currency, commission_pct: commissionPct, commission_fixed: commissionFixed, vat_pct: vatPct,
+          seller_contact_id: property.vendor_contact_id ?? null,
+          buyer_contact_id: body.buyer_contact_id ?? acceptedOffer?.buyer_contact_id ?? null,
+          completed_at: body.completed_at ?? new Date().toISOString().slice(0, 10),
+          notes: body.notes ?? null, agent_id: userId, created_by: userId,
+        };
+        const { data: sale, error: sErr } = await supabase.from('property_sales')
+          .upsert(saleRow, { onConflict: 'property_id' }).select('*').single();
+        if (sErr) throw new HttpError(400, sErr.message);
+        // Mark the listing sold + snapshot the final price.
+        await supabase.from('properties').update({ listing_status: 'sold', sold_price: salePrice, sold_at: new Date().toISOString() }).eq('id', propertyId).eq('workspace_id', workspaceId);
+        if (acceptedOffer) {
+          await supabase.from('property_offers').update({ status: 'accepted' }).eq('id', offerId).eq('workspace_id', workspaceId);
+          await supabase.from('property_offers').update({ status: 'rejected' }).eq('property_id', propertyId).eq('workspace_id', workspaceId).neq('id', offerId).in('status', ['offered', 'countered']);
+          const { data: fv } = await supabase.from('property_viewings').select('id, meeting_id').eq('property_id', propertyId).eq('workspace_id', workspaceId).eq('status', 'scheduled').gte('scheduled_at', new Date().toISOString());
+          for (const v of fv ?? []) {
+            await supabase.from('property_viewings').update({ status: 'cancelled' }).eq('id', v.id);
+            if (v.meeting_id) await supabase.from('crm_meetings').update({ status: 'cancelled' }).eq('id', v.meeting_id);
+          }
+        }
+        return json({ sale });
+      }
+
+      case 'list-sales': {
+        let q = supabase.from('property_sales')
+          .select('*, property:properties!property_sales_property_id_fkey ( id, title, reference_code, town, listing_agent_id, created_by, open_for_all ), seller:crm_contacts!property_sales_seller_contact_id_fkey ( id, name, email )')
+          .eq('workspace_id', workspaceId).order('completed_at', { ascending: false });
+        if (body.property_id) q = q.eq('property_id', String(body.property_id));
+        const { data, error } = await q;
+        if (error) throw new HttpError(400, error.message);
+        const rows = (data ?? []).filter((s: any) => access.isBroker || canViewProperty(s.property ?? {}));
+        return json({ sales: rows });
+      }
+
+      // Stamp the Finance commission invoice back onto the sale (called after the invoice is created).
+      case 'link-sale-invoice': {
+        requireManage();
+        const saleId = String(body.sale_id ?? '');
+        const invoiceId = String(body.invoice_id ?? '');
+        if (!saleId || !invoiceId) return json({ error: 'sale_id and invoice_id are required' }, 400);
+        const { data: sale } = await supabase.from('property_sales').select('property_id').eq('id', saleId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!sale) return json({ error: 'not found' }, 404);
+        await loadEditable(sale.property_id);
+        const { data, error } = await supabase.from('property_sales')
+          .update({ invoice_id: invoiceId, invoice_status: body.invoice_status ?? 'issued' }).eq('id', saleId).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ sale: data });
       }
 
       // ── A CRM person's linked properties (for the contact-page "Properties" panel) ──

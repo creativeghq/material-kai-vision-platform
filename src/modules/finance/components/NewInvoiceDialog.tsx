@@ -81,6 +81,12 @@ interface Props {
   onCreated: (invoiceId: string) => void;
   /** Pre-select the buyer (e.g. opened from a CRM party page). */
   initialCustomer?: Customer | null;
+  /** Pre-seed the line items (e.g. a real-estate sales-commission line). Falls back to one empty line. */
+  initialItems?: Partial<LineItem>[] | null;
+  /** Pre-select the myDATA document type (e.g. '2.1' service invoice for a commission). Default '1.1'. */
+  initialDocType?: string;
+  /** Pre-fill the invoice notes. */
+  initialNotes?: string;
 }
 
 const DOC_FAMILY: Record<string, string> = {
@@ -129,12 +135,15 @@ const taxOptionLabel = (r: TaxRef): string => `${r.description}${r.rate_kind ===
 
 const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   description: '', sku: '', quantity: '1', unit_price: '0', unit_cost: '', discount: '', unit: '',
-  measurement_unit_code: g?.measurement_unit_code ?? '', color: '', size: '',
-  vat_category: g?.vat_category ?? '', vat_exemption: '',
-  income_classification_type: g?.income_classification_type ?? '',
-  income_classification_category: g?.income_classification_category ?? '',
+  measurement_unit_code: '', color: '', size: '',
+  vat_category: '', vat_exemption: '',
+  income_classification_type: '',
+  income_classification_category: '',
   fees_category: '', stamp_duty_category: '', other_taxes_category: '',
   fees: '', stamp_duty: '', other_taxes: '', deductions: '', line_comments: '',
+  // Merge any provided fields last so globals (unit/VAT/income class) AND prefills
+  // (a real-estate commission line's description + unit_price) both apply.
+  ...g,
 });
 
 // Best-effort extraction of color/size/unit from heterogeneous product metadata.
@@ -148,7 +157,7 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
   return { unit: meta.unit, color: typeof color === 'string' ? color : '', size: typeof size === 'string' ? size : '' };
 }
 
-export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer }) => {
+export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer, initialItems, initialDocType, initialNotes }) => {
   const { toast } = useToast();
   const handleQuotaError = useQuotaErrorHandler();
   const navigate = useNavigate();
@@ -295,14 +304,14 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     // below loads its address. Otherwise start blank.
     setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
     setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
-    setDocumentType('1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
-    setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(''); setIssueNow(true);
+    setDocumentType(initialDocType || '1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
+    setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(initialNotes ?? ''); setIssueNow(true);
     setCategoryId(''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setNextNumber(null);
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat('');
-    setLines([emptyLine()]);
+    setLines(initialItems && initialItems.length ? initialItems.map((it) => emptyLine(it)) : [emptyLine()]);
     setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
     setVehicleNumber(''); setResponsible(''); setMovePurpose('1');
     setIsB2g(false); setB2gContractRef(''); setB2gBuyerRef(''); setB2gBuyerReg('');

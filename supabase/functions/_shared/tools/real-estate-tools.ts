@@ -44,7 +44,7 @@ export const createManageRealEstateTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, status, property_type, transaction_type, title, price, town, scheduled_at, property_id, work_order_title, work_order_description }) => {
+    async ({ action, status, property_type, transaction_type, title, price, town, scheduled_at, property_id, work_order_title, work_order_description, sale_price, commission_pct }) => {
       if (!workspaceId) return JSON.stringify({ success: false, error: 'No active workspace.' });
       if (!jwt) return JSON.stringify({ success: false, error: 'Real Estate tools require an authenticated session.' });
       if (!await moduleEnabled()) return JSON.stringify({ success: false, error: 'The Real Estate module is not enabled on this platform.' });
@@ -125,6 +125,13 @@ export const createManageRealEstateTool = (
           if (!res.ok) return JSON.stringify({ success: false, error: res.error });
           return JSON.stringify({ success: true, work_order: res.data?.work_order, note: 'Work order logged. Assign a contractor and track it in the listing Lettings tab.' });
         }
+        case 'complete_sale': {
+          if (!property_id || !sale_price) return JSON.stringify({ success: false, error: 'property_id and sale_price are required' });
+          const res = await callApi(jwt, workspaceId, 'complete-sale', { property_id, sale_price, ...(commission_pct !== undefined ? { commission_pct } : {}) });
+          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          const s = res.data?.sale;
+          return JSON.stringify({ success: true, sale: s, commission_net: s?.commission_base, currency: s?.currency, note: 'Listing marked sold and commission calculated. Issue the commission invoice from the listing Offers tab in Finance when ready.' });
+        }
         default:
           return JSON.stringify({ success: false, error: `Unknown action: ${action}` });
       }
@@ -144,9 +151,10 @@ export const createManageRealEstateTool = (
         '  • schedule_viewing — book a viewing (needs property_id + scheduled_at ISO datetime). Syncs to the calendar with a reminder.',
         '  • draft_description — AI-generate listing copy (needs property_id). CREDIT-METERED. Returns a draft to review, does not auto-save.',
         '  • log_maintenance  — raise a maintenance work order on a rental (needs property_id + work_order_title).',
+        '  • complete_sale    — mark a listing sold + calculate commission (needs property_id + sale_price; optional commission_pct, else the listing’s stored rate). Does NOT issue the invoice — that’s a deliberate step in the workbench.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description', 'log_maintenance']).describe('Which action to run.'),
+        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description', 'log_maintenance', 'complete_sale']).describe('Which action to run.'),
         status: z.string().optional().describe('Filter by listing_status (properties) or inquiry status (leads).'),
         property_type: z.string().optional().describe('residential/commercial/land/other — filter, or category for create_listing.'),
         transaction_type: z.string().optional().describe('sale/rent/short_let/business_transfer — for create_listing.'),
@@ -157,6 +165,8 @@ export const createManageRealEstateTool = (
         property_id: z.string().optional().describe('Target a specific listing (required for get_property/publish/schedule/draft/log_maintenance).'),
         work_order_title: z.string().optional().describe('Maintenance issue summary for log_maintenance.'),
         work_order_description: z.string().optional().describe('Optional detail for log_maintenance.'),
+        sale_price: z.number().optional().describe('Agreed final sale price for complete_sale.'),
+        commission_pct: z.number().optional().describe('Commission percent for complete_sale (defaults to the listing’s stored rate).'),
       }),
     },
   );

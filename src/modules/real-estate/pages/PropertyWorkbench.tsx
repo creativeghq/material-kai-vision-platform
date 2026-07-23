@@ -23,10 +23,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/t
 import {
   realEstateService, isPublishBlocked,
   type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
-  type Tenancy, type RentCharge, type MaintenanceWorkOrder, type LandlordStatement,
+  type Tenancy, type RentCharge, type MaintenanceWorkOrder, type LandlordStatement, type PropertySale,
 } from '../services/realEstateService';
 import { contractsService, type Contract } from '@/services/contractsService';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
+import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
@@ -527,7 +528,10 @@ export default function PropertyWorkbench() {
           </TabsContent>
 
           {/* ── Offers ── */}
-          <TabsContent value="offers"><OffersTab ws={ws} propertyId={id} canManage={editable} onAccepted={load} /></TabsContent>
+          <TabsContent value="offers" className="space-y-6">
+            <CommissionPanel ws={ws} propertyId={id} property={property} canManage={editable} onCompleted={load} />
+            <OffersTab ws={ws} propertyId={id} canManage={editable} onAccepted={load} />
+          </TabsContent>
 
           {/* ── Transaction (Contracts module: Memorandum of Sale / agency agreement + e-sign) ── */}
           {canManage && isRental && <TabsContent value="lettings"><LettingsTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>}
@@ -766,6 +770,111 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
 };
 
 // Offer ledger for a property — competing bids with qualification + accept/reject/counter cascade.
+// ── Sale completion + commission (#281) ──
+const CommissionPanel: React.FC<{ ws: string | null; propertyId: string; property: Property | null; canManage: boolean; onCompleted: () => void }> = ({ ws, propertyId, property, canManage, onCompleted }) => {
+  const { toast } = useToast();
+  const [sale, setSale] = useState<PropertySale | null | undefined>(undefined); // undefined = loading
+  const [busy, setBusy] = useState(false);
+  const [f, setF] = useState<Record<string, any>>({});
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!ws) return;
+    const rows = await realEstateService.listSales(ws, propertyId).catch(() => []);
+    setSale(rows[0] ?? null);
+  }, [ws, propertyId]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (property) setF((p) => ({ sale_price: p.sale_price ?? property.price ?? '', commission_pct: p.commission_pct ?? property.commission_pct ?? '', commission_fixed: p.commission_fixed ?? '' }));
+  }, [property]);
+
+  const complete = async () => {
+    if (!ws || !f.sale_price) { toast({ title: 'Sale price is required', variant: 'destructive' }); return; }
+    setBusy(true);
+    try {
+      await realEstateService.completeSale(ws, { property_id: propertyId, sale_price: Number(f.sale_price), commission_pct: f.commission_pct !== '' ? Number(f.commission_pct) : undefined, commission_fixed: f.commission_fixed !== '' ? Number(f.commission_fixed) : undefined });
+      await load(); onCompleted(); toast({ title: 'Sale completed', description: 'Listing marked sold; commission calculated.' });
+    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  const onInvoiceCreated = async (invoiceId: string) => {
+    setInvoiceOpen(false);
+    if (!ws || !sale) return;
+    try { await realEstateService.linkSaleInvoice(ws, sale.id, invoiceId); await load(); toast({ title: 'Commission invoice created', description: 'Linked to this sale.' }); }
+    catch (e) { toast({ title: 'Invoice created but linking failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
+
+  if (sale === undefined) return null;
+  const ccy = sale?.currency || property?.currency || 'EUR';
+
+  // Not sold yet → offer to complete the sale.
+  if (!sale) {
+    if (!canManage) return null;
+    return (
+      <Card className="border-primary/20"><CardContent className="space-y-3 p-4">
+        <div className="flex items-center gap-1.5 text-sm font-semibold"><Tag className="h-4 w-4" /> Complete sale &amp; commission</div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div><Label className="text-xs">Final sale price</Label><NumInput v={f.sale_price} on={(x) => setF((p) => ({ ...p, sale_price: x }))} /></div>
+          <div><Label className="text-xs">Commission %</Label><NumInput v={f.commission_pct} on={(x) => setF((p) => ({ ...p, commission_pct: x }))} /></div>
+          <div><Label className="text-xs">Fixed fee (optional)</Label><NumInput v={f.commission_fixed} on={(x) => setF((p) => ({ ...p, commission_fixed: x }))} /></div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button size="sm" className="rounded-full" onClick={complete} disabled={busy || !f.sale_price}>Mark sold &amp; calculate</Button>
+          {f.sale_price && (Number(f.commission_pct) || Number(f.commission_fixed)) ? (
+            <span className="text-xs text-muted-foreground">≈ {offerMoney(Number(f.sale_price) * (Number(f.commission_pct) || 0) / 100 + (Number(f.commission_fixed) || 0), ccy)} commission (+ VAT at invoice)</span>
+          ) : null}
+        </div>
+      </CardContent></Card>
+    );
+  }
+
+  // Sold → show the commission + issue/track the Finance invoice.
+  const sellerName = sale.seller?.name || null;
+  const commissionLine = `Sales commission — ${property?.title || 'property'}${sale.commission_pct ? ` (${sale.commission_pct}% of ${offerMoney(sale.sale_price, ccy)})` : ''}`;
+  return (
+    <Card className="border-emerald-500/25"><CardContent className="space-y-3 p-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+        <div>
+          <div className="text-xs text-muted-foreground">Sold for</div>
+          <div className="text-lg font-semibold">{offerMoney(sale.sale_price, ccy)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Commission {sale.commission_pct ? `(${sale.commission_pct}%${sale.commission_fixed ? ` + ${offerMoney(sale.commission_fixed, ccy)}` : ''})` : ''}</div>
+          <div className="text-lg font-semibold text-emerald-500">{offerMoney(sale.commission_base, ccy)}<span className="text-xs font-normal text-muted-foreground"> + VAT</span></div>
+        </div>
+        <Badge className="rounded-full border-0 bg-emerald-500/15 text-[11px] text-emerald-500">Sold {new Date(sale.completed_at).toLocaleDateString()}</Badge>
+      </div>
+      {canManage && (
+        <div className="flex items-center gap-3">
+          {sale.invoice_id ? (
+            <>
+              <Badge className="rounded-full border-0 bg-primary/15 text-[11px] capitalize">Invoice {sale.invoice_status || 'issued'}</Badge>
+              <Link to={`/finance/invoices/${sale.invoice_id}`}><Button size="sm" variant="ghost" className="rounded-full"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Open invoice</Button></Link>
+            </>
+          ) : sale.seller_contact_id ? (
+            <Button size="sm" className="rounded-full" onClick={() => setInvoiceOpen(true)}><FileText className="mr-1.5 h-4 w-4" /> Issue commission invoice</Button>
+          ) : (
+            <span className="text-xs text-muted-foreground">Set the vendor/seller contact in <b>Basics</b> to invoice the commission.</span>
+          )}
+        </div>
+      )}
+      {ws && sale.seller_contact_id && (
+        <NewInvoiceDialog
+          workspaceId={ws}
+          open={invoiceOpen}
+          onOpenChange={setInvoiceOpen}
+          onCreated={onInvoiceCreated}
+          initialCustomer={{ type: 'contact', id: sale.seller_contact_id, label: sellerName || 'Seller' }}
+          initialDocType="2.1"
+          initialNotes={commissionLine}
+          initialItems={[{ description: commissionLine, quantity: '1', unit_price: String(sale.commission_base) }]}
+        />
+      )}
+    </CardContent></Card>
+  );
+};
+
 const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: boolean; onAccepted: () => void }> = ({ ws, propertyId, canManage, onAccepted }) => {
   const { toast } = useToast();
   const [offers, setOffers] = useState<PropertyOffer[] | null>(null);
