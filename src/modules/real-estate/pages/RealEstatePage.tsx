@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Sparkles, Columns3, Link as LinkIcon } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon } from 'lucide-react';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { activateModule, requestModule } from '@/services/moduleActivationService';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
@@ -32,7 +32,7 @@ const InlineLoader: React.FC = () => (
 );
 
 export default function RealEstatePage() {
-  const { activeWorkspaceId, loading: wsLoading, workspaceRole } = useWorkspace();
+  const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { can } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const { toast } = useToast();
@@ -46,7 +46,6 @@ export default function RealEstatePage() {
   // is discoverable; when not entitled they render an Enable card instead of the (402-gated) panel.
   const pmEnabled = isModuleAvailable('real-estate-management');
   const investEnabled = isModuleAvailable('real-estate-investments');
-  const canActivate = workspaceRole === 'owner';
 
   const createDraft = async () => {
     if (!ws) return;
@@ -104,14 +103,16 @@ export default function RealEstatePage() {
           <TabsContent value="viewings"><ViewingsPanel ws={ws} /></TabsContent>
           <TabsContent value="sales"><SalesPanel ws={ws} /></TabsContent>
           <TabsContent value="lettings">
-            {pmEnabled ? <LettingsPortfolioPanel ws={ws} />
-              : <EnableAddonCard slug="real-estate-management" title="Property Management" canActivate={canActivate} ws={ws}
-                  blurb="Manage rentals end to end: tenancies, rent schedules & payments, maintenance work orders, and landlord statements." />}
+            <ModuleTabGate moduleSlug="real-estate-management" moduleName="Property Management"
+              blurb="Manage rentals end to end: tenancies, rent schedules & payments, maintenance work orders, and landlord statements.">
+              <LettingsPortfolioPanel ws={ws} />
+            </ModuleTabGate>
           </TabsContent>
           <TabsContent value="investments">
-            {investEnabled ? <InvestmentsPanel ws={ws} />
-              : <EnableAddonCard slug="real-estate-investments" title="Investments" canActivate={canActivate} ws={ws}
-                  blurb="Model investment properties: purchase + costs + financing + rent → gross/net yield, cap rate, cash-on-cash and monthly cash flow, with a portfolio roll-up." />}
+            <ModuleTabGate moduleSlug="real-estate-investments" moduleName="Investments"
+              blurb="Model investment properties: purchase + costs + financing + rent → gross/net yield, cap rate, cash-on-cash and monthly cash flow, with a portfolio roll-up.">
+              <InvestmentsPanel ws={ws} />
+            </ModuleTabGate>
           </TabsContent>
           {canManage && <TabsContent value="syndication"><FeedCard ws={ws} /></TabsContent>}
         </Tabs>
@@ -491,41 +492,6 @@ const Stat: React.FC<{ label: string; value: string; accent?: boolean }> = ({ la
     <div className={`mt-0.5 text-base font-semibold ${accent ? 'text-primary' : ''}`}>{value}</div>
   </div>
 );
-
-// #281 — in-context upsell when a Real-Estate add-on isn't entitled (keeps the tab discoverable
-// instead of hiding it — the mistake made with the payment submodules under Finance).
-const EnableAddonCard: React.FC<{ slug: string; title: string; blurb: string; canActivate: boolean; ws: string | null }> = ({ slug, title, blurb, canActivate, ws }) => {
-  const { toast } = useToast();
-  const [busy, setBusy] = useState(false);
-  const enable = async () => {
-    if (!ws) return;
-    setBusy(true);
-    try {
-      if (canActivate) {
-        const r = await activateModule(ws, slug);
-        if (r.checkout_url) { window.location.href = r.checkout_url; return; }
-        toast({ title: `${title} enabled`, description: 'Reloading…' });
-        setTimeout(() => window.location.reload(), 600);
-      } else {
-        const r = await requestModule(ws, slug);
-        toast({ title: 'Request sent', description: r.notified > 0 ? 'The workspace owner has been notified.' : 'Saved.' });
-      }
-    } catch (e) { toast({ title: 'Could not enable', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
-  };
-  return (
-    <div className="dashboard-card mx-auto max-w-xl p-8 text-center">
-      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/15"><Sparkles className="h-5 w-5 text-primary" /></div>
-      <div className="text-lg font-semibold">{title}</div>
-      <div className="mt-1 text-sm text-muted-foreground">{blurb}</div>
-      <div className="mt-2 text-xs text-muted-foreground">Add-on for the Real Estate module.</div>
-      <Button className="mt-4 rounded-full" onClick={enable} disabled={busy}>
-        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-        {canActivate ? `Enable ${title}` : 'Request access'}
-      </Button>
-    </div>
-  );
-};
 
 // #281 — Investments portfolio: per-property yield/cash-flow + roll-up.
 const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {

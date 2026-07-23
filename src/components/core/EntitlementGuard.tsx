@@ -12,18 +12,13 @@
  * direct Buy button (owner → Stripe checkout via activate-module) or a "request" button
  * (non-owner → notify the owner), in addition to the plan-upgrade path.
  */
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
-import { useEntitlements } from '@/hooks/useEntitlements';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { PageLoader } from '@/components/core/PageLoader';
-import { useToast } from '@/hooks/use-toast';
-import {
-  fetchModuleCatalog, activateModule, requestModule, formatAddonPrice, type ModuleCatalogRow,
-} from '@/services/moduleActivationService';
+import { useModuleUpsell } from '@/hooks/useModuleUpsell';
 
 interface Props {
   moduleSlug: string;
@@ -34,67 +29,12 @@ interface Props {
 }
 
 export const EntitlementGuard: React.FC<Props> = ({ moduleSlug, moduleName, children, fallbackPath = '/' }) => {
-  const { isModuleAvailable, tierOf, loading } = useEntitlements();
-  const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
   const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const [mod, setMod] = useState<ModuleCatalogRow | null>(null);
-  const [busy, setBusy] = useState<'buy' | 'request' | null>(null);
-
-  const available = !loading && isModuleAvailable(moduleSlug);
-
-  // Load the add-on's catalog row (price/name) only when we're actually showing the upsell.
-  useEffect(() => {
-    if (loading || available) return;
-    let cancelled = false;
-    fetchModuleCatalog()
-      .then((cat) => { if (!cancelled) setMod(cat.find((m) => m.slug === moduleSlug) ?? null); })
-      .catch(() => { /* upsell still renders without price */ });
-    return () => { cancelled = true; };
-  }, [loading, available, moduleSlug]);
+  const { loading, available, mod, label, price, tier, isOwner, purchasable, busy, onBuy, onRequest } =
+    useModuleUpsell(moduleSlug, moduleName);
 
   if (loading) return <PageLoader />;
   if (available) return <>{children}</>;
-
-  const label = moduleName ?? mod?.name ?? moduleSlug;
-  const tier = tierOf(moduleSlug);
-  const isOwner = workspaceRole === 'owner' || isPlatformOperator;
-  const price = mod?.is_addon ? formatAddonPrice(mod.addon_price_cents, mod.addon_currency, mod.billing_interval) : null;
-
-  const onBuy = async () => {
-    if (!activeWorkspaceId) return;
-    setBusy('buy');
-    try {
-      const res = await activateModule(activeWorkspaceId, moduleSlug);
-      if (res.checkout_url) { window.location.href = res.checkout_url; return; }
-      if (res.activated) {
-        toast({ title: 'Activated', description: `${label} is now available.` });
-        window.location.reload();
-        return;
-      }
-      toast({ title: 'Could not activate', description: 'Please try again.', variant: 'destructive' });
-    } catch (e) {
-      toast({ title: 'Could not activate', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const onRequest = async () => {
-    if (!activeWorkspaceId) return;
-    setBusy('request');
-    try {
-      await requestModule(activeWorkspaceId, moduleSlug);
-      toast({ title: 'Request sent', description: `Your workspace owner has been asked to enable ${label}.` });
-    } catch (e) {
-      toast({ title: 'Could not send request', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const purchasable = !!mod?.is_addon;
 
   return (
     <div className="container mx-auto py-12">
