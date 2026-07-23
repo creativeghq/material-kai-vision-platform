@@ -190,6 +190,9 @@ verify_jwt = false
 [functions.notification-dispatcher]
 verify_jwt = false
 
+[functions.monitoring-cron]
+verify_jwt = false
+
 [functions.price-monitoring-cron]
 verify_jwt = false
 
