@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon } from 'lucide-react';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
+import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -297,17 +299,58 @@ const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   );
 };
 
+// #249 — link an existing CRM contact into Real Estate as a buyer/seller (writes
+// property_contacts_ext.contact_role). The manual counterpart to the inbound capture paths
+// (public valuation widget / listing inquiries): the cross-module "connect" affordance — pick a
+// contact from the shared CRM spine and give it a real-estate role.
+const AddPartyButton: React.FC<{ ws: string; role: 'seller' | 'buyer'; onAdded: () => void }> = ({ ws, role, onAdded }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!contactId) return;
+    setBusy(true);
+    try {
+      await realEstateService.upsertContactExt(ws, contactId, { contact_role: role });
+      toast({ title: `Added as ${role}` });
+      setOpen(false); setContactId(null); onAdded();
+    } catch (e) { toast({ title: 'Could not add', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  return (
+    <>
+      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add {role}</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="capitalize">Add a {role}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Pick an existing CRM contact to track as a {role}. New person? Create them in CRM first, then link here.</p>
+            <ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder={`Search CRM contacts to add as ${role}…`} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="rounded-full capitalize" onClick={save} disabled={!contactId || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add {role}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
 const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [rows, setRows] = useState<SellerLead[] | null>(null);
   const [cmaOpen, setCmaOpen] = useState(false);
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!ws) return;
     realEstateService.listSellers(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load sellers', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
+  useEffect(() => { load(); }, [load]);
   const cmaButton = ws ? (
-    <div className="mb-3 flex justify-end">
+    <div className="mb-3 flex justify-end gap-2">
+      <AddPartyButton ws={ws} role="seller" onAdded={load} />
       <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCmaOpen(true)}><LineChart className="mr-1.5 h-4 w-4" /> Generate CMA</Button>
       <CmaReportDialog ws={ws} open={cmaOpen} onOpenChange={setCmaOpen} />
     </div>
