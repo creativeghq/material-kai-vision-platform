@@ -34,6 +34,13 @@ export interface ModuleManifest {
   icon: string;
   version: string;
   /**
+   * Slug of the module this one extends (a sub-module / add-on). When set, admin/tenant
+   * surfaces group this module UNDER its parent instead of as a standalone tile — e.g.
+   * `payments-stripe`/`payments-viva` → `payments`, `real-estate-*` → `real-estate`.
+   * Presentation only; there is no DB parent/child column and entitlement is per-slug.
+   */
+  parent?: string;
+  /**
    * Capabilities the module provides — used by other modules to detect what's
    * available and route work to the right place. Add new capability flags here
    * as new module integration patterns emerge; the provider-registry pattern

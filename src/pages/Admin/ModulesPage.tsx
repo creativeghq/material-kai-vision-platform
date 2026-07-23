@@ -78,6 +78,20 @@ const ModulesPage: React.FC = () => {
 
   const orphanedRows = rows.filter((row) => !registeredSlugs.has(row.slug));
 
+  // Group sub-modules (manifest.parent set) UNDER their parent instead of as loose tiles.
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, typeof registeredModules[number][]>();
+    for (const m of registeredModules) {
+      const parent = m.manifest.parent;
+      if (parent) map.set(parent, [...(map.get(parent) ?? []), m]);
+    }
+    return map;
+  }, []);
+  const topLevelModules = useMemo(
+    () => registeredModules.filter((m) => !m.manifest.parent),
+    [],
+  );
+
   const handleToggle = async (slug: string, next: boolean) => {
     setUpdating(slug);
     const { error } = await supabase
@@ -162,12 +176,13 @@ const ModulesPage: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {registeredModules.map(({ manifest, routes }) => {
+          {topLevelModules.map(({ manifest, routes }) => {
             const isRegistered = enabledMap.has(manifest.slug);
             const enabled = enabledMap.get(manifest.slug) ?? false;
             const primaryRoute = routes[0]?.path;
             const bill = billing.get(manifest.slug);
             const addonPrice = bill?.is_addon ? formatAddonPrice(bill.addon_price_cents, bill.addon_currency, bill.billing_interval) : null;
+            const children = childrenByParent.get(manifest.slug) ?? [];
 
             return (
               <Card key={manifest.slug} className="dashboard-card">
@@ -231,6 +246,47 @@ const ModulesPage: React.FC = () => {
                     <span>·</span>
                     <span>v{manifest.version}</span>
                   </div>
+
+                  {/* Sub-modules / add-ons grouped under their parent (payments-*, real-estate-*, …). */}
+                  {children.length > 0 && (
+                    <div className="mt-3 border-t border-white/10 pt-3">
+                      <div className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">Add-ons</div>
+                      <div className="space-y-1.5">
+                        {children.map((child) => {
+                          const cEnabled = enabledMap.get(child.manifest.slug) ?? false;
+                          const cReg = enabledMap.has(child.manifest.slug);
+                          const cBill = billing.get(child.manifest.slug);
+                          const cPrice = cBill?.is_addon ? formatAddonPrice(cBill.addon_price_cents, cBill.addon_currency, cBill.billing_interval) : null;
+                          return (
+                            <div key={child.manifest.slug} className="flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-1.5">
+                              <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="truncate text-sm font-medium">{child.manifest.name}</span>
+                                  {cPrice && <Badge variant="outline" className="gap-1 text-[10px]"><CreditCard className="h-2.5 w-2.5" />{cPrice}</Badge>}
+                                </div>
+                              </div>
+                              <Switch
+                                checked={cEnabled}
+                                disabled={!cReg || updating === child.manifest.slug}
+                                onCheckedChange={(next) => handleToggle(child.manifest.slug, next)}
+                              />
+                              {cEnabled && (
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Add-on billing" onClick={() => setBillingSlug(child.manifest.slug)}>
+                                  <CreditCard className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {cEnabled && (
+                                <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0" title="Module settings">
+                                  <Link to={`/admin/modules/${child.manifest.slug}/settings`}><KeyRound className="h-3 w-3" /></Link>
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
