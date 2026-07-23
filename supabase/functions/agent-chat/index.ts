@@ -809,6 +809,7 @@ const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
   { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
   { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees)' },
   { slug: 'social-media', name: 'Hermes', blurb: 'publishing or scheduling social-media posts, social analytics, best time to post' },
+  { slug: 'property-advisor', name: 'Estate', blurb: 'real estate — property listings, instant valuations, viewings, offers, buyer/seller lead matching, portal syndication' },
 ];
 
 /**
@@ -1002,6 +1003,23 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
+  },
+  // #249/#281 — Estate: the real-estate specialist. Every tool self-gates on the real-estate
+  // module + entitlement, so binding is safe even for workspaces without the module.
+  'property-advisor': {
+    id: 'property-advisor',
+    name: 'Estate',
+    description: 'Real-estate advisor — listings, valuations, viewings, offers, buyer/seller matching',
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
+    tools: [
+      'manage_real_estate',
+      // CRM + appointments help work leads and book viewings
+      'search_crm_by_kad', 'manage_appointments',
+      // core search + calculators (all users)
+      'knowledge_base_search', 'material_search', 'analyze_inspiration_url',
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
+    ],
+    // systemPrompt loaded from the database (prompts.category = 'property-advisor')
   },
   // ── Agent Fabric specialists (#132) — curated views over the proven tool
   // catalog, each with its own persona (prompts.category = slug). JARVIS
