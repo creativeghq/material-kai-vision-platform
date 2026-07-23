@@ -133,6 +133,29 @@ export interface RealEstateDashboard {
   upcoming_viewings: (PropertyViewing & { property?: { title: string | null } | null })[];
 }
 
+// ── Investments add-on (#281) ──
+export interface InvestmentInputs {
+  purchase_price: number; acquisition_costs: number; renovation_costs: number;
+  loan_amount: number; interest_rate_pct: number; loan_term_years: number;
+  monthly_rent: number; other_monthly_income: number; monthly_opex: number; vacancy_pct: number;
+  currency: string; notes: string | null;
+}
+export interface InvestmentMetrics {
+  total_investment: number; cash_invested: number; gross_annual_rent: number; effective_annual_rent: number;
+  annual_opex: number; noi: number; monthly_debt_service: number; annual_debt_service: number;
+  annual_cash_flow: number; monthly_cash_flow: number;
+  gross_yield_pct: number; net_yield_pct: number; cap_rate_pct: number; cash_on_cash_pct: number;
+}
+export interface PropertyInvestment extends InvestmentInputs {
+  id: string; property_id: string;
+  property?: { id: string; title: string | null; reference_code: string | null; town: string | null; listing_status: string } | null;
+  metrics?: InvestmentMetrics;
+}
+export interface InvestmentPortfolio {
+  count: number; total_invested: number; cash_invested: number; annual_noi: number;
+  annual_cash_flow: number; monthly_cash_flow: number; blended_net_yield_pct: number; currency: string;
+}
+
 export const realEstateService = {
   dashboard: (ws: string) => call<RealEstateDashboard>(ws, 'dashboard'),
   // Syndication feed
@@ -197,6 +220,14 @@ export const realEstateService = {
     call<{ sales: PropertySale[] }>(ws, 'list-sales', propertyId ? { property_id: propertyId } : {}).then((r) => r.sales),
   linkSaleInvoice: (ws: string, saleId: string, invoiceId: string, invoiceStatus = 'issued') =>
     call<{ sale: PropertySale }>(ws, 'link-sale-invoice', { sale_id: saleId, invoice_id: invoiceId, invoice_status: invoiceStatus }).then((r) => r.sale),
+
+  // Investments add-on (#281)
+  getInvestment: (ws: string, propertyId: string) =>
+    call<{ investment: PropertyInvestment | null; metrics: InvestmentMetrics | null }>(ws, 'get-investment', { property_id: propertyId }),
+  upsertInvestment: (ws: string, propertyId: string, fields: Partial<InvestmentInputs>) =>
+    call<{ investment: PropertyInvestment; metrics: InvestmentMetrics }>(ws, 'upsert-investment', { property_id: propertyId, ...fields }),
+  listInvestments: (ws: string) =>
+    call<{ investments: PropertyInvestment[]; portfolio: InvestmentPortfolio }>(ws, 'list-investments'),
   listInquiries: (ws: string, filters: { status?: string; property_id?: string } = {}) =>
     call<{ inquiries: PropertyInquiry[] }>(ws, 'list-inquiries', filters).then((r) => r.inquiries),
   updateInquiry: (ws: string, inquiryId: string, status: string) =>

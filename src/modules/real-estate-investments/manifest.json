@@ -1,0 +1,9 @@
+{
+  "slug": "real-estate-investments",
+  "name": "Investments",
+  "description": "Investment-analysis add-on for the Real Estate module — model purchase, costs, financing and rent into gross/net yield, cap rate, cash-on-cash return and monthly cash flow, with a portfolio roll-up. Surfaces as tabs inside Real Estate. Sibling add-on to real-estate-management.",
+  "category": "operations",
+  "priceTier": "pro",
+  "icon": "LineChart",
+  "version": "0.1.0"
+}

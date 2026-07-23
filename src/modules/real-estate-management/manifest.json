@@ -1,0 +1,9 @@
+{
+  "slug": "real-estate-management",
+  "name": "Property Management",
+  "description": "Lettings back-office add-on for the Real Estate module — tenancies, rent schedules & payments, maintenance work orders, and landlord statements. Surfaces as tabs inside Real Estate. Sibling add-on to real-estate-investments.",
+  "category": "operations",
+  "priceTier": "pro",
+  "icon": "KeyRound",
+  "version": "0.1.0"
+}

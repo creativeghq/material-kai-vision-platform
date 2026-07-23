@@ -5,10 +5,11 @@ import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
   Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature, Send,
-  KeyRound, Wrench, Receipt,
+  KeyRound, Wrench, Receipt, LineChart,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
@@ -24,6 +25,7 @@ import {
   realEstateService, isPublishBlocked,
   type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
   type Tenancy, type RentCharge, type MaintenanceWorkOrder, type LandlordStatement, type PropertySale,
+  type InvestmentMetrics,
 } from '../services/realEstateService';
 import { contractsService, type Contract } from '@/services/contractsService';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
@@ -90,6 +92,9 @@ export default function PropertyWorkbench() {
   const { id = '' } = useParams();
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { can } = usePermissions();
+  const { isModuleAvailable } = useEntitlements();
+  const pmEnabled = isModuleAvailable('real-estate-management');   // #281 Property Management add-on
+  const investEnabled = isModuleAvailable('real-estate-investments'); // #281 Investments add-on
   const { toast } = useToast();
   const navigate = useNavigate();
   const canManage = can('realestate.listings.manage');
@@ -237,7 +242,8 @@ export default function PropertyWorkbench() {
             <TabsTrigger value="inquiries"><Contact className="mr-1.5 h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="offers"><Gavel className="mr-1.5 h-4 w-4" /> Offers</TabsTrigger>
             <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
-            {canManage && isRental && <TabsTrigger value="lettings"><KeyRound className="mr-1.5 h-4 w-4" /> Lettings</TabsTrigger>}
+            {canManage && isRental && pmEnabled && <TabsTrigger value="lettings"><KeyRound className="mr-1.5 h-4 w-4" /> Lettings</TabsTrigger>}
+            {canManage && investEnabled && <TabsTrigger value="investment"><LineChart className="mr-1.5 h-4 w-4" /> Investment</TabsTrigger>}
             {canManage && <TabsTrigger value="transaction"><FileSignature className="mr-1.5 h-4 w-4" /> Transaction</TabsTrigger>}
           </TabsList>
 
@@ -534,7 +540,9 @@ export default function PropertyWorkbench() {
           </TabsContent>
 
           {/* ── Transaction (Contracts module: Memorandum of Sale / agency agreement + e-sign) ── */}
-          {canManage && isRental && <TabsContent value="lettings"><LettingsTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>}
+          {canManage && isRental && pmEnabled && <TabsContent value="lettings"><LettingsTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>}
+
+          {canManage && investEnabled && <TabsContent value="investment"><InvestmentTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>}
 
           {canManage && <TabsContent value="transaction"><TransactionTab ws={ws} propertyId={id} canEdit={editable} /></TabsContent>}
 
@@ -770,6 +778,95 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
 };
 
 // Offer ledger for a property — competing bids with qualification + accept/reject/counter cascade.
+// ── Investments add-on (#281) — per-property analysis ──
+const INVEST_FIELDS: [string, string, string?][] = [
+  ['purchase_price', 'Purchase price'], ['acquisition_costs', 'Acquisition costs', 'transfer tax, legal, fees'],
+  ['renovation_costs', 'Renovation'], ['loan_amount', 'Loan amount'],
+  ['interest_rate_pct', 'Interest rate %'], ['loan_term_years', 'Loan term (yrs)'],
+  ['monthly_rent', 'Monthly rent'], ['other_monthly_income', 'Other income /mo'],
+  ['monthly_opex', 'Operating costs /mo', 'mgmt, insurance, reserve'], ['vacancy_pct', 'Vacancy %'],
+];
+const InvestmentTab: React.FC<{ ws: string | null; propertyId: string; canManage: boolean }> = ({ ws, propertyId, canManage }) => {
+  const { toast } = useToast();
+  const [loaded, setLoaded] = useState(false);
+  const [f, setF] = useState<Record<string, any>>({ currency: 'EUR' });
+  const [metrics, setMetrics] = useState<InvestmentMetrics | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!ws) return;
+    const r = await realEstateService.getInvestment(ws, propertyId).catch(() => ({ investment: null, metrics: null }));
+    if (r.investment) setF({ ...r.investment });
+    setMetrics(r.metrics);
+    setLoaded(true);
+  }, [ws, propertyId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const save = async () => {
+    if (!ws) return;
+    setBusy(true);
+    try {
+      const num = (k: string) => (f[k] === '' || f[k] == null ? 0 : Number(f[k]));
+      const r = await realEstateService.upsertInvestment(ws, propertyId, {
+        purchase_price: num('purchase_price'), acquisition_costs: num('acquisition_costs'), renovation_costs: num('renovation_costs'),
+        loan_amount: num('loan_amount'), interest_rate_pct: num('interest_rate_pct'), loan_term_years: num('loan_term_years'),
+        monthly_rent: num('monthly_rent'), other_monthly_income: num('other_monthly_income'), monthly_opex: num('monthly_opex'),
+        vacancy_pct: num('vacancy_pct'), currency: f.currency || 'EUR', notes: f.notes ?? null,
+      });
+      setMetrics(r.metrics); toast({ title: 'Investment analysis saved' });
+    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  if (!loaded) return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">Loading…</div>;
+  const ccy = f.currency || 'EUR';
+  const cf = metrics?.monthly_cash_flow ?? 0;
+  return (
+    <div className="space-y-5">
+      {metrics && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <InvStat label="Total in" value={offerMoney(metrics.total_investment, ccy)} />
+          <InvStat label="Gross yield" value={`${metrics.gross_yield_pct}%`} />
+          <InvStat label="Net yield" value={`${metrics.net_yield_pct}%`} accent />
+          <InvStat label="Cap rate" value={`${metrics.cap_rate_pct}%`} />
+          <InvStat label="Cash-on-cash" value={`${metrics.cash_on_cash_pct}%`} accent />
+          <InvStat label="Cash flow /mo" value={offerMoney(cf, ccy)} tone={cf >= 0 ? 'pos' : 'neg'} />
+        </div>
+      )}
+      <Card><CardContent className="space-y-3 p-4">
+        <div className="text-sm font-semibold">Deal inputs</div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {INVEST_FIELDS.map(([k, label, hint]) => (
+            <div key={k}>
+              <Label className="text-xs">{label}</Label>
+              <NumInput v={f[k]} on={(x) => setF((p) => ({ ...p, [k]: x }))} />
+              {hint && <div className="mt-0.5 text-[10px] text-muted-foreground">{hint}</div>}
+            </div>
+          ))}
+        </div>
+        {canManage && <Button size="sm" className="rounded-full" onClick={save} disabled={busy}>Save &amp; recalculate</Button>}
+      </CardContent></Card>
+      {metrics && (
+        <Card><CardContent className="grid grid-cols-2 gap-x-6 gap-y-1.5 p-4 text-sm sm:grid-cols-4">
+          <Detail label="NOI (annual)" value={offerMoney(metrics.noi, ccy)} />
+          <Detail label="Effective rent (yr)" value={offerMoney(metrics.effective_annual_rent, ccy)} />
+          <Detail label="Debt service /mo" value={offerMoney(metrics.monthly_debt_service, ccy)} />
+          <Detail label="Cash invested" value={offerMoney(metrics.cash_invested, ccy)} />
+        </CardContent></Card>
+      )}
+    </div>
+  );
+};
+const InvStat: React.FC<{ label: string; value: string; accent?: boolean; tone?: 'pos' | 'neg' }> = ({ label, value, accent, tone }) => (
+  <div className={`dashboard-card p-3 ${accent ? 'ring-1 ring-primary/30' : ''}`}>
+    <div className="text-[11px] text-muted-foreground">{label}</div>
+    <div className={`mt-0.5 text-base font-semibold ${tone === 'pos' ? 'text-emerald-500' : tone === 'neg' ? 'text-red-500' : accent ? 'text-primary' : ''}`}>{value}</div>
+  </div>
+);
+const Detail: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex items-center justify-between gap-2"><span className="text-muted-foreground">{label}</span><span className="font-medium">{value}</span></div>
+);
+
 // ── Sale completion + commission (#281) ──
 const CommissionPanel: React.FC<{ ws: string | null; propertyId: string; property: Property | null; canManage: boolean; onCompleted: () => void }> = ({ ws, propertyId, property, canManage, onCompleted }) => {
   const { toast } = useToast();

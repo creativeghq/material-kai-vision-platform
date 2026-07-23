@@ -1,15 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Sparkles } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { activateModule, requestModule } from '@/services/moduleActivationService';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement } from '../services/realEstateService';
+import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 
 const STATUS_VARIANT: Record<ListingStatus, string> = {
@@ -26,13 +28,19 @@ const InlineLoader: React.FC = () => (
 );
 
 export default function RealEstatePage() {
-  const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
+  const { activeWorkspaceId, loading: wsLoading, workspaceRole } = useWorkspace();
   const { can } = usePermissions();
+  const { isModuleAvailable } = useEntitlements();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const canManage = can('realestate.listings.manage');
   const ws = activeWorkspaceId;
+  // #281 add-on entitlements (Property Management + Investments). Tabs stay visible so the add-on
+  // is discoverable; when not entitled they render an Enable card instead of the (402-gated) panel.
+  const pmEnabled = isModuleAvailable('real-estate-management');
+  const investEnabled = isModuleAvailable('real-estate-investments');
+  const canActivate = workspaceRole === 'owner';
 
   const createDraft = async () => {
     if (!ws) return;
@@ -75,8 +83,9 @@ export default function RealEstatePage() {
             <TabsTrigger value="buyers"><Users className="mr-1.5 h-4 w-4" /> Buyers</TabsTrigger>
             <TabsTrigger value="sellers"><Store className="mr-1.5 h-4 w-4" /> Sellers</TabsTrigger>
             <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings</TabsTrigger>
-            <TabsTrigger value="lettings"><KeyRound className="mr-1.5 h-4 w-4" /> Lettings</TabsTrigger>
             <TabsTrigger value="sales"><Handshake className="mr-1.5 h-4 w-4" /> Sales</TabsTrigger>
+            <TabsTrigger value="lettings"><KeyRound className="mr-1.5 h-4 w-4" /> Property Mgmt{!pmEnabled && <Lock className="ml-1 h-3 w-3 text-muted-foreground" />}</TabsTrigger>
+            <TabsTrigger value="investments"><LineChart className="mr-1.5 h-4 w-4" /> Investments{!investEnabled && <Lock className="ml-1 h-3 w-3 text-muted-foreground" />}</TabsTrigger>
             {canManage && <TabsTrigger value="syndication"><Rss className="mr-1.5 h-4 w-4" /> Syndication</TabsTrigger>}
           </TabsList>
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
@@ -85,8 +94,17 @@ export default function RealEstatePage() {
           <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>
           <TabsContent value="sellers"><SellersPanel ws={ws} /></TabsContent>
           <TabsContent value="viewings"><ViewingsPanel ws={ws} /></TabsContent>
-          <TabsContent value="lettings"><LettingsPortfolioPanel ws={ws} /></TabsContent>
           <TabsContent value="sales"><SalesPanel ws={ws} /></TabsContent>
+          <TabsContent value="lettings">
+            {pmEnabled ? <LettingsPortfolioPanel ws={ws} />
+              : <EnableAddonCard slug="real-estate-management" title="Property Management" canActivate={canActivate} ws={ws}
+                  blurb="Manage rentals end to end: tenancies, rent schedules & payments, maintenance work orders, and landlord statements." />}
+          </TabsContent>
+          <TabsContent value="investments">
+            {investEnabled ? <InvestmentsPanel ws={ws} />
+              : <EnableAddonCard slug="real-estate-investments" title="Investments" canActivate={canActivate} ws={ws}
+                  blurb="Model investment properties: purchase + costs + financing + rent → gross/net yield, cap rate, cash-on-cash and monthly cash flow, with a portfolio roll-up." />}
+          </TabsContent>
           {canManage && <TabsContent value="syndication"><FeedCard ws={ws} /></TabsContent>}
         </Tabs>
       </div>
@@ -436,6 +454,89 @@ const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
                 ? <Badge className="rounded-full border-0 bg-primary/15 text-[10px] capitalize">{s.invoice_status || 'invoiced'}</Badge>
                 : <span className="text-[10px] text-muted-foreground">not invoiced</span>}
             </div>
+          </button>
+        ))}
+      </div></CardContent></Card>
+    </div>
+  );
+};
+
+const Stat: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (
+  <div className={`dashboard-card p-3 ${accent ? 'ring-1 ring-primary/30' : ''}`}>
+    <div className="text-[11px] text-muted-foreground">{label}</div>
+    <div className={`mt-0.5 text-base font-semibold ${accent ? 'text-primary' : ''}`}>{value}</div>
+  </div>
+);
+
+// #281 — in-context upsell when a Real-Estate add-on isn't entitled (keeps the tab discoverable
+// instead of hiding it — the mistake made with the payment submodules under Finance).
+const EnableAddonCard: React.FC<{ slug: string; title: string; blurb: string; canActivate: boolean; ws: string | null }> = ({ slug, title, blurb, canActivate, ws }) => {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const enable = async () => {
+    if (!ws) return;
+    setBusy(true);
+    try {
+      if (canActivate) {
+        const r = await activateModule(ws, slug);
+        if (r.checkout_url) { window.location.href = r.checkout_url; return; }
+        toast({ title: `${title} enabled`, description: 'Reloading…' });
+        setTimeout(() => window.location.reload(), 600);
+      } else {
+        const r = await requestModule(ws, slug);
+        toast({ title: 'Request sent', description: r.notified > 0 ? 'The workspace owner has been notified.' : 'Saved.' });
+      }
+    } catch (e) { toast({ title: 'Could not enable', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="dashboard-card mx-auto max-w-xl p-8 text-center">
+      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/15"><Sparkles className="h-5 w-5 text-primary" /></div>
+      <div className="text-lg font-semibold">{title}</div>
+      <div className="mt-1 text-sm text-muted-foreground">{blurb}</div>
+      <div className="mt-2 text-xs text-muted-foreground">Add-on for the Real Estate module.</div>
+      <Button className="mt-4 rounded-full" onClick={enable} disabled={busy}>
+        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+        {canActivate ? `Enable ${title}` : 'Request access'}
+      </Button>
+    </div>
+  );
+};
+
+// #281 — Investments portfolio: per-property yield/cash-flow + roll-up.
+const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [data, setData] = useState<{ investments: PropertyInvestment[]; portfolio: InvestmentPortfolio } | null>(null);
+  useEffect(() => {
+    if (!ws) return;
+    realEstateService.listInvestments(ws)
+      .then(setData)
+      .catch((e) => { toast({ title: 'Failed to load investments', description: (e as Error).message, variant: 'destructive' }); setData({ investments: [], portfolio: { count: 0, total_invested: 0, cash_invested: 0, annual_noi: 0, annual_cash_flow: 0, monthly_cash_flow: 0, blended_net_yield_pct: 0, currency: 'EUR' } }); });
+  }, [ws, toast]);
+  if (data === null) return <InlineLoader />;
+  const { investments, portfolio } = data;
+  const ccy = portfolio.currency;
+  if (investments.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No investment analysis yet. Open a listing → <b>Investments</b> tab to add purchase, financing and rent, and see its yield & cash flow.</div>;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Stat label="Properties" value={String(portfolio.count)} />
+        <Stat label="Invested" value={money(portfolio.total_invested, ccy)} />
+        <Stat label="Cash in" value={money(portfolio.cash_invested, ccy)} />
+        <Stat label="Annual NOI" value={money(portfolio.annual_noi, ccy)} />
+        <Stat label="Cash flow / mo" value={money(portfolio.monthly_cash_flow, ccy)} accent />
+        <Stat label="Blended yield" value={`${portfolio.blended_net_yield_pct}%`} accent />
+      </div>
+      <Card><CardContent className="p-0"><div className="divide-y divide-border">
+        {investments.map((iv) => (
+          <button key={iv.id} onClick={() => navigate(`/properties/${iv.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
+            <LineChart className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">{iv.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· {money(iv.metrics?.total_investment ?? 0, iv.currency)} in</span></div>
+              <div className="mt-0.5 text-xs text-muted-foreground">net yield {iv.metrics?.net_yield_pct ?? 0}% · cap {iv.metrics?.cap_rate_pct ?? 0}% · CoC {iv.metrics?.cash_on_cash_pct ?? 0}%</div>
+            </div>
+            <div className={`shrink-0 text-sm font-semibold ${(iv.metrics?.monthly_cash_flow ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{money(iv.metrics?.monthly_cash_flow ?? 0, iv.currency)}/mo</div>
           </button>
         ))}
       </div></CardContent></Card>

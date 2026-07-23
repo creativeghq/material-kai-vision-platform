@@ -36,6 +36,42 @@ function matchesCriteria(c: any, p: any): boolean {
   return true;
 }
 
+/** #281 Investments: derive yield/cap-rate/cash-flow metrics from the stored inputs. */
+function computeInvestmentMetrics(r: any) {
+  const num = (x: any) => Number(x ?? 0);
+  const round = (x: number, d = 2) => (Number.isFinite(x) ? Math.round(x * 10 ** d) / 10 ** d : 0);
+  const pct = (x: number) => round(x * 100, 2);
+  const purchase = num(r.purchase_price);
+  const totalInvestment = purchase + num(r.acquisition_costs) + num(r.renovation_costs);
+  const vac = Math.min(Math.max(num(r.vacancy_pct), 0), 100) / 100;
+  const grossAnnualRent = (num(r.monthly_rent) + num(r.other_monthly_income)) * 12;
+  const effectiveAnnualRent = grossAnnualRent * (1 - vac);
+  const annualOpex = num(r.monthly_opex) * 12;
+  const noi = effectiveAnnualRent - annualOpex;
+  // Debt service as a standard fixed-rate annuity (interest-free loans fall back to straight-line).
+  const loan = num(r.loan_amount);
+  const monthlyRate = num(r.interest_rate_pct) / 100 / 12;
+  const nMonths = num(r.loan_term_years) * 12;
+  let monthlyDebt = 0;
+  if (loan > 0 && nMonths > 0) {
+    monthlyDebt = monthlyRate > 0 ? loan * monthlyRate / (1 - Math.pow(1 + monthlyRate, -nMonths)) : loan / nMonths;
+  }
+  const annualDebtService = monthlyDebt * 12;
+  const annualCashFlow = noi - annualDebtService;
+  const cashInvested = Math.max(totalInvestment - loan, 0);
+  return {
+    total_investment: round(totalInvestment), cash_invested: round(cashInvested),
+    gross_annual_rent: round(grossAnnualRent), effective_annual_rent: round(effectiveAnnualRent),
+    annual_opex: round(annualOpex), noi: round(noi),
+    monthly_debt_service: round(monthlyDebt), annual_debt_service: round(annualDebtService),
+    annual_cash_flow: round(annualCashFlow), monthly_cash_flow: round(annualCashFlow / 12),
+    gross_yield_pct: purchase > 0 ? pct(grossAnnualRent / purchase) : 0,
+    net_yield_pct: totalInvestment > 0 ? pct(noi / totalInvestment) : 0,
+    cap_rate_pct: purchase > 0 ? pct(noi / purchase) : 0,
+    cash_on_cash_pct: cashInvested > 0 ? pct(annualCashFlow / cashInvested) : 0,
+  };
+}
+
 /** Active saved searches in the workspace that match this listing (with their contact). */
 async function findMatchingBuyers(supabase: any, workspaceId: string, property: any): Promise<any[]> {
   const { data: reqs } = await supabase.from('property_buyer_requirements')
@@ -167,6 +203,13 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
     if (!ownsProperty(p)) throw new HttpError(403, 'This listing belongs to another agent.');
     return p;
   }
+
+  // Sub-module entitlement gates (#281): Property Management + Investments are add-ons on top of
+  // Real Estate. A workspace without the add-on gets 402 on those actions (root workspace is entitled).
+  const PM_ACTIONS = new Set(['list-tenancies', 'upsert-tenancy', 'list-rent-charges', 'generate-rent-schedule', 'mark-rent-paid', 'list-maintenance', 'upsert-maintenance', 'landlord-statement']);
+  const INVEST_ACTIONS = new Set(['get-investment', 'upsert-investment', 'list-investments']);
+  if (PM_ACTIONS.has(action)) { const g = await assertEntitled(supabase, workspaceId, 'real-estate-management'); if (!g.ok) return g.response; }
+  if (INVEST_ACTIONS.has(action)) { const g = await assertEntitled(supabase, workspaceId, 'real-estate-investments'); if (!g.ok) return g.response; }
 
   try {
     switch (action) {
@@ -961,6 +1004,52 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           tenancy: t, currency: t.currency,
           summary: { rent_charged: rentCharged, rent_received: rentReceived, rent_outstanding: outstanding, maintenance_spend: maintenanceSpend, net_to_landlord: rentReceived - maintenanceSpend },
         });
+      }
+
+      // ── Investments add-on (#281) — per-property analysis + portfolio ──────
+      case 'get-investment': {
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        await loadProperty(propertyId); // view-scoped 404
+        const { data } = await supabase.from('property_investments').select('*').eq('property_id', propertyId).eq('workspace_id', workspaceId).maybeSingle();
+        return json({ investment: data ?? null, metrics: data ? computeInvestmentMetrics(data) : null });
+      }
+      case 'upsert-investment': {
+        requireManage();
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        await loadEditable(propertyId);
+        const INVEST_WRITABLE = ['purchase_price', 'acquisition_costs', 'renovation_costs', 'loan_amount', 'interest_rate_pct', 'loan_term_years', 'monthly_rent', 'other_monthly_income', 'monthly_opex', 'vacancy_pct', 'currency', 'notes'];
+        const payload: Record<string, unknown> = {};
+        for (const k of INVEST_WRITABLE) if (body[k] !== undefined) payload[k] = body[k];
+        const { data, error } = await supabase.from('property_investments')
+          .upsert({ ...payload, workspace_id: workspaceId, property_id: propertyId, created_by: userId }, { onConflict: 'property_id' })
+          .select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ investment: data, metrics: computeInvestmentMetrics(data) });
+      }
+      case 'list-investments': {
+        const { data, error } = await supabase.from('property_investments')
+          .select('*, property:properties!property_investments_property_id_fkey ( id, title, reference_code, town, listing_status, listing_agent_id, created_by, open_for_all )')
+          .eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        const rows = (data ?? []).filter((r: any) => access.isBroker || canViewProperty(r.property ?? {}))
+          .map((r: any) => ({ ...r, metrics: computeInvestmentMetrics(r) }));
+        const currency = rows[0]?.currency ?? 'EUR';
+        const sum = (f: (m: any) => number) => rows.reduce((t: number, r: any) => t + f(r.metrics), 0);
+        const totalInvested = sum((m) => m.total_investment);
+        const annualNoi = sum((m) => m.noi);
+        const portfolio = {
+          count: rows.length,
+          total_invested: Math.round(totalInvested * 100) / 100,
+          cash_invested: Math.round(sum((m) => m.cash_invested) * 100) / 100,
+          annual_noi: Math.round(annualNoi * 100) / 100,
+          annual_cash_flow: Math.round(sum((m) => m.annual_cash_flow) * 100) / 100,
+          monthly_cash_flow: Math.round(sum((m) => m.monthly_cash_flow) * 100) / 100,
+          blended_net_yield_pct: totalInvested > 0 ? Math.round(annualNoi / totalInvested * 10000) / 100 : 0,
+          currency,
+        };
+        return json({ investments: rows, portfolio });
       }
 
       default:
