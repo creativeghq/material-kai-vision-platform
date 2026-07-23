@@ -697,7 +697,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
       // ── Buyer requirements (saved searches; auto-match in P2) ───────────
       case 'list-buyer-requirements': {
-        let q = supabase.from('property_buyer_requirements').select('*').eq('workspace_id', workspaceId).order('updated_at', { ascending: false });
+        let q = supabase.from('property_buyer_requirements').select('*, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( id, name, email )').eq('workspace_id', workspaceId).order('updated_at', { ascending: false });
         if (body.crm_contact_id) q = q.eq('crm_contact_id', String(body.crm_contact_id));
         const { data, error } = await q;
         if (error) throw new HttpError(400, error.message);

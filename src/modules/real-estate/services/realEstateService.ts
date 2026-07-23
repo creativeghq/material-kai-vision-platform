@@ -52,6 +52,7 @@ export interface PropertyViewing {
 
 export interface BuyerRequirement {
   id: string; crm_contact_id: string; label: string | null; criteria: Record<string, any>; is_active: boolean; created_at: string; updated_at: string;
+  contact?: { id: string; name: string | null; email: string | null } | null;
 }
 export interface ContactExt {
   crm_contact_id: string; workspace_id: string; contact_role: string | null;

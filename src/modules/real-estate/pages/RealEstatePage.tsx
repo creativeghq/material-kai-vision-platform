@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -9,7 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead } from '../services/realEstateService';
+import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement } from '../services/realEstateService';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 
 const STATUS_VARIANT: Record<ListingStatus, string> = {
@@ -72,15 +72,21 @@ export default function RealEstatePage() {
             <TabsTrigger value="overview"><LayoutDashboard className="mr-1.5 h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="listings"><Building2 className="mr-1.5 h-4 w-4" /> Listings</TabsTrigger>
             <TabsTrigger value="leads"><Inbox className="mr-1.5 h-4 w-4" /> Leads</TabsTrigger>
+            <TabsTrigger value="buyers"><Users className="mr-1.5 h-4 w-4" /> Buyers</TabsTrigger>
             <TabsTrigger value="sellers"><Store className="mr-1.5 h-4 w-4" /> Sellers</TabsTrigger>
             <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings</TabsTrigger>
+            <TabsTrigger value="lettings"><KeyRound className="mr-1.5 h-4 w-4" /> Lettings</TabsTrigger>
+            <TabsTrigger value="sales"><Handshake className="mr-1.5 h-4 w-4" /> Sales</TabsTrigger>
             {canManage && <TabsTrigger value="syndication"><Rss className="mr-1.5 h-4 w-4" /> Syndication</TabsTrigger>}
           </TabsList>
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
           <TabsContent value="listings"><ListingsPanel ws={ws} canManage={canManage} creating={creating} onCreate={createDraft} /></TabsContent>
           <TabsContent value="leads"><LeadsPanel ws={ws} /></TabsContent>
+          <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>
           <TabsContent value="sellers"><SellersPanel ws={ws} /></TabsContent>
           <TabsContent value="viewings"><ViewingsPanel ws={ws} /></TabsContent>
+          <TabsContent value="lettings"><LettingsPortfolioPanel ws={ws} /></TabsContent>
+          <TabsContent value="sales"><SalesPanel ws={ws} /></TabsContent>
           {canManage && <TabsContent value="syndication"><FeedCard ws={ws} /></TabsContent>}
         </Tabs>
       </div>
@@ -311,5 +317,128 @@ const ViewingsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         </button>
       ))}
     </div></CardContent></Card>
+  );
+};
+
+// #281 — registered buyers (saved searches) across the portfolio.
+const CRITERIA_KEYS: [string, string][] = [['property_type', ''], ['transaction_type', ''], ['town', ''], ['region', ''], ['bedrooms_min', 'beds ≥'], ['price_max', '≤']];
+const summariseCriteria = (c: Record<string, any>): string => {
+  const parts: string[] = [];
+  for (const [k, prefix] of CRITERIA_KEYS) { const v = c?.[k]; if (v !== undefined && v !== null && v !== '') parts.push(`${prefix ? prefix + ' ' : ''}${v}`); }
+  return parts.length ? parts.join(' · ') : 'Any property';
+};
+const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [rows, setRows] = useState<BuyerRequirement[] | null>(null);
+  useEffect(() => {
+    if (!ws) return;
+    realEstateService.listBuyerRequirements(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load buyers', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
+  }, [ws, toast]);
+  if (rows === null) return <InlineLoader />;
+  if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No registered buyers yet. Add a buyer’s requirements from their CRM contact → Property tab, and new matching listings alert you automatically.</div>;
+  return (
+    <Card><CardContent className="p-0"><div className="divide-y divide-border">
+      {rows.map((r) => (
+        <button key={r.id} onClick={() => r.crm_contact_id && navigate(`/crm/contacts/${r.crm_contact_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
+          <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">{r.contact?.name || 'Buyer'} {r.label && <span className="text-xs text-muted-foreground">· {r.label}</span>}</div>
+            <div className="mt-0.5 truncate text-xs text-muted-foreground">{summariseCriteria(r.criteria)}</div>
+          </div>
+          {!r.is_active && <Badge className="rounded-full border-0 bg-muted text-[11px]">paused</Badge>}
+        </button>
+      ))}
+    </div></CardContent></Card>
+  );
+};
+
+// #281 — portfolio lettings: active tenancies + open maintenance across all rentals.
+const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [tenancies, setTenancies] = useState<Tenancy[] | null>(null);
+  const [work, setWork] = useState<MaintenanceWorkOrder[]>([]);
+  useEffect(() => {
+    if (!ws) return;
+    realEstateService.listTenancies(ws).then(setTenancies).catch((e) => { toast({ title: 'Failed to load lettings', description: (e as Error).message, variant: 'destructive' }); setTenancies([]); });
+    realEstateService.listMaintenance(ws, { status: 'open' }).then(setWork).catch(() => setWork([]));
+  }, [ws, toast]);
+  if (tenancies === null) return <InlineLoader />;
+  const freq = (t: Tenancy) => `/${t.rent_frequency.replace('ly', '').replace('month', 'mo').replace('week', 'wk').replace('quarter', 'qtr').replace('year', 'yr')}`;
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><KeyRound className="h-4 w-4" /> Active tenancies</div>
+        {tenancies.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No tenancies yet. Set one up from a rental listing’s Lettings tab.</div> : (
+          <Card><CardContent className="p-0"><div className="divide-y divide-border">
+            {tenancies.map((t) => (
+              <button key={t.id} onClick={() => navigate(`/properties/${t.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">{t.property?.title || 'Rental'} <span className="text-xs text-muted-foreground">· {t.tenant?.name || 'no tenant'}</span></div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{money(t.rent_amount, t.currency)}{freq(t)} · from {new Date(t.start_date).toLocaleDateString()}</div>
+                </div>
+                <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{t.status}</Badge>
+              </button>
+            ))}
+          </div></CardContent></Card>
+        )}
+      </div>
+      {work.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Wrench className="h-4 w-4" /> Open maintenance <Badge className="rounded-full border-0 bg-amber-500/15 text-[10px] text-amber-500">{work.length}</Badge></div>
+          <Card><CardContent className="p-0"><div className="divide-y divide-border">
+            {work.map((w) => (
+              <button key={w.id} onClick={() => navigate(`/properties/${w.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left text-sm hover:bg-muted/40">
+                <Wrench className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="flex-1"><div className="font-medium">{w.title}</div><div className="text-xs text-muted-foreground">{w.property?.title || 'Property'}</div></div>
+                <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{w.priority}</Badge>
+              </button>
+            ))}
+          </div></CardContent></Card>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// #281 — completed sales + commission (the portfolio view of "how much have we earned").
+const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [rows, setRows] = useState<PropertySale[] | null>(null);
+  useEffect(() => {
+    if (!ws) return;
+    realEstateService.listSales(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load sales', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
+  }, [ws, toast]);
+  if (rows === null) return <InlineLoader />;
+  if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No completed sales yet. Close one from a listing’s Offers tab → “Complete sale & commission”.</div>;
+  const totalCommission = rows.reduce((t, s) => t + Number(s.commission_base ?? 0), 0);
+  const ccy = rows[0]?.currency ?? 'EUR';
+  return (
+    <div className="space-y-4">
+      <Card><CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 p-4">
+        <div><div className="text-[11px] text-muted-foreground">Completed</div><div className="text-base font-semibold">{rows.length}</div></div>
+        <div><div className="text-[11px] text-muted-foreground">Commission (net)</div><div className="text-base font-semibold text-emerald-500">{money(totalCommission, ccy)}</div></div>
+        <div><div className="text-[11px] text-muted-foreground">Invoiced</div><div className="text-base font-semibold">{rows.filter((s) => s.invoice_id).length}/{rows.length}</div></div>
+      </CardContent></Card>
+      <Card><CardContent className="p-0"><div className="divide-y divide-border">
+        {rows.map((s) => (
+          <button key={s.id} onClick={() => navigate(`/properties/${s.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
+            <Handshake className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">{s.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· sold {money(s.sale_price, s.currency)}</span></div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{s.seller?.name ? `${s.seller.name} · ` : ''}{new Date(s.completed_at).toLocaleDateString()}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-semibold text-emerald-500">{money(s.commission_base, s.currency)}</div>
+              {s.invoice_id
+                ? <Badge className="rounded-full border-0 bg-primary/15 text-[10px] capitalize">{s.invoice_status || 'invoiced'}</Badge>
+                : <span className="text-[10px] text-muted-foreground">not invoiced</span>}
+            </div>
+          </button>
+        ))}
+      </div></CardContent></Card>
+    </div>
   );
 };
