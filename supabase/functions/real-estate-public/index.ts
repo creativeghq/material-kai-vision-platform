@@ -19,6 +19,19 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
+// #281 buyer portal — same criteria contract as real-estate-api.matchesCriteria.
+function matchesCriteria(c: any, p: any): boolean {
+  if (!c) return false;
+  if (c.type && c.type !== p.property_type) return false;
+  if (c.transaction_type && c.transaction_type !== p.transaction_type) return false;
+  if (c.price_min != null && p.price != null && Number(p.price) < Number(c.price_min)) return false;
+  if (c.price_max != null && p.price != null && Number(p.price) > Number(c.price_max)) return false;
+  if (c.beds != null && p.bedrooms != null && Number(p.bedrooms) < Number(c.beds)) return false;
+  if (c.baths != null && p.bathrooms != null && Number(p.bathrooms) < Number(c.baths)) return false;
+  if (c.location) { const loc = `${p.town ?? ''} ${p.region ?? ''}`.toLowerCase(); if (!loc.includes(String(c.location).toLowerCase())) return false; }
+  return true;
+}
+
 Deno.serve(withApiLogging('real-estate-public', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -47,6 +60,62 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
       out[pid] = s?.signedUrl ?? null;
     }));
     return out;
+  }
+
+  // ── Buyer portal (#281) — a saved search's shareable matches page + favourites + viewing request.
+  async function loadRequirement(token: string): Promise<any> {
+    if (!token) throw new HttpError(400, 'token is required');
+    const { data } = await supabase.from('property_buyer_requirements')
+      .select('id, workspace_id, crm_contact_id, label, criteria, is_active')
+      .eq('portal_token', token).maybeSingle();
+    if (!data || data.is_active === false) throw new HttpError(404, 'not found');
+    return data;
+  }
+  if (action === 'buyer-portal') {
+    const req = await loadRequirement(String(body?.token ?? ''));
+    const [{ data: listings }, { data: favs }, { data: ws }] = await Promise.all([
+      supabase.from('properties').select('*').eq('workspace_id', req.workspace_id).eq('is_public', true).eq('listing_status', 'active').limit(120),
+      supabase.from('property_buyer_favorites').select('property_id').eq('requirement_id', req.id),
+      supabase.from('workspaces').select('name').eq('id', req.workspace_id).maybeSingle(),
+    ]);
+    const matched = (listings ?? []).filter((p: any) => matchesCriteria(req.criteria, p));
+    const covers = await coverUrls(matched.map((r: any) => r.id));
+    return json({
+      requirement: { label: req.label, criteria: req.criteria },
+      agency: ws?.name ?? null,
+      favorites: (favs ?? []).map((f: any) => f.property_id),
+      listings: matched.map((r: any) => ({ ...toPublic(r), cover_url: covers[r.id] ?? null })),
+    });
+  }
+  if (action === 'buyer-favorite') {
+    const req = await loadRequirement(String(body?.token ?? ''));
+    const propertyId = String(body?.property_id ?? '');
+    if (!propertyId) return json({ error: 'property_id is required' }, 400);
+    // The listing must belong to the same agency + be public (no cross-workspace favouriting).
+    const { data: p } = await supabase.from('properties').select('id').eq('id', propertyId).eq('workspace_id', req.workspace_id).eq('is_public', true).maybeSingle();
+    if (!p) return json({ error: 'not found' }, 404);
+    if (body?.on === false) {
+      await supabase.from('property_buyer_favorites').delete().eq('requirement_id', req.id).eq('property_id', propertyId);
+      return json({ ok: true, favorited: false });
+    }
+    await supabase.from('property_buyer_favorites').upsert({ workspace_id: req.workspace_id, requirement_id: req.id, property_id: propertyId }, { onConflict: 'requirement_id,property_id' });
+    return json({ ok: true, favorited: true });
+  }
+  if (action === 'buyer-request-viewing') {
+    const req = await loadRequirement(String(body?.token ?? ''));
+    const propertyId = String(body?.property_id ?? '');
+    if (!propertyId) return json({ error: 'property_id is required' }, 400);
+    const { data: p } = await supabase.from('properties').select('id').eq('id', propertyId).eq('workspace_id', req.workspace_id).eq('is_public', true).maybeSingle();
+    if (!p) return json({ error: 'not found' }, 404);
+    const { data: contact } = await supabase.from('crm_contacts').select('name, email, phone').eq('id', req.crm_contact_id).maybeSingle();
+    const { error } = await supabase.from('property_inquiries').insert({
+      workspace_id: req.workspace_id, property_id: propertyId,
+      name: contact?.name ?? 'Buyer (portal)', email: contact?.email ?? null, phone: contact?.phone ?? null,
+      message: String(body?.message ?? '').slice(0, 1000) || 'Viewing requested via buyer portal',
+      status: 'new', crm_contact_id: req.crm_contact_id, source: 'buyer_portal',
+    });
+    if (error) throw new HttpError(400, error.message);
+    return json({ ok: true });
   }
 
   // ── Cross-workspace Discovery (no token) — only active+public+in_discovery listings, toPublic-projected.

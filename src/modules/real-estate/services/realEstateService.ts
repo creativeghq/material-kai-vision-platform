@@ -52,6 +52,7 @@ export interface PropertyViewing {
 
 export interface BuyerRequirement {
   id: string; crm_contact_id: string; label: string | null; criteria: Record<string, any>; is_active: boolean; created_at: string; updated_at: string;
+  portal_token?: string | null; digest_enabled?: boolean; last_digest_at?: string | null;
   contact?: { id: string; name: string | null; email: string | null } | null;
 }
 export interface ContactExt {
@@ -359,6 +360,21 @@ export const realEstatePublic = {
     const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'request-valuation', workspace_id: by.workspaceId, user_id: by.userId, ...payload } });
     if (error) throw await edgeError(error);
     return data as ValuationResult;
+  },
+
+  // Buyer portal (#281) — token-scoped, no auth
+  async buyerPortal(token: string): Promise<{ requirement: { label: string | null; criteria: Record<string, any> }; agency: string | null; favorites: string[]; listings: PublicListingCard[] }> {
+    const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'buyer-portal', token } });
+    if (error) throw await edgeError(error);
+    return data as any;
+  },
+  async buyerFavorite(token: string, propertyId: string, on: boolean): Promise<void> {
+    const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'buyer-favorite', token, property_id: propertyId, on } });
+    if (error) throw await edgeError(error);
+  },
+  async buyerRequestViewing(token: string, propertyId: string, message?: string): Promise<void> {
+    const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'buyer-request-viewing', token, property_id: propertyId, message } });
+    if (error) throw await edgeError(error);
   },
 };
 

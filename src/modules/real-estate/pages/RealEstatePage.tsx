@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Sparkles, Columns3 } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Sparkles, Columns3, Link as LinkIcon } from 'lucide-react';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -369,17 +369,23 @@ const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   }, [ws, toast]);
   if (rows === null) return <InlineLoader />;
   if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No registered buyers yet. Add a buyer’s requirements from their CRM contact → Property tab, and new matching listings alert you automatically.</div>;
+  const copyPortal = (token?: string | null) => {
+    if (!token) { toast({ title: 'No portal link for this search yet', variant: 'destructive' }); return; }
+    void navigator.clipboard.writeText(`${window.location.origin}/buyer/${token}`);
+    toast({ title: 'Buyer portal link copied', description: 'Send it to the buyer — it shows their live matches.' });
+  };
   return (
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((r) => (
-        <button key={r.id} onClick={() => r.crm_contact_id && navigate(`/crm/contacts/${r.crm_contact_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
+        <div key={r.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40">
           <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
+          <button onClick={() => r.crm_contact_id && navigate(`/crm/contacts/${r.crm_contact_id}`)} className="min-w-0 flex-1 text-left">
             <div className="font-medium">{r.contact?.name || 'Buyer'} {r.label && <span className="text-xs text-muted-foreground">· {r.label}</span>}</div>
             <div className="mt-0.5 truncate text-xs text-muted-foreground">{summariseCriteria(r.criteria)}</div>
-          </div>
+          </button>
           {!r.is_active && <Badge className="rounded-full border-0 bg-muted text-[11px]">paused</Badge>}
-        </button>
+          <Button size="sm" variant="ghost" className="rounded-full" title="Copy buyer portal link" onClick={() => copyPortal(r.portal_token)}><LinkIcon className="mr-1 h-3.5 w-3.5" /> Portal</Button>
+        </div>
       ))}
     </div></CardContent></Card>
   );
