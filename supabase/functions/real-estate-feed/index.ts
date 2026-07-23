@@ -48,7 +48,9 @@ Deno.serve(withApiLogging('real-estate-feed', async (req) => {
   }
 
   const pubs = listings.map((l: any) => ({ raw: l, pub: toPublic(l), images: photosByProp[l.id] ?? [] }));
-  return xml(format === 'generic' ? renderGeneric(pubs) : renderKyero(pubs));
+  if (format === 'generic') return xml(renderGeneric(pubs));
+  if (format === 'openimmo') return xml(renderOpenImmo(pubs));
+  return xml(renderKyero(pubs));
 }));
 
 function priceFreq(tx: string): string {
@@ -85,6 +87,63 @@ ${imgs}
   <kyero><feed_version>3</feed_version></kyero>
 ${props}
 </root>`;
+}
+
+/** OpenImmo v1.2.7 (DACH standard). Minimal-but-valid subset covering the common consumer fields. */
+function renderOpenImmo(items: Array<{ raw: any; pub: any; images: string[] }>): string {
+  const objektart = (p: any) => {
+    if (p.property_type === 'land') return '<grundstueck/>';
+    if (p.property_type === 'commercial') return '<gewerbe gewerbe_typ="EINZELHANDEL"/>';
+    return '<wohnung wohnung_typ="ETAGE"/>';
+  };
+  const props = items.map(({ pub, images }) => {
+    const isRent = pub.transaction_type === 'rent' || pub.transaction_type === 'short_let';
+    const priceTag = pub.price != null
+      ? (isRent ? `<kaltmiete>${esc(pub.price)}</kaltmiete>` : `<kaufpreis>${esc(pub.price)}</kaufpreis>`)
+      : '';
+    const imgs = images.map((u, i) => `        <anhang location="EXTERN" gruppe="BILD"><anhangtitel>Bild ${i + 1}</anhangtitel><daten><pfad>${esc(u)}</pfad></daten></anhang>`).join('\n');
+    return `    <immobilie>
+      <objektkategorie>
+        <nutzungsart WOHNEN="${pub.property_type === 'commercial' ? 'false' : 'true'}" GEWERBE="${pub.property_type === 'commercial' ? 'true' : 'false'}"/>
+        <vermarktungsart KAUF="${isRent ? 'false' : 'true'}" MIETE_PACHT="${isRent ? 'true' : 'false'}"/>
+        <objektart>${objektart(pub)}</objektart>
+      </objektkategorie>
+      <geo>
+        <plz>${esc(pub.postcode ?? '')}</plz><ort>${esc(pub.town ?? '')}</ort>
+        <bundesland>${esc(pub.region ?? '')}</bundesland><land iso_land="${esc((pub.country_code ?? 'GR').toUpperCase())}"/>
+        ${pub.lat != null && pub.lng != null ? `<geokoordinaten breitengrad="${esc(pub.lat)}" laengengrad="${esc(pub.lng)}"/>` : ''}
+      </geo>
+      <preise>${priceTag}<waehrung iso_waehrung="${esc(pub.currency ?? 'EUR')}"/></preise>
+      <flaechen>
+        ${pub.area_built != null ? `<wohnflaeche>${esc(pub.area_built)}</wohnflaeche>` : ''}
+        ${(pub.plot_area ?? pub.area_plot) != null ? `<grundstuecksflaeche>${esc(pub.plot_area ?? pub.area_plot)}</grundstuecksflaeche>` : ''}
+        ${pub.bedrooms != null ? `<anzahl_schlafzimmer>${esc(pub.bedrooms)}</anzahl_schlafzimmer>` : ''}
+        ${pub.bathrooms != null ? `<anzahl_badezimmer>${esc(pub.bathrooms)}</anzahl_badezimmer>` : ''}
+      </flaechen>
+      <zustand_angaben>
+        ${pub.year_built != null ? `<baujahr>${esc(pub.year_built)}</baujahr>` : ''}
+        ${pub.energy_class ? `<energiepass><epart>ENDENERGIEBEDARF</epart><wertklasse>${esc(pub.energy_class)}</wertklasse></energiepass>` : ''}
+      </zustand_angaben>
+      <freitexte>
+        <objekttitel>${esc(pub.title ?? '')}</objekttitel>
+        <objektbeschreibung>${esc(pub.description_i18n?.en || pub.description_i18n?.el || '')}</objektbeschreibung>
+      </freitexte>
+      <anhaenge>
+${imgs}
+      </anhaenge>
+      <verwaltung_techn>
+        <objektnr_extern>${esc(pub.reference_code ?? pub.id)}</objektnr_extern>
+        <aktion/>
+      </verwaltung_techn>
+    </immobilie>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<openimmo>
+  <uebertragung art="ONLINE" umfang="VOLL" modus="NEU" version="1.2.7" sendersoftware="MaterialsHub"/>
+  <anbieter>
+${props}
+  </anbieter>
+</openimmo>`;
 }
 
 function renderGeneric(items: Array<{ raw: any; pub: any; images: string[] }>): string {

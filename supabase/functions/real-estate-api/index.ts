@@ -680,7 +680,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const patch: Record<string, unknown> = {};
         if (body.feed_enabled !== undefined) patch.feed_enabled = !!body.feed_enabled;
         if (body.feed_format !== undefined) {
-          if (!['kyero', 'generic'].includes(String(body.feed_format))) return json({ error: 'invalid feed_format' }, 400);
+          if (!['kyero', 'generic', 'openimmo'].includes(String(body.feed_format))) return json({ error: 'invalid feed_format' }, 400);
           patch.feed_format = body.feed_format;
         }
         const { data, error } = await supabase.from('real_estate_settings')

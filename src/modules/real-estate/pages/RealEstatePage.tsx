@@ -169,7 +169,8 @@ const FeedCard: React.FC<{ ws: string | null }> = ({ ws }) => {
           <div className="mb-2 flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Format</span>
             <select className="h-8 rounded-md border bg-background px-2 text-xs" value={s.feed_format} disabled={busy} onChange={(e) => patch({ feed_format: e.target.value })}>
-              <option value="kyero">Kyero v3</option>
+              <option value="kyero">Kyero v3 (ES/PT/IT)</option>
+              <option value="openimmo">OpenImmo (DACH)</option>
               <option value="generic">Generic XML</option>
             </select>
           </div>
