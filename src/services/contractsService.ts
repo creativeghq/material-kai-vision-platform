@@ -4,7 +4,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
 
-export type ContractContext = 'hr' | 'finance' | 'project';
+export type ContractContext = 'hr' | 'finance' | 'project' | 'realestate';
 export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined' | 'void';
 
 export interface Contract {
@@ -25,6 +25,7 @@ export interface Contract {
   order_id: string | null;
   quote_id: string | null;
   project_id: string | null;
+  property_id: string | null;
   counterparty_name: string | null;
   counterparty_email: string | null;
   sign_token: string | null;
@@ -63,6 +64,7 @@ export interface CreateContractInput {
   order_id?: string;
   quote_id?: string;
   project_id?: string;
+  property_id?: string;
 }
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
@@ -73,7 +75,7 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 export const contractsService = {
-  async list(workspaceId: string, opts: { context?: ContractContext; status?: ContractStatus } & Partial<Pick<Contract, 'hr_employee_id' | 'customer_company_id' | 'supplier_company_id' | 'order_id' | 'quote_id' | 'project_id'>> = {}): Promise<Contract[]> {
+  async list(workspaceId: string, opts: { context?: ContractContext; status?: ContractStatus } & Partial<Pick<Contract, 'hr_employee_id' | 'customer_company_id' | 'supplier_company_id' | 'order_id' | 'quote_id' | 'project_id' | 'property_id'>> = {}): Promise<Contract[]> {
     const { contracts } = await call<{ contracts: Contract[] }>({ action: 'list', workspace_id: workspaceId, ...opts });
     return contracts;
   },

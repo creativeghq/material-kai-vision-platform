@@ -26,6 +26,7 @@ const TYPE_OPTIONS: Record<ContractContext, string[]> = {
   hr: ['employment', 'amendment', 'nda', 'termination'],
   finance: ['sales', 'framework', 'service', 'supplier', 'nda'],
   project: ['work_agreement', 'amendment', 'nda'],
+  realestate: ['memorandum_of_sale', 'agency_agreement', 'reservation'],
 };
 
 type Subject = Partial<Pick<Contract, 'hr_employee_id' | 'customer_company_id' | 'supplier_company_id' | 'order_id' | 'quote_id' | 'project_id'>>;
@@ -34,6 +35,7 @@ const CONTEXT_BADGE: Record<ContractContext, string> = {
   hr: 'text-violet-600 border-violet-500/40',
   finance: 'text-sky-600 border-sky-500/40',
   project: 'text-teal-600 border-teal-500/40',
+  realestate: 'text-emerald-600 border-emerald-500/40',
 };
 
 export const ContractsSection: React.FC<{

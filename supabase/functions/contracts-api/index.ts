@@ -28,13 +28,13 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const json = (body: any, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-const CONTEXTS = ['hr', 'finance', 'project'];
+const CONTEXTS = ['hr', 'finance', 'project', 'realestate'];
 // Fields a caller may write (no status / token / workspace / created_by — those are server-set).
 const WRITABLE = [
   'contract_type', 'title', 'body_markdown', 'currency', 'value',
   'effective_date', 'expiry_date', 'counterparty_name', 'counterparty_email',
 ] as const;
-const SUBJECT_COLS = ['hr_employee_id', 'customer_company_id', 'supplier_company_id', 'order_id', 'quote_id', 'project_id'] as const;
+const SUBJECT_COLS = ['hr_employee_id', 'customer_company_id', 'supplier_company_id', 'order_id', 'quote_id', 'project_id', 'property_id'] as const;
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -138,7 +138,7 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
 
   if (action === 'create') {
     const context = String(body?.context ?? '');
-    if (!CONTEXTS.includes(context)) return json({ error: 'context must be hr | finance | project' }, 400);
+    if (!CONTEXTS.includes(context)) return json({ error: 'context must be hr | finance | project | realestate' }, 400);
     if (!String(body?.title ?? '').trim()) return json({ error: 'title is required' }, 400);
     const payload: Record<string, unknown> = {
       workspace_id: workspaceId,

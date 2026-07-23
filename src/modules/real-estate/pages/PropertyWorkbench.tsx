@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
-  Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X,
+  Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature, Send,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -23,6 +23,7 @@ import {
   realEstateService, isPublishBlocked,
   type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
 } from '../services/realEstateService';
+import { contractsService, type Contract } from '@/services/contractsService';
 
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
@@ -231,6 +232,7 @@ export default function PropertyWorkbench() {
             <TabsTrigger value="inquiries"><Contact className="mr-1.5 h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="offers"><Gavel className="mr-1.5 h-4 w-4" /> Offers</TabsTrigger>
             <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
+            {canManage && <TabsTrigger value="transaction"><FileSignature className="mr-1.5 h-4 w-4" /> Transaction</TabsTrigger>}
           </TabsList>
 
           {/* ── Overview / multi-step edit form ── */}
@@ -521,6 +523,9 @@ export default function PropertyWorkbench() {
           {/* ── Offers ── */}
           <TabsContent value="offers"><OffersTab ws={ws} propertyId={id} canManage={editable} onAccepted={load} /></TabsContent>
 
+          {/* ── Transaction (Contracts module: Memorandum of Sale / agency agreement + e-sign) ── */}
+          {canManage && <TabsContent value="transaction"><TransactionTab ws={ws} propertyId={id} canEdit={editable} /></TabsContent>}
+
           {/* ── Viewings ── */}
           <TabsContent value="viewings" className="space-y-4">
             {editable && (
@@ -627,6 +632,82 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
                   <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" title="Reject" disabled={busy} onClick={() => setStatus(o.id, 'rejected')}><X className="h-4 w-4" /></Button>
                 </div>
               )}
+            </div>
+          ))}
+        </div></CardContent></Card>
+      )}
+    </div>
+  );
+};
+
+// Transaction docs (Memorandum of Sale / agency agreement) via the Contracts module — e-sign reused.
+const RE_CONTRACT_TYPES = [
+  { v: 'memorandum_of_sale', label: 'Memorandum of Sale' },
+  { v: 'agency_agreement', label: 'Agency agreement' },
+  { v: 'reservation', label: 'Reservation agreement' },
+];
+const TransactionTab: React.FC<{ ws: string | null; propertyId: string; canEdit: boolean }> = ({ ws, propertyId, canEdit }) => {
+  const { toast } = useToast();
+  const [rows, setRows] = useState<Contract[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [f, setF] = useState<Record<string, any>>({ contract_type: 'memorandum_of_sale' });
+
+  const load = useCallback(async () => {
+    if (!ws) return;
+    try { setRows(await contractsService.list(ws, { context: 'realestate', property_id: propertyId } as any)); setErr(null); }
+    catch (e) { setErr((e as Error).message); setRows([]); }
+  }, [ws, propertyId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const create = async () => {
+    if (!ws || !f.title) return;
+    setBusy(true);
+    try {
+      await contractsService.create(ws, { context: 'realestate', property_id: propertyId, contract_type: f.contract_type, title: f.title, counterparty_name: f.counterparty_name || undefined, counterparty_email: f.counterparty_email || undefined, value: f.value ? Number(f.value) : undefined, body_markdown: f.body_markdown || undefined } as any);
+      setF({ contract_type: 'memorandum_of_sale' }); setAdding(false); await load(); toast({ title: 'Document created' });
+    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const send = async (id: string) => {
+    if (!ws) return;
+    setBusy(true);
+    try { const r = await contractsService.send(ws, id); const url = `${window.location.origin}${r.sign_path}`; void navigator.clipboard.writeText(url); await load(); toast({ title: 'Sent for signature', description: 'Sign link copied to clipboard.' }); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  if (rows === null && !err) return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">Loading…</div>;
+  if (err && /not available|not entitled|entitled|module/i.test(err)) {
+    return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">The <span className="font-medium">Contracts</span> module is needed for transaction documents &amp; e-signature. Enable it in Profile → Modules.</div>;
+  }
+  return (
+    <div className="space-y-4">
+      {canEdit && (adding ? (
+        <Card><CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-2">
+          <select className="h-9 rounded-md border bg-background px-2 text-sm" value={f.contract_type} onChange={(e) => setF((p) => ({ ...p, contract_type: e.target.value }))}>
+            {RE_CONTRACT_TYPES.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
+          </select>
+          <Input placeholder="Title" value={f.title ?? ''} onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} />
+          <Input placeholder="Counterparty name (buyer/vendor)" value={f.counterparty_name ?? ''} onChange={(e) => setF((p) => ({ ...p, counterparty_name: e.target.value }))} />
+          <Input type="email" placeholder="Counterparty email" value={f.counterparty_email ?? ''} onChange={(e) => setF((p) => ({ ...p, counterparty_email: e.target.value }))} />
+          <Input type="number" placeholder="Value (optional)" value={f.value ?? ''} onChange={(e) => setF((p) => ({ ...p, value: e.target.value }))} />
+          <Textarea placeholder="Body / terms (markdown)" className="col-span-full" rows={3} value={f.body_markdown ?? ''} onChange={(e) => setF((p) => ({ ...p, body_markdown: e.target.value }))} />
+          <div className="col-span-full flex gap-2"><Button size="sm" className="rounded-full" onClick={create} disabled={busy || !f.title}>Create</Button><Button size="sm" variant="ghost" className="rounded-full" onClick={() => setAdding(false)}>Cancel</Button></div>
+        </CardContent></Card>
+      ) : <Button variant="outline" size="sm" className="rounded-full" onClick={() => setAdding(true)}><FileSignature className="mr-1.5 h-4 w-4" /> New transaction document</Button>)}
+
+      {(rows ?? []).length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No transaction documents yet. Create a Memorandum of Sale or agency agreement and send it for e-signature.</div> : (
+        <Card><CardContent className="p-0"><div className="divide-y divide-border">
+          {(rows ?? []).map((c) => (
+            <div key={c.id} className="flex items-center gap-4 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{c.title}</div>
+                <div className="text-xs text-muted-foreground capitalize">{(c.contract_type ?? '').replace(/_/g, ' ')}{c.counterparty_name ? ` · ${c.counterparty_name}` : ''}</div>
+              </div>
+              <Badge className={`rounded-full border-0 text-[11px] capitalize ${c.status === 'signed' ? 'bg-emerald-500/15 text-emerald-500' : c.status === 'sent' ? 'bg-amber-500/15 text-amber-500' : 'bg-muted text-muted-foreground'}`}>{c.status}</Badge>
+              {canEdit && c.status === 'draft' && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={() => send(c.id)}><Send className="mr-1 h-3.5 w-3.5" /> Send</Button>}
             </div>
           ))}
         </div></CardContent></Card>
