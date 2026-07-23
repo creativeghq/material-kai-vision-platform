@@ -34,6 +34,16 @@ export interface LauncherSection {
  *   Email    (src/modules/email-marketing/pages/…Page.tsx) → campaigns | templates | contacts | setup
  */
 export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
+  'real-estate': [
+    { label: 'Listings', to: '/properties?tab=listings', icon: Building2 },
+    { label: 'Pipeline', to: '/properties?tab=pipeline', icon: ClipboardList },
+    { label: 'Leads', to: '/properties?tab=leads', icon: Contact },
+    { label: 'Buyers', to: '/properties?tab=buyers', icon: Users },
+    { label: 'Viewings', to: '/properties?tab=viewings', icon: CalendarDays },
+    { label: 'Sales', to: '/properties?tab=sales', icon: Banknote },
+    { label: 'Property Mgmt', to: '/properties?tab=lettings', icon: FolderOpen },
+    { label: 'Investments', to: '/properties?tab=investments', icon: BarChart3 },
+  ],
   crm: [
     { label: 'Users', to: '/crm?tab=users', icon: Users },
     { label: 'Contacts', to: '/crm?tab=contacts', icon: Contact },

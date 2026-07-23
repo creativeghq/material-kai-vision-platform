@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Sparkles, Columns3, Link as LinkIcon } from 'lucide-react';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
@@ -38,6 +38,8 @@ export default function RealEstatePage() {
   const [creating, setCreating] = useState(false);
   const canManage = can('realestate.listings.manage');
   const ws = activeWorkspaceId;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') || 'overview'; // deep-linkable from the App launcher
   // #281 add-on entitlements (Property Management + Investments). Tabs stay visible so the add-on
   // is discoverable; when not entitled they render an Enable card instead of the (402-gated) panel.
   const pmEnabled = isModuleAvailable('real-estate-management');
@@ -77,8 +79,8 @@ export default function RealEstatePage() {
         actions={canManage ? <Button onClick={createDraft} disabled={creating} className="rounded-full"><Plus className="mr-2 h-4 w-4" /> New listing</Button> : undefined} />
 
       <div className="p-3 sm:p-6">
-        <Tabs defaultValue="overview">
-          <TabsList className="mb-4 bg-muted">
+        <Tabs value={tab} onValueChange={(v) => setSearchParams(v === 'overview' ? {} : { tab: v }, { replace: true })}>
+          <TabsList className="mb-4 flex flex-wrap bg-muted">
             <TabsTrigger value="overview"><LayoutDashboard className="mr-1.5 h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="listings"><Building2 className="mr-1.5 h-4 w-4" /> Listings</TabsTrigger>
             <TabsTrigger value="pipeline"><Columns3 className="mr-1.5 h-4 w-4" /> Pipeline</TabsTrigger>
