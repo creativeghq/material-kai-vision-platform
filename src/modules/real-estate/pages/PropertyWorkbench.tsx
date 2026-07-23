@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -94,6 +94,7 @@ const STEPS: { id: string; label: string; icon: LucideIcon }[] = [
 
 export default function PropertyWorkbench() {
   const { id = '' } = useParams();
+  const [sp, setSp] = useSearchParams(); // deep-linkable tab (?tab=lettings|investment|…) from the global Add flows
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { can } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
@@ -241,7 +242,7 @@ export default function PropertyWorkbench() {
           </div>
         )}
 
-        <Tabs defaultValue="overview">
+        <Tabs value={sp.get('tab') || 'overview'} onValueChange={(v) => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', v); return n; }, { replace: true })}>
           <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="overview" className={RE_TAB}><Home className="h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="media" className={RE_TAB}><ImageIcon className="h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>

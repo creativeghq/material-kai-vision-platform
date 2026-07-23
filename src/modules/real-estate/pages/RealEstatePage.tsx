@@ -338,6 +338,136 @@ const AddPartyButton: React.FC<{ ws: string; role: 'seller' | 'buyer'; onAdded: 
   );
 };
 
+// #249 — shared property picker for the global "add" flows whose create is property-scoped
+// (schedule viewing / add tenancy / add investment) — pick the listing first.
+const PropertySelect: React.FC<{ ws: string | null; value: string; onChange: (id: string) => void }> = ({ ws, value, onChange }) => {
+  const [opts, setOpts] = useState<PropertyListItem[]>([]);
+  useEffect(() => { if (ws) realEstateService.listProperties(ws).then(setOpts).catch(() => setOpts([])); }, [ws]);
+  return (
+    <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Select a property…</option>
+      {opts.map((p) => <option key={p.id} value={p.id}>{p.title || 'Untitled'}{p.reference_code ? ` · #${p.reference_code}` : ''}</option>)}
+    </select>
+  );
+};
+
+// Schedule a viewing from the global Viewings tab (inline — createViewing is simple).
+const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAdded }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [propertyId, setPropertyId] = useState('');
+  const [when, setWhen] = useState('');
+  const [type, setType] = useState('in_person');
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!propertyId || !when) return;
+    setBusy(true);
+    try {
+      await realEstateService.createViewing(ws, { property_id: propertyId, scheduled_at: new Date(when).toISOString(), type, crm_contact_id: contactId ?? undefined });
+      toast({ title: 'Viewing scheduled' });
+      setOpen(false); setPropertyId(''); setWhen(''); setContactId(null); onAdded();
+    } catch (e) { toast({ title: 'Could not schedule', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  return (
+    <>
+      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Schedule viewing</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Schedule a viewing</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><label className="mb-1 block text-xs text-muted-foreground">Property</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="mb-1 block text-xs text-muted-foreground">When</label><input type="datetime-local" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
+              <div><label className="mb-1 block text-xs text-muted-foreground">Type</label><select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{['in_person', 'virtual', 'open_house'].map((o) => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}</select></div>
+            </div>
+            <div><label className="mb-1 block text-xs text-muted-foreground">Attendee (optional)</label><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Link a CRM contact…" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="rounded-full" onClick={save} disabled={!propertyId || !when || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Schedule</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+// Add a buyer (saved-search requirement) from the global Buyers tab (inline).
+const AddBuyerButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAdded }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [label, setLabel] = useState('');
+  const [c, setC] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!contactId) return;
+    setBusy(true);
+    try {
+      const criteria: Record<string, any> = {};
+      if (c.property_type) criteria.property_type = c.property_type;
+      if (c.town) criteria.town = c.town;
+      if (c.bedrooms_min) criteria.bedrooms_min = Number(c.bedrooms_min);
+      if (c.price_max) criteria.price_max = Number(c.price_max);
+      await realEstateService.upsertBuyerRequirement(ws, { crm_contact_id: contactId, label: label || undefined, criteria });
+      toast({ title: 'Buyer added' });
+      setOpen(false); setContactId(null); setLabel(''); setC({}); onAdded();
+    } catch (e) { toast({ title: 'Could not add buyer', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const field = (k: string, ph: string, t = 'text') => <input type={t} placeholder={ph} className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={c[k] ?? ''} onChange={(e) => setC((p) => ({ ...p, [k]: e.target.value }))} />;
+  return (
+    <>
+      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add buyer</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add a buyer</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><label className="mb-1 block text-xs text-muted-foreground">Contact</label><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Search CRM contacts…" /></div>
+            <input placeholder="Label (e.g. “3-bed in Athens”)" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={label} onChange={(e) => setLabel(e.target.value)} />
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Requirements (optional — auto-matches new listings)</div>
+              <div className="grid grid-cols-2 gap-2">{field('property_type', 'Type e.g. apartment')}{field('town', 'Town')}{field('bedrooms_min', 'Min beds', 'number')}{field('price_max', 'Max price', 'number')}</div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="rounded-full" onClick={save} disabled={!contactId || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add buyer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+// Pick a property then jump to its detail tab where the full contextual form lives
+// (tenancy / investment — heavy forms not worth duplicating in a global dialog).
+const AddViaPropertyButton: React.FC<{ ws: string; label: string; tab: string }> = ({ ws, label, tab }) => {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [propertyId, setPropertyId] = useState('');
+  return (
+    <>
+      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> {label}</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{label}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Choose the property — you’ll continue on its {tab} tab.</p>
+            <PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="rounded-full" onClick={() => propertyId && navigate(`/properties/${propertyId}?tab=${tab}`)} disabled={!propertyId}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
 const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -380,14 +510,17 @@ const ViewingsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [rows, setRows] = useState<PropertyViewing[] | null>(null);
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!ws) return;
     realEstateService.listViewings(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load viewings', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
+  useEffect(() => { load(); }, [load]);
+  const header = ws ? <div className="mb-3 flex justify-end"><ScheduleViewingButton ws={ws} onAdded={load} /></div> : null;
 
-  if (rows === null) return <InlineLoader />;
-  if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No viewings scheduled.</div>;
+  if (rows === null) return <>{header}<InlineLoader /></>;
+  if (rows.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No viewings scheduled.</div></>;
   return (
+    <>{header}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((v) => (
         <button key={v.id} onClick={() => navigate(`/properties/${v.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left text-sm hover:bg-muted/40">
@@ -397,6 +530,7 @@ const ViewingsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         </button>
       ))}
     </div></CardContent></Card>
+    </>
   );
 };
 
@@ -411,18 +545,21 @@ const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [rows, setRows] = useState<BuyerRequirement[] | null>(null);
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!ws) return;
     realEstateService.listBuyerRequirements(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load buyers', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
-  if (rows === null) return <InlineLoader />;
-  if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No registered buyers yet. Add a buyer’s requirements from their CRM contact → Property tab, and new matching listings alert you automatically.</div>;
+  useEffect(() => { load(); }, [load]);
+  const header = ws ? <div className="mb-3 flex justify-end"><AddBuyerButton ws={ws} onAdded={load} /></div> : null;
+  if (rows === null) return <>{header}<InlineLoader /></>;
+  if (rows.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No registered buyers yet. Add one here, or from a CRM contact → Property tab — new matching listings alert you automatically.</div></>;
   const copyPortal = (token?: string | null) => {
     if (!token) { toast({ title: 'No portal link for this search yet', variant: 'destructive' }); return; }
     void navigator.clipboard.writeText(`${window.location.origin}/buyer/${token}`);
     toast({ title: 'Buyer portal link copied', description: 'Send it to the buyer — it shows their live matches.' });
   };
   return (
+    <>{header}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((r) => (
         <div key={r.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40">
@@ -436,6 +573,7 @@ const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         </div>
       ))}
     </div></CardContent></Card>
+    </>
   );
 };
 
@@ -454,6 +592,7 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const freq = (t: Tenancy) => `/${t.rent_frequency.replace('ly', '').replace('month', 'mo').replace('week', 'wk').replace('quarter', 'qtr').replace('year', 'yr')}`;
   return (
     <div className="space-y-6">
+      {ws && <div className="flex justify-end"><AddViaPropertyButton ws={ws} label="Add tenancy" tab="lettings" /></div>}
       <div>
         <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><KeyRound className="h-4 w-4" /> Active tenancies</div>
         {tenancies.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No tenancies yet. Set one up from a rental listing’s Lettings tab.</div> : (
@@ -550,8 +689,10 @@ const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   if (data === null) return <InlineLoader />;
   const { investments, portfolio } = data;
   const ccy = portfolio.currency;
-  if (investments.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No investment analysis yet. Open a listing → <b>Investments</b> tab to add purchase, financing and rent, and see its yield & cash flow.</div>;
+  const header = ws ? <div className="mb-3 flex justify-end"><AddViaPropertyButton ws={ws} label="Add investment" tab="investment" /></div> : null;
+  if (investments.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No investment analysis yet. Add one here, or open a listing → <b>Investments</b> tab to model purchase, financing and rent.</div></>;
   return (
+    <>{header}
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Properties" value={String(portfolio.count)} />
@@ -574,5 +715,6 @@ const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         ))}
       </div></CardContent></Card>
     </div>
+    </>
   );
 };
