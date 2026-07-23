@@ -300,6 +300,10 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   real_estate_properties: 'Property listings',
   real_estate_property: 'Property',
   real_estate_leads: 'Property leads',
+  real_estate_listing_created: 'Draft listing created',
+  real_estate_listing_published: 'Listing published',
+  real_estate_viewing_scheduled: 'Viewing scheduled',
+  real_estate_description_draft: 'AI listing copy',
   // Appointments
   appointments_list: 'Upcoming appointments',
   appointment_scheduled: 'Appointment scheduled',
