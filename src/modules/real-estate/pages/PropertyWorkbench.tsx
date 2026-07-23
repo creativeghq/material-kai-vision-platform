@@ -30,6 +30,7 @@ import {
 import { contractsService, type Contract } from '@/services/contractsService';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
+import { CmaReportDialog } from '../components/CmaReportDialog';
 
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
@@ -101,6 +102,7 @@ export default function PropertyWorkbench() {
 
   const [property, setProperty] = useState<Property | null>(null);
   const [canEdit, setCanEdit] = useState(true);
+  const [cmaOpen, setCmaOpen] = useState(false);
   const [photos, setPhotos] = useState<PropertyPhoto[]>([]);
   const [inquiries, setInquiries] = useState<PropertyInquiry[]>([]);
   const [viewings, setViewings] = useState<PropertyViewing[]>([]);
@@ -218,6 +220,7 @@ export default function PropertyWorkbench() {
               catch (e) { toast({ title: 'Brochure failed', description: (e as Error).message, variant: 'destructive' }); }
               finally { setBusy(false); }
             }}><FileText className="mr-1 h-4 w-4" /> Brochure</Button>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => setCmaOpen(true)}><LineChart className="mr-1 h-4 w-4" /> CMA</Button>
             {editable && (property.is_public
               ? <Button variant="outline" size="sm" className="rounded-full" onClick={unpublish} disabled={busy}><EyeOff className="mr-1 h-4 w-4" /> Unpublish</Button>
               : <Button size="sm" className="rounded-full" onClick={publish} disabled={busy}><Globe className="mr-1 h-4 w-4" /> Publish</Button>)}
@@ -579,6 +582,7 @@ export default function PropertyWorkbench() {
           </TabsContent>
         </Tabs>
       </div>
+      {ws && <CmaReportDialog ws={ws} propertyId={id} open={cmaOpen} onOpenChange={setCmaOpen} />}
     </div>
   );
 }

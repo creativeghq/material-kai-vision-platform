@@ -1052,6 +1052,56 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ investments: rows, portfolio });
       }
 
+      // ── CMA / listing-pitch report (#281) — comps from own stock ──────────
+      case 'cma-report': {
+        const propertyId = String(body.property_id ?? '');
+        let subject: any = null;
+        let propertyType = String(body.property_type ?? '');
+        let town = String(body.town ?? '');
+        let area = Number(body.area ?? 0);
+        if (propertyId) {
+          subject = await loadProperty(propertyId); // view-scoped 404
+          propertyType = subject.property_type;
+          town = subject.town ?? '';
+          area = Number(subject.area_built ?? subject.plot_area ?? 0);
+        }
+        if (!propertyType) return json({ error: 'property_type or property_id is required' }, 400);
+        let cq = supabase.from('properties')
+          .select('id, title, town, price, area_built, plot_area, listing_status, sold_price, sold_at, created_at, currency, bedrooms')
+          .eq('workspace_id', workspaceId).eq('property_type', propertyType)
+          .in('listing_status', ['active', 'under_offer', 'sold']).not('price', 'is', null);
+        if (town) cq = cq.ilike('town', town);
+        if (propertyId) cq = cq.neq('id', propertyId);
+        const { data: raw } = await cq.limit(60);
+        const comps = (raw ?? []).map((c: any) => {
+          const a = Number(c.area_built ?? c.plot_area ?? 0);
+          const effPrice = c.listing_status === 'sold' && c.sold_price != null ? Number(c.sold_price) : Number(c.price);
+          const pps = a > 0 ? effPrice / a : null;
+          const dom = c.listing_status === 'sold' && c.sold_at ? Math.max(0, Math.round((new Date(c.sold_at).getTime() - new Date(c.created_at).getTime()) / 864e5)) : null;
+          return { id: c.id, title: c.title, town: c.town, price: effPrice, area: a || null, bedrooms: c.bedrooms ?? null, price_per_sqm: pps ? Math.round(pps) : null, listing_status: c.listing_status, days_on_market: dom, currency: c.currency ?? 'EUR' };
+        }).filter((c: any) => c.price_per_sqm != null).sort((a: any, b: any) => a.price_per_sqm - b.price_per_sqm);
+        const pps = comps.map((c: any) => c.price_per_sqm as number);
+        const median = pps.length ? pps[Math.floor(pps.length / 2)] : null;
+        const domVals = comps.map((c: any) => c.days_on_market).filter((d: any): d is number => d != null);
+        const stats = {
+          count: comps.length,
+          sold_count: comps.filter((c: any) => c.listing_status === 'sold').length,
+          min_per_sqm: pps[0] ?? null,
+          median_per_sqm: median,
+          max_per_sqm: pps[pps.length - 1] ?? null,
+          avg_days_on_market: domVals.length ? Math.round(domVals.reduce((a: number, b: number) => a + b, 0) / domVals.length) : null,
+        };
+        const suggestion = (median && area > 0) ? {
+          estimate: Math.round(median * area / 1000) * 1000,
+          low: Math.round(median * area * 0.9 / 1000) * 1000,
+          high: Math.round(median * area * 1.1 / 1000) * 1000,
+        } : null;
+        return json({
+          subject: { property_id: propertyId || null, title: subject?.title ?? null, property_type: propertyType, town, area: area || null, price: subject?.price ?? null, currency: subject?.currency ?? 'EUR' },
+          comps, stats, suggestion, generated_at: new Date().toISOString(),
+        });
+      }
+
       // ── Deal pipeline (#281) — stage board + per-deal tasks ────────────────
       case 'list-deals': {
         const { data, error } = await supabase.from('property_deals')

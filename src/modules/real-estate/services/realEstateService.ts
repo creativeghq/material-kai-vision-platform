@@ -156,6 +156,16 @@ export interface InvestmentPortfolio {
   annual_cash_flow: number; monthly_cash_flow: number; blended_net_yield_pct: number; currency: string;
 }
 
+// ── CMA report (#281) ──
+export interface CmaComp { id: string; title: string | null; town: string | null; price: number; area: number | null; bedrooms: number | null; price_per_sqm: number | null; listing_status: string; days_on_market: number | null; currency: string }
+export interface CmaReport {
+  subject: { property_id: string | null; title: string | null; property_type: string; town: string; area: number | null; price: number | null; currency: string };
+  comps: CmaComp[];
+  stats: { count: number; sold_count: number; min_per_sqm: number | null; median_per_sqm: number | null; max_per_sqm: number | null; avg_days_on_market: number | null };
+  suggestion: { estimate: number; low: number; high: number } | null;
+  generated_at: string;
+}
+
 // ── Deal pipeline (#281) ──
 export type DealStage = 'lead' | 'viewing' | 'offer' | 'under_offer' | 'conveyancing' | 'exchanged' | 'completed';
 export interface PropertyDeal {
@@ -240,6 +250,10 @@ export const realEstateService = {
     call<{ investment: PropertyInvestment; metrics: InvestmentMetrics }>(ws, 'upsert-investment', { property_id: propertyId, ...fields }),
   listInvestments: (ws: string) =>
     call<{ investments: PropertyInvestment[]; portfolio: InvestmentPortfolio }>(ws, 'list-investments'),
+
+  // CMA report (#281)
+  cmaReport: (ws: string, params: { property_id?: string; property_type?: string; town?: string; area?: number }) =>
+    call<CmaReport>(ws, 'cma-report', params),
 
   // Deal pipeline (#281)
   listDeals: (ws: string) => call<{ deals: PropertyDeal[] }>(ws, 'list-deals').then((r) => r.deals),

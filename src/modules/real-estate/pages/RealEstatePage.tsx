@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Sparkles, Columns3 } from 'lucide-react';
 import { PipelineBoard } from '../components/PipelineBoard';
+import { CmaReportDialog } from '../components/CmaReportDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -295,13 +296,22 @@ const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [rows, setRows] = useState<SellerLead[] | null>(null);
+  const [cmaOpen, setCmaOpen] = useState(false);
   useEffect(() => {
     if (!ws) return;
     realEstateService.listSellers(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load sellers', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
-  if (rows === null) return <InlineLoader />;
-  if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No seller leads yet. Valuation requests from your public profile capture sellers here.</div>;
+  const cmaButton = ws ? (
+    <div className="mb-3 flex justify-end">
+      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCmaOpen(true)}><LineChart className="mr-1.5 h-4 w-4" /> Generate CMA</Button>
+      <CmaReportDialog ws={ws} open={cmaOpen} onOpenChange={setCmaOpen} />
+    </div>
+  ) : null;
+  if (rows === null) return <>{cmaButton}<InlineLoader /></>;
+  if (rows.length === 0) return <>{cmaButton}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No seller leads yet. Valuation requests from your public profile capture sellers here — and you can pitch one with a CMA above.</div></>;
   return (
+    <>
+    {cmaButton}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((s) => (
         <button key={s.crm_contact_id} onClick={() => navigate(`/crm/contacts/${s.crm_contact_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
@@ -314,6 +324,7 @@ const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         </button>
       ))}
     </div></CardContent></Card>
+    </>
   );
 };
 
