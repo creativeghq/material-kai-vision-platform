@@ -112,6 +112,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   rfq_lines_priced: CheckCircle2,
   upstream_order_created: ShoppingCart,
   'realestate.buyer_matches_found': Home,
+  'realestate.new_listing_for_buyer': Home,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

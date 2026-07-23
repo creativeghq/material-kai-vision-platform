@@ -72,6 +72,7 @@ interface Contact {
   lead_status?: string | null;
   lead_score?: number | null;
   health_score?: number | null;
+  marketing_consent?: boolean;
   industry?: string;
   annual_revenue?: string;
   employee_count?: string;
@@ -730,6 +731,12 @@ export const ContactDetailPage: React.FC = () => {
                               <Sparkles className="mr-1 h-3.5 w-3.5" /> {scoringLead ? 'Scoring…' : 'AI score'}
                             </Button>
                           </div>
+                        )}
+                        {!isNew && (
+                          <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                            <input type="checkbox" checked={!!contact.marketing_consent} onChange={(e) => patchInline({ marketing_consent: e.target.checked })} />
+                            Marketing consent — may receive property/match alerts by email &amp; WhatsApp
+                          </label>
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => { patchInline({ lead_status: v }); if (v) logActivity('lead_status_changed', `Lead status set to "${v}"`); }} placeholder="Not set" />

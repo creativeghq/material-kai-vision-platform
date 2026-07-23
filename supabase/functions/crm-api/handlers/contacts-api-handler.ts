@@ -65,7 +65,7 @@ const CONTACT_WRITABLE_COLUMNS = [
   'first_name', 'last_name', 'profession',
   'linkedin', 'twitter', 'facebook', 'website',
   'address', 'city', 'state', 'postal_code', 'country', 'street', 'street_number',
-  'status', 'lead_source', 'lead_status', 'contact_type',
+  'status', 'lead_source', 'lead_status', 'contact_type', 'marketing_consent',
   'is_client', 'is_supplier',
   'vat_number', 'country_code', 'tax_office', 'date_of_birth',
   'discount_percent', 'discount_notes', 'credit_limit', 'user_level_key', 'prices_vat_inclusive',

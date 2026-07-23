@@ -39,7 +39,7 @@ function matchesCriteria(c: any, p: any): boolean {
 /** Active saved searches in the workspace that match this listing (with their contact). */
 async function findMatchingBuyers(supabase: any, workspaceId: string, property: any): Promise<any[]> {
   const { data: reqs } = await supabase.from('property_buyer_requirements')
-    .select('id, criteria, label, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( id, name, email )')
+    .select('id, criteria, label, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( id, name, email, phone, marketing_consent )')
     .eq('workspace_id', workspaceId).eq('is_active', true);
   return (reqs ?? []).filter((r: any) => matchesCriteria(r.criteria, property));
 }
@@ -73,6 +73,25 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
       match_count: matches.length,
       reason,
     });
+
+    // Direct-to-buyer (#281): notify each CONSENTED matching buyer that a new listing fits their
+    // search. GDPR — only contacts with marketing_consent=true. Public listing page as the link.
+    if (property.is_public && property.public_listing_token) {
+      const pubUrl = `/p/${property.public_listing_token}`;
+      const priceStr = property.price != null ? ` — ${new Intl.NumberFormat('en-GB', { style: 'currency', currency: property.currency || 'EUR', maximumFractionDigits: 0 }).format(Number(property.price))}` : '';
+      for (const m of matches) {
+        const c = m.contact;
+        if (!c?.marketing_consent || !c.email) continue;
+        await emitFlowEvent('realestate.new_listing_for_buyer', {
+          workspace_id: workspaceId, email: c.email, phone: c.phone ?? null, contact_name: c.name ?? null,
+          type: 'realestate_new_listing',
+          title: 'A new property matches your search',
+          subject: `New listing: ${label}`,
+          body: `${lead} matching your saved search: ${label}${priceStr}.`,
+          action_url: pubUrl, property_id: property.id,
+        }).catch(() => {});
+      }
+    }
   } catch (_) { /* non-fatal — alerting must never block the listing op */ }
 }
 

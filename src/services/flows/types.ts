@@ -130,12 +130,14 @@ export type TriggerType =
   // #237 — a reseller accepted a quote with operator-catalog lines, auto-creating a mirrored
   // SALES order + draft invoice in the supplier/operator workspace (notify the supplier admins)
   | 'upstream_order_created'
-  | 'realestate.buyer_matches_found';
+  | 'realestate.buyer_matches_found'
+  | 'realestate.new_listing_for_buyer';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
 export interface HrLateCheckinTriggerConfig {}
 export interface RealestateBuyerMatchesFoundTriggerConfig {}
+export interface RealestateNewListingForBuyerTriggerConfig {}
 export interface HrApplicantStageChangedTriggerConfig {}
 export interface HrEmployeeAddedTriggerConfig {}
 export interface HrAbsenceRequestedTriggerConfig {}
@@ -391,6 +393,7 @@ export type TriggerConfigMap = {
   rfq_lines_priced: RfqLinesPricedTriggerConfig;
   upstream_order_created: UpstreamOrderCreatedTriggerConfig;
   'realestate.buyer_matches_found': RealestateBuyerMatchesFoundTriggerConfig;
+  'realestate.new_listing_for_buyer': RealestateNewListingForBuyerTriggerConfig;
 };
 
 // =====================================================

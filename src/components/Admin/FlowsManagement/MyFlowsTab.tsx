@@ -184,6 +184,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   rfq_lines_priced: CheckCircle2,
   upstream_order_created: ShoppingCart,
   'realestate.buyer_matches_found': Home,
+  'realestate.new_listing_for_buyer': Home,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -284,6 +285,7 @@ const triggerLabels: Record<TriggerType, string> = {
   rfq_lines_priced: 'RFQ Lines Priced (supplier)',
   upstream_order_created: 'Reseller Order Created (supplier)',
   'realestate.buyer_matches_found': 'Buyer Matches Found',
+  'realestate.new_listing_for_buyer': 'New Listing for Buyer',
 };
 
 const statusColors: Record<FlowStatus, string> = {
