@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real Estate: Property Management (lettings) | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="real-estate.html">Real Estate</a> / Property Management</div>
+  <h1>Real Estate · Property Management (lettings) <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/real-estate</span></div>
+  <p class="lead">Selling a property ends at completion; letting one is a relationship that runs for years. <strong>Property Management</strong> is the lettings back-office for that relationship — it turns Real Estate from a sales tool into an agency that can also <strong>manage let properties on a landlord's behalf</strong>: who's renting what, whether the rent has actually arrived, the repairs you're chasing, and the statement you owe the owner at the end of the month. It's a <strong>sibling paid add-on</strong> that sits alongside <a href="real-estate.html">Real Estate</a> and <a href="real-estate-investments.html">Investments</a>, and it needs the Real Estate module underneath it.</p>
+
+  <div class="callout"><p><strong>Where:</strong> Property Management is its own <strong>Pro add-on</strong> (manifest name <em>“Property Management”</em>, parent <em>real-estate</em>). Enable it from the <a href="apps.html">App Launcher</a> once <a href="real-estate.html">Real Estate</a> is already on. It doesn't open a separate app — instead it <strong>surfaces as extra tabs inside the Real Estate workspace</strong> at <span class="badge route">/real-estate</span>, grouped under the <strong>Lettings</strong> tab. If Real Estate isn't enabled, Property Management has nothing to attach to.</p></div>
+
+  <h2>What Property Management is</h2>
+  <p>The core Real Estate module is built around <strong>selling</strong> — listings, buyers, viewings, offers, completions. Property Management adds the other half of an agency's life: <strong>lettings and ongoing management</strong>. Where a sale is a one-off event that closes, a tenancy is a live agreement that has to be serviced month after month — rent collected, maintenance handled, and the landlord kept informed and paid. This add-on is the record-keeping and workflow layer for exactly that.</p>
+  <p>Because it plugs into Real Estate rather than replacing anything, the properties you manage are the <strong>same property records</strong> you already list and sell; a tenant is a <strong>person</strong> (see <a href="crm.html">CRM</a>); and the money — rent coming in, costs going out, and what's owed to the landlord — relates to <a href="finance.html">Finance</a>. Property Management is the piece that connects a property, a tenant, a rent schedule and an owner statement into one lettings file.</p>
+
+  <h2>The four things it covers</h2>
+  <p>The add-on's data model has four building blocks. Together they answer the four questions a letting agent lives with: <em>who is renting this?</em>, <em>has the rent been paid?</em>, <em>what needs fixing?</em>, and <em>what do I owe the landlord?</em></p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Area</th><th>Record</th><th>What it records</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Tenancies</strong></td>
+        <td><code>Tenancy</code></td>
+        <td>A <strong>let of a property to a tenant</strong> — the tenancy agreement itself: which property, which tenant, the <strong>term</strong> (start/end of the let), and the <strong>rent amount and frequency</strong> (e.g. how much, how often). This is the anchor record the other three attach to.</td>
+      </tr>
+      <tr>
+        <td><strong>Rent ledger / schedule</strong></td>
+        <td><code>RentCharge</code></td>
+        <td>The <strong>schedule of rent due and payments received</strong> against a tenancy, so you can see at a glance <strong>what's been paid and what's outstanding</strong>. Each charge is a rent instalment on the timeline of the tenancy, marked against the money that has actually come in.</td>
+      </tr>
+      <tr>
+        <td><strong>Maintenance work orders</strong></td>
+        <td><code>MaintenanceWorkOrder</code></td>
+        <td>A logged <strong>repair or maintenance job on a property</strong> — the way you track work from “reported” through to “done”. Keeps the history of what was fixed, so nothing gets lost between the tenant reporting it and the contractor finishing it.</td>
+      </tr>
+      <tr>
+        <td><strong>Landlord statements</strong></td>
+        <td><code>LandlordStatement</code></td>
+        <td>A <strong>statement to the landlord/owner</strong> summarising <strong>rent collected, costs</strong> (for example maintenance) <strong>and what's due to them</strong> — the periodic “here's your money” document that closes the loop between the rent you collected and the payment you pass on.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Tenancies — the anchor record</h2>
+  <p>A <strong>Tenancy</strong> is the agreement that a given property is let to a given tenant. It captures the property, the tenant, the <strong>term</strong> (when the let starts and ends), and the <strong>rent</strong> — both the amount and how often it's charged. Everything else in the add-on hangs off a tenancy: the rent ledger is <em>this tenancy's</em> rent, the work orders are on <em>this tenancy's</em> property, and the landlord statement reports on <em>this tenancy's</em> collections and costs. Creating the tenancy is what starts the lettings file.</p>
+
+  <h2>The rent ledger — due vs received</h2>
+  <p>The rent ledger (a set of <strong>RentCharge</strong> records) is the schedule of rent due across the life of a tenancy, checked off against the payments that have actually landed. It's the difference between “rent of €X is due on this date” and “that rent has been received” — so at any moment you can see <strong>what's been paid and what's outstanding</strong>. This is the running account of a tenancy's money-in, and it's the source of the “rent collected” figure that later feeds the landlord statement.</p>
+  <div class="callout tip"><p><strong>Why the schedule matters:</strong> because charges are scheduled ahead against the tenancy term, a missed payment shows up as an <em>outstanding</em> charge rather than simply being absent — which is what makes arrears visible instead of silent.</p></div>
+
+  <h2>Maintenance work orders</h2>
+  <p>A <strong>MaintenanceWorkOrder</strong> is how you log and track a repair or maintenance job on a managed property. When something needs fixing, you raise a work order and follow it through to completion, keeping the record of what was done. For the agent this is the accountability trail — the tenant's reported issue, the job you opened, and its resolution all live in one place — and the costs it incurs are exactly the kind of expense that shows up as a deduction on the landlord's statement.</p>
+
+  <h2>Landlord statements — closing the loop</h2>
+  <p>A <strong>LandlordStatement</strong> is the document you give the property's owner. It summarises the <strong>rent collected</strong> over a period, the <strong>costs</strong> incurred against it (maintenance work being the obvious example), and <strong>what's due to the landlord</strong> once those costs are netted off. It's the bridge between the two other money records: the rent ledger tells you what came in, the work orders tell you what went out, and the statement reconciles them into the amount you owe the owner — the periodic settlement that makes managing on someone's behalf transparent.</p>
+
+  <h2>How it ties into the rest of the platform</h2>
+  <ul class="feat">
+    <li><strong>Tenants are people.</strong> A tenant on a tenancy is a person on the platform — managed through <a href="crm.html">CRM</a> like every other contact, so the same record that might once have been a buyer lead can be the tenant on a let.</li>
+    <li><strong>Rent and landlord payments relate to Finance.</strong> The money side — rent coming in on the ledger and the payment due out to the landlord on a statement — relates to <a href="finance.html">Finance</a>, so lettings income and owner payouts sit with the rest of your books rather than in a spreadsheet.</li>
+    <li><strong>It's the same properties.</strong> The properties you manage are the property records from the core <a href="real-estate.html">Real Estate</a> module — Property Management is a management layer over listings you already hold, not a separate inventory.</li>
+    <li><strong>Its companion add-on.</strong> <a href="real-estate-investments.html">Investments</a> is the other sibling add-on — where Property Management runs the day-to-day of a let, Investments analyses the numbers (yield, returns, portfolio).</li>
+  </ul>
+
+  <div class="callout warn"><p><strong>Requires Real Estate.</strong> Property Management is a sub-add-on: it enables from the App Launcher but only functions on top of an enabled Real Estate module, and it appears as the <strong>Lettings</strong> tabs <em>inside</em> the Real Estate workspace — there's no standalone route of its own.</p></div>
+
+  <div class="callout tip"><p><strong>Getting started:</strong> enable <a href="real-estate.html">Real Estate</a> → enable <strong>Property Management</strong> from the <a href="apps.html">App Launcher</a> → open <span class="badge route">/real-estate</span> and go to the <strong>Lettings</strong> tab → create a <strong>tenancy</strong> (property + tenant + term + rent) → let the <strong>rent ledger</strong> track due-vs-received, raise <strong>work orders</strong> for repairs, and issue a <strong>landlord statement</strong> to settle up with the owner.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

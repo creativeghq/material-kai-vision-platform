@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real Estate: Investments | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="real-estate.html">Real Estate</a> / Investments</div>
+  <h1>Real Estate · Investments <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/real-estate</span></div>
+  <p class="lead">Investments is an investment-analysis tool for property: you describe a deal — what you'd pay for it, what it costs to get in, how it's financed and what rent it earns — and it works out whether the numbers stack up. It computes the standard property-investment returns (yields, cap rate, cash-on-cash and monthly cash flow) for each property, then rolls every property you've modelled into a single <strong>portfolio</strong> view. It answers "is this a good buy, and how is my whole portfolio doing?" without a spreadsheet.</p>
+
+  <div class="callout"><p><strong>Where:</strong> Investments is a <strong>sibling paid add-on</strong> to <a href="real-estate.html">Real Estate</a> — a separate Pro-tier module (manifest name "Investments", parent "real-estate"). Enable it from the <a href="apps.html">App Launcher</a>; it then surfaces as an extra <strong>Investments</strong> tab inside the Real Estate workspace at <span class="badge route">/real-estate</span>. It <strong>requires the Real Estate module</strong> — it extends that workspace rather than standing alone.</p></div>
+
+  <h2>How it fits</h2>
+  <p>Real Estate ships with two sibling add-ons. <a href="real-estate-lettings.html">Property Management</a> handles lettings — the <em>actual</em> rent you collect, tenancies and statements. <strong>Investments</strong> is the other one, and it works the other way round: it's forward-looking <em>analysis</em>, modelling the expected returns of a deal before (or while) you hold it. Enabling either one adds its own tab to the same Real Estate workspace; you can run both together, use the modelled rent in Investments alongside the real rent tracked in Property Management, and feed real outcomes into your books through <a href="finance.html">Finance</a>.</p>
+
+  <h2>The inputs you provide</h2>
+  <p>For each property you model, you fill in a set of investment inputs. These are the assumptions the whole analysis is built on — change any of them and every metric below recalculates.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Input</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Purchase price</strong></td><td>What you pay for the property — the headline acquisition figure the returns are measured against.</td></tr>
+      <tr><td><strong>Costs</strong></td><td>The extra money needed to acquire and ready the property — for example acquisition costs and renovation costs — on top of the purchase price.</td></tr>
+      <tr><td><strong>Financing</strong></td><td>How the deal is funded — the loan / mortgage terms (the borrowed amount and its cost), which determine how much cash you actually put in and the loan repayments that eat into cash flow.</td></tr>
+      <tr><td><strong>Rent</strong></td><td>The expected rental income the property generates — the return side of the equation.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>The metrics it computes</h2>
+  <p>From those inputs, Investments derives the standard property-investment return measures. Each looks at the deal from a slightly different angle, which is why it computes several rather than one — a property can look strong on one and weak on another.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Metric</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Gross yield</strong></td><td>Annual rent as a percentage of the purchase price, before any costs — the quick, headline return.</td></tr>
+      <tr><td><strong>Net yield</strong></td><td>Annual rent as a percentage of the total invested, <em>after</em> costs are taken into account — a truer picture than gross yield.</td></tr>
+      <tr><td><strong>Cap rate</strong></td><td>The capitalisation rate — the property's income return relative to its value, the standard way to compare one property's earning power against another.</td></tr>
+      <tr><td><strong>Cash-on-cash return</strong></td><td>The return measured against the actual cash you put in (after financing), so a leveraged deal reads differently from an all-cash one.</td></tr>
+      <tr><td><strong>Monthly cash flow</strong></td><td>What's left each month once rent has covered the loan repayments and running costs — positive means the property pays you, negative means it costs you to hold.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout tip"><p><strong>Why several metrics?</strong> Gross yield flatters a deal because it ignores costs; net yield corrects for them. Cap rate lets you compare properties like-for-like. Cash-on-cash tells you how hard your <em>own</em> money is working once the mortgage is factored in. And monthly cash flow is the reality check — a property with a great cap rate can still bleed cash each month if the financing is heavy. Reading them together is the point.</p></div>
+
+  <h2>The portfolio roll-up</h2>
+  <p>Modelling one property answers "is this a good buy?". The <strong>portfolio</strong> (InvestmentPortfolio) answers the bigger question — "how is my whole property portfolio performing?" — by aggregating every property you've modelled into one portfolio-level view. Instead of checking each deal in isolation, you see your holdings together, so you can judge overall performance and spot which properties are pulling their weight and which aren't.</p>
+
+  <div class="callout warn"><p><strong>Modelled, not actual.</strong> Investments works from the assumptions you enter — expected rent and estimated costs — so its returns are projections, only as accurate as the numbers you feed it. For the rent you <em>actually</em> collect, tenancies and the rent ledger, use the <a href="real-estate-lettings.html">Property Management</a> add-on; for money that has genuinely moved through your books, use <a href="finance.html">Finance</a>.</p></div>
+
+  <h2>Related</h2>
+  <ul class="feat">
+    <li><a href="real-estate.html">Real Estate</a> — the parent module and workspace this tab lives in.</li>
+    <li><a href="real-estate-lettings.html">Property Management (lettings)</a> — the other sibling add-on: real rent collected, tenancies and landlord statements.</li>
+    <li><a href="finance.html">Finance</a> — where actual income and costs are recorded in your books.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real Estate: Listings &amp; workbench | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="real-estate.html">Real Estate</a> / Listings</div>
+  <h1>Real Estate · Listings &amp; workbench</h1>
+  <div class="routes"><span class="badge route">/real-estate</span> <span class="badge gated">Estate Agent</span></div>
+  <p class="lead">A <strong>listing</strong> is one property you're marketing — a flat for sale, a house to rent — and everything a buyer or portal needs to know about it. You build and maintain each one in the <strong>Property Workbench</strong>: a guided, multi-step editor that adapts its fields to the type of property you're describing, keeps portal-ready field sets alongside your own, and layers in the platform's AI to write the copy, tag the photos and pick a cover. When you're happy, you publish — and the same record becomes a public property page, a card in <a href="discover.html">Discovery</a>, and a line on your agency profile, all at once.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>Real Estate</strong> (<span class="badge route">/real-estate</span>) → the <strong>Listings</strong> tab. The tab shows your existing properties; a new one opens the <strong>Property Workbench</strong>. Real Estate is a <a href="apps.html">Pro add-on</a> — if you don't see it, enable it from the App Launcher first. Working with listings needs the <strong>Estate Agent</strong> role.</p>
+
+  <h2>What a listing record holds</h2>
+  <p>Every property in the Listings tab is summarised by a small set of headline fields — the same ones buyers filter on in Discovery — and each carries a public <code>slug</code> (the address of its own public page). At a glance a listing row shows:</p>
+  <ul class="feat">
+    <li><strong>Property type</strong> — apartment, house, plot, commercial, and so on. This is the field that drives the workbench: choose it and the editor shows the right fields for that kind of property.</li>
+    <li><strong>Transaction type</strong> — <em>sale</em> or <em>rent</em>. It changes how the listing reads and how buyers find it.</li>
+    <li><strong>Town / area</strong> — the location, used both on the public page and as a Discovery filter.</li>
+    <li><strong>Price</strong> — the asking price (or rent).</li>
+    <li><strong>Bedrooms</strong> — another headline filter for buyers.</li>
+    <li><strong>Photos</strong> — the property's image set, with one chosen as the cover.</li>
+    <li><strong>Status</strong> — where the listing is in its lifecycle (e.g. draft vs. published).</li>
+    <li><strong>Slug</strong> — the stable public identifier for the listing's own property page.</li>
+  </ul>
+
+  <h2>The Property Workbench</h2>
+  <p>Rather than one long form, the workbench walks you through a property in <strong>steps</strong> presented as tabs, so you can fill what you know now and come back to the rest. Two things make it more than a generic form:</p>
+  <ul class="feat">
+    <li><strong>Category-specific field editors.</strong> The fields aren't fixed — they change with the <strong>property type</strong> you picked. Describing a plot of land surfaces different inputs than describing an apartment, so you only ever see fields that make sense for what you're listing. This keeps records clean and comparable within a type.</li>
+    <li><strong>Portal-ready field sets.</strong> The workbench understands the <strong>Spitogatos</strong> and <strong>OpenImmo</strong> portal field vocabularies, so as you fill in a property you're also filling in the structured attributes those portals expect. That's what makes a listing <em>portal-ready</em> — when you later syndicate it (see <a href="real-estate-syndication.html">Portal syndication</a>), the data the portals need is already there rather than being re-keyed.</li>
+  </ul>
+  <div class="callout tip"><p><strong>Why the type matters first.</strong> Set the property type early in the workbench. Because it decides which category-specific editor you get, changing it later means a different field set — so pick the right one up front and the rest of the steps line up.</p></div>
+
+  <h2>Adding a property — step by step</h2>
+  <ol>
+    <li>Go to <strong>Real Estate → Listings</strong> and start a new property. This opens the <strong>Property Workbench</strong>.</li>
+    <li>Choose the <strong>property type</strong> and <strong>transaction type</strong> (sale or rent). The workbench now shows the category-specific field editor for that type.</li>
+    <li>Work through the steps, filling the details — <strong>town/area</strong>, <strong>price</strong>, <strong>bedrooms</strong> and the type-specific attributes. As you go, you're also populating the <strong>Spitogatos / OpenImmo</strong> field sets that keep the listing portal-ready.</li>
+    <li><strong>Upload the photos.</strong> Add the property's images; let AI tagging and the auto cover pick do their work (below).</li>
+    <li>Generate the <strong>listing copy</strong> with AI, or write your own description.</li>
+    <li>Optionally generate a <strong>brochure PDF</strong> to share or print.</li>
+    <li>Set the <strong>visibility</strong> controls, then <strong>publish</strong> when the listing is ready to go live.</li>
+  </ol>
+
+  <h2>The AI helpers</h2>
+  <p>Three assistants live in the workbench. All of them draw on your workspace <a href="account-credits.html">credits</a> — they're AI features, so each run has a small credit cost.</p>
+  <ul class="feat">
+    <li><strong>AI listing copy.</strong> Generate the property's description automatically instead of writing it from scratch. It's a credit-metered generation step, so you get a polished draft you can edit rather than a blank box. (Internally this is the "P2 AI — credit-metered listing-copy generation".)</li>
+    <li><strong>AI photo tagging.</strong> When you upload property photos, the platform auto-labels them — so images are described and searchable without manual captioning.</li>
+    <li><strong>Auto cover pick.</strong> Alongside tagging, the system chooses the best image as the listing's cover, so the strongest photo leads on the public page and in Discovery without you hand-picking it (you stay in control of the final choice).</li>
+  </ul>
+  <div class="callout"><p><strong>Cost note:</strong> listing-copy generation, photo tagging and the auto cover pick consume workspace credits like the platform's other AI features. See <a href="account-credits.html">Credits</a> for how consumption is metered.</p></div>
+
+  <h2>Brochure PDF</h2>
+  <p>From a listing you can generate a <strong>property brochure PDF</strong> — a shareable, printable document for the property. The generator returns a <code>pdf_url</code> to the finished file and its <code>page_count</code>, so you can hand a professional brochure to a viewer or attach it to an email without building one by hand.</p>
+
+  <h2>Publishing &amp; visibility</h2>
+  <p>Publishing a listing is what makes it public. Once published, the <em>one</em> property record shows up in three places at once:</p>
+  <ul class="feat">
+    <li><strong>Its own public property page.</strong> A standalone page (reached via the listing's <code>slug</code>) with the details, photos and an <strong>inquiry form</strong>. The form requires <strong>GDPR consent</strong> before a prospect can send their details — those inquiries become your <a href="real-estate-leads.html">leads</a>.</li>
+    <li><strong>Discovery.</strong> The listing appears in <a href="discover.html">Discovery</a>, where buyers browse and search by <strong>property type</strong>, <strong>transaction type</strong>, <strong>town</strong>, <strong>price range</strong> and <strong>bedrooms</strong> — the same headline fields you set in the workbench.</li>
+    <li><strong>Your agency profile.</strong> It's listed under your agency profile's <strong>Listings</strong>, so your public storefront stays in sync with what you're actively marketing.</li>
+  </ul>
+  <p>You decide what goes public with the per-listing <strong>visibility controls</strong>: an <strong>"Open for all"</strong> toggle plus a <strong>public-listings</strong> switch. Together they let you keep a property internal while you work on it, then flip it out to the public page, Discovery and your agency profile when it's ready — or pull it back to internal at any time.</p>
+  <div class="callout warn"><p><strong>Public = discoverable.</strong> A published, public listing is browsable by anyone in Discovery and reachable at its public URL, and its inquiry form feeds real leads into your pipeline. If a property isn't meant to be seen yet, keep the "Open for all" / public switch off until it is.</p></div>
+
+  <h2>Driving it from the assistant</h2>
+  <p>You don't have to open the workbench to work with listings. The dedicated <strong>Estate</strong> agent can create and update properties for you through the <code>manage_real_estate</code> toolkit — ask it in chat and it edits the same records. See <a href="agent-agents.html">AI Agents</a>.</p>
+
+  <div class="callout tip"><p><strong>End to end:</strong> add a property in the workbench → let the AI draft the copy, tag the photos and pick a cover → optionally generate a brochure PDF → set visibility and publish → watch inquiries land as <a href="real-estate-leads.html">leads</a>, and push the portal-ready listing out via <a href="real-estate-syndication.html">syndication</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

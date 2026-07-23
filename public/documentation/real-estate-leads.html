@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real Estate: Leads &amp; matching | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="real-estate.html">Real Estate</a> / Leads</div>
+  <h1>Real Estate · Leads, buyers &amp; matching</h1>
+  <div class="routes"><span class="badge route">/real-estate</span> <span class="badge gated">Estate Agent</span></div>
+  <p class="lead">This is the demand side of the agency: the people who want to buy, and the people who want to sell. It turns a public property inquiry into a tracked <a href="crm.html">CRM</a> lead; it records what each buyer is looking for and <strong>auto-matches</strong> your listings against those requirements; it can alert a buyer the moment a matching listing appears — by email and WhatsApp, but only where they've consented; and it captures vendor (seller) leads from valuations. Every lead is <strong>AI-scored</strong> on the same scale as the rest of your CRM pipeline.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open <span class="badge route">/real-estate</span> and use the <strong>Leads</strong> and <strong>Buyers</strong> tabs. Recent leads also surface on the Real Estate <strong>Overview</strong>. Because leads and buyer data live in the shared CRM, the same records appear on the relevant <a href="crm.html">CRM</a> contact pages.</p></div>
+
+  <h2>The lead lifecycle: public inquiry → CRM lead</h2>
+  <p>Everything starts with a published listing. Each property you publish gets its own public page with an <strong>inquiry form</strong> (see <a href="real-estate-listings.html">Listings &amp; workbench</a> for how listings are published to <a href="discover.html">Discovery</a> and your agency profile). When a visitor fills that form in, they submit their name, email, phone and a message — and they must tick a <strong>GDPR consent</strong> box before it can be sent. That submission is a <strong>property inquiry</strong>.</p>
+  <p>An inquiry lands in the <strong>Leads</strong> tab as buyer/seller interest against that specific property. From there you <strong>convert the inquiry to a CRM lead</strong>: the interest is promoted into a proper record in the shared <a href="crm.html">CRM / sales pipeline</a>, so it's tracked, assigned, scored and progressed exactly like any other lead the business handles — not stranded in a real-estate-only inbox.</p>
+  <ol>
+    <li>A visitor opens a published listing's public page and submits the <strong>inquiry form</strong> (name, email, phone, message, GDPR consent).</li>
+    <li>The <strong>property inquiry</strong> appears under <strong>Leads</strong>, tied to that listing.</li>
+    <li>You review it and <strong>convert the inquiry to a CRM lead</strong>, moving it into the shared sales pipeline.</li>
+    <li>The lead is progressed in <a href="crm.html">CRM</a> — assigned, scored, and worked through your normal stages.</li>
+  </ol>
+
+  <h3>What the inquiry form captures</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Field</th><th>What it is</th><th>Required</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Name</strong></td><td>The enquirer's name, used to create the CRM contact on conversion.</td><td>Yes</td></tr>
+      <tr><td><strong>Email</strong></td><td>Primary contact address — also the channel for new-listing email alerts (where consented).</td><td>Yes</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Phone number — the channel for WhatsApp new-listing alerts (where consented).</td><td>Yes</td></tr>
+      <tr><td><strong>Message</strong></td><td>Free-text — what the person is asking about this property.</td><td>Yes</td></tr>
+      <tr><td><strong>GDPR consent</strong></td><td>An explicit consent tick the enquirer must give before the form can be submitted. This is what later authorises direct-to-buyer alerts.</td><td>Yes — required</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Buyers &amp; buyer requirements</h2>
+  <p>The <strong>Buyers</strong> tab is where you record what a buyer actually wants — a <strong>buyer requirement</strong>. Rather than a loose note, it's a structured profile of their search: budget, the area or town they're targeting, the property type, and how many bedrooms. These requirements can be recorded directly on the person's <a href="crm-contacts.html">CRM contact page</a>, so a contact's buying brief lives alongside the rest of their record (their properties, activity and history).</p>
+
+  <h3>What a buyer requirement captures</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Attribute</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Budget</strong></td><td>What the buyer is willing to spend — the price ceiling matching works against.</td></tr>
+      <tr><td><strong>Area / town</strong></td><td>The location the buyer is searching in.</td></tr>
+      <tr><td><strong>Property type</strong></td><td>The kind of property they want (e.g. the listing's property type).</td></tr>
+      <tr><td><strong>Bedrooms</strong></td><td>The number of bedrooms required.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Auto-matching</h2>
+  <p>You don't run matching by hand. Whenever a listing is <strong>created or edited</strong>, the system automatically checks it against <strong>every</strong> buyer's requirements. A new or updated property that fits a buyer's budget, area, type and bedroom criteria is surfaced as a match — so the moment a suitable property comes into your book, the buyers who want it are already identified.</p>
+  <div class="callout tip"><p><strong>Why record requirements carefully:</strong> the more precisely you capture a buyer's budget, area, type and bedrooms on their <a href="crm-contacts.html">contact record</a>, the more accurate the auto-match — and, if they've consented, the more relevant the alerts they receive.</p></div>
+
+  <h2>New-listing alerts — direct to the buyer</h2>
+  <p>Matching isn't only an internal signal. When a new listing matches a buyer's requirements, that buyer can be <strong>alerted directly</strong> — reaching them over <strong>email and WhatsApp</strong>. These alerts are sent through an <strong>operator <a href="flows.html">Flow</a></strong>, so the delivery is automated and configurable rather than a manual send.</p>
+  <p>Crucially, this is <strong>GDPR-gated</strong>: only buyers who have <strong>consented</strong> are alerted. The consent captured on the original inquiry form is what authorises reaching out. The feature is <strong>opt-in and privacy-respecting</strong> by design — no consent, no direct alert.</p>
+  <div class="callout warn"><p><strong>Consent is the gate.</strong> Direct-to-buyer email/WhatsApp alerts only go to buyers who gave GDPR consent. Buyers without recorded consent are simply excluded from the alert Flow — auto-matching still surfaces them internally, but the platform won't message them.</p></div>
+
+  <h2>The seller / vendor side</h2>
+  <p>Not every lead is a buyer. A <strong>seller lead</strong> captures a <strong>vendor</strong> — someone who wants to sell or get a property valued. These commonly come from the <strong>instant valuation widget</strong>: a prospective seller runs a valuation, and that interest is captured as a seller lead you can follow up. The valuation side itself is documented under <a href="real-estate-sales.html">Viewings, offers &amp; sales</a> (instant AVM valuations).</p>
+  <div class="callout"><p><strong>Two demand streams, one place:</strong> buyer leads (from listing inquiries) and seller leads (from valuations) both feed the Leads area, giving you both sides of every potential transaction — the buyer looking, and the vendor with stock to sell.</p></div>
+
+  <h2>AI lead scoring</h2>
+  <p>Every lead is given an <strong>AI lead score</strong>. Rather than a real-estate-only metric, this is <strong>unified into the shared CRM / sales lead-scoring system</strong> — so a property lead is prioritised on the same scale, by the same logic, as every other lead across the business. The AI scoring is <strong>credit-metered</strong>: it consumes workspace <a href="account-credits.html">credits</a> like the platform's other AI features.</p>
+  <div class="callout tip"><p><strong>End to end:</strong> a consented public inquiry becomes a scored CRM lead; a well-captured buyer requirement earns automatic matches; and — where consent allows — the matching buyer hears about the property directly by email and WhatsApp, all without leaving the pipeline your team already works in.</p></div>
+
+  <h2>Related</h2>
+  <ul class="feat">
+    <li><a href="crm.html">CRM &amp; sales pipeline</a> — where converted leads are tracked and scored.</li>
+    <li><a href="crm-contacts.html">CRM contacts</a> — buyer requirements and properties recorded on a person's record.</li>
+    <li><a href="real-estate-listings.html">Listings &amp; workbench</a> — the published listings whose inquiry forms generate leads.</li>
+    <li><a href="real-estate-sales.html">Viewings, offers &amp; sales</a> — instant valuations that create seller leads.</li>
+    <li><a href="flows.html">Flows</a> — the operator Flow that delivers new-listing alerts.</li>
+    <li><a href="account-credits.html">Credits</a> — what AI lead scoring costs.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

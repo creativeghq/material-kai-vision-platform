@@ -45,6 +45,13 @@
     <li>The app moves to <strong>active</strong> and its screens, tabs and tools appear for that workspace. You can also manage activation from <a href="account-modules.html">Profile → Modules</a>.</li>
   </ol>
 
+  <h2>Sub-modules &amp; providers</h2>
+  <p>Some apps have <strong>sub-modules</strong> that extend a parent — and in the modules grid they're <strong>grouped under that parent</strong> so the list stays tidy. Each sub-module is enabled (and priced) on its own, but only makes sense with its parent on. Examples:</p>
+  <ul class="feat">
+    <li><strong><a href="real-estate.html">Real Estate</a></strong> → <strong>Property Management</strong> (lettings) and <strong>Investments</strong> — extra tabs inside Real Estate.</li>
+    <li><strong>Payments</strong> → provider sub-modules <strong>Stripe</strong> and <strong>Viva</strong> — priced add-ons that appear <strong>under Finance</strong>. A provider handles online checkout for subscriptions, credits and invoice/quote pay-links, plus webhook reconciliation and the customer billing portal. Turn on the provider(s) you use; more processors slot in alongside.</li>
+  </ul>
+
   <h2>Requesting an app (members)</h2>
   <p>Enabling a paid app is an <strong>owner</strong> action (it commits spend). If you're a member, you can <strong>request</strong> an app instead: the owner is notified (a <em>module-access-requested</em> event flows through <a href="flows.html">Flows</a>) and can approve it, after which you get access. This routes the “I need this capability” to the person who authorises it, cleanly.</p>
 
@@ -59,6 +66,7 @@
   <h2>The apps</h2>
   <div class="cards">
     <a class="card" href="hr.html"><div class="ico">👥</div><h3>HR</h3><p>Employees, attendance, time-off, payroll, recruitment, documents, Ergani filing — a full HR suite.</p></a>
+    <a class="card" href="real-estate.html"><div class="ico">🏢</div><h3>Real Estate</h3><p>List/manage/publish properties, leads &amp; matching, viewings, offers &amp; sales, syndication — plus Property Management &amp; Investments add-ons.</p></a>
     <a class="card" href="stock.html"><div class="ico">📦</div><h3>Stock Management</h3><p>Multi-warehouse inventory, movements, counts, AI resupply, ShipsGo tracking (BYOK) &amp; freight quotes.</p></a>
     <a class="card" href="contracts.html"><div class="ico">✍️</div><h3>Contracts &amp; e-Signature</h3><p>Signable agreements across HR, Finance &amp; Projects, with a public e-sign page + audit trail.</p></a>
     <a class="card" href="account-appointments-reviews.html"><div class="ico">⭐</div><h3>Reviews &amp; Ratings</h3><p>Product &amp; profile reviews — star ratings, verified-purchase badges, owner replies, AI summaries (free).</p></a>

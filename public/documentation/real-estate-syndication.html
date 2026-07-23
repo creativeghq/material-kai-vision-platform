@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real Estate: Portal syndication | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="real-estate.html">Real Estate</a> / Syndication</div>
+  <h1>Real Estate · Portal syndication</h1>
+  <div class="routes"><span class="badge route">/real-estate</span> <span class="badge gated">Estate Agent</span></div>
+  <p class="lead">Syndication is how your listings leave MaterialsHub and appear on <strong>external property portals</strong> — the aggregator sites where buyers search. Instead of re-typing every property into each portal by hand, you expose your live inventory in a format the portal understands, and the portal ingests it automatically. It lives in its own dedicated <strong>“Portal syndication feed”</strong> tab inside the <a href="real-estate.html">Real Estate</a> workspace.</p>
+
+  <h2>Where it is</h2>
+  <p>Open <span class="badge route">/real-estate</span> and choose the <strong>Portal syndication feed</strong> tab, alongside <em>Overview</em>, <em>Listings</em>, <em>Leads</em>, <em>Buyers</em>, <em>Viewings</em> and <em>Sales</em>. Syndication used to sit on the Overview dashboard; it was moved out into its own tab so the feed configuration has room of its own and doesn't clutter the agent dashboard.</p>
+
+  <h2>What syndication actually does</h2>
+  <p>A portal feed is a machine-readable export of your properties. You turn the feed on, pick the <strong>format</strong> the destination portal expects, and MaterialsHub renders your listings into that format. Two things are worth being clear about up front:</p>
+  <ul class="feat">
+    <li><strong>Only published, public listings are included.</strong> The feed respects each listing's visibility toggles — the same “Open for all” / public-listings switches described in <a href="real-estate-listings.html">Listings &amp; workbench</a>. A property you're still drafting, or one you've deliberately kept internal, never leaves the building. Publish a listing and it joins the feed; unpublish it and it drops out on the next fetch.</li>
+    <li><strong>You choose one format per feed.</strong> Different portals speak different “languages”. You pick the one your target portal asks for — see the table below.</li>
+  </ul>
+
+  <h2>The three feed formats</h2>
+  <p>The <strong>feed format</strong> (the <code>feed_format</code> setting) determines the shape of the exported XML. Match it to what the destination portal documents as its accepted import format:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Format</th><th>What it is</th><th>Choose it when…</th></tr></thead>
+    <tbody>
+      <tr><td><strong>OpenImmo</strong><br><span style="color:var(--muted)">(DACH standard)</span></td><td>The established property-listing standard for the German-speaking market (Germany, Austria, Switzerland). It's a <strong>push-style</strong> syndication format — the format DACH portals expect real-estate software to hand them.</td><td>You're publishing to a German / Austrian / Swiss portal, or any aggregator that documents OpenImmo as its import format.</td></tr>
+      <tr><td><strong>Kyero</strong></td><td>A widely-used international portal feed format, common across cross-border and holiday-property portals.</td><td>Your target is an international portal that lists Kyero as an accepted feed — the typical choice for reaching a broad, multi-country audience.</td></tr>
+      <tr><td><strong>Generic XML</strong></td><td>A plain, general-purpose XML feed of your listings — not tied to one portal's schema.</td><td>The portal doesn't require OpenImmo or Kyero specifically, or you're feeding a custom integration / in-house system that can map a generic structure.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout tip"><p><strong>Which one?</strong> Let the destination decide — every portal's import documentation names the format it accepts. If you're targeting a DACH portal, use <strong>OpenImmo</strong>; for a broad international portal, <strong>Kyero</strong> is the usual fit; when neither is mandated, <strong>Generic XML</strong> is the safe general-purpose export.</p></div>
+
+  <h2>Two directions: pull vs push</h2>
+  <p>Syndication works in two directions, and it helps to know which one your portal uses.</p>
+
+  <h3>PULL — a tokenized feed URL the portal fetches</h3>
+  <p>In the pull model, MaterialsHub <strong>exposes your live listings as a feed URL</strong> and the portal (or aggregator) <strong>pulls</strong> that URL on its own schedule to ingest whatever is currently published. This is the most common shape: you hand the portal one link, and it re-reads it periodically, so your inventory stays in sync without you re-uploading anything.</p>
+  <ul class="feat">
+    <li><strong>The feed is switched on with <code>feed_enabled</code>.</strong> Turn it on to make the URL live; turn it off to stop serving the feed entirely.</li>
+    <li><strong>The URL is protected by a <code>feed_token</code>.</strong> The feed URL carries a token, so the address is private — it works only for the portals you deliberately give it to, rather than being an open, guessable link. Give the tokenized URL to a portal and it can fetch; keep it to yourself and nobody else can read your inventory.</li>
+    <li><strong>Always current.</strong> Because the portal pulls the <em>live</em> feed, each fetch reflects your latest published set — new listings appear, sold/unpublished ones fall away.</li>
+  </ul>
+
+  <h3>PUSH — OpenImmo for the DACH market</h3>
+  <p>The <strong>OpenImmo (DACH)</strong> format is a <strong>push-style</strong> syndication format for the German-speaking market — it's the format used to deliver listings to those portals rather than having them poll a URL. If your destination is a DACH portal, this is the format you select.</p>
+
+  <h2>Turning it on — the shape of the setup</h2>
+  <ol>
+    <li>Open <strong>Real Estate → Portal syndication feed</strong>.</li>
+    <li>Choose the <strong>feed format</strong> — <em>OpenImmo</em>, <em>Kyero</em> or <em>Generic XML</em> — to match the portal you're targeting.</li>
+    <li>Enable the feed (<code>feed_enabled</code>) so it starts serving.</li>
+    <li>For a pull feed, take the <strong>tokenized feed URL</strong> (it includes the <code>feed_token</code>) and give it to the portal to register on their side.</li>
+    <li>Confirm your listings are <strong>published and public</strong> — only those appear. Anything internal stays out of the feed.</li>
+  </ol>
+
+  <div class="callout warn"><p><strong>Keep the feed token private.</strong> The token is what keeps your feed URL from being a public, guessable link — treat it like a shared secret and only hand it to portals you actually want ingesting your inventory. If a URL has been shared too widely, disabling the feed stops it serving.</p></div>
+
+  <div class="callout"><p><strong>Syndication is not the same as Discovery.</strong> Publishing a listing already makes it visible on the platform's own <a href="discover.html">Discovery</a> surface and your public agency page. Portal syndication is the <em>separate</em> step of pushing that same published inventory out to <em>external</em> third-party portals. The two are independent — you can publish to Discovery without syndicating, and syndication draws from the very listings you've made public.</p></div>
+
+  <h2>Related</h2>
+  <ul class="feat">
+    <li><a href="real-estate-listings.html">Listings &amp; workbench</a> — what a listing contains and the visibility toggles that decide whether it's eligible for the feed.</li>
+    <li><a href="real-estate.html">Real Estate hub</a> — how syndication fits alongside listings, leads, viewings and sales.</li>
+    <li><a href="discover.html">Discovery</a> — the platform's own public property surface, separate from external portals.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

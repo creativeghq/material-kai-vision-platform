@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real Estate: Viewings, offers &amp; sales | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="real-estate.html">Real Estate</a> / Sales</div>
+  <h1>Real Estate · Viewings, offers &amp; sales</h1>
+  <div class="routes"><span class="badge route">/real-estate</span> <span class="badge gated">Estate Agent</span></div>
+  <p class="lead">This is the deal-making end of the agency workflow: you show a property, you collect the offers made on it, and you complete the sale. Each step has its own home in the Real Estate workspace — a <strong>viewing scheduler</strong> that puts appointments on your calendar, a per-property <strong>offer ledger</strong> that keeps every bid in one place, and a <strong>sale completion</strong> that turns your agency commission into a real invoice in Finance. Alongside them sits the <strong>instant valuation</strong> tool, which gives a seller an automated price estimate on the spot and captures them as a lead while you're at it.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open Real Estate at <span class="badge route">/real-estate</span> and use the <strong>Viewings</strong> and <strong>Sales</strong> tabs; offers are taken on each property record. Everything here is gated to the <span class="badge gated">Estate Agent</span> role. The pieces reach into <a href="finance.html">Finance</a> (commission invoice), <a href="contracts.html">Contracts</a> (e-sign) and <a href="real-estate-leads.html">Leads</a> (seller leads).</p></div>
+
+  <h2>Viewings — schedule a showing, and see it on your calendar</h2>
+  <p>A <strong>viewing</strong> is an appointment to show a property to a prospective buyer. From the workbench you schedule one against a property for a specific buyer, and you set — and later update — its <strong>status</strong>, so the appointment always reflects where things actually stand (arranged, done, cancelled, and so on). The status control is yours to drive; the viewing record follows it.</p>
+  <p>The key connection is that <strong>scheduled viewings sync into the platform calendar</strong>. You don't keep a separate diary for showings — the moment a viewing is booked it lands on your agenda alongside every other appointment on the platform, so a property showing sits next to your meetings and reminders in one timeline. See the calendar reference under <strong>Profile → Appointments</strong> for how the shared agenda works.</p>
+  <ul class="feat">
+    <li><strong>Per-buyer, per-property.</strong> A viewing ties a buyer to the property they're coming to see, so the appointment carries the context of who and what.</li>
+    <li><strong>Status you control.</strong> The scheduler exposes a status you move through the viewing's life, keeping the record honest as plans firm up or fall through.</li>
+    <li><strong>On your agenda automatically.</strong> Booking a viewing writes it to the platform calendar — no double entry.</li>
+  </ul>
+
+  <h2>Offers — a ledger on every property</h2>
+  <p>Every property carries an <strong>offer ledger</strong>: the running list of bids received on it. Each entry is a <strong>PropertyOffer</strong> — you record the <strong>amount</strong>, <strong>from whom</strong> it came, and its <strong>status</strong>. Because the ledger lives on the property, you can see the full negotiation history for that home in one place rather than chasing offers across emails and notes.</p>
+  <p>When you <strong>accept</strong> an offer, the module runs an <strong>accept-cascade</strong>: accepting one offer updates the others and the property's state accordingly, so the ledger settles into a consistent picture — the winning bid is marked accepted and the competing offers are reconciled around it, rather than left dangling as if all were still live.</p>
+  <div class="callout tip"><p><strong>Why the ledger matters:</strong> multiple buyers can bid on the same property at once. Recording each as its own PropertyOffer, with a clear amount, source and status, means the negotiation is auditable — and the accept-cascade means the single action of accepting a bid does the tidy-up on all the rest, so you never have two "accepted" offers on one property.</p></div>
+
+  <h2>Sales — completion, and the commission invoice</h2>
+  <p>When a deal goes through, a <strong>PropertySale</strong> records the completed transaction on the property. Completion isn't just a status flip: <strong>completing a sale raises the agency commission as an invoice in <a href="finance.html">Finance</a></strong>. That means your commission stops being a number in your head and becomes a proper <a href="finance-doc-invoices.html">Finance invoice</a> — issued, tracked and reconciled like any other income document, so agency earnings flow straight into your books.</p>
+  <p>The <strong>Overview</strong> dashboard rolls the sales picture up into three headline totals:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Overview total</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Gross sales</strong></td><td>The total transaction value of completed sales — the headline volume you've moved.</td></tr>
+      <tr><td><strong>Invoiced</strong></td><td>What's been raised as invoices off the back of those sales — the billed side of the picture.</td></tr>
+      <tr><td><strong>Commissions</strong></td><td>The agency commission earned, i.e. the income the completion cascade posts into Finance.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Signing the paperwork — Contracts</h2>
+  <p>The legal documents that go with a transaction are handled by the <a href="contracts.html">Contracts</a> module, not re-invented here. Transaction documents are sent for <strong>public e-signature</strong> with a full <strong>audit trail</strong>, so an offer acceptance or a sale agreement is signed and evidenced through the same signing pipeline the rest of the platform uses.</p>
+
+  <h2>Instant valuation (AVM) — a price on the spot</h2>
+  <p>A seller doesn't have to wait for a manual appraisal to get a number. The <strong>instant automated valuation</strong> (an AVM — automated valuation model) gives an estimate immediately from a handful of property details. It's driven by the <strong>ValuationWidget</strong>, into which you enter the property's <strong>address</strong>, <strong>property type</strong>, <strong>town</strong>, and <strong>area/size</strong>; it returns a <strong>ValuationResult</strong>.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>ValuationResult field</th><th>What it returns</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Estimate</strong></td><td>The headline valuation figure for the property.</td></tr>
+      <tr><td><strong>Low–high range</strong></td><td>The confidence band around the estimate — the plausible spread rather than a single false-precision number.</td></tr>
+      <tr><td><strong>Comparables</strong></td><td>The number of comparable properties the estimate was built from — your sense of how well-supported it is.</td></tr>
+      <tr><td><strong>Median price per m²</strong></td><td>The median per-square-metre price underpinning the estimate, useful for sanity-checking against local expectations.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The valuation does double duty. Requesting one (with the seller's <strong>GDPR consent</strong>) also <strong>captures a seller lead</strong> — the person asking "what's my property worth?" is exactly the person you want in your pipeline, so the request feeds straight into <a href="real-estate-leads.html">Leads</a> as a seller opportunity.</p>
+  <div class="callout warn"><p><strong>Credits:</strong> the instant valuation is a credit-metered AI/analytics step — running an AVM draws on your workspace <a href="account-credits.html">credits</a>, the same way listing-copy generation and photo tagging do. See <a href="account-credits.html">Credits</a> for how metering works.</p></div>
+
+  <div class="callout tip"><p><strong>End to end:</strong> a seller runs an <strong>instant valuation</strong> (and becomes a <a href="real-estate-leads.html">lead</a>) → you list the property → you schedule <strong>viewings</strong> that show up on your <strong>calendar</strong> → buyers make <strong>offers</strong> into the property's ledger → you <strong>accept</strong> one (accept-cascade tidies the rest) → documents are <strong>e-signed</strong> via <a href="contracts.html">Contracts</a> → you <strong>complete the sale</strong>, which raises the <strong>commission invoice</strong> in <a href="finance.html">Finance</a> and updates the Overview's Gross sales / Invoiced / Commissions totals.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

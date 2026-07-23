@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real Estate | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Real Estate</div>
+  <h1>Real Estate <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/real-estate</span></div>
+  <p class="lead">Real Estate turns MaterialsHub into a full property agency platform: <strong>list, manage and publish properties</strong>, enriched with the platform's AI (listing copy, photo tagging, instant valuations); run the sales funnel end to end — <strong>leads, buyer matching, viewings, offers and completions</strong>; and <strong>syndicate</strong> your listings to external portals. Two sibling add-ons extend it — <strong>Property Management</strong> (lettings) and <strong>Investments</strong> (analysis). It's a purchasable add-on on the <a href="apps.html">module framework</a>, and it plugs into the parts of the platform you already use — <a href="crm.html">CRM</a>, <a href="finance.html">Finance</a>, <a href="contracts.html">Contracts</a>, <a href="discover.html">Discovery</a> and the <a href="agent-hub.html">assistant</a>.</p>
+
+  <div class="callout"><p><strong>Where:</strong> enable <strong>Real Estate</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on), then open it at <span class="badge route">/real-estate</span>. It's the agent workspace; individual properties, leads and viewings also surface on the relevant <a href="crm.html">CRM</a> records. The two sub-add-ons (<a href="real-estate-lettings.html">Property Management</a>, <a href="real-estate-investments.html">Investments</a>) appear as extra tabs once enabled.</p></div>
+
+  <h2>How it's organised</h2>
+  <p>The Real Estate workspace is a set of tabs — <strong>Overview</strong> (the agent dashboard), <strong>Listings</strong>, <strong>Leads</strong>, <strong>Buyers</strong>, <strong>Viewings</strong>, <strong>Sales</strong>, and the <strong>Portal syndication feed</strong>; with <strong>Lettings</strong> and <strong>Investments</strong> added by the sibling add-ons. There's also a public side: your published properties appear in <a href="discover.html">Discovery</a> and on your agency profile, each with its own public page and inquiry form.</p>
+
+  <h2>The areas</h2>
+  <div class="cards">
+    <a class="card" href="real-estate-listings.html"><div class="ico">🏠</div><h3>Listings &amp; workbench</h3><p>The multi-step property editor, AI listing copy &amp; photo tagging, brochure PDF, and publishing to Discovery.</p></a>
+    <a class="card" href="real-estate-leads.html"><div class="ico">🎯</div><h3>Leads, buyers &amp; matching</h3><p>Inquiries → CRM leads, buyer requirements + auto-match, AI lead scoring, and GDPR-gated new-listing alerts.</p></a>
+    <a class="card" href="real-estate-sales.html"><div class="ico">🤝</div><h3>Viewings, offers &amp; sales</h3><p>Viewing scheduler (→ calendar), the per-property offer ledger, and sale completion → a Finance commission invoice. Plus instant AVM valuations.</p></a>
+    <a class="card" href="real-estate-lettings.html"><div class="ico">🔑</div><h3>Property Management (lettings) <span style="font-size:12px">· add-on</span></h3><p>Tenancies, a rent ledger, maintenance work orders and landlord statements.</p></a>
+    <a class="card" href="real-estate-investments.html"><div class="ico">📈</div><h3>Investments <span style="font-size:12px">· add-on</span></h3><p>Yield, cap rate, cash-on-cash and cash-flow analysis, with a portfolio roll-up.</p></a>
+    <a class="card" href="real-estate-syndication.html"><div class="ico">🔗</div><h3>Portal syndication</h3><p>Publish to external portals — OpenImmo (DACH), Kyero and a generic XML feed, push and pull.</p></a>
+  </div>
+
+  <h2>How the pieces connect</h2>
+  <ul class="feat">
+    <li><strong>Leads live in CRM.</strong> A public property inquiry converts to a <a href="crm.html">CRM</a> lead; a person's <strong>properties and buyer requirements</strong> show on their CRM contact record, and lead scoring is the shared CRM/sales scoring.</li>
+    <li><strong>Sales post to Finance.</strong> Completing a sale raises the <strong>commission</strong> as a <a href="finance.html">Finance</a> invoice, so agency income flows into your books.</li>
+    <li><strong>Contracts do the paperwork.</strong> Transaction documents are signed through the <a href="contracts.html">Contracts</a> module (public e-sign + audit trail).</li>
+    <li><strong>Viewings hit your calendar.</strong> Scheduled viewings sync into the platform calendar.</li>
+    <li><strong>The assistant can run it.</strong> A dedicated <strong>“Estate”</strong> agent persona (a property advisor) and the <code>manage_real_estate</code> toolkit let you list, match and update from chat — see <a href="agent-agents.html">AI Agents</a>.</li>
+    <li><strong>AI is credit-metered.</strong> Listing-copy generation, photo tagging and valuations consume workspace <a href="account-credits.html">credits</a>.</li>
+  </ul>
+
+  <h2>Roles &amp; visibility</h2>
+  <p>There's a dedicated <strong>Estate Agent</strong> role for the people running listings. Each listing has visibility controls — an <strong>“Open for all”</strong> toggle and a public-listings switch — so you choose what's shown on your public agency page and Discovery versus kept internal.</p>
+
+  <div class="callout tip"><p><strong>Getting started:</strong> enable Real Estate → add a listing in the <a href="real-estate-listings.html">workbench</a> (let the AI draft the copy) → publish it → capture <a href="real-estate-leads.html">leads</a> and match buyers → schedule <a href="real-estate-sales.html">viewings</a>, take offers, and complete the sale. Add <a href="real-estate-lettings.html">Property Management</a> if you also let, and <a href="real-estate-syndication.html">syndication</a> to push to portals.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
