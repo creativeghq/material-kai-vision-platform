@@ -15,6 +15,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Package, Layers, ShieldCheck, Wand2 } from 'lucide-react';
@@ -2886,12 +2887,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <Activity className="h-4 w-4" />
                 Price Monitoring
               </h3>
-              <ProductMonitorTab
-                productId={product.id}
-                productName={product.name}
-                currentPrice={product.pricing?.retail}
-                currency={product.pricing?.currency}
-              />
+              <ModuleTabGate moduleSlug="price-monitoring" moduleName="Price Monitoring"
+                blurb="Track this product's price across retailers with alerts on drops and new sellers.">
+                <ProductMonitorTab
+                  productId={product.id}
+                  productName={product.name}
+                  currentPrice={product.pricing?.retail}
+                  currency={product.pricing?.currency}
+                />
+              </ModuleTabGate>
             </div>
 
             <div className="space-y-3">
@@ -2899,11 +2903,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <Sparkles className="h-4 w-4" />
                 Mentions &amp; LLM Visibility
               </h3>
-              <MentionMonitorTab
-                productId={product.id}
-                productName={product.name}
-                manufacturer={(product as any).manufacturer}
-              />
+              <ModuleTabGate moduleSlug="mention-monitoring" moduleName="Mention Monitoring"
+                blurb="Track where this product is mentioned across news, blogs and AI assistants.">
+                <MentionMonitorTab
+                  productId={product.id}
+                  productName={product.name}
+                  manufacturer={(product as any).manufacturer}
+                />
+              </ModuleTabGate>
             </div>
           </div>
         </TabsContent>
@@ -2912,13 +2919,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       {/* SEO Tab — Admin only (DataForSEO research + ranking + domain snapshot) */}
       {isAdmin && (
         <TabsContent value="seo" className="mt-6">
-          <ProductSEOTab
-            productId={product.id}
-            productName={product.name}
-            manufacturer={(product as any).manufacturer || (product as any).manufacturer_name || (product.metadata as any)?.factory?.factory_name}
-            homepageDomain={(product as any).manufacturer_homepage || (product.metadata as any)?.factory?.homepage_domain || null}
-            category={(product as any).category || (product as any).subcategory || null}
-          />
+          <ModuleTabGate moduleSlug="seo-toolkit" moduleName="SEO Toolkit"
+            blurb="Keyword research, ranking and domain snapshots for this product.">
+            <ProductSEOTab
+              productId={product.id}
+              productName={product.name}
+              manufacturer={(product as any).manufacturer || (product as any).manufacturer_name || (product.metadata as any)?.factory?.factory_name}
+              homepageDomain={(product as any).manufacturer_homepage || (product.metadata as any)?.factory?.homepage_domain || null}
+              category={(product as any).category || (product as any).subcategory || null}
+            />
+          </ModuleTabGate>
         </TabsContent>
       )}
 

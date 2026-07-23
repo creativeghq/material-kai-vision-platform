@@ -45,6 +45,7 @@ import { InlineText, InlineSelect } from '@/components/business/crm/inline/Inlin
 import { LeadFieldSelect } from '@/components/business/crm/LeadFieldSelect';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useModule } from '@/modules/_core';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PropertyBuyerPanel } from '@/modules/real-estate/components/PropertyBuyerPanel';
 import { scoreLead, leadScoreTint } from '@/modules/crm/services/leadScoring';
 import { financeService } from '@/modules/finance/services/financeService';
@@ -881,17 +882,20 @@ export const ContactDetailPage: React.FC = () => {
               {/* Account — standalone contacts only (business-linked financials live on the company). */}
               {!hasCompany && (
                 <TabsContent value="account" className="space-y-4">
-                  {contact.id ? (
-                    <>
-                      <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
-                      <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} partyRoles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }} />
-                      <PartyPaymentsCard contactId={contact.id} />
-                      <CustomerTopItemsCard contactId={contact.id} />
-                      <CustomerFinanceRulesCard contactId={contact.id} />
-                    </>
-                  ) : (
-                    <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to see their account &amp; orders.</CardContent></Card>
-                  )}
+                  <ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance"
+                    blurb="Track this customer's orders, invoices, payments and balance.">
+                    {contact.id ? (
+                      <>
+                        <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
+                        <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} partyRoles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }} />
+                        <PartyPaymentsCard contactId={contact.id} />
+                        <CustomerTopItemsCard contactId={contact.id} />
+                        <CustomerFinanceRulesCard contactId={contact.id} />
+                      </>
+                    ) : (
+                      <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to see their account &amp; orders.</CardContent></Card>
+                    )}
+                  </ModuleTabGate>
                 </TabsContent>
               )}
 
@@ -907,7 +911,10 @@ export const ContactDetailPage: React.FC = () => {
               )}
               {realEstateEnabled && (
                 <TabsContent value="property" className="space-y-4">
-                  <PropertyBuyerPanel contactId={contact.id} workspaceId={activeWorkspaceId} />
+                  <ModuleTabGate moduleSlug="real-estate" moduleName="Real Estate"
+                    blurb="See this contact's property interests, viewings and buyer requirements.">
+                    <PropertyBuyerPanel contactId={contact.id} workspaceId={activeWorkspaceId} />
+                  </ModuleTabGate>
                 </TabsContent>
               )}
             </Tabs>

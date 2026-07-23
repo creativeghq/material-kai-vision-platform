@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
@@ -1065,24 +1066,27 @@ export const CompanyDetailPage: React.FC = () => {
               the customer-only cards (repeat-buy, pricing rules) are hidden. */}
           {(showCommercial || showSupplierFeatures) && (
           <TabsContent value="account" className="space-y-4">
-            {company.id ? (
-              <>
-                {/* 1 — Money summary up top: orders count + value, owed (invoiced & on orders),
-                       paid, net position, AR aging (or AP / "we owe" for a supplier). */}
-                <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
-                {/* 2 — The orders themselves (customer + supplier orders). Click an order to manage
-                       its receivables/payables, invoices, supplier bills, payments and dispatch. */}
-                <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} partyRoles={{ customer: !!company.is_customer, supplier: !!company.is_supplier }} />
-                {/* 2b — Itemised cash movements across all their orders (money in & out), so the
-                       payments made to / received from this party are visible at the party level. */}
-                <PartyPaymentsCard companyId={company.id} />
-                {/* 3 + 4 — Customer-only: repeat-buy suggestions + finance/pricing rules. */}
-                {showCommercial && <CustomerTopItemsCard companyId={company.id} />}
-                {showCommercial && <CustomerFinanceRulesCard companyId={company.id} />}
-              </>
-            ) : (
-              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its account &amp; orders.</CardContent></Card>
-            )}
+            <ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance"
+              blurb="Track this company's orders, invoices, payments and balance.">
+              {company.id ? (
+                <>
+                  {/* 1 — Money summary up top: orders count + value, owed (invoiced & on orders),
+                         paid, net position, AR aging (or AP / "we owe" for a supplier). */}
+                  <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
+                  {/* 2 — The orders themselves (customer + supplier orders). Click an order to manage
+                         its receivables/payables, invoices, supplier bills, payments and dispatch. */}
+                  <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} partyRoles={{ customer: !!company.is_customer, supplier: !!company.is_supplier }} />
+                  {/* 2b — Itemised cash movements across all their orders (money in & out), so the
+                         payments made to / received from this party are visible at the party level. */}
+                  <PartyPaymentsCard companyId={company.id} />
+                  {/* 3 + 4 — Customer-only: repeat-buy suggestions + finance/pricing rules. */}
+                  {showCommercial && <CustomerTopItemsCard companyId={company.id} />}
+                  {showCommercial && <CustomerFinanceRulesCard companyId={company.id} />}
+                </>
+              ) : (
+                <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its account &amp; orders.</CardContent></Card>
+              )}
+            </ModuleTabGate>
           </TabsContent>
           )}
             </Tabs>

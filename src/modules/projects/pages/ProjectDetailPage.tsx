@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   FolderKanban,
@@ -300,12 +301,12 @@ export const ProjectDetailPage: React.FC = () => {
           {isOwner && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isOwner} /></TabsContent>}
           {isOwner && <TabsContent value="purchases"><PurchaseItemsTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} /></TabsContent>}
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
-          <TabsContent value="quotes"><QuotesTab projectId={project.id} /></TabsContent>
-          {isOwner && <TabsContent value="billing"><BillingTab projectId={project.id} /></TabsContent>}
-          {canFinance && <TabsContent value="finance"><FinanceTab projectId={project.id} /></TabsContent>}
+          <TabsContent value="quotes"><ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} /></ModuleTabGate></TabsContent>
+          {isOwner && <TabsContent value="billing"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Invoice and bill this project."><BillingTab projectId={project.id} /></ModuleTabGate></TabsContent>}
+          {canFinance && <TabsContent value="finance"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Orders, invoices and payments for this project."><FinanceTab projectId={project.id} /></ModuleTabGate></TabsContent>}
           <TabsContent value="sheets"><SheetsTab projectId={project.id} /></TabsContent>
           {isOwner && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isOwner} /></TabsContent>}
-          {isOwner && <TabsContent value="contracts"><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" /></TabsContent>}
+          {isOwner && <TabsContent value="contracts"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Draft and e-sign contracts for this project."><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" /></ModuleTabGate></TabsContent>}
           <TabsContent value="tasks"><TasksTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>

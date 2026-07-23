@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import type { LucideIcon } from 'lucide-react';
 import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
@@ -549,7 +550,7 @@ export default function PropertyWorkbench() {
 
           {canManage && investEnabled && <TabsContent value="investment"><InvestmentTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>}
 
-          {canManage && <TabsContent value="transaction"><TransactionTab ws={ws} propertyId={id} canEdit={editable} /></TabsContent>}
+          {canManage && <TabsContent value="transaction"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Transaction documents & e-signature (memoranda of sale, agency & reservation agreements)."><TransactionTab ws={ws} propertyId={id} canEdit={editable} /></ModuleTabGate></TabsContent>}
 
           {/* ── Viewings ── */}
           <TabsContent value="viewings" className="space-y-4">
@@ -1112,9 +1113,6 @@ const TransactionTab: React.FC<{ ws: string | null; propertyId: string; canEdit:
   };
 
   if (rows === null && !err) return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">Loading…</div>;
-  if (err && /not available|not entitled|entitled|module/i.test(err)) {
-    return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">The <span className="font-medium">Contracts</span> module is needed for transaction documents &amp; e-signature. Enable it in Profile → Modules.</div>;
-  }
   return (
     <div className="space-y-4">
       {canEdit && (adding ? (
