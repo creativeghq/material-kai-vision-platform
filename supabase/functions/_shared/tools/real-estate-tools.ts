@@ -44,7 +44,7 @@ export const createManageRealEstateTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, status, property_type, transaction_type, title, price, town, scheduled_at, property_id, work_order_title, work_order_description, sale_price, commission_pct }) => {
+    async ({ action, status, property_type, transaction_type, title, price, town, scheduled_at, property_id, work_order_title, work_order_description, sale_price, commission_pct, deal_id, stage, deal_value, buyer_contact_id, area, crm_contact_id }) => {
       if (!workspaceId) return JSON.stringify({ success: false, error: 'No active workspace.' });
       if (!jwt) return JSON.stringify({ success: false, error: 'Real Estate tools require an authenticated session.' });
       if (!await moduleEnabled()) return JSON.stringify({ success: false, error: 'The Real Estate module is not enabled on this platform.' });
@@ -132,6 +132,47 @@ export const createManageRealEstateTool = (
           const s = res.data?.sale;
           return JSON.stringify({ success: true, sale: s, commission_net: s?.commission_base, currency: s?.currency, note: 'Listing marked sold and commission calculated. Issue the commission invoice from the listing Offers tab in Finance when ready.' });
         }
+        case 'list_deals': {
+          const res = await callApi(jwt, workspaceId, 'list-deals');
+          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          const deals = (res.data?.deals ?? []).filter((d: any) => d.status !== 'lost');
+          const byStage: Record<string, any[]> = {};
+          for (const d of deals) (byStage[d.stage] ??= []).push({ id: d.id, property: d.property?.title, buyer: d.buyer?.name, value: d.value, tasks: `${d.task_done}/${d.task_total}` });
+          return JSON.stringify({ success: true, open_count: deals.length, by_stage: byStage });
+        }
+        case 'manage_deal': {
+          if (!property_id && !deal_id) return JSON.stringify({ success: false, error: 'property_id (to create) or deal_id (to update) is required' });
+          const fields: Record<string, unknown> = {};
+          if (deal_id) fields.deal_id = deal_id;
+          if (property_id) fields.property_id = property_id;
+          if (stage) fields.stage = stage;
+          if (deal_value !== undefined) fields.value = deal_value;
+          if (buyer_contact_id) fields.buyer_contact_id = buyer_contact_id;
+          if (status === 'won' || status === 'lost' || status === 'open') fields.status = status;
+          const res = await callApi(jwt, workspaceId, 'upsert-deal', fields);
+          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          return JSON.stringify({ success: true, deal: res.data?.deal });
+        }
+        case 'cma_report': {
+          if (!property_id && !property_type) return JSON.stringify({ success: false, error: 'property_id or property_type is required' });
+          const res = await callApi(jwt, workspaceId, 'cma-report', { property_id, property_type, town, area });
+          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          const r = res.data;
+          return JSON.stringify({ success: true, suggested_price: r?.suggestion?.estimate ?? null, price_range: r?.suggestion ? [r.suggestion.low, r.suggestion.high] : null, median_per_sqm: r?.stats?.median_per_sqm, comparables: r?.stats?.count, avg_days_on_market: r?.stats?.avg_days_on_market, currency: r?.subject?.currency, note: 'Comps-based CMA. Open the CMA button on the listing to save a client PDF.' });
+        }
+        case 'list_investments': {
+          const res = await callApi(jwt, workspaceId, 'list-investments');
+          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          const r = res.data;
+          return JSON.stringify({ success: true, portfolio: r?.portfolio, investments: (r?.investments ?? []).slice(0, 25).map((iv: any) => ({ property_id: iv.property_id, property: iv.property?.title, net_yield_pct: iv.metrics?.net_yield_pct, cap_rate_pct: iv.metrics?.cap_rate_pct, monthly_cash_flow: iv.metrics?.monthly_cash_flow })) });
+        }
+        case 'buyer_portal_link': {
+          const res = await callApi(jwt, workspaceId, 'list-buyer-requirements', crm_contact_id ? { crm_contact_id } : {});
+          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          const base = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
+          const portals = (res.data?.requirements ?? []).filter((r: any) => r.portal_token).map((r: any) => ({ buyer: r.contact?.name, label: r.label, url: `${base}/buyer/${r.portal_token}` }));
+          return JSON.stringify({ success: true, count: portals.length, portals, note: 'Share a portal URL with the buyer — it shows their live matches and lets them favourite + request viewings.' });
+        }
         default:
           return JSON.stringify({ success: false, error: `Unknown action: ${action}` });
       }
@@ -145,6 +186,10 @@ export const createManageRealEstateTool = (
         '  • get_property     — one listing with photo/inquiry counts (needs property_id).',
         '  • find_leads       — inquiries/leads; optional status/property_id. An invited agent sees only their own.',
         '  • list_lettings    — active tenancies + open maintenance work orders (optional property_id).',
+        '  • list_deals       — the deal pipeline, grouped by stage (lead→viewing→offer→under_offer→conveyancing→exchanged→completed).',
+        '  • list_investments — investment portfolio roll-up + per-property yield/cash-flow (needs the Investments add-on).',
+        '  • cma_report       — comparative market analysis: suggested price + comps stats (property_id, or property_type+town+area).',
+        '  • buyer_portal_link— the shareable portal URL(s) for registered buyers (optional crm_contact_id).',
         'Writes:',
         '  • create_listing   — create a DRAFT listing (title + property_type + transaction_type; optional price, town). Returns the id to finish in the workbench.',
         '  • publish_listing  — take a listing live (needs property_id). Fails with the missing fields if compliance requirements aren’t met (GR: energy class + Electronic Building ID, short-let: ΑΜΑ).',
@@ -152,9 +197,10 @@ export const createManageRealEstateTool = (
         '  • draft_description — AI-generate listing copy (needs property_id). CREDIT-METERED. Returns a draft to review, does not auto-save.',
         '  • log_maintenance  — raise a maintenance work order on a rental (needs property_id + work_order_title).',
         '  • complete_sale    — mark a listing sold + calculate commission (needs property_id + sale_price; optional commission_pct, else the listing’s stored rate). Does NOT issue the invoice — that’s a deliberate step in the workbench.',
+        '  • manage_deal      — create a pipeline deal (property_id) or update one (deal_id): move stage, set deal_value/buyer_contact_id, or set status won/lost/open.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description', 'log_maintenance', 'complete_sale']).describe('Which action to run.'),
+        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'list_deals', 'list_investments', 'cma_report', 'buyer_portal_link', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description', 'log_maintenance', 'complete_sale', 'manage_deal']).describe('Which action to run.'),
         status: z.string().optional().describe('Filter by listing_status (properties) or inquiry status (leads).'),
         property_type: z.string().optional().describe('residential/commercial/land/other — filter, or category for create_listing.'),
         transaction_type: z.string().optional().describe('sale/rent/short_let/business_transfer — for create_listing.'),
@@ -167,6 +213,12 @@ export const createManageRealEstateTool = (
         work_order_description: z.string().optional().describe('Optional detail for log_maintenance.'),
         sale_price: z.number().optional().describe('Agreed final sale price for complete_sale.'),
         commission_pct: z.number().optional().describe('Commission percent for complete_sale (defaults to the listing’s stored rate).'),
+        deal_id: z.string().optional().describe('Target a pipeline deal for manage_deal (update/move/win/lose).'),
+        stage: z.string().optional().describe('Pipeline stage for manage_deal: lead/viewing/offer/under_offer/conveyancing/exchanged/completed.'),
+        deal_value: z.number().optional().describe('Deal value for manage_deal.'),
+        buyer_contact_id: z.string().optional().describe('CRM contact id of the buyer for manage_deal.'),
+        area: z.number().optional().describe('Floor area (m²) for an ad-hoc cma_report.'),
+        crm_contact_id: z.string().optional().describe('Filter buyer_portal_link to one CRM contact.'),
       }),
     },
   );
