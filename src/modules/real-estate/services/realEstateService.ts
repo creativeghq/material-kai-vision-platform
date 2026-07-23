@@ -68,6 +68,13 @@ async function call<T>(workspaceId: string, action: string, extra: Record<string
   return data as T;
 }
 
+export interface PropertyOffer {
+  id: string; property_id: string; buyer_contact_id: string | null; buyer_name: string | null;
+  amount: number; currency: string; status: 'offered' | 'countered' | 'accepted' | 'rejected' | 'withdrawn';
+  terms: string | null; proof_of_funds: boolean; mortgage_in_principle: boolean; chain_free: boolean; note: string | null; created_at: string;
+  buyer?: { id: string; name: string | null; email: string | null } | null;
+}
+
 export interface SellerLead {
   crm_contact_id: string; owned_property_address: string | null; owned_property_value: number | null; owned_property_equity: number | null;
   contact?: { id: string; name: string | null; email: string | null; phone: string | null; lead_status: string | null; lead_score: number | null; lead_source: string | null; created_at: string } | null;
@@ -135,6 +142,13 @@ export const realEstateService = {
 
   // Inquiries / viewings
   listSellers: (ws: string) => call<{ sellers: SellerLead[] }>(ws, 'list-sellers').then((r) => r.sellers),
+  // Offers
+  listOffers: (ws: string, propertyId: string) => call<{ offers: PropertyOffer[] }>(ws, 'list-offers', { property_id: propertyId }).then((r) => r.offers),
+  createOffer: (ws: string, fields: { property_id: string; amount: number; currency?: string; buyer_contact_id?: string; buyer_name?: string; terms?: string; proof_of_funds?: boolean; mortgage_in_principle?: boolean; chain_free?: boolean; note?: string }) =>
+    call<{ offer: PropertyOffer }>(ws, 'create-offer', fields).then((r) => r.offer),
+  updateOffer: (ws: string, offerId: string, fields: { status?: string; amount?: number; terms?: string; note?: string }) =>
+    call<{ offer: PropertyOffer }>(ws, 'update-offer', { offer_id: offerId, ...fields }).then((r) => r.offer),
+  acceptOffer: (ws: string, offerId: string) => call<{ ok: true; cancelled_viewings: number }>(ws, 'accept-offer', { offer_id: offerId }),
   listInquiries: (ws: string, filters: { status?: string; property_id?: string } = {}) =>
     call<{ inquiries: PropertyInquiry[] }>(ws, 'list-inquiries', filters).then((r) => r.inquiries),
   updateInquiry: (ws: string, inquiryId: string, status: string) =>

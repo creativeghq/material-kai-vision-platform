@@ -502,6 +502,70 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ interest: data });
       }
 
+      // ── Offers (competing bids per property) ───────────────────────────
+      case 'list-offers': {
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadProperty(id);
+        const { data, error } = await supabase.from('property_offers')
+          .select('*, buyer:crm_contacts!property_offers_buyer_contact_id_fkey ( id, name, email )')
+          .eq('property_id', id).eq('workspace_id', workspaceId).order('created_at', { ascending: false });
+        if (error) throw new HttpError(400, error.message);
+        return json({ offers: data ?? [] });
+      }
+
+      case 'create-offer': {
+        const id = String(body.property_id ?? '');
+        if (!id || body.amount == null) return json({ error: 'property_id and amount are required' }, 400);
+        await loadEditable(id);
+        const { data, error } = await supabase.from('property_offers').insert({
+          workspace_id: workspaceId, property_id: id, amount: Number(body.amount), currency: body.currency ?? 'EUR',
+          buyer_contact_id: body.buyer_contact_id ?? null, buyer_name: body.buyer_name ?? null, terms: body.terms ?? null,
+          proof_of_funds: !!body.proof_of_funds, mortgage_in_principle: !!body.mortgage_in_principle, chain_free: !!body.chain_free,
+          note: body.note ?? null, agent_id: userId, created_by: userId, status: 'offered',
+        }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ offer: data });
+      }
+
+      case 'update-offer': {
+        const offerId = String(body.offer_id ?? '');
+        if (!offerId) return json({ error: 'offer_id is required' }, 400);
+        const { data: cur } = await supabase.from('property_offers').select('property_id').eq('id', offerId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!cur) return json({ error: 'not found' }, 404);
+        await loadEditable(cur.property_id);
+        const patch: Record<string, unknown> = {};
+        if (body.status !== undefined) {
+          if (!['offered', 'countered', 'accepted', 'rejected', 'withdrawn'].includes(String(body.status))) return json({ error: 'invalid status' }, 400);
+          patch.status = body.status;
+        }
+        if (body.amount !== undefined) patch.amount = Number(body.amount);
+        if (body.terms !== undefined) patch.terms = body.terms;
+        if (body.note !== undefined) patch.note = body.note;
+        const { data, error } = await supabase.from('property_offers').update(patch).eq('id', offerId).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ offer: data });
+      }
+
+      case 'accept-offer': {
+        const offerId = String(body.offer_id ?? '');
+        if (!offerId) return json({ error: 'offer_id is required' }, 400);
+        const { data: offer } = await supabase.from('property_offers').select('property_id').eq('id', offerId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!offer) return json({ error: 'not found' }, 404);
+        await loadEditable(offer.property_id);
+        // Accept-cascade: mark accepted, reject the other live offers, move the listing to under_offer,
+        // and cancel its future viewings (+ their calendar meetings).
+        await supabase.from('property_offers').update({ status: 'accepted' }).eq('id', offerId).eq('workspace_id', workspaceId);
+        await supabase.from('property_offers').update({ status: 'rejected' }).eq('property_id', offer.property_id).eq('workspace_id', workspaceId).neq('id', offerId).in('status', ['offered', 'countered']);
+        await supabase.from('properties').update({ listing_status: 'under_offer' }).eq('id', offer.property_id).eq('workspace_id', workspaceId);
+        const { data: fv } = await supabase.from('property_viewings').select('id, meeting_id').eq('property_id', offer.property_id).eq('workspace_id', workspaceId).eq('status', 'scheduled').gte('scheduled_at', new Date().toISOString());
+        for (const v of fv ?? []) {
+          await supabase.from('property_viewings').update({ status: 'cancelled' }).eq('id', v.id);
+          if (v.meeting_id) await supabase.from('crm_meetings').update({ status: 'cancelled' }).eq('id', v.meeting_id);
+        }
+        return json({ ok: true, cancelled_viewings: (fv ?? []).length });
+      }
+
       // ── Seller leads (vendors) — crm_contacts flagged seller via the RE extension ──
       case 'list-sellers': {
         const { data, error } = await supabase.from('property_contacts_ext')

@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
-  Contact, CalendarClock, Image as ImageIcon,
+  Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -21,7 +21,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import {
   realEstateService, isPublishBlocked,
-  type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing,
+  type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
 } from '../services/realEstateService';
 
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
@@ -229,6 +229,7 @@ export default function PropertyWorkbench() {
             <TabsTrigger value="overview"><Home className="mr-1.5 h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="media"><ImageIcon className="mr-1.5 h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="inquiries"><Contact className="mr-1.5 h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="offers"><Gavel className="mr-1.5 h-4 w-4" /> Offers</TabsTrigger>
             <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
           </TabsList>
 
@@ -517,6 +518,9 @@ export default function PropertyWorkbench() {
             )}
           </TabsContent>
 
+          {/* ── Offers ── */}
+          <TabsContent value="offers"><OffersTab ws={ws} propertyId={id} canManage={editable} onAccepted={load} /></TabsContent>
+
           {/* ── Viewings ── */}
           <TabsContent value="viewings" className="space-y-4">
             {editable && (
@@ -553,6 +557,83 @@ export default function PropertyWorkbench() {
     </div>
   );
 }
+
+const OFFER_TINT: Record<string, string> = {
+  offered: 'bg-amber-500/15 text-amber-500', countered: 'bg-blue-500/15 text-blue-500',
+  accepted: 'bg-emerald-500/15 text-emerald-500', rejected: 'bg-muted text-muted-foreground', withdrawn: 'bg-muted text-muted-foreground',
+};
+const offerMoney = (n: number, ccy: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n);
+
+// Offer ledger for a property — competing bids with qualification + accept/reject/counter cascade.
+const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: boolean; onAccepted: () => void }> = ({ ws, propertyId, canManage, onAccepted }) => {
+  const { toast } = useToast();
+  const [offers, setOffers] = useState<PropertyOffer[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [f, setF] = useState<Record<string, any>>({ currency: 'EUR' });
+  const load = useCallback(async () => { if (ws) setOffers(await realEstateService.listOffers(ws, propertyId).catch(() => [])); }, [ws, propertyId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const setStatus = async (id: string, status: string) => {
+    if (!ws) return;
+    setBusy(true);
+    try {
+      if (status === 'accepted') { const r = await realEstateService.acceptOffer(ws, id); toast({ title: 'Offer accepted', description: `Listing → under offer${r.cancelled_viewings ? `, ${r.cancelled_viewings} viewing(s) cancelled` : ''}.` }); onAccepted(); }
+      else await realEstateService.updateOffer(ws, id, { status });
+      await load();
+    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const add = async () => {
+    if (!ws || !f.amount) return;
+    setBusy(true);
+    try {
+      await realEstateService.createOffer(ws, { property_id: propertyId, amount: Number(f.amount), currency: f.currency || 'EUR', buyer_name: f.buyer_name || undefined, terms: f.terms || undefined, proof_of_funds: !!f.proof_of_funds, mortgage_in_principle: !!f.mortgage_in_principle, chain_free: !!f.chain_free });
+      setF({ currency: 'EUR' }); setAdding(false); await load(); toast({ title: 'Offer recorded' });
+    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  if (offers === null) return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">Loading…</div>;
+  return (
+    <div className="space-y-4">
+      {canManage && (adding ? (
+        <Card><CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
+          <NumInput v={f.amount} on={(x) => setF((p) => ({ ...p, amount: x }))} />
+          <Input placeholder="Buyer name" value={f.buyer_name ?? ''} onChange={(e) => setF((p) => ({ ...p, buyer_name: e.target.value }))} />
+          <Input placeholder="Terms (optional)" className="sm:col-span-2" value={f.terms ?? ''} onChange={(e) => setF((p) => ({ ...p, terms: e.target.value }))} />
+          <ChkGrid items={[['proof_of_funds', 'Proof of funds'], ['mortgage_in_principle', 'Mortgage in principle'], ['chain_free', 'Chain-free']]} form={f} set={(k, v) => setF((p) => ({ ...p, [k]: v }))} />
+          <div className="col-span-full flex gap-2"><Button size="sm" className="rounded-full" onClick={add} disabled={busy || !f.amount}>Record offer</Button><Button size="sm" variant="ghost" className="rounded-full" onClick={() => setAdding(false)}>Cancel</Button></div>
+        </CardContent></Card>
+      ) : <Button variant="outline" size="sm" className="rounded-full" onClick={() => setAdding(true)}><Gavel className="mr-1.5 h-4 w-4" /> Record an offer</Button>)}
+
+      {offers.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No offers yet.</div> : (
+        <Card><CardContent className="p-0"><div className="divide-y divide-border">
+          {offers.map((o) => (
+            <div key={o.id} className="flex items-start gap-4 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2"><span className="font-semibold">{offerMoney(o.amount, o.currency)}</span><Badge className={`${OFFER_TINT[o.status]} rounded-full border-0 text-[11px] capitalize`}>{o.status.replace('_', ' ')}</Badge></div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{o.buyer?.name || o.buyer_name || 'Buyer'} · {new Date(o.created_at).toLocaleDateString()}</div>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {o.proof_of_funds && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">Proof of funds</span>}
+                  {o.mortgage_in_principle && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">MIP</span>}
+                  {o.chain_free && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">Chain-free</span>}
+                </div>
+                {o.terms && <div className="mt-1 text-xs text-muted-foreground">{o.terms}</div>}
+              </div>
+              {canManage && ['offered', 'countered'].includes(o.status) && (
+                <div className="flex shrink-0 gap-1">
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-500" title="Accept" disabled={busy} onClick={() => setStatus(o.id, 'accepted')}><Check className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" title="Reject" disabled={busy} onClick={() => setStatus(o.id, 'rejected')}><X className="h-4 w-4" /></Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div></CardContent></Card>
+      )}
+    </div>
+  );
+};
 
 // Buyers whose saved searches match this listing (inverse auto-match).
 const BuyersForListing: React.FC<{ ws: string | null; propertyId: string }> = ({ ws, propertyId }) => {
