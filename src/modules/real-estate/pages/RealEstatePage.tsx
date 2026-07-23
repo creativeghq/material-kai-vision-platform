@@ -23,6 +23,8 @@ const STATUS_VARIANT: Record<ListingStatus, string> = {
   archived: 'bg-muted text-muted-foreground',
 };
 const money = (n: number | null, ccy: string) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+// Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
+const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
 
 // Lightweight in-content loader (matches Finance/CRM — never a full-bleed skeleton block).
 const InlineLoader: React.FC = () => (
@@ -80,18 +82,18 @@ export default function RealEstatePage() {
 
       <div className="p-3 sm:p-6">
         <Tabs value={tab} onValueChange={(v) => setSearchParams(v === 'overview' ? {} : { tab: v }, { replace: true })}>
-          <TabsList className="mb-4 flex flex-wrap bg-muted">
-            <TabsTrigger value="overview"><LayoutDashboard className="mr-1.5 h-4 w-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="listings"><Building2 className="mr-1.5 h-4 w-4" /> Listings</TabsTrigger>
-            <TabsTrigger value="pipeline"><Columns3 className="mr-1.5 h-4 w-4" /> Pipeline</TabsTrigger>
-            <TabsTrigger value="leads"><Inbox className="mr-1.5 h-4 w-4" /> Leads</TabsTrigger>
-            <TabsTrigger value="buyers"><Users className="mr-1.5 h-4 w-4" /> Buyers</TabsTrigger>
-            <TabsTrigger value="sellers"><Store className="mr-1.5 h-4 w-4" /> Sellers</TabsTrigger>
-            <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings</TabsTrigger>
-            <TabsTrigger value="sales"><Handshake className="mr-1.5 h-4 w-4" /> Sales</TabsTrigger>
-            <TabsTrigger value="lettings"><KeyRound className="mr-1.5 h-4 w-4" /> Property Mgmt{!pmEnabled && <Lock className="ml-1 h-3 w-3 text-muted-foreground" />}</TabsTrigger>
-            <TabsTrigger value="investments"><LineChart className="mr-1.5 h-4 w-4" /> Investments{!investEnabled && <Lock className="ml-1 h-3 w-3 text-muted-foreground" />}</TabsTrigger>
-            {canManage && <TabsTrigger value="syndication"><Rss className="mr-1.5 h-4 w-4" /> Syndication</TabsTrigger>}
+          <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="overview" className={RE_TAB}><LayoutDashboard className="h-4 w-4" /> Overview</TabsTrigger>
+            <TabsTrigger value="listings" className={RE_TAB}><Building2 className="h-4 w-4" /> Listings</TabsTrigger>
+            <TabsTrigger value="pipeline" className={RE_TAB}><Columns3 className="h-4 w-4" /> Pipeline</TabsTrigger>
+            <TabsTrigger value="leads" className={RE_TAB}><Inbox className="h-4 w-4" /> Leads</TabsTrigger>
+            <TabsTrigger value="buyers" className={RE_TAB}><Users className="h-4 w-4" /> Buyers</TabsTrigger>
+            <TabsTrigger value="sellers" className={RE_TAB}><Store className="h-4 w-4" /> Sellers</TabsTrigger>
+            <TabsTrigger value="viewings" className={RE_TAB}><CalendarClock className="h-4 w-4" /> Viewings</TabsTrigger>
+            <TabsTrigger value="sales" className={RE_TAB}><Handshake className="h-4 w-4" /> Sales</TabsTrigger>
+            <TabsTrigger value="lettings" className={RE_TAB}><KeyRound className="h-4 w-4" /> Property Mgmt{!pmEnabled && <Lock className="h-3 w-3 text-muted-foreground" />}</TabsTrigger>
+            <TabsTrigger value="investments" className={RE_TAB}><LineChart className="h-4 w-4" /> Investments{!investEnabled && <Lock className="h-3 w-3 text-muted-foreground" />}</TabsTrigger>
+            {canManage && <TabsTrigger value="syndication" className={RE_TAB}><Rss className="h-4 w-4" /> Syndication</TabsTrigger>}
           </TabsList>
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
           <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} /></TabsContent>

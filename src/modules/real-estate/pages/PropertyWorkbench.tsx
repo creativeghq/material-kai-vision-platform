@@ -32,6 +32,8 @@ import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDr
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 
+// Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
+const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
 const LISTING_STATUSES = ['draft', 'active', 'under_offer', 'sold', 'rented', 'withdrawn', 'archived'];
@@ -239,15 +241,15 @@ export default function PropertyWorkbench() {
         )}
 
         <Tabs defaultValue="overview">
-          <TabsList className="mb-4 bg-muted">
-            <TabsTrigger value="overview"><Home className="mr-1.5 h-4 w-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="media"><ImageIcon className="mr-1.5 h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="inquiries"><Contact className="mr-1.5 h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="offers"><Gavel className="mr-1.5 h-4 w-4" /> Offers</TabsTrigger>
-            <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
-            {canManage && isRental && pmEnabled && <TabsTrigger value="lettings"><KeyRound className="mr-1.5 h-4 w-4" /> Lettings</TabsTrigger>}
-            {canManage && investEnabled && <TabsTrigger value="investment"><LineChart className="mr-1.5 h-4 w-4" /> Investment</TabsTrigger>}
-            {canManage && <TabsTrigger value="transaction"><FileSignature className="mr-1.5 h-4 w-4" /> Transaction</TabsTrigger>}
+          <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="overview" className={RE_TAB}><Home className="h-4 w-4" /> Overview</TabsTrigger>
+            <TabsTrigger value="media" className={RE_TAB}><ImageIcon className="h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="inquiries" className={RE_TAB}><Contact className="h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="offers" className={RE_TAB}><Gavel className="h-4 w-4" /> Offers</TabsTrigger>
+            <TabsTrigger value="viewings" className={RE_TAB}><CalendarClock className="h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
+            {canManage && isRental && pmEnabled && <TabsTrigger value="lettings" className={RE_TAB}><KeyRound className="h-4 w-4" /> Lettings</TabsTrigger>}
+            {canManage && investEnabled && <TabsTrigger value="investment" className={RE_TAB}><LineChart className="h-4 w-4" /> Investment</TabsTrigger>}
+            {canManage && <TabsTrigger value="transaction" className={RE_TAB}><FileSignature className="h-4 w-4" /> Transaction</TabsTrigger>}
           </TabsList>
 
           {/* ── Overview / multi-step edit form ── */}
