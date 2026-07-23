@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { isWorkspaceEntitled, notEntitledResponse } from '../_shared/entitlement.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import {
@@ -134,6 +135,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       if (!op.success) return jsonResponse({ error: 'Operator role required for this action' }, 403);
     }
 
+    // #212 entitlement: WhatsApp is a paid ('messaging') feature. Gate the credit-spending /
+    // config-mutating actions on the TARGET workspace's entitlement (operator root bypasses inside
+    // isWorkspaceEntitled). Skips when no workspace is resolvable so the action's own guards + RLS
+    // still apply — never fail-closed on a null workspace and break a legit send.
+    const requireMessaging = async (wsId: string | null | undefined): Promise<Response | null> => {
+      if (!OPERATOR_ACTIONS.has(action) || isAdminAccess(auth) || !wsId) return null;
+      return (await isWorkspaceEntitled(supabaseClient, wsId, 'messaging')) ? null : notEntitledResponse('messaging');
+    };
+
     switch (action) {
       // ─────────────────────────────────────────────────────────────
       // Send single message (1+ recipients)
@@ -143,6 +153,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const channel = await resolveChannel(supabaseClient, body.from);
         if (!channel) throw new Error('No WhatsApp channel configured. Connect a WhatsApp number first.');
         if (!channel.zernio_account_id) throw new Error('Channel is not linked to a Zernio account.');
+        { const gate = await requireMessaging(channel.workspace_id ?? auth.workspace_id); if (gate) return gate; }
 
         let template: any = null;
         if (body.templateId) {
@@ -204,6 +215,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const channel = await resolveChannel(supabaseClient, body.from);
         if (!channel) throw new Error('No WhatsApp channel configured');
         if (!channel.zernio_account_id) throw new Error('Channel is not linked to a Zernio account.');
+        { const gate = await requireMessaging(channel.workspace_id ?? auth.workspace_id); if (gate) return gate; }
         if (channel.daily_quota && body.recipients.length > channel.daily_quota) {
           throw new Error(`Recipient count (${body.recipients.length}) exceeds channel daily quota (${channel.daily_quota})`);
         }
@@ -269,6 +281,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
         const wsId = workspaceId || auth.workspace_id;
         if (!wsId) throw new Error('No workspace context to attach the WhatsApp account to');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
         // #250 C27: operator roles are workspace-scoped — verify the caller belongs to the
         // target workspace before attaching a WhatsApp account (else operator-of-A could
         // connect an account to workspace-B by passing its id). Platform-secret callers pass.
@@ -347,6 +360,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // Sync channels: pull connected WhatsApp accounts from Zernio
       // ─────────────────────────────────────────────────────────────
       case 'sync-channels': {
+        { const gate = await requireMessaging(auth.workspace_id); if (gate) return gate; }
         const data = await zernioApi('GET', '/accounts?platform=whatsapp');
         const accounts = (data.accounts || data.data || []) as any[];
         const synced: any[] = [];
