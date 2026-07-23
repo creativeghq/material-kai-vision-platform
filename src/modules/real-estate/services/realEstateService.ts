@@ -68,6 +68,12 @@ async function call<T>(workspaceId: string, action: string, extra: Record<string
   return data as T;
 }
 
+export interface SellerLead {
+  crm_contact_id: string; owned_property_address: string | null; owned_property_value: number | null; owned_property_equity: number | null;
+  contact?: { id: string; name: string | null; email: string | null; phone: string | null; lead_status: string | null; lead_score: number | null; lead_source: string | null; created_at: string } | null;
+}
+export interface ValuationResult { estimate: number | null; range_low: number | null; range_high: number | null; currency: string; comps_count: number; median_per_sqm: number | null }
+
 export interface FeedSettings { workspace_id: string; feed_token: string; feed_enabled: boolean; feed_format: string }
 
 /** Public syndication feed URL a portal can pull. */
@@ -128,6 +134,7 @@ export const realEstateService = {
     call<{ ok: true; cover_photo_id: string | null; tagged: number; credits: number }>(ws, 'analyze-photos', { property_id: propertyId }),
 
   // Inquiries / viewings
+  listSellers: (ws: string) => call<{ sellers: SellerLead[] }>(ws, 'list-sellers').then((r) => r.sellers),
   listInquiries: (ws: string, filters: { status?: string; property_id?: string } = {}) =>
     call<{ inquiries: PropertyInquiry[] }>(ws, 'list-inquiries', filters).then((r) => r.inquiries),
   updateInquiry: (ws: string, inquiryId: string, status: string) =>
@@ -199,6 +206,12 @@ export const realEstatePublic = {
     const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'agency-listings', workspace_id: by.workspaceId, user_id: by.userId } });
     if (error) throw await edgeError(error);
     return (data as { listings: PublicListingCard[] }).listings;
+  },
+  /** Public seller lead-magnet: instant comps-based valuation + capture as a seller lead. */
+  async requestValuation(by: { workspaceId?: string; userId?: string }, payload: { name: string; email: string; phone?: string; address?: string; property_type?: string; town?: string; area?: number; gdpr_consent: boolean }): Promise<ValuationResult> {
+    const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'request-valuation', workspace_id: by.workspaceId, user_id: by.userId, ...payload } });
+    if (error) throw await edgeError(error);
+    return data as ValuationResult;
   },
 };
 

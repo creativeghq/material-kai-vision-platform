@@ -29,6 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useModule } from '@/modules/_core';
 import { realEstatePublic, type PublicListingCard } from '@/modules/real-estate/services/realEstateService';
 import { PropertyCardGrid } from '@/modules/real-estate/components/PropertyCardGrid';
+import { ValuationWidget } from '@/modules/real-estate/components/ValuationWidget';
 import { useAuth } from '@/contexts/AuthContext';
 import { HireMeModal } from '@/components/core/Profile/HireMeModal';
 import type { ServiceItem } from '@/components/core/Profile/ProfileTab';
@@ -477,6 +478,11 @@ export const PublicProfilePage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* #249 — seller lead-magnet: instant valuation (agencies with the Real Estate module) */}
+          {realEstateEnabled && profile.show_listings !== false && userId && (
+            <div className="mt-5"><ValuationWidget userId={userId} /></div>
+          )}
 
           {/* ── Tabs ─────────────────────────────────────────────────────────── */}
           <Tabs defaultValue="about" className="mt-5">

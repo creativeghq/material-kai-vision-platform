@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2 } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -9,7 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings } from '../services/realEstateService';
+import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead } from '../services/realEstateService';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 
 const STATUS_VARIANT: Record<ListingStatus, string> = {
@@ -72,12 +72,14 @@ export default function RealEstatePage() {
             <TabsTrigger value="overview"><LayoutDashboard className="mr-1.5 h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="listings"><Building2 className="mr-1.5 h-4 w-4" /> Listings</TabsTrigger>
             <TabsTrigger value="leads"><Inbox className="mr-1.5 h-4 w-4" /> Leads</TabsTrigger>
+            <TabsTrigger value="sellers"><Store className="mr-1.5 h-4 w-4" /> Sellers</TabsTrigger>
             <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings</TabsTrigger>
             {canManage && <TabsTrigger value="syndication"><Rss className="mr-1.5 h-4 w-4" /> Syndication</TabsTrigger>}
           </TabsList>
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
           <TabsContent value="listings"><ListingsPanel ws={ws} canManage={canManage} creating={creating} onCreate={createDraft} /></TabsContent>
           <TabsContent value="leads"><LeadsPanel ws={ws} /></TabsContent>
+          <TabsContent value="sellers"><SellersPanel ws={ws} /></TabsContent>
           <TabsContent value="viewings"><ViewingsPanel ws={ws} /></TabsContent>
           {canManage && <TabsContent value="syndication"><FeedCard ws={ws} /></TabsContent>}
         </Tabs>
@@ -244,6 +246,32 @@ const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
           </div>
           <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{q.status.replace('_', ' ')}</Badge>
         </div>
+      ))}
+    </div></CardContent></Card>
+  );
+};
+
+const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [rows, setRows] = useState<SellerLead[] | null>(null);
+  useEffect(() => {
+    if (!ws) return;
+    realEstateService.listSellers(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load sellers', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
+  }, [ws, toast]);
+  if (rows === null) return <InlineLoader />;
+  if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No seller leads yet. Valuation requests from your public profile capture sellers here.</div>;
+  return (
+    <Card><CardContent className="p-0"><div className="divide-y divide-border">
+      {rows.map((s) => (
+        <button key={s.crm_contact_id} onClick={() => navigate(`/crm/contacts/${s.crm_contact_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">{s.contact?.name || 'Seller'} <span className="text-xs text-muted-foreground">{s.contact?.email}</span></div>
+            <div className="mt-0.5 truncate text-xs text-muted-foreground">{s.owned_property_address || '—'}{s.owned_property_value != null ? ` · est. ${money(s.owned_property_value, 'EUR')}` : ''}</div>
+          </div>
+          {s.contact?.lead_score != null && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title="Lead score">{s.contact.lead_score}</Badge>}
+          <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{(s.contact?.lead_status || 'new').replace('_', ' ')}</Badge>
+        </button>
       ))}
     </div></CardContent></Card>
   );

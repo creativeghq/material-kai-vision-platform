@@ -502,6 +502,16 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ interest: data });
       }
 
+      // ── Seller leads (vendors) — crm_contacts flagged seller via the RE extension ──
+      case 'list-sellers': {
+        const { data, error } = await supabase.from('property_contacts_ext')
+          .select('crm_contact_id, owned_property_address, owned_property_value, owned_property_equity, contact:crm_contacts!property_contacts_ext_crm_contact_id_fkey ( id, name, email, phone, lead_status, lead_score, lead_source, created_at )')
+          .eq('workspace_id', workspaceId).eq('contact_role', 'seller');
+        if (error) throw new HttpError(400, error.message);
+        const sellers = (data ?? []).sort((a: any, b: any) => new Date(b.contact?.created_at ?? 0).getTime() - new Date(a.contact?.created_at ?? 0).getTime());
+        return json({ sellers });
+      }
+
       // ── Buyer requirements (saved searches; auto-match in P2) ───────────
       case 'list-buyer-requirements': {
         let q = supabase.from('property_buyer_requirements').select('*').eq('workspace_id', workspaceId).order('updated_at', { ascending: false });

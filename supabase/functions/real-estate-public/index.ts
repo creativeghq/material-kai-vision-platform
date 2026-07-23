@@ -85,6 +85,59 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     return json({ listings: rows.map((r: any) => ({ ...toPublic(r), cover_url: covers[r.id] ?? null })) });
   }
 
+  // ── Seller lead-magnet: instant valuation (no token) — comps-based estimate from the agency's own
+  //    stock + captures the visitor as a seller lead. GDPR-gated. ──
+  if (action === 'request-valuation') {
+    const wsId = String(body?.workspace_id ?? '').trim();
+    const userId = String(body?.user_id ?? '').trim();
+    let workspaceId = wsId;
+    if (!workspaceId && userId) {
+      const { data: owned } = await supabase.from('workspace_members').select('workspace_id').eq('user_id', userId).eq('role', 'owner').eq('status', 'active').limit(1).maybeSingle();
+      workspaceId = owned?.workspace_id ?? '';
+    }
+    if (!workspaceId) return json({ error: 'workspace_id or user_id is required' }, 400);
+    const name = String(body?.name ?? '').trim();
+    const email = String(body?.email ?? '').trim();
+    if (!name || !email) return json({ error: 'name and email are required' }, 400);
+    if (body?.gdpr_consent !== true) return json({ error: 'gdpr_consent is required' }, 400);
+
+    const propertyType = String(body?.property_type ?? 'residential');
+    const town = String(body?.town ?? '').trim();
+    const area = Number(body?.area ?? 0);
+
+    // Comps: the agency's own listings of the same type + town with a price and a floor area.
+    let cq = supabase.from('properties').select('price, area_built, plot_area')
+      .eq('workspace_id', workspaceId).eq('property_type', propertyType)
+      .in('listing_status', ['active', 'under_offer', 'sold']).not('price', 'is', null);
+    if (town) cq = cq.ilike('town', `%${town}%`);
+    const { data: comps } = await cq.limit(100);
+    const perSqm = (comps ?? [])
+      .map((c: any) => { const a = Number(c.area_built ?? c.plot_area ?? 0); return a > 0 && c.price != null ? Number(c.price) / a : null; })
+      .filter((v: any): v is number => v != null && isFinite(v) && v > 0)
+      .sort((a: number, b: number) => a - b);
+    let estimate: number | null = null, low: number | null = null, high: number | null = null, medianPerSqm: number | null = null;
+    if (perSqm.length >= 3 && area > 0) {
+      medianPerSqm = perSqm[Math.floor(perSqm.length / 2)];
+      estimate = Math.round((medianPerSqm * area) / 1000) * 1000;
+      low = Math.round((estimate * 0.85) / 1000) * 1000;
+      high = Math.round((estimate * 1.15) / 1000) * 1000;
+    }
+
+    // Capture the seller lead (crm_contact + real-estate extension). property_id/workspace are server-set.
+    const { data: contact } = await supabase.from('crm_contacts').insert({
+      workspace_id: workspaceId, name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
+      contact_type: 'seller', lead_source: 'valuation_request', lead_status: 'new',
+    }).select('id').single();
+    if (contact?.id) {
+      await supabase.from('property_contacts_ext').upsert({
+        crm_contact_id: contact.id, workspace_id: workspaceId, contact_role: 'seller',
+        owned_property_address: [String(body?.address ?? '').trim(), town].filter(Boolean).join(', ') || null,
+        owned_property_value: estimate,
+      }, { onConflict: 'crm_contact_id' });
+    }
+    return json({ estimate, range_low: low, range_high: high, currency: 'EUR', comps_count: perSqm.length, median_per_sqm: medianPerSqm });
+  }
+
   const token = String(body?.token ?? '').trim();
   if (!token) return json({ error: 'token is required' }, 400);
 
