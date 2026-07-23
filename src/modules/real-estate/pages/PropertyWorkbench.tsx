@@ -24,6 +24,7 @@ import {
   type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
 } from '../services/realEstateService';
 import { contractsService, type Contract } from '@/services/contractsService';
+import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
@@ -42,7 +43,7 @@ const AMENITIES: readonly (readonly [string, string])[] = [
 
 const FORM_FIELDS = [
   // basics
-  'title', 'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status', 'open_for_all',
+  'title', 'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status', 'open_for_all', 'vendor_contact_id',
   // pricing
   'price', 'currency', 'price_period', 'price_on_request', 'common_charges', 'previous_price',
   // location
@@ -275,6 +276,7 @@ export default function PropertyWorkbench() {
                 <F label="Subtype"><Input value={form.subtype ?? ''} onChange={(e) => set('subtype', e.target.value)} placeholder="apartment, warehouse, plot…" /></F>
                 <F label="Transaction"><Sel value={form.transaction_type} opts={TRANSACTION_TYPES} onChange={(v) => set('transaction_type', v)} /></F>
                 <F label="Status"><Sel value={form.listing_status} opts={LISTING_STATUSES} onChange={(v) => set('listing_status', v)} /></F>
+                <F label="Vendor / owner (CRM)" wide><ContactSearchDropdown selectedContactId={form.vendor_contact_id ?? null} onSelect={(id) => set('vendor_contact_id', id)} placeholder="Link the seller/owner contact…" /></F>
                 <Chk label="Open for all agents (visible to the whole team)" checked={!!form.open_for_all} onChange={(v) => set('open_for_all', v)} />
               </FormSection>
             )}

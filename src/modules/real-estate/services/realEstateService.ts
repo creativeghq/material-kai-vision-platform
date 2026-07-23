@@ -142,6 +142,9 @@ export const realEstateService = {
 
   // Inquiries / viewings
   listSellers: (ws: string) => call<{ sellers: SellerLead[] }>(ws, 'list-sellers').then((r) => r.sellers),
+  /** A CRM person's linked properties — those they're selling (vendor) + interested in. */
+  contactProperties: (ws: string, crmContactId: string) =>
+    call<{ selling: PropertyListItem[]; interested: (PropertyListItem & { interest_type: string })[] }>(ws, 'contact-properties', { crm_contact_id: crmContactId }),
   // Offers
   listOffers: (ws: string, propertyId: string) => call<{ offers: PropertyOffer[] }>(ws, 'list-offers', { property_id: propertyId }).then((r) => r.offers),
   createOffer: (ws: string, fields: { property_id: string; amount: number; currency?: string; buyer_contact_id?: string; buyer_name?: string; terms?: string; proof_of_funds?: boolean; mortgage_in_principle?: boolean; chain_free?: boolean; note?: string }) =>

@@ -20,15 +20,18 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
   const [adding, setAdding] = useState(false);
   const [score, setScore] = useState<{ lead_score: number; health_score: number; rationale?: string } | null>(null);
   const [scoring, setScoring] = useState(false);
+  const [cp, setCp] = useState<{ selling: PropertyListItem[]; interested: (PropertyListItem & { interest_type: string })[] } | null>(null);
 
   const load = useCallback(async () => {
     if (!ws) return;
-    const [e, r] = await Promise.all([
+    const [e, r, props] = await Promise.all([
       realEstateService.getContactExt(ws, contactId).catch(() => null),
       realEstateService.listBuyerRequirements(ws, contactId).catch(() => []),
+      realEstateService.contactProperties(ws, contactId).catch(() => ({ selling: [], interested: [] })),
     ]);
     setExt(e ?? {});
     setReqs(r);
+    setCp(props);
   }, [ws, contactId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -50,8 +53,25 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
     finally { setSavingExt(false); }
   };
 
+  const money2 = (n: number | null, ccy: string) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+  const propRow = (p: PropertyListItem & { interest_type?: string }) => (
+    <Link key={p.id} to={`/properties/${p.id}`} className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/50">
+      <span className="min-w-0 flex-1 truncate">{p.title || 'Listing'} <span className="text-muted-foreground">{[p.town, p.region].filter(Boolean).join(', ')}</span></span>
+      {p.interest_type && <Badge className="rounded-full border-0 bg-muted text-[10px] capitalize">{p.interest_type.replace('_', ' ')}</Badge>}
+      <Badge className="rounded-full border-0 bg-muted text-[10px] capitalize">{p.listing_status.replace('_', ' ')}</Badge>
+      <span className="shrink-0 font-medium">{money2(p.price, p.currency)}</span>
+    </Link>
+  );
+
   return (
     <div className="space-y-4">
+      {cp && (cp.selling.length > 0 || cp.interested.length > 0) && (
+        <Card><CardContent className="p-4">
+          <div className="mb-2 flex items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Properties</span></div>
+          {cp.selling.length > 0 && <div className="mb-2"><div className="mb-1 text-xs font-medium text-muted-foreground">Selling ({cp.selling.length})</div><div className="space-y-0.5">{cp.selling.map((p) => propRow(p))}</div></div>}
+          {cp.interested.length > 0 && <div><div className="mb-1 text-xs font-medium text-muted-foreground">Interested in ({cp.interested.length})</div><div className="space-y-0.5">{cp.interested.map((p) => propRow(p))}</div></div>}
+        </CardContent></Card>
+      )}
       <Card><CardContent className="p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Buyer / seller profile</span>
           {score && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title={score.rationale}>Lead {score.lead_score} · Health {score.health_score}</Badge>}

@@ -566,6 +566,19 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ ok: true, cancelled_viewings: (fv ?? []).length });
       }
 
+      // ── A CRM person's linked properties (for the contact-page "Properties" panel) ──
+      case 'contact-properties': {
+        const contactId = String(body.crm_contact_id ?? '');
+        if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
+        const cardCols = 'id, title, reference_code, property_type, transaction_type, listing_status, price, currency, town, region, is_public, public_listing_token';
+        const [{ data: selling }, { data: interests }] = await Promise.all([
+          supabase.from('properties').select(cardCols).eq('workspace_id', workspaceId).eq('vendor_contact_id', contactId).order('updated_at', { ascending: false }),
+          supabase.from('property_interests').select(`interest_type, property:properties!property_interests_property_id_fkey ( ${cardCols} )`).eq('workspace_id', workspaceId).eq('crm_contact_id', contactId),
+        ]);
+        const interested = (interests ?? []).map((r: any) => ({ ...r.property, interest_type: r.interest_type })).filter((p: any) => p?.id);
+        return json({ selling: selling ?? [], interested });
+      }
+
       // ── Seller leads (vendors) — crm_contacts flagged seller via the RE extension ──
       case 'list-sellers': {
         const { data, error } = await supabase.from('property_contacts_ext')
