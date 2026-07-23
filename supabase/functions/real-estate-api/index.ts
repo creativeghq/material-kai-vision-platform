@@ -206,7 +206,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
   // Sub-module entitlement gates (#281): Property Management + Investments are add-ons on top of
   // Real Estate. A workspace without the add-on gets 402 on those actions (root workspace is entitled).
-  const PM_ACTIONS = new Set(['list-tenancies', 'upsert-tenancy', 'list-rent-charges', 'generate-rent-schedule', 'mark-rent-paid', 'list-maintenance', 'upsert-maintenance', 'landlord-statement']);
+  const PM_ACTIONS = new Set(['list-tenancies', 'upsert-tenancy', 'list-rent-charges', 'generate-rent-schedule', 'mark-rent-paid', 'list-maintenance', 'upsert-maintenance', 'landlord-statement', 'invoice-rent-charge', 'renew-tenancy']);
   const INVEST_ACTIONS = new Set(['get-investment', 'upsert-investment', 'list-investments']);
   if (PM_ACTIONS.has(action)) { const g = await assertEntitled(supabase, workspaceId, 'real-estate-management'); if (!g.ok) return g.response; }
   if (INVEST_ACTIONS.has(action)) { const g = await assertEntitled(supabase, workspaceId, 'real-estate-investments'); if (!g.ok) return g.response; }
@@ -1050,6 +1050,57 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           currency,
         };
         return json({ investments: rows, portfolio });
+      }
+
+      // ── Rent → Finance (#281) — draft invoice per rent charge, to the tenant ──
+      case 'invoice-rent-charge': {
+        requireManage();
+        const chargeId = String(body.charge_id ?? '');
+        if (!chargeId) return json({ error: 'charge_id is required' }, 400);
+        const { data: charge } = await supabase.from('property_rent_charges')
+          .select('id, amount, currency, due_date, invoice_id, tenancy:property_tenancies!property_rent_charges_tenancy_id_fkey ( property_id, tenant_contact_id )')
+          .eq('id', chargeId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!charge) return json({ error: 'not found' }, 404);
+        if (charge.invoice_id) return json({ invoice_id: charge.invoice_id, already: true });
+        const tenancy = (charge as any).tenancy;
+        if (!tenancy?.property_id) return json({ error: 'charge has no tenancy' }, 400);
+        await loadEditable(tenancy.property_id);
+        if (!tenancy.tenant_contact_id) return json({ error: 'Set a tenant on the tenancy before invoicing rent.' }, 400);
+        const property = await loadProperty(tenancy.property_id);
+        const amount = Number(charge.amount);
+        const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
+        if (numErr) throw new HttpError(500, `numbering failed: ${numErr.message}`);
+        // Draft, VAT-0 (operator sets the correct rent VAT/doc-type on issue — residential rent is
+        // usually exempt, commercial is not). Not transmitted until issued in Finance.
+        const { data: inv, error: invErr } = await supabase.from('invoices').insert({
+          workspace_id: workspaceId, customer_contact_id: tenancy.tenant_contact_id,
+          internal_number: draftNumber as string, status: 'draft', document_type: '1.1',
+          currency: charge.currency ?? 'EUR', subtotal_net: amount, vat_rate: 0, vat_amount: 0, total: amount,
+          notes: `Rent — ${property.title ?? 'property'} — due ${charge.due_date}`, issued_at: null, due_at: charge.due_date,
+        }).select('id').single();
+        if (invErr) throw new HttpError(400, invErr.message);
+        const { error: itErr } = await supabase.from('invoice_items').insert({
+          invoice_id: (inv as any).id, description: `Rent — ${property.title ?? 'property'} (${charge.due_date})`,
+          quantity: 1, unit_price: amount, net_value: amount, vat_amount: 0, line_total: amount,
+        });
+        if (itErr) throw new HttpError(400, itErr.message);
+        await supabase.from('property_rent_charges').update({ invoice_id: (inv as any).id }).eq('id', chargeId).eq('workspace_id', workspaceId);
+        return json({ invoice_id: (inv as any).id });
+      }
+
+      case 'renew-tenancy': {
+        requireManage();
+        const tenancyId = String(body.tenancy_id ?? '');
+        if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        const { data: t } = await supabase.from('property_tenancies').select('property_id').eq('id', tenancyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!t) return json({ error: 'not found' }, 404);
+        await loadEditable(t.property_id);
+        const patch: Record<string, unknown> = { status: 'active' };
+        if (body.new_end_date) patch.end_date = body.new_end_date;
+        if (body.new_rent != null && body.new_rent !== '') patch.rent_amount = Number(body.new_rent);
+        const { data, error } = await supabase.from('property_tenancies').update(patch).eq('id', tenancyId).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ tenancy: data });
       }
 
       // ── CMA / listing-pitch report (#281) — comps from own stock ──────────

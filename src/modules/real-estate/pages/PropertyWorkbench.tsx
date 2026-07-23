@@ -5,7 +5,7 @@ import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
   Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature, Send,
-  KeyRound, Wrench, Receipt, LineChart,
+  KeyRound, Wrench, Receipt, LineChart, RotateCw,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -659,6 +659,20 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
     try { await realEstateService.markRentPaid(ws, id, { status }); await load(); }
     catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
   };
+  const invoiceRent = async (id: string) => {
+    if (!ws) return;
+    try { const r = await realEstateService.invoiceRentCharge(ws, id); await load(); toast({ title: r.already ? 'Already invoiced' : 'Draft rent invoice created', description: 'Review VAT & issue it in Finance.' }); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
+  const renew = async () => {
+    if (!ws || !tenancy) return;
+    const newEnd = window.prompt('Renew tenancy — new end date (YYYY-MM-DD), leave blank to keep:', tenancy.end_date ?? '');
+    if (newEnd === null) return;
+    const newRent = window.prompt('New monthly rent (leave blank to keep current):', String(tenancy.rent_amount));
+    if (newRent === null) return;
+    try { await realEstateService.renewTenancy(ws, tenancy.id, { new_end_date: newEnd || undefined, new_rent: newRent ? Number(newRent) : undefined }); await load(); toast({ title: 'Tenancy renewed' }); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
   const addWo = async () => {
     if (!ws || !wf.title) return;
     setBusy(true);
@@ -703,7 +717,13 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
           </div>
           <Badge className="rounded-full border-0 bg-primary/15 text-[11px] capitalize">{tenancy.status}</Badge>
           {tenancy.deposit != null && <div className="text-xs text-muted-foreground">Deposit {offerMoney(tenancy.deposit, ccy)}</div>}
-          {canManage && <Button size="sm" variant="ghost" className="ml-auto rounded-full" onClick={() => setEditing(true)}>Edit</Button>}
+          {tenancy.end_date && <div className="text-xs text-muted-foreground">Ends {new Date(tenancy.end_date).toLocaleDateString()}</div>}
+          {canManage && (
+            <div className="ml-auto flex gap-1.5">
+              <Button size="sm" variant="ghost" className="rounded-full" onClick={renew}><RotateCw className="mr-1 h-3.5 w-3.5" /> Renew</Button>
+              <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setEditing(true)}>Edit</Button>
+            </div>
+          )}
         </CardContent></Card>
       )}
 
@@ -728,13 +748,18 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                   <span className="w-24 shrink-0 text-muted-foreground">{new Date(c.due_date).toLocaleDateString()}</span>
                   <span className="font-medium">{offerMoney(c.amount, c.currency)}</span>
                   <Badge className={`${LEDGER_TINT[c.status]} rounded-full border-0 text-[10px] capitalize`}>{c.status}</Badge>
-                  {canManage && c.status !== 'paid' && c.status !== 'waived' && (
-                    <div className="ml-auto flex gap-1.5">
-                      <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => markPaid(c.id, 'paid')}><Check className="mr-1 h-3 w-3" /> Paid</Button>
-                      <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-muted-foreground" onClick={() => markPaid(c.id, 'waived')}>Waive</Button>
-                    </div>
-                  )}
-                  {c.status === 'paid' && c.paid_at && <span className="ml-auto text-xs text-muted-foreground">Paid {new Date(c.paid_at).toLocaleDateString()}</span>}
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {c.invoice_id
+                      ? <Link to={`/finance/invoices/${c.invoice_id}`}><Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-primary"><FileText className="mr-1 h-3 w-3" /> Invoice</Button></Link>
+                      : canManage && c.status !== 'waived' && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => invoiceRent(c.id)}><FileText className="mr-1 h-3 w-3" /> Invoice</Button>}
+                    {canManage && c.status !== 'paid' && c.status !== 'waived' && (
+                      <>
+                        <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => markPaid(c.id, 'paid')}><Check className="mr-1 h-3 w-3" /> Paid</Button>
+                        <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-muted-foreground" onClick={() => markPaid(c.id, 'waived')}>Waive</Button>
+                      </>
+                    )}
+                    {c.status === 'paid' && c.paid_at && <span className="text-xs text-muted-foreground">Paid {new Date(c.paid_at).toLocaleDateString()}</span>}
+                  </div>
                 </div>
               ))}
             </div></CardContent></Card>

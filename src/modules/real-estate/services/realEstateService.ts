@@ -96,6 +96,7 @@ export interface Tenancy {
 export interface RentCharge {
   id: string; tenancy_id: string; due_date: string; amount: number; currency: string;
   status: 'due' | 'paid' | 'overdue' | 'waived'; paid_at: string | null; paid_amount: number | null; note: string | null;
+  invoice_id: string | null;
 }
 export interface MaintenanceWorkOrder {
   id: string; property_id: string; tenancy_id: string | null; title: string; description: string | null;
@@ -311,6 +312,10 @@ export const realEstateService = {
     call<{ work_order: MaintenanceWorkOrder }>(ws, 'upsert-maintenance', fields).then((r) => r.work_order),
   landlordStatement: (ws: string, tenancyId: string) =>
     call<LandlordStatement>(ws, 'landlord-statement', { tenancy_id: tenancyId }),
+  invoiceRentCharge: (ws: string, chargeId: string) =>
+    call<{ invoice_id: string; already?: boolean }>(ws, 'invoice-rent-charge', { charge_id: chargeId }),
+  renewTenancy: (ws: string, tenancyId: string, fields: { new_end_date?: string; new_rent?: number }) =>
+    call<{ tenancy: Tenancy }>(ws, 'renew-tenancy', { tenancy_id: tenancyId, ...fields }).then((r) => r.tenancy),
 
   /** Upload a File to the signed URL returned by photoUploadUrl, then register the row. */
   async uploadPhoto(ws: string, propertyId: string, file: File, kind = 'photo'): Promise<PropertyPhoto> {

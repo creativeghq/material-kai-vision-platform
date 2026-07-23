@@ -16,6 +16,9 @@ verify_jwt = false
 [functions.real-estate-buyer-digests]
 verify_jwt = false
 
+[functions.real-estate-rent-invoicing]
+verify_jwt = false
+
 [functions.project-plan-engine]
 verify_jwt = false
 
