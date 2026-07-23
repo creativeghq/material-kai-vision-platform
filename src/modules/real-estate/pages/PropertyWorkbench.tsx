@@ -5,6 +5,7 @@ import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
   Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature, Send,
+  KeyRound, Wrench, Receipt,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -22,6 +23,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/t
 import {
   realEstateService, isPublishBlocked,
   type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
+  type Tenancy, type RentCharge, type MaintenanceWorkOrder, type LandlordStatement,
 } from '../services/realEstateService';
 import { contractsService, type Contract } from '@/services/contractsService';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
@@ -194,6 +196,7 @@ export default function PropertyWorkbench() {
   const isLand = cat === 'land';
   const isShortLet = form.transaction_type === 'short_let';
   const isBusinessSale = form.transaction_type === 'business_transfer';
+  const isRental = form.transaction_type === 'rent' || form.listing_status === 'rented';
   const publicUrl = property.public_listing_token ? `${window.location.origin}/p/${property.public_listing_token}` : null;
   const stepId = STEPS[step].id;
 
@@ -233,6 +236,7 @@ export default function PropertyWorkbench() {
             <TabsTrigger value="inquiries"><Contact className="mr-1.5 h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="offers"><Gavel className="mr-1.5 h-4 w-4" /> Offers</TabsTrigger>
             <TabsTrigger value="viewings"><CalendarClock className="mr-1.5 h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-1 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
+            {canManage && isRental && <TabsTrigger value="lettings"><KeyRound className="mr-1.5 h-4 w-4" /> Lettings</TabsTrigger>}
             {canManage && <TabsTrigger value="transaction"><FileSignature className="mr-1.5 h-4 w-4" /> Transaction</TabsTrigger>}
           </TabsList>
 
@@ -526,6 +530,8 @@ export default function PropertyWorkbench() {
           <TabsContent value="offers"><OffersTab ws={ws} propertyId={id} canManage={editable} onAccepted={load} /></TabsContent>
 
           {/* ── Transaction (Contracts module: Memorandum of Sale / agency agreement + e-sign) ── */}
+          {canManage && isRental && <TabsContent value="lettings"><LettingsTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>}
+
           {canManage && <TabsContent value="transaction"><TransactionTab ws={ws} propertyId={id} canEdit={editable} /></TabsContent>}
 
           {/* ── Viewings ── */}
@@ -570,6 +576,194 @@ const OFFER_TINT: Record<string, string> = {
   accepted: 'bg-emerald-500/15 text-emerald-500', rejected: 'bg-muted text-muted-foreground', withdrawn: 'bg-muted text-muted-foreground',
 };
 const offerMoney = (n: number, ccy: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n);
+
+// ── Lettings / property management (#281) ──
+const LEDGER_TINT: Record<string, string> = {
+  due: 'bg-amber-500/10 text-amber-500', paid: 'bg-emerald-500/10 text-emerald-500',
+  overdue: 'bg-red-500/10 text-red-500', waived: 'bg-muted text-muted-foreground',
+};
+const WO_TINT: Record<string, string> = {
+  open: 'bg-amber-500/10 text-amber-500', in_progress: 'bg-blue-500/10 text-blue-500',
+  completed: 'bg-emerald-500/10 text-emerald-500', cancelled: 'bg-muted text-muted-foreground',
+};
+const Stat: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (
+  <div className={`dashboard-card p-3 ${accent ? 'ring-1 ring-primary/30' : ''}`}>
+    <div className="text-[11px] text-muted-foreground">{label}</div>
+    <div className={`mt-0.5 text-base font-semibold ${accent ? 'text-primary' : ''}`}>{value}</div>
+  </div>
+);
+
+const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: boolean }> = ({ ws, propertyId, canManage }) => {
+  const { toast } = useToast();
+  const [tenancy, setTenancy] = useState<Tenancy | null | undefined>(undefined); // undefined = loading
+  const [charges, setCharges] = useState<RentCharge[]>([]);
+  const [wos, setWos] = useState<MaintenanceWorkOrder[]>([]);
+  const [stmt, setStmt] = useState<LandlordStatement['summary'] | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState<Record<string, any>>({ currency: 'EUR', rent_frequency: 'monthly', status: 'active' });
+  const [busy, setBusy] = useState(false);
+  const [woAdding, setWoAdding] = useState(false);
+  const [wf, setWf] = useState<Record<string, any>>({ priority: 'normal' });
+
+  const load = useCallback(async () => {
+    if (!ws) return;
+    const list = await realEstateService.listTenancies(ws, propertyId).catch(() => []);
+    const t = list[0] ?? null;
+    setTenancy(t);
+    if (t) {
+      setF({ tenant_contact_id: t.tenant_contact_id, landlord_contact_id: t.landlord_contact_id, rent_amount: t.rent_amount, currency: t.currency, rent_frequency: t.rent_frequency, deposit: t.deposit, start_date: t.start_date, end_date: t.end_date, status: t.status, notes: t.notes });
+      const [c, s] = await Promise.all([
+        realEstateService.listRentCharges(ws, t.id).catch(() => []),
+        realEstateService.landlordStatement(ws, t.id).catch(() => null),
+      ]);
+      setCharges(c); setStmt(s?.summary ?? null);
+    }
+    setWos(await realEstateService.listMaintenance(ws, { property_id: propertyId }).catch(() => []));
+  }, [ws, propertyId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const saveTenancy = async () => {
+    if (!ws || !f.rent_amount || !f.start_date) { toast({ title: 'Rent amount and start date are required', variant: 'destructive' }); return; }
+    setBusy(true);
+    try {
+      await realEstateService.upsertTenancy(ws, { tenancy_id: tenancy?.id, property_id: propertyId, tenant_contact_id: f.tenant_contact_id || null, landlord_contact_id: f.landlord_contact_id || null, rent_amount: Number(f.rent_amount), currency: f.currency || 'EUR', rent_frequency: f.rent_frequency, deposit: f.deposit != null && f.deposit !== '' ? Number(f.deposit) : null, start_date: f.start_date, end_date: f.end_date || null, status: f.status, notes: f.notes });
+      setEditing(false); await load(); toast({ title: 'Tenancy saved' });
+    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const genSchedule = async () => {
+    if (!ws || !tenancy) return;
+    setBusy(true);
+    try { const r = await realEstateService.generateRentSchedule(ws, tenancy.id, 12); toast({ title: `Added ${r.created} rent charge(s)`, description: r.skipped ? `${r.skipped} already scheduled` : undefined }); await load(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const markPaid = async (id: string, status: 'paid' | 'waived') => {
+    if (!ws) return;
+    try { await realEstateService.markRentPaid(ws, id, { status }); await load(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
+  const addWo = async () => {
+    if (!ws || !wf.title) return;
+    setBusy(true);
+    try { await realEstateService.upsertMaintenance(ws, { property_id: propertyId, tenancy_id: tenancy?.id ?? null, title: wf.title, description: wf.description, priority: wf.priority, contractor_name: wf.contractor_name, cost: wf.cost != null && wf.cost !== '' ? Number(wf.cost) : null }); setWf({ priority: 'normal' }); setWoAdding(false); await load(); toast({ title: 'Work order added' }); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const setWoStatus = async (id: string, status: string) => {
+    if (!ws) return;
+    try { await realEstateService.upsertMaintenance(ws, { work_order_id: id, status }); await load(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
+
+  if (tenancy === undefined) return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">Loading…</div>;
+  const ccy = tenancy?.currency || f.currency || 'EUR';
+
+  return (
+    <div className="space-y-6">
+      {(!tenancy || editing) ? (
+        <Card><CardContent className="space-y-3 p-4">
+          <div className="text-sm font-semibold">{tenancy ? 'Edit tenancy' : 'Set up tenancy'}</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div><Label className="text-xs">Tenant</Label><ContactSearchDropdown selectedContactId={f.tenant_contact_id ?? null} onSelect={(id) => setF((p) => ({ ...p, tenant_contact_id: id }))} placeholder="Link tenant…" /></div>
+            <div><Label className="text-xs">Landlord</Label><ContactSearchDropdown selectedContactId={f.landlord_contact_id ?? null} onSelect={(id) => setF((p) => ({ ...p, landlord_contact_id: id }))} placeholder="Link landlord…" /></div>
+            <div><Label className="text-xs">Rent</Label><NumInput v={f.rent_amount} on={(x) => setF((p) => ({ ...p, rent_amount: x }))} /></div>
+            <div><Label className="text-xs">Frequency</Label><Sel value={f.rent_frequency} opts={['weekly', 'monthly', 'quarterly', 'yearly']} onChange={(v) => setF((p) => ({ ...p, rent_frequency: v }))} /></div>
+            <div><Label className="text-xs">Deposit</Label><NumInput v={f.deposit} on={(x) => setF((p) => ({ ...p, deposit: x }))} /></div>
+            <div><Label className="text-xs">Status</Label><Sel value={f.status} opts={['pending', 'active', 'ended', 'terminated']} onChange={(v) => setF((p) => ({ ...p, status: v }))} /></div>
+            <div><Label className="text-xs">Start date</Label><Input type="date" value={f.start_date ?? ''} onChange={(e) => setF((p) => ({ ...p, start_date: e.target.value }))} /></div>
+            <div><Label className="text-xs">End date</Label><Input type="date" value={f.end_date ?? ''} onChange={(e) => setF((p) => ({ ...p, end_date: e.target.value }))} /></div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="rounded-full" onClick={saveTenancy} disabled={busy}>Save tenancy</Button>
+            {tenancy && <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setEditing(false)}>Cancel</Button>}
+          </div>
+        </CardContent></Card>
+      ) : (
+        <Card><CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
+          <div>
+            <div className="text-lg font-semibold">{offerMoney(tenancy.rent_amount, ccy)}<span className="text-xs font-normal text-muted-foreground"> / {tenancy.rent_frequency}</span></div>
+            <div className="text-xs text-muted-foreground">{tenancy.tenant?.name || 'No tenant set'} · from {new Date(tenancy.start_date).toLocaleDateString()}</div>
+          </div>
+          <Badge className="rounded-full border-0 bg-primary/15 text-[11px] capitalize">{tenancy.status}</Badge>
+          {tenancy.deposit != null && <div className="text-xs text-muted-foreground">Deposit {offerMoney(tenancy.deposit, ccy)}</div>}
+          {canManage && <Button size="sm" variant="ghost" className="ml-auto rounded-full" onClick={() => setEditing(true)}>Edit</Button>}
+        </CardContent></Card>
+      )}
+
+      {tenancy && (<>
+        {stmt && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Rent received" value={offerMoney(stmt.rent_received, ccy)} />
+            <Stat label="Outstanding" value={offerMoney(stmt.rent_outstanding, ccy)} />
+            <Stat label="Maintenance" value={offerMoney(stmt.maintenance_spend, ccy)} />
+            <Stat label="Net to landlord" value={offerMoney(stmt.net_to_landlord, ccy)} accent />
+          </div>
+        )}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-sm font-semibold"><Receipt className="h-4 w-4" /> Rent ledger</div>
+            {canManage && <Button size="sm" variant="outline" className="rounded-full" onClick={genSchedule} disabled={busy}>Generate 12 periods</Button>}
+          </div>
+          {charges.length === 0 ? <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">No rent charges yet. Generate a schedule to start the ledger.</div> : (
+            <Card><CardContent className="p-0"><div className="divide-y divide-border">
+              {charges.map((c) => (
+                <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                  <span className="w-24 shrink-0 text-muted-foreground">{new Date(c.due_date).toLocaleDateString()}</span>
+                  <span className="font-medium">{offerMoney(c.amount, c.currency)}</span>
+                  <Badge className={`${LEDGER_TINT[c.status]} rounded-full border-0 text-[10px] capitalize`}>{c.status}</Badge>
+                  {canManage && c.status !== 'paid' && c.status !== 'waived' && (
+                    <div className="ml-auto flex gap-1.5">
+                      <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => markPaid(c.id, 'paid')}><Check className="mr-1 h-3 w-3" /> Paid</Button>
+                      <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-muted-foreground" onClick={() => markPaid(c.id, 'waived')}>Waive</Button>
+                    </div>
+                  )}
+                  {c.status === 'paid' && c.paid_at && <span className="ml-auto text-xs text-muted-foreground">Paid {new Date(c.paid_at).toLocaleDateString()}</span>}
+                </div>
+              ))}
+            </div></CardContent></Card>
+          )}
+        </div>
+      </>)}
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-sm font-semibold"><Wrench className="h-4 w-4" /> Maintenance</div>
+          {canManage && !woAdding && <Button size="sm" variant="outline" className="rounded-full" onClick={() => setWoAdding(true)}>Add work order</Button>}
+        </div>
+        {woAdding && (
+          <Card className="mb-3"><CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
+            <Input placeholder="Title" className="sm:col-span-2" value={wf.title ?? ''} onChange={(e) => setWf((p) => ({ ...p, title: e.target.value }))} />
+            <Input placeholder="Contractor" value={wf.contractor_name ?? ''} onChange={(e) => setWf((p) => ({ ...p, contractor_name: e.target.value }))} />
+            <NumInput v={wf.cost} on={(x) => setWf((p) => ({ ...p, cost: x }))} />
+            <div className="sm:col-span-1"><Sel value={wf.priority} opts={['low', 'normal', 'high', 'urgent']} onChange={(v) => setWf((p) => ({ ...p, priority: v }))} /></div>
+            <Textarea placeholder="Description" className="sm:col-span-3" value={wf.description ?? ''} onChange={(e) => setWf((p) => ({ ...p, description: e.target.value }))} />
+            <div className="col-span-full flex gap-2"><Button size="sm" className="rounded-full" onClick={addWo} disabled={busy || !wf.title}>Add</Button><Button size="sm" variant="ghost" className="rounded-full" onClick={() => setWoAdding(false)}>Cancel</Button></div>
+          </CardContent></Card>
+        )}
+        {wos.length === 0 ? <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">No maintenance work orders.</div> : (
+          <Card><CardContent className="p-0"><div className="divide-y divide-border">
+            {wos.map((w) => (
+              <div key={w.id} className="flex items-start gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2"><span className="font-medium">{w.title}</span><Badge className={`${WO_TINT[w.status]} rounded-full border-0 text-[10px] capitalize`}>{w.status.replace('_', ' ')}</Badge>{w.priority !== 'normal' && <Badge className="rounded-full border-0 bg-muted text-[10px] capitalize">{w.priority}</Badge>}</div>
+                  {w.description && <div className="mt-0.5 text-xs text-muted-foreground">{w.description}</div>}
+                  <div className="mt-0.5 text-xs text-muted-foreground">{[w.contractor_name, w.cost != null ? offerMoney(w.cost, ccy) : null, new Date(w.reported_at).toLocaleDateString()].filter(Boolean).join(' · ')}</div>
+                </div>
+                {canManage && w.status !== 'completed' && w.status !== 'cancelled' && (
+                  <div className="flex shrink-0 gap-1.5">
+                    {w.status === 'open' && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => setWoStatus(w.id, 'in_progress')}>Start</Button>}
+                    <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => setWoStatus(w.id, 'completed')}><Check className="mr-1 h-3 w-3" /> Done</Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div></CardContent></Card>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // Offer ledger for a property — competing bids with qualification + accept/reject/counter cascade.
 const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: boolean; onAccepted: () => void }> = ({ ws, propertyId, canManage, onAccepted }) => {

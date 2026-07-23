@@ -81,6 +81,31 @@ export interface SellerLead {
 }
 export interface ValuationResult { estimate: number | null; range_low: number | null; range_high: number | null; currency: string; comps_count: number; median_per_sqm: number | null }
 
+// ── Lettings / property management (#281) ──
+export type RentFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export interface Tenancy {
+  id: string; property_id: string; tenant_contact_id: string | null; landlord_contact_id: string | null;
+  rent_amount: number; currency: string; rent_frequency: RentFrequency; deposit: number | null;
+  start_date: string; end_date: string | null; status: 'pending' | 'active' | 'ended' | 'terminated'; notes: string | null;
+  property?: { id: string; title: string | null; reference_code: string | null; town: string | null } | null;
+  tenant?: { id: string; name: string | null; email: string | null; phone: string | null } | null;
+  landlord?: { id: string; name: string | null } | null;
+}
+export interface RentCharge {
+  id: string; tenancy_id: string; due_date: string; amount: number; currency: string;
+  status: 'due' | 'paid' | 'overdue' | 'waived'; paid_at: string | null; paid_amount: number | null; note: string | null;
+}
+export interface MaintenanceWorkOrder {
+  id: string; property_id: string; tenancy_id: string | null; title: string; description: string | null;
+  status: 'open' | 'in_progress' | 'completed' | 'cancelled'; priority: 'low' | 'normal' | 'high' | 'urgent';
+  contractor_name: string | null; cost: number | null; reported_at: string; resolved_at: string | null;
+  property?: { id: string; title: string | null; reference_code: string | null } | null;
+}
+export interface LandlordStatement {
+  tenancy: Tenancy; currency: string;
+  summary: { rent_charged: number; rent_received: number; rent_outstanding: number; maintenance_spend: number; net_to_landlord: number };
+}
+
 export interface FeedSettings { workspace_id: string; feed_token: string; feed_enabled: boolean; feed_format: string }
 
 /** Public syndication feed URL a portal can pull. */
@@ -180,6 +205,24 @@ export const realEstateService = {
     call<{ viewing: PropertyViewing }>(ws, 'create-viewing', fields).then((r) => r.viewing),
   updateViewing: (ws: string, viewingId: string, fields: { status?: string; scheduled_at?: string; feedback?: string }) =>
     call<{ viewing: PropertyViewing }>(ws, 'update-viewing', { viewing_id: viewingId, ...fields }).then((r) => r.viewing),
+
+  // ── Lettings / property management (#281) ──
+  listTenancies: (ws: string, propertyId?: string) =>
+    call<{ tenancies: Tenancy[] }>(ws, 'list-tenancies', propertyId ? { property_id: propertyId } : {}).then((r) => r.tenancies),
+  upsertTenancy: (ws: string, fields: { tenancy_id?: string; property_id: string; tenant_contact_id?: string | null; landlord_contact_id?: string | null; rent_amount: number; currency?: string; rent_frequency?: RentFrequency; deposit?: number | null; start_date: string; end_date?: string | null; status?: string; notes?: string }) =>
+    call<{ tenancy: Tenancy }>(ws, 'upsert-tenancy', fields).then((r) => r.tenancy),
+  listRentCharges: (ws: string, tenancyId: string) =>
+    call<{ charges: RentCharge[] }>(ws, 'list-rent-charges', { tenancy_id: tenancyId }).then((r) => r.charges),
+  generateRentSchedule: (ws: string, tenancyId: string, periods = 12, fromDate?: string) =>
+    call<{ ok: true; created: number; skipped: number }>(ws, 'generate-rent-schedule', { tenancy_id: tenancyId, periods, from_date: fromDate }),
+  markRentPaid: (ws: string, chargeId: string, fields: { paid_amount?: number; status?: 'paid' | 'waived'; note?: string } = {}) =>
+    call<{ charge: RentCharge }>(ws, 'mark-rent-paid', { charge_id: chargeId, ...fields }).then((r) => r.charge),
+  listMaintenance: (ws: string, filters: { property_id?: string; status?: string } = {}) =>
+    call<{ work_orders: MaintenanceWorkOrder[] }>(ws, 'list-maintenance', filters).then((r) => r.work_orders),
+  upsertMaintenance: (ws: string, fields: { work_order_id?: string; property_id?: string; tenancy_id?: string | null; title?: string; description?: string; status?: string; priority?: string; contractor_name?: string; cost?: number | null }) =>
+    call<{ work_order: MaintenanceWorkOrder }>(ws, 'upsert-maintenance', fields).then((r) => r.work_order),
+  landlordStatement: (ws: string, tenancyId: string) =>
+    call<LandlordStatement>(ws, 'landlord-statement', { tenancy_id: tenancyId }),
 
   /** Upload a File to the signed URL returned by photoUploadUrl, then register the row. */
   async uploadPhoto(ws: string, propertyId: string, file: File, kind = 'photo'): Promise<PropertyPhoto> {

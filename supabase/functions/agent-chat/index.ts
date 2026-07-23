@@ -809,7 +809,7 @@ const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
   { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
   { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees)' },
   { slug: 'social-media', name: 'Hermes', blurb: 'publishing or scheduling social-media posts, social analytics, best time to post' },
-  { slug: 'property-advisor', name: 'Estate', blurb: 'real estate — property listings, instant valuations, viewings, offers, buyer/seller lead matching, portal syndication' },
+  { slug: 'property-advisor', name: 'Estate', blurb: 'real estate — property listings, instant valuations, viewings, offers, buyer/seller lead matching, portal syndication, lettings (tenancies, rent, maintenance)' },
 ];
 
 /**

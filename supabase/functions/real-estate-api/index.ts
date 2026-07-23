@@ -730,6 +730,152 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ settings: data });
       }
 
+      // ── Lettings / property management (#281) — tenancies → rent ledger → maintenance ──
+      // A tenancy hangs off a rental property; its rent charges are the ledger; maintenance
+      // work-orders are per property. Landlord statement = rent received − maintenance cost.
+      case 'list-tenancies': {
+        // workspace-wide list for the Lettings dashboard, or property-scoped when property_id given
+        let q = supabase.from('property_tenancies')
+          .select('*, property:properties!property_tenancies_property_id_fkey ( id, title, reference_code, town, listing_agent_id, created_by, open_for_all ), tenant:crm_contacts!property_tenancies_tenant_contact_id_fkey ( id, name, email, phone ), landlord:crm_contacts!property_tenancies_landlord_contact_id_fkey ( id, name )')
+          .eq('workspace_id', workspaceId).order('created_at', { ascending: false });
+        if (body.property_id) q = q.eq('property_id', String(body.property_id));
+        const { data, error } = await q;
+        if (error) throw new HttpError(400, error.message);
+        // agent scoping: non-brokers only see tenancies on listings they can view
+        const rows = (data ?? []).filter((t: any) => access.isBroker || canViewProperty(t.property ?? {}));
+        return json({ tenancies: rows });
+      }
+
+      case 'upsert-tenancy': {
+        requireManage();
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        await loadEditable(propertyId); // owner-or-broker on the underlying listing
+        if (body.rent_amount == null || !body.start_date) return json({ error: 'rent_amount and start_date are required' }, 400);
+        const payload = pick(body, ['tenant_contact_id', 'landlord_contact_id', 'rent_amount', 'currency', 'rent_frequency', 'deposit', 'start_date', 'end_date', 'status', 'notes']);
+        const tenancyId = String(body.tenancy_id ?? '');
+        if (tenancyId) {
+          const { data, error } = await supabase.from('property_tenancies').update(payload).eq('id', tenancyId).eq('workspace_id', workspaceId).select('*').single();
+          if (error) throw new HttpError(400, error.message);
+          return json({ tenancy: data });
+        }
+        const { data, error } = await supabase.from('property_tenancies')
+          .insert({ ...payload, workspace_id: workspaceId, property_id: propertyId, agent_id: userId, created_by: userId }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ tenancy: data });
+      }
+
+      case 'list-rent-charges': {
+        const tenancyId = String(body.tenancy_id ?? '');
+        if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        const { data, error } = await supabase.from('property_rent_charges')
+          .select('*').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId).order('due_date', { ascending: true });
+        if (error) throw new HttpError(400, error.message);
+        return json({ charges: data ?? [] });
+      }
+
+      case 'generate-rent-schedule': {
+        requireManage();
+        const tenancyId = String(body.tenancy_id ?? '');
+        const periods = Math.min(Math.max(Number(body.periods ?? 12), 1), 60);
+        if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        const { data: t } = await supabase.from('property_tenancies').select('*').eq('id', tenancyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!t) return json({ error: 'not found' }, 404);
+        await loadEditable(t.property_id);
+        const start = new Date(String(body.from_date ?? t.start_date));
+        const rows: any[] = [];
+        for (let i = 0; i < periods; i++) {
+          const d = new Date(start);
+          if (t.rent_frequency === 'weekly') d.setUTCDate(d.getUTCDate() + i * 7);
+          else if (t.rent_frequency === 'quarterly') d.setUTCMonth(d.getUTCMonth() + i * 3);
+          else if (t.rent_frequency === 'yearly') d.setUTCFullYear(d.getUTCFullYear() + i);
+          else d.setUTCMonth(d.getUTCMonth() + i); // monthly
+          if (t.end_date && d > new Date(t.end_date)) break;
+          rows.push({ workspace_id: workspaceId, tenancy_id: tenancyId, due_date: d.toISOString().slice(0, 10), amount: t.rent_amount, currency: t.currency, status: 'due' });
+        }
+        // skip due dates already scheduled so re-running is idempotent
+        const { data: existing } = await supabase.from('property_rent_charges').select('due_date').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId);
+        const seen = new Set((existing ?? []).map((r: any) => r.due_date));
+        const fresh = rows.filter((r) => !seen.has(r.due_date));
+        if (fresh.length) {
+          const { error } = await supabase.from('property_rent_charges').insert(fresh);
+          if (error) throw new HttpError(400, error.message);
+        }
+        return json({ ok: true, created: fresh.length, skipped: rows.length - fresh.length });
+      }
+
+      case 'mark-rent-paid': {
+        requireManage();
+        const chargeId = String(body.charge_id ?? '');
+        if (!chargeId) return json({ error: 'charge_id is required' }, 400);
+        const { data: charge } = await supabase.from('property_rent_charges').select('amount, tenancy_id').eq('id', chargeId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!charge) return json({ error: 'not found' }, 404);
+        const paid = body.status === 'waived';
+        const patch = paid
+          ? { status: 'waived' as const, paid_at: null, paid_amount: null, note: body.note ?? null }
+          : { status: 'paid' as const, paid_at: new Date().toISOString(), paid_amount: Number(body.paid_amount ?? charge.amount), note: body.note ?? null };
+        const { data, error } = await supabase.from('property_rent_charges').update(patch).eq('id', chargeId).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ charge: data });
+      }
+
+      case 'list-maintenance': {
+        let q = supabase.from('property_maintenance')
+          .select('*, property:properties!property_maintenance_property_id_fkey ( id, title, reference_code, listing_agent_id, created_by, open_for_all )')
+          .eq('workspace_id', workspaceId).order('reported_at', { ascending: false });
+        if (body.property_id) q = q.eq('property_id', String(body.property_id));
+        if (body.status) q = q.eq('status', String(body.status));
+        const { data, error } = await q;
+        if (error) throw new HttpError(400, error.message);
+        const rows = (data ?? []).filter((m: any) => access.isBroker || canViewProperty(m.property ?? {}));
+        return json({ work_orders: rows });
+      }
+
+      case 'upsert-maintenance': {
+        requireManage();
+        const propertyId = String(body.property_id ?? '');
+        const woId = String(body.work_order_id ?? '');
+        if (!propertyId && !woId) return json({ error: 'property_id is required' }, 400);
+        const payload = pick(body, ['tenancy_id', 'title', 'description', 'status', 'priority', 'contractor_name', 'cost', 'resolved_at']);
+        if (woId) {
+          const { data: existing } = await supabase.from('property_maintenance').select('property_id').eq('id', woId).eq('workspace_id', workspaceId).maybeSingle();
+          if (!existing) return json({ error: 'not found' }, 404);
+          await loadEditable(existing.property_id);
+          if (payload.status === 'completed' && body.resolved_at == null) (payload as any).resolved_at = new Date().toISOString();
+          const { data, error } = await supabase.from('property_maintenance').update(payload).eq('id', woId).eq('workspace_id', workspaceId).select('*').single();
+          if (error) throw new HttpError(400, error.message);
+          return json({ work_order: data });
+        }
+        await loadEditable(propertyId);
+        if (!payload.title) return json({ error: 'title is required' }, 400);
+        const { data, error } = await supabase.from('property_maintenance')
+          .insert({ ...payload, workspace_id: workspaceId, property_id: propertyId, created_by: userId }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ work_order: data });
+      }
+
+      case 'landlord-statement': {
+        // Per-tenancy summary: rent charged / received / outstanding + maintenance spend = net to landlord.
+        const tenancyId = String(body.tenancy_id ?? '');
+        if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        const { data: t } = await supabase.from('property_tenancies').select('*, property:properties!property_tenancies_property_id_fkey ( id, title, listing_agent_id, created_by, open_for_all )').eq('id', tenancyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!t) return json({ error: 'not found' }, 404);
+        if (!access.isBroker && !canViewProperty(t.property ?? {})) return json({ error: 'not found' }, 404);
+        const [{ data: charges }, { data: wos }] = await Promise.all([
+          supabase.from('property_rent_charges').select('amount, paid_amount, status').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId),
+          supabase.from('property_maintenance').select('cost, status').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId),
+        ]);
+        const num = (x: any) => Number(x ?? 0);
+        const rentCharged = (charges ?? []).filter((c: any) => c.status !== 'waived').reduce((s: number, c: any) => s + num(c.amount), 0);
+        const rentReceived = (charges ?? []).filter((c: any) => c.status === 'paid').reduce((s: number, c: any) => s + num(c.paid_amount), 0);
+        const outstanding = (charges ?? []).filter((c: any) => c.status === 'due' || c.status === 'overdue').reduce((s: number, c: any) => s + num(c.amount), 0);
+        const maintenanceSpend = (wos ?? []).reduce((s: number, w: any) => s + num(w.cost), 0);
+        return json({
+          tenancy: t, currency: t.currency,
+          summary: { rent_charged: rentCharged, rent_received: rentReceived, rent_outstanding: outstanding, maintenance_spend: maintenanceSpend, net_to_landlord: rentReceived - maintenanceSpend },
+        });
+      }
+
       default:
         return json({ error: `Unknown action: ${action}` }, 400);
     }

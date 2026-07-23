@@ -44,7 +44,7 @@ export const createManageRealEstateTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, status, property_type, transaction_type, title, price, town, scheduled_at, property_id }) => {
+    async ({ action, status, property_type, transaction_type, title, price, town, scheduled_at, property_id, work_order_title, work_order_description }) => {
       if (!workspaceId) return JSON.stringify({ success: false, error: 'No active workspace.' });
       if (!jwt) return JSON.stringify({ success: false, error: 'Real Estate tools require an authenticated session.' });
       if (!await moduleEnabled()) return JSON.stringify({ success: false, error: 'The Real Estate module is not enabled on this platform.' });
@@ -104,6 +104,27 @@ export const createManageRealEstateTool = (
           onChunk?.({ type: 'real_estate_description_draft', draft: res.data, timestamp: Date.now() });
           return JSON.stringify({ success: true, title: res.data?.title, description_en: res.data?.description_en, credits: res.data?.credits, note: 'Draft copy — review and Save it on the listing.' });
         }
+        case 'list_lettings': {
+          const [tRes, mRes] = await Promise.all([
+            callApi(jwt, workspaceId, 'list-tenancies', property_id ? { property_id } : {}),
+            callApi(jwt, workspaceId, 'list-maintenance', { status: 'open' }),
+          ]);
+          if (!tRes.ok) return JSON.stringify({ success: false, error: tRes.error });
+          const tenancies = tRes.data?.tenancies ?? [];
+          const openWork = mRes.ok ? (mRes.data?.work_orders ?? []) : [];
+          return JSON.stringify({
+            success: true,
+            tenancy_count: tenancies.length,
+            tenancies: tenancies.slice(0, 25).map((t: any) => ({ id: t.id, property: t.property?.title, tenant: t.tenant?.name, rent: t.rent_amount, currency: t.currency, frequency: t.rent_frequency, status: t.status })),
+            open_work_orders: openWork.slice(0, 25).map((w: any) => ({ id: w.id, property: w.property?.title, title: w.title, priority: w.priority, status: w.status })),
+          });
+        }
+        case 'log_maintenance': {
+          if (!property_id || !work_order_title) return JSON.stringify({ success: false, error: 'property_id and work_order_title are required' });
+          const res = await callApi(jwt, workspaceId, 'upsert-maintenance', { property_id, title: work_order_title, description: work_order_description });
+          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          return JSON.stringify({ success: true, work_order: res.data?.work_order, note: 'Work order logged. Assign a contractor and track it in the listing Lettings tab.' });
+        }
         default:
           return JSON.stringify({ success: false, error: `Unknown action: ${action}` });
       }
@@ -116,14 +137,16 @@ export const createManageRealEstateTool = (
         '  • list_properties — listings; optional status or property_type filter.',
         '  • get_property     — one listing with photo/inquiry counts (needs property_id).',
         '  • find_leads       — inquiries/leads; optional status/property_id. An invited agent sees only their own.',
+        '  • list_lettings    — active tenancies + open maintenance work orders (optional property_id).',
         'Writes:',
         '  • create_listing   — create a DRAFT listing (title + property_type + transaction_type; optional price, town). Returns the id to finish in the workbench.',
         '  • publish_listing  — take a listing live (needs property_id). Fails with the missing fields if compliance requirements aren’t met (GR: energy class + Electronic Building ID, short-let: ΑΜΑ).',
         '  • schedule_viewing — book a viewing (needs property_id + scheduled_at ISO datetime). Syncs to the calendar with a reminder.',
         '  • draft_description — AI-generate listing copy (needs property_id). CREDIT-METERED. Returns a draft to review, does not auto-save.',
+        '  • log_maintenance  — raise a maintenance work order on a rental (needs property_id + work_order_title).',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_properties', 'get_property', 'find_leads', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description']).describe('Which action to run.'),
+        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description', 'log_maintenance']).describe('Which action to run.'),
         status: z.string().optional().describe('Filter by listing_status (properties) or inquiry status (leads).'),
         property_type: z.string().optional().describe('residential/commercial/land/other — filter, or category for create_listing.'),
         transaction_type: z.string().optional().describe('sale/rent/short_let/business_transfer — for create_listing.'),
@@ -131,7 +154,9 @@ export const createManageRealEstateTool = (
         price: z.number().optional().describe('Asking price for create_listing.'),
         town: z.string().optional().describe('Town/area for create_listing.'),
         scheduled_at: z.string().optional().describe('ISO datetime for schedule_viewing.'),
-        property_id: z.string().optional().describe('Target a specific listing (required for get_property/publish/schedule/draft).'),
+        property_id: z.string().optional().describe('Target a specific listing (required for get_property/publish/schedule/draft/log_maintenance).'),
+        work_order_title: z.string().optional().describe('Maintenance issue summary for log_maintenance.'),
+        work_order_description: z.string().optional().describe('Optional detail for log_maintenance.'),
       }),
     },
   );
