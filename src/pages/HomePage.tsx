@@ -16,9 +16,11 @@ import {
   ArrowRight,
   Bot,
   Boxes,
+  Briefcase,
   Building2,
   Calculator,
   FileText,
+  Home,
   Image as ImageIcon,
   LineChart,
   LogIn,
@@ -27,6 +29,7 @@ import {
   Sparkles,
   Store,
   Wand2,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -96,10 +99,29 @@ const FEATURES: Feature[] = [
     description:
       'Publish an online storefront, share catalogs, and connect with brands and buyers through the materials marketplace.',
   },
+  {
+    icon: Home,
+    title: 'Real estate & listings',
+    description:
+      'Run property listings end to end — publish public listing pages, capture buyer requirements with auto-matching, schedule viewings, track offers, and syndicate to portals.',
+  },
+  {
+    icon: Briefcase,
+    title: 'Hiring & careers',
+    description:
+      'Post openings to a branded public careers page and job board, collect résumés, and manage candidates — your own recruiting pipeline built in.',
+  },
+  {
+    icon: Workflow,
+    title: 'Automations & add-on apps',
+    description:
+      'Enable modular add-ons from a Hub-grouped app store and automate notifications, emails and workflows with a visual flow builder — no code required.',
+  },
 ];
 
 /** Free, no-login public tools already live on the platform. */
 const TOOLS: { label: string; to: string }[] = [
+  { label: 'Material search', to: '/tools/product-search' },
   { label: 'Price scan', to: '/tools/price-scan' },
   { label: 'Mention scan', to: '/tools/mention-scan' },
   { label: 'Project plan estimator', to: '/tools/project-plan' },
