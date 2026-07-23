@@ -457,7 +457,25 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       } else {
         const cf = pick(body?.candidate ?? {}, ['name', 'email', 'phone', 'headline', 'source']);
         if (!cf.name) return json({ error: 'candidate.name is required' }, 400);
-        const { data: created, error: cErr } = await supabase.from('hr_candidates').insert({ ...cf, workspace_id: workspaceId }).select('id').single();
+        // Shared-spine link: an applicant is the SAME person the CRM sees. Resolve/create a
+        // crm_contacts row (lead_source='application') so recruitment and CRM share one identity.
+        // Best-effort — never block the application on the link.
+        let crmContactId: string | null = null;
+        try {
+          const email = String((cf as any).email ?? '').trim().toLowerCase();
+          if (email) {
+            const { data: existing } = await supabase.from('crm_contacts')
+              .select('id').eq('workspace_id', workspaceId).ilike('email', email).limit(1).maybeSingle();
+            crmContactId = existing?.id ?? null;
+          }
+          if (!crmContactId) {
+            const { data: c2 } = await supabase.from('crm_contacts')
+              .insert({ workspace_id: workspaceId, name: String((cf as any).name), email: email || null, phone: (cf as any).phone ?? null, lead_source: 'application' })
+              .select('id').single();
+            crmContactId = c2?.id ?? null;
+          }
+        } catch { /* best-effort spine link */ }
+        const { data: created, error: cErr } = await supabase.from('hr_candidates').insert({ ...cf, workspace_id: workspaceId, crm_contact_id: crmContactId }).select('id').single();
         if (cErr) throw new HttpError(400, cErr.message);
         candidateId = created.id;
       }

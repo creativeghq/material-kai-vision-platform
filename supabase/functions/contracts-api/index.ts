@@ -147,6 +147,29 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
       ...pick(body, WRITABLE),
       ...pick(body, SUBJECT_COLS),
     };
+
+    // Shared-spine link: resolve the free-text counterparty to a crm_contacts row so a contract
+    // party is the SAME person the CRM/Finance/RE modules see. Best-effort — never block contract
+    // creation on the link (matches the degrade-silently pattern used across ingest paths).
+    if (!payload.crm_contact_id && (body?.counterparty_email || body?.counterparty_name)) {
+      try {
+        const email = String(body?.counterparty_email ?? '').trim().toLowerCase();
+        let contactId: string | null = null;
+        if (email) {
+          const { data: existing } = await asUser.from('crm_contacts')
+            .select('id').eq('workspace_id', workspaceId).ilike('email', email).limit(1).maybeSingle();
+          contactId = existing?.id ?? null;
+        }
+        if (!contactId) {
+          const { data: created } = await asUser.from('crm_contacts')
+            .insert({ workspace_id: workspaceId, name: String(body?.counterparty_name ?? email ?? 'Contract counterparty'), email: email || null, created_by: userId, lead_source: 'contract' })
+            .select('id').single();
+          contactId = created?.id ?? null;
+        }
+        if (contactId) payload.crm_contact_id = contactId;
+      } catch { /* best-effort spine link — proceed without it */ }
+    }
+
     const { data, error } = await asUser.from('contracts').insert(payload).select().single();
     if (error) return json({ error: error.message }, error.code === '42501' ? 403 : 400);
     return json({ contract: data });
