@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Sparkles } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Sparkles, Columns3 } from 'lucide-react';
+import { PipelineBoard } from '../components/PipelineBoard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -79,6 +80,7 @@ export default function RealEstatePage() {
           <TabsList className="mb-4 bg-muted">
             <TabsTrigger value="overview"><LayoutDashboard className="mr-1.5 h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="listings"><Building2 className="mr-1.5 h-4 w-4" /> Listings</TabsTrigger>
+            <TabsTrigger value="pipeline"><Columns3 className="mr-1.5 h-4 w-4" /> Pipeline</TabsTrigger>
             <TabsTrigger value="leads"><Inbox className="mr-1.5 h-4 w-4" /> Leads</TabsTrigger>
             <TabsTrigger value="buyers"><Users className="mr-1.5 h-4 w-4" /> Buyers</TabsTrigger>
             <TabsTrigger value="sellers"><Store className="mr-1.5 h-4 w-4" /> Sellers</TabsTrigger>
@@ -89,6 +91,7 @@ export default function RealEstatePage() {
             {canManage && <TabsTrigger value="syndication"><Rss className="mr-1.5 h-4 w-4" /> Syndication</TabsTrigger>}
           </TabsList>
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
+          <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="listings"><ListingsPanel ws={ws} canManage={canManage} creating={creating} onCreate={createDraft} /></TabsContent>
           <TabsContent value="leads"><LeadsPanel ws={ws} /></TabsContent>
           <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>
