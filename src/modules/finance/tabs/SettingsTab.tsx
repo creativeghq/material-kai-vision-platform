@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
+import { PaymentProvidersCard } from '@/modules/payments/components/PaymentProvidersCard';
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
 import { DocumentSetupCard } from '@/modules/finance/components/DocumentSetupCard';
 import { InvoiceTemplateCard } from '@/modules/finance/components/InvoiceTemplateCard';
@@ -261,7 +262,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <BankAccountsCard workspaceId={workspaceId} />
         </TabsContent>
 
-        <TabsContent value="payments" className="mt-0">
+        <TabsContent value="payments" className="mt-0 space-y-4">
+          <PaymentProvidersCard workspaceId={workspaceId} />
           <PaymentRoutingCard workspaceId={workspaceId} />
         </TabsContent>
 

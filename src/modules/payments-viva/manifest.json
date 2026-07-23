@@ -3,7 +3,7 @@
   "name": "Viva.com",
   "description": "Viva.com as a payment provider — per-workspace BYOK merchant account, Smart Checkout card payments and Greek RF bank-transfer codes. Funds settle directly to the workspace's own Viva wallet. Sibling to payments-stripe.",
   "category": "core",
-  "priceTier": "free",
+  "priceTier": "pro",
   "icon": "CreditCard",
   "version": "0.1.0",
   "provides": { "payments": true }
