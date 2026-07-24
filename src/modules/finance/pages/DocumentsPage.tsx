@@ -7,8 +7,8 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2 } from 'lucide-react';
-import { Card, CardContent } from '@/components/core/ui/card';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -209,72 +209,83 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
 
   const statusVariant = (s: string) => s === 'overdue' ? 'destructive' : s === 'paid' ? 'default' : 'outline';
 
+  // Type-conditional header actions — shared by the dispatch (board) and table layouts so the
+  // title/actions look identical whether the content is a Card table or the kanban board.
+  const docActions = (
+    <div className="flex items-center gap-2 flex-wrap">
+      {type !== 'dispatch' && filterGroups.length > 0 && (
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          title={`Filter ${DOC_LABEL[type].toLowerCase()}`}
+        />
+      )}
+      {type === 'receipts' && !isAccountant && (
+        <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
+      )}
+      {(type === 'invoices' || type === 'expenses') && canOperateFinance && (
+        <Button size="sm" variant="outline" disabled={syncing} onClick={syncInbound}>
+          {syncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Wallet className="h-3.5 w-3.5 mr-1" />} Sync from myDATA
+        </Button>
+      )}
+      {(type === 'invoices' || type === 'receipts') && canOperateFinance && (
+        <Button size="sm" variant="outline" onClick={() => setCategoryKind('income')} title="Add an internal income category">
+          <Tags className="h-3.5 w-3.5 mr-1" /> Income category
+        </Button>
+      )}
+      {type === 'expenses' && canOperateFinance && (
+        <Button size="sm" variant="outline" onClick={() => setCategoryKind('expense')} title="Add an internal expense category">
+          <Tags className="h-3.5 w-3.5 mr-1" /> Expense category
+        </Button>
+      )}
+      {type === 'expenses' && canOperateFinance && (
+        <Button size="sm" onClick={() => setNewExpenseOpen(true)} title="Record a business expense (rent, utilities, fees…)">
+          <Plus className="h-3.5 w-3.5 mr-1" /> Add expense
+        </Button>
+      )}
+      {(type === 'invoices' || type === 'receipts') && !isAccountant && (
+        <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+      )}
+      {type === 'delivery_notes' && !isAccountant && (
+        <Button size="sm" onClick={() => setNewDeliveryOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+      )}
+      {type === 'dispatch' && !isAccountant && (
+        <Button size="sm" onClick={() => setNewDeliveryOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add manual note</Button>
+      )}
+      {type === 'cheques' && !isAccountant && (
+        <Button size="sm" onClick={() => setNewChequeOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+      )}
+      {type === 'payments' && canOperateFinance && (
+        <Button size="sm" onClick={() => setRecordPaymentOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
+      )}
+      {type === 'credit_notes' && !isAccountant && (
+        <Button size="sm" onClick={() => setNewCreditNoteOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
+      )}
+    </div>
+  );
+
   return (
     <div>
       <div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           {/* Content — the document-type nav lives in FinancePage's DOC_TABS sidebar. */}
           <div className="min-w-0 flex-1 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold capitalize">{DOC_LABEL[type]}</h2>
-              <div className="flex items-center gap-2">
-                {type !== 'dispatch' && filterGroups.length > 0 && (
-                  <FilterBar
-                    groups={filterGroups}
-                    values={filterValues}
-                    onChange={setFilterValues}
-                    previewCount={previewCount}
-                    title={`Filter ${DOC_LABEL[type].toLowerCase()}`}
-                  />
-                )}
-                {type === 'receipts' && !isAccountant && (
-                  <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
-                )}
-                {(type === 'invoices' || type === 'expenses') && canOperateFinance && (
-                  <Button size="sm" variant="outline" disabled={syncing} onClick={syncInbound}>
-                    {syncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Wallet className="h-3.5 w-3.5 mr-1" />} Sync from myDATA
-                  </Button>
-                )}
-                {(type === 'invoices' || type === 'receipts') && canOperateFinance && (
-                  <Button size="sm" variant="outline" onClick={() => setCategoryKind('income')} title="Add an internal income category">
-                    <Tags className="h-3.5 w-3.5 mr-1" /> Income category
-                  </Button>
-                )}
-                {type === 'expenses' && canOperateFinance && (
-                  <Button size="sm" variant="outline" onClick={() => setCategoryKind('expense')} title="Add an internal expense category">
-                    <Tags className="h-3.5 w-3.5 mr-1" /> Expense category
-                  </Button>
-                )}
-                {type === 'expenses' && canOperateFinance && (
-                  <Button size="sm" onClick={() => setNewExpenseOpen(true)} title="Record a business expense (rent, utilities, fees…)">
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add expense
-                  </Button>
-                )}
-                {(type === 'invoices' || type === 'receipts') && !isAccountant && (
-                  <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
-                )}
-                {type === 'delivery_notes' && !isAccountant && (
-                  <Button size="sm" onClick={() => setNewDeliveryOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
-                )}
-                {type === 'dispatch' && !isAccountant && (
-                  <Button size="sm" onClick={() => setNewDeliveryOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add manual note</Button>
-                )}
-                {type === 'cheques' && !isAccountant && (
-                  <Button size="sm" onClick={() => setNewChequeOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
-                )}
-                {type === 'payments' && canOperateFinance && (
-                  <Button size="sm" onClick={() => setRecordPaymentOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
-                )}
-                {type === 'credit_notes' && !isAccountant && (
-                  <Button size="sm" onClick={() => setNewCreditNoteOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
-                )}
-              </div>
-            </div>
-
             {type === 'dispatch' ? (
-              activeWorkspaceId ? <DispatchBoard key={dispatchRefresh} workspaceId={activeWorkspaceId} readOnly={isAccountant} /> : null
+              <>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <h2 className="text-sm font-semibold capitalize flex items-center gap-2"><Truck className="h-4 w-4" /> {DOC_LABEL[type]}</h2>
+                  {docActions}
+                </div>
+                {activeWorkspaceId ? <DispatchBoard key={dispatchRefresh} workspaceId={activeWorkspaceId} readOnly={isAccountant} /> : null}
+              </>
             ) : (
             <Card>
+              <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
+                <CardTitle className="text-sm flex items-center gap-2 capitalize"><FileText className="h-4 w-4" /> {DOC_LABEL[type]}</CardTitle>
+                {docActions}
+              </CardHeader>
               <CardContent className="p-0">
                 {loading || wsLoading ? (
                   <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>

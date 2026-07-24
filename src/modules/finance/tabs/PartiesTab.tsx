@@ -160,21 +160,6 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold">Customers &amp; Suppliers</h3>
-          <p className="text-xs text-muted-foreground">Combined view of every CRM party with finance activity. Click a row for the full breakdown and to email a statement.</p>
-        </div>
-        <FilterBar
-          groups={filterGroups}
-          values={filterValues}
-          onChange={setFilterValues}
-          previewCount={previewCount}
-          searchPlaceholder="Name or email"
-          title="Filter parties"
-        />
-      </div>
-
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Card className="dashboard-card border-0"><CardContent className="p-3">
           <div className="text-xs text-muted-foreground">Total customers owe</div>
@@ -199,6 +184,20 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
       </div>
 
       <Card>
+        <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Users className="h-4 w-4" /> Customers &amp; Suppliers
+            <span className="text-[10px] font-normal text-muted-foreground">· finance activity</span>
+          </CardTitle>
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            searchPlaceholder="Name or email"
+            title="Filter parties"
+          />
+        </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>

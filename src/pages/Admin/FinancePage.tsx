@@ -745,27 +745,26 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── RECEIVABLES ─────────── */}
           <TabsContent value="ar" className="space-y-4">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div>
-                <h3 className="text-sm font-semibold">Receivables — money customers owe us</h3>
-                <p className="text-xs text-muted-foreground">Open invoices plus confirmed orders not yet invoiced. To invoice an accepted quote, use Issue invoice on the quote page.</p>
-              </div>
-              {!isAccountant && (
-                <div className="flex items-center gap-2">
-                  <Button onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
-                </div>
-              )}
-            </div>
-
             <BucketCards buckets={arBuckets} active={arBucket} onPick={pickArBucket} noun="receivable(s)" />
-            <FilterBar
-              groups={arGroups} values={arValues} onChange={setArValues}
-              previewCount={arPreview}
-              searchPlaceholder="Search customer / number…"
-              title="Filter receivables"
-            />
 
             <Card>
+              <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> Receivables
+                  <span className="text-[10px] font-normal text-muted-foreground">· money customers owe us</span>
+                </CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <FilterBar
+                    groups={arGroups} values={arValues} onChange={setArValues}
+                    previewCount={arPreview}
+                    searchPlaceholder="Search customer / number…"
+                    title="Filter receivables"
+                  />
+                  {!isAccountant && (
+                    <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+                  )}
+                </div>
+              </CardHeader>
               <CardContent className="p-0">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
@@ -872,27 +871,26 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── PAYABLES ─────────── */}
           <TabsContent value="ap" className="space-y-4">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div>
-                <h3 className="text-sm font-semibold">Payables — money we owe</h3>
-                <p className="text-xs text-muted-foreground">Open supplier bills plus confirmed purchase orders not yet billed. Suppliers must be marked <code>is_supplier</code> in CRM.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {!isAccountant && <Button variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
-                {!isAccountant && <Button variant="outline" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>}
-                {!isAccountant && <Button onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
-              </div>
-            </div>
-
             <BucketCards buckets={apBuckets} active={apBucket} onPick={pickApBucket} noun="bill(s)" />
-            <FilterBar
-              groups={apGroups} values={apValues} onChange={setApValues}
-              previewCount={apPreview}
-              searchPlaceholder="Search supplier / bill #…"
-              title="Filter payables"
-            />
 
             <Card>
+              <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Banknote className="h-4 w-4" /> Payables
+                  <span className="text-[10px] font-normal text-muted-foreground">· money we owe</span>
+                </CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <FilterBar
+                    groups={apGroups} values={apValues} onChange={setApValues}
+                    previewCount={apPreview}
+                    searchPlaceholder="Search supplier / bill #…"
+                    title="Filter payables"
+                  />
+                  {!isAccountant && <Button size="sm" variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
+                  {!isAccountant && <Button size="sm" variant="outline" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>}
+                  {!isAccountant && <Button size="sm" onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
+                </div>
+              </CardHeader>
               <CardContent className="p-0">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
