@@ -1603,120 +1603,137 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
             )}
 
             {payOpen && (
-              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-medium flex items-center gap-1">
-                    {editingPaymentId && <span className="text-muted-foreground">Edit ·</span>}
-                    {payDir === 'in' ? <><ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500" /> Money in (received)</> : <><ArrowUpRight className="h-3.5 w-3.5 text-red-400" /> Money out (sent)</>}
+              <div className="rounded-md border border-border/60 bg-muted/20 p-4 space-y-4">
+                {/* Header — what this panel does + close. */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold flex items-center gap-1.5">
+                    {editingPaymentId && <span className="text-muted-foreground font-normal">Edit ·</span>}
+                    {payDir === 'in'
+                      ? <><ArrowDownLeft className="h-4 w-4 text-emerald-500" /> Money in (received)</>
+                      : <><ArrowUpRight className="h-4 w-4 text-red-400" /> Money out (sent)</>}
                   </span>
-                  <Input className="h-8 w-28 text-right text-sm" type="text" inputMode="decimal" placeholder="0.00" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
-                  <span className="text-xs text-muted-foreground">{order.currency}</span>
-                  {/* Icon-only confirm/dismiss — the row is already dense with inputs, so two
-                      more word-buttons read as further fields rather than as the actions. */}
-                  <Button
-                    size="icon" className="h-8 w-8 rounded-full" onClick={recordPay} disabled={saving}
-                    title={editingPaymentId ? 'Update payment' : 'Save payment'}
-                    aria-label={editingPaymentId ? 'Update payment' : 'Save payment'}
-                  >
-                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-4 w-4" />}
-                  </Button>
-                  <Button
-                    size="icon" variant="ghost"
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                    onClick={() => { setPayOpen(false); setEditingPaymentId(null); }}
-                    title="Cancel" aria-label="Cancel"
-                  >
+                  <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => { setPayOpen(false); setEditingPaymentId(null); }} title="Cancel" aria-label="Cancel">
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                {/* Money out: which supplier we're paying (so it registers against them) + a reason. */}
-                {payDir === 'out' && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {paySupplier ? (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs"><Building2 className="h-3 w-3" /> {paySupplier.name}
-                        <button type="button" className="ml-1 text-muted-foreground hover:text-foreground" onClick={() => setPaySupplier(null)}>✕</button>
-                      </span>
+
+                {/* Labelled fields — one consistent grid, aligned, full-width inputs. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Amount</Label>
+                    <div className="flex items-center gap-2">
+                      <Input className="h-9 flex-1 text-right" type="text" inputMode="decimal" placeholder="0.00" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
+                      <span className="text-sm text-muted-foreground w-8">{order.currency}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">{payDir === 'in' ? 'Received into account' : 'Paid from account'}</Label>
+                    {bankAccounts.length > 0 ? (
+                      <Select value={payAccountId} onValueChange={(v) => { setPayAccountId(v); setPayMethod(methodForAccount(v)); }}>
+                        <SelectTrigger className="h-9 w-full"><SelectValue placeholder="Select an account" /></SelectTrigger>
+                        <SelectContent>{ACCOUNT_KIND_ORDER
+                          .map((k) => ({ kind: k, items: bankAccounts.filter((a) => a.kind === k) }))
+                          .filter((g) => g.items.length > 0)
+                          .map((g) => (
+                            <SelectGroup key={g.kind}>
+                              <SelectLabel>{ACCOUNT_KIND_LABEL[g.kind]}</SelectLabel>
+                              {g.items.map((a) => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  <span className="flex w-full items-center justify-between gap-4">
+                                    <span>{a.name}{a.currency !== order.currency ? ` · ${a.currency}` : ''}</span>
+                                    {acctBalance.has(a.id) && (
+                                      <span className={`tabular-nums text-[11px] ${(acctBalance.get(a.id) ?? 0) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                        {formatMoney(acctBalance.get(a.id) ?? 0, a.currency)}
+                                      </span>
+                                    )}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}</SelectContent>
+                      </Select>
                     ) : (
-                      <div className="relative">
-                        <Input className="h-8 w-56 text-sm" value={paySupplierSearch} onChange={(e) => setPaySupplierSearch(e.target.value)} placeholder="Pay which supplier? Search…" />
-                        {paySupplierOpts.length > 0 && (
-                          <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
-                            {paySupplierOpts.map((s) => (
-                              <button key={s.id} type="button" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setPaySupplier(s); setPaySupplierSearch(''); setPaySupplierOpts([]); }}>{s.name}</button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <Button size="sm" variant="outline" className="h-9 w-full" onClick={createCashAccount} disabled={creatingAccount}>
+                        {creatingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Plus className="h-3.5 w-3.5 mr-1" /> Create cash account</>}
+                      </Button>
                     )}
                   </div>
-                )}
-                {/* Required for every cash movement: which account it hits, how it moved, and why.
-                    Without an account the money floats unattached and never shows in finance balances. */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {bankAccounts.length > 0 ? (
-                    <Select value={payAccountId} onValueChange={(v) => { setPayAccountId(v); setPayMethod(methodForAccount(v)); }}>
-                      <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="Account…" /></SelectTrigger>
-                      <SelectContent>{ACCOUNT_KIND_ORDER
-                        .map((k) => ({ kind: k, items: bankAccounts.filter((a) => a.kind === k) }))
-                        .filter((g) => g.items.length > 0)
-                        .map((g) => (
-                          <SelectGroup key={g.kind}>
-                            <SelectLabel>{ACCOUNT_KIND_LABEL[g.kind]}</SelectLabel>
-                            {g.items.map((a) => (
-                              <SelectItem key={a.id} value={a.id}>
-                                <span className="flex w-full items-center justify-between gap-4">
-                                  <span>{a.name}{a.currency !== order.currency ? ` · ${a.currency}` : ''}</span>
-                                  {acctBalance.has(a.id) && (
-                                    <span className={`tabular-nums text-[11px] ${(acctBalance.get(a.id) ?? 0) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                                      {formatMoney(acctBalance.get(a.id) ?? 0, a.currency)}
-                                    </span>
-                                  )}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        ))}</SelectContent>
-                    </Select>
-                  ) : (
-                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={createCashAccount} disabled={creatingAccount}>
-                      {creatingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Plus className="h-3.5 w-3.5 mr-1" /> Create cash account</>}
-                    </Button>
+
+                  {/* Money out is attached to a supplier — who we're paying. */}
+                  {payDir === 'out' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Supplier</Label>
+                      {paySupplier ? (
+                        <div className="flex h-9 items-center justify-between gap-1 rounded-md border border-border/60 px-3 text-sm">
+                          <span className="inline-flex items-center gap-1.5 min-w-0"><Building2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{paySupplier.name}</span></span>
+                          <button type="button" className="text-muted-foreground hover:text-foreground shrink-0" onClick={() => setPaySupplier(null)} aria-label="Clear supplier"><X className="h-3.5 w-3.5" /></button>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <Input className="h-9 w-full" value={paySupplierSearch} onChange={(e) => setPaySupplierSearch(e.target.value)} placeholder="Search supplier…" />
+                          {paySupplierOpts.length > 0 && (
+                            <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
+                              {paySupplierOpts.map((s) => (
+                                <button key={s.id} type="button" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setPaySupplier(s); setPaySupplierSearch(''); setPaySupplierOpts([]); }}>{s.name}</button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
-                  {/* No method dropdown — the method is inferred from the account (a bank account →
-                      bank transfer, a cash account → cash). The saved payment still carries it. */}
-                  <Input className="h-8 w-52 text-sm" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'Reason (e.g. pre-payment, deposit)' : 'Reason (e.g. deposit to supplier)'} />
-                </div>
-                {/* Bank Payment → which of the counterparty's OWN banks the money moved to/from.
-                    Managed on their CRM record (Tax & VAT → Bank Accounts). Optional. */}
-                {payMethod === 'bank_transfer' && counterpartyBanks.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] text-muted-foreground">{payDir === 'in' ? 'Received to their bank' : 'Paid to their bank'}</span>
-                    <Select value={payCounterpartyBankId || '__none__'} onValueChange={(v) => setPayCounterpartyBankId(v === '__none__' ? '' : v)}>
-                      <SelectTrigger className="h-8 w-64 text-xs"><SelectValue placeholder="Their bank (optional)…" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">— Not specified —</SelectItem>
-                        {counterpartyBanks.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.bank_name}{b.iban ? ` · ${b.iban.slice(0, 8)}…` : ''}{b.is_primary ? ' (primary)' : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Reason</Label>
+                    <Input className="h-9 w-full" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'e.g. pre-payment, deposit' : 'e.g. deposit to supplier'} />
                   </div>
-                )}
+
+                  {/* Bank Payment → which of the counterparty's OWN banks the money moved to/from
+                      (managed on their CRM record → Tax & VAT → Bank Accounts). Optional. */}
+                  {payMethod === 'bank_transfer' && counterpartyBanks.length > 0 && (
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs text-muted-foreground">{payDir === 'in' ? 'Received to their bank' : 'Paid to their bank'} <span className="text-muted-foreground/70">(optional)</span></Label>
+                      <Select value={payCounterpartyBankId || '__none__'} onValueChange={(v) => setPayCounterpartyBankId(v === '__none__' ? '' : v)}>
+                        <SelectTrigger className="h-9 w-full"><SelectValue placeholder="Their bank…" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— Not specified —</SelectItem>
+                          {counterpartyBanks.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.bank_name}{b.iban ? ` · ${b.iban.slice(0, 8)}…` : ''}{b.is_primary ? ' (primary)' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
                 {/* Cash sale: record the money AND issue the order's receipt/invoice in one step. */}
                 {payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
-                  <label className="flex items-center gap-2 text-[11px] cursor-pointer pt-0.5">
-                    <Checkbox checked={payIssueDoc} onCheckedChange={(v) => setPayIssueDoc(v === true)} />
-                    {editingPaymentId ? 'Issue' : 'Also issue'} a {salesDocKind === 'receipt' ? 'receipt' : 'invoice'} for this order (opens it to review &amp; transmit)
-                    <span className="text-muted-foreground">— {order.customer_company_id ? 'business → invoice' : 'private → receipt'}</span>
+                  <label className="flex items-start gap-2 text-xs cursor-pointer">
+                    <Checkbox className="mt-0.5" checked={payIssueDoc} onCheckedChange={(v) => setPayIssueDoc(v === true)} />
+                    <span>
+                      {editingPaymentId ? 'Issue' : 'Also issue'} a {salesDocKind === 'receipt' ? 'receipt' : 'invoice'} for this order (opens it to review &amp; transmit)
+                      <span className="text-muted-foreground"> — {order.customer_company_id ? 'business → invoice' : 'private → receipt'}</span>
+                    </span>
                   </label>
                 )}
-                <p className="text-[10px] text-muted-foreground">
+
+                <p className="text-[11px] text-muted-foreground">
                   {payIssueDoc
-                    ? `${editingPaymentId ? 'Updates the payment' : 'Records the cash'} and creates the ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} draft — review &amp; transmit it next.`
+                    ? `${editingPaymentId ? 'Updates the payment' : 'Records the cash'} and creates the ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} draft — review & transmit it next.`
                     : <>Just the cash movement — no document. Tick the box above, or use Actions → {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}, to issue one.</>}
                 </p>
+
+                {/* Footer actions — clearly separated from the fields. */}
+                <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+                  <Button variant="outline" size="sm" className="h-9" onClick={() => { setPayOpen(false); setEditingPaymentId(null); }} disabled={saving}>Cancel</Button>
+                  <Button size="sm" className="h-9" onClick={recordPay} disabled={saving}>
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingPaymentId ? 'Update payment' : 'Save payment')}
+                  </Button>
+                </div>
               </div>
             )}
 
