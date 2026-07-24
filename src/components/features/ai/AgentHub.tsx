@@ -284,6 +284,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   email_campaign_sent: 'Campaign sending',
   // CRM
   crm_company_created: 'Company added to CRM',
+  crm_kad_results: 'Business activity codes (KAD)',
   // Messaging / WhatsApp
   messaging_channels_list: 'WhatsApp channels',
   messaging_sent: 'WhatsApp sent',
@@ -361,6 +362,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   social_best_time: 'Best time to post',
   social_insights: 'Social insights',
   social_post_analytics: 'Post analytics',
+  // Quotes
+  quotes_list: 'Quotes',
   // Misc
   price_lookup_matches: 'Price lookup matches',
   project_created: 'Project created',
