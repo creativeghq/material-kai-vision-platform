@@ -5,7 +5,7 @@
 
 import { LegalShell } from './LegalShell';
 
-const LAST_UPDATED = '13 July 2026';
+const LAST_UPDATED = '24 July 2026';
 
 export default function PrivacyPolicyPage() {
   return (
@@ -103,6 +103,39 @@ export default function PrivacyPolicyPage() {
         We keep personal data for as long as your account is active and as needed to provide the
         Services, then for any additional period required to meet legal, tax, accounting or dispute-
         resolution obligations. When data is no longer needed, we delete or anonymise it.
+      </p>
+      <p>
+        To keep the Platform secure and efficient, we automatically remove generated and temporary
+        files once they are no longer needed. In particular:
+      </p>
+      <ul>
+        <li>
+          <strong>Regenerable documents</strong> — quote, catalog, presentation-sheet and
+          client-view PDFs and similar exports may be deleted from storage after a short period of
+          inactivity (typically around one week), or when you delete, close or mark the related item
+          as completed. These documents are recreated automatically the next time you open or send
+          them, so no information is lost.
+        </li>
+        <li>
+          <strong>AI-generated media</strong> — images, edits and videos created in the assistant or
+          other generation tools that you do not save are removed after a period of inactivity
+          (typically around 30 days), or when you delete the related conversation or item. Media you
+          save (for example, to a moodboard or project) is retained with that item.
+        </li>
+        <li>
+          <strong>Temporary and intermediate files</strong> — uploads, previews and processing
+          artifacts that are no longer referenced are cleared automatically on a routine schedule.
+        </li>
+        <li>
+          <strong>Legal and financial records</strong> — invoices, credit notes, delivery notes and
+          other tax or accounting documents are retained for the period required by applicable law,
+          even after related items are removed elsewhere.
+        </li>
+      </ul>
+      <p>
+        You remain responsible for downloading or otherwise saving any content you wish to keep
+        outside the Platform. When you delete your account, we delete or anonymise your data except
+        for records we are required to retain by law.
       </p>
 
       <h2>9. Your rights</h2>

@@ -5,7 +5,7 @@
 
 import { LegalShell } from './LegalShell';
 
-const LAST_UPDATED = '13 July 2026';
+const LAST_UPDATED = '24 July 2026';
 
 export default function TermsOfServicePage() {
   return (
@@ -51,6 +51,17 @@ export default function TermsOfServicePage() {
         host, process, transmit and display Your Content solely to operate and provide the Services
         to you. You are responsible for the accuracy and legality of Your Content and for having the
         necessary rights and consents, including for any personal data of your contacts and customers.
+      </p>
+      <p>
+        To keep the Platform secure and efficient, we automatically remove generated and temporary
+        files once they are no longer needed — for example, when you delete, close or mark the
+        related item as completed, or after a period of inactivity. Documents that can be regenerated
+        (such as quote, catalog, presentation-sheet and client-view PDFs) may be deleted from storage
+        and are recreated automatically when next needed. AI-generated images and videos that you do
+        not save may be removed after a period of inactivity. Records we are required to keep by law,
+        such as invoices and tax documents, are retained accordingly. You are responsible for
+        downloading or saving any content you wish to retain outside the Platform. Full details are
+        set out in our <a href="/privacy">Privacy Policy</a>.
       </p>
 
       <h2>5. AI features</h2>
