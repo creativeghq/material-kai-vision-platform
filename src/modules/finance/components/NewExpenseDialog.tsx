@@ -21,6 +21,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
 
@@ -59,6 +60,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [partySearch, setPartySearch] = useState('');
   const [partyOptions, setPartyOptions] = useState<Party[]>([]);
   const [creatingParty, setCreatingParty] = useState(false);
+  // The payee's own bank accounts — offered on a Bank Payment so you record which of THEIR banks
+  // you paid to (managed on their CRM record → Tax & VAT → Bank Accounts).
+  const [payeeBanks, setPayeeBanks] = useState<CrmBankAccount[]>([]);
+  const [counterpartyBankId, setCounterpartyBankId] = useState<string>('');
 
   const expenseCats = useMemo(
     () => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'),
@@ -101,6 +106,21 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setBankAccountId((cur) => cur || accts.find((a) => a.is_default)?.bank_account_id || accts[0]?.bank_account_id || '');
     }).catch(() => setBankAccounts([]));
   }, [open, workspaceId]);
+
+  // Load the picked payee's own bank accounts (for the Bank Payment "paid to their bank" selector).
+  useEffect(() => {
+    if (!open || !party) { setPayeeBanks([]); return; }
+    let cancelled = false;
+    crmBankAccountsAPI.list(party.type === 'company' ? { companyId: party.id } : { contactId: party.id })
+      .then((banks) => { if (!cancelled) setPayeeBanks(banks); })
+      .catch(() => { if (!cancelled) setPayeeBanks([]); });
+    return () => { cancelled = true; };
+  }, [open, party]);
+
+  // Clear the chosen payee bank if it's no longer valid (payee changed / not a bank payment).
+  useEffect(() => {
+    if (counterpartyBankId && !payeeBanks.some((b) => b.id === counterpartyBankId)) setCounterpartyBankId('');
+  }, [payeeBanks, counterpartyBankId]);
 
   // Optional supplier/payee search (suppliers only).
   useEffect(() => {
@@ -186,6 +206,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         paidNow,
         paidFromBankAccountId: paidNow ? (bankAccountId || null) : null,
         paymentMethod: method,
+        counterpartyBankAccountId: paidNow && method === 'bank_transfer' ? (counterpartyBankId || null) : null,
         paidAt: paidNow ? new Date(issuedAt || Date.now()).toISOString() : undefined,
       });
       // "Repeat" → also register a recurring template; the first period's bill was just created,
@@ -365,6 +386,24 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 onMethodChange={setMethod}
                 accounts={bankAccounts}
               />
+            )}
+            {/* Bank Payment → which of the payee's own banks you paid to. Optional; only shows
+                once a payee with saved bank accounts is picked. */}
+            {paidNow && method === 'bank_transfer' && payeeBanks.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Paid to their bank</Label>
+                <Select value={counterpartyBankId || '__none__'} onValueChange={(v) => setCounterpartyBankId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Their bank (optional)…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Not specified —</SelectItem>
+                    {payeeBanks.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.bank_name}{b.iban ? ` · ${b.iban.slice(0, 8)}…` : ''}{b.is_primary ? ' (primary)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
 

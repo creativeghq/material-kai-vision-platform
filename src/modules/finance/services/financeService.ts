@@ -124,10 +124,10 @@ export type PaymentMethod = 'bank_transfer' | 'cash' | 'card' | 'check' | 'other
 
 /** Human display labels for payment methods (Title Case). */
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
-  cash: 'Cash',
+  cash: 'Payment on Hands',
   card: 'Card',
-  bank_transfer: 'Bank Transfer',
-  check: 'Check',
+  bank_transfer: 'Bank Payment',
+  check: 'Check Payment',
   other: 'Other',
 };
 
@@ -148,8 +148,11 @@ export const methodsForAccountKind = (kind: BankAccountKind | null | undefined):
     case 'cash': return ['cash'];
     case 'card': return ['card'];
     case 'online': return ['other'];
-    case 'bank': return ['bank_transfer', 'check', 'other'];
-    default: return ['bank_transfer', 'cash', 'card', 'check', 'other'];
+    // Bank accounts clear three ways the operator cares about: a transfer (Bank Payment), a cheque
+    // (Check Payment), or cash handed over (Payment on Hands). 'other'/'card' stay valid enum values
+    // for legacy rows but aren't offered here.
+    case 'bank': return ['bank_transfer', 'check', 'cash'];
+    default: return ['bank_transfer', 'cash', 'check'];
   }
 };
 
@@ -754,6 +757,9 @@ const _financeServiceCore = {
     categoryId?: string | null;
     /** Which bank/cash account the money moved through (in → deposited to / out → paid from). */
     bankAccountId?: string | null;
+    /** The counterparty's OWN bank (crm_bank_accounts) this money moved to/from — recorded on a
+     *  Bank Payment for traceability. Distinct from bankAccountId (your treasury account). */
+    counterpartyBankAccountId?: string | null;
     /** Money-in only: generate + email the receipt to the customer (default true). When
      *  false, the payment is recorded silently — no receipt, no customer notification. */
     sendReceipt?: boolean;
@@ -794,6 +800,10 @@ const _financeServiceCore = {
       p_order_id: input.orderId ?? null,
     });
     if (error) throw error;
+    // The RPC doesn't carry the counterparty bank — stamp it on the created row when provided.
+    if (input.counterpartyBankAccountId && data) {
+      await supabase.from('payments').update({ counterparty_bank_account_id: input.counterpartyBankAccountId }).eq('id', data as string);
+    }
     // Payment received → generate the receipt + notify/email the customer via the seeded
     // flow (fire-and-forget). Only for inbound money, and only when sendReceipt isn't
     // opted out — when false the payment is recorded silently.
@@ -1342,6 +1352,8 @@ const _financeServiceCore = {
     paidFromBankAccountId?: string | null;
     paymentMethod?: PaymentMethod;
     paidAt?: string;
+    /** The supplier's own bank (crm_bank_accounts) the money was paid to, on a Bank Payment. */
+    counterpartyBankAccountId?: string | null;
   }): Promise<{ billId: string; paymentId: string | null }> {
     // A supplier bill requires a counterparty (DB CHECK supplier_bills_supplier_required) —
     // needed for AP/myDATA/statements/spend-per-supplier. Callers must supply a payee.
@@ -1383,6 +1395,7 @@ const _financeServiceCore = {
         notes: input.description ?? null,
         categoryId: input.categoryId,
         bankAccountId: input.paidFromBankAccountId ?? null,
+        counterpartyBankAccountId: input.paymentMethod === 'bank_transfer' ? (input.counterpartyBankAccountId ?? null) : null,
         allocations: [{ target_id: bill.id, target_type: 'supplier_bill', amount: total }],
       });
     }

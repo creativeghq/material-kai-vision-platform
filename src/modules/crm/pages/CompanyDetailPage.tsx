@@ -34,6 +34,7 @@ import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
 import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
+import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
@@ -852,6 +853,9 @@ export const CompanyDetailPage: React.FC = () => {
                           )}
                         </CardContent>
                       </Card>
+                      {!isNew && id && activeWorkspaceId && (
+                        <CrmBankAccountsCard workspaceId={activeWorkspaceId} companyId={id} />
+                      )}
                     </TabsContent>
 
                     {showCommercial && (

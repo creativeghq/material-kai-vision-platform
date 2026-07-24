@@ -20,6 +20,7 @@ import {
   ACCOUNT_KIND_LABEL, ACCOUNT_KIND_ORDER,
 } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
 import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -836,6 +837,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const [bankAccounts, setBankAccounts] = useState<Awaited<ReturnType<typeof financeService.listBankAccounts>>>([]);
   const [payAccountId, setPayAccountId] = useState<string>('');
   const [payMethod, setPayMethod] = useState<string>('cash');
+  // The counterparty's OWN bank this money moved to/from (offered on a Bank Payment). Loaded from
+  // the customer (money-in) or the picked supplier (money-out); optional.
+  const [counterpartyBanks, setCounterpartyBanks] = useState<CrmBankAccount[]>([]);
+  const [payCounterpartyBankId, setPayCounterpartyBankId] = useState<string>('');
   // Running balance per account, so you can see what's in an account while choosing it.
   const [acctBalance, setAcctBalance] = useState<Map<string, number>>(new Map());
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -968,10 +973,11 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     setPayIssueDoc(false);
     setPayReason(''); setPaySupplier(null); setPaySupplierSearch(''); setPaySupplierOpts([]);
     setPayAccountId(defaultAccountId()); setPayMethod(methodForAccount(defaultAccountId()));
+    setPayCounterpartyBankId('');
     // Money out: no prefill — the operator types what they're actually paying (which supplier +
     // how much is their call, not the whole order balance). Money in: prefill the remaining
     // receivable (rounded to cents so no float dust), a sensible "customer pays the balance" default.
-    setPayAmt(dir === 'out' ? '' : String(Math.max(0, Math.round((Number(order.total) - (fin?.received ?? 0)) * 100) / 100)));
+    setPayAmt(dir === 'out' ? '' : String(Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100)));
     setPayOpen(true);
   };
 
@@ -981,6 +987,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     setPayDir('out'); setPayIssueDoc(false); setPayReason('');
     setPaySupplier(sup); setPaySupplierSearch(''); setPaySupplierOpts([]);
     setPayAccountId(defaultAccountId()); setPayMethod(methodForAccount(defaultAccountId()));
+    setPayCounterpartyBankId('');
     setPayAmt(String(Math.max(0, owed)));
     setPayOpen(true);
   };
@@ -1009,6 +1016,23 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     }, 200);
     return () => clearTimeout(h);
   }, [paySupplierSearch, payOpen, payDir, paySupplier]);
+
+  // Load the counterparty's own bank accounts so a Bank Payment can point to a specific one.
+  // Money-in → the order's customer; money-out → the picked supplier.
+  useEffect(() => {
+    if (!payOpen || !order) { setCounterpartyBanks([]); return; }
+    const parent = payDir === 'out'
+      ? (paySupplier?.id ? { companyId: paySupplier.id } : null)
+      : (order.customer_company_id ? { companyId: order.customer_company_id }
+        : order.customer_contact_id ? { contactId: order.customer_contact_id } : null);
+    if (!parent) { setCounterpartyBanks([]); return; }
+    let cancelled = false;
+    crmBankAccountsAPI.list(parent)
+      .then((banks) => { if (!cancelled) setCounterpartyBanks(banks); })
+      .catch(() => { if (!cancelled) setCounterpartyBanks([]); });
+    return () => { cancelled = true; };
+  }, [payOpen, payDir, paySupplier, order?.customer_company_id, order?.customer_contact_id, order?.id]);
+
   const recordPay = async () => {
     if (!order) return;
     const amt = parseDecimal(payAmt);
@@ -1031,6 +1055,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           bankAccountId: payAccountId,
           counterpartyCompanyId: payDir === 'out' ? (paySupplier?.id ?? null) : (order.customer_company_id ?? null),
           counterpartyContactId: payDir === 'in' ? (order.customer_contact_id ?? null) : null,
+          counterpartyBankAccountId: payMethod === 'bank_transfer' ? (payCounterpartyBankId || null) : null,
         });
       } else {
         // Money in → settle the order's open invoice(s); money out → cash to the supplier
@@ -1042,6 +1067,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           order: { id: order.id, workspace_id: order.workspace_id, currency: order.currency, customer_company_id: order.customer_company_id, customer_contact_id: order.customer_contact_id },
           direction: payDir, amount: amt, reference: payReason.trim(), method: payMethod || null,
           bankAccountId: payAccountId, supplierCompanyId: paySupplier?.id ?? null, targets,
+          counterpartyBankAccountId: payMethod === 'bank_transfer' ? (payCounterpartyBankId || null) : null,
         });
       }
       const wasEdit = !!editingPaymentId;
@@ -1056,11 +1082,17 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     } finally { setSaving(false); }
   };
 
+  // How much of this order is settled, per the #280 allocation ledger (NOT `fin.received`, which only
+  // sees cash tagged with `payments.order_id` and misses credit re-homed from an on-account payment).
+  // Sales settle from money-in allocations, purchases from money-out. This mirrors
+  // `recompute_order_payment_status`, so "outstanding" agrees with the order's payment_status.
+  const orderSettled = () => (order?.order_type === 'sales' ? (fin?.settled_in ?? 0) : (fin?.settled_out ?? 0));
+
   // Settle this sales order from the customer's on-account credit — no new cash. Re-homes existing
   // "money in" onto the order (server-side, split-safe); the order flips to paid/partial via trigger.
   const applyCredit = async () => {
     if (!order) return;
-    const outstanding = Math.max(0, Math.round((Number(order.total) - (fin?.received ?? 0)) * 100) / 100);
+    const outstanding = Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100);
     const willApply = Math.min(applicableCredit, outstanding);
     if (willApply <= 0.005) return;
     if (!window.confirm(`Apply ${formatMoney(willApply, order.currency)} of ${order.customer_company_id || order.customer_contact_id ? 'this customer’s' : 'the'} account credit to this order? No new money is recorded — the existing credit is used.`)) return;
@@ -1076,7 +1108,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   };
 
   // Edit an existing payment: pre-fill the pay panel from the row and flip it into update mode.
-  const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null }) => {
+  const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_bank_account_id?: string | null }) => {
     setEditingPaymentId(p.id);
     setPayDir(p.direction);
     setPayIssueDoc(false);
@@ -1084,6 +1116,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     setPayReason(p.reference ?? '');
     setPayMethod(p.method || 'cash');
     setPayAccountId(p.bank_account_id ?? defaultAccountId());
+    setPayCounterpartyBankId(p.counterparty_bank_account_id ?? '');
     setPaySupplierSearch(''); setPaySupplierOpts([]);
     // Money out is attached to a supplier — restore the chip so the user sees who it pays.
     if (p.direction === 'out' && p.counterparty_company_id) {
@@ -1248,7 +1281,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const orderDiscountAmount = order
     ? Math.round((items.reduce((a, it) => a + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0) - Number(order.subtotal_net)) * 100) / 100
     : 0;
-  const outstanding = order ? Math.max(0, Math.round((Number(order.total) - (fin?.received ?? 0)) * 100) / 100) : 0;
+  const outstanding = order ? Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100) : 0;
   const creditToApply = Math.min(applicableCredit, outstanding);
   // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
   // myDATA finalises the exact document type at issue; this just labels the action correctly.
@@ -1653,6 +1686,24 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                       bank transfer, a cash account → cash). The saved payment still carries it. */}
                   <Input className="h-8 w-52 text-sm" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'Reason (e.g. pre-payment, deposit)' : 'Reason (e.g. deposit to supplier)'} />
                 </div>
+                {/* Bank Payment → which of the counterparty's OWN banks the money moved to/from.
+                    Managed on their CRM record (Tax & VAT → Bank Accounts). Optional. */}
+                {payMethod === 'bank_transfer' && counterpartyBanks.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] text-muted-foreground">{payDir === 'in' ? 'Received to their bank' : 'Paid to their bank'}</span>
+                    <Select value={payCounterpartyBankId || '__none__'} onValueChange={(v) => setPayCounterpartyBankId(v === '__none__' ? '' : v)}>
+                      <SelectTrigger className="h-8 w-64 text-xs"><SelectValue placeholder="Their bank (optional)…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Not specified —</SelectItem>
+                        {counterpartyBanks.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.bank_name}{b.iban ? ` · ${b.iban.slice(0, 8)}…` : ''}{b.is_primary ? ' (primary)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {/* Cash sale: record the money AND issue the order's receipt/invoice in one step. */}
                 {payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
                   <label className="flex items-center gap-2 text-[11px] cursor-pointer pt-0.5">
@@ -1770,9 +1821,23 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
             )}
 
             {/* Attached payments */}
-            {fin && fin.payments.length > 0 && (
+            {fin && (fin.payments.length > 0 || fin.creditApplied.length > 0) && (
               <div className="rounded-md border border-border/60">
                 <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments</div>
+                {/* Credit re-homed onto this order from an on-account payment — no fresh cash, so it's
+                    read-only here (to reverse it, un-apply from the source payment). Counts in Received. */}
+                {fin.creditApplied.map((c) => (
+                  <div key={c.allocation_id} className="flex items-start justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        Applied from account credit
+                        {c.counterparty_name && <span className="text-muted-foreground">{c.direction === 'in' ? ' · from ' : ' · to '}<span className="text-foreground/80">{c.counterparty_name}</span></span>}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">{new Date(c.paid_at).toLocaleDateString()} · {c.direction === 'in' ? 'Money in' : 'Money out'} · account credit</span>
+                    </span>
+                    <span className={`tabular-nums shrink-0 ${c.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(c.amount, c.currency)}</span>
+                  </div>
+                ))}
                 {fin.payments.map((p) => {
                   const acctName = p.bank_account_id ? bankAccounts.find((a) => a.id === p.bank_account_id)?.name : null;
                   // Who the cash moved between: money-in came FROM the customer, money-out went TO the supplier.

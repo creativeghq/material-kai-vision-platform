@@ -486,36 +486,64 @@ export const ordersService = {
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
     supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
-    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_name: string | null }>;
+    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null }>;
     received: number;
     paid_out: number;
     profit: number;
+    // Canonical settlement per #280: Σ payment_allocations for this order, by payment direction.
+    // This is what `recompute_order_payment_status` uses — and unlike `received`/`paid_out` (which
+    // only see cash whose `payments.order_id` = this order) it also counts credit re-homed onto the
+    // order from an on-account payment (whose `order_id` is NULL). Drive "outstanding" off this.
+    settled_in: number;
+    settled_out: number;
+    // Money re-homed onto this order from a payment that is NOT tagged to it (an on-account credit
+    // applied here). Shown read-only in the Payments list so a credit-settled order isn't blank.
+    creditApplied: Array<{ allocation_id: string; payment_id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; counterparty_name: string | null }>;
   }> {
-    const [inv, bills, pay] = await Promise.all([
+    const [inv, bills, pay, alloc] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
-      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, bank_account_id, counterparty_company_id, counterparty_contact_id').eq('order_id', orderId).order('paid_at', { ascending: false }),
+      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, bank_account_id, counterparty_company_id, counterparty_contact_id, counterparty_bank_account_id').eq('order_id', orderId).order('paid_at', { ascending: false }),
+      supabase.from('payment_allocations').select('id, amount, payment_id, payments!inner(direction, order_id, currency, paid_at, counterparty_company_id, counterparty_contact_id)').eq('order_id', orderId),
     ]);
-    const rawPayments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null }>;
+    const rawPayments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null }>;
+    type AllocRow = { id: string; amount: number; payment_id: string; payments: { direction: 'in' | 'out'; order_id: string | null; currency: string; paid_at: string; counterparty_company_id: string | null; counterparty_contact_id: string | null } | null };
+    const allocRows = (alloc.data ?? []) as unknown as AllocRow[];
+    // Credit rows = allocations whose source payment is tagged to a DIFFERENT order (or none) — i.e.
+    // on-account money re-homed here. Order-tagged payments are already in `rawPayments`, so exclude
+    // them to avoid double-listing.
+    const creditAllocs = allocRows.filter((a) => a.payments && a.payments.order_id !== orderId);
     // Resolve the counterparty (who the cash went to / came from) so the UI can show it.
     // Money-in → the order's customer; money-out → the supplier paid. Both land in counterparty_company_id;
     // a bare contact customer/supplier lands in counterparty_contact_id instead.
+    const companyIds = [...rawPayments.map((p) => p.counterparty_company_id), ...creditAllocs.map((a) => a.payments!.counterparty_company_id)].filter(Boolean) as string[];
+    const contactIds = [...rawPayments.map((p) => p.counterparty_contact_id), ...creditAllocs.map((a) => a.payments!.counterparty_contact_id)].filter(Boolean) as string[];
     const [companyNames, contactNames] = await Promise.all([
-      this.getCompanyNames(rawPayments.map((p) => p.counterparty_company_id).filter(Boolean) as string[]).catch(() => new Map<string, string>()),
-      this.getContactNames(rawPayments.map((p) => p.counterparty_contact_id).filter(Boolean) as string[]).catch(() => new Map<string, string>()),
+      this.getCompanyNames(companyIds).catch(() => new Map<string, string>()),
+      this.getContactNames(contactIds).catch(() => new Map<string, string>()),
     ]);
+    const nameFor = (companyId: string | null, contactId: string | null) =>
+      (companyId ? companyNames.get(companyId) : null) ?? (contactId ? contactNames.get(contactId) : null) ?? null;
     const payments = rawPayments.map((p) => ({
       ...p,
-      counterparty_name: (p.counterparty_company_id ? companyNames.get(p.counterparty_company_id) : null)
-        ?? (p.counterparty_contact_id ? contactNames.get(p.counterparty_contact_id) : null)
-        ?? null,
+      counterparty_name: nameFor(p.counterparty_company_id, p.counterparty_contact_id),
     }));
-    const received = payments.filter((p) => p.direction === 'in').reduce((a, p) => a + Number(p.amount), 0);
-    const paid_out = payments.filter((p) => p.direction === 'out').reduce((a, p) => a + Number(p.amount), 0);
+    const creditApplied = creditAllocs.map((a) => ({
+      allocation_id: a.id, payment_id: a.payment_id, direction: a.payments!.direction, amount: Number(a.amount),
+      currency: a.payments!.currency, paid_at: a.payments!.paid_at,
+      counterparty_name: nameFor(a.payments!.counterparty_company_id, a.payments!.counterparty_contact_id),
+    }));
+    // "Received" / "Paid" now read the allocation ledger (canonical settlement, matches payment_status)
+    // rather than only cash tagged with `payments.order_id`. For a normally-paid order the two are
+    // identical; for a credit-settled order this is what surfaces the money that was applied.
+    const settled_in = allocRows.filter((a) => a.payments?.direction === 'in').reduce((s, a) => s + Number(a.amount), 0);
+    const settled_out = allocRows.filter((a) => a.payments?.direction === 'out').reduce((s, a) => s + Number(a.amount), 0);
+    const received = settled_in;
+    const paid_out = settled_out;
     return {
       invoices: (inv.data ?? []) as Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
       supplierBills: (bills.data ?? []) as Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
-      payments, received, paid_out, profit: received - paid_out,
+      payments, received, paid_out, profit: received - paid_out, settled_in, settled_out, creditApplied,
     };
   },
 
@@ -536,6 +564,8 @@ export const ordersService = {
     bankAccountId: string;
     /** money-out: the supplier we're paying (counterparty). */
     supplierCompanyId?: string | null;
+    /** The counterparty's own bank (crm_bank_accounts) the money moved to/from, on a Bank Payment. */
+    counterpartyBankAccountId?: string | null;
     /** Open targets to settle: invoices for money-in, supplier_bills for money-out. */
     targets?: Array<{ id: string; amount_due: number; type: 'invoice' | 'supplier_bill' }>;
     fxRateToBase?: number;
@@ -565,6 +595,7 @@ export const ordersService = {
       // Money in → the order's customer; money out → the supplier being paid.
       counterpartyCompanyId: input.direction === 'out' ? (input.supplierCompanyId ?? null) : (input.order.customer_company_id ?? null),
       counterpartyContactId: input.direction === 'in' ? (input.order.customer_contact_id ?? null) : null,
+      counterpartyBankAccountId: input.counterpartyBankAccountId ?? null,
       allocations,
     });
   },
@@ -579,6 +610,7 @@ export const ordersService = {
     paymentId: string; orderId: string;
     direction: 'in' | 'out'; amount: number; reference: string; method: string | null;
     bankAccountId: string; counterpartyCompanyId: string | null; counterpartyContactId: string | null;
+    counterpartyBankAccountId?: string | null;
   }): Promise<void> {
     const { data: allocs, error: aErr } = await supabase
       .from('payment_allocations').select('id, invoice_id, supplier_bill_id, amount').eq('payment_id', input.paymentId);
@@ -589,6 +621,7 @@ export const ordersService = {
     const { error } = await supabase.from('payments').update({
       direction: input.direction, amount: input.amount, reference: input.reference, method: input.method || null,
       bank_account_id: input.bankAccountId, counterparty_company_id: input.counterpartyCompanyId, counterparty_contact_id: input.counterpartyContactId,
+      counterparty_bank_account_id: input.counterpartyBankAccountId ?? null,
     }).eq('id', input.paymentId).eq('order_id', input.orderId);
     if (error) throw error;
     // Re-sync the single allocation amount so the settled invoice/bill matches the new cash amount.

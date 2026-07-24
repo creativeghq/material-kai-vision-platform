@@ -22,6 +22,7 @@ import { CrmActivityTimeline } from '@/components/business/crm/CrmActivityTimeli
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
+import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
 import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
 import { Checkbox } from '@/components/core/ui/checkbox';
@@ -873,6 +874,9 @@ export const ContactDetailPage: React.FC = () => {
                         </Card>
 
                         <ContactTaxVatCard vatNumber={contact.vat_number ?? null} countryCode={contact.country_code ?? null} taxOffice={contact.tax_office ?? null} onPatch={(updates) => patchInline(updates as Partial<Contact>)} />
+                        {!isNew && contact.id && activeWorkspaceId && (
+                          <CrmBankAccountsCard workspaceId={activeWorkspaceId} contactId={contact.id} />
+                        )}
                       </TabsContent>
                     )}
                   </div>

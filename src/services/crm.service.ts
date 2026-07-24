@@ -741,3 +741,87 @@ export const addressUnitsAPI = {
     }
   },
 };
+
+// -------- CRM bank accounts (a counterparty's OWN bank details) --------
+
+export interface CrmBankAccount {
+  id: string;
+  workspace_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  bank_name: string;
+  account_holder: string | null;
+  iban: string | null;
+  account_ref: string | null;
+  currency: string;
+  is_primary: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CrmBankAccountInput = Partial<
+  Pick<CrmBankAccount, 'bank_name' | 'account_holder' | 'iban' | 'account_ref' | 'currency' | 'is_primary' | 'notes'>
+>;
+
+/**
+ * Bank accounts belonging to a CRM company OR contact — the counterparty's own banks (e.g. a
+ * supplier IBAN you pay to). Distinct from `finance_bank_accounts` (your workspace treasury).
+ * Reads + writes go through the supabase client; table RLS = is_workspace_member(workspace_id).
+ * Trust fields (workspace_id / company_id / contact_id) are set here from the verified parent,
+ * never spread from a caller body (mass-assignment invariant #8).
+ */
+export const crmBankAccountsAPI = {
+  async list(parent: { companyId?: string; contactId?: string }): Promise<CrmBankAccount[]> {
+    let query = (supabase as any).from('crm_bank_accounts').select('*');
+    if (parent.companyId) query = query.eq('company_id', parent.companyId);
+    else if (parent.contactId) query = query.eq('contact_id', parent.contactId);
+    else return [];
+    const { data, error } = await query
+      .order('is_primary', { ascending: false })
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(error.message || 'Failed to fetch bank accounts');
+    return (data ?? []) as CrmBankAccount[];
+  },
+
+  async create(
+    parent: { workspaceId: string; companyId?: string; contactId?: string },
+    input: CrmBankAccountInput,
+  ): Promise<CrmBankAccount> {
+    const payload = {
+      workspace_id: parent.workspaceId,
+      company_id: parent.companyId ?? null,
+      contact_id: parent.companyId ? null : (parent.contactId ?? null),
+      bank_name: (input.bank_name ?? '').trim(),
+      account_holder: input.account_holder?.trim() || null,
+      iban: input.iban?.trim() || null,
+      account_ref: input.account_ref?.trim() || null,
+      currency: input.currency || 'EUR',
+      is_primary: input.is_primary ?? false,
+      notes: input.notes?.trim() || null,
+    };
+    if (!payload.bank_name) throw new Error('Bank name is required');
+    const { data, error } = await (supabase as any).from('crm_bank_accounts').insert(payload).select('*').single();
+    if (error) throw new Error(error.message || 'Failed to add bank account');
+    return data as CrmBankAccount;
+  },
+
+  async update(id: string, input: CrmBankAccountInput): Promise<CrmBankAccount> {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (input.bank_name !== undefined) patch.bank_name = (input.bank_name ?? '').trim();
+    if (input.account_holder !== undefined) patch.account_holder = input.account_holder?.trim() || null;
+    if (input.iban !== undefined) patch.iban = input.iban?.trim() || null;
+    if (input.account_ref !== undefined) patch.account_ref = input.account_ref?.trim() || null;
+    if (input.currency !== undefined) patch.currency = input.currency || 'EUR';
+    if (input.is_primary !== undefined) patch.is_primary = input.is_primary;
+    if (input.notes !== undefined) patch.notes = input.notes?.trim() || null;
+    const { data, error } = await (supabase as any).from('crm_bank_accounts').update(patch).eq('id', id).select('*').single();
+    if (error) throw new Error(error.message || 'Failed to update bank account');
+    return data as CrmBankAccount;
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await (supabase as any).from('crm_bank_accounts').delete().eq('id', id);
+    if (error) throw new Error(error.message || 'Failed to delete bank account');
+  },
+};
