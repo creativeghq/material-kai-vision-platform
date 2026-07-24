@@ -174,6 +174,8 @@ export interface OrderSearchOptions extends OrderListOptions {
   totalMin?: number;
   totalMax?: number;
   currency?: string;
+  /** Collections segment: 'unpaid' | 'partial' | 'paid'. Reads orders.payment_status. */
+  paymentStatus?: OrderPaymentStatus;
 }
 
 export const ordersService = {
@@ -199,6 +201,7 @@ export const ordersService = {
       p_total_min: opts.totalMin ?? null,
       p_total_max: opts.totalMax ?? null,
       p_currency: opts.currency ?? null,
+      p_payment_status: opts.paymentStatus ?? null,
     });
     if (error) throw error;
     const raw = (data ?? []) as Array<{ order_row: Order; party_name: string | null; total_count: number }>;
@@ -333,6 +336,31 @@ export const ordersService = {
         };
       })
       .filter((r) => r.outstanding > 0.005);
+  },
+
+  /**
+   * Settled-so-far per order for a set of order ids, from the allocation ledger (money actually
+   * received on sales / paid on purchase). Lets a list show "outstanding = total − settled"
+   * without an N+1 getOrderFinance per row. One query, keyed by order id.
+   */
+  async settledByOrder(orderIds: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (orderIds.length === 0) return out;
+    const { data } = await supabase
+      .from('payment_allocations')
+      .select('order_id, amount, payment:payments(direction)')
+      .in('order_id', orderIds);
+    // A sales order settles on money IN; a purchase order on money OUT. We don't know each order's
+    // type here, so bucket both directions and let the caller net per order type. In practice an
+    // order only ever has allocations of its own settlement direction, so summing the matching
+    // direction is safe — we return the net (in − out) and the caller uses its sign.
+    for (const a of (data ?? []) as Array<{ order_id: string; amount: number; payment: { direction: 'in' | 'out' } | { direction: 'in' | 'out' }[] | null }>) {
+      const dir = Array.isArray(a.payment) ? a.payment[0]?.direction : a.payment?.direction;
+      if (!dir) continue;
+      const signed = dir === 'in' ? Number(a.amount) : -Number(a.amount);
+      out.set(a.order_id, (out.get(a.order_id) ?? 0) + signed);
+    }
+    return out;
   },
 
   async get(id: string): Promise<{ order: Order; items: OrderItem[] }> {

@@ -31,7 +31,7 @@ import { FilterBar, type FilterGroupDef, type FilterValues } from '@/components/
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
-  type OrderType, type OrderStatus, type OrderListRow, type OrderItem, type Order,
+  type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
   type ThreeWayMatch, type ThreeWayMatchStatus,
 } from '@/modules/finance/services/ordersService';
 
@@ -60,6 +60,12 @@ const ORDER_FILTER_GROUPS: FilterGroupDef[] = [
         key: 'status', type: 'select', label: 'Status',
         options: (Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => ({ value: s, label: ORDER_STATUS_LABEL[s] })),
       },
+      {
+        // Collections segment — narrow the whole workspace to orders that still owe money.
+        key: 'payment_status', type: 'select', label: 'Payment',
+        description: 'Segment for collection — show only orders still to collect / pay.',
+        options: (Object.keys(ORDER_PAYMENT_LABEL) as OrderPaymentStatus[]).map((s) => ({ value: s, label: ORDER_PAYMENT_LABEL[s] })),
+      },
     ],
   },
   {
@@ -86,6 +92,7 @@ function orderSearchParams(v: FilterValues) {
   return {
     orderType: (v.order_type as OrderType | undefined) || undefined,
     status: (v.status as OrderStatus | undefined) || undefined,
+    paymentStatus: (v.payment_status as OrderPaymentStatus | undefined) || undefined,
     createdFrom: created.from,
     createdTo: created.to,
     totalMin: totalRange.min,
@@ -117,6 +124,9 @@ export const OrdersPanel: React.FC<{
 }> = ({ workspaceId, companyId, contactId, projectId, partyRoles }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
+  // Outstanding € per order for the visible page (total − settled), so the list doubles as a
+  // collections worklist. Keyed by order id; filled after each page load.
+  const [outstandingById, setOutstandingById] = useState<Map<string, number>>(new Map());
   // Total MATCHING rows as counted by the server — the list itself only ever holds one page.
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -196,6 +206,15 @@ export const OrdersPanel: React.FC<{
       if (clamped !== page) { setPage(clamped); return; }
       setRows(res.rows);
       setTotal(res.count);
+      // Outstanding for just this page — one batched query. Sales settle on money-in (positive
+      // net), purchase on money-out (negative net), so we take the magnitude against the total.
+      try {
+        const settled = await ordersService.settledByOrder(res.rows.map((r) => r.id));
+        setOutstandingById(new Map(res.rows.map((r) => {
+          const net = Math.abs(settled.get(r.id) ?? 0);
+          return [r.id, Math.round((Number(r.total) - net) * 100) / 100] as const;
+        })));
+      } catch { setOutstandingById(new Map()); }
     } catch (err: any) {
       toast({ title: 'Failed to load orders', description: err?.message, variant: 'destructive' });
     } finally {
@@ -303,6 +322,7 @@ export const OrdersPanel: React.FC<{
                   <th className="px-4 py-2 text-left">Status</th>
                   <th className="px-4 py-2 text-left">Payment</th>
                   <th className="px-4 py-2 text-right">Total</th>
+                  <th className="px-4 py-2 text-right" title="Still to collect (sales) or pay (purchase) — total minus settled">Outstanding</th>
                   <th className="px-4 py-2 text-right">Created</th>
                 </tr>
               </thead>
@@ -324,6 +344,13 @@ export const OrdersPanel: React.FC<{
                     <td className="px-4 py-2"><Badge variant={STATUS_TONE[r.status] as any} className="text-[10px]">{ORDER_STATUS_LABEL[r.status]}</Badge></td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[r.payment_status]}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(r.total), r.currency)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {(() => {
+                        const o = outstandingById.get(r.id);
+                        if (o == null || o <= 0.005) return <span className="text-xs text-emerald-600">Settled</span>;
+                        return <span className={r.order_type === 'sales' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-red-400 font-medium'}>{formatMoney(o, r.currency)}</span>;
+                      })()}
+                    </td>
                     <td className="px-4 py-2 text-right text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
@@ -1655,11 +1682,38 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                   <div className="text-sm font-semibold text-red-400">{formatMoney(fin.paid_out, order.currency)}</div>
                 </div>
                 <div className="rounded-md border border-border/60 p-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Net cash (in − out)</div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    Net cash (in − out)
+                    <span title="Cash in the bank now. It differs from Profit because part of the profit is still unpaid (customer / suppliers) and because VAT you've collected sits here until you remit it to the tax office.">ⓘ</span>
+                  </div>
                   <div className={`text-sm font-semibold ${fin.profit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.profit, order.currency)}</div>
                 </div>
               </div>
             )}
+
+            {/* The ladder — the middle rung between "profit earned" and "cash in bank". Makes the
+                gap self-explaining (profit is earned on the sale; cash is only what's landed), so
+                a profitable-but-uncollected order never reads as lost money. Sales only — payables
+                already have the "Suppliers on this order" block below. */}
+            {fin && order.order_type === 'sales' && orderMargin != null && (() => {
+              const supplierOwed = supExposure.reduce((a, s) => a + Math.max(0, s.owed), 0);
+              const hasGap = outstanding > 0.005 || supplierOwed > 0.005;
+              if (!hasGap) return null;
+              return (
+                <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs space-y-1">
+                  <div className="font-medium text-muted-foreground mb-1.5">Earned vs collected</div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Margin earned (net)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
+                  {outstanding > 0.005 && (
+                    <div className="flex justify-between"><span className="text-muted-foreground">— customer still to pay</span><span className="tabular-nums text-amber-600 dark:text-amber-400">{formatMoney(outstanding, order.currency)}</span></div>
+                  )}
+                  {supplierOwed > 0.005 && (
+                    <div className="flex justify-between"><span className="text-muted-foreground">— you still owe suppliers</span><span className="tabular-nums text-red-400">{formatMoney(supplierOwed, order.currency)}</span></div>
+                  )}
+                  <div className="flex justify-between border-t border-border/50 pt-1 font-medium"><span>Cash in bank now</span><span className={`tabular-nums ${fin.profit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.profit, order.currency)}</span></div>
+                  <p className="text-[10px] text-muted-foreground pt-0.5">Profit is earned when you sell; cash is what's actually landed. The difference is unpaid balances plus VAT you're holding for the tax office — not lost money.</p>
+                </div>
+              );
+            })()}
 
             {/* What we owe suppliers on this order — line costs grouped by the line's supplier,
                 minus money-out already paid to them. "Pay" pre-fills a money-out for the balance. */}
