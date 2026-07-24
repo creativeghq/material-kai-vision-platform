@@ -62,6 +62,22 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'requester_name', label: 'Requester name', note: 'Display name of the requester.' },
     { key: 'quote_request_id', label: 'Quote request ID', note: 'The generated quote request.' },
   ]),
+  moodboard_dormancy_warning: withStandard([
+    { key: 'moodboard_id', label: 'Moodboard ID', note: 'The inactive moodboard.' },
+    { key: 'moodboard_title', label: 'Moodboard title', note: 'Title of the moodboard.' },
+    { key: 'owner_email', label: 'Owner email', note: 'Email of the board owner (email recipient).' },
+    { key: 'deletion_scheduled_at', label: 'Deletion date', note: 'When the board will be removed if not kept active.' },
+    { key: 'keep_active_url', label: 'Keep-active link', note: 'One-click URL that keeps the board and clears the schedule.' },
+    { key: 'email_html', label: 'Email body (HTML)', note: 'Pre-built HTML body for the send-email action.' },
+  ]),
+  moodboard_dormancy_reminder: withStandard([
+    { key: 'moodboard_id', label: 'Moodboard ID', note: 'The inactive moodboard.' },
+    { key: 'moodboard_title', label: 'Moodboard title', note: 'Title of the moodboard.' },
+    { key: 'owner_email', label: 'Owner email', note: 'Email of the board owner (email recipient).' },
+    { key: 'deletion_scheduled_at', label: 'Deletion date', note: 'When the board will be removed if not kept active.' },
+    { key: 'keep_active_url', label: 'Keep-active link', note: 'One-click URL that keeps the board and clears the schedule.' },
+    { key: 'email_html', label: 'Email body (HTML)', note: 'Pre-built HTML body for the send-email action.' },
+  ]),
   marketplace_want_match: withStandard([
     { key: 'listing_id', label: 'Listing ID', note: 'The newly published surplus listing.' },
     { key: 'listing_title', label: 'Listing title', note: 'Title of the matched listing.' },

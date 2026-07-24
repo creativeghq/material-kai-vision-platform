@@ -73,6 +73,12 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'moodboard_quote_requested', group: 'Moodboards',
     label: 'Quote Requested', description: 'Someone requests a quote from a moodboard', icon: 'FileText', color: 'emerald',
     defaultData: { label: 'Moodboard Quote Requested', category: 'trigger', triggerType: 'moodboard_quote_requested', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'moodboard_dormancy_warning', group: 'Moodboards',
+    label: 'Dormancy Warning', description: 'Inactive moodboard flagged for removal (keep-active link)', icon: 'Clock', color: 'emerald',
+    defaultData: { label: 'Moodboard Dormancy Warning', category: 'trigger', triggerType: 'moodboard_dormancy_warning', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'moodboard_dormancy_reminder', group: 'Moodboards',
+    label: 'Dormancy Reminder', description: 'Final reminder before an inactive moodboard is removed', icon: 'Clock', color: 'emerald',
+    defaultData: { label: 'Moodboard Dormancy Reminder', category: 'trigger', triggerType: 'moodboard_dormancy_reminder', config: {} } as TriggerNodeData },
 
   // ── Profiles ──
   { type: 'triggerNode', category: 'trigger', subType: 'hire_me_received', group: 'Profiles',

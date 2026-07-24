@@ -31,6 +31,11 @@ verify_jwt = false
 [functions.supplier-orders-api]
 verify_jwt = false
 
+# One-click "keep this moodboard" link, opened straight from a dormancy email
+# (no auth header). Token is the capability.
+[functions.moodboard-keep-active]
+verify_jwt = false
+
 [functions.dashboard-insights]
 verify_jwt = false
 

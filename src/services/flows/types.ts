@@ -32,6 +32,8 @@ export type TriggerType =
   | 'moodboard_shared'
   | 'moodboard_commented'
   | 'moodboard_quote_requested'
+  | 'moodboard_dormancy_warning'
+  | 'moodboard_dormancy_reminder'
   | 'hire_me_received'
   | 'profile_followed'
   | 'profile_published'
@@ -253,6 +255,9 @@ export interface MoodboardQuoteRequestedTriggerConfig {}
 
 export interface MoodboardSharedTriggerConfig {}
 
+export interface MoodboardDormancyWarningTriggerConfig {}
+export interface MoodboardDormancyReminderTriggerConfig {}
+
 export interface MoodboardCommentedTriggerConfig {
   filter_moodboard_id?: string;
 }
@@ -319,6 +324,8 @@ export type TriggerConfigMap = {
   moodboard_shared: MoodboardSharedTriggerConfig;
   moodboard_commented: MoodboardCommentedTriggerConfig;
   moodboard_quote_requested: MoodboardQuoteRequestedTriggerConfig;
+  moodboard_dormancy_warning: MoodboardDormancyWarningTriggerConfig;
+  moodboard_dormancy_reminder: MoodboardDormancyReminderTriggerConfig;
   hire_me_received: HireMeReceivedTriggerConfig;
   profile_followed: ProfileFollowedTriggerConfig;
   profile_published: ProfilePublishedTriggerConfig;

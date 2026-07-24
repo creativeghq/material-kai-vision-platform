@@ -38,6 +38,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   moodboard_shared: Share2,
   moodboard_commented: ImagePlus,
   moodboard_quote_requested: FileText,
+  moodboard_dormancy_warning: Clock,
+  moodboard_dormancy_reminder: Clock,
   hire_me_received: UserPlus,
   profile_followed: UserPlus,
   profile_published: UserPlus,
