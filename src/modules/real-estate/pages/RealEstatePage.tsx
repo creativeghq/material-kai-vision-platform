@@ -6,6 +6,7 @@ import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
@@ -274,13 +275,23 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
 const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [rows, setRows] = useState<PropertyInquiry[] | null>(null);
   const load = useCallback(() => {
     if (!ws) return;
     realEstateService.listInquiries(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load leads', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
   useEffect(() => { load(); }, [load]);
-  const header = ws ? <div className="mb-3 flex justify-end"><AddLeadButton ws={ws} onAdded={load} /></div> : null;
+  // Leads are captured by the inquiry form on the agency's public page (/u/{userId}: listings +
+  // valuation widget). Surface it so agents know where public leads come from / what to share.
+  const header = ws ? (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      {user?.id
+        ? <a href={`/u/${user.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary" title="Your public agency page — listings, inquiry form & valuation widget"><Globe className="h-3.5 w-3.5" /> Where leads come from → your public page &amp; inquiry form</a>
+        : <span />}
+      <AddLeadButton ws={ws} onAdded={load} />
+    </div>
+  ) : null;
 
   if (rows === null) return <>{header}<InlineLoader /></>;
   if (rows.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No leads yet. Add one here, or they arrive from your public listing pages.</div></>;
