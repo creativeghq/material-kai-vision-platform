@@ -275,14 +275,17 @@ const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [rows, setRows] = useState<PropertyInquiry[] | null>(null);
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!ws) return;
     realEstateService.listInquiries(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load leads', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
+  useEffect(() => { load(); }, [load]);
+  const header = ws ? <div className="mb-3 flex justify-end"><AddLeadButton ws={ws} onAdded={load} /></div> : null;
 
-  if (rows === null) return <InlineLoader />;
-  if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No leads yet. Inquiries from your public listing pages appear here.</div>;
+  if (rows === null) return <>{header}<InlineLoader /></>;
+  if (rows.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No leads yet. Add one here, or they arrive from your public listing pages.</div></>;
   return (
+    <>{header}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((q) => (
         <div key={q.id} className="flex items-start gap-4 px-4 py-3">
@@ -296,6 +299,7 @@ const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         </div>
       ))}
     </div></CardContent></Card>
+    </>
   );
 };
 
@@ -461,6 +465,47 @@ const AddViaPropertyButton: React.FC<{ ws: string; label: string; tab: string }>
           <DialogFooter>
             <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
             <Button className="rounded-full" onClick={() => propertyId && navigate(`/properties/${propertyId}?tab=${tab}`)} disabled={!propertyId}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+// Manually add a lead (off-web contact) from the global Leads tab. property_inquiries requires a
+// property, so a lead is property-scoped; the backend also creates the CRM contact (D9).
+const AddLeadButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAdded }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [propertyId, setPropertyId] = useState('');
+  const [f, setF] = useState<{ name?: string; email?: string; phone?: string; message?: string }>({});
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!propertyId || !f.name?.trim()) return;
+    setBusy(true);
+    try {
+      await realEstateService.createInquiry(ws, { property_id: propertyId, name: f.name.trim(), email: f.email, phone: f.phone, message: f.message });
+      toast({ title: 'Lead added' });
+      setOpen(false); setPropertyId(''); setF({}); onAdded();
+    } catch (e) { toast({ title: 'Could not add lead', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const field = (k: 'name' | 'email' | 'phone', ph: string, t = 'text') => <input type={t} placeholder={ph} className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={f[k] ?? ''} onChange={(e) => setF((p) => ({ ...p, [k]: e.target.value }))} />;
+  return (
+    <>
+      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add lead</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add a lead</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><label className="mb-1 block text-xs text-muted-foreground">Property they’re interested in</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
+            <div className="grid grid-cols-2 gap-2">{field('name', 'Name')}{field('email', 'Email', 'email')}</div>
+            {field('phone', 'Phone')}
+            <textarea placeholder="Notes / what they’re after…" rows={2} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={f.message ?? ''} onChange={(e) => setF((p) => ({ ...p, message: e.target.value }))} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="rounded-full" onClick={save} disabled={!propertyId || !f.name?.trim() || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add lead</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

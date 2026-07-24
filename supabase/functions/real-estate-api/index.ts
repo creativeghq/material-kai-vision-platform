@@ -502,6 +502,39 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ inquiry: data });
       }
 
+      case 'create-inquiry': {
+        // Manually record a lead (someone who contacted the agency off-web). property_inquiries
+        // requires a property, so a lead is always property-scoped. The lead IS a crm_contact (D9):
+        // create/link the contact + a property_interest immediately, mirroring convert-inquiry.
+        const name = String(body.name ?? '').trim();
+        const propertyId = String(body.property_id ?? '');
+        if (!name) return json({ error: 'name is required' }, 400);
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        const { data: prop } = await supabase.from('properties').select('id').eq('id', propertyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!prop) return json({ error: 'property not found' }, 404);
+        const email = body.email ? String(body.email).trim() : null;
+        const phone = body.phone ? String(body.phone).trim() : null;
+        const message = String(body.message ?? '').slice(0, 1000) || 'Manually added lead';
+
+        const { data: contact, error: cErr } = await supabase.from('crm_contacts').insert({
+          workspace_id: workspaceId, name, email, phone,
+          contact_type: 'buyer', lead_source: 'manual', lead_status: 'new',
+          responsible_sales_user_ids: [userId],
+        }).select('id').single();
+        if (cErr) throw new HttpError(400, cErr.message);
+
+        const { data: inq, error } = await supabase.from('property_inquiries').insert({
+          workspace_id: workspaceId, property_id: propertyId, name, email, phone, message,
+          status: 'new', source: 'manual', gdpr_consent: true, crm_contact_id: contact.id,
+        }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+
+        await supabase.from('property_interests').upsert(
+          { workspace_id: workspaceId, property_id: propertyId, crm_contact_id: contact.id, interest_type: 'interested', note: 'manually added lead' },
+          { onConflict: 'property_id,crm_contact_id,interest_type' });
+        return json({ inquiry: inq, crm_contact_id: contact.id });
+      }
+
       // ── Viewings (agent-scoped, Google Calendar sync in P2) ────────────
       case 'list-viewings': {
         let q = supabase.from('property_viewings')

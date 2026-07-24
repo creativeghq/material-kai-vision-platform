@@ -270,6 +270,9 @@ export const realEstateService = {
     call<{ inquiries: PropertyInquiry[] }>(ws, 'list-inquiries', filters).then((r) => r.inquiries),
   updateInquiry: (ws: string, inquiryId: string, status: string) =>
     call<{ inquiry: PropertyInquiry }>(ws, 'update-inquiry', { inquiry_id: inquiryId, status }).then((r) => r.inquiry),
+  /** Manually record a lead (off-web contact). property_id is required; also creates the CRM contact. */
+  createInquiry: (ws: string, fields: { property_id: string; name: string; email?: string; phone?: string; message?: string }) =>
+    call<{ inquiry: PropertyInquiry; crm_contact_id: string }>(ws, 'create-inquiry', fields).then((r) => r.inquiry),
   /** Turn an anonymous inquiry into a CRM lead (contact) linked to the property + assigned to caller. */
   convertInquiry: (ws: string, inquiryId: string) =>
     call<{ crm_contact_id: string; already_linked?: boolean }>(ws, 'convert-inquiry', { inquiry_id: inquiryId }),

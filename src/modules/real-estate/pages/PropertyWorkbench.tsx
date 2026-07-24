@@ -32,6 +32,7 @@ import { contractsService, type Contract } from '@/services/contractsService';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { CmaReportDialog } from '../components/CmaReportDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
 const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
@@ -107,6 +108,7 @@ export default function PropertyWorkbench() {
   const [property, setProperty] = useState<Property | null>(null);
   const [canEdit, setCanEdit] = useState(true);
   const [cmaOpen, setCmaOpen] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
   const [photos, setPhotos] = useState<PropertyPhoto[]>([]);
   const [inquiries, setInquiries] = useState<PropertyInquiry[]>([]);
   const [viewings, setViewings] = useState<PropertyViewing[]>([]);
@@ -175,6 +177,13 @@ export default function PropertyWorkbench() {
     finally { setBusy(false); }
   };
 
+  const del = async () => {
+    if (!ws) return;
+    setBusy(true);
+    try { await realEstateService.deleteProperty(ws, id); toast({ title: 'Listing deleted' }); navigate('/properties'); }
+    catch (e) { toast({ title: 'Could not delete', description: (e as Error).message, variant: 'destructive' }); setBusy(false); }
+  };
+
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []); if (!ws || !files.length) return;
     setBusy(true);
@@ -229,6 +238,7 @@ export default function PropertyWorkbench() {
               ? <Button variant="outline" size="sm" className="rounded-full" onClick={unpublish} disabled={busy}><EyeOff className="mr-1 h-4 w-4" /> Unpublish</Button>
               : <Button size="sm" className="rounded-full" onClick={publish} disabled={busy}><Globe className="mr-1 h-4 w-4" /> Publish</Button>)}
             {editable && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>}
+            {editable && <Button variant="ghost" size="sm" className="rounded-full text-red-500 hover:bg-red-500/10 hover:text-red-600" onClick={() => setDelOpen(true)} disabled={busy} title="Delete listing"><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>}
           </div>
         } />
 
@@ -587,6 +597,16 @@ export default function PropertyWorkbench() {
         </Tabs>
       </div>
       {ws && <CmaReportDialog ws={ws} propertyId={id} open={cmaOpen} onOpenChange={setCmaOpen} />}
+      <Dialog open={delOpen} onOpenChange={setDelOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete this listing?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This permanently removes “{property.title || 'this listing'}” and its offers, viewings, photos and related records. This cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setDelOpen(false)}>Cancel</Button>
+            <Button variant="destructive" className="rounded-full" onClick={del} disabled={busy}>{busy ? 'Deleting…' : 'Delete listing'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
