@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Check, X } from 'lucide-react';
-import { Card, CardContent } from '@/components/core/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -253,56 +253,55 @@ export const OrdersPanel: React.FC<{
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Orders</h3>
-          <p className="text-xs text-muted-foreground">Sales &amp; purchase orders. Invoices, payments, dispatch and profit all hang off an order.</p>
-        </div>
-        <div className="flex items-end gap-2 flex-wrap">
-          {/* Filters only matter on the global Finance list. Inside a single party the list is
-              short and already scoped — the dropdowns are just noise there. */}
-          {!embedded && (
-            <FilterBar
-              groups={ORDER_FILTER_GROUPS}
-              values={filterValues}
-              onChange={(next) => { setFilterValues(next); setPage(1); }}
-              previewCount={previewCount}
-              searchPlaceholder="Party or number"
-              title="Filter orders"
-            />
-          )}
-          {/* One entry point, one dropdown — the order kind is an explicit choice in the menu
-              (a "pre-order" is just a sales order saved as a draft). */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-1" /> New order <ChevronDown className="h-4 w-4 ml-1" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              {showSales && (
-                <DropdownMenuItem onClick={() => openCreate('sales', false)}>
-                  <ShoppingCart className="h-3.5 w-3.5 mr-2" /> Sales order
-                </DropdownMenuItem>
-              )}
-              {showPurchase && (
-                <DropdownMenuItem onClick={() => openCreate('purchase', false)}>
-                  <Package className="h-3.5 w-3.5 mr-2" /> Purchase order
-                </DropdownMenuItem>
-              )}
-              {/* Pre-order is a sales draft — only offered where selling is offered. */}
-              {showSales && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => openCreate('sales', true)}>
-                    <FileClock className="h-3.5 w-3.5 mr-2" /> Pre-order <span className="ml-1 text-[10px] text-muted-foreground">(draft)</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
       <Card>
+        <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" /> Orders
+            <span className="text-[10px] font-normal text-muted-foreground">· sales &amp; purchase</span>
+          </CardTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Filters only matter on the global Finance list. Inside a single party the list is
+                short and already scoped — the dropdowns are just noise there. */}
+            {!embedded && (
+              <FilterBar
+                groups={ORDER_FILTER_GROUPS}
+                values={filterValues}
+                onChange={(next) => { setFilterValues(next); setPage(1); }}
+                previewCount={previewCount}
+                searchPlaceholder="Party or number"
+                title="Filter orders"
+              />
+            )}
+            {/* One entry point, one dropdown — the order kind is an explicit choice in the menu
+                (a "pre-order" is just a sales order saved as a draft). */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> New order <ChevronDown className="h-4 w-4 ml-1" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {showSales && (
+                  <DropdownMenuItem onClick={() => openCreate('sales', false)}>
+                    <ShoppingCart className="h-3.5 w-3.5 mr-2" /> Sales order
+                  </DropdownMenuItem>
+                )}
+                {showPurchase && (
+                  <DropdownMenuItem onClick={() => openCreate('purchase', false)}>
+                    <Package className="h-3.5 w-3.5 mr-2" /> Purchase order
+                  </DropdownMenuItem>
+                )}
+                {/* Pre-order is a sales draft — only offered where selling is offered. */}
+                {showSales && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => openCreate('sales', true)}>
+                      <FileClock className="h-3.5 w-3.5 mr-2" /> Pre-order <span className="ml-1 text-[10px] text-muted-foreground">(draft)</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
