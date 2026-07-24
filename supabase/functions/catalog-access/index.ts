@@ -272,6 +272,29 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         return jsonResponse({ granted_access: false, reason: 'access_revoked' });
       }
 
+      // Rebuild the catalog PDF if the storage-retention sweep purged it. The page
+      // renders from body_data regardless, but the download link needs a live file.
+      // The renderer accepts the service-role key (cross-tenant 'secret' level);
+      // credit-free. Best-effort — self-heals on the first view after a purge.
+      let catalogPdfPath: string | null = catalog.pdf_storage_path;
+      if (!catalogPdfPath) {
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/generate-catalog-pdf`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+            body: JSON.stringify({ catalog_id: catalog.id, regenerate: true }),
+          });
+          const { data: fresh } = await supabase
+            .from('presentation_catalogs').select('pdf_storage_path').eq('id', catalog.id).maybeSingle();
+          catalogPdfPath = fresh?.pdf_storage_path ?? null;
+        } catch (_) {
+          /* best-effort */
+        }
+      }
+      const catalogPdfUrl = catalogPdfPath
+        ? (await supabase.storage.from('pdf-documents').createSignedUrl(catalogPdfPath, 604800))?.data?.signedUrl ?? catalog.pdf_url
+        : catalog.pdf_url;
+
       const branding = await resolveOwnerBranding(supabase, catalog.workspace_id ?? null, catalog.owner_user_id);
 
       return jsonResponse({
@@ -286,9 +309,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
           cover_data: catalog.cover_data,
           body_data: catalog.body_data,
           back_cover_data: catalog.back_cover_data,
-          pdf_url: catalog.pdf_storage_path
-            ? (await supabase.storage.from('pdf-documents').createSignedUrl(catalog.pdf_storage_path, 604800))?.data?.signedUrl ?? catalog.pdf_url
-            : catalog.pdf_url,
+          pdf_url: catalogPdfUrl,
         },
         branding: {
           logo_url: branding.logo_url,

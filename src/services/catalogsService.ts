@@ -45,6 +45,8 @@ export interface PresentationCatalog {
   pdf_storage_path: string | null;
   pdf_url: string | null;
   pdf_generated_at: string | null;
+  /** Set by the storage-retention sweep when the PDF file was purged (rebuilds on open). */
+  files_purged_at?: string | null;
   page_count: number | null;
   published_at: string | null;
   unpublished_at: string | null;
@@ -301,7 +303,12 @@ class CatalogsService {
   }
 
   async refreshPdfUrl(catalogId: string): Promise<string | null> {
-    const cat = await this.get(catalogId);
+    let cat = await this.get(catalogId);
+    // Purged by the storage-retention sweep → rebuild on demand (credit-free).
+    if (!cat?.pdf_storage_path && cat?.files_purged_at) {
+      try { await this.generatePdf(catalogId, true); } catch { /* fall through to null */ }
+      cat = await this.get(catalogId);
+    }
     if (!cat?.pdf_storage_path) return null;
     const { data } = await supabase.storage
       .from('pdf-documents')
