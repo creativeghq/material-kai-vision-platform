@@ -349,6 +349,9 @@ export interface MoodBoard {
   projectId?: string | null;
   /** Project room linkage. Only meaningful when projectId is set. */
   roomId?: string | null;
+  /** Lifecycle status. 'completed' lets the storage-retention sweep purge the
+   *  board's regenerable sheet PDFs (they rebuild on open). Defaults to 'active'. */
+  status?: 'active' | 'completed' | 'archived';
 }
 
 export interface MoodBoardItem {

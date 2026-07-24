@@ -26,6 +26,8 @@ export interface PresentationSheet {
   pdf_storage_path: string | null;
   pdf_url: string | null;
   pdf_generated_at: string | null;
+  /** Set by the storage-retention sweep when the PDF file was purged (rebuilds on open). */
+  files_purged_at?: string | null;
   page_count: number | null;
   credits_used: number;
   ai_log_ids: string[];
@@ -212,7 +214,12 @@ class MoodboardSheetsService {
   }
 
   async refreshPdfUrl(sheetId: string): Promise<string | null> {
-    const sheet = await this.get(sheetId);
+    let sheet = await this.get(sheetId);
+    // Purged by the storage-retention sweep → rebuild on demand (credit-free).
+    if (!sheet?.pdf_storage_path && sheet?.files_purged_at) {
+      try { await this.generatePdf(sheetId); } catch { /* fall through to null */ }
+      sheet = await this.get(sheetId);
+    }
     if (!sheet?.pdf_storage_path) return null;
 
     const { data, error } = await supabase

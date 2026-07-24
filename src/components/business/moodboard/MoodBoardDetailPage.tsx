@@ -18,6 +18,8 @@ import {
   Link,
   LockKeyhole,
   Search,
+  CheckCircle2,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -145,6 +147,23 @@ export const MoodBoardDetailPage: React.FC = () => {
       navigate('/moodboard');
     } catch {
       toast({ title: 'Error', description: 'Failed to delete moodboard', variant: 'destructive' });
+    }
+  };
+
+  const handleToggleComplete = async () => {
+    if (!moodboard) return;
+    const next = moodboard.status === 'completed' ? 'active' : 'completed';
+    try {
+      await moodboardAPI.setMoodBoardStatus(moodboard.id, next);
+      setMoodboard({ ...moodboard, status: next });
+      toast({
+        title: next === 'completed' ? 'Marked as done' : 'Reopened',
+        description: next === 'completed'
+          ? 'Generated sheet PDFs will be cleared from storage and rebuilt on demand.'
+          : 'Moodboard reopened.',
+      });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' });
     }
   };
 
@@ -374,6 +393,24 @@ export const MoodBoardDetailPage: React.FC = () => {
               Copy link
             </Button>
           )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`rounded-full gap-1.5 bg-black/35 backdrop-blur-sm ${
+              moodboard.status === 'completed'
+                ? 'text-green-300 hover:text-green-200 hover:bg-black/50'
+                : 'text-white hover:text-white hover:bg-black/50'
+            }`}
+            onClick={handleToggleComplete}
+            title={moodboard.status === 'completed'
+              ? 'Completed — click to reopen'
+              : 'Mark as done (frees generated sheet PDFs; they rebuild on open)'}
+          >
+            {moodboard.status === 'completed'
+              ? <><RotateCcw className="h-3.5 w-3.5" />Reopen</>
+              : <><CheckCircle2 className="h-3.5 w-3.5" />Mark done</>}
+          </Button>
 
           <Button
             variant="ghost"

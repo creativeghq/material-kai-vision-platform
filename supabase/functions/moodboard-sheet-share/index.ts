@@ -29,6 +29,44 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+/**
+ * Return a fresh signed URL for a deliverable PDF, rebuilding it first if the
+ * storage-retention sweep has purged the file (pdf_storage_path nulled). The
+ * renderer accepts the service-role key (ownership verified when the row was
+ * created), so a stale shared link transparently re-renders — no credit cost.
+ * Best-effort: if regeneration fails the page still renders its non-PDF content.
+ */
+async function ensureDeliverablePdf(
+  supabase: ReturnType<typeof createClient>,
+  regenBody: Record<string, unknown>,
+  table: 'project_client_views' | 'moodboard_presentation_sheets',
+  id: string,
+  currentPath: string | null,
+): Promise<string | null> {
+  let path = currentPath;
+  if (!path) {
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/generate-moodboard-sheet-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify(regenBody),
+      });
+      const { data: fresh } = await supabase
+        .from(table).select('pdf_storage_path').eq('id', id).maybeSingle();
+      path = (fresh as { pdf_storage_path: string | null } | null)?.pdf_storage_path ?? null;
+    } catch (_) {
+      /* best-effort */
+    }
+  }
+  if (!path) return null;
+  const { data: signed } = await supabase.storage
+    .from('pdf-documents').createSignedUrl(path, 60 * 60);
+  return signed?.signedUrl ?? null;
+}
+
 Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -126,12 +164,13 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       lightingImageUrl = deriveLightingImage(ordered) || (view.cover?.cover_image_url ?? null);
     }
 
-    let pdf_url: string | null = null;
-    if (view.pdf_storage_path) {
-      const { data: signed } = await supabase.storage
-        .from('pdf-documents').createSignedUrl(view.pdf_storage_path, 60 * 60);
-      pdf_url = signed?.signedUrl ?? null;
-    }
+    const pdf_url = await ensureDeliverablePdf(
+      supabase,
+      { client_view_id: view.id, regenerate: true },
+      'project_client_views',
+      view.id,
+      view.pdf_storage_path,
+    );
 
     let vr_world: any = null;
     if (view.embed_vr && view.vr_world_id) {
@@ -212,12 +251,13 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
     .eq('id', sheet.id)
     .then(() => {});
 
-  let pdf_url: string | null = null;
-  if (sheet.pdf_storage_path) {
-    const { data: signed } = await supabase.storage
-      .from('pdf-documents').createSignedUrl(sheet.pdf_storage_path, 60 * 60);
-    pdf_url = signed?.signedUrl ?? null;
-  }
+  const pdf_url = await ensureDeliverablePdf(
+    supabase,
+    { sheet_id: sheet.id },
+    'moodboard_presentation_sheets',
+    sheet.id,
+    sheet.pdf_storage_path,
+  );
 
   return jsonResponse({
     sheet: {

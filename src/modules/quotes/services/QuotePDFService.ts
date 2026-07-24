@@ -33,14 +33,27 @@ class QuotePDFService {
   }
 
   /**
-   * Get a fresh signed URL for an existing PDF
+   * Get a fresh signed URL for an existing PDF. If the stored PDF has been
+   * purged by the storage-retention sweep (pdf_storage_path nulled +
+   * pdf_generation_status='expired'), rebuild it on demand first — regeneration
+   * is credit-free, so an old quote's PDF transparently comes back on open.
    */
   async refreshPDFUrl(quoteId: string): Promise<string | null> {
-    const { data: quote } = await supabase
+    let { data: quote } = await supabase
       .from('quotes')
-      .select('pdf_storage_path')
+      .select('pdf_storage_path, pdf_generation_status')
       .eq('id', quoteId)
       .single();
+
+    if (!quote?.pdf_storage_path && quote?.pdf_generation_status === 'expired') {
+      await this.generatePDF(quoteId, true);
+      const { data: fresh } = await supabase
+        .from('quotes')
+        .select('pdf_storage_path, pdf_generation_status')
+        .eq('id', quoteId)
+        .single();
+      quote = fresh;
+    }
 
     if (!quote?.pdf_storage_path) return null;
 

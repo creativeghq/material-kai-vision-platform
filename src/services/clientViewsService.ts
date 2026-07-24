@@ -32,6 +32,8 @@ export interface ClientView {
   pdf_storage_path: string | null;
   pdf_generation_status: 'draft' | 'generating' | 'completed' | 'failed';
   pdf_generated_at: string | null;
+  /** Set by the storage-retention sweep when the PDF file was purged (rebuilds on open). */
+  files_purged_at?: string | null;
   page_count: number | null;
   error_message: string | null;
   public_share_token: string | null;
@@ -163,9 +165,14 @@ class ClientViewsService {
     return { pdf_url: data.pdf_url, pdf_storage_path: data.pdf_storage_path, page_count: data.page_count ?? 1 };
   }
 
-  /** Fresh 1-hour signed URL for the stored deck PDF. */
+  /** Fresh 1-hour signed URL for the stored deck PDF. Rebuilds on demand
+   *  (credit-free) if the storage-retention sweep has purged the file. */
   async refreshPdfUrl(id: string): Promise<string | null> {
-    const view = await this.get(id);
+    let view = await this.get(id);
+    if (!view?.pdf_storage_path && view?.files_purged_at) {
+      try { await this.generatePdf(id, true); } catch { /* fall through to null */ }
+      view = await this.get(id);
+    }
     if (!view?.pdf_storage_path) return null;
     const { data, error } = await supabase.storage
       .from('pdf-documents')

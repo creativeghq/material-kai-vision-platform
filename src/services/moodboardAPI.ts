@@ -155,6 +155,9 @@ class MoodBoardAPI {
       items: [], // Will be loaded separately
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at),
+      projectId: (data as any).project_id ?? null,
+      roomId: (data as any).room_id ?? null,
+      status: (data as any).status ?? 'active',
     };
   }
 
@@ -235,6 +238,23 @@ class MoodBoardAPI {
       projectId: (result as any).project_id ?? null,
       roomId: (result as any).room_id ?? null,
     };
+  }
+
+  /**
+   * Mark a moodboard completed (or reopen it). Completing it is a lifecycle flag
+   * only — items and sheets are untouched — but it lets the daily storage-retention
+   * sweep purge the moodboard's regenerable sheet PDFs (which rebuild on open),
+   * so a finished board stops holding storage. Reopening clears the flag.
+   */
+  async setMoodBoardStatus(id: string, status: 'active' | 'completed'): Promise<void> {
+    const { error } = await supabase
+      .from('moodboards')
+      .update({
+        status,
+        completed_at: status === 'completed' ? new Date().toISOString() : null,
+      } as never)
+      .eq('id', id);
+    if (error) throw error;
   }
 
   // Delete a moodboard
