@@ -828,7 +828,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const [payIssueDoc, setPayIssueDoc] = useState(false);
   // Money in carries a reason; money out is attached to a supplier (so it registers what we pay them).
   const [payReason, setPayReason] = useState('');
-  const [paySupplier, setPaySupplier] = useState<{ id: string; name: string } | null>(null);
+  // id === null → a one-off payee not saved in CRM (name-only); the payment stores counterparty_name.
+  const [paySupplier, setPaySupplier] = useState<{ id: string | null; name: string } | null>(null);
   const [paySupplierSearch, setPaySupplierSearch] = useState('');
   const [paySupplierOpts, setPaySupplierOpts] = useState<Array<{ id: string; name: string }>>([]);
   // Which cash/bank account the money lands in (or leaves from) + how it moved. Without an account
@@ -1054,6 +1055,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           bankAccountId: payAccountId,
           counterpartyCompanyId: payDir === 'out' ? (paySupplier?.id ?? null) : (order.customer_company_id ?? null),
           counterpartyContactId: payDir === 'in' ? (order.customer_contact_id ?? null) : null,
+          counterpartyName: payDir === 'out' && !paySupplier?.id ? (paySupplier?.name ?? null) : null,
           counterpartyBankAccountId: payMethod === 'bank_transfer' ? (payCounterpartyBankId || null) : null,
         });
       } else {
@@ -1065,7 +1067,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         await ordersService.recordOrderPayment({
           order: { id: order.id, workspace_id: order.workspace_id, currency: order.currency, customer_company_id: order.customer_company_id, customer_contact_id: order.customer_contact_id },
           direction: payDir, amount: amt, reference: payReason.trim(), method: payMethod || null,
-          bankAccountId: payAccountId, supplierCompanyId: paySupplier?.id ?? null, targets,
+          bankAccountId: payAccountId, supplierCompanyId: paySupplier?.id ?? null,
+          supplierName: !paySupplier?.id ? (paySupplier?.name ?? null) : null, targets,
           counterpartyBankAccountId: payMethod === 'bank_transfer' ? (payCounterpartyBankId || null) : null,
         });
       }
@@ -1107,7 +1110,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   };
 
   // Edit an existing payment: pre-fill the pay panel from the row and flip it into update mode.
-  const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_bank_account_id?: string | null }) => {
+  const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_bank_account_id?: string | null; counterparty_name?: string | null }) => {
     setEditingPaymentId(p.id);
     setPayDir(p.direction);
     setPayIssueDoc(false);
@@ -1126,6 +1129,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         const { data } = await supabase.from('crm_companies').select('name').eq('id', p.counterparty_company_id).maybeSingle();
         if (data?.name) setPaySupplier({ id: p.counterparty_company_id, name: data.name });
       }
+    } else if (p.direction === 'out' && p.counterparty_name) {
+      // One-off payee (not a CRM supplier) — restore as an id-less chip.
+      setPaySupplier({ id: null, name: p.counterparty_name });
     } else {
       setPaySupplier(null);
     }
@@ -1660,27 +1666,34 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                     )}
                   </div>
 
-                  {/* Money out is attached to a supplier — who we're paying. */}
+                  {/* Money out is attached to a payee — a saved CRM supplier, OR a one-off name for
+                      someone not in the platform (stored as a free-text counterparty on the payment). */}
                   {payDir === 'out' && (
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Supplier</Label>
+                      <Label className="text-xs text-muted-foreground">Supplier / payee</Label>
                       {paySupplier ? (
                         <div className="flex h-9 items-center justify-between gap-1 rounded-md border border-border/60 px-3 text-sm">
-                          <span className="inline-flex items-center gap-1.5 min-w-0"><Building2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{paySupplier.name}</span></span>
-                          <button type="button" className="text-muted-foreground hover:text-foreground shrink-0" onClick={() => setPaySupplier(null)} aria-label="Clear supplier"><X className="h-3.5 w-3.5" /></button>
+                          <span className="inline-flex items-center gap-1.5 min-w-0"><Building2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{paySupplier.name}</span>{paySupplier.id === null && <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">· one-off</span>}</span>
+                          <button type="button" className="text-muted-foreground hover:text-foreground shrink-0" onClick={() => setPaySupplier(null)} aria-label="Clear payee"><X className="h-3.5 w-3.5" /></button>
                         </div>
                       ) : (
                         <div className="relative">
-                          <Input className="h-9 w-full" value={paySupplierSearch} onChange={(e) => setPaySupplierSearch(e.target.value)} placeholder="Search supplier…" />
-                          {paySupplierOpts.length > 0 && (
+                          <Input className="h-9 w-full" value={paySupplierSearch} onChange={(e) => setPaySupplierSearch(e.target.value)} placeholder="Search a supplier, or type any payee name…" />
+                          {paySupplierSearch.trim().length >= 1 && (
                             <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
                               {paySupplierOpts.map((s) => (
                                 <button key={s.id} type="button" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setPaySupplier(s); setPaySupplierSearch(''); setPaySupplierOpts([]); }}>{s.name}</button>
                               ))}
+                              {/* Pay a one-off payee not saved in CRM. */}
+                              <button type="button" className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-muted ${paySupplierOpts.length > 0 ? 'border-t border-border/40' : ''}`}
+                                onClick={() => { setPaySupplier({ id: null, name: paySupplierSearch.trim() }); setPaySupplierSearch(''); setPaySupplierOpts([]); }}>
+                                <span className="text-muted-foreground">Pay </span>“{paySupplierSearch.trim()}”<span className="ml-1 text-[10px] text-muted-foreground">· one-off, not in CRM</span>
+                              </button>
                             </div>
                           )}
                         </div>
                       )}
+                      <p className="text-[10px] text-muted-foreground">Pick a saved supplier, or type any name to pay someone not in your CRM.</p>
                     </div>
                   )}
 

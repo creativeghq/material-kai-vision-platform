@@ -749,6 +749,8 @@ const _financeServiceCore = {
     paidAt?: string;
     counterpartyContactId?: string | null;
     counterpartyCompanyId?: string | null;
+    /** Free-text payee name when the counterparty is NOT a saved CRM company/contact (one-off). */
+    counterpartyName?: string | null;
     reference?: string | null;
     notes?: string | null;
     /** Payment currency → workspace base currency, at paid_at. Defaults to 1. */
@@ -800,9 +802,12 @@ const _financeServiceCore = {
       p_order_id: input.orderId ?? null,
     });
     if (error) throw error;
-    // The RPC doesn't carry the counterparty bank — stamp it on the created row when provided.
-    if (input.counterpartyBankAccountId && data) {
-      await supabase.from('payments').update({ counterparty_bank_account_id: input.counterpartyBankAccountId }).eq('id', data as string);
+    // The RPC doesn't carry the counterparty bank / ad-hoc payee name — stamp them on the created row.
+    const postInsert: Record<string, unknown> = {};
+    if (input.counterpartyBankAccountId) postInsert.counterparty_bank_account_id = input.counterpartyBankAccountId;
+    if (input.counterpartyName && !input.counterpartyCompanyId && !input.counterpartyContactId) postInsert.counterparty_name = input.counterpartyName;
+    if (Object.keys(postInsert).length > 0 && data) {
+      await supabase.from('payments').update(postInsert).eq('id', data as string);
     }
     // Payment received → generate the receipt + notify/email the customer via the seeded
     // flow (fire-and-forget). Only for inbound money, and only when sendReceipt isn't
