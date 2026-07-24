@@ -758,36 +758,12 @@ export const ordersService = {
    * the order's payment_status recomputes via the payment trigger and any remainder stays as credit.
    * Pass `amount` to cap it; omit to apply up to the order's outstanding.
    */
-  async applyCreditToOrder(orderId: string, workspaceId: string, amount?: number, bankAccountId?: string | null): Promise<number> {
+  async applyCreditToOrder(orderId: string, workspaceId: string, amount?: number): Promise<number> {
     const { data, error } = await supabase.rpc('apply_customer_credit_to_order', {
       p_workspace_id: workspaceId, p_order_id: orderId, p_amount: amount ?? null,
-      p_bank_account_id: bankAccountId ?? null,
     });
     if (error) throw error;
     return Number((data as any)?.applied) || 0;
-  },
-
-  /** Which of the workspace's bank accounts currently hold this customer's unallocated credit
-   *  (money-in minus allocations), newest first — used to default the "withdraw from" picker. */
-  async getCustomerCreditAccounts(workspaceId: string, opts: { companyId?: string | null; contactId?: string | null }): Promise<string[]> {
-    let q = supabase.from('payments')
-      .select('bank_account_id, paid_at, payment_allocations(amount_doc_currency), amount')
-      .eq('workspace_id', workspaceId).eq('direction', 'in').not('bank_account_id', 'is', null)
-      .order('paid_at', { ascending: false });
-    if (opts.companyId) q = q.eq('counterparty_company_id', opts.companyId);
-    else if (opts.contactId) q = q.eq('counterparty_contact_id', opts.contactId);
-    else return [];
-    const { data, error } = await q;
-    if (error) return [];
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const row of (data ?? []) as Array<{ bank_account_id: string | null; amount: number; payment_allocations: Array<{ amount_doc_currency: number }> | null }>) {
-      const allocated = (row.payment_allocations ?? []).reduce((s, a) => s + Number(a.amount_doc_currency), 0);
-      if (row.bank_account_id && Number(row.amount) - allocated > 0.005 && !seen.has(row.bank_account_id)) {
-        seen.add(row.bank_account_id); out.push(row.bank_account_id);
-      }
-    }
-    return out;
   },
 
   /**
