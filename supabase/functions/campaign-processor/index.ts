@@ -215,18 +215,26 @@ serve(withApiLogging('campaign-processor', async (req) => {
             .select('id', { count: 'exact', head: true })
             .eq('campaign_id', campaign.id)
             .eq('status', 'sent');
-          await emitFlowEvent('campaign_sent', {
-            type: 'campaign_sent',
-            workspace_id: campaign.workspace_id,
-            campaign_id: campaign.id,
-            campaign_name: campaign.name,
-            status: finalStatus,
-            sent_count: sentCount ?? 0,
-            failed_count: failedCount ?? 0,
-            title: `Campaign sent: ${campaign.name}`,
-            body: `"${campaign.name}" finished sending — ${sentCount ?? 0} delivered${failedCount ? `, ${failedCount} failed` : ''}.`,
-            action_url: '/email-marketing?tab=campaigns',
-          });
+          // Notify the campaign owner that their send finished. create_notification
+          // needs a concrete user_id, so resolve the creator (skip if absent).
+          const { data: campOwner } = await supabase
+            .from('campaigns').select('created_by').eq('id', campaign.id).maybeSingle();
+          const campCreatorId = (campOwner as { created_by?: string } | null)?.created_by ?? campaign.created_by ?? null;
+          if (campCreatorId) {
+            await emitFlowEvent('campaign_sent', {
+              user_id: campCreatorId,
+              type: 'campaign_sent',
+              workspace_id: campaign.workspace_id,
+              campaign_id: campaign.id,
+              campaign_name: campaign.name,
+              status: finalStatus,
+              sent_count: sentCount ?? 0,
+              failed_count: failedCount ?? 0,
+              title: `Campaign sent: ${campaign.name}`,
+              body: `"${campaign.name}" finished sending — ${sentCount ?? 0} delivered${failedCount ? `, ${failedCount} failed` : ''}.`,
+              action_url: '/email-marketing?tab=campaigns',
+            });
+          }
         } catch { /* best-effort */ }
         continue;
       }

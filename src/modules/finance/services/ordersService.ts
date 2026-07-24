@@ -464,22 +464,24 @@ export const ordersService = {
       if (itErr) throw itErr;
     }
     // Flows — order lifecycle (fire-and-forget).
-    flowEventService.emit('order_created', {
-      type: 'order_created',
-      workspace_id: input.workspaceId,
-      order_id: orderId,
-      order_number: (order as any).order_number ?? null,
-      order_type: input.orderType,
-      status: input.status ?? 'draft',
-      total,
-      currency: input.currency ?? 'EUR',
-      customer_company_id: input.customerCompanyId ?? null,
-      supplier_company_id: input.supplierCompanyId ?? null,
-      project_id: input.projectId ?? null,
-      title: `${input.orderType === 'purchase' ? 'Purchase' : 'Sales'} order created${(order as any).order_number ? ` #${(order as any).order_number}` : ''}`,
-      body: `A ${input.orderType} order was created (${total.toFixed(2)} ${input.currency ?? 'EUR'}).`,
-      action_url: '/finance?tab=orders',
-    });
+    flowEventService.emitToWorkspaceRoles(input.workspaceId, ['owner', 'admin'], 'order_created',
+      (recipientUserId) => ({
+        user_id: recipientUserId,
+        type: 'order_created',
+        workspace_id: input.workspaceId,
+        order_id: orderId,
+        order_number: (order as any).order_number ?? null,
+        order_type: input.orderType,
+        status: input.status ?? 'draft',
+        total,
+        currency: input.currency ?? 'EUR',
+        customer_company_id: input.customerCompanyId ?? null,
+        supplier_company_id: input.supplierCompanyId ?? null,
+        project_id: input.projectId ?? null,
+        title: `${input.orderType === 'purchase' ? 'Purchase' : 'Sales'} order created${(order as any).order_number ? ` #${(order as any).order_number}` : ''}`,
+        body: `A ${input.orderType} order was created (${total.toFixed(2)} ${input.currency ?? 'EUR'}).`,
+        action_url: '/finance?tab=orders',
+      }));
     return orderId;
   },
 
@@ -688,20 +690,22 @@ export const ordersService = {
       .single();
     if (error) throw error;
     // Flows — order status change (fire-and-forget).
-    flowEventService.emit('order_status_changed', {
-      type: 'order_status_changed',
-      workspace_id: (data as any).workspace_id,
-      order_id: id,
-      order_number: (data as any).order_number ?? null,
-      order_type: (data as any).order_type,
-      status,
-      status_label: ORDER_STATUS_LABEL[status] ?? status,
-      total: (data as any).total,
-      currency: (data as any).currency ?? 'EUR',
-      title: `Order ${(data as any).order_number ? `#${(data as any).order_number} ` : ''}→ ${ORDER_STATUS_LABEL[status] ?? status}`,
-      body: `Order status changed to "${ORDER_STATUS_LABEL[status] ?? status}".`,
-      action_url: '/finance?tab=orders',
-    });
+    flowEventService.emitToWorkspaceRoles((data as any).workspace_id, ['owner', 'admin'], 'order_status_changed',
+      (recipientUserId) => ({
+        user_id: recipientUserId,
+        type: 'order_status_changed',
+        workspace_id: (data as any).workspace_id,
+        order_id: id,
+        order_number: (data as any).order_number ?? null,
+        order_type: (data as any).order_type,
+        status,
+        status_label: ORDER_STATUS_LABEL[status] ?? status,
+        total: (data as any).total,
+        currency: (data as any).currency ?? 'EUR',
+        title: `Order ${(data as any).order_number ? `#${(data as any).order_number} ` : ''}→ ${ORDER_STATUS_LABEL[status] ?? status}`,
+        body: `Order status changed to "${ORDER_STATUS_LABEL[status] ?? status}".`,
+        action_url: '/finance?tab=orders',
+      }));
   },
 
   /**

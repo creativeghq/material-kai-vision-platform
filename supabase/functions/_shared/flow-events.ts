@@ -72,6 +72,41 @@ export async function emitAgentEvent(
   }
 }
 
+/**
+ * Emit a workspace-level flow event to every member of the workspace holding one
+ * of `roles` (e.g. owner/admin). The Flows `create_notification` action targets a
+ * single `user_id` and skips when it's absent, so a workspace event with no
+ * per-recipient `user_id` silently delivers nothing. This resolves the recipients
+ * and fires one enriched event per recipient (mirrors the `module_access_requested`
+ * pattern). `buildData(recipientUserId)` must return the payload including
+ * `user_id: recipientUserId`, `title`, `body`, `type`.
+ */
+export async function emitFlowEventToWorkspaceRoles(
+  workspaceId: string,
+  roles: string[],
+  eventType: string,
+  buildData: (recipientUserId: string) => Record<string, unknown>,
+  opts?: { excludeUserId?: string },
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase || !workspaceId) return;
+  try {
+    const { data: members } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .in('role', roles)
+      .eq('status', 'active');
+    const ids = [...new Set((members || []).map((m: { user_id: string }) => m.user_id as string))]
+      .filter((id) => id && id !== opts?.excludeUserId);
+    for (const uid of ids) {
+      await emitFlowEvent(eventType, buildData(uid));
+    }
+  } catch (err) {
+    console.error(`[flow-events] emitFlowEventToWorkspaceRoles error for ${eventType}:`, err);
+  }
+}
+
 export async function emitFlowEvent(
   eventType: string,
   data: Record<string, unknown>,

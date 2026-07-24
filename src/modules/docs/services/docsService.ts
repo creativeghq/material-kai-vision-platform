@@ -132,21 +132,28 @@ export async function createSuggestion(
   if (error) throw new Error(error.message);
   // Flows — a member proposed an edit; the doc owner can automate a review notification.
   let docTitle: string | null = null;
+  let docOwnerId: string | null = null;
   try {
-    const { data: d } = await supabase.from('workspace_docs').select('title').eq('id', docId).maybeSingle();
+    const { data: d } = await supabase.from('workspace_docs').select('title, created_by').eq('id', docId).maybeSingle();
     docTitle = (d as any)?.title ?? null;
+    docOwnerId = (d as any)?.created_by ?? null;
   } catch { /* best-effort */ }
-  flowEventService.emit('doc_suggestion_submitted', {
-    type: 'doc_suggestion_submitted',
-    workspace_id: workspaceId,
-    doc_id: docId,
-    doc_title: docTitle,
-    proposer_user_id: userId,
-    rationale: rationale || null,
-    title: `Edit proposed${docTitle ? `: ${docTitle}` : ''}`,
-    body: `A member proposed an edit${docTitle ? ` to "${docTitle}"` : ''}.`,
-    action_url: `/docs?doc=${docId}`,
-  });
+  // Notify the doc owner (create_notification needs a concrete user_id; skip if the
+  // owner is the proposer or unknown).
+  if (docOwnerId && docOwnerId !== userId) {
+    flowEventService.emit('doc_suggestion_submitted', {
+      user_id: docOwnerId,
+      type: 'doc_suggestion_submitted',
+      workspace_id: workspaceId,
+      doc_id: docId,
+      doc_title: docTitle,
+      proposer_user_id: userId,
+      rationale: rationale || null,
+      title: `Edit proposed${docTitle ? `: ${docTitle}` : ''}`,
+      body: `A member proposed an edit${docTitle ? ` to "${docTitle}"` : ''}.`,
+      action_url: `/docs?doc=${docId}`,
+    });
+  }
 }
 
 export async function reviewSuggestion(id: string, action: 'accept' | 'reject'): Promise<void> {

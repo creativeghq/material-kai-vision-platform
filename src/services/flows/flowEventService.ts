@@ -32,6 +32,38 @@ class FlowEventService {
       console.warn(`[flowEventService] Failed to emit ${eventType}:`, err);
     }
   }
+
+  /**
+   * Emit a workspace-level event to every member holding one of `roles`
+   * (e.g. owner/admin). The Flows `create_notification` action targets a single
+   * `user_id` and skips when it's absent, so a workspace event without a
+   * per-recipient `user_id` delivers nothing. This resolves the recipients and
+   * fires one enriched event each. `buildData(recipientUserId)` must include
+   * `user_id: recipientUserId`, `title`, `body`, `type`.
+   */
+  async emitToWorkspaceRoles(
+    workspaceId: string,
+    roles: string[],
+    eventType: string,
+    buildData: (recipientUserId: string) => Record<string, unknown>,
+    opts?: { excludeUserId?: string },
+  ): Promise<void> {
+    if (!workspaceId) return;
+    try {
+      const { data: members } = await supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', workspaceId)
+        .in('role', roles)
+        .eq('status', 'active');
+      const rows = (members ?? []) as Array<{ user_id: string }>;
+      const ids = [...new Set(rows.map((m) => m.user_id))]
+        .filter((id): id is string => !!id && id !== opts?.excludeUserId);
+      await Promise.all(ids.map((uid) => this.emit(eventType, buildData(uid))));
+    } catch (err) {
+      console.warn(`[flowEventService] emitToWorkspaceRoles failed for ${eventType}:`, err);
+    }
+  }
 }
 
 export const flowEventService = new FlowEventService();

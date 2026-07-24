@@ -6,7 +6,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { callClaudeTool, meterHrAi, creditBalance, reserveHrCredits, refundHrCredits, base64FromBytes } from './ai-meter.ts';
 import { businessDaysInclusive, tagEmployee } from './hr-util.ts';
 // NOTE: payslip.ts (→ pdf-lib + fontkit, heavy) is imported LAZILY inside the generate-payslips
@@ -268,14 +268,16 @@ async function emitApplicantStage(supabase: any, workspaceId: string, applicatio
       .select('candidate:hr_candidates!hr_applications_candidate_id_fkey ( id, name, email ), posting:hr_job_postings!hr_applications_job_posting_id_fkey ( id, title )')
       .eq('id', applicationId).maybeSingle();
     const cand = (a as any)?.candidate, post = (a as any)?.posting;
-    await emitFlowEvent('hr.applicant_stage_changed', {
-      workspace_id: workspaceId, application_id: applicationId, from_stage: fromStage, to_stage: toStage,
-      candidate_id: cand?.id ?? null, candidate_name: cand?.name ?? null, candidate_email: cand?.email ?? null,
-      job_posting_id: post?.id ?? null, job_title: post?.title ?? null,
-      title: `Applicant: ${cand?.name ?? 'candidate'} → ${toStage}`,
-      body: `${cand?.name ?? 'A candidate'} moved to "${toStage}"${post?.title ? ` for ${post.title}` : ''}.`,
-      action_url: '/hr?tab=recruitment', type: 'hr.applicant_stage_changed',
-    });
+    await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'hr.applicant_stage_changed',
+      (recipientUserId) => ({
+        user_id: recipientUserId,
+        workspace_id: workspaceId, application_id: applicationId, from_stage: fromStage, to_stage: toStage,
+        candidate_id: cand?.id ?? null, candidate_name: cand?.name ?? null, candidate_email: cand?.email ?? null,
+        job_posting_id: post?.id ?? null, job_title: post?.title ?? null,
+        title: `Applicant: ${cand?.name ?? 'candidate'} → ${toStage}`,
+        body: `${cand?.name ?? 'A candidate'} moved to "${toStage}"${post?.title ? ` for ${post.title}` : ''}.`,
+        action_url: '/hr?tab=recruitment', type: 'hr.applicant_stage_changed',
+      }));
   } catch { /* flow emit is best-effort — never block the stage change */ }
 }
 

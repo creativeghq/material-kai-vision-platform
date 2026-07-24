@@ -20,7 +20,7 @@ import { handleExpansion, handleSelfService } from './expansion.ts';
 import { handleErgani } from './ergani.ts';
 import { handleAccounting } from './accounting.ts';
 import { businessDaysInclusive, tagEmployee } from './hr-util.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -234,14 +234,16 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         // Flows — HR lifecycle. Best-effort; never block the create.
         try {
           const empName = (withSum as any)?.contact?.name ?? (body?.contact as any)?.name ?? 'New employee';
-          await emitFlowEvent('hr.employee_added', {
-            workspace_id: workspaceId, type: 'hr.employee_added',
-            employee_id: (emp as any).id, crm_contact_id: contactId, employee_name: empName,
-            employment_type: (empFields as any).employment_type ?? null,
-            title: `New employee: ${empName}`,
-            body: `${empName} was added to the HR module.`,
-            action_url: '/hr?tab=employees',
-          });
+          await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'hr.employee_added',
+            (recipientUserId) => ({
+              user_id: recipientUserId,
+              workspace_id: workspaceId, type: 'hr.employee_added',
+              employee_id: (emp as any).id, crm_contact_id: contactId, employee_name: empName,
+              employment_type: (empFields as any).employment_type ?? null,
+              title: `New employee: ${empName}`,
+              body: `${empName} was added to the HR module.`,
+              action_url: '/hr?tab=employees',
+            }), { excludeUserId: userId });
         } catch { /* best-effort */ }
         return json({ employee: withSum }, 201);
       }
@@ -343,14 +345,16 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         if (error) throw new HttpError(400, error.message);
         try {
           const nm = await employeeName(supabase, workspaceId, employeeId);
-          await emitFlowEvent('hr.absence_requested', {
-            workspace_id: workspaceId, type: 'hr.absence_requested',
-            absence_id: (data as any).id, employee_id: employeeId, employee_name: nm,
-            absence_type: absenceType, start_date: startDate, end_date: endDate, working_days: workingDays,
-            title: `Absence requested: ${nm}`,
-            body: `${nm} requested ${absenceType} leave ${startDate} → ${endDate} (${workingDays}d).`,
-            action_url: '/hr?tab=absences',
-          });
+          await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'hr.absence_requested',
+            (recipientUserId) => ({
+              user_id: recipientUserId,
+              workspace_id: workspaceId, type: 'hr.absence_requested',
+              absence_id: (data as any).id, employee_id: employeeId, employee_name: nm,
+              absence_type: absenceType, start_date: startDate, end_date: endDate, working_days: workingDays,
+              title: `Absence requested: ${nm}`,
+              body: `${nm} requested ${absenceType} leave ${startDate} → ${endDate} (${workingDays}d).`,
+              action_url: '/hr?tab=absences',
+            }), { excludeUserId: userId });
         } catch { /* best-effort */ }
         return json({ absence: data }, 201);
       }
@@ -370,15 +374,26 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         if (!data) return json({ error: 'not found' }, 404);
         try {
           const nm = await employeeName(supabase, workspaceId, String((data as any).employee_id));
-          await emitFlowEvent('hr.absence_reviewed', {
-            workspace_id: workspaceId, type: 'hr.absence_reviewed',
-            absence_id: (data as any).id, employee_id: (data as any).employee_id, employee_name: nm,
-            status: newStatus, absence_type: (data as any).absence_type,
-            start_date: (data as any).start_date, end_date: (data as any).end_date,
-            title: `Absence ${newStatus}: ${nm}`,
-            body: `${nm}'s ${(data as any).absence_type} leave was ${newStatus}.`,
-            action_url: '/hr?tab=absences',
-          });
+          // The reviewed employee is the recipient — resolve their linked auth user.
+          const { data: empRow } = await supabase
+            .from('hr_employees')
+            .select('user_id')
+            .eq('id', String((data as any).employee_id))
+            .eq('workspace_id', workspaceId)
+            .maybeSingle();
+          const employeeUserId = (empRow as { user_id?: string } | null)?.user_id ?? null;
+          if (employeeUserId) {
+            await emitFlowEvent('hr.absence_reviewed', {
+              user_id: employeeUserId,
+              workspace_id: workspaceId, type: 'hr.absence_reviewed',
+              absence_id: (data as any).id, employee_id: (data as any).employee_id, employee_name: nm,
+              status: newStatus, absence_type: (data as any).absence_type,
+              start_date: (data as any).start_date, end_date: (data as any).end_date,
+              title: `Absence ${newStatus}: ${nm}`,
+              body: `Your ${(data as any).absence_type} leave was ${newStatus}.`,
+              action_url: '/hr?tab=absences',
+            });
+          }
         } catch { /* best-effort */ }
         return json({ absence: data });
       }
