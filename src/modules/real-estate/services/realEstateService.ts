@@ -273,6 +273,18 @@ export const realEstateService = {
   /** Manually record a lead (off-web contact). property_id is required; also creates the CRM contact. */
   createInquiry: (ws: string, fields: { property_id: string; name: string; email?: string; phone?: string; message?: string }) =>
     call<{ inquiry: PropertyInquiry; crm_contact_id: string }>(ws, 'create-inquiry', fields).then((r) => r.inquiry),
+  /** Edit a lead's contact fields and/or status. */
+  editInquiry: (ws: string, inquiryId: string, fields: { name?: string; email?: string; phone?: string; message?: string; status?: string }) =>
+    call<{ inquiry: PropertyInquiry }>(ws, 'update-inquiry', { inquiry_id: inquiryId, ...fields }).then((r) => r.inquiry),
+  deleteInquiry: (ws: string, inquiryId: string) => call<{ ok: true }>(ws, 'delete-inquiry', { inquiry_id: inquiryId }),
+  deleteOffer: (ws: string, offerId: string) => call<{ ok: true }>(ws, 'delete-offer', { offer_id: offerId }),
+  deleteViewing: (ws: string, viewingId: string) => call<{ ok: true }>(ws, 'delete-viewing', { viewing_id: viewingId }),
+  deleteTenancy: (ws: string, tenancyId: string) => call<{ ok: true }>(ws, 'delete-tenancy', { tenancy_id: tenancyId }),
+  deleteMaintenance: (ws: string, workOrderId: string) => call<{ ok: true }>(ws, 'delete-maintenance', { work_order_id: workOrderId }),
+  deleteSale: (ws: string, saleId: string) => call<{ ok: true }>(ws, 'delete-sale', { sale_id: saleId }),
+  deleteInvestment: (ws: string, propertyId: string) => call<{ ok: true }>(ws, 'delete-investment', { property_id: propertyId }),
+  /** Unlink a person from Real Estate (removes their buyer/seller role); the CRM contact stays. */
+  unlinkContact: (ws: string, crmContactId: string) => call<{ ok: true }>(ws, 'delete-contact-ext', { crm_contact_id: crmContactId }),
   /** Turn an anonymous inquiry into a CRM lead (contact) linked to the property + assigned to caller. */
   convertInquiry: (ws: string, inquiryId: string) =>
     call<{ crm_contact_id: string; already_linked?: boolean }>(ws, 'convert-inquiry', { inquiry_id: inquiryId }),

@@ -494,10 +494,20 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'update-inquiry': {
+        // Edit a lead: status and/or its contact fields (name/email/phone/message).
         const inqId = String(body.inquiry_id ?? '');
-        const status = String(body.status ?? '');
-        if (!inqId || !INQUIRY_STATUSES.includes(status)) return json({ error: 'inquiry_id and a valid status are required' }, 400);
-        const { data, error } = await supabase.from('property_inquiries').update({ status }).eq('id', inqId).eq('workspace_id', workspaceId).select('*').single();
+        if (!inqId) return json({ error: 'inquiry_id is required' }, 400);
+        const patch: Record<string, unknown> = {};
+        if (body.status !== undefined) {
+          const status = String(body.status);
+          if (!INQUIRY_STATUSES.includes(status)) return json({ error: 'a valid status is required' }, 400);
+          patch.status = status;
+        }
+        for (const k of ['name', 'email', 'phone', 'message']) {
+          if (body[k] !== undefined) patch[k] = body[k] === null ? null : String(body[k]).slice(0, 1000);
+        }
+        if (Object.keys(patch).length === 0) return json({ error: 'nothing to update' }, 400);
+        const { data, error } = await supabase.from('property_inquiries').update(patch).eq('id', inqId).eq('workspace_id', workspaceId).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ inquiry: data });
       }
@@ -533,6 +543,54 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           { workspace_id: workspaceId, property_id: propertyId, crm_contact_id: contact.id, interest_type: 'interested', note: 'manually added lead' },
           { onConflict: 'property_id,crm_contact_id,interest_type' });
         return json({ inquiry: inq, crm_contact_id: contact.id });
+      }
+
+      // ── Deletes for the sub-entities (workspace-scoped + editable-property guard) ──
+      // Property-scoped: fetch the row's property_id, assert it's editable by the caller, then delete.
+      case 'delete-inquiry':
+      case 'delete-offer':
+      case 'delete-viewing':
+      case 'delete-tenancy':
+      case 'delete-maintenance':
+      case 'delete-sale': {
+        requireManage();
+        const MAP: Record<string, { table: string; idKey: string }> = {
+          'delete-inquiry': { table: 'property_inquiries', idKey: 'inquiry_id' },
+          'delete-offer': { table: 'property_offers', idKey: 'offer_id' },
+          'delete-viewing': { table: 'property_viewings', idKey: 'viewing_id' },
+          'delete-tenancy': { table: 'property_tenancies', idKey: 'tenancy_id' },
+          'delete-maintenance': { table: 'property_maintenance', idKey: 'work_order_id' },
+          'delete-sale': { table: 'property_sales', idKey: 'sale_id' },
+        };
+        const { table, idKey } = MAP[action];
+        const rowId = String(body[idKey] ?? '');
+        if (!rowId) return json({ error: `${idKey} is required` }, 400);
+        const { data: ex } = await supabase.from(table).select('property_id').eq('id', rowId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!ex) return json({ error: 'not found' }, 404);
+        await loadEditable(ex.property_id);
+        const { error } = await supabase.from(table).delete().eq('id', rowId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      case 'delete-investment': {
+        requireManage();
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        await loadEditable(propertyId);
+        const { error } = await supabase.from('property_investments').delete().eq('property_id', propertyId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      case 'delete-contact-ext': {
+        // Unlink a person from Real Estate (removes their buyer/seller role); the CRM contact stays.
+        requireManage();
+        const contactId = String(body.crm_contact_id ?? '');
+        if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
+        const { error } = await supabase.from('property_contacts_ext').delete().eq('crm_contact_id', contactId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
       }
 
       // ── Viewings (agent-scoped, Google Calendar sync in P2) ────────────

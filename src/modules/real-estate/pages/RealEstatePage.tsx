@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil } from 'lucide-react';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
@@ -273,7 +273,6 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
 };
 
 const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const [rows, setRows] = useState<PropertyInquiry[] | null>(null);
@@ -298,17 +297,7 @@ const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   return (
     <>{header}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
-      {rows.map((q) => (
-        <div key={q.id} className="flex items-start gap-4 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="font-medium">{q.name || 'Anonymous'} <span className="text-xs text-muted-foreground">{q.email}</span></div>
-            {q.property?.title && <button onClick={() => navigate(`/properties/${q.property_id}`)} className="text-xs text-primary hover:underline">{q.property.title}</button>}
-            {q.message && <div className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{q.message}</div>}
-            <div className="mt-0.5 text-[11px] text-muted-foreground">{new Date(q.created_at).toLocaleString()}</div>
-          </div>
-          <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{q.status.replace('_', ' ')}</Badge>
-        </div>
-      ))}
+      {rows.map((q) => <LeadRow key={q.id} ws={ws as string} q={q} onChanged={load} />)}
     </div></CardContent></Card>
     </>
   );
@@ -524,6 +513,80 @@ const AddLeadButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAd
   );
 };
 
+const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'];
+
+// Reusable destructive-confirm icon button for list rows.
+const DeleteIconButton: React.FC<{ title: string; confirmText: string; onDelete: () => Promise<void> }> = ({ title, confirmText, onDelete }) => {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const go = async () => { setBusy(true); try { await onDelete(); setOpen(false); } finally { setBusy(false); } };
+  return (
+    <>
+      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/10 hover:text-red-600" title={title} onClick={(e) => { e.stopPropagation(); setOpen(true); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{title}?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">{confirmText}</p>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="destructive" className="rounded-full" onClick={go} disabled={busy}>{busy ? 'Deleting…' : 'Delete'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+// A lead row with inline status change + edit + delete (the Leads tab is a plain list, not a link).
+const LeadRow: React.FC<{ ws: string; q: PropertyInquiry; onChanged: () => void }> = ({ ws, q, onChanged }) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ name: q.name ?? '', email: q.email ?? '', phone: q.phone ?? '', message: q.message ?? '' });
+  const setStatus = async (status: string) => {
+    try { await realEstateService.editInquiry(ws, q.id, { status }); onChanged(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
+  const saveEdit = async () => {
+    setBusy(true);
+    try { await realEstateService.editInquiry(ws, q.id, f); toast({ title: 'Lead updated' }); setEditing(false); onChanged(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const field = (k: 'name' | 'email' | 'phone', ph: string, t = 'text') => <input type={t} placeholder={ph} className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={f[k]} onChange={(e) => setF((p) => ({ ...p, [k]: e.target.value }))} />;
+  return (
+    <div className="flex items-start gap-2 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="font-medium">{q.name || 'Anonymous'} <span className="text-xs text-muted-foreground">{q.email}</span></div>
+        {q.property?.title && <button onClick={() => navigate(`/properties/${q.property_id}`)} className="text-xs text-primary hover:underline">{q.property.title}</button>}
+        {q.message && <div className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{q.message}</div>}
+        <div className="mt-0.5 text-[11px] text-muted-foreground">{new Date(q.created_at).toLocaleString()}</div>
+      </div>
+      <select className="h-7 shrink-0 rounded-md border bg-background px-1.5 text-xs capitalize" value={q.status} onChange={(e) => setStatus(e.target.value)} title="Status">
+        {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+      </select>
+      {q.crm_contact_id && <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" title="Open CRM contact" onClick={() => navigate(`/crm/contacts/${q.crm_contact_id}`)}><Users className="h-3.5 w-3.5" /></Button>}
+      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" title="Edit lead" onClick={() => { setF({ name: q.name ?? '', email: q.email ?? '', phone: q.phone ?? '', message: q.message ?? '' }); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+      <DeleteIconButton title="Delete lead" confirmText={`Delete the lead “${q.name || q.email || 'this lead'}”? This removes the inquiry record.`} onDelete={() => realEstateService.deleteInquiry(ws, q.id).then(() => onChanged())} />
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit lead</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">{field('name', 'Name')}{field('email', 'Email', 'email')}</div>
+            {field('phone', 'Phone')}
+            <textarea placeholder="Notes…" rows={2} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={f.message} onChange={(e) => setF((p) => ({ ...p, message: e.target.value }))} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button className="rounded-full" onClick={saveEdit} disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
 const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -548,14 +611,17 @@ const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
     {cmaButton}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((s) => (
-        <button key={s.crm_contact_id} onClick={() => navigate(`/crm/contacts/${s.crm_contact_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
-          <div className="min-w-0 flex-1">
-            <div className="font-medium">{s.contact?.name || 'Seller'} <span className="text-xs text-muted-foreground">{s.contact?.email}</span></div>
-            <div className="mt-0.5 truncate text-xs text-muted-foreground">{s.owned_property_address || '—'}{s.owned_property_value != null ? ` · est. ${money(s.owned_property_value, 'EUR')}` : ''}</div>
-          </div>
-          {s.contact?.lead_score != null && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title="Lead score">{s.contact.lead_score}</Badge>}
-          <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{(s.contact?.lead_status || 'new').replace('_', ' ')}</Badge>
-        </button>
+        <div key={s.crm_contact_id} className="flex items-center hover:bg-muted/40">
+          <button onClick={() => navigate(`/crm/contacts/${s.crm_contact_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left">
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">{s.contact?.name || 'Seller'} <span className="text-xs text-muted-foreground">{s.contact?.email}</span></div>
+              <div className="mt-0.5 truncate text-xs text-muted-foreground">{s.owned_property_address || '—'}{s.owned_property_value != null ? ` · est. ${money(s.owned_property_value, 'EUR')}` : ''}</div>
+            </div>
+            {s.contact?.lead_score != null && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title="Lead score">{s.contact.lead_score}</Badge>}
+            <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{(s.contact?.lead_status || 'new').replace('_', ' ')}</Badge>
+          </button>
+          <div className="pr-3"><DeleteIconButton title="Remove seller" confirmText={`Remove ${s.contact?.name || 'this person'} from the sellers list? Their CRM contact stays — only the seller role is removed.`} onDelete={() => realEstateService.unlinkContact(ws as string, s.crm_contact_id).then(load)} /></div>
+        </div>
       ))}
     </div></CardContent></Card>
     </>
@@ -579,11 +645,14 @@ const ViewingsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
     <>{header}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((v) => (
-        <button key={v.id} onClick={() => navigate(`/properties/${v.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left text-sm hover:bg-muted/40">
-          <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <div className="flex-1"><div className="font-medium">{new Date(v.scheduled_at).toLocaleString()}</div><div className="text-xs text-muted-foreground">{v.property?.title || 'Listing'} · <span className="capitalize">{v.type.replace('_', ' ')}</span></div></div>
-          <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{v.status.replace('_', ' ')}</Badge>
-        </button>
+        <div key={v.id} className="flex items-center hover:bg-muted/40">
+          <button onClick={() => navigate(`/properties/${v.property_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left text-sm">
+            <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1"><div className="font-medium">{new Date(v.scheduled_at).toLocaleString()}</div><div className="text-xs text-muted-foreground">{v.property?.title || 'Listing'} · <span className="capitalize">{v.type.replace('_', ' ')}</span></div></div>
+            <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{v.status.replace('_', ' ')}</Badge>
+          </button>
+          <div className="pr-3"><DeleteIconButton title="Delete viewing" confirmText="Delete this viewing from the calendar?" onDelete={() => realEstateService.deleteViewing(ws as string, v.id).then(load)} /></div>
+        </div>
       ))}
     </div></CardContent></Card>
     </>
@@ -626,6 +695,7 @@ const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
           </button>
           {!r.is_active && <Badge className="rounded-full border-0 bg-muted text-[11px]">paused</Badge>}
           <Button size="sm" variant="ghost" className="rounded-full" title="Copy buyer portal link" onClick={() => copyPortal(r.portal_token)}><LinkIcon className="mr-1 h-3.5 w-3.5" /> Portal</Button>
+          <DeleteIconButton title="Delete buyer" confirmText={`Delete the saved search for ${r.contact?.name || 'this buyer'}? Their CRM contact stays.`} onDelete={() => realEstateService.deleteBuyerRequirement(ws as string, r.id).then(load)} />
         </div>
       ))}
     </div></CardContent></Card>
@@ -639,11 +709,12 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const { toast } = useToast();
   const [tenancies, setTenancies] = useState<Tenancy[] | null>(null);
   const [work, setWork] = useState<MaintenanceWorkOrder[]>([]);
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!ws) return;
     realEstateService.listTenancies(ws).then(setTenancies).catch((e) => { toast({ title: 'Failed to load lettings', description: (e as Error).message, variant: 'destructive' }); setTenancies([]); });
     realEstateService.listMaintenance(ws, { status: 'open' }).then(setWork).catch(() => setWork([]));
   }, [ws, toast]);
+  useEffect(() => { load(); }, [load]);
   if (tenancies === null) return <InlineLoader />;
   const freq = (t: Tenancy) => `/${t.rent_frequency.replace('ly', '').replace('month', 'mo').replace('week', 'wk').replace('quarter', 'qtr').replace('year', 'yr')}`;
   return (
@@ -654,13 +725,16 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         {tenancies.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No tenancies yet. Set one up from a rental listing’s Lettings tab.</div> : (
           <Card><CardContent className="p-0"><div className="divide-y divide-border">
             {tenancies.map((t) => (
-              <button key={t.id} onClick={() => navigate(`/properties/${t.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium">{t.property?.title || 'Rental'} <span className="text-xs text-muted-foreground">· {t.tenant?.name || 'no tenant'}</span></div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">{money(t.rent_amount, t.currency)}{freq(t)} · from {new Date(t.start_date).toLocaleDateString()}</div>
-                </div>
-                <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{t.status}</Badge>
-              </button>
+              <div key={t.id} className="flex items-center hover:bg-muted/40">
+                <button onClick={() => navigate(`/properties/${t.property_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">{t.property?.title || 'Rental'} <span className="text-xs text-muted-foreground">· {t.tenant?.name || 'no tenant'}</span></div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{money(t.rent_amount, t.currency)}{freq(t)} · from {new Date(t.start_date).toLocaleDateString()}</div>
+                  </div>
+                  <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{t.status}</Badge>
+                </button>
+                <div className="pr-3"><DeleteIconButton title="Delete tenancy" confirmText={`Delete the tenancy for ${t.property?.title || 'this rental'}? Rent charges and history for it are removed.`} onDelete={() => realEstateService.deleteTenancy(ws as string, t.id).then(load)} /></div>
+              </div>
             ))}
           </div></CardContent></Card>
         )}
@@ -688,10 +762,11 @@ const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [rows, setRows] = useState<PropertySale[] | null>(null);
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!ws) return;
     realEstateService.listSales(ws).then(setRows).catch((e) => { toast({ title: 'Failed to load sales', description: (e as Error).message, variant: 'destructive' }); setRows([]); });
   }, [ws, toast]);
+  useEffect(() => { load(); }, [load]);
   if (rows === null) return <InlineLoader />;
   if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No completed sales yet. Close one from a listing’s Offers tab → “Complete sale & commission”.</div>;
   const totalCommission = rows.reduce((t, s) => t + Number(s.commission_base ?? 0), 0);
@@ -705,19 +780,22 @@ const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
       </CardContent></Card>
       <Card><CardContent className="p-0"><div className="divide-y divide-border">
         {rows.map((s) => (
-          <button key={s.id} onClick={() => navigate(`/properties/${s.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
-            <Handshake className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <div className="font-medium">{s.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· sold {money(s.sale_price, s.currency)}</span></div>
-              <div className="mt-0.5 text-xs text-muted-foreground">{s.seller?.name ? `${s.seller.name} · ` : ''}{new Date(s.completed_at).toLocaleDateString()}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-semibold text-emerald-500">{money(s.commission_base, s.currency)}</div>
-              {s.invoice_id
-                ? <Badge className="rounded-full border-0 bg-primary/15 text-[10px] capitalize">{s.invoice_status || 'invoiced'}</Badge>
-                : <span className="text-[10px] text-muted-foreground">not invoiced</span>}
-            </div>
-          </button>
+          <div key={s.id} className="flex items-center hover:bg-muted/40">
+            <button onClick={() => navigate(`/properties/${s.property_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left">
+              <Handshake className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{s.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· sold {money(s.sale_price, s.currency)}</span></div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{s.seller?.name ? `${s.seller.name} · ` : ''}{new Date(s.completed_at).toLocaleDateString()}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-semibold text-emerald-500">{money(s.commission_base, s.currency)}</div>
+                {s.invoice_id
+                  ? <Badge className="rounded-full border-0 bg-primary/15 text-[10px] capitalize">{s.invoice_status || 'invoiced'}</Badge>
+                  : <span className="text-[10px] text-muted-foreground">not invoiced</span>}
+              </div>
+            </button>
+            <div className="pr-3"><DeleteIconButton title="Delete sale" confirmText="Delete this completed sale? Its commission is removed from your reporting. This does not delete any linked invoice." onDelete={() => realEstateService.deleteSale(ws as string, s.id).then(load)} /></div>
+          </div>
         ))}
       </div></CardContent></Card>
     </div>
@@ -736,12 +814,13 @@ const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [data, setData] = useState<{ investments: PropertyInvestment[]; portfolio: InvestmentPortfolio } | null>(null);
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!ws) return;
     realEstateService.listInvestments(ws)
       .then(setData)
       .catch((e) => { toast({ title: 'Failed to load investments', description: (e as Error).message, variant: 'destructive' }); setData({ investments: [], portfolio: { count: 0, total_invested: 0, cash_invested: 0, annual_noi: 0, annual_cash_flow: 0, monthly_cash_flow: 0, blended_net_yield_pct: 0, currency: 'EUR' } }); });
   }, [ws, toast]);
+  useEffect(() => { load(); }, [load]);
   if (data === null) return <InlineLoader />;
   const { investments, portfolio } = data;
   const ccy = portfolio.currency;
@@ -760,14 +839,17 @@ const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
       </div>
       <Card><CardContent className="p-0"><div className="divide-y divide-border">
         {investments.map((iv) => (
-          <button key={iv.id} onClick={() => navigate(`/properties/${iv.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
-            <LineChart className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <div className="font-medium">{iv.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· {money(iv.metrics?.total_investment ?? 0, iv.currency)} in</span></div>
-              <div className="mt-0.5 text-xs text-muted-foreground">net yield {iv.metrics?.net_yield_pct ?? 0}% · cap {iv.metrics?.cap_rate_pct ?? 0}% · CoC {iv.metrics?.cash_on_cash_pct ?? 0}%</div>
-            </div>
-            <div className={`shrink-0 text-sm font-semibold ${(iv.metrics?.monthly_cash_flow ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{money(iv.metrics?.monthly_cash_flow ?? 0, iv.currency)}/mo</div>
-          </button>
+          <div key={iv.id} className="flex items-center hover:bg-muted/40">
+            <button onClick={() => navigate(`/properties/${iv.property_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left">
+              <LineChart className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{iv.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· {money(iv.metrics?.total_investment ?? 0, iv.currency)} in</span></div>
+                <div className="mt-0.5 text-xs text-muted-foreground">net yield {iv.metrics?.net_yield_pct ?? 0}% · cap {iv.metrics?.cap_rate_pct ?? 0}% · CoC {iv.metrics?.cash_on_cash_pct ?? 0}%</div>
+              </div>
+              <div className={`shrink-0 text-sm font-semibold ${(iv.metrics?.monthly_cash_flow ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{money(iv.metrics?.monthly_cash_flow ?? 0, iv.currency)}/mo</div>
+            </button>
+            <div className="pr-3"><DeleteIconButton title="Delete investment analysis" confirmText={`Remove the investment analysis for ${iv.property?.title || 'this property'}? The listing itself is not affected.`} onDelete={() => realEstateService.deleteInvestment(ws as string, iv.property_id).then(load)} /></div>
+          </div>
         ))}
       </div></CardContent></Card>
     </div>

@@ -2,7 +2,7 @@
 // (the app's established "board" pattern — see HR RecruitmentSection — not drag-and-drop).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, MoreVertical, Trophy, XCircle, Trash2, ListChecks, Loader2, RotateCcw } from 'lucide-react';
+import { Plus, MoreVertical, Trophy, XCircle, Trash2, ListChecks, Loader2, RotateCcw, Pencil } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -90,13 +90,14 @@ export const PipelineBoard: React.FC<{ ws: string | null; canManage: boolean }> 
         </div>
       )}
 
-      {creating && ws && <NewDealDialog ws={ws} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); load(); }} />}
+      {creating && ws && <DealDialog ws={ws} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />}
     </div>
   );
 };
 
 const DealCard: React.FC<{ ws: string; deal: PropertyDeal; canManage: boolean; onChanged: () => void; onOpen: () => void }> = ({ ws, deal, canManage, onChanged, onOpen }) => {
   const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
   const act = async (fields: Parameters<typeof realEstateService.upsertDeal>[1]) => {
     try { await realEstateService.upsertDeal(ws, { deal_id: deal.id, ...fields }); onChanged(); }
     catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
@@ -113,6 +114,7 @@ const DealCard: React.FC<{ ws: string; deal: PropertyDeal; canManage: boolean; o
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="h-6 w-6 p-0"><MoreVertical className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditing(true)}><Pencil className="mr-2 h-3.5 w-3.5" /> Edit</DropdownMenuItem>
               <DropdownMenuItem onClick={() => act({ stage: 'completed', status: 'won' })}><Trophy className="mr-2 h-3.5 w-3.5" /> Mark won</DropdownMenuItem>
               <DropdownMenuItem onClick={() => act({ status: 'lost' })}><XCircle className="mr-2 h-3.5 w-3.5" /> Mark lost</DropdownMenuItem>
               <DropdownMenuItem onClick={del} className="text-red-500"><Trash2 className="mr-2 h-3.5 w-3.5" /> Delete</DropdownMenuItem>
@@ -135,6 +137,7 @@ const DealCard: React.FC<{ ws: string; deal: PropertyDeal; canManage: boolean; o
         </Popover>
       </div>
       {deal.expected_close_date && <div className="mt-1.5 text-[10px] text-muted-foreground">Close ~ {new Date(deal.expected_close_date).toLocaleDateString()}</div>}
+      {editing && <DealDialog ws={ws} deal={deal} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />}
     </div>
   );
 };
@@ -173,29 +176,32 @@ const DealTasks: React.FC<{ ws: string; dealId: string; canManage: boolean; onCh
   );
 };
 
-const NewDealDialog: React.FC<{ ws: string; onClose: () => void; onCreated: () => void }> = ({ ws, onClose, onCreated }) => {
+// Create OR edit a deal. In edit mode the property is fixed; buyer/value/stage/close are editable.
+const DealDialog: React.FC<{ ws: string; deal?: PropertyDeal; onClose: () => void; onSaved: () => void }> = ({ ws, deal, onClose, onSaved }) => {
   const { toast } = useToast();
   const [listings, setListings] = useState<PropertyListItem[]>([]);
-  const [f, setF] = useState<Record<string, any>>({ currency: 'EUR', stage: 'lead' });
+  const [f, setF] = useState<Record<string, any>>(deal
+    ? { property_id: deal.property_id, buyer_contact_id: deal.buyer_contact_id ?? '', stage: deal.stage, value: deal.value ?? '', currency: deal.currency ?? 'EUR', expected_close_date: deal.expected_close_date ?? '' }
+    : { currency: 'EUR', stage: 'lead' });
   const [busy, setBusy] = useState(false);
   useEffect(() => { realEstateService.listProperties(ws).then(setListings).catch(() => setListings([])); }, [ws]);
-  const create = async () => {
+  const save = async () => {
     if (!f.property_id) { toast({ title: 'Pick a property', variant: 'destructive' }); return; }
     setBusy(true);
     try {
-      await realEstateService.upsertDeal(ws, { property_id: f.property_id, buyer_contact_id: f.buyer_contact_id || null, stage: f.stage, value: f.value ? Number(f.value) : null, currency: f.currency, expected_close_date: f.expected_close_date || null });
-      toast({ title: 'Deal created' }); onCreated();
+      await realEstateService.upsertDeal(ws, { deal_id: deal?.id, property_id: f.property_id, buyer_contact_id: f.buyer_contact_id || null, stage: f.stage, value: f.value ? Number(f.value) : null, currency: f.currency, expected_close_date: f.expected_close_date || null });
+      toast({ title: deal ? 'Deal updated' : 'Deal created' }); onSaved();
     } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>New deal</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{deal ? 'Edit deal' : 'New deal'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div>
             <Label className="text-xs">Property</Label>
-            <Select value={f.property_id} onValueChange={(v) => setF((p) => ({ ...p, property_id: v }))}>
+            <Select value={f.property_id} onValueChange={(v) => setF((p) => ({ ...p, property_id: v }))} disabled={!!deal}>
               <SelectTrigger><SelectValue placeholder="Select a listing…" /></SelectTrigger>
               <SelectContent>{listings.map((l) => <SelectItem key={l.id} value={l.id}>{l.title || l.reference_code || 'Listing'}</SelectItem>)}</SelectContent>
             </Select>
@@ -206,7 +212,7 @@ const NewDealDialog: React.FC<{ ws: string; onClose: () => void; onCreated: () =
             <div><Label className="text-xs">Expected close</Label><Input type="date" value={f.expected_close_date ?? ''} onChange={(e) => setF((p) => ({ ...p, expected_close_date: e.target.value }))} /></div>
           </div>
         </div>
-        <DialogFooter><Button variant="ghost" className="rounded-full" onClick={onClose}>Cancel</Button><Button className="rounded-full" onClick={create} disabled={busy || !f.property_id}>Create</Button></DialogFooter>
+        <DialogFooter><Button variant="ghost" className="rounded-full" onClick={onClose}>Cancel</Button><Button className="rounded-full" onClick={save} disabled={busy || !f.property_id}>{deal ? 'Save' : 'Create'}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
