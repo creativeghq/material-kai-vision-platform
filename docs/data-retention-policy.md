@@ -32,7 +32,7 @@ Cleanup is performed by two mechanisms:
 | Table | Reason |
 |---|---|
 | `ai_usage_logs` | **Billing audit log.** Every credit debit is recorded here. Required for business analytics, dispute resolution, and revenue reporting. Deleting these would remove visibility into platform usage and revenue patterns. |
-| `agent_chat_conversations` | User conversation history. Small volume; users may want to refer back to previous sessions. |
+| `agent_chat_conversations` | User conversation **text** is kept indefinitely (small volume; users refer back). **Generated media is not** — see the storage-retention note below. |
 | `agent_chat_messages` | Individual messages within conversations. Kept together with parent conversations. |
 | `products` | Core product catalogue. Never cleaned automatically. |
 | `user_credits` | Credit balances. Financial data, never deleted. |
@@ -51,6 +51,17 @@ Cleanup is performed by two mechanisms:
 | `job-cleanup-weekly` | `0 3 * * 0` (Sun 03:00 UTC) | Edge function | Full multi-table cleanup pass via `job-cleanup-cron` edge function |
 | `system-logs-daily-cleanup` | `0 2 * * *` (daily 02:00 UTC) | Direct SQL | `DELETE FROM system_logs WHERE created_at < NOW() - INTERVAL '30 days'` — handles bulk purge without edge function overhead |
 | `purge-orphan-agent-projects` | `30 3 */2 * *` (every 2 days, 03:30 UTC) | Direct SQL | `DELETE FROM agent_projects WHERE workspace_id IS NULL` — removes unreachable orphan Agent Fabric projects (NULL workspace can never satisfy the `is_workspace_admin(workspace_id)` RLS). CASCADEs to that project's secrets/deployments/snapshots. Same purge runs in `reset-platform` STEP 1.6. |
+| `retention-sweep-daily` | `30 3 * * *` (daily 03:30 UTC) | Direct SQL | `SELECT run_storage_retention_sweep(false, 30)` — see storage-retention note below. |
+
+---
+
+## Storage retention — generated files (2026-07-24)
+
+DB rows above are only half the story; **generated files in storage** need their own ceiling or the buckets grow unbounded. The one garbage collector is `storage-orphan-cleanup-nightly` (04:00 UTC), which deletes any object **not referenced** by `build_storage_reference_set()` and older than its bucket grace (pdf-documents 72h, pdf-tiles 48h, generation-images 14d). Because it is reference-based, finished work stays referenced — and therefore alive — forever. `retention-sweep-daily` (03:30 UTC, `run_storage_retention_sweep`) closes that gap by **expiring references** so the nightly GC can reclaim the bytes. No second deleter.
+
+**Phase 1 (shipped 2026-07-24) — agent chat media.** The sweep stamps `agent_chat_conversations.files_purged_at` on conversations idle > **30 days** (`updated_at`). `build_storage_reference_set()` skips purged conversations (session-prefix branch + both message-URL-scan branches), so their `generation-images/u/{uid}/sessions/{cid}/` media (AI generations + uploads) falls out of the reference set and the nightly GC deletes it. **The conversation text is untouched** — only the heavy media goes. Media the user promoted to a moodboard is safe: promotion copies the bytes to `u/{uid}/moodboards/{mid}/`, protected by a separate `moodboard_items.media_url` branch. `agent_uploaded_files` protection is time-gated inline (30d on its own `updated_at`) since it has no `conversation_id`. Idle days are a function arg (`run_storage_retention_sweep(dry_run, idle_days)`) — tune without a redeploy.
+
+**Phase 2 (planned) — regenerable deliverable PDFs.** Quote / sheet / client-view / catalog PDFs would purge on **~1 week idle OR parent closed/completed/deleted**, re-rendering on demand. Blocked on adding **auto-regenerate-on-open** to the viewers/share endpoints (today `refreshPdfUrl()` returns null when the path is gone — it does not lazily rebuild), plus wiring a "Mark as Done" control for `moodboards` (the `status`/`completed_at` columns are already added). `files_purged_at` columns exist on those tables as scaffolding but are not yet consumed. Finance/tax PDFs (invoices, credit/delivery notes, statements) and KB source PDFs are **hard-exempt**.
 
 ---
 
