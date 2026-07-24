@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save, Send, Truck, FilePlus2, Eye } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus } from 'lucide-react';
+import { marketplacePricingService } from '@/services/marketplacePricingService';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -90,6 +91,8 @@ export const QuoteDetailPage: React.FC = () => {
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, string>>({});
   const [vatRate, setVatRate] = useState<string>('24');
   const [savingPrices, setSavingPrices] = useState(false);
+  // #237 — per-line "save this typed price to the workspace catalog" so it's pulled next time.
+  const [savingCatalogId, setSavingCatalogId] = useState<string | null>(null);
   // #227 — order-level paid-upfront (cash) discount
   const [paidUpfront, setPaidUpfront] = useState(false);
   const [cashPct, setCashPct] = useState(0);
@@ -413,6 +416,24 @@ export const QuoteDetailPage: React.FC = () => {
       const price = parseDecimal(itemPrices[item.id]);
       return price !== null && price > 0;
     });
+
+  // #237 — remember a typed unit price in the workspace catalog (product_prices.list_price),
+  // so the resolver pulls it automatically on the next quote. Saves the pre-discount unit
+  // price (the list anchor) — customer discounts still apply on top per-customer.
+  const handleSaveToCatalog = async (item: QuoteItemWithProduct, listPrice: number) => {
+    if (!item.product_id || !(listPrice > 0) || !quote?.workspace_id) return;
+    setSavingCatalogId(item.id);
+    try {
+      await marketplacePricingService.setListPrice(quote.workspace_id, item.product_id, listPrice, {
+        unit: (item.product as any)?.metadata?.unit ?? null,
+      });
+      toast({ title: 'Saved to catalog', description: 'This price will be pulled automatically next time.' });
+    } catch (err: any) {
+      toast({ title: 'Could not save to catalog', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSavingCatalogId(null);
+    }
+  };
 
   const handleSavePrices = async () => {
     if (!quote?.id || !quote.items) return;
@@ -1045,16 +1066,31 @@ export const QuoteDetailPage: React.FC = () => {
                                 </td>
                                 <td className="p-3 text-sm text-center">{item.quantity}</td>
                                 <td className="p-3">
-                                  <div className="relative">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="0.00"
-                                      className="pl-6 h-8 w-28"
-                                      value={itemPrices[item.id] || ''}
-                                      onChange={(e) => setItemPrices(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                    />
+                                  <div className="flex items-center gap-1">
+                                    <div className="relative">
+                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="0.00"
+                                        className="pl-6 h-8 w-28"
+                                        value={itemPrices[item.id] || ''}
+                                        onChange={(e) => setItemPrices(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                      />
+                                    </div>
+                                    {/* #237 — save this typed price to the catalog so it's pulled next time (catalog products only). */}
+                                    {item.product_id && unitPrice > 0 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-muted-foreground hover:text-primary flex-shrink-0"
+                                        title="Save this price to the catalog (pulled automatically next time)"
+                                        disabled={savingCatalogId === item.id}
+                                        onClick={() => handleSaveToCatalog(item, unitPrice)}
+                                      >
+                                        {savingCatalogId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookmarkPlus className="h-3.5 w-3.5" />}
+                                      </Button>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="p-3">
