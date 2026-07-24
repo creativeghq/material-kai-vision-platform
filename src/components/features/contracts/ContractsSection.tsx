@@ -57,13 +57,21 @@ export const ContractsSection: React.FC<{
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // The context used when CREATING (finance is the only one creatable without an entity subject).
-  const createContext: ContractContext = context === 'all' ? 'finance' : context;
-  // hr/project need a subject (employee/project); finance can be created with a free-text counterparty.
-  const canCreate = context !== 'all' && (context === 'finance' || !!subject);
+  // The context used when CREATING. On the standalone 'all' tab the user picks it in the dialog;
+  // on a specific tab (or an entity-scoped mount) it's locked to that context.
+  const [createContext, setCreateContext] = useState<ContractContext>(context === 'all' ? 'finance' : context);
+  // Category picker is only shown on the cross-context 'all' tab — a specific tab IS the category.
+  const pickCategory = context === 'all';
+  // Create is always available: entity-scoped mounts link the new row to the employee/project via
+  // `subject`; standalone mounts (incl. 'all') create with a free-text counterparty, category chosen
+  // by tab or by the in-dialog picker. The backend only requires context + title.
+  const canCreate = true;
 
   const [title, setTitle] = useState('');
-  const [type, setType] = useState<string>(TYPE_OPTIONS[createContext][0]);
+  const [type, setType] = useState<string>(TYPE_OPTIONS[context === 'all' ? 'finance' : context][0]);
+
+  // Switching category resets the type list to that category's options.
+  const changeCategory = (c: ContractContext) => { setCreateContext(c); setType(TYPE_OPTIONS[c][0]); };
   const [counterparty, setCounterparty] = useState('');
   const [counterpartyEmail, setCounterpartyEmail] = useState('');
   const [effective, setEffective] = useState('');
@@ -142,11 +150,9 @@ export const ContractsSection: React.FC<{
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2"><FileSignature className="h-4 w-4" /> {heading}</h3>
-        {canCreate
-          ? <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New contract</Button>
-          : context !== 'all'
-            ? <span className="text-xs text-muted-foreground">Create from the {context === 'hr' ? 'employee' : context} record</span>
-            : null}
+        {canCreate && (
+          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New contract</Button>
+        )}
       </div>
 
       {groups.length > 0 && rows.length > 0 && (
@@ -204,6 +210,18 @@ export const ContractsSection: React.FC<{
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New {createContext} contract</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {pickCategory && (
+              <div className="space-y-1"><Label>Category</Label>
+                <Select value={createContext} onValueChange={(v) => changeCategory(v as ContractContext)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="finance">Finance</SelectItem>
+                    <SelectItem value="hr">HR</SelectItem>
+                    <SelectItem value="project">Projects</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1 col-span-2"><Label>Title *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Framework supply agreement" /></div>
               <div className="space-y-1"><Label>Type</Label>
