@@ -841,6 +841,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   // the customer (money-in) or the picked supplier (money-out); optional.
   const [counterpartyBanks, setCounterpartyBanks] = useState<CrmBankAccount[]>([]);
   const [payCounterpartyBankId, setPayCounterpartyBankId] = useState<string>('');
+  // "Apply credit" account picker — the account the credit is withdrawn from (balance drops by it).
+  const [applyCreditOpen, setApplyCreditOpen] = useState(false);
+  const [applyCreditAmount, setApplyCreditAmount] = useState(0);
+  const [applyCreditAccountId, setApplyCreditAccountId] = useState<string>('');
   // Running balance per account, so you can see what's in an account while choosing it.
   const [acctBalance, setAcctBalance] = useState<Map<string, number>>(new Map());
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -1095,10 +1099,24 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     const outstanding = Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100);
     const willApply = Math.min(applicableCredit, outstanding);
     if (willApply <= 0.005) return;
-    if (!window.confirm(`Apply ${formatMoney(willApply, order.currency)} of ${order.customer_company_id || order.customer_contact_id ? 'this customer’s' : 'the'} account credit to this order? No new money is recorded — the existing credit is used.`)) return;
+    // Pick which account the credit is withdrawn from — default to where this customer's credit
+    // actually sits. One account → use it straight away; several → let the operator choose.
+    const creditAccts = await ordersService.getCustomerCreditAccounts(order.workspace_id, { companyId: order.customer_company_id, contactId: order.customer_contact_id }).catch(() => []);
+    const defaultAcct = creditAccts[0] || bankAccounts.find((a) => a.is_default)?.id || bankAccounts[0]?.id || '';
+    // One account → withdraw from it automatically; several → open the picker to choose.
+    if (bankAccounts.length <= 1) { await doApplyCredit(defaultAcct, willApply); return; }
+    setApplyCreditAmount(willApply);
+    setApplyCreditAccountId(defaultAcct);
+    setApplyCreditOpen(true);
+  };
+
+  // Run the apply once the account is chosen (or auto-picked when there's only one).
+  const doApplyCredit = async (accountId: string, amount: number) => {
+    if (!order) return;
+    setApplyCreditOpen(false);
     setSaving(true);
     try {
-      const applied = await ordersService.applyCreditToOrder(order.id, order.workspace_id, willApply);
+      const applied = await ordersService.applyCreditToOrder(order.id, order.workspace_id, amount, accountId || null);
       await load(order.id);
       onChanged();
       toast({ title: applied > 0 ? `Applied ${formatMoney(applied, order.currency)} from credit` : 'Nothing to apply' });
@@ -1911,6 +1929,50 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           onPick={(companyId) => void setLineSupplier(supplierPick.itemId, supplierPick.productId, companyId)}
         />
       )}
+    </Dialog>
+    {/* Apply-credit account picker — choose which account the credit is withdrawn from (its balance
+        drops by the applied amount). Only shown when there's more than one account. */}
+    <Dialog open={applyCreditOpen} onOpenChange={setApplyCreditOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Apply {order ? formatMoney(applyCreditAmount, order.currency) : ''} from credit</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Choose the account this credit is withdrawn from — its balance drops by {order ? formatMoney(applyCreditAmount, order.currency) : ''}.
+          </p>
+          <div>
+            <Label className="text-xs text-muted-foreground">Withdraw from</Label>
+            <Select value={applyCreditAccountId} onValueChange={setApplyCreditAccountId}>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Select an account" /></SelectTrigger>
+              <SelectContent>{ACCOUNT_KIND_ORDER
+                .map((k) => ({ kind: k, items: bankAccounts.filter((a) => a.kind === k) }))
+                .filter((g) => g.items.length > 0)
+                .map((g) => (
+                  <SelectGroup key={g.kind}>
+                    <SelectLabel>{ACCOUNT_KIND_LABEL[g.kind]}</SelectLabel>
+                    {g.items.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        <span className="flex w-full items-center justify-between gap-4">
+                          <span>{a.name}</span>
+                          {acctBalance.has(a.id) && (
+                            <span className={`tabular-nums text-xs ${(acctBalance.get(a.id) ?? 0) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                              {formatMoney(acctBalance.get(a.id) ?? 0, a.currency)}
+                            </span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}</SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setApplyCreditOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={() => void doApplyCredit(applyCreditAccountId, applyCreditAmount)} disabled={saving || !applyCreditAccountId}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : `Apply ${order ? formatMoney(applyCreditAmount, order.currency) : ''}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
     {connectEmailGate}
     </>
