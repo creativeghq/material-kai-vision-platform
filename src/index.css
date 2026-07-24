@@ -1160,6 +1160,42 @@ All colors MUST be HSL.
   .animate-fade-in {
     animation: fade-in 0.3s ease-out;
   }
+
+  /* Loading skeleton — theme-adaptive.
+     `bg-muted` sits only ~3% below the page background on the light themes, so
+     skeleton blocks rendered as near-invisible flat grey boxes that read as
+     broken rather than "loading". Derive the fill + shimmer from --foreground
+     opacity so they keep real contrast in every theme (light oat/cool + dark
+     plum/navy). Apply as `className="skeleton rounded-xl h-32 …"` — no bg-muted
+     or animate-pulse needed. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: hsl(var(--foreground) / 0.09);
+  }
+
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.07),
+      transparent
+    );
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-shimmer {
+    100% { transform: translateX(100%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton::after { animation: none; }
+    .skeleton { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  }
 }
 
 /* ============================================================

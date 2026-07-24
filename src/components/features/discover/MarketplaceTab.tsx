@@ -306,7 +306,7 @@ export const MarketplaceTab: React.FC = () => {
 
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-60 rounded-2xl bg-muted animate-pulse" />)}
+          {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-60 rounded-2xl skeleton" />)}
         </div>
       ) : count === 0 ? (
         <Empty text="No surplus listings yet — be the first to list from your warehouse." />

@@ -41,7 +41,7 @@ export const PropertyDiscoveryTab: React.FC = () => {
       </div>
 
       {listings === null || loading
-        ? <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />)}</div>
+        ? <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="aspect-[4/3] rounded-xl skeleton" />)}</div>
         : <PropertyCardGrid listings={listings} />}
     </div>
   );
