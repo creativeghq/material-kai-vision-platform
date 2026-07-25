@@ -1439,23 +1439,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
               )}
             </div>
 
-            {/* Order note — captured when the order is placed; prints on the invoice + receipt. */}
-            <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-              <Label className="text-[10px] text-muted-foreground">Order note</Label>
-              <Textarea
-                key={order.id}
-                rows={2}
-                defaultValue={order.notes ?? ''}
-                disabled={saving}
-                placeholder="Note from whoever placed the order — e.g. pickup / delivery instructions. Prints on the invoice & receipt."
-                className="text-sm"
-                onBlur={(e) => {
-                  const v = e.target.value.trim() || null;
-                  if (v !== (order.notes ?? null)) void saveMeta({ notes: v });
-                }}
-              />
-            </div>
-
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
@@ -1937,6 +1920,24 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
               line delivered moves warehouse stock (sales out / purchase in) and auto-advances the status. The
               receipt/invoice is the separate Create document action.
             </p>
+
+            {/* Order note — moved below payments to keep the top of the order clean. Captured when the
+                order is placed; prints on the invoice + receipt. */}
+            <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+              <Label className="text-[10px] text-muted-foreground">Order note</Label>
+              <Textarea
+                key={order.id}
+                rows={2}
+                defaultValue={order.notes ?? ''}
+                disabled={saving}
+                placeholder="Note from whoever placed the order — e.g. pickup / delivery instructions. Prints on the invoice & receipt."
+                className="text-sm"
+                onBlur={(e) => {
+                  const v = e.target.value.trim() || null;
+                  if (v !== (order.notes ?? null)) void saveMeta({ notes: v });
+                }}
+              />
+            </div>
           </div>
         )}
         <DialogFooter>
