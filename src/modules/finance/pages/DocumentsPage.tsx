@@ -352,9 +352,12 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             {type === 'expenses' && !loading && recurring.length > 0 && (
               <RecurringExpensesCard rows={recurring} categoryName={categoryName} readOnly={!canOperateFinance} onChanged={load} />
             )}
-            {type === 'expenses' && !loading && supplierBills.length > 0 && (
-              <RecordedExpensesCard rows={supplierBills} categoryName={categoryName} />
-            )}
+            {/* Only OPEN (unpaid) bills live here — once a bill is paid, its cash-out shows in the
+                Payments tab instead (the money ledger). Keeps Expenses = "what you still owe". */}
+            {type === 'expenses' && !loading && (() => {
+              const openBills = supplierBills.filter((b) => b.status !== 'paid' && Number(b.amount_due) > 0.005);
+              return openBills.length > 0 ? <RecordedExpensesCard rows={openBills} categoryName={categoryName} /> : null;
+            })()}
           </div>
         </div>
       </div>
@@ -497,8 +500,9 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
   );
 };
 
-/** Recorded-expense spend log (manual + supplier bills) shown under the myDATA inbox on the
- *  Expenses tab. These are `supplier_bills` — they also appear in Payables (open ones age in AP). */
+/** Open (unpaid) supplier bills shown under the myDATA inbox on the Expenses tab — what you still
+ *  owe. These `supplier_bills` also age in Payables (AP). Once paid, a bill drops off here and its
+ *  cash-out appears in the Payments tab (the money ledger). */
 const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: any) => string }> = ({ rows, categoryName }) => {
   const [page, setPage] = useState(1);
   useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
@@ -507,8 +511,8 @@ const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: 
   return (
     <Card>
       <div className="border-b border-border/60 px-4 py-2.5">
-        <div className="text-sm font-semibold">Recorded expenses &amp; bills</div>
-        <p className="text-[11px] text-muted-foreground">Categorized costs you entered or received. Open ones also age in Payables (AP).</p>
+        <div className="text-sm font-semibold">Open bills you owe</div>
+        <p className="text-[11px] text-muted-foreground">Unpaid supplier bills — these age in Payables (AP). Once paid, a bill moves to the Payments tab as a “Paid” cash-out.</p>
       </div>
       <CardContent className="p-0">
         <table className="w-full text-sm">

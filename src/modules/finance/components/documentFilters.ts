@@ -53,7 +53,7 @@ export function buildDocumentFilters(
             },
             {
               key: 'direction', type: 'multi', label: 'Direction',
-              options: [{ value: 'in', label: 'Received' }, { value: 'out', label: 'Paid out' }],
+              options: [{ value: 'in', label: 'Received' }, { value: 'out', label: 'Paid / Refund' }],
               accessor: (r) => r.direction,
             },
             {
