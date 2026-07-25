@@ -189,6 +189,9 @@ const InvoiceDetailPage: React.FC = () => {
               {invoice.due_at && ` · Due ${invoice.due_at}`}
               {Number((invoice as any).branch_code ?? 0) > 0 && ` · Establishment #${(invoice as any).branch_code}`}
               {(invoice as any).series && ` · Series ${(invoice as any).series}`}
+              {(invoice as any).order_id && (
+                <> · <Link to={`${financeBase}?tab=doc_orders&order=${(invoice as any).order_id}`} className="text-primary hover:underline">View order</Link></>
+              )}
             </p>
           </div>
         </div>
