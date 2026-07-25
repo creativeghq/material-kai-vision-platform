@@ -825,7 +825,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   // attached to the order. `expensePrefill` seeds the expense modal from a specific line or the order.
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
-  const [recordPayOpen, setRecordPayOpen] = useState(false);
+  // The Record-Payment modal config: 'received' (money in from the customer) or 'paid_out' (paying a
+  // supplier — "Mark as paid" / "Pay supplier"). null = closed.
+  const [payDlg, setPayDlg] = useState<{ kind: 'received' | 'paid_out'; supplier?: { companyId?: string | null; name?: string | null }; amount?: number } | null>(null);
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
   // Catalog list prices for the order's products → summarised as a discount total below.
@@ -872,7 +874,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setRecordPayOpen(false); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setApplicableCredit(0); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayDlg(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setApplicableCredit(0); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -934,30 +936,21 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   };
 
   // Record real cash ON the order: money in (a payment received) or money out (a payment sent).
-  // Per-line "Mark as paid" — record this line's cost as a real supplier bill + payment, linked to
-  // the order. Pre-fills amount (line cost), payee (line supplier if set), and the order's category;
-  // the dialog just needs the account (and confirmation).
-  const openLineExpense = (it: { description: string; unit_cost: number | null; quantity: number; supplier_company_id: string | null }) => {
-    if (!order) return;
+  // Per-line "Mark as paid" — record a PAYMENT to this line's supplier (money out), NOT an expense.
+  // Pre-fills the amount (line cost) + the supplier (if the line has one); opens the payment modal
+  // locked to "paid to supplier". If the line has no supplier, the operator adds one in the modal.
+  const openLinePayment = (it: { unit_cost: number | null; quantity: number; supplier_company_id: string | null }) => {
     const cost = it.unit_cost != null ? Math.round(Number(it.unit_cost) * Number(it.quantity) * 100) / 100 : 0;
-    setExpensePrefill({
+    setPayDlg({
+      kind: 'paid_out',
       amount: cost,
-      description: `Cost — ${it.description}`,
-      categoryId: order.category_id ?? undefined,
       supplier: it.supplier_company_id ? { companyId: it.supplier_company_id, name: supplierNames.get(it.supplier_company_id) ?? null } : undefined,
     });
-    setExpenseOpen(true);
   };
 
-  // Pay a specific supplier straight from the "what we owe" rollup — records a real expense (bill +
-  // payment) via the standard expense modal, pre-filled with the supplier + owed amount.
+  // Pay a specific supplier straight from the "what we owe" rollup — a payment to the supplier.
   const openPaySupplier = (sup: { id: string; name: string }, owed: number) => {
-    setExpensePrefill({
-      amount: Math.round(Math.max(0, owed) * 100) / 100,
-      categoryId: order?.category_id ?? undefined,
-      supplier: { companyId: sup.id, name: sup.name },
-    });
-    setExpenseOpen(true);
+    setPayDlg({ kind: 'paid_out', amount: Math.round(Math.max(0, owed) * 100) / 100, supplier: { companyId: sup.id, name: sup.name } });
   };
 
   // How much of this order is settled, per the #280 allocation ledger (NOT `fin.received`, which only
@@ -1154,26 +1147,24 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     {/* The order moves REAL cash only: money in (received) / money out (sent). */}
-                    <DropdownMenuItem className="items-start" onClick={() => setRecordPayOpen(true)}>
+                    <DropdownMenuItem className="items-start" onClick={() => setPayDlg({ kind: 'received', amount: outstanding > 0.005 ? outstanding : undefined })}>
                       <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
                       <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">Money received from the customer.</span></span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({ categoryId: order.category_id ?? undefined }); setExpenseOpen(true); }}>
+                    <DropdownMenuItem className="items-start" onClick={() => setPayDlg({ kind: 'paid_out' })}>
                       <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                      <span className="flex flex-col"><span>Record expense</span><span className="text-[10px] text-muted-foreground">A supplier bill paid — same form as everywhere (Payables &amp; P&amp;L).</span></span>
+                      <span className="flex flex-col"><span>Pay supplier</span><span className="text-[10px] text-muted-foreground">Money paid to a supplier for this order.</span></span>
+                    </DropdownMenuItem>
+                    {/* A general business expense (rent, utilities…) as a supplier bill → Payables &amp; P&amp;L. */}
+                    <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({ categoryId: order.category_id ?? undefined }); setExpenseOpen(true); }}>
+                      <Receipt className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
+                      <span className="flex flex-col"><span>Record expense</span><span className="text-[10px] text-muted-foreground">A cost with a bill (Payables &amp; P&amp;L) — not paying the order's supplier.</span></span>
                     </DropdownMenuItem>
                     {/* Settle from the customer's on-account credit — no new cash movement. */}
                     {order.order_type === 'sales' && creditToApply > 0.005 && (
                       <DropdownMenuItem className="items-start" onClick={applyCredit}>
                         <Banknote className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
                         <span className="flex flex-col"><span>Pay from account credit</span><span className="text-[10px] text-muted-foreground">Use {formatMoney(creditToApply, order.currency)} of this customer’s existing credit.</span></span>
-                      </DropdownMenuItem>
-                    )}
-                    {/* Turn the line cost (what the goods cost YOU) into a real supplier bill/expense. */}
-                    {order.order_type === 'sales' && lineCostTotal > 0.005 && (
-                      <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({ amount: Math.round(lineCostTotal * 100) / 100, description: `Cost of goods — order ${order.order_number ?? order.id.slice(0, 8)}`, categoryId: order.category_id ?? undefined }); setExpenseOpen(true); }}>
-                        <Receipt className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                        <span className="flex flex-col"><span>Add expense (cost of goods)</span><span className="text-[10px] text-muted-foreground">Record the {formatMoney(lineCostTotal, order.currency)} line cost as a supplier bill — Payables &amp; P&amp;L.</span></span>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
@@ -1292,7 +1283,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                           </button>
                           {/* Mark this line's cost as paid → records a real supplier bill + payment on the order. */}
                           {lineCost != null && lineCost > 0.005 && order.order_type === 'sales' && (
-                            <button type="button" className="text-[10px] text-red-400 hover:text-foreground inline-flex items-center gap-0.5" title="Record this cost as a paid supplier bill" onClick={() => openLineExpense(it)}>
+                            <button type="button" className="text-[10px] text-red-400 hover:text-foreground inline-flex items-center gap-0.5" title="Record a payment to this line's supplier" onClick={() => openLinePayment(it)}>
                               <Receipt className="h-2.5 w-2.5" /> Mark paid
                             </button>
                           )}
@@ -1664,20 +1655,23 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         onCreated={() => { setExpenseOpen(false); void load(order.id); onChanged(); }}
       />
     )}
-    {/* Money in on the order uses the standard Record Payment modal, attached to the order (settles
-        its open invoice if any, else records as customer credit tagged to the order). */}
-    {order && order.order_type === 'sales' && (
+    {/* Record payment (money in from the customer) AND pay supplier (money out) both use the standard
+        Record Payment modal, attached to the order. 'paid_out' locks the direction + shows a supplier
+        picker; 'received' settles the order's invoice (or records order-tagged credit). */}
+    {order && (
       <RecordPaymentDialog
         workspaceId={order.workspace_id}
-        open={recordPayOpen}
-        onOpenChange={setRecordPayOpen}
+        open={!!payDlg}
+        onOpenChange={(o) => { if (!o) setPayDlg(null); }}
         orderId={order.id}
-        initialCounterparty={{ companyId: order.customer_company_id, contactId: order.customer_contact_id }}
-        defaultAmount={outstanding > 0.005 ? outstanding : undefined}
-        presetInvoiceId={(fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id}
-        issueDocLabel={(fin?.invoices.length ?? 0) === 0 ? `Also issue a ${salesDocKind} for this order` : undefined}
+        lockKind={payDlg?.kind === 'paid_out' ? 'paid_out' : undefined}
+        initialSupplier={payDlg?.supplier}
+        initialCounterparty={payDlg?.kind === 'received' ? { companyId: order.customer_company_id, contactId: order.customer_contact_id } : undefined}
+        defaultAmount={payDlg?.amount}
+        presetInvoiceId={payDlg?.kind === 'received' ? (fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id : undefined}
+        issueDocLabel={payDlg?.kind === 'received' && (fin?.invoices.length ?? 0) === 0 ? `Also issue a ${salesDocKind} for this order` : undefined}
         onIssueDoc={createInvoice}
-        onSaved={() => { setRecordPayOpen(false); void load(order.id); onChanged(); }}
+        onSaved={() => { setPayDlg(null); void load(order.id); onChanged(); }}
       />
     )}
     {connectEmailGate}

@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { financeService, type Invoice, type PaymentMethod, type BankAccountBalance } from '@/modules/finance/services/financeService';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
@@ -49,9 +50,17 @@ export const RecordPaymentDialog: React.FC<{
    *  receipt/invoice in the same step. `onIssueDoc` runs after the payment is recorded. */
   issueDocLabel?: string;
   onIssueDoc?: () => Promise<void>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, preset, initialCounterparty, orderId, defaultAmount, presetInvoiceId, issueDocLabel, onIssueDoc }) => {
+  /** Force the direction and hide the type picker (e.g. "Mark as paid" → always paid_out). */
+  lockKind?: Kind;
+  /** Pre-select the supplier for a paid_out (a saved CRM company or a one-off name). */
+  initialSupplier?: { companyId?: string | null; name?: string | null } | null;
+}> = ({ workspaceId, open, onOpenChange, onSaved, preset, initialCounterparty, orderId, defaultAmount, presetInvoiceId, issueDocLabel, onIssueDoc, lockKind, initialSupplier }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
+  // paid_out: who we're paying — a saved CRM supplier (id) or a one-off name (id === null).
+  const [supplier, setSupplier] = useState<{ id: string | null; name: string } | null>(null);
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [supplierOpts, setSupplierOpts] = useState<Array<{ id: string; name: string }>>([]);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
@@ -72,8 +81,11 @@ export const RecordPaymentDialog: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    const initialKind = preset?.direction ?? 'received';
+    const initialKind = lockKind ?? preset?.direction ?? 'received';
     setKind(initialKind);
+    setSupplier(initialSupplier?.companyId ? { id: initialSupplier.companyId, name: initialSupplier.name || 'Supplier' }
+      : initialSupplier?.name ? { id: null, name: initialSupplier.name } : null);
+    setSupplierSearch(''); setSupplierOpts([]);
     setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod('cash'); setPaidAt(new Date().toISOString().slice(0, 10));
     setCategoryId(''); setReference(''); setNotes('');
     setTargetInvoiceId(preset && preset.direction === 'received' ? preset.targetId : (presetInvoiceId ?? ''));
@@ -96,6 +108,19 @@ export const RecordPaymentDialog: React.FC<{
       setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
   }, [open, workspaceId, preset]);
+
+  // Supplier search for paid_out (CRM companies flagged as suppliers).
+  useEffect(() => {
+    if (!open || kind !== 'paid_out' || supplier) { setSupplierOpts([]); return; }
+    const t = supplierSearch.trim();
+    if (t.length < 2) { setSupplierOpts([]); return; }
+    let cancelled = false;
+    const h = setTimeout(async () => {
+      const { data } = await supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike('name', `%${t}%`).limit(8);
+      if (!cancelled) setSupplierOpts((data ?? []) as Array<{ id: string; name: string }>);
+    }, 200);
+    return () => { cancelled = true; clearTimeout(h); };
+  }, [supplierSearch, open, kind, supplier]);
 
   // Received → open invoices. Refund → any issued invoice (usually paid).
   const pickableInvoices = useMemo(
@@ -125,6 +150,10 @@ export const RecordPaymentDialog: React.FC<{
       toast({ title: 'Pick the invoice to credit', description: 'A refund issues a credit note against an invoice. Choose it, or turn off the credit note.', variant: 'destructive' });
       return;
     }
+    if (kind === 'paid_out' && !supplier) {
+      toast({ title: 'Pick the supplier', description: 'Choose who you paid — a saved supplier, or type a one-off payee name.', variant: 'destructive' });
+      return;
+    }
     setBusy(true);
     try {
       // Refund: first issue the credit note (5.1 correlated) so myDATA nets the original invoice.
@@ -149,6 +178,7 @@ export const RecordPaymentDialog: React.FC<{
       let allocations: Array<{ target_id: string; target_type: 'invoice'; amount: number }> = [];
       let counterpartyCompanyId: string | null = null;
       let counterpartyContactId: string | null = null;
+      let counterpartyName: string | null = null;
       if (kind === 'refund') {
         counterpartyCompanyId = selectedInvoice?.customer_company_id ?? null;
         counterpartyContactId = selectedInvoice?.customer_contact_id ?? null;
@@ -156,11 +186,15 @@ export const RecordPaymentDialog: React.FC<{
         allocations = [{ target_id: selectedTarget.id, target_type: 'invoice', amount: amt }];
         counterpartyCompanyId = selectedTarget.customer_company_id ?? null;
         counterpartyContactId = selectedTarget.customer_contact_id ?? null;
+      } else if (kind === 'paid_out' && supplier) {
+        // Money out → the supplier being paid (a saved CRM company, or a one-off name).
+        counterpartyCompanyId = supplier.id;
+        counterpartyName = supplier.id === null ? supplier.name : null;
       }
 
       // No target chosen (unallocated / on-account) → tie it to the party the
       // dialog was opened for so it still rolls up under that customer.
-      if (!counterpartyCompanyId && !counterpartyContactId && initialCounterparty) {
+      if (!counterpartyCompanyId && !counterpartyContactId && !counterpartyName && initialCounterparty) {
         counterpartyCompanyId = initialCounterparty.companyId ?? null;
         counterpartyContactId = initialCounterparty.contactId ?? null;
       }
@@ -176,6 +210,7 @@ export const RecordPaymentDialog: React.FC<{
         notes: notes || null,
         counterpartyCompanyId,
         counterpartyContactId,
+        counterpartyName,
         allocations,
         bankAccountId: bankAccountId || null,
         orderId: orderId ?? null,
@@ -207,25 +242,55 @@ export const RecordPaymentDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Record payment</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{lockKind === 'paid_out' ? 'Pay supplier' : 'Record payment'}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Type</Label>
-              <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="received">Received (from customer)</SelectItem>
-                  <SelectItem value="paid_out">Paid out (to supplier)</SelectItem>
-                  <SelectItem value="refund">Refund / return (to customer)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!lockKind && (
+              <div className="space-y-1">
+                <Label>Type</Label>
+                <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="received">Received from customer</SelectItem>
+                    <SelectItem value="paid_out">Paid to supplier</SelectItem>
+                    <SelectItem value="refund">Refund / return (to customer)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Amount</Label>
               <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
           </div>
+
+          {/* Paid to supplier — who we're paying: a saved CRM supplier, or a one-off name. */}
+          {kind === 'paid_out' && (
+            <div className="space-y-1">
+              <Label>Supplier / payee</Label>
+              {supplier ? (
+                <div className="flex h-9 items-center justify-between gap-1 rounded-md border border-border/60 px-3 text-sm">
+                  <span className="truncate">{supplier.name}{supplier.id === null && <span className="ml-1.5 text-[10px] text-muted-foreground">· one-off, not in CRM</span>}</span>
+                  <button type="button" className="text-muted-foreground hover:text-foreground shrink-0" onClick={() => setSupplier(null)}>✕</button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Search a supplier, or type any payee name…" />
+                  {supplierSearch.trim().length >= 1 && (
+                    <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
+                      {supplierOpts.map((s) => (
+                        <button key={s.id} type="button" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setSupplier(s); setSupplierSearch(''); setSupplierOpts([]); }}>{s.name}</button>
+                      ))}
+                      <button type="button" className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-muted ${supplierOpts.length > 0 ? 'border-t border-border/40' : ''}`}
+                        onClick={() => { setSupplier({ id: null, name: supplierSearch.trim() }); setSupplierSearch(''); setSupplierOpts([]); }}>
+                        <span className="text-muted-foreground">Pay </span>“{supplierSearch.trim()}”<span className="ml-1 text-[10px] text-muted-foreground">· one-off, not in CRM</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {kind === 'received' && (
             <div className="space-y-1">
@@ -260,7 +325,7 @@ export const RecordPaymentDialog: React.FC<{
           )}
 
           {kind === 'paid_out' && (
-            <p className="text-[11px] text-muted-foreground">Records cash out (on-account). To settle a specific supplier bill, use the Settle action on that bill.</p>
+            <p className="text-[11px] text-muted-foreground">Records money paid to the supplier. It reduces the bank and what you owe them on the order; it doesn&rsquo;t post a cost to P&amp;L (use Record expense for that).</p>
           )}
 
           {kind === 'refund' && (
