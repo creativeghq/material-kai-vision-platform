@@ -166,8 +166,8 @@ const InvoiceDetailPage: React.FC = () => {
     <div className="px-3 sm:px-6 space-y-6 py-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <Link to={financeBase}>
-            <Button variant="ghost" size="sm" className="-ml-2">
+          <Link to={financeBase} aria-label="Back to finance">
+            <Button variant="ghost" size="sm" className="-ml-2" aria-label="Back to finance">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Download, X } from 'lucide-react';
 
-import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -151,6 +151,10 @@ export function InvoicePreviewModal({
         hideClose
         className="no-card-hover w-[100vw] h-[100vh] max-w-none p-0 gap-0 rounded-none border-0 flex flex-col bg-muted/40"
       >
+        {/* Radix requires a title + description on every dialog for screen readers; the toolbar
+            shows a visible label, so these are visually hidden but announced. */}
+        <DialogTitle className="sr-only">Invoice preview</DialogTitle>
+        <DialogDescription className="sr-only">Full-page preview of the invoice document with a download action.</DialogDescription>
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-3 px-4 h-14 shrink-0 border-b border-border/40 bg-background">
           <span className="text-sm font-medium">Invoice preview</span>

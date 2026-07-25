@@ -169,6 +169,8 @@ export const WorkspaceCreditsCard: React.FC<{ workspaceId: string }> = ({ worksp
                         size="icon"
                         variant="outline"
                         className="h-8 w-8"
+                        aria-label="Save credit limit"
+                        title="Save credit limit"
                         onClick={() => saveLimit(m.user_id)}
                         disabled={savingId === m.user_id}
                       >

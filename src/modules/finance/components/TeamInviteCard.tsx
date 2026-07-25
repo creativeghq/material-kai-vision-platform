@@ -74,7 +74,7 @@ export const TeamInviteCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
             <Label className="text-xs">Share this link (valid 30 days)</Label>
             <div className="flex gap-2">
               <Input readOnly value={link} className="text-xs" onFocus={(e) => e.currentTarget.select()} />
-              <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(link); toast({ title: 'Copied' }); }}>
+              <Button variant="outline" size="icon" aria-label="Copy invite link" title="Copy invite link" onClick={() => { navigator.clipboard.writeText(link); toast({ title: 'Copied' }); }}>
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
