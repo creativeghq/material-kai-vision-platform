@@ -16,6 +16,20 @@
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
+import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
+
+// Up-front credit ceiling reserved before the Opus loop, then settled down to the actual
+// token-based cost after the run (surplus refunded, overage charged best-effort). Admin-triggered,
+// but the spend is real (Opus 4.8, up to 20 iterations) so it must be metered — previously $0.
+const KAI_TASK_CREDIT_CEILING = 100;
+
+// Per-1M-token USD pricing for settling the actual cost (mirrors base-agent's MODEL_USD_PER_M_TOKENS).
+// Unknown models default to Opus (the most expensive) so we never silently undercharge.
+const KAI_TASK_MODEL_PRICE: Record<string, { input: number; output: number }> = {
+  'claude-haiku-4-5':  { input: 1.0,  output: 5.0 },
+  'claude-sonnet-4-6': { input: 3.0,  output: 15.0 },
+  'claude-opus-4-8':   { input: 15.0, output: 75.0 },
+};
 
 // ── Inline tool definitions ───────────────────────────────────────────────────
 // (Minimal copies — no SSE streaming, just value return)
@@ -145,17 +159,38 @@ export class KaiTaskAgent implements AgentRunner {
       }
     };
 
-    const result = await runLangGraphAgent({
-      anthropicApiKey,
-      openaiApiKey,
-      googleApiKey,
-      model,
-      systemPrompt,
-      tools,
-      userMessage:   taskPrompt,
-      maxIterations: Number(agentConfig.config?.max_iterations ?? 20),
-      onLog,
-    });
+    // ── Meter the run (invariant #10) ──────────────────────────────────────────
+    // Reserve a ceiling before the Opus loop; block if the triggering admin can't afford it.
+    // Keyed on the agent's creator + their workspace pool. Settled to actual cost after the run.
+    const billUserId = (agentConfig.created_by ?? undefined) as string | undefined;
+    const billWorkspaceId = (agentConfig.workspace_id ?? undefined) as string | undefined;
+    const reserve = await reserveCredits(supabase, billUserId, billWorkspaceId, KAI_TASK_CREDIT_CEILING, 'kai_task_agent');
+    if (!reserve.ok) {
+      return {
+        success: false,
+        output: { error: reserve.message || 'Insufficient credits to run this task' },
+        inputTokens: 0, outputTokens: 0, creditsDebited: 0,
+      };
+    }
+
+    let result: Awaited<ReturnType<typeof runLangGraphAgent>>;
+    try {
+      result = await runLangGraphAgent({
+        anthropicApiKey,
+        openaiApiKey,
+        googleApiKey,
+        model,
+        systemPrompt,
+        tools,
+        userMessage:   taskPrompt,
+        maxIterations: Number(agentConfig.config?.max_iterations ?? 20),
+        onLog,
+      });
+    } catch (err) {
+      // Refund the full reserved ceiling — the run produced nothing billable.
+      await refundCredits(supabase, billUserId, billWorkspaceId, KAI_TASK_CREDIT_CEILING, 'kai_task_agent', { reason: 'agent_run_failed' });
+      throw err;
+    }
 
     await log('info', `KAI background task completed`, {
       iterations:    result.iterations,
@@ -180,12 +215,19 @@ export class KaiTaskAgent implements AgentRunner {
       });
     }
 
+    // Settle the reserve against the actual token-based cost: refund the unused surplus (or charge
+    // the overage best-effort when a long run exceeded the ceiling).
+    const price = KAI_TASK_MODEL_PRICE[model] ?? { input: 15, output: 75 };
+    const rawUsd = (result.inputTokens / 1_000_000) * price.input + (result.outputTokens / 1_000_000) * price.output;
+    const actualCredits = Math.max(1, Math.ceil(rawUsd * 1.5 * 100)); // ×1.5 markup, 1 credit = $0.01
+    await settleCredits(supabase, billUserId, billWorkspaceId, KAI_TASK_CREDIT_CEILING, actualCredits, 'kai_task_agent', { run_id: run.id });
+
     return {
       success:       true,
       output:        { report: result.finalResponse, tool_calls: result.toolResults.length },
       inputTokens:   result.inputTokens,
       outputTokens:  result.outputTokens,
-      creditsDebited: 0,
+      creditsDebited: actualCredits,
       triggerChain:  false,
     };
   }

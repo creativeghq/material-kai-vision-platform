@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { chargeCronUser } from '../_shared/cron-billing.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -376,18 +377,69 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
 
   const mode = body.mode === 'preview' ? 'preview' : 'full';
 
+  // ── Credit metering ──────────────────────────────────────────────────────
+  // Firecrawl scrape fan-out (+ MIVAA Voyage embed per page) is paid upstream.
+  // Interactive user calls debit_credits; the cron path charges the website
+  // owner's PERSONAL balance (user_websites is user-scoped — no workspace, so
+  // chargeCronUser, not chargeCronWorkspace). NOTE: 'seo-website-crawl' must be
+  // registered in the cron cost registry for the cron charge to take effect;
+  // chargeCronUser fails OPEN (charges 0, still runs) until it is.
+  const WEBSITE_CRAWL_CREDIT_COST = mode === 'preview' ? 1 : 5;
+  let billedUserId: string | null = null;
+  let billedAmount = 0;
+  if (isCron) {
+    const r = await chargeCronUser(supabase, website.user_id as string, 'seo-website-crawl', {
+      units: 1, description: `crawl ${website.url}`,
+    });
+    if (!r.allowed) {
+      return jsonResponse({ success: false, error: 'insufficient_credits', skipped: true }, 200);
+    }
+    if (r.charged > 0) { billedUserId = website.user_id as string; billedAmount = r.charged; }
+  } else {
+    const { data: dd, error: de } = await supabase.rpc('debit_credits', {
+      p_user_id: userId,
+      p_amount: WEBSITE_CRAWL_CREDIT_COST,
+      p_operation_type: 'website_crawl',
+      p_description: `Website ${mode} crawl (${website.url})`,
+      p_metadata: { website_id: website.id, mode },
+      p_workspace_id: null,
+    });
+    const drow = Array.isArray(dd) ? dd[0] : dd;
+    if (de || !drow?.success) {
+      return jsonResponse({ success: false, error: drow?.error_message || de?.message || 'Insufficient credits' }, 402);
+    }
+    billedUserId = userId;
+    billedAmount = WEBSITE_CRAWL_CREDIT_COST;
+  }
+  const refundCrawl = async (reason: string): Promise<void> => {
+    if (!billedUserId || billedAmount <= 0) return;
+    try {
+      await supabase.rpc('refund_credits', {
+        p_user_id: billedUserId,
+        p_amount: billedAmount,
+        p_operation_type: 'website_crawl_refund',
+        p_description: `Website crawl refund (${reason})`,
+        p_metadata: { website_id: website.id, mode },
+        p_workspace_id: null,
+      });
+    } catch (e) { console.warn('[crawl-user-website] refund failed:', e); }
+  };
+
   try {
     if (mode === 'preview') {
       console.log(`[crawl-user-website] PREVIEW ${website.url}`);
       const result = await previewWebsite(supabase, website);
+      if (!result.ok) await refundCrawl('preview_failed');
       return jsonResponse({ success: result.ok, mode: 'preview', data: result });
     }
 
     console.log(`[crawl-user-website] FULL ${website.url} (cap=${website.max_pages})`);
     const result = await crawlOneWebsite(supabase, website);
+    if (!result.ok) await refundCrawl('crawl_failed');
     return jsonResponse({ success: result.ok, mode: 'full', data: result });
   } catch (e: any) {
     console.error('[crawl-user-website] error:', e);
+    await refundCrawl('exception');
     if (mode === 'full') {
       await supabase.from('user_websites').update({
         last_crawled_at: new Date().toISOString(),

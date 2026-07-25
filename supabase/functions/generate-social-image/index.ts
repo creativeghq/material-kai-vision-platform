@@ -13,7 +13,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
+import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -222,10 +222,15 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
   const creditCost = CREDIT_COSTS[resolvedModel];
   const serviceKey = MODEL_SERVICE_KEYS[resolvedModel];
 
-  // ① Pre-flight check
-  const { sufficient, balance } = await checkCreditBalance(supabase, userId, serviceKey);
-  if (!sufficient) {
-    return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
+  // ① Debit credits BEFORE the upstream image generation (invariant #10 — debit-before,
+  // refund-on-failure). Replaces the old non-atomic pre-flight read + deduct-on-success,
+  // which let a race between the read and the charge deliver a free image.
+  const debitResult = await debitExternalServiceCredits(
+    supabase, userId, serviceKey, 'social_image_generation', 1,
+    { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id },
+  );
+  if (!debitResult.success) {
+    return jsonResponse({ success: false, error: debitResult.error || 'Insufficient credits', required: creditCost }, 402);
   }
 
   try {
@@ -248,17 +253,6 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     // ④ Store in Supabase Storage
     const filename = `${Date.now()}-${resolvedModel}.${resolvedModel === 'flux' ? 'webp' : 'png'}`;
     const storedUrl = await storeImage(supabase, imageUrl!, filename);
-
-    // ⑤ Debit ONLY after a usable image is generated AND stored — never charge when the
-    // model call or the storage upload fails (deduct-on-success, matching
-    // generate-interior-gemini / generate-region-edit; closes the charge-on-failure gap).
-    const debitResult = await debitExternalServiceCredits(
-      supabase, userId, serviceKey, 'social_image_generation', 1,
-      { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id },
-    );
-    if (!debitResult.success) {
-      return jsonResponse({ success: false, error: debitResult.error || 'Credit debit failed' }, 402);
-    }
 
     // ⑥ Update social_posts if post_id provided
     if (post_id) {
@@ -307,6 +301,17 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
 
   } catch (err) {
     console.error('[generate-social-image] Error:', err);
+    // Refund the upfront debit — no usable image was delivered.
+    if (debitResult.success && debitResult.credits_debited > 0) {
+      await supabase.rpc('refund_credits', {
+        p_user_id: userId,
+        p_amount: debitResult.credits_debited,
+        p_operation_type: 'social_image_generation_refund',
+        p_description: 'Refund: social image generation failed',
+        p_metadata: { model: resolvedModel, error: String(err) },
+        p_workspace_id: null,
+      }).then(() => {}, () => {});
+    }
     return jsonResponse({ success: false, error: String(err) }, 500);
   }
 }));

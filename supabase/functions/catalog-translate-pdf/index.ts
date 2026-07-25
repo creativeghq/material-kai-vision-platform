@@ -119,6 +119,26 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  // ── Credit metering state (function-scope so the catch can refund too) ────
+  const CATALOG_TRANSLATE_CREDIT_COST = 5;
+  let chargedUserId: string | null = null;
+  let refundMeta: Record<string, unknown> = {};
+  let translateRefunded = false;
+  const refundTranslate = async (reason: string): Promise<void> => {
+    if (!chargedUserId || translateRefunded) return;
+    translateRefunded = true;
+    try {
+      await supabase.rpc('refund_credits', {
+        p_user_id: chargedUserId,
+        p_amount: CATALOG_TRANSLATE_CREDIT_COST,
+        p_operation_type: 'catalog_translate_pdf_refund',
+        p_description: `Catalog translate refund (${reason})`,
+        p_metadata: { ...refundMeta, reason },
+        p_workspace_id: null,
+      });
+    } catch (e) { console.warn('[catalog-translate-pdf] refund failed:', e instanceof Error ? e.message : e); }
+  };
+
   try {
     const body: TranslateRequest = await req.json();
     if (!body.source_pdf_id || !body.target_catalog_id) {
@@ -148,6 +168,27 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
       max: MAX_MATERIALS,
     });
 
+    // ── Credit metering: debit before the paid Sonnet vision pass ──────────
+    // "Act on behalf of": agent-chat invokes server-to-server (secret level)
+    // with the real user in body.caller_user_id; a direct call binds to the JWT.
+    const effectiveUserId = auth.level === 'secret' && body.caller_user_id ? body.caller_user_id : auth.userId;
+    if (effectiveUserId) {
+      refundMeta = { catalog_id: body.target_catalog_id, source_pdf_id: pdf.id };
+      const { data: dd, error: de } = await supabase.rpc('debit_credits', {
+        p_user_id: effectiveUserId,
+        p_amount: CATALOG_TRANSLATE_CREDIT_COST,
+        p_operation_type: 'catalog_translate_pdf',
+        p_description: `Catalog translate: ${pdf.original_filename}`,
+        p_metadata: { catalog_id: body.target_catalog_id, source_pdf_id: pdf.id },
+        p_workspace_id: null,
+      });
+      const row = Array.isArray(dd) ? dd[0] : dd;
+      if (de || !row?.success) {
+        return jsonResponse({ success: false, error: row?.error_message || de?.message || 'Insufficient credits' }, 402);
+      }
+      chargedUserId = effectiveUserId;
+    }
+
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -172,6 +213,7 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
 
     if (!resp.ok) {
       const errText = await resp.text();
+      await refundTranslate('anthropic_error');
       return jsonResponse({ success: false, error: `Anthropic ${resp.status}: ${errText.slice(0, 300)}` }, 502);
     }
 
@@ -231,7 +273,10 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
       .from('presentation_catalogs')
       .update({ body_data: { ...baseBody, sections: mergedSections }, updated_at: new Date().toISOString() })
       .eq('id', body.target_catalog_id);
-    if (upErr) return jsonResponse({ success: false, error: upErr.message }, 500);
+    if (upErr) {
+      await refundTranslate('persist_failed');
+      return jsonResponse({ success: false, error: upErr.message }, 500);
+    }
 
     await logCost(supabase, body.caller_user_id, body.target_catalog_id, pdf.id, data?.usage);
 
@@ -242,6 +287,7 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
     });
   } catch (err) {
     console.error('[catalog-translate-pdf] error:', err);
+    await refundTranslate('exception');
     return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'Translation failed' }, 500);
   }
 }));

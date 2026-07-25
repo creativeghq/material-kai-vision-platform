@@ -21,6 +21,8 @@
  * ai_usage_logs for the operations dashboard.
  */
 
+import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
+
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
@@ -30,6 +32,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY');
 
 const RESEARCH_MODEL = 'claude-sonnet-4-6';   // tech judgement benefits from reasoning
+// Credit ceiling reserved before the (2× Sonnet + web_search) review, settled to actual after.
+// Injected on kai/Pepper for ALL users, so it must be metered (previously credits_debited=0).
+const REVIEW_CREDIT_CEILING = 40;
 const RING_VALUES   = ['adopt', 'trial', 'assess', 'hold'] as const;
 const CATEGORY_VALUES = ['models', 'libraries', 'frameworks', 'infra', 'services', 'patterns', 'tooling', 'other'] as const;
 const LEVEL_VALUES  = ['low', 'medium', 'high'] as const;
@@ -311,7 +316,7 @@ export async function runRadarForSubject(
   return { summary: research.summary, ...persisted, rawCostUsd: research.rawCostUsd };
 }
 
-async function logUsage(sb: ReturnType<typeof svcClient>, userId: string | null, cost: number, meta: Record<string, unknown>) {
+async function logUsage(sb: ReturnType<typeof svcClient>, userId: string | null, cost: number, meta: Record<string, unknown>, creditsDebited = 0) {
   try {
     await sb.from('ai_usage_logs').insert({
       user_id: userId,
@@ -319,9 +324,9 @@ async function logUsage(sb: ReturnType<typeof svcClient>, userId: string | null,
       model_name: RESEARCH_MODEL,
       api_provider: 'anthropic',
       raw_cost_usd: cost,
-      markup_multiplier: 1,
-      billed_cost_usd: cost,
-      credits_debited: 0,
+      markup_multiplier: 1.5,
+      billed_cost_usd: cost * 1.5,
+      credits_debited: creditsDebited,
       metadata: { feature: 'tech_radar', ...meta },
       created_at: new Date().toISOString(),
     });
@@ -375,15 +380,32 @@ export const createReviewSolutionTool = (
       }
 
       try {
-        let result;
-        if (subject.id) {
-          result = await runRadarForSubject(sb, subject, { runId: null });
-        } else {
-          // ephemeral (not saved) — research only, no persistence
-          const research = await researchSolution(subject);
-          result = { summary: research.summary, newCount: research.findings.length, total: research.findings.length, rows: research.findings, rawCostUsd: research.rawCostUsd };
+        // Meter the review (invariant #10): reserve a ceiling BEFORE the paid Sonnet + web_search
+        // passes, settle to the actual token-based cost after, refund on failure.
+        const reserve = await reserveCredits(sb, userId, workspaceId, REVIEW_CREDIT_CEILING, 'tech_radar_review');
+        if (!reserve.ok) {
+          return JSON.stringify({ success: false, error: reserve.message || 'Not enough credits to run this review.' });
         }
-        await logUsage(sb, userId, result.rawCostUsd, { subject_id: subject.id, title: subject.title, finding_count: result.total });
+
+        let result;
+        try {
+          if (subject.id) {
+            result = await runRadarForSubject(sb, subject, { runId: null });
+          } else {
+            // ephemeral (not saved) — research only, no persistence
+            const research = await researchSolution(subject);
+            result = { summary: research.summary, newCount: research.findings.length, total: research.findings.length, rows: research.findings, rawCostUsd: research.rawCostUsd };
+          }
+        } catch (researchErr) {
+          // Refund the full reserved ceiling — the review produced nothing billable.
+          await refundCredits(sb, userId, workspaceId, REVIEW_CREDIT_CEILING, 'tech_radar_review', { reason: 'research_failed' });
+          throw researchErr;
+        }
+
+        // Settle: actual = raw cost × 1.5 markup, 1 credit = $0.01. Refund the unused surplus.
+        const actualCredits = Math.max(1, Math.ceil(result.rawCostUsd * 1.5 * 100));
+        await settleCredits(sb, userId, workspaceId, REVIEW_CREDIT_CEILING, actualCredits, 'tech_radar_review', { subject_id: subject.id });
+        await logUsage(sb, userId, result.rawCostUsd, { subject_id: subject.id, title: subject.title, finding_count: result.total }, actualCredits);
 
         onChunk?.({
           type: 'tech_radar_findings',
@@ -402,6 +424,7 @@ export const createReviewSolutionTool = (
           summary: result.summary,
           findings: result.rows,
           new_findings: result.newCount,
+          credits_used: actualCredits,
           hint: subject.id
             ? 'Findings saved. Say "keep watching this" to set up a background monitor.'
             : 'One-shot review (not saved). Pass save=true to track it.',

@@ -12,7 +12,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
-import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -103,6 +103,26 @@ async function isPlatformAdmin(supabase: SupabaseClient, userId: string): Promis
     .maybeSingle();
   const role = (data as { roles?: { name?: string } } | null)?.roles?.name;
   return role === 'admin' || role === 'super_admin';
+}
+
+// Flat charge for the web_search / perplexity_search action (Anthropic Haiku + web_search
+// server-tool surcharge, max_uses=5 ≈ $0.05 + tokens → ~$0.08 billed → ~8 credits). Debited
+// up front on tenant flows and refunded on failure; operator/global flows stay free.
+const FLOW_WEB_SEARCH_COST = 8;
+
+// Preflight affordability gate for an ext-service flow action: block a 0-credit tenant flow
+// owner BEFORE the paid upstream call. Operator/global flows resolve to null → not gated.
+// Returns an error string when the caller can't afford `serviceName`, else null.
+async function assertFlowCanAfford(
+  supabase: SupabaseClient,
+  userId: string | undefined,
+  scope: FlowScope | undefined,
+  serviceName: string,
+): Promise<string | null> {
+  const dt = resolveFlowDebit(userId, scope);
+  if (!dt) return null; // operator/global flow — stays free, not gated
+  const chk = await checkCreditBalance(supabase, dt.userId, serviceName, 1, dt.workspaceId);
+  return chk.sufficient ? null : 'insufficient_credits: not enough credits to run this automation action';
 }
 
 function resolveFlowDebit(
@@ -317,6 +337,8 @@ async function executeAction(
     // 'send_sms' kept as a legacy alias — SMS is gone, both now send WhatsApp via Zernio.
     case 'send_sms':
     case 'send_whatsapp': {
+      // Fail-closed affordability gate: block a 0-credit tenant flow owner before the send.
+      { const g = await assertFlowCanAfford(supabase, userId, scope, 'zernio-whatsapp'); if (g) throw new Error(g); }
       const { data, error } = await supabase.functions.invoke('messaging-api', {
         body: {
           action: 'send',
@@ -704,41 +726,78 @@ async function executeAction(
 
       if (!category) throw new Error('Category is required');
 
-      const scope = country
+      // Meter tenant flows only (operator/global flows resolve to null → stay free). Debit BEFORE
+      // the Anthropic web_search call (invariant #10 — previously the only paid flow action with
+      // zero metering); refunded below if the call fails. `scope` here is the outer FlowScope —
+      // the geo string is `geoScope` to avoid shadowing it.
+      const webSearchDebit = resolveFlowDebit(userId, scope);
+      if (webSearchDebit) {
+        const { data: wsDbt } = await supabase.rpc('debit_credits', {
+          p_user_id: webSearchDebit.userId,
+          p_amount: FLOW_WEB_SEARCH_COST,
+          p_operation_type: 'flow_web_search',
+          p_description: `Flow web search (${category})`,
+          p_metadata: { category, country, region: regionId, limit },
+          p_workspace_id: webSearchDebit.workspaceId,
+        });
+        const wsRow = Array.isArray(wsDbt) ? wsDbt[0] : wsDbt;
+        if (wsRow && wsRow.success === false) {
+          throw new Error(wsRow.error_message || 'Insufficient credits for web search');
+        }
+      }
+
+      const geoScope = country
         ? `in ${country}`
         : regionId
         ? `in the ${regionId} region`
         : 'across Europe and major global manufacturing hubs';
 
-      const query = `Find B2B manufacturers of ${category} ${scope}. I need actual production companies (not distributors) with their own manufacturing facilities. For each company provide: name, website URL, city/country, main products. Return up to ${limit} results as a structured list.`;
+      const query = `Find B2B manufacturers of ${category} ${geoScope}. I need actual production companies (not distributors) with their own manufacturing facilities. For each company provide: name, website URL, city/country, main products. Return up to ${limit} results as a structured list.`;
 
-      const { textContent } = await withRetry(async () => {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'x-api-key': ANTHROPIC_API_KEY(),
-            'anthropic-version': '2023-06-01',
-            'anthropic-beta': 'web-search-2025-03-05',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5',
-            max_tokens: 4096,
-            tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
-            messages: [{ role: 'user', content: query }],
-          }),
+      let textContent = '';
+      try {
+        const searchRes = await withRetry(async () => {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': ANTHROPIC_API_KEY(),
+              'anthropic-version': '2023-06-01',
+              'anthropic-beta': 'web-search-2025-03-05',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5',
+              max_tokens: 4096,
+              tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+              messages: [{ role: 'user', content: query }],
+            }),
+          });
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Web search failed: ${response.status} - ${errText}`);
+          }
+          const data = await response.json();
+          const text = (data.content as any[])
+            ?.filter((b: any) => b.type === 'text')
+            .map((b: any) => b.text)
+            .join('\n') || '';
+          return { textContent: text };
         });
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Web search failed: ${response.status} - ${errText}`);
+        textContent = searchRes.textContent;
+      } catch (err) {
+        // Refund the tenant flow's debit — the search produced nothing.
+        if (webSearchDebit) {
+          await supabase.rpc('refund_credits', {
+            p_user_id: webSearchDebit.userId,
+            p_amount: FLOW_WEB_SEARCH_COST,
+            p_operation_type: 'flow_web_search_refund',
+            p_description: 'Refund: flow web search failed',
+            p_metadata: { category, error: String(err) },
+            p_workspace_id: webSearchDebit.workspaceId,
+          }).then(() => {}, () => {});
         }
-        const data = await response.json();
-        const textContent = (data.content as any[])
-          ?.filter((b: any) => b.type === 'text')
-          .map((b: any) => b.text)
-          .join('\n') || '';
-        return { textContent };
-      });
+        throw err;
+      }
 
       return {
         output: {
@@ -756,6 +815,8 @@ async function executeAction(
 
       const url = String(resolved.url || '');
       if (!url) throw new Error('URL is required');
+      // Fail-closed affordability gate: block a 0-credit tenant flow owner before the scrape.
+      { const g = await assertFlowCanAfford(supabase, userId, scope, 'firecrawl-scrape'); if (g) throw new Error(g); }
 
       const { markdown, metadata } = await withRetry(async () => {
         const controller = new AbortController();
@@ -800,6 +861,8 @@ async function executeAction(
 
       const companyName = String(resolved.company_name || '');
       if (!companyName) throw new Error('Company name is required');
+      // Fail-closed affordability gate: block a 0-credit tenant flow owner before the enrichment.
+      { const g = await assertFlowCanAfford(supabase, userId, scope, 'apollo-enrich'); if (g) throw new Error(g); }
 
       const body: Record<string, unknown> = {
         q_organization_name: companyName,
@@ -874,6 +937,9 @@ async function executeAction(
       const lastName = String(resolved.last_name || '');
 
       if (!domain && !companyName) throw new Error('Domain or company name is required');
+      // Fail-closed affordability gate: block a 0-credit tenant flow owner before the Hunter call
+      // (email-finder + domain-search are priced the same, so one gate covers both branches).
+      { const g = await assertFlowCanAfford(supabase, userId, scope, 'hunter-email-finder'); if (g) throw new Error(g); }
 
       // Person-specific search
       if (firstName || lastName) {
@@ -957,6 +1023,8 @@ async function executeAction(
 
       const email = String(resolved.email || '');
       if (!email) throw new Error('Email is required');
+      // Fail-closed affordability gate: block a 0-credit tenant flow owner before the validation.
+      { const g = await assertFlowCanAfford(supabase, userId, scope, 'zerobounce-validate'); if (g) throw new Error(g); }
 
       const zbData = await withRetry(async () => {
         const controller = new AbortController();

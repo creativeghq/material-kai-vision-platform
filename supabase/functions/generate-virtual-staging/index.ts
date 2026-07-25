@@ -63,25 +63,6 @@ async function uploadToStorage(
   return data.publicUrl;
 }
 
-async function deductCredits(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-  credits: number,
-  description: string,
-  workspaceId?: string | null,
-): Promise<void> {
-  const { data, error } = await supabase.rpc('debit_credits', {
-    p_user_id: userId,
-    p_amount: credits,
-    p_operation_type: 'virtual_staging',
-    p_description: description,
-    p_workspace_id: workspaceId ?? null,
-  });
-  if (error) throw new Error(`Credit deduction failed: ${error.message}`);
-  const row = Array.isArray(data) ? data[0] : data;
-  if (row && !row.success) throw new Error(`Credit deduction failed: ${row.error_message}`);
-}
-
 async function runReplicate(
   imageUrl: string,
   room: string,
@@ -215,30 +196,24 @@ async function handleRequest(
   const room = body.room;
   const furnitureStyle = body.furniture_style || 'Default (AI decides)';
 
-  // Pre-check balance before the expensive Replicate call
-  const { data: creditData } = await supabase
-    .from('user_credits')
-    .select('balance')
-    .eq('user_id', userId)
-    .single();
-  if (!creditData || (creditData.balance ?? 0) < CREDIT_COST) {
-    return jsonResponse({
-      success: false,
-      error: `Insufficient credits. Required: ${CREDIT_COST}, Available: ${creditData?.balance ?? 0}`,
-    }, 402);
+  // Debit credits BEFORE the expensive Replicate call (invariant #10 — debit-before,
+  // refund-on-failure). The old non-atomic balance pre-read let a race deliver a free
+  // staging; a real debit gates the caller and is refunded if generation fails.
+  const { data: debitData, error: debitError } = await supabase.rpc('debit_credits', {
+    p_user_id: userId,
+    p_amount: CREDIT_COST,
+    p_operation_type: 'virtual_staging',
+    p_description: `Virtual staging (${room}, ${furnitureStyle})`,
+    p_workspace_id: body.workspace_id ?? null,
+  });
+  const debit = Array.isArray(debitData) ? debitData[0] : debitData;
+  if (debitError || !debit?.success) {
+    return jsonResponse({ success: false, error: debit?.error_message || 'Insufficient credits' }, 402);
   }
 
   try {
     const tempUrl = await runReplicate(body.source_image_url, room, furnitureStyle, body.furniture_items);
     const imageUrl = await uploadToStorage(supabase, tempUrl, jobId, { userId, conversationId: body.conversation_id });
-
-    await deductCredits(
-      supabase,
-      userId,
-      CREDIT_COST,
-      `Virtual staging (${room}, ${furnitureStyle})`,
-      body.workspace_id,
-    );
 
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
@@ -269,6 +244,15 @@ async function handleRequest(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[generate-virtual-staging] Error:`, message);
+    // Refund the upfront debit — the staging never reached the user.
+    await supabase.rpc('refund_credits', {
+      p_user_id: userId,
+      p_amount: CREDIT_COST,
+      p_operation_type: 'virtual_staging_refund',
+      p_description: 'Refund: virtual staging failed',
+      p_metadata: { error: message },
+      p_workspace_id: body.workspace_id ?? null,
+    }).then(() => {}, () => {});
     return jsonResponse({ success: false, error: message }, 500);
   }
 }

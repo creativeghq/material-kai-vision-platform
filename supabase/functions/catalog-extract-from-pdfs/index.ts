@@ -161,10 +161,26 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
       }
     }
 
+    // ── Credit metering: one Sonnet vision pass per PDF → charge per PDF ────
+    const EXTRACT_CREDIT_COST_PER_PDF = 3;
+    const refundExtract = async (pdfId: string, wsId: string | null, reason: string): Promise<void> => {
+      try {
+        await supabase.rpc('refund_credits', {
+          p_user_id: effectiveUserId,
+          p_amount: EXTRACT_CREDIT_COST_PER_PDF,
+          p_operation_type: 'catalog_extract_from_pdf_refund',
+          p_description: `Catalog extract refund (${reason})`,
+          p_metadata: { catalog_id: body.catalog_id, source_pdf_id: pdfId, reason },
+          p_workspace_id: wsId,
+        });
+      } catch (e) { console.warn('[catalog-extract] refund failed:', e instanceof Error ? e.message : e); }
+    };
+
     const allCandidates: Candidate[] = [];
     const errors: string[] = [];
 
     for (const pdf of pdfs) {
+      let pdfCharged = false;
       try {
         const { data: blob, error: dlErr } = await supabase.storage
           .from('pdf-documents')
@@ -185,6 +201,22 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
           query: body.query,
           max: perPdfBudget,
         });
+
+        // Debit before this PDF's Sonnet vision pass; refund below if it fails.
+        const { data: dd, error: de } = await supabase.rpc('debit_credits', {
+          p_user_id: effectiveUserId,
+          p_amount: EXTRACT_CREDIT_COST_PER_PDF,
+          p_operation_type: 'catalog_extract_from_pdf',
+          p_description: `Catalog extract: ${pdf.original_filename}`,
+          p_metadata: { catalog_id: body.catalog_id, source_pdf_id: pdf.id },
+          p_workspace_id: pdf.workspace_id ?? null,
+        });
+        const drow = Array.isArray(dd) ? dd[0] : dd;
+        if (de || !drow?.success) {
+          errors.push(`insufficient credits: ${pdf.id}`);
+          break; // out of credits → remaining PDFs would also fail
+        }
+        pdfCharged = true;
 
         const resp = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -210,6 +242,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
 
         if (!resp.ok) {
           const errText = await resp.text();
+          if (pdfCharged) await refundExtract(pdf.id, pdf.workspace_id ?? null, 'anthropic_error');
           errors.push(`anthropic ${resp.status}: ${errText.slice(0, 200)}`);
           continue;
         }
@@ -239,6 +272,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
 
         if (allCandidates.length >= maxResults) break;
       } catch (perPdfErr) {
+        if (pdfCharged) await refundExtract(pdf.id, pdf.workspace_id ?? null, 'exception');
         errors.push(`pdf ${pdf.id}: ${perPdfErr instanceof Error ? perPdfErr.message : 'error'}`);
       }
     }

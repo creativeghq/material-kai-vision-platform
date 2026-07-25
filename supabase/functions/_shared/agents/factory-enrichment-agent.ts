@@ -206,6 +206,36 @@ export class FactoryEnrichmentAgent implements AgentRunner {
 
     await log('info', 'Starting factory enrichment', { batchSize, productCount: productIds.length });
 
+    // ── Credit metering setup ─────────────────────────────────────────────
+    // This agent fans out to paid B2B APIs (Apollo + Firecrawl + Hunter) per
+    // product. The agent run carries no triggering user (triggered_by='event'),
+    // so bill the WORKSPACE OWNER, routing pool→personal via p_workspace_id.
+    const FACTORY_ENRICH_CREDIT_COST = 8; // ≈ (Apollo $0.05 + Hunter $0.01) × 1.5 markup × 100
+    let billOwnerId: string | null = null;
+    if (workspaceId) {
+      const { data: ws } = await supabase
+        .from('workspaces').select('created_by').eq('id', workspaceId).maybeSingle();
+      billOwnerId = ((ws as { created_by?: string } | null)?.created_by) ?? null;
+    }
+    if (!billOwnerId) {
+      await log('warn', 'No billable workspace owner resolved — enrichment will run unmetered', { workspaceId });
+    }
+    const refundProduct = async (productId: string, reason: string): Promise<void> => {
+      if (!billOwnerId) return;
+      try {
+        await supabase.rpc('refund_credits', {
+          p_user_id: billOwnerId,
+          p_amount: FACTORY_ENRICH_CREDIT_COST,
+          p_operation_type: 'factory_enrichment_refund',
+          p_description: `Factory enrichment refund (${reason})`,
+          p_metadata: { product_id: productId, reason },
+          p_workspace_id: workspaceId,
+        });
+      } catch (e) {
+        await log('warn', 'Factory enrichment refund failed', { product_id: productId, error: String(e) });
+      }
+    };
+
     // ── Fetch products that need enrichment ────────────────────────────────
     let query = supabase
       .from('products')
@@ -256,6 +286,30 @@ export class FactoryEnrichmentAgent implements AgentRunner {
 
       await log('info', `Enriching factory "${factoryName}" for product ${product.id}`);
 
+      // ── Credit gate: bill the workspace owner before the paid fan-out ──────
+      // Apollo (~$0.05) + Firecrawl + Hunter (~$0.01) run below. Debit up front;
+      // refund if this product yields nothing (or the cascade throws).
+      let productCharged = false;
+      if (billOwnerId) {
+        const { data: debitData, error: debitErr } = await supabase.rpc('debit_credits', {
+          p_user_id: billOwnerId,
+          p_amount: FACTORY_ENRICH_CREDIT_COST,
+          p_operation_type: 'factory_enrichment',
+          p_description: `Factory enrichment (${factoryName})`,
+          p_metadata: { product_id: product.id, factory_name: factoryName },
+          p_workspace_id: workspaceId,
+        });
+        const debitRow = Array.isArray(debitData) ? debitData[0] : debitData;
+        if (debitErr || !debitRow?.success) {
+          const msg = debitRow?.error_message || debitErr?.message || 'insufficient_credits';
+          await log('warn', `Skipping enrichment — credit debit failed: ${msg}`, { product_id: product.id });
+          skippedCount++;
+          break; // owner out of credits → remaining products would fail too
+        }
+        productCharged = true;
+      }
+
+      try {
       const website = (factory.website ?? meta.website ?? '') as string;
       const country = (factory.country  ?? meta.country  ?? '') as string;
       const domain  = website
@@ -316,7 +370,16 @@ export class FactoryEnrichmentAgent implements AgentRunner {
         });
       } else {
         skippedCount++;
+        if (productCharged) await refundProduct(product.id, 'no_data_found');
         await log('debug', `No new data found for product ${product.id} (factory: ${factoryName})`);
+      }
+      } catch (cascadeErr) {
+        // Hard failure mid-cascade — refund so the owner isn't charged for nothing.
+        if (productCharged) await refundProduct(product.id, 'cascade_error');
+        skippedCount++;
+        await log('warn', `Enrichment failed for product ${product.id}`, {
+          error: cascadeErr instanceof Error ? cascadeErr.message : String(cascadeErr),
+        });
       }
     }
 

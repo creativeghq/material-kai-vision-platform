@@ -160,6 +160,19 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
     return jsonResponse(response);
   } catch (error: any) {
     console.error('[seo-plan] Error:', error);
+    try {
+      await supabase.rpc('refund_credits', {
+        p_user_id: userId,
+        p_amount: CREDIT_COST,
+        p_operation_type: 'seo_plan_refund',
+        p_description: 'Refund: SEO planning failed',
+        p_metadata: { error: error.message },
+        p_workspace_id: null,
+      });
+      console.log('[seo-plan] Credits refunded');
+    } catch (refundErr) {
+      console.error('[seo-plan] Refund failed:', refundErr);
+    }
     return jsonResponse(
       { success: false, error: error.message || 'Planning failed' },
       500,

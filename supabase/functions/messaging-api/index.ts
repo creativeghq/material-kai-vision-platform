@@ -53,6 +53,24 @@ function normalizePhoneNumber(phone: string): string {
   return n;
 }
 
+/** Best-effort refund of a pre-charged WhatsApp credit when the send fails (invariant #10). */
+async function refundWhatsAppCredits(
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string,
+  credits: number,
+  to: string,
+): Promise<void> {
+  if (!(credits > 0)) return;
+  await supabaseClient.rpc('refund_credits', {
+    p_user_id: userId,
+    p_amount: credits,
+    p_operation_type: 'messaging_whatsapp_refund',
+    p_description: 'Refund: WhatsApp send failed',
+    p_metadata: { to },
+    p_workspace_id: null,
+  }).then(() => {}, () => {});
+}
+
 function renderTemplate(content: string, variables: Record<string, string>): string {
   let out = content || '';
   for (const [k, v] of Object.entries(variables || {})) {
@@ -167,16 +185,36 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
         for (const raw of recipients) {
           const to = normalizePhoneNumber(raw);
-          const result = await sendWhatsAppMessage({
-            accountId: channel.zernio_account_id,
-            to,
-            message: template
-              ? renderTemplate(template.content, body.templateVariables || {})
-              : body.content,
-            templateName: template?.whatsapp_template_name || undefined,
-            templateLanguage: template?.whatsapp_language_code || undefined,
-            templateParams: template ? orderedTemplateParams(template, body.templateVariables || {}) : undefined,
-          });
+
+          // Debit BEFORE the WhatsApp send (invariant #10 — fail-closed). A caller with no
+          // credits is blocked before the message is delivered; the charge is refunded if the
+          // send itself fails. Per-recipient debit keeps accounting exact.
+          const debit = await debitExternalServiceCredits(
+            supabaseClient, user.id, 'zernio-whatsapp', 'messaging_whatsapp', 1,
+            { to },
+          );
+          if (!debit.success) {
+            results.push({ to, success: false, error: debit.error || 'Insufficient credits' });
+            continue;
+          }
+
+          let result: any;
+          try {
+            result = await sendWhatsAppMessage({
+              accountId: channel.zernio_account_id,
+              to,
+              message: template
+                ? renderTemplate(template.content, body.templateVariables || {})
+                : body.content,
+              templateName: template?.whatsapp_template_name || undefined,
+              templateLanguage: template?.whatsapp_language_code || undefined,
+              templateParams: template ? orderedTemplateParams(template, body.templateVariables || {}) : undefined,
+            });
+          } catch (sendErr) {
+            await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
+            results.push({ to, success: false, error: sendErr instanceof Error ? sendErr.message : String(sendErr) });
+            continue;
+          }
           results.push({ to, ...result });
 
           if (result.success) {
@@ -194,10 +232,9 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               status: 'sent',
               sent_at: new Date().toISOString(),
             });
-            await debitExternalServiceCredits(
-              supabaseClient, user.id, 'zernio-whatsapp', 'messaging_whatsapp', 1,
-              { to, message_id: result.messageId },
-            );
+          } else {
+            // Send returned a soft failure — refund the pre-charged credit.
+            await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
           }
         }
 
@@ -231,14 +268,36 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         for (const r of body.recipients) {
           const to = normalizePhoneNumber(r.to);
           const vars = r.variables || {};
-          const result = await sendWhatsAppMessage({
-            accountId: channel.zernio_account_id,
-            to,
-            message: template ? renderTemplate(template.content, vars) : body.content,
-            templateName: template?.whatsapp_template_name || undefined,
-            templateLanguage: template?.whatsapp_language_code || undefined,
-            templateParams: template ? orderedTemplateParams(template, vars) : undefined,
-          });
+
+          // Debit BEFORE each send (invariant #10 — fail-closed). Out-of-credits stops the
+          // blast before delivery; per-recipient debit keeps bulk accounting exact and each
+          // charge is refunded if its send fails.
+          const debit = await debitExternalServiceCredits(
+            supabaseClient, user.id, 'zernio-whatsapp', 'messaging_bulk_whatsapp', 1,
+            { to },
+          );
+          if (!debit.success) {
+            results.push({ to, success: false, error: debit.error || 'Insufficient credits' });
+            // Stop the bulk run once the owner is out of credits — no point retrying every row.
+            break;
+          }
+
+          let result: any;
+          try {
+            result = await sendWhatsAppMessage({
+              accountId: channel.zernio_account_id,
+              to,
+              message: template ? renderTemplate(template.content, vars) : body.content,
+              templateName: template?.whatsapp_template_name || undefined,
+              templateLanguage: template?.whatsapp_language_code || undefined,
+              templateParams: template ? orderedTemplateParams(template, vars) : undefined,
+            });
+          } catch (sendErr) {
+            await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
+            results.push({ to, success: false, error: sendErr instanceof Error ? sendErr.message : String(sendErr) });
+            await new Promise((res) => setTimeout(res, 50));
+            continue;
+          }
           results.push({ to, ...result });
 
           if (result.success) {
@@ -256,17 +315,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               status: 'sent',
               sent_at: new Date().toISOString(),
             });
+          } else {
+            // Soft failure — refund the pre-charged credit for this recipient.
+            await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
           }
           await new Promise((res) => setTimeout(res, 50));
         }
 
         const sent = results.filter((r) => r.success).length;
-        if (sent > 0) {
-          await debitExternalServiceCredits(
-            supabaseClient, user.id, 'zernio-whatsapp', 'messaging_bulk_whatsapp', sent,
-            { total_sent: sent },
-          );
-        }
         return jsonResponse({ success: true, sent, failed: results.length - sent, results });
       }
 

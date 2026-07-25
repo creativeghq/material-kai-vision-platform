@@ -397,8 +397,29 @@ async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise
     const debitRes = Array.isArray(debit) ? debit[0] : debit;
     if (!debitRes?.success) return;
 
-    const replyText = await buildAgentDraft(db, thread);
-    if (!replyText) return;
+    // Refund the owner (pool → personal) for any post-debit failure — a blank draft, a
+    // draft-generation throw, or a failed post — so an auto-reply that never reached the
+    // customer isn't billed. Mirrors the suggest_reply refund below.
+    const refundReply = () => db.rpc('refund_credits', {
+      p_user_id: owner,
+      p_amount: INBOX_AGENT_REPLY_COST,
+      p_operation_type: 'inbox_agent_reply_refund',
+      p_description: 'Refund — agent auto-reply produced no message',
+      p_metadata: { thread_id: threadId },
+      p_workspace_id: workspaceId,
+    }).catch(() => {});
+
+    let replyText: string;
+    try {
+      replyText = await buildAgentDraft(db, thread);
+    } catch (draftErr) {
+      await refundReply();
+      throw draftErr;
+    }
+    if (!replyText) {
+      await refundReply();
+      return;
+    }
 
     // The agent participant (created when the thread was handed over / auto-engaged).
     const { data: agentP } = await db
@@ -406,15 +427,20 @@ async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise
       .eq('thread_id', threadId).eq('participant_type', 'agent').eq('status', 'active')
       .limit(1).maybeSingle();
 
-    await insertMessageAndNotify(db, {
-      thread,
-      senderParticipantId: (agentP as { id?: string } | null)?.id ?? null,
-      body: replyText,
-      attachments: [],
-      messageType: 'agent',
-      senderUserId: null,
-      senderLabel: 'Assistant',
-    });
+    try {
+      await insertMessageAndNotify(db, {
+        thread,
+        senderParticipantId: (agentP as { id?: string } | null)?.id ?? null,
+        body: replyText,
+        attachments: [],
+        messageType: 'agent',
+        senderUserId: null,
+        senderLabel: 'Assistant',
+      });
+    } catch (postErr) {
+      await refundReply();
+      throw postErr;
+    }
   } catch (e) {
     console.warn('[inbox-api] agent reply failed:', e instanceof Error ? e.message : String(e));
   }

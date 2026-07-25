@@ -489,7 +489,36 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     let basicRecEn: BasicRecEn | null = null;
     if (body.translate) {
       const primaryActDescr = (activities.find((a) => a.kind === 1) ?? activities[0] ?? null)?.description ?? null;
-      basicRecEn = await translateBasicRec(basicRec, primaryActDescr);
+      // ── Credit metering: the SOAP lookup is free; the Haiku translation is
+      // paid. Debit before it; refund if the translation call fails.
+      const AADE_TRANSLATE_CREDIT_COST = 1;
+      const { data: dd, error: de } = await admin.rpc('debit_credits', {
+        p_user_id: user.id,
+        p_amount: AADE_TRANSLATE_CREDIT_COST,
+        p_operation_type: 'aade_field_translation',
+        p_description: 'ΑΑΔΕ field translation (Haiku)',
+        p_metadata: { workspace_id: body.workspace_id ?? null, afm: rawAfm },
+        p_workspace_id: body.workspace_id ?? null,
+      });
+      const drow = Array.isArray(dd) ? dd[0] : dd;
+      if (!de && drow?.success) {
+        basicRecEn = await translateBasicRec(basicRec, primaryActDescr);
+        if (!basicRecEn) {
+          // Translation failed (returned null) → refund.
+          try {
+            await admin.rpc('refund_credits', {
+              p_user_id: user.id,
+              p_amount: AADE_TRANSLATE_CREDIT_COST,
+              p_operation_type: 'aade_field_translation_refund',
+              p_description: 'ΑΑΔΕ field translation refund (failed)',
+              p_metadata: { workspace_id: body.workspace_id ?? null, afm: rawAfm },
+              p_workspace_id: body.workspace_id ?? null,
+            });
+          } catch (e) { console.warn('[myaade-rgwspublic2] translation refund failed:', e); }
+        }
+      } else {
+        console.warn('[myaade-rgwspublic2] skipping translation — credit debit failed:', drow?.error_message || de?.message);
+      }
     }
 
     const result = {

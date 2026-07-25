@@ -67,6 +67,10 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
     const body: SearchRequest = await req.json();
     if (!body.query?.trim()) return jsonResponse({ success: false, error: 'query is required' }, 400);
 
+    // "Act on behalf of": secret/service callers pass the real user in body.caller_user_id;
+    // a direct user call binds to its verified JWT. Null (pure service) → run unbilled.
+    const effectiveUserId = auth.level === 'secret' && body.caller_user_id ? body.caller_user_id : auth.userId;
+
     const maxCandidates = Math.min(12, Math.max(1, body.max_candidates || 6));
     const searchDbFirst = body.search_db_first !== false;
 
@@ -82,9 +86,40 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
 
     if (candidates.length < maxCandidates) {
       const webNeeded = maxCandidates - candidates.length;
+      // ── Credit metering: DataForSEO Images SERP is paid — debit before it ──
+      let webCharged = false;
+      if (effectiveUserId) {
+        const { data: dd, error: de } = await supabase.rpc('debit_credits', {
+          p_user_id: effectiveUserId,
+          p_amount: 1,
+          p_operation_type: 'catalog_image_search_web',
+          p_description: `Catalog image web search: ${body.query.slice(0, 60)}`,
+          p_metadata: { query: body.query },
+          p_workspace_id: null,
+        });
+        const drow = Array.isArray(dd) ? dd[0] : dd;
+        if (de || !drow?.success) {
+          // Out of credits → skip the paid web fallback, return DB hits only.
+          return jsonResponse({ success: true, candidates: candidates.slice(0, maxCandidates), db_hits: dbHits, web_hits: 0 });
+        }
+        webCharged = true;
+      }
       const webResults = await searchWebImages(body.query, webNeeded);
       webHits = webResults.length;
       candidates.push(...webResults);
+      // DataForSEO returned nothing (or not configured) → refund the debit.
+      if (webCharged && webResults.length === 0) {
+        try {
+          await supabase.rpc('refund_credits', {
+            p_user_id: effectiveUserId,
+            p_amount: 1,
+            p_operation_type: 'catalog_image_search_web_refund',
+            p_description: 'Catalog image web search refund (no results)',
+            p_metadata: { query: body.query },
+            p_workspace_id: null,
+          });
+        } catch (e) { console.warn('[catalog-image-search] refund failed:', e instanceof Error ? e.message : e); }
+      }
     }
 
     return jsonResponse({

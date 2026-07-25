@@ -354,24 +354,59 @@ serve(
 
     const snapshot = await gatherSnapshot(admin, userId, workspaceId);
 
+    // ── Credit metering: debit before the Haiku call (only reached on a cache
+    // miss — a warm cache returned above). If the caller is out of credits we
+    // silently serve the deterministic fallback (this endpoint never errors).
+    const INSIGHTS_CREDIT_COST = 1;
+    let charged = false;
+    {
+      const { data: dd, error: de } = await admin.rpc('debit_credits', {
+        p_user_id: userId,
+        p_amount: INSIGHTS_CREDIT_COST,
+        p_operation_type: 'dashboard_insights',
+        p_description: 'Dashboard AI insights',
+        p_metadata: { workspace_id: workspaceId },
+        p_workspace_id: workspaceId,
+      });
+      const drow = Array.isArray(dd) ? dd[0] : dd;
+      charged = !de && !!drow?.success;
+    }
+
     let insights: Insights;
     let model: string | null = null;
     let source: 'ai' | 'fallback' = 'ai';
-    try {
-      const result = await generateStructuredWithClaude(buildPrompt(snapshot), InsightsSchema, {
-        model: INSIGHTS_MODEL,
-        systemPrompt: SYSTEM_PROMPT,
-        temperature: 0.5,
-        maxTokens: 900,
-        task: 'dashboard_insights',
-      });
-      insights = result.output;
-      model = result.model;
-      if (!insights?.insights?.length) throw new Error('empty insights');
-    } catch (err) {
-      console.error('[dashboard-insights] AI generation failed, using deterministic fallback:', err);
+    if (!charged) {
+      // No credits (or debit failed) → deterministic fallback, no charge.
       insights = buildFallbackInsights(snapshot);
       source = 'fallback';
+    } else {
+      try {
+        const result = await generateStructuredWithClaude(buildPrompt(snapshot), InsightsSchema, {
+          model: INSIGHTS_MODEL,
+          systemPrompt: SYSTEM_PROMPT,
+          temperature: 0.5,
+          maxTokens: 900,
+          task: 'dashboard_insights',
+        });
+        insights = result.output;
+        model = result.model;
+        if (!insights?.insights?.length) throw new Error('empty insights');
+      } catch (err) {
+        console.error('[dashboard-insights] AI generation failed, using deterministic fallback:', err);
+        // Refund — the AI path failed; we deliver the deterministic fallback instead.
+        try {
+          await admin.rpc('refund_credits', {
+            p_user_id: userId,
+            p_amount: INSIGHTS_CREDIT_COST,
+            p_operation_type: 'dashboard_insights_refund',
+            p_description: 'Dashboard AI insights refund (fallback)',
+            p_metadata: { workspace_id: workspaceId },
+            p_workspace_id: workspaceId,
+          });
+        } catch (e) { console.warn('[dashboard-insights] refund failed:', e); }
+        insights = buildFallbackInsights(snapshot);
+        source = 'fallback';
+      }
     }
 
     const ttlMs = source === 'ai' ? CACHE_TTL_DAYS * 864e5 : FALLBACK_TTL_HOURS * 36e5;

@@ -339,6 +339,8 @@ async function suggestFieldMappings(
   fieldSamples: Map<string, FieldDetection>,
   anthropicApiKey: string,
   supabase: SupabaseClient,
+  userId: string | null,
+  workspaceId: string | null,
 ): Promise<Map<string, MappingSuggestion>> {
   const allFieldNames = Array.from(fieldSamples.keys());
   const { confident, ambiguous, unknown } = classifyFields(allFieldNames);
@@ -394,6 +396,41 @@ ${JSON.stringify(fieldsInfo, null, 2)}
 
 For each xml_field, return its best target mapping with a confidence score 0.0-1.0. If a dictionary_hint is provided, it's a low-confidence guess — confirm or override.`;
 
+  // ── Credit metering: only reached when the dictionary left residual fields
+  // AND an API key exists → Haiku is about to run. Charge the caller; refund on
+  // failure. The dictionary-only fast path above never pays. A null user
+  // (service-role import) runs unbilled — nobody to charge.
+  const XML_FIELD_MAP_CREDIT_COST = 1;
+  const refundMapping = async (): Promise<void> => {
+    if (!userId) return;
+    try {
+      await supabase.rpc('refund_credits', {
+        p_user_id: userId,
+        p_amount: XML_FIELD_MAP_CREDIT_COST,
+        p_operation_type: 'xml_field_mapping_refund',
+        p_description: 'XML field mapping refund (Haiku failed)',
+        p_metadata: { workspace_id: workspaceId, residual_count: residualFields.length },
+        p_workspace_id: workspaceId,
+      });
+    } catch (e) { console.warn('XML field mapping refund failed:', e); }
+  };
+  if (userId) {
+    const { data: dd, error: de } = await supabase.rpc('debit_credits', {
+      p_user_id: userId,
+      p_amount: XML_FIELD_MAP_CREDIT_COST,
+      p_operation_type: 'xml_field_mapping',
+      p_description: `XML field mapping (${residualFields.length} residual fields)`,
+      p_metadata: { workspace_id: workspaceId, residual_count: residualFields.length },
+      p_workspace_id: workspaceId,
+    });
+    const drow = Array.isArray(dd) ? dd[0] : dd;
+    if (de || !drow?.success) {
+      console.log('⚠️ Credit debit failed for XML field mapping, using dictionary-only fallback');
+      applyDefaults();
+      return suggestions;
+    }
+  }
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -413,6 +450,7 @@ For each xml_field, return its best target mapping with a confidence score 0.0-1
 
     if (!response.ok) {
       console.error('Claude API error:', await response.text());
+      await refundMapping();
       applyDefaults();
       return suggestions;
     }
@@ -422,6 +460,7 @@ For each xml_field, return its best target mapping with a confidence score 0.0-1
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error('No JSON found in Claude response');
+      await refundMapping();
       applyDefaults();
       return suggestions;
     }
@@ -448,6 +487,7 @@ For each xml_field, return its best target mapping with a confidence score 0.0-1
     return suggestions;
   } catch (error) {
     console.error('Error calling Claude API:', error);
+    await refundMapping();
     applyDefaults();
     return suggestions;
   }
@@ -618,6 +658,8 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
         fieldDetections,
         anthropicApiKey(),
         supabase,
+        userId,
+        workspace_id,
       );
 
       // Build detected fields response

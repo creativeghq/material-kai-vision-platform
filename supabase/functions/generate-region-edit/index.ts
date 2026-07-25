@@ -127,22 +127,26 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
   if (!body.mask_data_url) return jsonResponse({ success: false, error: 'mask_data_url is required' }, 400);
   if (!body.prompt?.trim()) return jsonResponse({ success: false, error: 'prompt is required' }, 400);
 
-  // Check credits upfront
-  const { data: creditData, error: creditErr } = await supabase
-    .from('user_credits')
-    .select('balance')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (creditErr) return jsonResponse({ success: false, error: `Credit check failed: ${creditErr.message}` }, 500);
-  if (!creditData || (creditData.balance ?? 0) < CREDITS_REQUIRED) {
-    return jsonResponse({
-      success: false,
-      error: `Insufficient credits. Required: ${CREDITS_REQUIRED}, Available: ${creditData?.balance ?? 0}`,
-      insufficient_credits: true,
-    }, 402);
-  }
-
   const jobId = crypto.randomUUID();
+
+  // Debit credits BEFORE the upstream inpaint call (invariant #10 — debit-before,
+  // refund-on-failure). The old non-atomic balance pre-read + deduct-after-generation
+  // let a race deliver a free edit; a real debit gates the caller and is refunded on failure.
+  const { data: debitData, error: debitErr } = await supabase.rpc('debit_credits', {
+    p_user_id: userId,
+    p_amount: CREDITS_REQUIRED,
+    p_operation_type: 'region_edit',
+    p_description: `Region edit (Grok Aurora inpainting)`,
+    p_metadata: { workspace_id: body.workspace_id, job_id: jobId },
+    p_workspace_id: body.workspace_id ?? null,
+  });
+  {
+    const row = Array.isArray(debitData) ? debitData[0] : debitData;
+    if (debitErr || (row && row.success === false)) {
+      const msg = row?.error_message || debitErr?.message || 'Insufficient credits';
+      return jsonResponse({ success: false, error: msg, insufficient_credits: true }, 402);
+    }
+  }
 
   try {
     // Fetch room image bytes
@@ -157,29 +161,7 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
       imageMimeType,
     });
 
-    // Upload the result FIRST, before debiting — otherwise a storage/upload failure lands in
-    // the catch below and returns 500 with the credit already gone (user charged, no image).
     const imageUrl = await uploadResult(supabase, result.base64, result.mimeType, jobId, { userId, conversationId: body.conversation_id });
-
-    // Debit credits — check the RPC's success flag, otherwise a transient
-    // race (balance drained between the upfront check and now) silently
-    // delivers the result without charging the user.
-    const { data: debitData, error: debitErr } = await supabase.rpc('debit_credits', {
-      p_user_id: userId,
-      p_amount: CREDITS_REQUIRED,
-      p_operation_type: 'region_edit',
-      p_description: `Region edit (Grok Aurora inpainting)`,
-      p_metadata: { workspace_id: body.workspace_id, job_id: jobId },
-      p_workspace_id: body.workspace_id ?? null,
-    });
-    {
-      const row = Array.isArray(debitData) ? debitData[0] : debitData;
-      if (debitErr || (row && row.success === false)) {
-        const msg = row?.error_message || debitErr?.message || 'Credit deduction failed after generation';
-        console.error('[generate-region-edit] Credit deduction failed post-generation:', msg);
-        return jsonResponse({ success: false, error: msg }, 402);
-      }
-    }
 
     return jsonResponse({
       success: true,
@@ -191,6 +173,15 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
 
   } catch (err) {
     console.error('[generate-region-edit] Error:', err);
+    // Refund the upfront debit — no edited image was delivered.
+    await supabase.rpc('refund_credits', {
+      p_user_id: userId,
+      p_amount: CREDITS_REQUIRED,
+      p_operation_type: 'region_edit_refund',
+      p_description: 'Refund: region edit failed',
+      p_metadata: { job_id: jobId, error: String(err) },
+      p_workspace_id: body.workspace_id ?? null,
+    }).then(() => {}, () => {});
     return jsonResponse({ success: false, error: String(err) }, 500);
   }
 }));
