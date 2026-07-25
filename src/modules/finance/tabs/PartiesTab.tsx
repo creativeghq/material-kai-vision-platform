@@ -3,7 +3,6 @@ import { Loader2, FileText, Receipt, Printer, BookOpen, Coins, Users } from 'luc
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -224,17 +223,21 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{r.display_name}</span>
                         {r.over_credit_limit && (
-                          <Badge variant="destructive" className="text-[10px]" title={`Outstanding ${formatMoney(Number(r.receivable_outstanding || 0))} exceeds credit limit ${formatMoney(Number(r.credit_limit || 0))}`}>Over limit</Badge>
+                          <span className="text-[10px] font-medium text-destructive" title={`Outstanding ${formatMoney(Number(r.receivable_outstanding || 0))} exceeds credit limit ${formatMoney(Number(r.credit_limit || 0))}`}>Over limit</span>
                         )}
                       </div>
                       {r.email && <div className="text-[10px] text-muted-foreground">{r.email}</div>}
                     </td>
+                    {/* Roles as plain words (colour on the text, not a pill background) — Customer /
+                        Supplier read at a glance without the tag look. Segment trails in muted text. */}
                     <td className="px-4 py-2">
-                      <div className="flex gap-1 flex-wrap">
-                        {r.is_customer && <Badge variant="outline" className="text-[10px]">Customer</Badge>}
-                        {r.is_supplier && <Badge variant="default" className="text-[10px]">Supplier</Badge>}
-                        {r.contact_group && <Badge variant="secondary" className="text-[10px]">{SEGMENT_LABELS[r.contact_group] ?? r.contact_group}</Badge>}
-                      </div>
+                      <span className="text-xs">
+                        {r.is_customer && <span className="text-emerald-600 dark:text-emerald-400">Customer</span>}
+                        {r.is_customer && r.is_supplier && <span className="text-muted-foreground"> · </span>}
+                        {r.is_supplier && <span className="text-sky-600 dark:text-sky-400">Supplier</span>}
+                        {!r.is_customer && !r.is_supplier && <span className="text-muted-foreground">—</span>}
+                        {r.contact_group && <span className="text-muted-foreground"> · {SEGMENT_LABELS[r.contact_group] ?? r.contact_group}</span>}
+                      </span>
                     </td>
                     <td className="px-4 py-2 text-right">{formatMoney(Number(r.invoiced_total || 0))}</td>
                     <td className={`px-4 py-2 text-right ${Number(r.receivable_outstanding) > 0 ? 'text-destructive font-medium' : ''}`}>

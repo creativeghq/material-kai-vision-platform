@@ -94,7 +94,10 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      'text-lg font-semibold leading-none tracking-tight',
+      // Headings use the display face (font-display) — so every modal title matches the app's
+      // heading language by default. Previously only modals that overrode the class got it;
+      // the rest fell back to the body font and looked off. Overrides via className still win.
+      'font-display text-lg font-semibold leading-none tracking-tight',
       className,
     )}
     {...props}
