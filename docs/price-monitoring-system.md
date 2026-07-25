@@ -167,5 +167,5 @@ Hourly. Calls `get_internal_tracked_queries_due()` then POSTs `/products/{id}/re
 - [CLAUDE.md → Price Monitoring](../CLAUDE.md)
 - [Price Monitoring API (external consumers)](api/price-monitoring-api.md)
 - [Cron API](api/price-monitoring-cron-api.md)
-- [Edge Function README](../supabase/functions/price-monitoring-cron/README.md)
+- Edge function: the price-monitoring cron was consolidated into `supabase/functions/monitoring-cron`.
 - [CHANGELOG](../CHANGELOG.md)

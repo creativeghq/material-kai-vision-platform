@@ -27,6 +27,14 @@ suite('money paths · payments + credits', () => {
     await addMember(svc, wsA, A.id, 'owner');
     await addMember(svc, wsB, B.id, 'owner');
 
+    // New users get a signup welcome-grant credit_transaction (+ a user_credits row). Clear it so
+    // the credits tests below start from a clean ledger — otherwise the welcome grant shows up as
+    // drift in the "ledger vs cached balance in agreement" invariant.
+    for (const u of [A.id, B.id]) {
+      await svc.from('credit_transactions').delete().eq('user_id', u).then(() => {}, () => {});
+      await svc.from('user_credits').delete().eq('user_id', u).then(() => {}, () => {});
+    }
+
     // Fixtures owned by B — used to prove A can't reach across the tenant boundary.
     const o = await svc.from('orders').insert({ workspace_id: wsB, created_by: B.id }).select('id').maybeSingle();
     orderB = o.data?.id ?? '';

@@ -148,5 +148,5 @@ Supabase Dashboard → Edge Functions → `price-monitoring-cron` → Logs.
 ## Related Documentation
 
 - [Price Monitoring API](./price-monitoring-api.md)
-- [Edge Function README](../../supabase/functions/price-monitoring-cron/README.md)
+- Edge function: the price-monitoring cron was consolidated into `supabase/functions/monitoring-cron`.
 - [Internal Pricing & Credit System](../internal-pricing-credit-system.md)

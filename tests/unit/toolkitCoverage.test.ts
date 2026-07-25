@@ -69,6 +69,9 @@ const KNOWN_UNCLUSTERED = new Set([
   // Business expenses (added by the concurrent finance-expenses work, commit 7db30144) — not yet
   // clustered by that change; tracked here so main stays green until it gets a Finance-Hub cluster.
   'record_expense', 'list_recent_expenses',
+  // Real Estate module (#249) — the manage_real_estate agent tool has no toolkit cluster yet;
+  // tracked here until a Real-Estate cluster (+ picker entry) is added to agentToolsCatalog.ts.
+  'manage_real_estate',
   // Generation extras (belong in the Interior Design cluster)
   'generate_gemini', 'generate_video', 'virtual_staging',
   // HVAC / energy calculators

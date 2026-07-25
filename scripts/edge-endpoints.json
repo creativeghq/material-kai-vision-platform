@@ -2415,38 +2415,6 @@
     "response": "{ success, message, stats: { backgroundJobs, scrapingSessions, ... , totalCleaned }, timestamp }"
   },
   {
-    "name": "job-research-cron",
-    "tag": "Monitoring Crons",
-    "summary": "Hourly cron (at :45) that refreshes due internal job-research tracked jobs via MIVAA.",
-    "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/job-research/cron-refresh with limit=50. Respects volatility-aware cadence (6h/24h/48h/72h/168h). External API consumers are excluded.",
-    "security": [
-      "cronSecret"
-    ],
-    "docs": "api/job-research-api.md",
-    "methods": [
-      "POST"
-    ],
-    "actions": [],
-    "request": [],
-    "response": "{success: boolean, message: string, backend_response: object, timestamp: string}"
-  },
-  {
-    "name": "job-research-digest-cron",
-    "tag": "Monitoring Crons",
-    "summary": "Hourly cron (at :05) that dispatches consolidated daily job-research digest emails per user.",
-    "description": "Validates x-cron-secret, computes current UTC hour, and POSTs to MIVAA /api/v1/job-research/cron-digest?current_hour_utc=H. Users whose digest_hour_utc matches receive one consolidated email covering all their tracked job searches.",
-    "security": [
-      "cronSecret"
-    ],
-    "docs": "api/job-research-api.md",
-    "methods": [
-      "POST"
-    ],
-    "actions": [],
-    "request": [],
-    "response": "{success: boolean, hour_utc: number, backend_response: object, timestamp: string}"
-  },
-  {
     "name": "kb-generate-embedding",
     "tag": "Knowledge Base",
     "summary": "Generate or regenerate a Voyage AI 1024D embedding for a kb_docs row",
@@ -2469,38 +2437,6 @@
       }
     ],
     "response": "{ success, doc_id, dimensions, model, generation_time_ms }"
-  },
-  {
-    "name": "llm-mention-probe-cron",
-    "tag": "Monitoring Crons",
-    "summary": "Daily cron (03:00 UTC) that runs LLM visibility probes for tracked mention subjects.",
-    "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/mention-monitoring/cron-probe-llm with limit=25 and min_age_days=7. Runs a 4-template x 4-model probe matrix per subject (~$0.008/subject/week).",
-    "security": [
-      "cronSecret"
-    ],
-    "docs": "api/mention-monitoring-api.md",
-    "methods": [
-      "POST"
-    ],
-    "actions": [],
-    "request": [],
-    "response": "{success: boolean, message: string, backend_response: object, timestamp: string}"
-  },
-  {
-    "name": "mention-monitoring-cron",
-    "tag": "Monitoring Crons",
-    "summary": "Hourly cron that refreshes due internal mention-monitoring subjects via MIVAA.",
-    "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/mention-monitoring/cron-refresh with limit=50. Scheduled at :30 every hour by pg_cron mention-monitoring-refresh-hourly.",
-    "security": [
-      "cronSecret"
-    ],
-    "docs": "api/mention-monitoring-api.md",
-    "methods": [
-      "POST"
-    ],
-    "actions": [],
-    "request": [],
-    "response": "{success: boolean, message: string, backend_response: object, timestamp: string}"
   },
   {
     "name": "messaging-api",
@@ -3561,22 +3497,6 @@
       }
     ],
     "response": "{ ok, secrets: MaskedSecretView[] }"
-  },
-  {
-    "name": "price-monitoring-cron",
-    "tag": "Monitoring Crons",
-    "summary": "Hourly cron that refreshes due internal price-monitoring tracked queries via MIVAA.",
-    "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/price-monitoring/tracked-queries/cron-refresh with limit=50. External API consumers (api_key_id IS NOT NULL) are intentionally excluded.",
-    "security": [
-      "cronSecret"
-    ],
-    "docs": null,
-    "methods": [
-      "POST"
-    ],
-    "actions": [],
-    "request": [],
-    "response": "{success: boolean, refreshed?: number, errors?: number}"
   },
   {
     "name": "quote-public-share",
