@@ -29,7 +29,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { FilterBar, useFilters } from '@/components/core/filters';
+import { FilterBar, useFilters, optionsFromRows, type FilterGroupDef } from '@/components/core/filters';
 import { buildAgingFilters, AGE_BUCKET_KEY } from '@/modules/finance/components/agingFilters';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useToast } from '@/hooks/use-toast';
@@ -402,6 +402,23 @@ const FinancePage: React.FC = () => {
     values: apValues, setValues: setApValues, filtered: apFiltered, previewCount: apPreview,
   } = useFilters<AgingRow>(ap, apGroups);
 
+  // Follow-ups (quotes needing a nudge) — unbounded list, so give it search / status / value / idle.
+  const followUpGroups = useMemo<FilterGroupDef[]>(() => {
+    const maxVal = followUps.reduce((m, r) => Math.max(m, Number(r.grand_total) || 0), 0);
+    const maxIdle = followUps.reduce((m, r) => Math.max(m, Number(r.days_since_activity) || 0), 0);
+    return [{
+      key: 'general', label: 'General', icon: Bell,
+      fields: [
+        { key: 'q', type: 'text', label: 'Search', placeholder: 'Quote number / name…', accessor: (r: FollowUpRow) => [r.quote_number, r.name] },
+        { key: 'status', type: 'multi', label: 'Status', options: optionsFromRows(followUps, (r) => r.status), accessor: (r: FollowUpRow) => r.status },
+        { key: 'value', type: 'range', label: 'Value', min: 0, max: Math.max(Math.ceil(maxVal / 10) * 10, 10), accessor: (r: FollowUpRow) => r.grand_total },
+        { key: 'idle', type: 'range', label: 'Days idle', min: 0, max: Math.max(maxIdle, 10), accessor: (r: FollowUpRow) => r.days_since_activity },
+      ],
+    }];
+  }, [followUps]);
+  const { values: fuValues, setValues: setFuValues, filtered: followUpsView, previewCount: fuPreview } =
+    useFilters<FollowUpRow>(followUps, followUpGroups);
+
   // Clicking a bucket card toggles the SAME field the modal edits — never a parallel piece of state.
   const arBucket = (arValues[AGE_BUCKET_KEY] as string) ?? 'all';
   const apBucket = (apValues[AGE_BUCKET_KEY] as string) ?? 'all';
@@ -418,7 +435,8 @@ const FinancePage: React.FC = () => {
   // Recording a payment / issuing a document drops rows out from under the current page.
   useEffect(() => { setArPage((p) => clampPage(p, arFiltered.length)); }, [arFiltered.length]);
   useEffect(() => { setApPage((p) => clampPage(p, apFiltered.length)); }, [apFiltered.length]);
-  useEffect(() => { setFollowUpsPage((p) => clampPage(p, followUps.length)); }, [followUps.length]);
+  useEffect(() => { setFollowUpsPage((p) => clampPage(p, followUpsView.length)); }, [followUpsView.length]);
+  useEffect(() => { setFollowUpsPage(1); }, [fuValues]);
   useEffect(() => { setDepositsPage((p) => clampPage(p, deposits.rows.length)); }, [deposits.rows.length]);
 
   if (loading && !workspaceId) {
@@ -1044,12 +1062,17 @@ const FinancePage: React.FC = () => {
           {/* ─────────── FOLLOW-UPS ─────────── */}
           <TabsContent value="followups" className="space-y-4">
             <Card>
-              <CardHeader className="border-b border-border/60 px-5 py-3">
+              <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
                 <CardTitle className="text-sm">Quotes needing a nudge</CardTitle>
+                {followUps.length > 0 && (
+                  <FilterBar groups={followUpGroups} values={fuValues} onChange={setFuValues} previewCount={fuPreview} title="Filter follow-ups" />
+                )}
               </CardHeader>
               <CardContent className="p-0">
                 {followUps.length === 0 ? (
                   <div className="p-8 text-center text-sm text-muted-foreground">No follow-ups outstanding.</div>
+                ) : followUpsView.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">No follow-ups match the filter.</div>
                 ) : (
                   <>
                   <table className="w-full text-sm">
@@ -1064,7 +1087,7 @@ const FinancePage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginate(followUps, followUpsPage).map((r) => (
+                      {paginate(followUpsView, followUpsPage).map((r) => (
                         <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
                           <td className="px-4 py-2">
                             <Link to={`/quotes/${r.id}`} className="text-primary hover:underline">{r.quote_number ?? r.name ?? r.id.slice(0, 8)}</Link>
@@ -1078,7 +1101,7 @@ const FinancePage: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
-                  <TablePagination page={followUpsPage} total={followUps.length} onPageChange={setFollowUpsPage} label="quotes" />
+                  <TablePagination page={followUpsPage} total={followUpsView.length} onPageChange={setFollowUpsPage} label="quotes" />
                   </>
                 )}
               </CardContent>
