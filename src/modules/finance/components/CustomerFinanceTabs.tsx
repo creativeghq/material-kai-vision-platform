@@ -6,8 +6,6 @@ import { Link } from 'react-router-dom';
 import { Loader2, FileText, Wallet, ShoppingBag, ShoppingCart, Banknote, AlertCircle, CalendarClock, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
-import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   financeService,
@@ -363,9 +361,9 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
                   <tr key={p.id} className="border-b border-border/30 hover:bg-muted/30">
                     <td className="px-4 py-2 whitespace-nowrap">{new Date(p.paid_at).toLocaleDateString()}</td>
                     <td className="px-4 py-2">
-                      <Badge variant="outline" className={isIn ? 'border-emerald-500/40 text-emerald-400' : 'border-amber-500/40 text-amber-400'}>
-                        {isIn ? 'Received' : 'Paid out'}
-                      </Badge>
+                      <span className={`text-xs ${isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {isIn ? 'Received' : 'Paid'}
+                      </span>
                     </td>
                     <td className="px-4 py-2">{p.method ? humanizeLabel(p.method) : '—'}</td>
                     <td className="px-4 py-2 text-muted-foreground">{p.reference || '—'}</td>

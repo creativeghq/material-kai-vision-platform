@@ -51,6 +51,7 @@ import {
   type TopOutstandingRow,
   type BankAccountBalance,
 } from '@/modules/finance/services/financeService';
+import { statusTone } from '@/modules/finance/utils/statusTone';
 import {
   ordersService,
   ORDER_STATUS_LABEL,
@@ -806,12 +807,12 @@ const FinancePage: React.FC = () => {
                           {isOrder ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.description}</span>
-                              <Badge variant="secondary" className="text-[10px]">Order · not invoiced</Badge>
+                              <span className="text-[10px] text-muted-foreground">· Order, not invoiced</span>
                             </span>
                           ) : isCredit ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.credit_number ?? r.description}</span>
-                              <Badge variant="outline" className="text-[10px]">Credit · on account</Badge>
+                              <span className="text-[10px] text-muted-foreground">· Credit on account</span>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.internal_number}</span>
@@ -828,7 +829,7 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2">
                           {isCredit
                             ? <span className="text-xs text-muted-foreground">—</span>
-                            : <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>}
+                            : <span className={`text-xs ${r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`}>{ageBucketLabel(r.age_bucket)}</span>}
                         </td>
                         <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.total)}</td>
                         <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.amount_paid)}</td>
@@ -923,7 +924,7 @@ const FinancePage: React.FC = () => {
                           {isOrder ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.description}</span>
-                              <Badge variant="secondary" className="text-[10px]">Order · not invoiced</Badge>
+                              <span className="text-[10px] text-muted-foreground">· Order, not invoiced</span>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.supplier_bill_number ?? '—'}</span>
@@ -938,7 +939,7 @@ const FinancePage: React.FC = () => {
                           ) : (r.category_name ?? '—')}
                         </td>
                         <td className="px-4 py-2">
-                          <Badge variant={r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'destructive' : 'outline'}>{ageBucketLabel(r.age_bucket)}</Badge>
+                          <span className={`text-xs ${r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`}>{ageBucketLabel(r.age_bucket)}</span>
                         </td>
                         <td className="px-4 py-2 text-right">{formatMoney(r.total)}</td>
                         <td className="px-4 py-2 text-right">{formatMoney(r.amount_paid)}</td>
@@ -1068,7 +1069,7 @@ const FinancePage: React.FC = () => {
                           <td className="px-4 py-2">
                             <Link to={`/quotes/${r.id}`} className="text-primary hover:underline">{r.quote_number ?? r.name ?? r.id.slice(0, 8)}</Link>
                           </td>
-                          <td className="px-4 py-2"><Badge variant="outline">{r.status}</Badge></td>
+                          <td className="px-4 py-2"><span className={`text-xs ${statusTone(r.status)}`}>{r.status}</span></td>
                           <td className="px-4 py-2 text-right">{formatMoney(r.grand_total ?? 0, r.currency ?? 'EUR')}</td>
                           <td className="px-4 py-2 text-right">{r.days_since_activity ?? '—'}d</td>
                           <td className="px-4 py-2 text-right">{r.next_scheduled_follow_up ? new Date(r.next_scheduled_follow_up).toLocaleDateString() : '—'}</td>

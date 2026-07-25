@@ -18,6 +18,7 @@ import {
   formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel,
   type PaymentWithAllocation,
 } from '@/modules/finance/services/financeService';
+import { statusTone } from '@/modules/finance/utils/statusTone';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
@@ -36,10 +37,6 @@ import {
   type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
   type ThreeWayMatch, type ThreeWayMatchStatus,
 } from '@/modules/finance/services/ordersService';
-
-const STATUS_TONE: Record<OrderStatus, string> = {
-  draft: 'secondary', confirmed: 'outline', partially_fulfilled: 'outline', fulfilled: 'default', cancelled: 'destructive',
-};
 
 /**
  * Orders filter every dimension in SQL (`search_orders` RPC), so NO field carries an accessor —
@@ -334,7 +331,7 @@ export const OrdersPanel: React.FC<{
                     <td className="px-4 py-2">{r.party_name ?? '—'}</td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className="text-[10px] capitalize">{r.order_type}</Badge>
+                        <span className="text-xs capitalize text-muted-foreground">{r.order_type}</span>
                         {r.order_type === 'purchase' && r.three_way_match_status && (r.three_way_match_status === 'variance' || r.three_way_match_status === 'awaiting_bill') && (
                           <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[9px] font-medium ${MATCH_META[r.three_way_match_status].cls}`} title="3-way match status">
                             {MATCH_META[r.three_way_match_status].label}
@@ -342,7 +339,7 @@ export const OrdersPanel: React.FC<{
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-2"><Badge variant={STATUS_TONE[r.status] as any} className="text-[10px]">{ORDER_STATUS_LABEL[r.status]}</Badge></td>
+                    <td className="px-4 py-2"><span className={`text-xs ${statusTone(r.status)}`}>{ORDER_STATUS_LABEL[r.status]}</span></td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[r.payment_status]}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(r.total), r.currency)}</td>
                     <td className="px-4 py-2 text-right tabular-nums">
@@ -1612,7 +1609,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
             )}
 
             <p className="text-[11px] text-muted-foreground">
-              Payments / expenses above are real cash on this order (money received from the customer / paid out). Marking a catalog
+              Payments / Expenses above are real cash on this order (money received from the customer / paid out). Marking a catalog
               line delivered moves warehouse stock (sales out / purchase in) and auto-advances the status. The
               receipt/invoice is the separate Create document action.
             </p>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin, UserPlus,
 } from 'lucide-react';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
+import { statusTone } from '@/modules/finance/utils/statusTone';
 import {
   tripExpenseService, TRIP_EXPENSE_CATEGORIES, TRIP_STATUS_LABEL,
   EXPENSE_CARD_TYPES, EXPENSE_CARD_TYPE_LABEL,
@@ -354,10 +355,7 @@ const TripCardDetail: React.FC<{
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-3 py-2 text-center">
-                    <Badge
-                      variant={it.approval_status === 'approved' ? 'default' : it.approval_status === 'rejected' ? 'destructive' : 'outline'}
-                      className="text-[10px] capitalize"
-                    >{it.approval_status}</Badge>
+                    <span className={`text-xs capitalize ${statusTone(it.approval_status)}`}>{it.approval_status}</span>
                   </td>
                   <td className="px-3 py-2 text-right">
                     {canReviewNow ? (
@@ -544,7 +542,7 @@ const RequestCardDialog: React.FC<{
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Title / category</label>
+              <label className="text-xs text-muted-foreground">Title / Category</label>
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Q3 client tour" />
             </div>
           </div>
@@ -623,7 +621,7 @@ const AddExpenseDialog: React.FC<{
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Vendor</label>
-              <Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Beat / hotel name" />
+              <Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Beat / Hotel name" />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Amount ({currency})</label>

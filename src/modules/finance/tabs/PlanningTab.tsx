@@ -2,18 +2,18 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, CheckCircle2, X, Bell, Loader2, CalendarDays, Coins, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import {
   financeService, formatMoney,
   type PlannedPayment, type PlannedPaymentStatus, type PlannedPaymentDirection,
 } from '@/modules/finance/services/financeService';
+import { statusTone, directionTone } from '@/modules/finance/utils/statusTone';
 import { NewPlannedPaymentDialog } from '@/modules/finance/components/NewPlannedPaymentDialog';
 import { humanizeLabel } from '@/utils/humanize';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import {
   FilterBar, optionsFromRows, useFilters,
-  type DateRangeValue, type FilterGroupDef, type FilterValues,
+  type DateRangeValue, type FilterGroupDef,
 } from '@/components/core/filters';
 
 interface Props { workspaceId: string }
@@ -284,11 +284,11 @@ const FlatTable: React.FC<{
         <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30">
           <td className="px-4 py-2"><div className="font-medium">{r.title}</div>{r.notes && <div className="text-[10px] text-muted-foreground line-clamp-1">{r.notes}</div>}</td>
           <td className="px-4 py-2 text-xs text-muted-foreground">{r.category}</td>
-          <td className="px-4 py-2">{r.direction === 'in' ? <Badge variant="default" className="text-[10px]">In</Badge> : <Badge variant="outline" className="text-[10px]">Out</Badge>}</td>
+          <td className="px-4 py-2"><span className={`text-xs ${directionTone(r.direction)}`}>{r.direction === 'in' ? 'In' : 'Out'}</span></td>
           <td className={`px-4 py-2 text-right font-medium ${r.direction === 'out' ? 'text-red-400' : 'text-emerald-500'}`}>{formatMoney(Number(r.amount), r.currency)}</td>
           <td className="px-4 py-2 text-right">{r.scheduled_for}</td>
           <td className="px-4 py-2 text-right">{r.reminder_at ? <span className="inline-flex items-center gap-1 text-xs"><Bell className="h-3 w-3" /> {r.reminder_at}</span> : '—'}</td>
-          <td className="px-4 py-2 text-right"><Badge variant={r.status === 'overdue' ? 'destructive' : r.status === 'paid' ? 'default' : 'outline'} className="text-[10px]">{humanizeLabel(r.status)}</Badge></td>
+          <td className="px-4 py-2 text-right"><span className={`text-xs ${statusTone(r.status)}`}>{humanizeLabel(r.status)}</span></td>
           <td className="px-4 py-2 text-right">
             {r.status === 'planned' || r.status === 'overdue' ? (
               <div className="flex justify-end gap-1">
