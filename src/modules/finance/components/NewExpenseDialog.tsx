@@ -109,14 +109,22 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // Load expense categories + bank accounts when the dialog opens.
   useEffect(() => {
     if (!open || !workspaceId) return;
-    void financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+    void financeCategoriesService.list(workspaceId).then((cats) => {
+      setCategories(cats);
+      // Order-attached expense → default to the protected "Order" category (unless one is prefilled).
+      if (orderId && !prefill?.categoryId) {
+        const orderCat = cats.find((c) => c.is_system);
+        if (orderCat) setCategoryId((cur) => cur || orderCat.id);
+      }
+    }).catch(() => setCategories([]));
     // Balances (not just names) so the picker can show what's left in each account.
     void financeService.getBankAccountBalances(workspaceId).then((accts) => {
       setBankAccounts(accts);
       // Default to the workspace's default account when none picked yet.
       setBankAccountId((cur) => cur || accts.find((a) => a.is_default)?.bank_account_id || accts[0]?.bank_account_id || '');
     }).catch(() => setBankAccounts([]));
-  }, [open, workspaceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, workspaceId, orderId]);
 
   // Seed amount/description/category/payee when opened from an order's "Mark as paid" / "Add expense"
   // (turning a line cost into a real bill). Keyed on the prefill amount too, so re-opening for a

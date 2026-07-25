@@ -526,6 +526,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         await supabase.from('credit_notes').update({
           fiscal_status: result.status,
           fiscal_mark: result.mark ?? null,
+          fiscal_uid: result.uid ?? null,
+          fiscal_qr_url: result.qrUrl ?? null,
           status: accepted ? 'submitted' : 'failed',
           updated_at: new Date().toISOString(),
         }).eq('id', body.credit_note_id);
@@ -603,6 +605,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         await supabase.from('delivery_notes').update({
           fiscal_status: result.status,
           fiscal_mark: result.mark ?? null,
+          fiscal_uid: result.uid ?? null,
+          fiscal_qr_url: result.qrUrl ?? null,
           updated_at: new Date().toISOString(),
         }).eq('id', body.delivery_note_id);
 

@@ -9,13 +9,15 @@ export interface FinanceCategory {
   is_active: boolean;
   /** #207 — default sell margin % for products in this category; auto-prices received goods. */
   margin_pct: number | null;
+  /** Protected built-in (the "Order" category): can't be renamed/deleted; auto-attached to order costs. */
+  is_system: boolean;
 }
 
 export const financeCategoriesService = {
   async list(workspaceId: string): Promise<FinanceCategory[]> {
     const { data, error } = await supabase
       .from('finance_categories')
-      .select('id, name, kind, color, is_active, margin_pct')
+      .select('id, name, kind, color, is_active, margin_pct, is_system')
       .eq('workspace_id', workspaceId)
       .eq('is_active', true)
       .order('name', { ascending: true });

@@ -79,6 +79,7 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
               <div key={c.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
                 <span>{c.name}</span>
                 <div className="flex items-center gap-3">
+                  {c.is_system && <Badge variant="secondary" className="text-[10px]" title="Built-in category — auto-attached to order costs. Can't be renamed or deleted.">System</Badge>}
                   <Badge variant={kindBadge(c.kind)} className="text-[10px]">{humanizeLabel(c.kind)}</Badge>
                   <div className="flex items-center gap-1" title="Default sell margin % — auto-prices received goods in this category">
                     <input type="text" inputMode="decimal" defaultValue={c.margin_pct ?? ''} placeholder="Margin"
@@ -86,7 +87,9 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
                       onBlur={(e) => saveMargin(c.id, e.target.value)} />
                     <span className="text-[10px] text-muted-foreground">%</span>
                   </div>
-                  <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => remove(c.id)}><Trash2 className="h-3.5 w-3.5" /></button>
+                  {c.is_system
+                    ? <span className="w-3.5" aria-hidden />
+                    : <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => remove(c.id)}><Trash2 className="h-3.5 w-3.5" /></button>}
                 </div>
               </div>
             ))}
