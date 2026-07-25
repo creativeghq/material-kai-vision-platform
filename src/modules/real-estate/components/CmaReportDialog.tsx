@@ -140,7 +140,7 @@ function buildCmaHtml(r: CmaReport): string {
   </tr>`).join('');
   const suggestion = r.suggestion
     ? `<div class="hero"><div class="lbl">Suggested asking price</div><div class="big">${m(r.suggestion.estimate)}</div><div class="sub">range ${m(r.suggestion.low)} – ${m(r.suggestion.high)}</div></div>`
-    : `<div class="note">Not enough comparable listings to suggest a price.</div>`;
+    : '<div class="note">Not enough comparable listings to suggest a price.</div>';
   return `<!doctype html><html><head><meta charset="utf-8"><title>CMA — ${subjectTitle}</title>
   <style>
     *{box-sizing:border-box} body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;margin:0;padding:32px;max-width:800px}
