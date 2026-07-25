@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Badge } from '@/components/core/ui/badge';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -1134,7 +1133,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           <div className="space-y-4">
             {/* Status + actions sit ON TOP of the products (then the document + totals below). */}
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="capitalize">{order.order_type}</Badge>
+              <span className={`text-sm font-semibold capitalize ${order.order_type === 'sales' ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>{order.order_type}</span>
               <span className="text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[order.payment_status]}</span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <Label className="text-xs text-muted-foreground">Status</Label>
