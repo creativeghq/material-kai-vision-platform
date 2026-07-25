@@ -33,9 +33,13 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
+  /** Link the expense to an order (so it shows on that order) + seed the amount/description. Used by
+   *  the order's "Add expense" to turn a line cost into a real supplier bill in one step. */
+  orderId?: string;
+  prefill?: { amount?: number; description?: string };
 }
 
-export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, orderId, prefill }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
 
@@ -107,6 +111,14 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setBankAccountId((cur) => cur || accts.find((a) => a.is_default)?.bank_account_id || accts[0]?.bank_account_id || '');
     }).catch(() => setBankAccounts([]));
   }, [open, workspaceId]);
+
+  // Seed amount/description when opened from an order's "Add expense" (turning a line cost into a bill).
+  useEffect(() => {
+    if (!open || !prefill) return;
+    if (prefill.amount != null) { setSubtotalNet(String(prefill.amount)); setVatAmount('0'); }
+    if (prefill.description) setDescription(prefill.description);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, orderId]);
 
   // Load the picked payee's own bank accounts (for the Bank Payment "paid to their bank" selector).
   useEffect(() => {
@@ -201,6 +213,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         supplierCompanyId: cpCompanyId,
         supplierContactId: cpContactId,
         supplierName: adhocSupplierName,
+        orderId,
         currency,
         subtotalNet: parseDecimalOr(subtotalNet, 0),
         vatAmount: parseDecimalOr(vatAmount, 0),

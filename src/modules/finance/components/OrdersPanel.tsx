@@ -21,6 +21,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
+import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -841,6 +842,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   // the customer (money-in) or the picked supplier (money-out); optional.
   const [counterpartyBanks, setCounterpartyBanks] = useState<CrmBankAccount[]>([]);
   const [payCounterpartyBankId, setPayCounterpartyBankId] = useState<string>('');
+  // "Add expense" — turn the order's line cost (COGS) into a real supplier bill linked to the order.
+  const [expenseOpen, setExpenseOpen] = useState(false);
   // Running balance per account, so you can see what's in an account while choosing it.
   const [acctBalance, setAcctBalance] = useState<Map<string, number>>(new Map());
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -1291,6 +1294,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
   // myDATA finalises the exact document type at issue; this just labels the action correctly.
   const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
+  // Total cost of goods on the lines — offered as an "Add expense" (supplier bill) on a sales order.
+  const lineCostTotal = items.reduce((a, it) => a + (Number(it.unit_cost) || 0) * (Number(it.quantity) || 0), 0);
 
   return (
     <>
@@ -1334,6 +1339,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                       <DropdownMenuItem className="items-start" onClick={applyCredit}>
                         <Banknote className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
                         <span className="flex flex-col"><span>Pay from account credit</span><span className="text-[10px] text-muted-foreground">Use {formatMoney(creditToApply, order.currency)} of this customer’s existing credit.</span></span>
+                      </DropdownMenuItem>
+                    )}
+                    {/* Turn the line cost (what the goods cost YOU) into a real supplier bill/expense. */}
+                    {order.order_type === 'sales' && lineCostTotal > 0.005 && (
+                      <DropdownMenuItem className="items-start" onClick={() => setExpenseOpen(true)}>
+                        <Receipt className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
+                        <span className="flex flex-col"><span>Add expense (cost of goods)</span><span className="text-[10px] text-muted-foreground">Record the {formatMoney(lineCostTotal, order.currency)} line cost as a supplier bill — Payables &amp; P&amp;L.</span></span>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
@@ -1941,6 +1953,17 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         />
       )}
     </Dialog>
+    {/* Turn the order's cost of goods into a real supplier bill (expense), linked to this order. */}
+    {order && (
+      <NewExpenseDialog
+        workspaceId={order.workspace_id}
+        open={expenseOpen}
+        onOpenChange={setExpenseOpen}
+        orderId={order.id}
+        prefill={{ amount: Math.round(lineCostTotal * 100) / 100, description: `Cost of goods — order ${order.order_number ?? order.id.slice(0, 8)}` }}
+        onCreated={() => { setExpenseOpen(false); void load(order.id); onChanged(); }}
+      />
+    )}
     {connectEmailGate}
     </>
   );

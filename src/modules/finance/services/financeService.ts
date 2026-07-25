@@ -1364,6 +1364,8 @@ const _financeServiceCore = {
     paidAt?: string;
     /** The supplier's own bank (crm_bank_accounts) the money was paid to, on a Bank Payment. */
     counterpartyBankAccountId?: string | null;
+    /** Link this expense (the cost of goods) to the order it belongs to, so it shows on the order. */
+    orderId?: string | null;
   }): Promise<{ billId: string; paymentId: string | null }> {
     // A supplier bill needs a payee — a saved CRM supplier OR a one-off free-text name.
     if (!input.supplierCompanyId && !input.supplierContactId && !input.supplierName?.trim()) {
@@ -1388,6 +1390,7 @@ const _financeServiceCore = {
       dueAt: input.dueAt,
       notes: input.notes ?? input.description ?? undefined,
       categoryId: input.categoryId,
+      orderId: input.orderId ?? undefined,
     });
 
     let paymentId: string | null = null;
@@ -1405,6 +1408,7 @@ const _financeServiceCore = {
         reference: input.reference || null,
         notes: input.description ?? null,
         categoryId: input.categoryId,
+        orderId: input.orderId ?? null,
         bankAccountId: input.paidFromBankAccountId ?? null,
         counterpartyBankAccountId: input.paymentMethod === 'bank_transfer' ? (input.counterpartyBankAccountId ?? null) : null,
         allocations: [{ target_id: bill.id, target_type: 'supplier_bill', amount: total }],
