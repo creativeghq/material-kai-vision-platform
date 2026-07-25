@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, X } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
-import { Checkbox } from '@/components/core/ui/checkbox';
 import { Label } from '@/components/core/ui/label';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -17,10 +16,9 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
   formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel,
-  ACCOUNT_KIND_LABEL, ACCOUNT_KIND_ORDER,
+  type PaymentWithAllocation,
 } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
-import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { parseDecimal } from '@/utils/decimal';
@@ -32,6 +30,7 @@ import { MoneyInput } from '@/components/core/ui/money-input';
 import { TablePagination, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { FilterBar, type FilterGroupDef, type FilterValues } from '@/components/core/filters';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
+import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
@@ -820,40 +819,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const [items, setItems] = useState<OrderItem[]>([]);
   const [fin, setFin] = useState<Awaited<ReturnType<typeof ordersService.getOrderFinance>> | null>(null);
   const [saving, setSaving] = useState(false);
-  const [payOpen, setPayOpen] = useState(false);
-  // When set, the pay panel is editing an existing payment (update) rather than recording a new one.
-  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
-  const [payAmt, setPayAmt] = useState('');
-  // The order only deals in REAL cash: money in (a payment received) or money out (a payment sent).
-  const [payDir, setPayDir] = useState<'in' | 'out'>('in');
-  // Optional: issue the order's receipt/invoice in the same step as recording money in.
-  const [payIssueDoc, setPayIssueDoc] = useState(false);
-  // Money in carries a reason; money out is attached to a supplier (so it registers what we pay them).
-  const [payReason, setPayReason] = useState('');
-  // id === null → a one-off payee not saved in CRM (name-only); the payment stores counterparty_name.
-  const [paySupplier, setPaySupplier] = useState<{ id: string | null; name: string } | null>(null);
-  const [paySupplierSearch, setPaySupplierSearch] = useState('');
-  const [paySupplierOpts, setPaySupplierOpts] = useState<Array<{ id: string; name: string }>>([]);
-  // Which cash/bank account the money lands in (or leaves from) + how it moved. Without an account
-  // the payment floats unattached and never shows up in the /finance bank balances.
+  // Bank accounts — used to label a payment row with the account name it moved through.
   const [bankAccounts, setBankAccounts] = useState<Awaited<ReturnType<typeof financeService.listBankAccounts>>>([]);
-  const [payAccountId, setPayAccountId] = useState<string>('');
-  const [payMethod, setPayMethod] = useState<string>('cash');
-  // Payment date (Record-Payment parity) — defaults to today; editable per payment.
-  const [payDate, setPayDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  // The counterparty's OWN bank this money moved to/from (offered on a Bank Payment). Loaded from
-  // the customer (money-in) or the picked supplier (money-out); optional.
-  const [counterpartyBanks, setCounterpartyBanks] = useState<CrmBankAccount[]>([]);
-  const [payCounterpartyBankId, setPayCounterpartyBankId] = useState<string>('');
-  // "Add expense" / per-line "Mark as paid" — turn a line cost (COGS) into a real supplier bill
-  // linked to the order. `expensePrefill` seeds the dialog from the specific line (or the whole order).
+  // Recording money in/out now goes through the shared modals (RecordPaymentDialog / NewExpenseDialog),
+  // attached to the order. `expensePrefill` seeds the expense modal from a specific line or the order.
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
-  // "Record payment" (money in) now uses the standard Record Payment modal, attached to the order.
   const [recordPayOpen, setRecordPayOpen] = useState(false);
-  // Running balance per account, so you can see what's in an account while choosing it.
-  const [acctBalance, setAcctBalance] = useState<Map<string, number>>(new Map());
-  const [creatingAccount, setCreatingAccount] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
   // Catalog list prices for the order's products → summarised as a discount total below.
@@ -885,10 +857,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         financeService.listBankAccounts(res.order.workspace_id).catch(() => []),
         ordersService.listOrderPaymentAudit(id).catch(() => []),
       ]);
-      setAcctBalance(new Map(
-        (await financeService.getBankAccountBalances(res.order.workspace_id).catch(() => []))
-          .map((b) => [b.bank_account_id, Number(b.current_balance ?? 0)] as const),
-      ));
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
       setBankAccounts(accounts); setPayAudit(audit);
       setMatch(res.order.order_type === 'purchase'
@@ -904,7 +872,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setPayOpen(false); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setApplicableCredit(0); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setRecordPayOpen(false); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setApplicableCredit(0); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -966,16 +934,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   };
 
   // Record real cash ON the order: money in (a payment received) or money out (a payment sent).
-  // The payment trigger recomputes payment_status; getOrderFinance refreshes Received/Paid/Profit.
-  // Default to the workspace's default account (or the first), so the money lands somewhere real.
-  const defaultAccountId = () => (bankAccounts.find((a) => a.is_default) ?? bankAccounts[0])?.id ?? '';
-  // The payment method follows the account: a Cash account moved cash, a Card account a card, a
-  // Bank/online account a transfer (by default). So the operator picks WHERE the money lands and
-  // the HOW is inferred — the method picker only surfaces for accounts where it's genuinely
-  // ambiguous (bank/online/other can be transfer vs cheque vs card).
-  const METHOD_FOR_KIND: Record<string, string> = { cash: 'cash', card: 'card', bank: 'bank_transfer', online: 'bank_transfer', other: 'other' };
-  const accountKind = (id: string): string => bankAccounts.find((a) => a.id === id)?.kind ?? '';
-  const methodForAccount = (id: string): string => METHOD_FOR_KIND[accountKind(id)] ?? 'cash';
   // Per-line "Mark as paid" — record this line's cost as a real supplier bill + payment, linked to
   // the order. Pre-fills amount (line cost), payee (line supplier if set), and the order's category;
   // the dialog just needs the account (and confirmation).
@@ -1002,100 +960,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     setExpenseOpen(true);
   };
 
-  // No account yet → create a "Cash" account on the fly so the user is never blocked.
-  const createCashAccount = async () => {
-    if (!order) return;
-    setCreatingAccount(true);
-    try {
-      const acct = await financeService.createBankAccount({ workspaceId: order.workspace_id, name: 'Cash', kind: 'cash', currency: order.currency });
-      setBankAccounts((prev) => [...prev, acct]);
-      setPayAccountId(acct.id); setPayMethod('cash');
-    } catch (err: any) {
-      toast({ title: 'Could not create account', description: err?.message, variant: 'destructive' });
-    } finally { setCreatingAccount(false); }
-  };
-
-  // Supplier search for money-out (CRM companies flagged supplier).
-  useEffect(() => {
-    if (!payOpen || payDir !== 'out' || paySupplier) { return; }
-    const t = paySupplierSearch.trim();
-    if (t.length < 2) { setPaySupplierOpts([]); return; }
-    const h = setTimeout(async () => {
-      const { data } = await supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike('name', `%${t}%`).limit(8);
-      setPaySupplierOpts((data ?? []) as Array<{ id: string; name: string }>);
-    }, 200);
-    return () => clearTimeout(h);
-  }, [paySupplierSearch, payOpen, payDir, paySupplier]);
-
-  // Load the counterparty's own bank accounts so a Bank Payment can point to a specific one.
-  // Money-in → the order's customer; money-out → the picked supplier.
-  useEffect(() => {
-    if (!payOpen || !order) { setCounterpartyBanks([]); return; }
-    const parent = payDir === 'out'
-      ? (paySupplier?.id ? { companyId: paySupplier.id } : null)
-      : (order.customer_company_id ? { companyId: order.customer_company_id }
-        : order.customer_contact_id ? { contactId: order.customer_contact_id } : null);
-    if (!parent) { setCounterpartyBanks([]); return; }
-    let cancelled = false;
-    crmBankAccountsAPI.list(parent)
-      .then((banks) => { if (!cancelled) setCounterpartyBanks(banks); })
-      .catch(() => { if (!cancelled) setCounterpartyBanks([]); });
-    return () => { cancelled = true; };
-  }, [payOpen, payDir, paySupplier, order?.customer_company_id, order?.customer_contact_id, order?.id]);
-
-  const recordPay = async () => {
-    if (!order) return;
-    const amt = parseDecimal(payAmt);
-    if (amt == null || amt <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
-    if (!payReason.trim()) { toast({ title: 'Add a reason', description: 'Every cash movement needs a reason so the payment is traceable (e.g. pre-payment, deposit, balance).', variant: 'destructive' }); return; }
-    if (!payAccountId) { toast({ title: 'Pick an account', description: 'Choose which cash/bank account the money lands in (or leaves from) so it shows in your finance balances.', variant: 'destructive' }); return; }
-    if (payDir === 'out' && !paySupplier) { toast({ title: 'Pick the supplier', description: 'Money out is registered against a supplier so we track what we paid them.', variant: 'destructive' }); return; }
-    // Issue the order's receipt/invoice in the same step — works both when recording NEW money in
-    // and when editing an existing payment (as long as the order has no document yet). Whether it's
-    // a receipt (private contact) or an invoice (business) is driven by salesDocKind.
-    const alsoIssue = payIssueDoc && payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
-    setSaving(true);
-    try {
-      if (editingPaymentId) {
-        // Edit in place — keep the original paid_at, correct the fields, and keep any single
-        // invoice/bill allocation in sync (handled in the service).
-        await ordersService.updateOrderPayment({
-          paymentId: editingPaymentId, orderId: order.id,
-          direction: payDir, amount: amt, reference: payReason.trim(), method: payMethod || null,
-          bankAccountId: payAccountId,
-          counterpartyCompanyId: payDir === 'out' ? (paySupplier?.id ?? null) : (order.customer_company_id ?? null),
-          counterpartyContactId: payDir === 'in' ? (order.customer_contact_id ?? null) : null,
-          counterpartyName: payDir === 'out' && !paySupplier?.id ? (paySupplier?.name ?? null) : null,
-          counterpartyBankAccountId: payMethod === 'bank_transfer' ? (payCounterpartyBankId || null) : null,
-          paidAt: payDate ? new Date(payDate).toISOString() : undefined,
-        });
-      } else {
-        // Money in → settle the order's open invoice(s); money out → cash to the supplier
-        // (we don't auto-settle supplier bills, which may span multiple suppliers).
-        const targets = payDir === 'in'
-          ? (fin?.invoices ?? []).filter((iv) => Number(iv.amount_due) > 0).map((iv) => ({ id: iv.id, amount_due: Number(iv.amount_due), type: 'invoice' as const }))
-          : [];
-        await ordersService.recordOrderPayment({
-          order: { id: order.id, workspace_id: order.workspace_id, currency: order.currency, customer_company_id: order.customer_company_id, customer_contact_id: order.customer_contact_id },
-          direction: payDir, amount: amt, reference: payReason.trim(), method: payMethod || null,
-          bankAccountId: payAccountId, supplierCompanyId: paySupplier?.id ?? null,
-          supplierName: !paySupplier?.id ? (paySupplier?.name ?? null) : null, targets,
-          counterpartyBankAccountId: payMethod === 'bank_transfer' ? (payCounterpartyBankId || null) : null,
-          paidAt: payDate ? new Date(payDate).toISOString() : undefined,
-        });
-      }
-      const wasEdit = !!editingPaymentId;
-      setPayOpen(false); setPayAmt(''); setEditingPaymentId(null);
-      // Cash sale: issue the order's receipt/invoice from the same step, then open it to transmit.
-      if (alsoIssue) { await createInvoice(); return; }
-      await load(order.id);
-      onChanged();
-      toast({ title: wasEdit ? 'Saved' : (payDir === 'in' ? 'Payment recorded' : 'Expense recorded') });
-    } catch (err: any) {
-      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
-    } finally { setSaving(false); }
-  };
-
   // How much of this order is settled, per the #280 allocation ledger (NOT `fin.received`, which only
   // sees cash tagged with `payments.order_id` and misses credit re-homed from an on-account payment).
   // Sales settle from money-in allocations, purchases from money-out. This mirrors
@@ -1118,52 +982,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
       toast({ title: applied > 0 ? `Applied ${formatMoney(applied, order.currency)} from credit` : 'Nothing to apply' });
     } catch (err: any) {
       toast({ title: 'Failed to apply credit', description: err?.message, variant: 'destructive' });
-    } finally { setSaving(false); }
-  };
-
-  // Edit an existing payment: pre-fill the pay panel from the row and flip it into update mode.
-  const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_bank_account_id?: string | null; counterparty_name?: string | null; paid_at?: string }) => {
-    setEditingPaymentId(p.id);
-    setPayDir(p.direction);
-    setPayIssueDoc(false);
-    setPayAmt(String(p.amount));
-    setPayReason(p.reference ?? '');
-    setPayMethod(p.method || 'cash');
-    setPayDate(p.paid_at ? new Date(p.paid_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
-    setPayAccountId(p.bank_account_id ?? defaultAccountId());
-    setPayCounterpartyBankId(p.counterparty_bank_account_id ?? '');
-    setPaySupplierSearch(''); setPaySupplierOpts([]);
-    // Money out is attached to a supplier — restore the chip so the user sees who it pays.
-    if (p.direction === 'out' && p.counterparty_company_id) {
-      const name = supplierNames.get(p.counterparty_company_id);
-      if (name) { setPaySupplier({ id: p.counterparty_company_id, name }); }
-      else {
-        setPaySupplier({ id: p.counterparty_company_id, name: '…' });
-        const { data } = await supabase.from('crm_companies').select('name').eq('id', p.counterparty_company_id).maybeSingle();
-        if (data?.name) setPaySupplier({ id: p.counterparty_company_id, name: data.name });
-      }
-    } else if (p.direction === 'out' && p.counterparty_name) {
-      // One-off payee (not a CRM supplier) — restore as an id-less chip.
-      setPaySupplier({ id: null, name: p.counterparty_name });
-    } else {
-      setPaySupplier(null);
-    }
-    setPayOpen(true);
-  };
-
-  // Delete a payment off the order (reverses the cash). Trigger recomputes payment_status on delete.
-  const deletePay = async (p: { id: string; amount: number; currency: string; direction: 'in' | 'out' }) => {
-    if (!order) return;
-    if (!window.confirm(`Delete this ${p.direction === 'in' ? 'payment' : 'expense'} of ${formatMoney(Number(p.amount), p.currency)}? This removes the cash from the order and your finance balances.`)) return;
-    setSaving(true);
-    try {
-      await ordersService.deleteOrderPayment(p.id, order.id);
-      if (editingPaymentId === p.id) { setPayOpen(false); setEditingPaymentId(null); }
-      await load(order.id);
-      onChanged();
-      toast({ title: 'Payment deleted' });
-    } catch (err: any) {
-      toast({ title: 'Failed to delete', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -1304,8 +1122,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
   // myDATA finalises the exact document type at issue; this just labels the action correctly.
   const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
-  // Currency symbol for field labels (falls back to the ISO code for currencies we don't map).
-  const curSym = order ? (({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[order.currency] ?? order.currency) : '';
   // Total cost of goods on the lines — offered as an "Add expense" (supplier bill) on a sales order.
   const lineCostTotal = items.reduce((a, it) => a + (Number(it.unit_cost) || 0) * (Number(it.quantity) || 0), 0);
 
@@ -1622,149 +1438,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
               </div>
             )}
 
-            {payOpen && (
-              <div className="rounded-md border border-border/60 bg-muted/20 p-4 space-y-4">
-                {/* Header — what this panel does + close. */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold flex items-center gap-1.5">
-                    {payDir === 'in'
-                      ? <><ArrowDownLeft className="h-4 w-4 text-emerald-500" /> {editingPaymentId ? 'Edit payment' : 'Record payment'}</>
-                      : <><ArrowUpRight className="h-4 w-4 text-red-400" /> {editingPaymentId ? 'Edit expense' : 'Record expense'}</>}
-                  </span>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                    onClick={() => { setPayOpen(false); setEditingPaymentId(null); }} title="Cancel" aria-label="Cancel">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Labelled fields — one consistent grid, aligned, full-width inputs. */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Amount ({curSym})</Label>
-                    <Input className="h-9 w-full text-right" type="text" inputMode="decimal" placeholder="0.00" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">{payDir === 'in' ? 'Received into account' : 'Paid from account'}</Label>
-                    {bankAccounts.length > 0 ? (
-                      <Select value={payAccountId} onValueChange={(v) => { setPayAccountId(v); setPayMethod(methodForAccount(v)); }}>
-                        <SelectTrigger className="h-9 w-full"><SelectValue placeholder="Select an account" /></SelectTrigger>
-                        <SelectContent>{ACCOUNT_KIND_ORDER
-                          .map((k) => ({ kind: k, items: bankAccounts.filter((a) => a.kind === k) }))
-                          .filter((g) => g.items.length > 0)
-                          .map((g) => (
-                            <SelectGroup key={g.kind}>
-                              <SelectLabel>{ACCOUNT_KIND_LABEL[g.kind]}</SelectLabel>
-                              {g.items.map((a) => (
-                                <SelectItem key={a.id} value={a.id}>
-                                  <span className="flex w-full items-center justify-between gap-4">
-                                    <span>{a.name}{a.currency !== order.currency ? ` · ${a.currency}` : ''}</span>
-                                    {acctBalance.has(a.id) && (
-                                      <span className={`tabular-nums text-[11px] ${(acctBalance.get(a.id) ?? 0) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                                        {formatMoney(acctBalance.get(a.id) ?? 0, a.currency)}
-                                      </span>
-                                    )}
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          ))}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Button size="sm" variant="outline" className="h-9 w-full" onClick={createCashAccount} disabled={creatingAccount}>
-                        {creatingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Plus className="h-3.5 w-3.5 mr-1" /> Create cash account</>}
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Money out is attached to a payee — a saved CRM supplier, OR a one-off name for
-                      someone not in the platform (stored as a free-text counterparty on the payment). */}
-                  {payDir === 'out' && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Supplier / payee</Label>
-                      {paySupplier ? (
-                        <div className="flex h-9 items-center justify-between gap-1 rounded-md border border-border/60 px-3 text-sm">
-                          <span className="inline-flex items-center gap-1.5 min-w-0"><Building2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{paySupplier.name}</span>{paySupplier.id === null && <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">· one-off</span>}</span>
-                          <button type="button" className="text-muted-foreground hover:text-foreground shrink-0" onClick={() => setPaySupplier(null)} aria-label="Clear payee"><X className="h-3.5 w-3.5" /></button>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <Input className="h-9 w-full" value={paySupplierSearch} onChange={(e) => setPaySupplierSearch(e.target.value)} placeholder="Search a supplier, or type any payee name…" />
-                          {paySupplierSearch.trim().length >= 1 && (
-                            <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
-                              {paySupplierOpts.map((s) => (
-                                <button key={s.id} type="button" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setPaySupplier(s); setPaySupplierSearch(''); setPaySupplierOpts([]); }}>{s.name}</button>
-                              ))}
-                              {/* Pay a one-off payee not saved in CRM. */}
-                              <button type="button" className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-muted ${paySupplierOpts.length > 0 ? 'border-t border-border/40' : ''}`}
-                                onClick={() => { setPaySupplier({ id: null, name: paySupplierSearch.trim() }); setPaySupplierSearch(''); setPaySupplierOpts([]); }}>
-                                <span className="text-muted-foreground">Pay </span>“{paySupplierSearch.trim()}”<span className="ml-1 text-[10px] text-muted-foreground">· one-off, not in CRM</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <p className="text-[10px] text-muted-foreground">Pick a saved supplier, or type any name to pay someone not in your CRM.</p>
-                    </div>
-                  )}
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Reason</Label>
-                    <Input className="h-9 w-full" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'e.g. pre-payment, deposit' : 'e.g. deposit to supplier'} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Date</Label>
-                    <Input className="h-9 w-full" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-                  </div>
-
-                  {/* Bank Payment → which of the counterparty's OWN banks the money moved to/from
-                      (managed on their CRM record → Tax & VAT → Bank Accounts). Optional. */}
-                  {payMethod === 'bank_transfer' && counterpartyBanks.length > 0 && (
-                    <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs text-muted-foreground">{payDir === 'in' ? 'Received to their bank' : 'Paid to their bank'} <span className="text-muted-foreground/70">(optional)</span></Label>
-                      <Select value={payCounterpartyBankId || '__none__'} onValueChange={(v) => setPayCounterpartyBankId(v === '__none__' ? '' : v)}>
-                        <SelectTrigger className="h-9 w-full"><SelectValue placeholder="Their bank…" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— Not specified —</SelectItem>
-                          {counterpartyBanks.map((b) => (
-                            <SelectItem key={b.id} value={b.id}>
-                              {b.bank_name}{b.iban ? ` · ${b.iban.slice(0, 8)}…` : ''}{b.is_primary ? ' (primary)' : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-
-                {/* Cash sale: record the money AND issue the order's receipt/invoice in one step. */}
-                {payDir === 'in' && order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
-                  <label className="flex items-start gap-2 text-xs cursor-pointer">
-                    <Checkbox className="mt-0.5" checked={payIssueDoc} onCheckedChange={(v) => setPayIssueDoc(v === true)} />
-                    <span>
-                      {editingPaymentId ? 'Issue' : 'Also issue'} a {salesDocKind === 'receipt' ? 'receipt' : 'invoice'} for this order (opens it to review &amp; transmit)
-                      <span className="text-muted-foreground"> — {order.customer_company_id ? 'business → invoice' : 'private → receipt'}</span>
-                    </span>
-                  </label>
-                )}
-
-                <p className="text-[11px] text-muted-foreground">
-                  {payIssueDoc
-                    ? `${editingPaymentId ? 'Updates the payment' : 'Records the cash'} and creates the ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} draft — review & transmit it next.`
-                    : <>Just the cash movement — no document. Tick the box above, or use Actions → {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}, to issue one.</>}
-                </p>
-
-                {/* Footer actions — clearly separated from the fields. */}
-                <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3">
-                  <Button variant="outline" size="sm" className="h-9" onClick={() => { setPayOpen(false); setEditingPaymentId(null); }} disabled={saving}>Cancel</Button>
-                  <Button size="sm" className="h-9" onClick={recordPay} disabled={saving}>
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingPaymentId ? 'Update payment' : 'Save payment')}
-                  </Button>
-                </div>
-              </div>
-            )}
-
             {/* Realised cash on the order — money actually received minus money actually paid out.
                 (Distinct from the order's Profit-margin above, which is revenue − cost on the lines.) */}
             {fin && (
@@ -1888,7 +1561,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                   // Who the cash moved between: money-in came FROM the customer, money-out went TO the supplier.
                   const who = p.counterparty_name;
                   return (
-                  <div key={p.id} className={`flex items-start justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0 ${editingPaymentId === p.id ? 'bg-muted/30' : ''}`}>
+                  <div key={p.id} className="flex items-start justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                     <span className="min-w-0">
                       <span className="block truncate">
                         {p.reference || <span className="text-muted-foreground italic">No reason</span>}
@@ -1903,8 +1576,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                       {/* Payment receipt (απόδειξη είσπραξης) — proof of money received, NOT a tax doc,
                           never sent to myDATA. Email it / copy a link / download the PDF. */}
                       <PaymentReceiptActions paymentId={p.id} direction={p.direction} className="border-r border-border/40 pr-1.5 mr-0.5" />
-                      <button type="button" title="Edit payment" className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={saving} onClick={() => void editPay(p)}><Pencil className="h-3.5 w-3.5" /></button>
-                      <button type="button" title="Delete payment" className="text-muted-foreground hover:text-destructive disabled:opacity-40" disabled={saving} onClick={() => void deletePay(p)}><Trash2 className="h-3.5 w-3.5" /></button>
+                      {/* Edit (modal) + Greek-law-correct delete/return — the SAME component used on the
+                          party payments list, so editing a payment looks identical everywhere. */}
+                      <PaymentRowActions
+                        payment={{ ...p, workspace_id: order.workspace_id, allocations: [] } as unknown as PaymentWithAllocation}
+                        workspaceId={order.workspace_id}
+                        onChanged={() => { void load(order.id); onChanged(); }}
+                      />
                     </span>
                   </div>
                   );
@@ -1997,6 +1675,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         initialCounterparty={{ companyId: order.customer_company_id, contactId: order.customer_contact_id }}
         defaultAmount={outstanding > 0.005 ? outstanding : undefined}
         presetInvoiceId={(fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id}
+        issueDocLabel={(fin?.invoices.length ?? 0) === 0 ? `Also issue a ${salesDocKind} for this order` : undefined}
+        onIssueDoc={createInvoice}
         onSaved={() => { setRecordPayOpen(false); void load(order.id); onChanged(); }}
       />
     )}

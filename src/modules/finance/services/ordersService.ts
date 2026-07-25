@@ -488,7 +488,7 @@ export const ordersService = {
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
     supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
-    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null }>;
+    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null }>;
     received: number;
     paid_out: number;
     profit: number;
@@ -505,10 +505,10 @@ export const ordersService = {
     const [inv, bills, pay, alloc] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
-      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, bank_account_id, counterparty_company_id, counterparty_contact_id, counterparty_bank_account_id, counterparty_name').eq('order_id', orderId).order('paid_at', { ascending: false }),
+      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, notes, bank_account_id, counterparty_company_id, counterparty_contact_id, counterparty_bank_account_id, counterparty_name').eq('order_id', orderId).order('paid_at', { ascending: false }),
       supabase.from('payment_allocations').select('id, amount, payment_id, payments!inner(direction, order_id, currency, paid_at, counterparty_company_id, counterparty_contact_id)').eq('order_id', orderId),
     ]);
-    const rawPayments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null }>;
+    const rawPayments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null }>;
     type AllocRow = { id: string; amount: number; payment_id: string; payments: { direction: 'in' | 'out'; order_id: string | null; currency: string; paid_at: string; counterparty_company_id: string | null; counterparty_contact_id: string | null } | null };
     const allocRows = (alloc.data ?? []) as unknown as AllocRow[];
     // Credit rows = allocations whose source payment is tagged to a DIFFERENT order (or none) — i.e.

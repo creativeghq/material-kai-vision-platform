@@ -45,7 +45,11 @@ export const RecordPaymentDialog: React.FC<{
   orderId?: string;
   defaultAmount?: number;
   presetInvoiceId?: string;
-}> = ({ workspaceId, open, onOpenChange, onSaved, preset, initialCounterparty, orderId, defaultAmount, presetInvoiceId }) => {
+  /** When set (order-attached, received, no invoice yet), offers a checkbox to also issue the order's
+   *  receipt/invoice in the same step. `onIssueDoc` runs after the payment is recorded. */
+  issueDocLabel?: string;
+  onIssueDoc?: () => Promise<void>;
+}> = ({ workspaceId, open, onOpenChange, onSaved, preset, initialCounterparty, orderId, defaultAmount, presetInvoiceId, issueDocLabel, onIssueDoc }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -59,6 +63,7 @@ export const RecordPaymentDialog: React.FC<{
   const [targetInvoiceId, setTargetInvoiceId] = useState<string>(''); // received allocation target
   const [issueCreditNote, setIssueCreditNote] = useState(true);
   const [sendReceipt, setSendReceipt] = useState(true);
+  const [issueDoc, setIssueDoc] = useState(false);  // order-attached: also create the receipt/invoice
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
@@ -75,6 +80,7 @@ export const RecordPaymentDialog: React.FC<{
     setInvoiceId(preset?.direction === 'refund' ? preset.targetId : '');
     setIssueCreditNote(true);
     setSendReceipt(true);
+    setIssueDoc(false);
     (async () => {
       const [cats, invs, banks] = await Promise.all([
         financeCategoriesService.list(workspaceId).catch(() => []),
@@ -175,6 +181,9 @@ export const RecordPaymentDialog: React.FC<{
         orderId: orderId ?? null,
         sendReceipt: kind === 'received' ? sendReceipt : false,
       });
+      // Order-attached: also create the order's receipt/invoice when asked (best-effort — the
+      // payment is already recorded; a doc-issue hiccup shouldn't roll it back).
+      if (issueDoc && onIssueDoc) { try { await onIssueDoc(); } catch { /* issue separately from Actions */ } }
       if (creditNoteFiscalError) {
         // Cash-out logged + credit note created, but myDATA transmission failed —
         // don't pretend it's filed. Operator must retransmit from the credit-note list.
@@ -239,6 +248,14 @@ export const RecordPaymentDialog: React.FC<{
             <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
               <span className="text-xs">Send receipt to customer <span className="text-muted-foreground">— emails the payment receipt &amp; notifies them. Off = record it silently.</span></span>
               <Switch checked={sendReceipt} onCheckedChange={setSendReceipt} />
+            </label>
+          )}
+
+          {/* Order-attached only: record the payment AND create the order's receipt/invoice in one step. */}
+          {kind === 'received' && issueDocLabel && (
+            <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
+              <span className="text-xs">{issueDocLabel}</span>
+              <Switch checked={issueDoc} onCheckedChange={setIssueDoc} />
             </label>
           )}
 
