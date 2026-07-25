@@ -85,6 +85,8 @@ interface ParsedAddress {
   street_number: string | null;
   postal_code: string | null;
   city: string | null;
+  /** State / province where the local address convention carries one (e.g. IT province code). NULL otherwise. */
+  state: string | null;
 }
 
 /**
@@ -120,15 +122,23 @@ function parseEuAddress(country: string, raw: string | null | undefined): Parsed
 
   if (!match) {
     // Fall back: dump the raw string into street, leave the rest blank
-    return { street: text, street_number: null, postal_code: null, city: null };
+    return { street: text, street_number: null, postal_code: null, city: null, state: null };
   }
 
   const postalCode = match[1].replace(/\s+/g, ' ').trim();
   const beforePostal = text.slice(0, match.index!).trim().replace(/[,\s-]+$/, '');
   const afterPostal = text.slice(match.index! + match[0].length).trim().replace(/^[,\s-]+/, '');
 
-  // City is everything after the postal code, stripped of trailing province codes (IT) etc.
-  const city = afterPostal || null;
+  // City is everything after the postal code. Some countries append a province/state
+  // code to the city line (Italy: "20121 MILANO MI") — peel it off into `state`.
+  let city = afterPostal || null;
+  let state: string | null = null;
+  // Countries that suffix a 2-letter province code after the city.
+  const provinceSuffixCountries = new Set(['IT']);
+  if (city && provinceSuffixCountries.has(country)) {
+    const pm = city.match(/^(.+?)[,\s]+\(?([A-Z]{2})\)?$/);
+    if (pm) { city = pm[1].trim() || null; state = pm[2]; }
+  }
 
   // Try to peel a house number off the street block
   let street = beforePostal || null;
@@ -149,6 +159,7 @@ function parseEuAddress(country: string, raw: string | null | undefined): Parsed
     street_number: streetNumber,
     postal_code: postalCode,
     city,
+    state,
   };
 }
 

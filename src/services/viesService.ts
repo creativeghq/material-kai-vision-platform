@@ -5,6 +5,8 @@ export interface ViesParsedAddress {
   street_number: string | null;
   postal_code: string | null;
   city: string | null;
+  /** State / province where the local address convention carries one (e.g. IT province code). NULL otherwise. */
+  state: string | null;
 }
 
 export interface ViesValidationResult {

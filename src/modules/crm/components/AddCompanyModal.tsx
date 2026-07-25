@@ -14,6 +14,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { validateVatViaVies } from '@/services/viesService';
+import { enrichCompany } from '@/services/companyEnrichService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -89,6 +90,8 @@ export const AddCompanyModal: React.FC<{
   const [countryCode, setCountryCode] = useState('EL');
   const [vatNumber, setVatNumber] = useState('');
   const [busy, setBusy] = useState(false);
+  // Sub-phase label shown while the lookup button is busy (e.g. "Finding business info…").
+  const [statusLine, setStatusLine] = useState<string | null>(null);
   // Prefill accumulated from a VAT lookup (carried into the create form).
   const [prefill, setPrefill] = useState<Record<string, any>>({});
   const [verified, setVerified] = useState<null | { name: string | null; address: string | null; source: 'aade' | 'vies' }>(null);
@@ -112,7 +115,55 @@ export const AddCompanyModal: React.FC<{
 
   const reset = () => {
     setStep('role'); setRole(null); setName(''); setCountryCode('EL'); setVatNumber('');
-    setBusy(false); setPrefill({}); setVerified(null);
+    setBusy(false); setStatusLine(null); setPrefill({}); setVerified(null);
+  };
+
+  /**
+   * Auto-enrichment after a successful VAT lookup — fills the *soft* identity a VAT
+   * registry never carries (website, socials, phone, email, description, industry).
+   * Best-effort: only fills prefill slots that are still empty, and never throws, so a
+   * failed enrichment can't undo the VIES/ΑΑΔΕ result the user just got.
+   */
+  const runEnrichment = async (companyName: string, countryName: string | null, vat: string) => {
+    if (!companyName) return;
+    setStatusLine('Finding business info…');
+    try {
+      const res = await enrichCompany({
+        name: companyName,
+        countryName: countryName ?? undefined,
+        vatNumber: vat || undefined,
+        workspaceId: activeWorkspaceId ?? undefined,
+      });
+      if (res.ok && res.fields) {
+        const f = res.fields;
+        setPrefill((p) => ({
+          ...p,
+          website: p.website || f.website || null,
+          email: p.email || f.email || null,
+          phone: p.phone || f.phone || null,
+          linkedin: p.linkedin || f.linkedin || null,
+          facebook: p.facebook || f.facebook || null,
+          twitter: p.twitter || f.twitter || null,
+          description: p.description || f.description || null,
+          industry: p.industry || f.industry || null,
+          employee_count: p.employee_count || f.employee_count || null,
+          city: p.city || f.city || null,
+          state: p.state || f.state || null,
+          country: p.country || f.country || null,
+        }));
+        const filled = [
+          f.website && 'website',
+          f.phone && 'phone',
+          f.email && 'email',
+          (f.linkedin || f.facebook || f.twitter) && 'socials',
+        ].filter(Boolean);
+        if (filled.length) {
+          toast({ title: 'Business info found', description: `Added ${filled.join(', ')}. Review on the next screen.` });
+        }
+      }
+    } finally {
+      setStatusLine(null);
+    }
   };
 
   const close = (next: boolean) => { if (!next) reset(); onOpenChange(next); };
@@ -143,6 +194,7 @@ export const AddCompanyModal: React.FC<{
           if (pf.name) setName(pf.name);
           setVerified({ name: pf.vat_validated_name ?? pf.name, address: pf.vat_validated_address, source: 'aade' });
           toast({ title: 'ΑΑΔΕ data fetched', description: pf.name ? `Imported ${pf.name}.` : 'Business details imported.' });
+          await runEnrichment(pf.name || name, 'Greece', vat);
         }
         return;
       }
@@ -155,11 +207,14 @@ export const AddCompanyModal: React.FC<{
       if (res.valid === true) {
         const adr = res.address_parsed;
         const legal = res.legal_name ?? res.name ?? null;
+        const countryName = VAT_COUNTRY_OPTIONS.find((o) => o.code === cc)?.name ?? null;
         setPrefill((p) => ({
           ...p,
           name: legal ?? p.name ?? '',
           vat_number: vat,
           country_code: cc,
+          country: countryName ?? p.country ?? null,
+          state: adr?.state ?? p.state ?? null,
           address: res.address ?? null,
           street: adr?.street ?? null,
           street_number: adr?.street_number ?? null,
@@ -174,6 +229,7 @@ export const AddCompanyModal: React.FC<{
         if (legal) setName(legal);
         setVerified({ name: legal, address: res.address ?? null, source: 'vies' });
         toast({ title: 'VAT verified', description: legal ? `Registered as ${legal}` : 'Number is valid.' });
+        await runEnrichment(legal || name, countryName, vat);
       } else if (res.valid === false) {
         toast({ title: 'VAT not recognised', description: 'VIES does not recognise this number for the given country.', variant: 'destructive' });
       } else {
@@ -278,6 +334,11 @@ export const AddCompanyModal: React.FC<{
                     <span className="ml-1">{countryCode === 'EL' ? 'ΑΑΔΕ' : 'VIES'}</span>
                   </Button>
                 </div>
+                {statusLine && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> {statusLine}
+                  </div>
+                )}
                 {verified && (
                   <div className="rounded-md border border-emerald-500/30 bg-emerald-500/[0.06] p-2 text-xs flex items-start gap-2">
                     <Check className="h-3.5 w-3.5 text-emerald-400 mt-0.5 shrink-0" />
